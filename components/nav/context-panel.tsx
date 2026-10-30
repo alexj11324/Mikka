@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { LetterAvatar } from './letter-avatar'
 import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
-import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
+import { BotAvatar, COORDINATOR_AVATAR } from './bot-avatar'
 import { GroupHeader } from './group-header'
 import { ThreadList } from './thread-list'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
@@ -126,7 +126,7 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
       <TabsContent value="overview" className="flex min-h-0 flex-col">
         <Tabs value={shown} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
           <div className="flex shrink-0 flex-col items-center gap-3 px-4 pt-9 pb-4">
-            {coordinator ? <CoordinatorAvatar size="profile" /> : conversation.kind === 'bot' ? <BotAvatar color={conversation.color} shape={conversation.shape} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
+            {coordinator || conversation.kind === 'bot' ? <BotAvatar {...(coordinator ? COORDINATOR_AVATAR : { color: conversation.color, shape: conversation.shape })} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
             <h2 className="max-w-full truncate text-xl font-semibold">{conversation.name}</h2>
             <TabsList aria-label={t('tabs')} className="mt-2 gap-1 bg-transparent p-0">
               {tabs.map(item => <TabsTrigger key={item} value={item} className={pill}>{t(item)}</TabsTrigger>)}

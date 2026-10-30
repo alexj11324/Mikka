@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, registerExtraShapes, type BotColor, type BotShape } from '@/lib/bot-shapes'
 import { cn } from '@/lib/utils'
 
@@ -21,10 +21,50 @@ export function colorFor(name: string): BotColor {
   return BOT_COLORS[Math.abs(hash) % (BOT_COLORS.length - 1)]
 }
 
-/** The Coordinator is a bot like any other (Figma 202:4518): the default ink circle, no badge. */
+/** The Coordinator's look (Figma 202:4518): the default ink circle, no badge. */
+export const COORDINATOR_AVATAR = { color: 'encre', shape: 'cercle' } as const
+
+/**
+ * The Coordinator is a bot like any other. Where the same slot can show the
+ * Coordinator or a bot, render `BotAvatar` with `COORDINATOR_AVATAR` instead,
+ * so switching keeps one mounted blob that morphs.
+ */
 export function CoordinatorAvatar({ size = 'list', mood }: { size?: keyof typeof SIZES; mood?: BotMood }) {
-  return <BotAvatar color="encre" shape="cercle" size={size} mood={mood} />
+  return <BotAvatar {...COORDINATOR_AVATAR} size={size} mood={mood} />
 }
+
+type Runtime = [typeof import('@norbert_bodziony/bloub'), typeof import('@solidjs/web'), typeof import('solid-js')]
+let runtime: Runtime | null = null
+let loading: Promise<Runtime> | null = null
+/** bloub and Solid load once per page and stay cached, so a remount draws its first frame at once. */
+function loadRuntime(): Promise<Runtime> {
+  loading ??= Promise.all([import('@norbert_bodziony/bloub'), import('@solidjs/web'), import('solid-js')]).then(loaded => {
+    registerExtraShapes(loaded[0].SHAPE_BY_ID as unknown as Map<string, { id: string; radii: number[] }>)
+    runtime = loaded
+    return loaded
+  })
+  return loading
+}
+if (typeof window !== 'undefined') void loadRuntime()
+
+/**
+ * Idle plays a montage instead of one long idle block: rest (bloub blinks on
+ * its own), a wink, rest, a wide-eyed glance. Other moods hold their state.
+ */
+function cycleFor(bloub: Runtime[0], mood: BotMood) {
+  if (mood !== 'idle') return [{ state: mood, duration: 12 }]
+  return ([['idle', 6], ['wink', 1.6], ['idle', 5], ['wide', 2.2]] as const).map(([state, seconds]) => ({ state, duration: bloub.clampDuration(state, seconds) }))
+}
+
+/** A steady start point per bot plus the page clock, so a remounted avatar continues where it was instead of restarting. */
+function phaseFor(seed: string, length: number): number {
+  let hash = 0
+  for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) | 0
+  const offset = (Math.abs(hash) % 1000) / 1000 * length
+  return (offset + performance.now() / 1000) % length
+}
+
+const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** Visible blob sizes. bloub's svg is 1.58× the blob, so it overflows its box on purpose. */
 const SIZES = { row: 16, pill: 22, search: 28, list: 34, cell: 40, profile: 72, hero: 144 } as const
@@ -55,24 +95,33 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
   const latest = useRef(current)
   latest.current = current
 
-  useEffect(() => {
+  const seed = `${tone}:${form}`
+  const latestSeed = useRef(seed)
+  latestSeed.current = seed
+
+  useLayoutEffect(() => {
     const node = host.current
     if (!node) return
     let alive = true
-    void Promise.all([import('@norbert_bodziony/bloub'), import('@solidjs/web'), import('solid-js')]).then(([{ BloubBot, SHAPE_BY_ID }, { render, createComponent }, { createSignal }]) => {
+    const frozen = still || reducedMotion()
+    const mount = ([bloub, { render, createComponent }, { createSignal }]: Runtime) => {
       if (!alive) return
-      registerExtraShapes(SHAPE_BY_ID as unknown as Map<string, { id: string; radii: number[] }>)
-      const [state, setState] = createSignal(latest.current())
-      const dispose = render(() => createComponent(BloubBot, {
-        size: Math.round(px * SVG_SCALE), paper: 'transparent', ariaLabel: label ?? '', fps: 30, initialPhase: Math.random() * 12,
-        ...(still ? { frozenAt: 0 } : {}),
+      const first = latest.current()
+      const [state, setState] = createSignal(first)
+      const cycle = cycleFor(bloub, first.mood)
+      const length = cycle.reduce((sum, block) => sum + block.duration, 0)
+      const dispose = render(() => createComponent(bloub.BloubBot, {
+        size: Math.round(px * SVG_SCALE), paper: 'transparent', ariaLabel: label ?? '', fps: 30,
+        ...(frozen ? { frozenAt: 0 } : { initialPhase: phaseFor(latestSeed.current, length) }),
         get color() { return state().color },
         get shape() { return state().shape },
-        get cycle() { return [{ state: state().mood, duration: 12 }] },
-        get follow() { return !still && state().mood === 'idle' },
+        get cycle() { return cycleFor(bloub, state().mood) },
+        get follow() { return !frozen && state().mood === 'idle' },
       }), node)
       live.current = { set: next => setState(() => next), dispose }
-    })
+    }
+    if (runtime) mount(runtime)
+    else void loadRuntime().then(mount)
     // Ink flips to cream when the theme changes.
     const watch = new MutationObserver(() => live.current?.set(latest.current()))
     watch.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })

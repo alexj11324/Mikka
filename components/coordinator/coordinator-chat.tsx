@@ -6,7 +6,7 @@ import { withBasePath } from '@/lib/base-path'
 import { useTranslations } from 'next-intl'
 import { getCoordinatorChat, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
-import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
+import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
 import { useActionError } from '@/lib/use-action-error'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -61,7 +61,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const tNav = useTranslations('Nav')
   const botId = bot?.id ?? null
   const name = bot?.name ?? t('label')
-  const avatar = (size: 'pill' | 'profile', mood?: 'thinking') => bot ? <BotAvatar color={bot.color} shape={bot.shape} size={size} mood={mood} /> : <CoordinatorAvatar size={size} mood={mood} />
+  const avatar = (size: 'pill' | 'profile', mood?: 'thinking') => <BotAvatar {...(bot ? { color: bot.color, shape: bot.shape } : COORDINATOR_AVATAR)} size={size} mood={mood} />
   const [viewing, setViewing] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
