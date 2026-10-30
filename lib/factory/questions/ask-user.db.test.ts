@@ -63,12 +63,12 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     const get = (userId: string | null, query = "") =>
       handleFactoryQuestionList(questions, { actor: userId ? { userId } : null, authorization: null, method: "GET", url: `https://mikka.test/api/factory/questions${query}` });
 
-    // Whole-database fingerprint: every public table's rows plus the sequences, so a GET that writes anywhere is caught.
+    // Whole-database fingerprint: every public table's rows (with xmin, so no-op writes like SET status=status are caught) plus the sequences, so a GET that writes anywhere is caught.
     const dbHash = async () => {
       const { rows: tables } = await pool.query<{ t: string }>("SELECT quote_ident(tablename) AS t FROM pg_tables WHERE schemaname='public' ORDER BY 1");
       const parts: string[] = [];
       for (const { t } of tables)
-        parts.push(t + ":" + (await pool.query(`SELECT count(*)::text||':'||coalesce(md5(string_agg(x::text, '|' ORDER BY x::text)),'') AS h FROM ${t} x`)).rows[0].h);
+        parts.push(t + ":" + (await pool.query(`SELECT count(*)::text||':'||coalesce(md5(string_agg(x.xmin::text||':'||x::text, '|' ORDER BY x::text)),'') AS h FROM ${t} x`)).rows[0].h);
       const { rows: seqs } = await pool.query<{ s: string }>("SELECT quote_ident(sequencename) AS s FROM pg_sequences WHERE schemaname='public' ORDER BY 1");
       for (const { s: q } of seqs) parts.push(q + ":" + (await pool.query(`SELECT last_value::text||is_called::text AS v FROM ${q}`)).rows[0].v);
       return parts.join("\n");
@@ -239,6 +239,8 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
         assert.equal((await within(get("owner", `?taskId=${b.taskId}`), "GET route")).status, 200);
         // Task-detail GET (store.read) is a no-lock read too.
         assert.equal((await within(store.read("owner", b.taskId), "task-detail read")).task.id, b.taskId);
+        const issueId = (await pool.query<{ issueId: string }>('SELECT "issueId" FROM factory_tasks WHERE id=$1', [b.taskId])).rows[0].issueId;
+        assert.ok((await within(store.listForIssue("owner", issueId), "listForIssue")).tasks.some((x) => x.id === b.taskId));
         // Control: a real write path (dispatch -> lockForDispatch, FOR UPDATE on the task) does wait.
         const snap = await store.read("owner", b.taskId);
         const write = dispatch("owner", { binding: factoryBinding(snap.task), agentId: fixture.owner.agentId, deviceRepoId: fixture.owner.repoId }).then(() => "done", () => "done");
