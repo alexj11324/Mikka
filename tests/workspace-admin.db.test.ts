@@ -235,11 +235,17 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
   // guarantee (saves on one workspace run one after the other); the expectedVersion CAS is the second
   // layer for a stale version across sessions. The mutants below are copies of the real modules with
   // one guard removed, written next to the originals and deleted afterwards, so this is re-runnable.
-  const { readFile, writeFile, rm } = await import('node:fs/promises')
-  const { resolve } = await import('node:path')
+  const { mkdtemp, readFile, rm, symlink, writeFile } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join, resolve } = await import('node:path')
   const { pathToFileURL } = await import('node:url')
-  const mutantFiles: string[] = []
-  t.after(async () => { await Promise.all(mutantFiles.map(file => rm(file, { force: true }))) })
+  // Mutants live under os.tmpdir(), never in the source tree. '@/' imports point back at the real
+  // modules (same instances, same pools); bare packages resolve through a node_modules symlink.
+  const root = resolve('.')
+  const mutantDir = await mkdtemp(join(tmpdir(), 'be15-mutant-'))
+  await symlink(join(root, 'node_modules'), join(mutantDir, 'node_modules'), 'dir')
+  await writeFile(join(mutantDir, 'package.json'), '{"type":"module"}\n') // ESM like the repo, so the server-only loader hook applies
+  t.after(async () => { await rm(mutantDir, { recursive: true, force: true }) })
   const LOCK_ANCHOR = ".for('update').limit(1)\n  if (!row || (admin"
   const CAS_ANCHOR = `    const match = expectedVersion === undefined
       ? eq(workspaceSettings.workspaceId, workspaceId)
@@ -252,26 +258,26 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     if (!source.includes(anchor)) throw new Error(`BE-15 mutant ${label}: anchor not found in the real module; update the mutant`)
     return source.replace(anchor, replacement)
   }
+  const realImports = (source: string) => source.replaceAll("from '@/", `from '${root}/`)
   const botsMutant = async (guards: { lock: boolean; cas: boolean }): Promise<typeof botAdmin> => {
     const id = randomUUID().slice(0, 8)
-    let bots = await readFile('lib/workspace-admin/bots.ts', 'utf8')
+    let bots = realImports(await readFile('lib/workspace-admin/bots.ts', 'utf8'))
     if (!guards.lock) {
       const access = mutate(await readFile('lib/workspace-access.ts', 'utf8'), LOCK_ANCHOR, ".limit(1)\n  if (!row || (admin", 'no-lock')
-      const accessFile = resolve(`lib/.be15-mutant-access-${id}.ts`)
-      mutantFiles.push(accessFile)
-      await writeFile(accessFile, access)
-      bots = mutate(bots, "from '@/lib/workspace-access'", `from '../.be15-mutant-access-${id}'`, 'no-lock')
+      await writeFile(join(mutantDir, `access-${id}.ts`), realImports(access))
+      bots = mutate(bots, `from '${root}/lib/workspace-access'`, `from './access-${id}'`, 'no-lock')
     }
     if (!guards.cas) bots = mutate(bots, CAS_ANCHOR, CAS_MUTANT, 'no-cas')
-    const botsFile = resolve(`lib/workspace-admin/.be15-mutant-bots-${id}.ts`)
-    mutantFiles.push(botsFile)
+    const botsFile = join(mutantDir, `bots-${id}.ts`)
     await writeFile(botsFile, bots)
     return await import(pathToFileURL(botsFile).href) as typeof botAdmin
   }
-  type Waiter = { pid: number; query: string }
-  const lockWaiters = async (): Promise<Waiter[]> => (await pool.query<Waiter>(
-    `select pid, query from pg_stat_activity
-     where datname = current_database() and wait_event_type = 'Lock' and pid <> pg_backend_pid()`)).rows
+  // Backends that hold a lock on `table` and are themselves waiting on a lock (pg_locks, not query text).
+  const waitersOn = async (table: string): Promise<number[]> => (await pool.query<{ pid: number }>(
+    `select distinct l.pid from pg_locks l join pg_stat_activity a on a.pid = l.pid
+     where l.relation = $1::regclass and l.granted and a.datname = current_database() and l.pid <> pg_backend_pid()
+       and cardinality(pg_blocking_pids(l.pid)) > 0
+       and exists (select 1 from pg_locks w where w.pid = l.pid and not w.granted)`, [table])).rows.map(row => row.pid)
   const waitUntil = async <T>(probe: () => Promise<T | undefined>, what: string): Promise<T> => {
     for (const deadline = Date.now() + 10_000; Date.now() < deadline; await new Promise(r => setTimeout(r, 20))) {
       const hit = await probe()
@@ -279,10 +285,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     }
     throw new Error(`timed out waiting for ${what}`)
   }
-  // pg_stat_activity truncates long queries, so match on the leading text. Only a locking read waits on a lock.
-  const waitsOnWorkspaceRow = (w: Waiter) => /^select\b[\s\S]*"mikka_workspaces"/i.test(w.query)
-  // The second writer queues behind the first on the tuple lock, so count writers, not the holder's direct waiters.
-  const settingsWriters = (waiters: Waiter[]) => waiters.filter(w => /^update "workspace_settings"/i.test(w.query)).length
+  const settingsWriters = async () => (await waitersOn('workspace_settings')).length
   const conflictCode = (r: PromiseSettledResult<unknown>) => r.status === 'rejected' ? (r.reason as { code?: string }).code : 'ok'
   // A workspace whose settings row exists at version 1.
   const seedDefaults = async () => {
@@ -307,7 +310,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     try {
       saves = [mod.saveBotDefaults(admin, ws, { defaultModel: 'codex', expectedVersion: 1 }), mod.saveBotDefaults(admin, ws, { defaultModel: 'mikka', expectedVersion: 1 })]
       saves.forEach(save => save.catch(() => undefined))
-      await waitUntil(async () => settingsWriters(await lockWaiters()) >= 2 || undefined, 'both saves to wait at the UPDATE')
+      await waitUntil(async () => await settingsWriters() >= 2 || undefined, 'both saves to wait at the UPDATE')
     } finally { await held.release() }
     const results = await Promise.allSettled(saves)
     return { codes: results.map(conflictCode).sort(), version: (await mod.botDefaultOptions(ws)).version }
@@ -332,14 +335,14 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     try {
       const first = mod.saveBotDefaults(admin, ws, { defaultModel: 'codex', expectedVersion: 1 })
       first.catch(() => undefined)
-      await waitUntil(async () => settingsWriters(await lockWaiters()) >= 1 || undefined, 'the first save to reach the UPDATE')
+      await waitUntil(async () => await settingsWriters() >= 1 || undefined, 'the first save to reach the UPDATE')
       const second = mod.saveBotDefaults(admin, ws, { defaultModel: 'mikka', expectedVersion: 1 })
       second.catch(() => undefined)
       saves = [first, second]
+      // A is not waiting on mikka_workspaces (its UPDATE sits on another connection), so any waiter there is B.
       waited = await waitUntil(async () => {
-        const waiters = await lockWaiters()
-        if (waiters.some(waitsOnWorkspaceRow)) return true
-        if (settingsWriters(waiters) >= 2) return false
+        if ((await waitersOn('mikka_workspaces')).length > 0) return true
+        if (await settingsWriters() >= 2) return false
         return undefined
       }, 'the second save to block')
     } finally { await held.release() }
@@ -349,7 +352,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
 
   await t.test('BE-15 lock: a second save on the same workspace waits on the workspace row lock', async () => {
     const real = await secondSaveWaitsOnWorkspaceLock(botAdmin)
-    assert.equal(real.waited, true, 'second save must be blocked on the workspace FOR UPDATE (Lock wait in pg_stat_activity)')
+    assert.equal(real.waited, true, 'second save must hold a lock on mikka_workspaces and be blocked (pg_locks / pg_blocking_pids)')
     assert.deepEqual(real.codes, ['ok', 'botDefaultsConflict'], 'lock serialises the saves; the waiter then sees the new version')
     // The detector is not vacuous: with the lock removed it reports no workspace-lock wait.
     assert.equal((await secondSaveWaitsOnWorkspaceLock(await botsMutant({ lock: false, cas: true }))).waited, false)
