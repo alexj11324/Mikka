@@ -5,7 +5,9 @@ import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { createFactoryStore } from './store';
-import { reservePublication } from './approval';
+import { createFactoryApprovals, deferPublication, markPublicationSucceeded, reservePublication } from './approval';
+import { handleFactoryApproval } from './approval-http';
+import { PublicationDeferred } from './publication-operation';
 import { FactoryError } from './approval-contract';
 
 const base = process.env.E2E_DATABASE_URL;
@@ -106,6 +108,86 @@ test('B2/B4 migrations: failed publications are terminal and a superseded candid
     // A live (non-failed) row still blocks a fresh attempt.
     const c3 = await pool.connect();
     try { await assert.rejects(reservePublication(c3, row(a4)), claimed); } finally { c3.release(); }
+
+    // ---- QA M3/M4/M6/M7/M8: a real failed row is terminal ----
+    const snap = async (id: string) => (await pool.query(`SELECT to_jsonb(p) AS j FROM factory_publications p WHERE id=$1`, [id])).rows[0].j;
+    const isDeferred = (state: string) => (e: unknown) => e instanceof PublicationDeferred && e.state === state;
+    const aF = randomUUID();
+    await approve(aF, candidateId, 'preview');
+    const req = { binding: await binding(), eventId: randomUUID(), approvalId: aF, action: 'deploy_preview', target: 'preview', targetEnvironment: 'preview' };
+    const fpub = randomUUID();
+    await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt) VALUES ($1,$2,$3,$4,'deploy_preview','preview',$5,$6,'failed','{"operationId":"dpl_err"}')`, [fpub, aF, taskId, candidateId, req.eventId, JSON.stringify(req)]);
+    const failedRow = await snap(fpub);
+    let provider = 0;
+    const adapter = { action: 'deploy_preview' as const, target: 'preview', environment: 'preview',
+      execute: async () => { provider++; throw new Error('provider must not be called'); },
+      reconcile: async () => { provider++; throw new Error('provider must not be called'); } };
+    const service = createFactoryApprovals(pool, async () => true, store, [adapter]);
+    // M4: reconcile reports the terminal failure, never asks the provider, never writes.
+    await assert.rejects(service.reconcile({ userId: 'owner' }, { ...req, publicationId: fpub }), isDeferred('failed'));
+    assert.equal(provider, 0, 'reconcile of a failed row does not call the provider');
+    assert.deepEqual(await snap(fpub), failedRow, 'reconcile leaves the failed row unchanged');
+    // M6: the browser route answers 409 factoryPublicationFailed with no next operation.
+    const http = await handleFactoryApproval({ reconcile: (_a: unknown, input: unknown) => service.reconcile({ userId: 'owner' }, input) } as any, {
+      actor: { userId: 'owner', sessionId: 's' }, authorization: null, method: 'POST', taskId, origin: 'https://app.example', url: 'https://app.example/x',
+      body: { operation: 'reconcile', input: { ...req, publicationId: fpub } } });
+    assert.deepEqual(http, { status: 409, body: { error: 'factoryPublicationFailed', publicationId: fpub, status: 'failed', nextOperation: null } });
+    assert.equal(provider, 0);
+    // M3: no deferred/uncertain/generic write overwrites failed.
+    for (const err of [new PublicationDeferred(fpub, 'uncertain', { x: 1 }), new PublicationDeferred(fpub, 'pending', { x: 2 }), new FactoryError('factoryVercelUnavailable'), new Error('boom')])
+      await assert.rejects(deferPublication(pool, fpub, err));
+    assert.deepEqual(await snap(fpub), failedRow, 'failed is never overwritten');
+    // M8: failed cannot become succeeded.
+    await assert.rejects(markPublicationSucceeded(pool, fpub, { operationId: 'dpl_ok' } as any), claimed);
+    assert.deepEqual(await snap(fpub), failedRow, 'failed never becomes succeeded');
+    // M7: a provider terminal failure on a live row is stored as failed, not uncertain.
+    const live = async (target: string, status: string) => {
+      const id = randomUUID(), aid = randomUUID();
+      await approve(aid, candidateId, target);
+      await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status) VALUES ($1,$2,$3,$4,'deploy_preview',$5,$6,'{}',$7)`, [id, aid, taskId, candidateId, target, randomUUID(), status]);
+      return id;
+    };
+    const u1 = await live('t-uncertain', 'uncertain');
+    await assert.rejects(deferPublication(pool, u1, new PublicationDeferred(u1, 'failed', { operationId: 'dpl_err', readyState: 'ERROR' })), isDeferred('failed'));
+    assert.equal((await snap(u1)).status, 'failed');
+    assert.deepEqual((await snap(u1)).receipt, { operationId: 'dpl_err', readyState: 'ERROR' });
+    const r1 = await live('t-reserved', 'reserved');
+    await assert.rejects(deferPublication(pool, r1, new PublicationDeferred(r1, 'failed')), isDeferred('failed'));
+    assert.equal((await snap(r1)).status, 'failed');
+    const g1 = await live('t-generic', 'reserved');
+    await assert.rejects(deferPublication(pool, g1, new FactoryError('factoryVercelUnavailable')), isDeferred('uncertain'));
+    assert.equal((await snap(g1)).status, 'uncertain', 'control: an unknown outcome stays uncertain');
+    // A live row can still succeed (control for M8).
+    await markPublicationSucceeded(pool, g1, { operationId: 'dpl_ok' } as any);
+    assert.equal((await snap(g1)).status, 'succeeded');
+
+    // ---- validApproval ignores an invalidated approval ----
+    await pool.query(`UPDATE factory_tasks SET stage='publish',status='passed',"candidateId"=$2 WHERE id=$1`, [taskId, candidateId]);
+    const sBinding = await binding();
+    const a5 = randomUUID();
+    await approve(a5, sBinding.candidateId, 'preview');
+    const sReq = { binding: sBinding, eventId: randomUUID(), approvalId: a5, action: 'deploy_preview', target: 'p-succeeded', targetEnvironment: 'preview' };
+    const spub = randomUUID();
+    await pool.query(`INSERT INTO factory_publications (id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,result) VALUES ($1,$2,$3,$4,'deploy_preview','p-succeeded',$5,$6,'succeeded',$7)`, [spub, a5, taskId, sBinding.candidateId, sReq.eventId, JSON.stringify(sReq), JSON.stringify({ binding: sBinding })]);
+    const approvalRows: number[] = [];
+    const spyPool = { connect: async () => {
+      const c = await pool.connect();
+      const q = c.query.bind(c);
+      (c as any).query = async (...args: any[]) => {
+        const r = await (q as any)(...args);
+        if (typeof args[0] === 'string' && args[0].startsWith('SELECT * FROM factory_approvals WHERE id=$1')) approvalRows.push(r.rowCount);
+        return r;
+      };
+      return c;
+    } } as unknown as Pool;
+    const spied = createFactoryApprovals(spyPool, async () => true, store, [adapter]);
+    await spied.reconcile({ userId: 'owner' }, { ...sReq, publicationId: spub }).catch(() => {});
+    assert.ok(approvalRows.length > 0 && approvalRows.every((n) => n === 1), 'control: the live approval is found');
+    approvalRows.length = 0;
+    await pool.query(`UPDATE factory_approvals SET "invalidatedAt"=now(),"invalidationReason"='candidateSuperseded' WHERE id=$1`, [a5]);
+    await assert.rejects(spied.reconcile({ userId: 'owner' }, { ...sReq, publicationId: spub }), (e: unknown) => e instanceof FactoryError && e.code === 'factoryApprovalInvalid');
+    assert.ok(approvalRows.length > 0 && (approvalRows as number[]).every((n) => n === 0), `an invalidated approval is not selected: ${approvalRows}`);
+    assert.equal(provider, 0);
   } finally {
     await pool.end();
     for (let i = 0; i < 100; i++) {

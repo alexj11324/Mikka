@@ -192,7 +192,7 @@ async function validApproval(
   const {
     rows: [a],
   } = await tx.query(
-    'SELECT * FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL AND "expiresAt">clock_timestamp() FOR UPDATE',
+    'SELECT * FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL AND "invalidatedAt" IS NULL AND "expiresAt">clock_timestamp() FOR UPDATE',
     [id, task.id, task.userId, task.candidateId],
   );
   if (
@@ -329,6 +329,45 @@ export interface PublicationAdapter {
   ): Promise<PublicationAdapterReceipt>;
 }
 
+/** Records a deferred/failed provider outcome on a live reservation, then rethrows.
+ * failed and succeeded are terminal: the WHERE clause never rewrites them (B2). */
+export async function deferPublication(
+  pool: Pick<Pool, "query">,
+  publicationId: string,
+  error: unknown,
+): Promise<never> {
+  const state =
+    error instanceof PublicationDeferred ? error.state : "uncertain";
+  const checkpoint =
+    error instanceof PublicationDeferred ? error.checkpoint : null;
+  await pool.query(
+    `UPDATE factory_publications SET status=$2,receipt=coalesce($3::jsonb,receipt),"finishedAt"=clock_timestamp() WHERE id=$1 AND status NOT IN ('succeeded','failed')`,
+    [
+      publicationId,
+      state === "pending" ? "reserved" : state,
+      checkpoint == null ? null : JSON.stringify(checkpoint),
+    ],
+  );
+  if (error instanceof PublicationDeferred)
+    throw new PublicationDeferred(publicationId, state, checkpoint);
+  if (error instanceof FactoryError && error.code.startsWith("factoryVercel"))
+    throw new PublicationDeferred(publicationId, "uncertain");
+  throw error;
+}
+
+/** Only a live reservation (reserved/uncertain) can succeed; failed stays failed (B2). */
+export async function markPublicationSucceeded(
+  tx: Pick<PoolClient, "query">,
+  publicationId: string,
+  receipt: PublicationAdapterReceipt,
+) {
+  const { rowCount } = await tx.query(
+    `UPDATE factory_publications SET status='succeeded',receipt=$2,"finishedAt"=clock_timestamp() WHERE id=$1 AND status IN ('reserved','uncertain')`,
+    [publicationId, JSON.stringify(receipt)],
+  );
+  if (rowCount !== 1) fail("factoryPublicationAlreadyClaimed");
+}
+
 export function createFactoryApprovals(
   pool: Pool,
   authorize: FactoryAuthorize,
@@ -368,23 +407,7 @@ export function createFactoryApprovals(
     if (digest(bindingOf(task)) !== digest(binding)) fail("factoryStale");
   }
   async function defer(error: unknown, publicationId: string): Promise<never> {
-    const state =
-      error instanceof PublicationDeferred ? error.state : "uncertain";
-    const checkpoint =
-      error instanceof PublicationDeferred ? error.checkpoint : null;
-    await pool.query(
-      `UPDATE factory_publications SET status=$2,receipt=coalesce($3::jsonb,receipt),"finishedAt"=clock_timestamp() WHERE id=$1 AND status NOT IN ('succeeded','failed')`,
-      [
-        publicationId,
-        state === "pending" ? "reserved" : state,
-        checkpoint == null ? null : JSON.stringify(checkpoint),
-      ],
-    );
-    if (error instanceof PublicationDeferred)
-      throw new PublicationDeferred(publicationId, state, checkpoint);
-    if (error instanceof FactoryError && error.code.startsWith("factoryVercel"))
-      throw new PublicationDeferred(publicationId, "uncertain");
-    throw error;
+    return deferPublication(pool, publicationId, error);
   }
   async function complete(
     tx: PoolClient,
@@ -405,10 +428,7 @@ export function createFactoryApprovals(
       publicationBindingHash(providerInput(task, a, req, publicationId)),
     );
     providerBinding(receipt, providerInput(task, a, req, publicationId));
-    await tx.query(
-      `UPDATE factory_publications SET status='succeeded',receipt=$2,"finishedAt"=clock_timestamp() WHERE id=$1 AND status IN ('reserved','uncertain')`,
-      [publicationId, JSON.stringify(receipt)],
-    );
+    await markPublicationSucceeded(tx, publicationId, receipt);
     const result = await store.apply(
       task.userId,
       req.binding,
