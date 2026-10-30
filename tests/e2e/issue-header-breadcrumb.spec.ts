@@ -19,6 +19,8 @@ async function header(page: Page) {
 
 for (const scheme of ['light', 'dark'] as const) {
   test(`任务详情面包屑与右侧操作在各宽度不重叠，编号不截断 ${scheme}`, async ({ page }, testInfo) => {
+    // 5 widths × sidebar states × screenshots outgrow the 90s default on CI runners.
+    test.setTimeout(240_000)
     await page.emulateMedia({ colorScheme: scheme })
     await register(page)
     const title = `面包屑重叠检查 一个非常非常长的任务标题用来测试截断顺序 ${randomUUID().slice(0, 8)}`
