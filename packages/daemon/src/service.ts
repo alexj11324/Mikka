@@ -57,18 +57,17 @@ export async function restartService(update: boolean, beforeRestart: () => void,
 /** Remove only our service definition; npm, repositories and worktrees stay. */
 export async function uninstallService(clearCredential: () => void, dependencies = {
   manager: process.env.MIKKA_SERVICE,
-  platform: process.platform as string,
   home: homedir(),
   uid: process.getuid?.() ?? 0,
   run: async (program: string, args: string[]) => { await exec(program, args, { timeout: 10_000 }) },
   exit: (): void => { process.exit(0) },
 }) {
   try {
-    if (dependencies.platform === 'linux') {
-      if (dependencies.manager === 'systemd') await dependencies.run('systemctl', ['--user', 'disable', 'mikka-daemon.service'])
+    if (dependencies.manager === 'systemd') {
+      await dependencies.run('systemctl', ['--user', 'disable', 'mikka-daemon.service'])
       await rm(join(dependencies.home, '.config/systemd/user/mikka-daemon.service'), { force: true })
-      if (dependencies.manager === 'systemd') await dependencies.run('systemctl', ['--user', 'daemon-reload'])
-    } else if (dependencies.platform === 'darwin') {
+      await dependencies.run('systemctl', ['--user', 'daemon-reload'])
+    } else if (dependencies.manager === 'launchd') {
       await rm(join(dependencies.home, 'Library/LaunchAgents', `${label}.plist`), { force: true })
     }
   } finally {

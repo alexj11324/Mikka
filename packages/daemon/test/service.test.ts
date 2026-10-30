@@ -50,7 +50,7 @@ it.each([
     await writeFile(join(home, file), 'fixture service')
     await writeFile(join(home, 'repository'), 'keep repository')
     await uninstallService(() => { events.push('credential') }, {
-      platform, manager, home, uid: 501,
+      manager, home, uid: 501,
       run: async (program, args) => { events.push(`${program} ${args.join(' ')}`) },
       exit: () => { events.push('exit') },
     })
@@ -59,5 +59,21 @@ it.each([
     expect(events.at(-1)).toBe('exit')
     if (manager === 'systemd') expect(events).toEqual(['systemctl --user disable mikka-daemon.service', 'systemctl --user daemon-reload', 'credential', 'exit'])
     else expect(events).toEqual(['credential', 'launchctl bootout gui/501/com.aspectlylabs.mikka.daemon', 'exit'])
+  } finally { await rm(home, { recursive: true, force: true }) }
+})
+
+it('a foreground daemon clears its credentials without removing another managed service', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'mikka-foreground-uninstall-'))
+  const file = join(home, '.config/systemd/user/mikka-daemon.service')
+  const events: string[] = []
+  try {
+    await mkdir(dirname(file), { recursive: true }); await writeFile(file, 'another daemon service')
+    await uninstallService(() => { events.push('credential') }, {
+      manager: undefined, home, uid: 1000,
+      run: async () => { throw new Error('Foreground daemon has no managed service') },
+      exit: () => { events.push('exit') },
+    })
+    expect(await readFile(file, 'utf8')).toBe('another daemon service')
+    expect(events).toEqual(['credential', 'exit'])
   } finally { await rm(home, { recursive: true, force: true }) }
 })

@@ -68,7 +68,7 @@ it('uninstall waits for active threads, persists and sends its receipt, removes 
   const uninstall = service.uninstallService
   vi.spyOn(service, 'uninstallService').mockImplementation(clear => uninstall(() => {
     clear(); events.push('credential')
-  }, { manager: 'systemd', platform: 'linux', home, uid: 1000,
+  }, { manager: 'systemd', home, uid: 1000,
     run: async (program, args) => { events.push(`${program} ${args.join(' ')}`) },
     exit: () => { events.push('exit') },
   }))
