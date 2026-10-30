@@ -3055,5 +3055,22 @@
     "attestationRequired": "生产发布需要签名证明。",
     "artifactError": "证据打开失败。",
     "closeEvidence": "关闭证据"
+  },
+  "CredentialLogin": {
+    "title": "登录 {site}",
+    "close": "关闭",
+    "email": "邮箱",
+    "emailPlaceholder": "name@example.com",
+    "password": "密码",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
+    "submit": "登录",
+    "code": "验证码",
+    "verify": "验证",
+    "securedBy": "Secured by",
+    "wrongPassword": "密码不对",
+    "wrongCode": "验证码不对",
+    "failed": "没登上，再试一次",
+    "signedIn": "已登录 {site}"
   }
 }

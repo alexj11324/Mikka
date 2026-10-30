@@ -3055,5 +3055,22 @@
     "attestationRequired": "Production needs a signed attestation.",
     "artifactError": "The evidence did not open.",
     "closeEvidence": "Close evidence"
+  },
+  "CredentialLogin": {
+    "title": "Sign in to {site}",
+    "close": "Close",
+    "email": "Email",
+    "emailPlaceholder": "name@example.com",
+    "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "submit": "Sign in",
+    "code": "Verification code",
+    "verify": "Verify",
+    "securedBy": "Secured by",
+    "wrongPassword": "Wrong password",
+    "wrongCode": "Wrong code",
+    "failed": "Couldn’t sign in. Try again.",
+    "signedIn": "Signed in to {site}"
   }
 }
