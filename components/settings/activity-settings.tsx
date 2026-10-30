@@ -67,7 +67,7 @@ export function ActivitySettings() {
 
     {loading && <SettingsLoading label={t('loading')} rows={4} />}
     {!loading && failed && <p role="alert" className="text-sm text-destructive">{t('loadError')}</p>}
-    {!loading && !failed && items.length === 0 && <p className="py-6 text-sm text-muted-foreground">{t('empty')}</p>}
+    {!loading && !failed && items.length === 0 && <p className="py-6 text-sm text-muted-foreground">{t('emptyScope')}</p>}
 
     <div className="flex flex-col gap-1">
       {items.map(item => {

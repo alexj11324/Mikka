@@ -1995,7 +1995,8 @@
         "otp_submitted": "已提交验证码",
         "session_applied": "恢复了登录会话",
         "denied_or_failed": "被拒绝或失败"
-      }
+      },
+      "emptyScope": "还没有活动记录。这里只记录 Bot 用你的登录、你批准或拒绝的操作，以及协调员发给你的提醒；普通对话和任务不会出现在这里。"
     },
     "logins": {
       "heading": "网站登录",
@@ -2023,7 +2024,9 @@
         "otp_submitted": "已提交验证码",
         "session_applied": "恢复了登录会话",
         "denied_or_failed": "被拒绝或失败"
-      }
+      },
+      "emptyHow": "还没有保存的网站登录。Bot 在对话里需要登录某个网站时，会先问你，你同意后才会保存在这里。",
+      "add": "在对话里添加登录"
     },
     "sectionUnavailable": "这个分区还在设计中，暂时没有可用的操作。",
     "workspaceLoading": "正在读取工作区…",

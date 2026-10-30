@@ -1995,7 +1995,8 @@
         "otp_submitted": "Code submitted",
         "session_applied": "Session restored",
         "denied_or_failed": "Refused or failed"
-      }
+      },
+      "emptyScope": "No activity yet. This lists bots using your logins, actions you approved or declined, and reminders from the Coordinator. Ordinary chats and tasks don’t show up here."
     },
     "logins": {
       "heading": "Site sign-ins",
@@ -2023,7 +2024,9 @@
         "otp_submitted": "Code submitted",
         "session_applied": "Session restored",
         "denied_or_failed": "Refused or failed"
-      }
+      },
+      "emptyHow": "No saved site logins yet. When a bot needs to sign in to a site during a chat, it asks you first, and the login is saved here once you agree.",
+      "add": "Add a login in a chat"
     },
     "sectionUnavailable": "This section is still being designed and has nothing to act on yet.",
     "workspaceLoading": "Loading the workspace…",

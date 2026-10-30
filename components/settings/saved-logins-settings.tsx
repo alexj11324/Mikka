@@ -5,6 +5,8 @@ import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { deleteSavedLogin, listSavedLoginUsage, listSavedLogins } from '@/app/actions/settings-activity'
 import type { SavedLogin, SavedLoginUse } from '@/lib/settings/saved-logins'
+import { Link } from '@/i18n/navigation'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
@@ -44,7 +46,10 @@ export function SavedLoginsSettings() {
     <SettingsSection id="saved-logins-heading" title={t('heading')} description={t('description')}>
       {isLoading && <SettingsLoading label={t('loading')} rows={3} />}
       {error && <p role="alert" className="px-5 py-3 text-sm text-destructive">{t('loadError')}</p>}
-      {!isLoading && !error && logins.length === 0 && <p className="px-5 py-6 text-sm text-muted-foreground">{t('empty')}</p>}
+      {!isLoading && !error && logins.length === 0 && <div className="flex flex-col items-start gap-3 px-5 py-6">
+        <p className="text-sm text-muted-foreground">{t('emptyHow')}</p>
+        <Button variant="secondary" size="sm" nativeButton={false} render={<Link href="/" />}><Plus data-icon="inline-start" />{t('add')}</Button>
+      </div>}
       {logins.map(login => <SettingRow key={login.id} title={withoutScheme(login.site)} description={[login.account, login.lastUsedAt ? t('lastUsedBy', { when: relativeTime(login.lastUsedAt, locale), bot: login.lastUsedBy ?? t('unknownBot') }) : t('never')].join(' · ')}>
         <div className="flex items-center gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={() => setUsageOf(login)}>{t('usage')}</Button>
