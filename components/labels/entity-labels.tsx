@@ -1,7 +1,7 @@
 'use client'
 
 import type { ComponentType, ReactNode, SVGProps } from 'react'
-import { Box, Cloud, Laptop, Monitor, Server, Sparkles, type LucideIcon } from 'lucide-react'
+import { Box, Cloud, Laptop, Monitor, Server, type LucideIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { modelProvider, type DeviceKind, type ModelProvider } from '@/lib/execution-settings-view'
@@ -20,12 +20,6 @@ function EntityLabel({ icon: Icon, children, muted }: { icon: Mark; children: Re
     <Icon aria-hidden="true" className="size-4 shrink-0" />
     {children}
   </span>
-}
-
-/** 自动: one neutral icon so every list lines up (R-74). */
-export function AutoLabel() {
-  const t = useTranslations('Settings.botAgents')
-  return <EntityLabel icon={Sparkles}><span className="truncate">{t('auto')}</span></EntityLabel>
 }
 
 const DEVICE_ICONS: Record<DeviceKind, LucideIcon> = { laptop: Laptop, server: Server, cloud: Cloud, unknown: Monitor }

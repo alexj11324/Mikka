@@ -2038,11 +2038,8 @@
     "workspaceUnavailable": "无法读取工作区，请刷新后重试。",
     "botAgents": {
       "bots": "Bot",
-      "agents": "Agents",
       "addRule": "添加规则",
       "default": "默认",
-      "auto": "自动",
-      "autoBotHint": "额度用完或登录失效时换一个",
       "cloud": "云端托管",
       "online": "在线",
       "offline": "离线",
@@ -2067,8 +2064,24 @@
         "model": "模型",
         "actions": "操作"
       },
-      "coordinatorHint": "和你对话，分派任务",
-      "defaultHint": "没匹配到标签时"
+      "botHint": "和你对话，分派任务",
+      "defaults": "任务默认",
+      "noAccount": "未连接账号",
+      "whenQuotaExhausted": "额度用完时",
+      "whenQuotaExhaustedHint": "Bot 所用账号的额度用完后",
+      "quotaStop": "停下等我",
+      "quotaSwitch": "换用另一个账号",
+      "setting": "{name}：{value}",
+      "defaultsNote": "标签没匹配到规则的任务用这里的设置",
+      "placeHint": "任务在哪里运行",
+      "harnessHint": "运行任务的编程 Agent",
+      "modelHint": "Harness 使用的模型",
+      "whenDeviceOffline": "设备离线时",
+      "whenDeviceOfflineHint": "选定的设备不在线时",
+      "offlineWait": "等它上线",
+      "offlineCloud": "改到云端运行",
+      "labels": "按标签",
+      "labelsNote": "从上往下匹配任务标签"
     }
   },
   "TelegramBot": {
