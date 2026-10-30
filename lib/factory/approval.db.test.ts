@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { factory194Fixture } from "../../tests/helpers/factory194";
-import { factoryRunAuthorityCases } from "../../tests/helpers/factory194-run-authority";
 import { factory194Target } from "../../tests/helpers/factory194-target";
 import { FactoryError } from "./approval-contract";
 import { handleFactoryApproval } from "./approval-http";
@@ -39,24 +38,40 @@ test(
     const f = await factory194Fixture(db!);
     try {
       const { actor, pool, provider } = f;
-      await factoryRunAuthorityCases(t, f);
       await t.test(
         "a live browser session approves and publishes without any decision authority",
         async () => {
           const x = await f.prepare(),
             human = { ...x.approval } as Record<string, unknown>,
-            service = f.service([f.adapter], null),
+            service = f.service([f.adapter]),
             before = provider.posts();
-          delete human.decisionCredentialId;
+
           delete human.evidenceDigest;
           delete human.evidenceReadId;
-          assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_evidence_reads')).rows[0].n, 0);
+          assert.equal(
+            (
+              await pool.query(
+                "SELECT count(*)::int AS n FROM factory_evidence_reads",
+              )
+            ).rows[0].n,
+            0,
+          );
           // GET evidence remains available for display and never writes a receipt.
           await service.evidence(actor, x.task.id);
-          assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_evidence_reads')).rows[0].n, 0);
+          assert.equal(
+            (
+              await pool.query(
+                "SELECT count(*)::int AS n FROM factory_evidence_reads",
+              )
+            ).rows[0].n,
+            0,
+          );
           const approved = await service.approve(actor, human);
           // Display content can change without invalidating the approved commit.
-          await pool.query(`UPDATE agent_runs SET report=jsonb_set(report,'{summary}','"updated display"') WHERE "issueId"=$1`, [x.task.issueId]);
+          await pool.query(
+            `UPDATE agent_runs SET report=jsonb_set(report,'{summary}','"updated display"') WHERE "issueId"=$1`,
+            [x.task.issueId],
+          );
           const published = await service.publish(actor, {
             ...approved,
             eventId: randomUUID(),
@@ -73,13 +88,21 @@ test(
             )
           ).rows[0];
           assert.equal(grant.humanSessionId, actor.sessionId);
-          assert.equal((await pool.query('SELECT "evidenceDigest" FROM factory_approvals WHERE id=$1', [approved.approvalId])).rows[0].evidenceDigest, null);
+          assert.equal(
+            (
+              await pool.query(
+                'SELECT "evidenceDigest" FROM factory_approvals WHERE id=$1',
+                [approved.approvalId],
+              )
+            ).rows[0].evidenceDigest,
+            null,
+          );
           assert.equal(grant.decisionCredentialId, null);
           assert.equal(grant.decisionScope, null);
           assert.equal(grant.decisionEvidence, null);
           const next = await f.prepare(),
             nextHuman = { ...next.approval } as Record<string, unknown>;
-          delete nextHuman.decisionCredentialId;
+
           await pool.query(
             `UPDATE "session" SET "expiresAt"=now()-interval '1 second' WHERE id=$1`,
             [actor.sessionId],
@@ -98,207 +121,22 @@ test(
         },
       );
       await t.test(
-        "policy allow publishes for authenticated backend owner without any human session prerequisite",
+        "backend identity and a supplied decision credential cannot approve",
         async () => {
-          const backendActor = { userId: actor.userId },
-            x = await f.prepare(backendActor);
-          const p = await x.publication(),
-            before = provider.posts();
-          const result = await f.service().publish(backendActor, p);
-          assert.ok(result);
-          assert.equal(provider.posts(), before + 1);
-          const grant = (
-            await pool.query(
-              'SELECT "humanSessionId","decisionCredentialId","decisionEvidence" FROM factory_approvals WHERE id=$1',
-              [p.approvalId],
-            )
-          ).rows[0];
-          assert.equal(grant.humanSessionId, null);
-          assert.equal(
-            grant.decisionCredentialId,
-            x.approval.decisionCredentialId,
-          );
-          assert.equal(grant.decisionEvidence.decision, "allow");
-          const tx = await pool.connect();
-          try {
-            const receipt = await readFactoryPublicationReceiptV2(
-              tx,
-              actor.userId,
-              x.task.id,
-              x.task.candidateId!,
-            );
-            assert.equal(receipt.publicationId, result.publicationId);
-            assert.equal(
-              receipt.verifiedTarget.provider?.bindingHash,
-              result.receipt.verifiedTarget.provider?.bindingHash,
-            );
-            const forged = structuredClone(grant.decisionEvidence);
-            forged.verification.signatureDigest = "e".repeat(64);
-            await pool.query(
-              'UPDATE factory_approvals SET "decisionEvidence"=$2 WHERE id=$1',
-              [p.approvalId, JSON.stringify(forged)],
-            );
-            await rejects(
-              () =>
-                readFactoryPublicationReceiptV2(
-                  tx,
-                  actor.userId,
-                  x.task.id,
-                  x.task.candidateId!,
-                ),
-              "factoryPublicationReceiptRequired",
-            );
-            await pool.query(
-              'UPDATE factory_approvals SET "decisionEvidence"=NULL WHERE id=$1',
-              [p.approvalId],
-            );
-            await rejects(
-              () =>
-                readFactoryPublicationReceiptV2(
-                  tx,
-                  actor.userId,
-                  x.task.id,
-                  x.task.candidateId!,
-                ),
-              "factoryPublicationReceiptRequired",
-            );
-          } finally {
-            // Keep the invalid synthetic evidence for inspection; never restore.
-            tx.release();
-          }
-        },
-      );
-      await t.test(
-        "only existing policy ask needs its decision-bound confirmation; deny and missing authority never become a second human fallback",
-        async () => {
-          const backendActor = { userId: actor.userId },
-            before = provider.posts();
-          for (const mode of ["ask", "deny"] as const) {
-            const x = await f.prepare(backendActor),
-              d = f.decisions.get(x.approval.decisionCredentialId)!;
-            d.decision = mode;
-            await rejects(
-              () => x.approve(),
-              mode === "ask"
-                ? "factoryPolicyConfirmationRequired"
-                : "factoryPolicyDenied",
-            );
-            assert.equal(
-              (
-                await pool.query(
-                  'SELECT count(*)::int AS n FROM factory_approvals WHERE "taskId"=$1',
-                  [x.task.id],
-                )
-              ).rows[0].n,
-              0,
-            );
-            if (mode === "ask") {
-              d.confirmation = {
-                decisionId: d.credentialId,
-                ownerId: actor.userId,
-                sessionId: actor.sessionId,
-                scopeDigest: d.scopeDigest,
-                confirmedAt: new Date().toISOString(),
-                expiresAt: d.expiresAt,
-              };
-              const p = await x.publication();
-              assert.ok(p.approvalId);
-              assert.equal(
-                (
-                  await pool.query(
-                    'SELECT "humanSessionId" FROM factory_approvals WHERE id=$1',
-                    [p.approvalId],
-                  )
-                ).rows[0].humanSessionId,
-                actor.sessionId,
-              );
-            }
-          }
-          const x = await f.prepare(backendActor);
+          const x = await f.prepare(),
+            service = f.service();
           await rejects(
-            () => f.service(undefined, null).approve(backendActor, x.approval),
-            "factoryPolicyDecisionUnavailable",
+            () => service.approve({ userId: actor.userId }, x.approval),
+            "factoryHumanRequired",
           );
           await rejects(
             () =>
-              f
-                .service()
-                .approve(backendActor, { ...x.approval, decision: "allow" }),
+              service.approve(actor, {
+                ...x.approval,
+                decisionCredentialId: "removed-path",
+              }),
             "factoryInvalid",
           );
-          assert.equal(provider.posts(), before);
-        },
-      );
-      await t.test(
-        "one policy credential cannot create another grant, move to another task or repeat an effect",
-        async () => {
-          const backendActor = { userId: actor.userId },
-            x = await f.prepare(backendActor);
-          const first = await x.approve(),
-            again = await x.approve();
-          assert.equal(first.approvalId, again.approvalId);
-          await rejects(
-            () =>
-              f.service().approve(backendActor, {
-                ...x.approval,
-                eventId: randomUUID(),
-              }),
-            "factoryStale",
-          );
-          const other = await f.prepare(backendActor);
-          await rejects(
-            () =>
-              f.service().approve(backendActor, {
-                ...other.approval,
-                decisionCredentialId: x.approval.decisionCredentialId,
-              }),
-            "factoryPolicyDecisionMismatch",
-          );
-          assert.equal(
-            (
-              await pool.query(
-                'SELECT count(*)::int AS n FROM factory_approvals WHERE "decisionCredentialId"=$1',
-                [x.approval.decisionCredentialId],
-              )
-            ).rows[0].n,
-            1,
-          );
-          // The existing grant table itself enforces the one-credential invariant.
-          await assert.rejects(
-            () =>
-              pool.query(
-                `INSERT INTO factory_approvals SELECT $1,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","decisionCredentialId","decisionScope","decisionEvidence",$2,request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt","revokedAt","createdAt" FROM factory_approvals WHERE id=$3`,
-                [randomUUID(), randomUUID(), first.approvalId],
-              ),
-            (e: unknown) =>
-              e instanceof Error && "code" in e && e.code === "23505",
-          );
-        },
-      );
-      await t.test(
-        "policy revoked during provider project preflight prevents POST without asking a human again",
-        async () => {
-          const backendActor = { userId: actor.userId },
-            x = await f.prepare(backendActor),
-            p = await x.publication();
-          const before = provider.posts(),
-            requestCount = provider.requests.length;
-          provider.state.projectDelayMs = 250;
-          const pending = f.service().publish(backendActor, p);
-          try {
-            for (
-              let i = 0;
-              i < 100 && provider.requests.length === requestCount;
-              i++
-            )
-              await new Promise((r) => setTimeout(r, 5));
-            assert.ok(provider.requests.length > requestCount);
-            f.decisions.get(x.approval.decisionCredentialId)!.decision = "deny";
-            await rejects(() => pending, "factoryPolicyDenied");
-            assert.equal(provider.posts(), before);
-          } finally {
-            provider.state.projectDelayMs = 0;
-          }
         },
       );
       await t.test(
@@ -476,7 +314,7 @@ test(
           provider.state.readyState = "READY";
           const a = await s.approve(
             actor,
-            f.issuePolicyDecision({
+            f.approvalRequestForHuman({
               ...x.approval,
               action: "deploy_production",
               target: adapter.target,
@@ -719,7 +557,7 @@ test(
                 x.approval.expiresAt = new Date(
                   Date.now() + 2000,
                 ).toISOString();
-              Object.assign(x.approval, f.issuePolicyDecision(x.approval));
+              Object.assign(x.approval, f.approvalRequestForHuman(x.approval));
               const p = await x.publication();
               if (field === "session")
                 await pool.query(
@@ -811,8 +649,8 @@ test(
         async () => {
           const x = await f.prepare(),
             human = { ...x.approval } as Record<string, unknown>,
-            s = f.service([f.adapter], null);
-          delete human.decisionCredentialId;
+            s = f.service([f.adapter]);
+
           const approved = await s.approve(actor, human);
           const p = {
             ...approved,
@@ -906,7 +744,11 @@ test(
               () => s.reconcile(actor, { ...p, publicationId: op.id }),
               "factoryApprovalInvalid",
             );
-            assert.equal(provider.requests.length, requests, "provider not asked");
+            assert.equal(
+              provider.requests.length,
+              requests,
+              "provider not asked",
+            );
             assert.equal(
               (await s.ledger(actor, x.task.id)).publications[0].status,
               "reserved",
@@ -930,7 +772,7 @@ test(
             result = await s.publish(actor, p);
           assert.ok(result);
           const oldRequest = { ...x.approval } as Record<string, unknown>;
-          delete oldRequest.decisionCredentialId;
+
           const legacyReceipt = structuredClone(result.receipt);
           legacyReceipt.verifiedTarget.provider!.bindingHash =
             publicationBindingHash({

@@ -19,7 +19,7 @@ test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/
     const x = await f.prepare();
     const adapter = createVercelPublicationAdapter({ ...MIKKA_VERCEL, environment: "production" }, f.provider.client);
     const service = f.service([adapter]);
-    const approved = await service.approve(f.actor, f.issuePolicyDecision({ ...x.approval, action: "deploy_production", target: adapter.target, targetEnvironment: "production" }));
+    const approved = await service.approve(f.actor, f.approvalRequestForHuman({ ...x.approval, action: "deploy_production", target: adapter.target, targetEnvironment: "production" }));
     await service.publish(f.actor, { ...approved, eventId: randomUUID(), action: "deploy_production", target: adapter.target, targetEnvironment: "production" });
     const tx = await f.pool.connect();
     try {

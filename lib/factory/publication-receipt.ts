@@ -2,15 +2,13 @@ import { z } from "zod";
 import type { PoolClient } from "pg";
 import { candidateSchema, FactoryError } from "./approval-contract";
 import { digest } from "./evidence";
+import { publicationBindingHash } from "./publication-operation";
+
 import {
-  publicationBindingHash,
-  publicationPolicyBinding,
-} from "./publication-operation";
-import {
-  verifiedFactoryDecision,
-  factoryDecisionScope,
-} from "./policy-authorization";
-import { approvalRequest, publicationRequest, publicationAction } from "./approval-contract";
+  approvalRequest,
+  publicationRequest,
+  publicationAction,
+} from "./approval-contract";
 
 const provider = z
   .object({
@@ -170,7 +168,7 @@ export async function readFactoryPublicationReceiptV2(
     rows: [p],
   } = await tx.query(
     `
-    SELECT p.*,a.candidate,a.request AS "approvalRequest",a.action AS "approvalAction",a.target AS "approvalTarget",a."publishAttemptId",a."publishRevision",a."humanSessionId",a."decisionCredentialId",a."decisionScope",a."decisionEvidence",a.evidence AS "approvalEvidence",a."revokedAt",t."issueId",c.sha,c.repository,c.environment,c.scope,
+    SELECT p.*,a.candidate,a.request AS "approvalRequest",a.action AS "approvalAction",a.target AS "approvalTarget",a."publishAttemptId",a."publishRevision",a."humanSessionId",a.evidence AS "approvalEvidence",a."revokedAt",t."issueId",c.sha,c.repository,c.environment,c.scope,
       s.status AS "publishStatus",s.output AS "publishOutput",s."finishedAt" AS "publishFinishedAt"
     FROM factory_publications p
     JOIN factory_approvals a ON a.id=p."approvalId" AND a."taskId"=p."taskId" AND a."candidateId"=p."candidateId" AND a."userId"=$1
@@ -231,66 +229,6 @@ export async function readFactoryPublicationReceiptV2(
       p.publishFinishedAt.getTime()
   )
     throw new FactoryError("factoryPublicationReceiptRequired");
-  let policy: ReturnType<typeof publicationPolicyBinding> | undefined;
-  if (
-    approval.data.decisionCredentialId ||
-    p.decisionCredentialId ||
-    p.decisionEvidence
-  ) {
-    const d = verifiedFactoryDecision.safeParse(p.decisionEvidence);
-    const scope = factoryDecisionScope.safeParse({
-      ownerId: userId,
-      binding: approval.data.binding,
-      candidate,
-      action: approval.data.action,
-      target: approval.data.target,
-      targetEnvironment: approval.data.targetEnvironment,
-      evidenceDigest: approval.data.evidenceDigest,
-      expiresAt: approval.data.expiresAt,
-      visualEvidenceDigests: p.approvalEvidence?.artifacts
-        ?.filter((a: any) => a.kind === "screenshot" || a.kind === "video")
-        .map((a: any) => a.sha256),
-    });
-    if (
-      !d.success ||
-      !scope.success ||
-      d.data.decision === "deny" ||
-      d.data.permissionAction !== approval.data.action ||
-      d.data.credentialId !== approval.data.decisionCredentialId ||
-      p.decisionCredentialId !== d.data.credentialId ||
-      d.data.ownerId !== userId ||
-      digest(scope.data) !== digest(p.decisionScope) ||
-      d.data.scopeDigest !== digest(scope.data) ||
-      (d.data.judgment !== undefined &&
-        (d.data.judgment.scopeDigest !== d.data.scopeDigest ||
-          d.data.judgment.evidenceDigest !== scope.data.evidenceDigest ||
-          digest(d.data.judgment.imageDigests) !==
-            digest(scope.data.visualEvidenceDigests) ||
-          (d.data.judgment.visualInputRequired &&
-            !d.data.judgment.imageDigests.length))) ||
-      new Date(d.data.issuedAt).getTime() > p.createdAt.getTime() ||
-      new Date(d.data.expiresAt).getTime() <
-        new Date(approval.data.expiresAt).getTime()
-    )
-      throw new FactoryError("factoryPublicationReceiptRequired");
-    if (d.data.decision === "ask") {
-      const c = d.data.confirmation;
-      if (
-        !c ||
-        c.decisionId !== d.data.credentialId ||
-        c.ownerId !== userId ||
-        c.sessionId !== p.humanSessionId ||
-        c.scopeDigest !== d.data.scopeDigest ||
-        new Date(c.confirmedAt).getTime() <
-          new Date(d.data.issuedAt).getTime() ||
-        new Date(c.confirmedAt).getTime() > p.createdAt.getTime() ||
-        new Date(c.expiresAt).getTime() <
-          new Date(approval.data.expiresAt).getTime()
-      )
-        throw new FactoryError("factoryPublicationReceiptRequired");
-    }
-    policy = publicationPolicyBinding(d.data);
-  }
   assertPublicationTarget(
     receipt.data,
     candidate,
@@ -298,7 +236,21 @@ export async function readFactoryPublicationReceiptV2(
     p.target,
     p.request.targetEnvironment,
     p.id,
-    publicationBindingHash({ idempotencyKey:p.id, candidate, authorization:{approvalId:p.approvalId,ownerId:userId,...(policy ? {policy} : {humanSessionId:p.humanSessionId}),expiresAt:p.approvalRequest.expiresAt,binding:p.request.binding,eventId:p.request.eventId,action:p.action,target:p.target,targetEnvironment:p.request.targetEnvironment} }),
+    publicationBindingHash({
+      idempotencyKey: p.id,
+      candidate,
+      authorization: {
+        approvalId: p.approvalId,
+        ownerId: userId,
+        humanSessionId: p.humanSessionId,
+        expiresAt: p.approvalRequest.expiresAt,
+        binding: p.request.binding,
+        eventId: p.request.eventId,
+        action: p.action,
+        target: p.target,
+        targetEnvironment: p.request.targetEnvironment,
+      },
+    }),
   );
   if (
     receipt.data.verifiedTarget.provider?.bindingHash !== undefined &&
@@ -309,7 +261,7 @@ export async function readFactoryPublicationReceiptV2(
         authorization: {
           approvalId: p.approvalId,
           ownerId: userId,
-          ...(policy ? { policy } : { humanSessionId: p.humanSessionId }),
+          humanSessionId: p.humanSessionId,
           expiresAt: p.approvalRequest.expiresAt,
           binding: p.request.binding,
           eventId: p.request.eventId,
