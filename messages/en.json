@@ -3094,6 +3094,8 @@
     "sharingOn": "Sharing is on. Links you sent still work.",
     "newLink": "Copy a new link",
     "shareStopped": "Sharing stopped",
+    "shareRecheckFailed": "Couldn't check the share status yet. Try again in a moment.",
+    "shareStillShared": "The link is still shared",
     "shareLink": "Share link",
     "sharedNotFoundHint": "Sharing was stopped, or the link is incomplete.",
     "notFoundTitle": "This link is no longer active",

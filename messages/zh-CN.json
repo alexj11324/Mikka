@@ -1954,7 +1954,7 @@
       "exportWait": "刚导出过，{minutes} 分钟后再试。",
       "sharing": "共享",
       "sharedLinks": "已共享的链接",
-      "sharedLinksCount": "{count} 个 Artifact 仍可公开访问",
+      "sharedLinksCount": "{count} 个产物仍可公开访问",
       "sharedLinksNone": "没有公开访问的链接。",
       "sharedLinksDescription": "停止分享后，已经发出去的链接立即失效。",
       "manage": "管理",
@@ -3042,7 +3042,7 @@
     "original": "原文：「{title}」"
   },
   "ArtifactsPage": {
-    "title": "Artifact",
+    "title": "产物",
     "category": {
       "all": "全部",
       "documents": "文档",
@@ -3053,11 +3053,11 @@
       "source": "来源",
       "updated": "上次活动"
     },
-    "loadError": "Artifact 加载失败。",
+    "loadError": "产物 加载失败。",
     "retry": "重试",
-    "loading": "正在加载 Artifact",
-    "empty": "还没有 Artifact",
-    "threadEntry": "Artifact · {count}"
+    "loading": "正在加载 产物",
+    "empty": "还没有 产物",
+    "threadEntry": "产物 · {count}"
   },
   "Artifact": {
     "kindDocument": "文档",
@@ -3094,6 +3094,8 @@
     "sharingOn": "正在分享，之前发出的链接仍然有效。",
     "newLink": "复制新链接",
     "shareStopped": "已停止分享",
+    "shareRecheckFailed": "分享状态还没确认，请稍后再查一次。",
+    "shareStillShared": "链接仍在分享中",
     "shareLink": "分享链接",
     "sharedNotFoundHint": "分享已停止，或者链接不完整。",
     "notFoundTitle": "链接已失效",

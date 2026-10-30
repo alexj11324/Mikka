@@ -85,13 +85,14 @@ export function ArtifactShare({ artifactId, shared, onChange }: { artifactId: st
     try {
       const detail = await getArtifact(artifactId)
       if (!detail) { toast.error(t('loadError')); return }
-      if (detail.shared) { setLink(null); setMode('idle'); onChange(); return }
+      if (detail.shared) { setLink(null); setMode('idle'); toast.info(t('shareStillShared')); onChange(); return }
       setLink(null)
       setMode('stopped')
       toast.success(t('shareStopped'))
       onChange()
     } catch {
       // Still unknown. Keep the unconfirmed state so nobody reads this as stopped.
+      toast.error(t('shareRecheckFailed'))
     } finally {
       setBusy(false)
     }
