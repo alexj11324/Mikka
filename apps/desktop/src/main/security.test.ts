@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { appExternalUrl, desktopAuthFinishUrl, desktopAuthState, externalUrl, insecureExternalUrl, isTrustedFrame, navigationDecision, originOf } from './security'
+import { appExternalUrl, desktopAuthFinishUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision, originOf } from './security'
 
 const APP = 'https://app.aspectlylabs.com/mikka'
 
@@ -26,15 +26,16 @@ test('navigation keeps only the app, opens every other HTTPS URL externally', ()
   assert.equal(navigationDecision('https://accounts.google.com/o/oauth2/auth', APP), 'external')
   assert.equal(navigationDecision('https://docs.example/page', APP), 'external')
   assert.equal(navigationDecision('mailto:support@example.com', APP), 'external')
-  assert.equal(navigationDecision('http://evil.example/mikka', APP), 'deny')
+  // A lookalike host never loads in the app window; it goes to the system browser.
+  assert.equal(navigationDecision('http://evil.example/mikka', APP), 'external')
   assert.equal(navigationDecision('file:///etc/passwd', APP), 'deny')
   assert.equal(navigationDecision('javascript:alert(1)', APP), 'deny')
 })
 
-test('external opens accept only HTTPS and mailto without credentials', () => {
+test('external opens accept only HTTP(S) and mailto without credentials', () => {
   assert.equal(externalUrl('https://example.com/a?b=1'), 'https://example.com/a?b=1')
   assert.equal(externalUrl('mailto:support@example.com'), 'mailto:support@example.com')
-  assert.equal(externalUrl('http://example.com'), null)
+  assert.equal(externalUrl('http://example.com'), 'http://example.com/')
   assert.equal(externalUrl('file:///etc/passwd'), null)
   assert.equal(externalUrl('data:text/html,hi'), null)
   assert.equal(externalUrl('https://user:pass@example.com'), null)
@@ -82,12 +83,10 @@ test('the loopback nonce is bounded', () => {
   assert.equal(desktopAuthState(null), null)
 })
 
-test('plain-HTTP links are recognised for a prompt, never opened directly', () => {
-  assert.equal(externalUrl('http://example.com/docs'), null)
-  assert.equal(insecureExternalUrl('http://example.com/docs'), 'http://example.com/docs')
-  assert.equal(insecureExternalUrl('http://user:pass@example.com'), null)
-  assert.equal(insecureExternalUrl('https://example.com'), null)
-  assert.equal(insecureExternalUrl('file:///etc/passwd'), null)
-  assert.equal(insecureExternalUrl('javascript:alert(1)'), null)
-  assert.equal(insecureExternalUrl(`http://example.com/${'a'.repeat(2_048)}`), null)
+test('plain-HTTP links open in the system browser like HTTPS; other schemes stay denied', () => {
+  assert.equal(externalUrl('http://example.com/docs'), 'http://example.com/docs')
+  assert.equal(navigationDecision('http://example.com/docs', APP), 'external')
+  assert.equal(externalUrl('http://user:pass@example.com'), null)
+  assert.equal(externalUrl('file:///etc/passwd'), null)
+  assert.equal(externalUrl('javascript:alert(1)'), null)
 })

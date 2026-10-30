@@ -13,7 +13,7 @@ import { localDeviceStatus, localQuota } from './daemon'
 import { AppLoadState, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { NotificationCenter } from './notification-center'
-import { appExternalUrl, desktopAuthState, externalUrl, insecureExternalUrl, navigationDecision } from './security'
+import { appExternalUrl, desktopAuthState, externalUrl, navigationDecision } from './security'
 
 const APP_URL = __MIKKA_APP_URL__
 const APP_VERSION = __MIKKA_APP_VERSION__
@@ -119,28 +119,10 @@ function handleNavigation(event: Electron.Event, url: string): void {
   openOutside(url)
 }
 
-const INSECURE_LINK_COPY = {
-  zh: { message: '链接未加密', open: '在浏览器中打开', cancel: '取消' },
-  en: { message: 'This link is not encrypted', open: 'Open in browser', cancel: 'Cancel' },
-} as const
-let insecurePromptOpen = false
-
-/**
- * HTTPS and mailto go to the system browser. A plain-HTTP link used to be
- * dropped without a word; it still never opens on its own, but the user sees
- * it and can choose to open it in the browser, as the web app would.
- */
+/** HTTP(S) and mailto go to the system browser; other schemes are denied. */
 function openOutside(url: string): void {
   const target = externalUrl(url)
-  if (target) { void shell.openExternal(target); return }
-  const insecure = insecureExternalUrl(url)
-  if (!insecure || insecurePromptOpen) return
-  insecurePromptOpen = true
-  const copy = INSECURE_LINK_COPY[app.getLocale().toLowerCase().startsWith('zh') ? 'zh' : 'en']
-  void messageBox({ type: 'warning', message: copy.message, detail: insecure, buttons: [copy.open, copy.cancel], defaultId: 1, cancelId: 1, noLink: true })
-    .then(({ response }) => { if (response === 0) return shell.openExternal(insecure) })
-    .catch(() => {})
-    .finally(() => { insecurePromptOpen = false })
+  if (target) void shell.openExternal(target)
 }
 
 function openChild(url: string): void {
