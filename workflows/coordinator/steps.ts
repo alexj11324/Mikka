@@ -21,6 +21,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
+import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
@@ -136,6 +137,8 @@ export async function pushToPhones(userId: string, botId: string | null, text: s
  */
 export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
+  // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
+  // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1') {
     const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     await factoryRuntimeForBot(botId).reconcile(userId)
@@ -162,7 +165,8 @@ export async function preparePrompt(userId: string, botId: string | null = null,
   const base = snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS)
   const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
   const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
-  return { instructions: instructionsWithMemory(instructions, memory) + factoryPolicy, messages: promptMessages(summary, messages, summaryTrust) }
+  // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
+  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions), memory) + factoryPolicy, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }

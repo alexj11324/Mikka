@@ -170,7 +170,6 @@ export function MembersSettings({
       year: "numeric",
       month: "short",
       day: "numeric",
-      timeZone: "UTC",
     });
   const members = data.members
     .filter((member) =>

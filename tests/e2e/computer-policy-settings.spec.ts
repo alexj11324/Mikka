@@ -3,7 +3,7 @@ import { test, expect, register } from './fixtures'
 // Real application, normal allocated account and browser interaction. Only the
 // computer-policy response is a bounded UI fixture. The actual PostgreSQL policy
 // and owner/deny enforcement run in the mandatory cloud/computer database suites.
-test('电脑策略可以选择并重载允许，非管理员不能修改', async ({ page }, testInfo) => {
+test('电脑操作可以选择并重载允许，非管理员只看到当前值', async ({ page }, testInfo) => {
   let permission: 'allow' | 'ask' | 'deny' = 'ask'
   let canEdit = true
   const writes: string[] = []
@@ -17,7 +17,8 @@ test('电脑策略可以选择并重载允许，非管理员不能修改', async
     }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, permission, canEdit }) })
   })
-  await register(page, '/settings?section=workspace')
+  await register(page, '/settings?section=permissions')
+  await expect(page.getByRole('heading', { name: '电脑操作', exact: true })).toBeVisible()
   const controls = page.getByRole('group', { name: 'Bot 操作电脑', exact: true })
   const allow = controls.getByRole('button', { name: '允许', exact: true })
   const ask = controls.getByRole('button', { name: '操作前审批', exact: true })
@@ -40,8 +41,9 @@ test('电脑策略可以选择并重载允许，非管理员不能修改', async
   expect(writes).toEqual(['allow', 'deny', 'ask'])
   canEdit = false
   await page.reload()
-  await expect(allow).toBeDisabled()
-  await expect(ask).toBeDisabled()
-  await expect(deny).toBeDisabled()
+  // Non-admins see the value as text, with no control they cannot use.
+  await expect(page.getByText('操作前审批', { exact: true })).toBeVisible()
+  await expect(controls).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^(允许|操作前审批|禁止)$/ })).toHaveCount(0)
   expect(writes).toEqual(['allow', 'deny', 'ask'])
 })

@@ -7,6 +7,7 @@ import { rememberLocale } from '@/lib/suggestions/action-title-server'
 import { ensureComposioTriggers } from '@/lib/suggestions/sources'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { listSuggestions, recordTimeZone, todaysBriefing } from '@/lib/suggestions/store'
+import { manualTimeZone } from '@/lib/suggestions/time-zone'
 
 export const runtime = 'nodejs'
 
@@ -18,7 +19,8 @@ const headers = { 'Cache-Control': 'private, no-store' }
  * (R-21). Reading the list still writes the day's briefing if the briefings
  * cron has not, and wakes the Coordinator to deliver it. `tz` is the person's
  * IANA time zone, remembered so the cron writes at 08:00 their time; without
- * it the visitor's location decides.
+ * it the visitor's location decides. A zone the person picked in Settings
+ * ('manual') is used instead and is not replaced.
  * `locale` is the UI language, remembered so new items' action lines (R-45)
  * are written in it.
  */
@@ -45,7 +47,8 @@ export async function GET(request: Request) {
       catch (error) { console.error('Remembering the locale failed', error instanceof Error ? error.message : error) }
     })
   }
-  const timeZone = browserTimeZone ?? request.headers.get('x-vercel-ip-timezone')
+  // A zone picked in Settings wins over what this browser or IP reports.
+  const timeZone = await manualTimeZone(user.id) ?? browserTimeZone ?? request.headers.get('x-vercel-ip-timezone')
   const [, items] = await Promise.all([todaysBriefing(user.id, timeZone, { onPushed: () => after(() => wakeCoordinator(user.id)) }), listSuggestions(user.id)])
   const executions = items.length ? (await pool.query('SELECT "suggestionId",status,"runId","subagentId" FROM suggestion_executions WHERE "ownerId"=$1 AND "suggestionId"=ANY($2::uuid[])', [user.id, items.map(item => item.id)])).rows : []
   const execution = new Map(executions.map(row => [row.suggestionId as string, row]))

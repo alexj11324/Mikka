@@ -88,7 +88,7 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
   }
   await title.fill('')
   await signOut()
-  await expect(page.getByRole('alert').filter({ hasText: '请填写任务标题，修改尚未保存。' })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: '任务标题不能为空，修改未保存。' })).toBeVisible()
   await expect(title).toHaveValue('')
   expect(requests).toBe(0)
   await expect(page.getByRole('status', { name: '正在退出…', exact: true })).toHaveCount(0)
@@ -117,7 +117,7 @@ test('failed sign-out preserves an invalid project draft and its validation erro
   await expect(name).toBeVisible()
   await name.fill('')
   await name.press('Tab')
-  await expect(page.getByText('项目名称不能为空。', { exact: true })).toBeVisible()
+  await expect(page.getByText('项目名称不能为空', { exact: true })).toBeVisible()
 
   let release!: () => void
   const gate = new Promise<void>(resolve => { release = resolve })
@@ -138,6 +138,6 @@ test('failed sign-out preserves an invalid project draft and its validation erro
   await expect(name).toBeVisible()
   await expect(name).toHaveText('')
   await expect(name).toHaveAttribute('aria-invalid', 'true')
-  await expect(page.getByText('项目名称不能为空。', { exact: true })).toBeVisible()
+  await expect(page.getByText('项目名称不能为空', { exact: true })).toBeVisible()
   await expect(page.getByRole('alert').filter({ hasText: '退出失败，请稍后重试。' })).toBeVisible()
 })

@@ -1,17 +1,18 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import {
   agents, agentRuns, deviceRepos, devices, issueMembers, runChunks, runMessages, users,
   type SupportedHarness,
 } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS, issueDeviceToken } from '@/lib/device-link'
+import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
 import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
@@ -20,7 +21,9 @@ import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
-import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, type IssueThread } from '@/lib/issue-threads'
+import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
+import { threadQuestionStates } from '@/lib/issue-thread-questions'
+import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
 async function getUserId(): Promise<string> {
@@ -63,7 +66,7 @@ export interface AgentView {
 /** Every local device this person owns, with its repository history. */
 export async function listDevices(): Promise<DeviceView[]> {
   const userId = await getUserId()
-  const rows = await db.select().from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'))).orderBy(desc(devices.lastSeenAt))
+  const rows = await db.select().from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'), isNull(devices.removedAt))).orderBy(desc(devices.lastSeenAt))
   const repos = rows.length
     ? await db.select().from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
@@ -105,9 +108,23 @@ export async function setDeviceEnabled(input: { deviceId: string; enabled: boole
     if (!parsed.success) return { error: 'deviceNotFound' }
     await db.update(devices)
       .set({ enabled: parsed.data.enabled, updatedAt: new Date() })
-      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId)))
+      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt)))
     return { success: true }
   })
+}
+
+/** Renames one of the person's devices (1–60 characters); the daemon keeps the new name. */
+export async function renameDevice(id: string, name: string): Promise<ActionResult<{ id: string; name: string }>> {
+  return runAction(async () => renameOwnedDevice(await getUserId(), id, name))
+}
+
+/**
+ * Removes one of the person's devices. Refused with `deviceHasActiveRuns`
+ * while a thread is live on it. Its daemon credentials are revoked at once;
+ * past threads keep their device (lib/device-removal.ts).
+ */
+export async function removeDevice(id: string): Promise<ActionResult<{ id: string; revokedTokens: number }>> {
+  return runAction(async () => removeOwnedDevice(await getUserId(), id))
 }
 
 /** The hosts in this server's `~/.ssh/config`, offered as one-click targets. */
@@ -155,10 +172,15 @@ const threadColumns = {
 export async function listIssueThreads(issueId: string): Promise<IssueThread[]> {
   const { issue, user, memberIds } = await issueThreadAccess(issueId)
   if (!memberIds.has(user.id)) return []
+  // BE-18: fold continuation chains by root first, then take the newest ISSUE_THREAD_LIMIT
+  // roots, so continuations never use up a slot (lib/run-chain.ts). Read-only, no locks.
+  const chains = await listIssueRunChains(pool, issue.id, [...memberIds], ISSUE_THREAD_LIMIT)
+  if (!chains.length) return []
   const rows = await db.select(threadColumns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
-    .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds])))
+    .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds]), inArray(agentRuns.id, chains.map(chain => chain.rootRunId))))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
-  return projectIssueThreads(rows, issue.id, user.id, memberIds)
+  const byRoot = new Map(chains.map(chain => [chain.rootRunId, chain]))
+  return threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)
 }
 
 async function readableThread(issueId: string, runId: string) {
@@ -177,6 +199,23 @@ export interface IssueThreadDetail {
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
 }
 
+/**
+ * Which of the viewer's own threads end on a run that owes them an answer, or whose answer is
+ * resuming them. Only the owner may answer (lib/agent-runs.ts), and only while Factory lifecycle
+ * is on; the answer itself goes through sendIssueThreadMessage to the chain's latestRunId.
+ * A teammate's thread or a live run never carries a question.
+ */
+async function threadQuestions(threads: readonly IssueThread[], viewerId: string): Promise<IssueThread[]> {
+  // Keyed by the chain's live end (threadQuestionRunId), so an earlier attempt's answered question never resurfaces.
+  const asked = new Map(threads.flatMap(thread => {
+    const runId = thread.ownedByCurrentUser ? threadQuestionRunId(thread) : null
+    return runId ? [[thread.id, runId] as const] : []
+  }))
+  if (!asked.size || process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return [...threads]
+  const byRun = await threadQuestionStates(pool, [...new Set(asked.values())], viewerId)
+  return threads.map(thread => ({ ...thread, question: byRun.get(asked.get(thread.id) ?? '') ?? null }))
+}
+
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
 export async function getIssueThread(issueId: string, runId: string): Promise<IssueThreadDetail> {
   const { row, user } = await readableThread(issueId, runId)
@@ -185,9 +224,16 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
-  const [thread] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
+  // The run that resumes this one after an answered question is the same thread: its chain (BE-18).
+  const [projected] = projectIssueThreads([row], row.issueId ?? '', user.id, new Set([user.id]))
+  const chain = projected ? await readRunChain(pool, row.userId, row.id) : null
+  const [thread] = projected ? await threadQuestions([withRunChain(projected, chain)], user.id) : []
+  if (!thread) throw new ActionFailureError('runNotFound')
+  // A stop request belongs to the live run that send and stop address, not to an earlier attempt.
+  const live = chain?.attempts.find(attempt => attempt.runId === thread.latestRunId)
+  const stopRequestedAt = live && live.runId !== row.id ? live.stopRequestedAt : row.stopRequestedAt
   return {
-    thread: { ...thread, prompt: row.prompt, stopRequestedAt: row.stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, prompt: row.prompt, stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }
@@ -221,6 +267,6 @@ export async function getThreadName(runId: string): Promise<string | null> {
 }
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
-export async function stopRun(runId: string): Promise<void> {
-  await requestRunStop(await getUserId(), runId)
+export async function stopRun(runId: string): Promise<{ stoppedRunIds: string[] }> {
+  return requestRunStop(await getUserId(), runId)
 }

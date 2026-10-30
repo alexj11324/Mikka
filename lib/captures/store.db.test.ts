@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 // Run captures belong to one run and its owner: teammates, other devices and
 // other workspaces never read, share or make them. Uploads count only once
@@ -12,10 +13,7 @@ import test from 'node:test'
 let databaseUrl: string | undefined
 try {
   const target = new URL(process.env.E2E_DATABASE_URL ?? '')
-  if (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true'
-    && ['postgres:', 'postgresql:'].includes(target.protocol)
-    && target.hostname === '127.0.0.1' && target.port === '5432' && target.pathname === '/mikka_e2e'
-    && !target.search && !target.hash && process.env.MIKKA_DATABASE_URL === target.href
+  if (isE2eTarget(target.href) && process.env.MIKKA_DATABASE_URL === target.href
     && process.env.DATABASE_URL === target.href) databaseUrl = target.href
 } catch { /* no eligible disposable CI database */ }
 if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')

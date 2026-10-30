@@ -4,7 +4,7 @@ const allowedProperties = new Set([
   '$lib', '$lib_version', '$browser', '$browser_version', '$os', '$os_version', '$device_type',
   '$screen_width', '$screen_height', '$viewport_width', '$viewport_height', '$is_identified', '$process_person_profile',
   '$feature_flag', '$feature_flag_response', '$feature_flag_request_id', '$feature_flag_reason', '$feature_flag_error', '$active_feature_flags',
-  'app', 'environment', 'runtime', 'section',
+  'app', 'environment', 'runtime', 'section', 'test_account',
 ])
 
 export function analyticsPath(pathname: string) {

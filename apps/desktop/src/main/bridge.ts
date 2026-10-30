@@ -13,6 +13,7 @@ import { isTrustedFrame } from './security'
 export interface BridgeOptions {
   appUrl: string
   openExternal(url: string): Promise<void>
+  prepareAuth(state: string): Promise<string>
   localDevice(): Promise<LocalDevice>
   quota(): Promise<QuotaSnapshotReport>
   notifications: NotificationCenter
@@ -33,6 +34,7 @@ export function registerBridge(options: BridgeOptions): void {
   }
 
   handle(IPC.appOpenExternal, url => options.openExternal(typeof url === 'string' ? url : ''))
+  handle(IPC.appPrepareAuth, state => options.prepareAuth(typeof state === 'string' ? state : ''))
   handle(IPC.deviceStatus, () => options.localDevice())
   handle(IPC.quotaGet, () => options.quota())
   handle(IPC.notificationsShow, notification => options.notifications.show(notification))

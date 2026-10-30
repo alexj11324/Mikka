@@ -121,7 +121,7 @@ source wins in a conflict is in [`README.md`](README.md).
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
   shows a machine picker.
-- **R-23** Machine picker order: **Mikka Cloud** first and selected by
+- **R-23** Machine picker order: **E2B** first and selected by
   default; then the group **本机** (this Mac, a local Linux machine); then the
   group **Remote control** (VPS and SSH hosts reached through the user's
   machine). Settings › 设备 uses the same two groups.
@@ -348,7 +348,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 ## Copy
 
 - **R-40** No filler or explanatory copy in the UI (口水话; Alex repeated
-  this on 2026-10-23 and 2026-10-24). If a sentence only explains the screen
+  this on 2026-10-23 and 2026-10-24). How the remaining words must be written
+  — status lines, no colloquial phrasing, no apology, no 「请」 — is
+  [`copy.md`](copy.md) (C-01…C-08). If a sentence only explains the screen
   or narrates state, remove it. Examples that were removed: 「谁在工作 · 1 个
   agent 正在处理任务」 above the composer, 「和你的 Coordinator 聊聊」,
   「有值得看的会第一时间放到这里」, and on a login sheet the subtitle

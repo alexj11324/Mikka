@@ -15,7 +15,8 @@ export function CoordinatorReply({ text, citations }: { text: string; citations:
   return <AgentCitationsContext value={citations}>
     <div className="flex w-full min-w-0 flex-col gap-2 break-words">
       <ReplyBubbles value><AgentGenerativeUI response={text} isStreaming={false} onAction={() => {}} showErrors={false} /></ReplyBubbles>
-      <CitationSources text={text} />
+      {/* A choice card already shows its task chip; no "N sources" footnote under it. */}
+      {!/\bBeQuestions\(/.test(text) && <CitationSources text={text} />}
     </div>
   </AgentCitationsContext>
 }
