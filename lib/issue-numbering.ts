@@ -8,7 +8,10 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 export async function allocateIssueNumbers(tx: Transaction, ownerId: string) {
   // Lock the owner row so concurrent creates and legacy backfills never allocate the same number.
-  await tx.select({ id: users.id }).from(users).where(eq(users.id, ownerId)).for('update')
+  // NO KEY UPDATE still serializes numbering, but unlike UPDATE it does not block
+  // foreign-key checks (KEY SHARE) on this user from transactions that already hold an
+  // issue row lock, which deadlocked against the issue lock below.
+  await tx.select({ id: users.id }).from(users).where(eq(users.id, ownerId)).for('no key update')
   const rows = await tx.select({ id: issues.id, content: issues.content }).from(issues).where(eq(issues.userId, ownerId)).orderBy(asc(issues.createdAt), asc(issues.id)).for('update')
   let next = rows.reduce((max, row) => Math.max(max, readIssueMetadata(row.content).number ?? 0), 0)
   for (const row of rows) {

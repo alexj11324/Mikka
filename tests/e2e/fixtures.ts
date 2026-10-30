@@ -1,6 +1,6 @@
 import { randomBytes, randomInt, randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
-import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
+import { test as base, expect, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import { Pool } from 'pg'
 import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 
@@ -83,6 +83,13 @@ export async function seedSuggestion(page: Page, { source = 'gmail', action = 'r
 export function conversationPill(page: Page) {
   // Conversations opened earlier stay mounted but hidden; only the current one is visible.
   return page.locator('[data-slot="conversation-pill"]:visible [data-slot="conversation-pill-title"]')
+}
+
+// The composer is server-rendered. Text typed before React hydrates it can be
+// reset to the controlled (empty) value, which no person could do in practice
+// and made the composer tests flaky. Type only once React owns the field.
+export async function hydrated(field: Locator) {
+  await expect.poll(() => field.evaluate(element => Object.keys(element).some(key => key.startsWith('__reactProps$')))).toBe(true)
 }
 
 type ExpectedConsoleError = { path: string; message: string }

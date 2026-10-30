@@ -1,4 +1,4 @@
-import { test, expect, register, conversationPill } from './fixtures'
+import { test, expect, register, conversationPill, hydrated } from './fixtures'
 
 // The left column is a list of bots; the Coordinator is one of them. Every bot
 // chats on the Coordinator harness, in its own conversation. No model runs in
@@ -76,6 +76,7 @@ test('连续按下发送只提交一次', async ({ page }) => {
     return route.fallback()
   })
   const composer = page.getByLabel('给 Coordinator 发消息', { exact: true })
+  await hydrated(composer)
   await composer.fill('只提交一次')
   await composer.press('Enter')
   await composer.press('Enter')
@@ -88,6 +89,7 @@ test('连续按下发送只提交一次', async ({ page }) => {
 test('发送失败后草稿仍保留，恢复后可再发', async ({ page }) => {
   await register(page)
   const composer = page.getByLabel('给 Coordinator 发消息', { exact: true })
+  await hydrated(composer)
   await composer.fill('发送失败时保留')
   const failPost = async (route: import('@playwright/test').Route) => {
     const request = route.request()
@@ -108,6 +110,7 @@ test('发送失败后草稿仍保留，恢复后可再发', async ({ page }) => 
 test('接近长度上限时显示计数，超长输入被截断但不清空', async ({ page }) => {
   await register(page)
   const composer = page.getByLabel('给 Coordinator 发消息', { exact: true })
+  await hydrated(composer)
   await composer.fill('字'.repeat(9600))
   await expect(page.getByText('9600 / 10000')).toBeVisible()
   await composer.fill('字'.repeat(10500))
@@ -119,7 +122,9 @@ test('接近长度上限时显示计数，超长输入被截断但不清空', as
 // find them.
 test('登出会清除本标签页里未发送的草稿', async ({ page }) => {
   await register(page)
-  await page.getByLabel('给 Coordinator 发消息', { exact: true }).fill('登出前的草稿')
+  const composer = page.getByLabel('给 Coordinator 发消息', { exact: true })
+  await hydrated(composer)
+  await composer.fill('登出前的草稿')
   const stored = () => page.evaluate(() => Object.keys(sessionStorage).filter(key => key.startsWith('mikka:draft:')))
   expect((await stored()).length).toBe(1)
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
