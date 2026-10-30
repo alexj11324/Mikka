@@ -8,7 +8,7 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { issueVisibility } from '@/lib/issue-visibility'
-import { BOT_MODEL_GROUPS, botThreadsInput, botThreadTitle, decodeBotThreadCursor, encodeBotThreadCursor, type BotModelGroup } from '@/lib/workspace-admin/bot-threads'
+import { BOT_MODEL_GROUPS, botThreadsInput, botThreadHref, botThreadTitle, decodeBotThreadCursor, encodeBotThreadCursor, type BotModelGroup } from '@/lib/workspace-admin/bot-threads'
 
 export interface BotDefaults { defaultModel: WorkspaceBotModel | null; defaultRepository: string | null }
 export interface BotDefaultOptions extends BotDefaults {
@@ -106,26 +106,38 @@ export async function workspaceBots(workspaceId: string): Promise<WorkspaceBotVi
 }
 
 export interface BotThreadView {
-  /** agent_runs.id */
-  id: string
-  /** Task title or the thread's opening line; null when the viewer may not see it (show 私有线程). */
+  /** `issue:<issueId>` (a task's thread) or `chat:<userId>` (one person's chat with this bot). Row key and cursor key. */
+  threadId: string
+  /** Task title or the chat's opening line; null when the viewer may not see it (show 私有线程). */
   title: string | null
-  /** 运行中 for any unfinished run (queued included), else 已完成 (done, failed or stopped). */
+  /** The thread's latest run: 运行中 for any unfinished status (queued included), else 已完成. */
   status: 'running' | 'done'
-  updatedAt: string
+  /** Latest activity across all of the thread's runs (updatedAt / lastReplyAt). */
+  lastActivityAt: string
+  /** True only when the viewer may open the thread. */
+  canOpen: boolean
+  /** In-app link to the thread; null when !canOpen. */
+  href: string | null
 }
 
 export interface BotThreadPage {
   bot: { id: string; name: string }
+  /** Drawer subtitle data (no text): every thread of this bot, open or not. */
+  summary: { totalThreads: number; lastActivityAt: string | null }
   threads: BotThreadView[]
   /** Pass back as `cursor` for the next page; null on the last page. */
   nextCursor: string | null
 }
 
+const iso = (column: ReturnType<typeof sql>) => sql<string>`to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
+
 /**
- * WS-07 线程列表: one bot's threads (its agent runs), newest first. Any active
- * member of the bot's workspace may read the list, like workspaceBots; titles
- * follow botThreadTitle's visibility rule. Keyset on (createdAt, id) DESC.
+ * WS-07 线程列表: one bot's threads, most recently active first. Runs are
+ * grouped per thread (a task, or one person's chat with the bot), so several
+ * runs show as one row with the latest run's status. Any active member of the
+ * bot's workspace may read the list; titles follow botThreadHref, botThreadTitle, and a
+ * chat's prompt is only selected from the database for its own owner.
+ * Keyset on (lastActivityAt, threadId) DESC with a row comparison.
  */
 // TODO(audit): reading threads is not audited; if bot settings writes need audit, call
 // recordAudit(tx, …) from lib/audit/record (PR #432) inside the bot/defaults update transaction.
@@ -136,15 +148,34 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
   if (!bot) throw new WorkspaceError('botNotFound')
   const position = cursor ? decodeBotThreadCursor(cursor) : null
   if (cursor && !position) throw new WorkspaceError('validationGeneric')
-  const after = position
-    ? sql`(${agentRuns.createdAt}, ${agentRuns.id}) < (${position.createdAt}::timestamptz, ${position.id}::uuid)`
-    : undefined
-  const rows = await db.select({
-    id: agentRuns.id, userId: agentRuns.userId, issueId: agentRuns.issueId, status: agentRuns.status, prompt: agentRuns.prompt,
-    createdAt: sql<string>`to_char(${agentRuns.createdAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
-    updatedAt: agentRuns.updatedAt, issueTitle: issues.title,
-  }).from(agentRuns).leftJoin(issues, eq(issues.id, agentRuns.issueId))
-    .where(and(eq(agentRuns.botId, botId), after)).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(limit + 1)
+  const threadKey = sql`case when ${agentRuns.issueId} is not null then 'issue:' || ${agentRuns.issueId}::text else 'chat:' || ${agentRuns.userId} end`
+  const activity = sql`greatest(${agentRuns.updatedAt}, coalesce(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt}))`
+  const runs = db.$with('bot_thread_runs').as(db.select({
+    threadId: sql<string>`${threadKey}`.as('threadId'),
+    issueId: agentRuns.issueId,
+    ownerId: agentRuns.userId,
+    status: agentRuns.status,
+    createdAt: agentRuns.createdAt,
+    id: agentRuns.id,
+    activity: sql<Date>`${activity}`.as('activity'),
+    // The prompt leaves the database only for the viewer's own chat runs.
+    prompt: sql<string | null>`case when ${agentRuns.issueId} is null and ${agentRuns.userId} = ${viewerId} then ${agentRuns.prompt} end`.as('prompt'),
+  }).from(agentRuns).where(eq(agentRuns.botId, botId)))
+  const threads = db.$with('bot_threads').as(db.with(runs).selectDistinctOn([runs.threadId], {
+    threadId: runs.threadId, issueId: runs.issueId, ownerId: runs.ownerId, status: runs.status,
+    lastActivity: sql<Date>`max(${runs.activity}) over (partition by ${runs.threadId})`.as('lastActivity'),
+    opening: sql<string | null>`first_value(${runs.prompt}) over (partition by ${runs.threadId} order by ${runs.createdAt}, ${runs.id})`.as('opening'),
+  }).from(runs).orderBy(runs.threadId, desc(runs.createdAt), desc(runs.id)))
+  const after = position ? sql`(${threads.lastActivity}, ${threads.threadId}) < (${position.at}::timestamptz, ${position.threadId})` : undefined
+  const rows = await db.with(runs, threads).select({
+    threadId: threads.threadId, issueId: threads.issueId, ownerId: threads.ownerId, status: threads.status, opening: threads.opening,
+    lastActivityAt: iso(sql`${threads.lastActivity}`), issueTitle: issues.title,
+  }).from(threads).leftJoin(issues, eq(issues.id, threads.issueId))
+    .where(after).orderBy(desc(threads.lastActivity), desc(threads.threadId)).limit(limit + 1)
+  const [summary] = await db.with(runs).select({
+    totalThreads: sql<number>`count(distinct ${runs.threadId})::int`,
+    lastActivityAt: sql<string | null>`to_char(max(${runs.activity}) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+  }).from(runs)
   const page = rows.slice(0, limit)
   const issueIds = [...new Set(page.flatMap(row => row.issueId && row.issueTitle !== null ? [row.issueId] : []))]
   let visible = new Set<string>()
@@ -154,12 +185,23 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
     visible = new Set(seen.map(row => row.id))
   }
   const unfinished = new Set<string>(UNFINISHED_RUN_STATUSES)
-  const threads = page.map(row => ({
-    id: row.id,
-    title: botThreadTitle({ issueTitle: row.issueTitle, issueVisible: !!row.issueId && visible.has(row.issueId), prompt: row.prompt, startedByViewer: row.userId === viewerId }),
-    status: unfinished.has(row.status) ? 'running' as const : 'done' as const,
-    updatedAt: row.updatedAt.toISOString(),
-  }))
+  const views = page.map(row => {
+    const issueVisible = !!row.issueId && visible.has(row.issueId)
+    const href = botThreadHref({ issueId: row.issueId, ownerId: row.ownerId, botId }, { id: viewerId, issueVisible })
+    return {
+      threadId: row.threadId,
+      title: botThreadTitle({ issueTitle: row.issueTitle, issueVisible, prompt: row.opening, startedByViewer: row.ownerId === viewerId }),
+      status: unfinished.has(row.status) ? 'running' as const : 'done' as const,
+      lastActivityAt: row.lastActivityAt,
+      canOpen: href !== null,
+      href,
+    }
+  })
   const last = page.at(-1)
-  return { bot, threads, nextCursor: rows.length > limit && last ? encodeBotThreadCursor({ createdAt: last.createdAt, id: last.id }) : null }
+  return {
+    bot,
+    summary: { totalThreads: summary?.totalThreads ?? 0, lastActivityAt: summary?.lastActivityAt ?? null },
+    threads: views,
+    nextCursor: rows.length > limit && last ? encodeBotThreadCursor({ at: last.lastActivityAt, threadId: last.threadId }) : null,
+  }
 }

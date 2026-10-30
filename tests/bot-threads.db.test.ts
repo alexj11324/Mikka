@@ -19,48 +19,77 @@ test('bot thread list', { skip: !dbUrl }, async t => {
   const bot = await seedBot(pool, ws.id, owner, 'Reviewer')
   const foreignBot = await seedBot(pool, other.id, outsider)
   const agent = await seedAgent(pool, owner)
-  const privateIssue = await seedIssue(pool, owner)
-  await pool.query(`update issues set title='Owner private task' where id=$1`, [privateIssue])
-  const runs: string[] = []
-  for (let i = 0; i < 5; i++) {
-    const id = await seedRun(pool, { userId: owner, agentId: agent, botId: bot, status: i === 4 ? 'queued' : i === 3 ? 'running' : i === 2 ? 'failed' : 'succeeded', issueId: i === 0 ? privateIssue : null })
-    await pool.query(`update agent_runs set prompt=$2, "createdAt"=now() - ($3 || ' minutes')::interval where id=$1`, [id, `Chat ${i}\nmore`, String(10 - i)])
-    runs.push(id)
+  const issueA = await seedIssue(pool, owner), issueB = await seedIssue(pool, owner)
+  await pool.query(`update issues set title='Owner private task' where id=$1`, [issueA])
+  await pool.query(`update issues set title='Second task' where id=$1`, [issueB])
+  // run(user, issue, status, prompt, minutes ago created, minutes ago updated, lastReply minutes ago)
+  const run = async (userId: string, issueId: string | null, status: string, prompt: string, created: number, updated: number, reply: number | null = null) => {
+    const id = await seedRun(pool, { userId, agentId: agent, botId: bot, status, issueId })
+    await pool.query(`update agent_runs set prompt=$2, "createdAt"=now() - ($3 || ' minutes')::interval, "updatedAt"=now() - ($4 || ' minutes')::interval,
+      "lastReplyAt"=case when $5::text is null then null else now() - ($5 || ' minutes')::interval end where id=$1`, [id, prompt, String(created), String(updated), reply === null ? null : String(reply)])
+    return id
   }
-  // Same createdAt for two rows: keyset must not skip or repeat ties.
-  await pool.query(`update agent_runs set "createdAt"=(select "createdAt" from agent_runs where id=$1) where id=$2`, [runs[1], runs[2]])
+  // Task A: two runs → one row, latest run running, activity = newest of the two.
+  await run(owner, issueA, 'succeeded', 'a1', 60, 50)
+  await run(owner, issueA, 'running', 'a2', 40, 30)
+  // Task B: one finished run; its lastReplyAt (5) is newer than updatedAt (45).
+  await run(owner, issueB, 'succeeded', 'b1', 50, 45, 5)
+  // Owner's chat: three runs, opening line comes from the first; latest finished.
+  await run(owner, null, 'failed', 'Chat opening\nmore', 90, 85)
+  await run(owner, null, 'running', 'Chat middle', 80, 75)
+  await run(owner, null, 'succeeded', 'Chat latest', 20, 10)
+  // Member's chat: same activity as owner's chat to exercise keyset ties.
+  await run(member, null, 'queued', 'Member private ask', 15, 10)
+  await pool.query(`update agent_runs set "updatedAt"=(select max("updatedAt") from agent_runs where "botId"=$1 and "issueId" is null and "userId"=$2) where "botId"=$1 and "userId"=$3`, [bot, owner, member])
   await seedRun(pool, { userId: outsider, agentId: await seedAgent(pool, outsider), botId: foreignBot })
+  const allThreads = [`issue:${issueA}`, `issue:${issueB}`, `chat:${owner}`, `chat:${member}`]
 
-  await t.test('owner sees everything with titles and running/done status', async () => {
+  await t.test('runs aggregate per thread: latest status, last activity, opening title, href', async () => {
     const page = await botAdmin.listBotThreadsFor(owner, ws.id, { botId: bot })
     assert.deepEqual(page.bot, { id: bot, name: 'Reviewer' })
-    assert.equal(page.threads.length, 5)
+    assert.equal(page.summary.totalThreads, 4)
     assert.equal(page.nextCursor, null)
-    const byId = new Map(page.threads.map(row => [row.id, row]))
-    assert.equal(byId.get(runs[0])!.title, 'Owner private task')
-    assert.equal(byId.get(runs[3])!.title, 'Chat 3')
-    assert.deepEqual(runs.map(id => byId.get(id)!.status), ['done', 'done', 'done', 'running', 'running'])
-    assert.equal(page.threads[0].id, runs[4], 'newest first')
-    assert.ok(!Number.isNaN(Date.parse(page.threads[0].updatedAt)))
+    assert.deepEqual(page.threads.map(row => row.threadId).sort(), [...allThreads].sort())
+    const by = new Map(page.threads.map(row => [row.threadId, row]))
+    assert.deepEqual(by.get(`issue:${issueA}`), { threadId: `issue:${issueA}`, title: 'Owner private task', status: 'running', lastActivityAt: by.get(`issue:${issueA}`)!.lastActivityAt, canOpen: true, href: `/?issue=${issueA}` })
+    assert.equal(by.get(`issue:${issueB}`)!.status, 'done')
+    assert.equal(page.threads[0].threadId, `issue:${issueB}`, 'lastReplyAt counts as activity; most recent first')
+    assert.equal(page.summary.lastActivityAt, page.threads[0].lastActivityAt)
+    const chat = by.get(`chat:${owner}`)!
+    assert.deepEqual([chat.title, chat.status, chat.canOpen, chat.href], ['Chat opening', 'done', true, `/?section=coordinator&bot=${bot}`])
+    const memberChat = by.get(`chat:${member}`)!
+    assert.deepEqual([memberChat.title, memberChat.status, memberChat.canOpen, memberChat.href], [null, 'running', false, null])
+    assert.ok(Date.parse(by.get(`issue:${issueA}`)!.lastActivityAt) > Date.parse(chat.lastActivityAt) - 25 * 60_000)
+    assert.ok(!JSON.stringify(page).includes('Member private ask'))
   })
 
-  await t.test('another member sees the list but no private titles or prompts', async () => {
+  await t.test('another member: no task titles, no owner prompt, only own chat opens', async () => {
     const page = await botAdmin.listBotThreadsFor(member, ws.id, { botId: bot })
-    assert.equal(page.threads.length, 5)
-    assert.ok(page.threads.every(row => row.title === null))
+    assert.equal(page.summary.totalThreads, 4)
+    const by = new Map(page.threads.map(row => [row.threadId, row]))
+    for (const id of [`issue:${issueA}`, `issue:${issueB}`, `chat:${owner}`]) assert.deepEqual([by.get(id)!.title, by.get(id)!.canOpen, by.get(id)!.href], [null, false, null], id)
+    assert.deepEqual([by.get(`chat:${member}`)!.title, by.get(`chat:${member}`)!.href], ['Member private ask', `/?section=coordinator&bot=${bot}`])
+    assert.ok(!JSON.stringify(page).includes('Chat opening'))
   })
 
-  await t.test('keyset paging covers every thread exactly once, including ties', async () => {
-    const seen: string[] = []
-    let cursor: string | null = null
-    do {
-      const page: Awaited<ReturnType<typeof botAdmin.listBotThreadsFor>> = await botAdmin.listBotThreadsFor(owner, ws.id, { botId: bot, limit: 2, cursor })
-      assert.ok(page.threads.length <= 2)
-      seen.push(...page.threads.map(row => row.id))
-      cursor = page.nextCursor
-    } while (cursor)
-    assert.deepEqual([...seen].sort(), [...runs].sort())
-    assert.equal(new Set(seen).size, runs.length)
+  await t.test('keyset paging by threadId covers every thread exactly once, including ties', async () => {
+    for (const limit of [1, 2, 3]) {
+      const seen: string[] = []
+      let cursor: string | null = null
+      do {
+        const page: Awaited<ReturnType<typeof botAdmin.listBotThreadsFor>> = await botAdmin.listBotThreadsFor(owner, ws.id, { botId: bot, limit, cursor })
+        assert.ok(page.threads.length <= limit)
+        seen.push(...page.threads.map(row => row.threadId))
+        cursor = page.nextCursor
+      } while (cursor)
+      assert.deepEqual([...seen].sort(), [...allThreads].sort(), `limit ${limit}`)
+    }
+  })
+
+  await t.test('empty bot: zero threads and null last activity', async () => {
+    const empty = await seedBot(pool, ws.id, owner, 'Idle')
+    const page = await botAdmin.listBotThreadsFor(owner, ws.id, { botId: empty })
+    assert.deepEqual([page.threads, page.summary, page.nextCursor], [[], { totalThreads: 0, lastActivityAt: null }, null])
   })
 
   await t.test('scoping: other workspace bot, outsiders, suspended members and bad cursors are refused', async () => {
