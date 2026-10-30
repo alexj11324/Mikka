@@ -126,3 +126,11 @@ export async function retireSupersededCiRuns(tx: PoolClient, userId: string, cur
     RETURNING id`, [userId, current.issueId, current.remoteKey, String(current.prNumber), current.head, current.fingerprint])
   return result.rowCount ?? 0
 }
+
+/** Kill switch at claim: with MIKKA_CI_RESUME_ENABLED off, an already-queued CI
+ * follow-up is stopped instead of reaching a model. */
+export async function retireDisabledCiRun(userId: string, runId: string) {
+  const result = await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='superseded',error='CI resume is disabled.',"finishedAt"=now(),"updatedAt"=now()
+    WHERE id=$1 AND "userId"=$2 AND status='queued' AND "stopRequestedAt" IS NULL AND "ciContinuation" IS NOT NULL RETURNING id`, [runId, userId])
+  return Boolean(result.rowCount)
+}

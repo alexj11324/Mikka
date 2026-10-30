@@ -34,7 +34,9 @@ test('only failed suggestion deliveries in the window are redelivered, once per 
   ], since)
   assert.deepEqual(picked.map(item => item.id), ['1', '103'])
   assert.equal(failedDeliveries([delivery(1, 'a', 30, 503), delivery(2, 'b', 31, 503)], since, 1).length, 1)
-  assert.equal(failedDeliveries([delivery(7, 'ci', 30, 503, 'workflow_run')], since)[0]?.id, '7')
+  // CI deliveries are only handled, and redelivered, with MIKKA_CI_RESUME_ENABLED on.
+  assert.equal(failedDeliveries([delivery(7, 'ci', 30, 503, 'workflow_run')], since).length, 0)
+  assert.equal(failedDeliveries([delivery(7, 'ci', 30, 503, 'workflow_run')], since, undefined, true)[0]?.id, '7')
 })
 
 test('reads the next page cursor from the Link header', () => {

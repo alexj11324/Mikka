@@ -29,6 +29,7 @@ import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { PublicationError } from '@/lib/run-publication-result'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
+import { ciResumeEnabled } from '@/lib/github/ci/flag'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,10 +74,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
   let ciGeneration: string | undefined
   if (run.ciContinuation) {
-    const { preflightCiClaim, retireStaleCiRun } = await import('@/lib/ci-continuation')
+    const { preflightCiClaim, retireStaleCiRun, retireDisabledCiRun } = await import('@/lib/ci-continuation')
+    // Kill switch: a follow-up queued while CI resume was on never reaches a model once it is off.
+    if (!ciResumeEnabled()) {
+      if (await retireDisabledCiRun(caller.userId, runId)) await afterRunEnded(caller.userId, runId)
+      return NextResponse.json({ error: 'CI resume is disabled.' }, { status: 409 })
+    }
     const ciStatus = await preflightCiClaim(caller.userId, run.ciContinuation)
     if (ciStatus.kind === 'stale') {
       const retired = await retireStaleCiRun(caller.userId, runId, run.ciContinuation, ciStatus.generation)
+      if (retired) await afterRunEnded(caller.userId, runId)
       return NextResponse.json({ error: retired ? 'CI result is no longer current.' : 'CI status changed; retry.' }, { status: retired ? 409 : 503 })
     }
     if (ciStatus.kind === 'unavailable') return NextResponse.json({ error: 'CI status is temporarily unavailable.' }, { status: 503 })

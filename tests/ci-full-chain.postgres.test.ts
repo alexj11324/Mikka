@@ -5,13 +5,11 @@ import { readdir, readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { orderMigrations } from '../scripts/migration-order.mjs'
+import { isE2eTarget, E2E_DB_RULE } from './helpers/e2e-target.mjs'
 
-const target = process.env.CI_CHAIN_DATABASE_URL ?? (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' ? process.env.E2E_DATABASE_URL : undefined)
+const target = process.env.CI_CHAIN_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (!target && process.env.REQUIRE_DB === '1') throw new Error('CI full-chain database fixture is required')
-if (target) {
-  const url = new URL(target)
-  if (url.protocol !== 'postgresql:' || url.hostname !== '127.0.0.1' || url.port !== '5432' || url.pathname !== '/mikka_e2e' || url.search || url.hash) throw new Error('CI fixture requires isolated loopback mikka_e2e')
-}
+if (target && !isE2eTarget(target)) throw new Error(E2E_DB_RULE)
 
 test('isolated PG: signed webhook schedules, snapshot settles, real admission queues and claim binds the original session', { skip: !target, timeout: 90_000 }, async () => {
   const schema = `ci_full_${randomUUID().replaceAll('-', '')}`
@@ -21,7 +19,7 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
   fixtureURL.searchParams.set('options', `-c search_path=${schema}`)
   const databaseURL = fixtureURL.toString()
   const fixture = new Pool({ connectionString: databaseURL, max: 10 })
-  const previous = { MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL, GITHUB_WEBHOOK_SECRET: process.env.GITHUB_WEBHOOK_SECRET, GITHUB_APP_ID: process.env.GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY: process.env.GITHUB_APP_PRIVATE_KEY, NODE_ENV: process.env.NODE_ENV }
+  const previous = { MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL, GITHUB_WEBHOOK_SECRET: process.env.GITHUB_WEBHOOK_SECRET, GITHUB_APP_ID: process.env.GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY: process.env.GITHUB_APP_PRIVATE_KEY, NODE_ENV: process.env.NODE_ENV, MIKKA_CI_RESUME_ENABLED: process.env.MIKKA_CI_RESUME_ENABLED }
   const originalFetch = globalThis.fetch
   process.env.MIKKA_DATABASE_URL = databaseURL
   process.env.DATABASE_URL = databaseURL
@@ -29,9 +27,10 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
   process.env.GITHUB_APP_ID = '123'
   process.env.GITHUB_APP_PRIVATE_KEY = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } }).privateKey
   Object.assign(process.env, { NODE_ENV: 'test' })
+  delete process.env.MIKKA_CI_RESUME_ENABLED
   let scopedPool: Pool | undefined, workspacePool: Pool | undefined
   try {
-    assert.equal((await fixture.query('SHOW server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+    assert.ok(Number((await fixture.query('SHOW server_version_num')).rows[0].server_version_num) >= 160000)
     const migrations = new URL('../drizzle/', import.meta.url)
     // This fixture skips only the unrelated global pg_trgm search index migration:
     // CREATE EXTENSION is database-global and outside its private schema.
@@ -86,6 +85,12 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
       return new Request('http://localhost/api/webhooks/github', { method: 'POST', body: raw, headers: { 'x-github-event': 'workflow_run', 'x-hub-signature-256': `sha256=${createHmac('sha256', process.env.GITHUB_WEBHOOK_SECRET!).update(raw).digest('hex')}` } })
     }
     const invalid = new Request('http://localhost/api/webhooks/github', { method: 'POST', body, headers: { 'x-github-event': 'workflow_run', 'x-hub-signature-256': 'sha256=wrong' } })
+    // Flag off (default): a signed CI event is acknowledged exactly as before
+    // and writes nothing, although a matching publication receipt exists.
+    assert.equal((await POST(signed())).status, 202)
+    assert.equal((await fixture.query('SELECT count(*)::int n FROM github_ci_observations')).rows[0].n, 0)
+    assert.equal((await fixture.query('SELECT count(*)::int n FROM github_ci_workflow_attempts')).rows[0].n, 0)
+    process.env.MIKKA_CI_RESUME_ENABLED = '1'
     assert.equal((await POST(invalid)).status, 401)
     assert.equal((await fixture.query('SELECT count(*)::int n FROM github_ci_observations')).rows[0].n, 0)
     assert.equal((await POST(signed())).status, 202)
@@ -210,6 +215,19 @@ test('isolated PG: signed webhook schedules, snapshot settles, real admission qu
     const { rows: escalations } = await fixture.query(`SELECT payload FROM coordinator_events WHERE "dedupeKey" LIKE 'ci_escalation:%' ORDER BY "createdAt"`)
     assert.equal(escalations.length, 2)
     assert.match(escalations[1].payload.text, /"result":"success"/)
+    // Failure isolation on real PG: a broken CI table never fails the webhook
+    // (202 for the other handlers) and the CI transaction leaves no partial write.
+    const before = (await fixture.query('SELECT generation FROM github_ci_observations')).rows[0].generation
+    await fixture.query('ALTER TABLE github_ci_workflow_attempts RENAME TO github_ci_workflow_attempts_broken')
+    const errors = test.mock.method(console, 'error', () => {})
+    try {
+      assert.equal((await POST(signed(3))).status, 202)
+      assert.ok(errors.mock.calls.some(call => call.arguments[0] === 'GitHub CI result could not be recorded'))
+    } finally {
+      errors.mock.restore()
+      await fixture.query('ALTER TABLE github_ci_workflow_attempts_broken RENAME TO github_ci_workflow_attempts')
+    }
+    assert.equal((await fixture.query('SELECT generation FROM github_ci_observations')).rows[0].generation, before)
   } finally {
     globalThis.fetch = originalFetch
     await scopedPool?.end().catch(() => {})

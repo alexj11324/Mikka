@@ -89,6 +89,26 @@ test('run result publication commits one owner-scoped result through retries and
   try {
     assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
 
+    await t.test('with MIKKA_CI_RESUME_ENABLED on, the published PR gets one task-bound CI watch', async () => {
+      const previous = process.env.MIKKA_CI_RESUME_ENABLED
+      process.env.MIKKA_CI_RESUME_ENABLED = '1'
+      try {
+        const f = await fixture({ approved: true })
+        await prepareRunPublication(assignment(f), f.remoteUrl)
+        await persistRunCompletion(f.userId, f.runId, completion(f))
+        const open: OpenPullRequest = async input => {
+          await input.onVerified?.({ installationId: 99, repositoryId: 789, githubAccountId: f.githubAccountId, defaultBranch: 'trunk' })
+          return prFor(f)
+        }
+        assert.deepEqual(await publishRunResult(f.runId, open), { done: true })
+        const watches = (await pool.query('select "originRunId","prNumber","remoteKey" from github_ci_observations where "issueId"=$1', [f.issueId])).rows
+        assert.deepEqual(watches, [{ originRunId: f.runId, prNumber: 77, remoteKey: f.remoteKey }])
+      } finally {
+        if (previous === undefined) delete process.env.MIKKA_CI_RESUME_ENABLED
+        else process.env.MIKKA_CI_RESUME_ENABLED = previous
+      }
+    })
+
     await t.test('concurrent completions and workers create one PR, one history row, and one chat event', async () => {
       const f = await fixture({ approved: true })
       const pinned = await prepareRunPublication(assignment(f), f.remoteUrl)
@@ -129,6 +149,8 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal(published.attempts, 1)
       assert.deepEqual(published.pullRequest, prFor(f))
       assert.equal(published.leaseToken, null)
+      // MIKKA_CI_RESUME_ENABLED is off by default: publishing writes no CI watch.
+      assert.equal((await pool.query('select count(*)::int as n from github_ci_observations where "issueId"=$1', [f.issueId])).rows[0].n, 0)
       const saved = await task(f)
       assert.equal(saved.status, 'review')
       assert.equal(saved.revision, 2)

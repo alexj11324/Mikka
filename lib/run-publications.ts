@@ -21,6 +21,7 @@ import { openRunPullRequest, PublicationError, type PublicationErrorCode, type P
 import { matchesRepositoryAdmission } from './repository-admission'
 import { mayCompleteIssue } from './run-completion'
 import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects } from './run-completion-effects'
+import { ciResumeEnabled } from './github/ci/flag'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Run = typeof agentRuns.$inferSelect
@@ -213,9 +214,19 @@ async function settlePublication(claim: Publication, result: { pullRequest?: Pub
       result = { ...result, errorCode: error.code }
       await finishResult(tx, run, { ...result, branch: claim.branch }, false, claim.scopeVersion)
     }
-    if (result.pullRequest && !result.errorCode) {
-      const { registerCiPublication } = await import('@/lib/github/ci/register')
-      await registerCiPublication(tx, { userId: claim.userId, issueId: claim.issueId, remoteKey: claim.remoteKey, runId: claim.runId, scopeVersion: claim.scopeVersion, url: result.pullRequest.url, state: result.pullRequest.state, ciOriginRunId: run.ciContinuation?.originRunId })
+    // CI resume is off by default (lib/github/ci/flag.ts): then no watch row is written.
+    if (result.pullRequest && !result.errorCode && ciResumeEnabled()) {
+      // Isolated: a CI watch failure never blocks the publication receipt; the
+      // next matching webhook can still backfill the watch from this receipt.
+      await tx.execute(sql`SAVEPOINT ci_watch`)
+      try {
+        const { registerCiPublication } = await import('@/lib/github/ci/register')
+        await registerCiPublication(tx, { userId: claim.userId, issueId: claim.issueId, remoteKey: claim.remoteKey, runId: claim.runId, scopeVersion: claim.scopeVersion, url: result.pullRequest.url, state: result.pullRequest.state, ciOriginRunId: run.ciContinuation?.originRunId })
+        await tx.execute(sql`RELEASE SAVEPOINT ci_watch`)
+      } catch {
+        await tx.execute(sql`ROLLBACK TO SAVEPOINT ci_watch`)
+        console.error('CI watch registration failed')
+      }
     }
     await tx.update(runPublications).set({ status: result.pullRequest ? 'published' : 'blocked', pullRequest: result.pullRequest ?? null, errorCode: result.errorCode ?? null, leaseToken: null, leaseExpiresAt: null, updatedAt: new Date() }).where(eq(runPublications.runId, claim.runId))
     return true

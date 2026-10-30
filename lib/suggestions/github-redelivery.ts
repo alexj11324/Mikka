@@ -1,4 +1,5 @@
 import { createSign } from 'node:crypto'
+import { ciResumeEnabled } from '../github/ci/flag'
 
 // GitHub's side of the hourly suggestions backfill. Mikka's GitHub App keeps a
 // log of every webhook delivery it sent (three days). Deliveries that did not
@@ -12,7 +13,9 @@ export const REDELIVERY_WINDOW_MS = 3 * 60 * 60 * 1000
 /** At most this many redeliveries per run. */
 export const REDELIVERY_LIMIT = 25
 /** The events app/api/webhooks/github processes; others are not worth redelivering. */
-const HANDLED_EVENTS = new Set(['pull_request', 'issues', 'issue_comment', 'pull_request_review', 'pull_request_review_comment', 'workflow_run'])
+const HANDLED_EVENTS = new Set(['pull_request', 'issues', 'issue_comment', 'pull_request_review', 'pull_request_review_comment'])
+/** Only handled, and so only worth redelivering, while MIKKA_CI_RESUME_ENABLED is on. */
+const CI_EVENTS = new Set(['workflow_run'])
 
 /** One row of GET /app/hook/deliveries. */
 export interface GitHubDelivery { id: string; guid: string; delivered_at: string; redelivery: boolean; status_code: number; event: string }
@@ -39,14 +42,14 @@ const succeeded = (delivery: GitHubDelivery) => delivery.status_code >= 200 && d
  * earlier redelivery may already have succeeded). One per guid, the latest
  * attempt, at most `limit`.
  */
-export function failedDeliveries(deliveries: readonly GitHubDelivery[], since: Date, limit = REDELIVERY_LIMIT): GitHubDelivery[] {
+export function failedDeliveries(deliveries: readonly GitHubDelivery[], since: Date, limit = REDELIVERY_LIMIT, includeCi = false): GitHubDelivery[] {
   const byGuid = new Map<string, GitHubDelivery[]>()
   for (const delivery of deliveries) byGuid.set(delivery.guid, [...byGuid.get(delivery.guid) ?? [], delivery])
   const failed: GitHubDelivery[] = []
   for (const attempts of byGuid.values()) {
     if (attempts.some(succeeded)) continue
     const latest = attempts.reduce((a, b) => new Date(b.delivered_at) > new Date(a.delivered_at) ? b : a)
-    if (new Date(latest.delivered_at) < since || !HANDLED_EVENTS.has(latest.event)) continue
+    if (new Date(latest.delivered_at) < since || !(HANDLED_EVENTS.has(latest.event) || (includeCi && CI_EVENTS.has(latest.event)))) continue
     failed.push(latest)
   }
   return failed.sort((a, b) => new Date(a.delivered_at).getTime() - new Date(b.delivered_at).getTime()).slice(0, limit)
@@ -106,7 +109,7 @@ export async function redeliverFailedGitHubWebhooks({ now = new Date(), fetcher 
     if (!cursor || !rows.length || rows.some(row => new Date(row.delivered_at) < since)) break
   }
   result.scanned = deliveries.length
-  const failed = failedDeliveries(deliveries, since, Infinity)
+  const failed = failedDeliveries(deliveries, since, Infinity, ciResumeEnabled(env))
   result.failed = failed.length
   for (const delivery of fairRedeliveries(failed)) {
     const response = await fetcher(`${API}/app/hook/deliveries/${delivery.id}/attempts`, { method: 'POST', headers })

@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import pg from 'pg'
 import { isolatedPostgresURL } from '../tests/helpers/isolated-postgres.mjs'
 
-const url = process.env.CI_CONTINUATION_TEST_DATABASE_URL ?? (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' ? process.env.E2E_DATABASE_URL : undefined)
+const url = process.env.CI_CONTINUATION_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 test('CI continuation PG identity, generation and retirement', { skip: !url, timeout: 120_000 }, async t => {
 const fixtureUrl = await isolatedPostgresURL(url!)
 const schema = `ci_cont_${randomUUID().replaceAll('-', '')}`
@@ -17,7 +17,7 @@ mock.module('@/lib/github/repository-installation', { namedExports: { linkedGitH
 mock.module('@/lib/github/run-pull-request', { namedExports: { verifyGitHubRepositoryAccess: async () => { throw Error('not used') } } })
 mock.module('@/lib/github/ci/read', { namedExports: { readCi: async () => { throw Error('not used') } } })
 mock.module('@/lib/github/ci/snapshot', { namedExports: { summarize: () => { throw Error('not used') } } })
-const { guardCiClaim, retireStaleCiRun, retryUnsentCiClaim, retireSupersededCiRuns } = await import('./ci-continuation')
+const { guardCiClaim, retireStaleCiRun, retryUnsentCiClaim, retireSupersededCiRuns, retireDisabledCiRun } = await import('./ci-continuation')
 const c = { originRunId: 'origin', originSessionId: 'session', issueId: 'issue', remoteKey: 'v2/github.com/owner/repo', prNumber: 12, scopeVersion: 1, head: 'a'.repeat(40), fingerprint: 'b'.repeat(64), followUp: 'CI finished.', requireSessionResume: true as const }
 try {
   await pool.query(`CREATE TABLE issues (id text PRIMARY KEY,"scopeVersion" integer NOT NULL);
@@ -80,6 +80,18 @@ try {
       assert.equal(observed.generation, '6')
       assert.equal(observed.deliveredFingerprint, null)
     } finally { tx.release() }
+  })
+  await t.test('kill switch at claim stops only a queued CI follow-up, once', async () => {
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId",status,"ciContinuation") VALUES ('queued-ci','owner','issue','queued',$1),('plain','owner','issue','queued',NULL),('stopping','owner','issue','queued',$1)`, [JSON.stringify(c)])
+    await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id='stopping'`)
+    assert.equal(await retireDisabledCiRun('other', 'queued-ci'), false)
+    assert.equal(await retireDisabledCiRun('owner', 'plain'), false)
+    assert.equal(await retireDisabledCiRun('owner', 'stopping'), false)
+    assert.equal(await retireDisabledCiRun('owner', 'queued-ci'), true)
+    assert.equal(await retireDisabledCiRun('owner', 'queued-ci'), false)
+    const rows = (await pool.query(`SELECT id,status,"stopReason",error FROM agent_runs WHERE id IN ('queued-ci','plain','stopping') ORDER BY id`)).rows
+    assert.deepEqual(rows.map(row => [row.id, row.status]), [['plain', 'queued'], ['queued-ci', 'stopped'], ['stopping', 'queued']])
+    assert.equal(rows[1].error, 'CI resume is disabled.')
   })
 } finally {
   await pool.end()
