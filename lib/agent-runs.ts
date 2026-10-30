@@ -10,7 +10,7 @@ import { SubscriptionRepository } from '@/lib/subscription-repository'
 import { agents, agentRuns, bots, deviceRepos, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
-import { isDeviceOnline } from '@mikka/protocol/device'
+import { runWaitingDeviceId } from '@/lib/run-waiting-for'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { workspaceRunView } from '@/lib/run-visibility'
@@ -151,7 +151,7 @@ export async function visibleRuns(userId: string, input: { issueId?: string; run
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
   const visibility = await issueVisibility(userId)
   const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
-  const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt }).from(agentRuns)
+  const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
       or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), visibility.predicate)), and(visibility.predicate, shared)),
@@ -159,7 +159,10 @@ export async function visibleRuns(userId: string, input: { issueId?: string; run
       input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
       input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,
     )).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
-  return rows.map(({ ownerId,waitDeviceId,lastSeenAt, ...run }) => ownerId === userId ? {...run,...(run.status==='queued' && waitDeviceId && !isDeviceOnline(lastSeenAt) ? {waitFor:waitDeviceId} : {})} : workspaceRunView(run))
+  return rows.map(({ ownerId, waitDeviceId, lastSeenAt, deviceEnabled, ...run }) => {
+    const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, lastSeenAt, deviceEnabled })
+    return ownerId === userId ? { ...run, ...(waitFor ? { waitFor } : {}) } : workspaceRunView(run)
+  })
 }
 
 export async function readRun(userId: string, runId: string): Promise<RunDetail | null> {
