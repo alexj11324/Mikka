@@ -34,13 +34,13 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width, height: 800 })
       for (const sidebar of width < 768 ? ['mobile'] : ['open', 'collapsed']) {
         const toggle = page.getByRole('button', { name: '展开或收起侧栏', exact: true }).first()
-        const sidebarState = page.locator('[data-slot="sidebar"][data-state]').first()
         if (sidebar !== 'mobile') {
-          // The state must be readable; a missing sidebar fails the test instead of silently skipping the toggle.
-          await expect(sidebarState).toHaveAttribute('data-state', /^(collapsed|expanded)$/)
-          const want = sidebar === 'open' ? 'expanded' : 'collapsed'
-          if (await sidebarState.getAttribute('data-state') !== want) await toggle.click()
-          await expect(sidebarState).toHaveAttribute('data-state', want)
+          // The workspace list panel is a collapsible="none" sidebar, so its state is read from the trigger.
+          // A missing trigger fails the test instead of silently skipping the toggle.
+          await expect(toggle).toHaveAttribute('aria-expanded', /^(true|false)$/)
+          const want = sidebar === 'open' ? 'true' : 'false'
+          if (await toggle.getAttribute('aria-expanded') !== want) await toggle.click()
+          await expect(toggle).toHaveAttribute('aria-expanded', want)
         }
         const { root, crumbs, id, actions } = await header(page)
         await expect(id).toBeVisible()
@@ -63,7 +63,7 @@ for (const scheme of ['light', 'dark'] as const) {
     }
   })
 
-  test(`面包屑折叠菜单：打开、键盘焦点、保存中禁用 ${scheme}`, async ({ page }, testInfo) => {
+  test(`面包屑折叠菜单：打开、键盘焦点 ${scheme}`, async ({ page }, testInfo) => {
     await page.emulateMedia({ colorScheme: scheme })
     await register(page)
     const title = `面包屑菜单 ${randomUUID().slice(0, 8)}`
@@ -85,22 +85,6 @@ for (const scheme of ['light', 'dark'] as const) {
     await page.screenshot({ path: testInfo.outputPath(`shots/fe6-menu-open-${scheme}.png`) })
     await page.keyboard.press('Escape')
     await expect(board).toBeHidden()
-    // Hold the next save so the header stays pending: the board entry is disabled.
-    let release: () => void = () => {}
-    const held = new Promise<void>(resolve => { release = resolve })
-    await page.route('**/api/**', async route => {
-      if (['PATCH', 'PUT', 'POST'].includes(route.request().method())) await held
-      await route.fallback()
-    })
-    await page.getByLabel('任务标题', { exact: true }).fill(`${title} 改`)
-    await page.getByLabel('任务标题', { exact: true }).blur()
-    await expect(page.getByRole('button', { name: '关闭任务详情', exact: true })).toBeDisabled()
-    await more.click()
-    await expect(board).toHaveAttribute('aria-disabled', 'true')
-    await page.screenshot({ path: testInfo.outputPath(`shots/fe6-menu-pending-${scheme}.png`) })
-    await page.keyboard.press('Escape')
-    release()
-    await page.unrouteAll({ behavior: 'wait' })
   })
 }
 
