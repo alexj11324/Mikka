@@ -1,3 +1,4 @@
+import { maskFactoryNote } from "./note-mask";
 import { z } from "zod";
 import { bindingSchema, FactoryError } from "./contract";
 import type { createFactoryStore } from "./store";
@@ -71,7 +72,8 @@ export async function handleFactory(
     const { binding, eventId, action, reason } = parsed.data;
     return {
       status: 200,
-      body: await store.apply(req.userId, binding, eventId, { action, reason }),
+      // A person typed this reason; mask before it reaches task/attempt rows.
+      body: await store.apply(req.userId, binding, eventId, { action, reason: maskFactoryNote(reason) }),
     };
   } catch (error) {
     if (!(error instanceof FactoryError)) throw error;
