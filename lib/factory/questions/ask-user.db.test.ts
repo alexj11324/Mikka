@@ -166,6 +166,20 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       }
     });
 
+    await t.test("list by task: newest first with id tiebreak", async () => {
+      const first = await asked("decision", "Tiebreak 0", ["A"]);
+      const ids = [first.questionId];
+      // Move three more questions onto the same task, then give all four the same createdAt so only `id DESC` orders them.
+      for (let i = 1; i < 4; i++) {
+        const { questionId } = await asked("decision", `Tiebreak ${i}`, ["A"]);
+        await pool.query('UPDATE factory_questions f SET "taskId"=o."taskId","attemptId"=o."attemptId","candidateId"=o."candidateId" FROM factory_questions o WHERE f.id=$1 AND o.id=$2', [questionId, first.questionId]);
+        ids.push(questionId);
+      }
+      await pool.query(`UPDATE factory_questions SET "createdAt"='2020-06-01T00:00:00Z' WHERE "taskId"=$1`, [first.taskId]);
+      const got = ((await get("owner", `?taskId=${first.taskId}`)).body as { questions: { questionId: string }[] }).questions.map((q) => q.questionId);
+      assert.deepEqual(got, [...ids].sort().reverse());
+    });
+
     await t.test("rejects bad input and anonymous callers", async () => {
       assert.equal((await get("owner", `?taskId=${a.taskId}&runId=${a.runId}`)).status, 422);
       assert.equal((await get("owner", "?runId=nope")).status, 422);
