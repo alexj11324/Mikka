@@ -35,7 +35,7 @@
 | [#490](https://github.com/alexj11324/Mikka/issues/490) Bot 与 Agents: backend for per-label execution rules (place · harness · model) and bot model choice | 后端/daemon | 已有未合PR；避免重复 | open #512实现per-label place/harness/model与bot model；先完成该PR评审、回归和整合，前端归#504。 |
 | [#485](https://github.com/alexj11324/Mikka/issues/485) 第二阶段待办：#476 上线后按顺序做（过度设计简化 + Agent 自查 CI + QA 遗留） | 总跟踪 | 持续跟踪 | 第二阶段聚合；A1/A2/A7/A9/A10/A11/C1已勾选，不能随其中一个PR合入就关闭总项。 |
 | [#408](https://github.com/alexj11324/Mikka/issues/408) Open implemented non-Linear features with verified runtime prerequisites | 总跟踪/发布 | 部分已实施；运行开放与验收不足 | 27项非Linear迁移及#409/#410/#414-#420已有交付；旧comment中的“无spend budget”已被#420更新。需核实当前部署配置与真实guarded-login/provider，不重跑已执行迁移。 |
-| [#390](https://github.com/alexj11324/Mikka/issues/390) 按网站将本机浏览器登录态安全导入 Mikka 云电脑 | 混合/新能力 | 缺实现；产品与敏感数据范围待落实 | 明确是本机选定站点/profile→云浏览器导入；#180/#342仅云端session保存复用。先选首批OS/浏览器及合同，不能因这次代码任务去读取用户真实cookie。 |
+| [#390](https://github.com/alexj11324/Mikka/issues/390) 按网站将本机浏览器登录态安全导入 E2B | 混合/新能力 | 缺实现；产品与敏感数据范围待落实 | 明确是本机选定站点/profile→云浏览器导入；#180/#342仅云端session保存复用。先选首批OS/浏览器及合同，不能因这次代码任务去读取用户真实cookie。 |
 | [#350](https://github.com/alexj11324/Mikka/issues/350) 主动推荐（R-73）：用户画像、夜间后台调研、限量卡片、即时触发和反馈 | 混合/推荐 | 部分已合入；后续缺实现 | #353仅画像/记忆阶段1；后台调研、排序限量反馈、即时触发仍需逐期实现；不要将画像页当整条R-73完成。 |
 | [#342](https://github.com/alexj11324/Mikka/issues/342) 云电脑改版：每个云端线程一台机器，Bot 网页分身，点建议卡片直接开始 | 混合/云运行 | 后端已整合；真实执行与前端仍有缺口 | #346通过#401整合，#420增加spend guards；旧10/27comment“未合入”已过时。保留真实E2B/browser evidence，但真实native订阅推理、接管/暂停及当前同版本前端需补验。 |
 | [#330](https://github.com/alexj11324/Mikka/issues/330) 验收 GitHub App 用户仓库授权与 PR 状态更新链路 | 后端/集成验收 | 实现已合入；真实验收未证明 | #333已提供个人仓库授权与PR状态；issue要求真实用户App安装/仓库绑定及Mikka实际任务PR读回，不能只凭webhook202关闭。与#500联合复验。 |
