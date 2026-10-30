@@ -12,10 +12,27 @@ export interface FactoryDispatchRequest {
 }
 
 /**
+ * The route's gate (route.ts): the Coordinator issue-mutation flag plus both
+ * Factory flags. Any one off -> 404 factoryLifecycleUnavailable, before dispatch.
+ */
+export function factoryDispatchEnabled(issueMutations: boolean, env: Record<string, string | undefined> = process.env): boolean {
+  return issueMutations && env.MIKKA_FACTORY_ROUTING_ENABLED === "1" && env.MIKKA_FACTORY_LIFECYCLE_ENABLED === "1";
+}
+
+/**
  * POST /api/factory/tasks: non-LLM dispatch entry, modeled on Devin's
  * "create session". It reuses the exact dispatch used by the Coordinator tool
  * (factoryRuntimeForBot(null).dispatch), so permissions (session-owned issue),
  * the factory_events audit receipt and replay/idempotency are identical.
+ *
+ * Idempotency: keyed on the binding's attemptId (factory_events eventId
+ * `dispatch-v2:<attemptId>`), no Idempotency-Key header. The same binding with
+ * the same body (agentId, deviceRepoId, masked note) replays the first run: 200,
+ * replayed: true, same runId. The same binding with any other body (e.g. a
+ * different note) is 409 factoryReplayMismatch; a binding whose revision,
+ * attemptId or candidateId no longer matches the task is 409 factoryStale. Notes
+ * are compared after masking, so two notes differing only in a masked secret
+ * count as the same request.
  */
 export async function handleFactoryDispatch(
   dispatch: () => Promise<FactoryDispatchFn>,

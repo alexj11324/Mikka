@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { handleFactoryList } from "@/lib/factory/http";
 import { factoryStore } from "@/lib/factory/server";
-import { handleFactoryDispatch } from "@/lib/factory/dispatch-http";
+import { factoryDispatchEnabled, handleFactoryDispatch } from "@/lib/factory/dispatch-http";
 import { issueMutationsEnabled } from "@/lib/coordinator/issue-tools-enabled";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,8 @@ export async function GET(request: Request) {
 /**
  * POST /api/factory/tasks: dispatch the current attempt of a routed task
  * without an LLM. Body: { binding, agentId, deviceRepoId, note? }.
- * 201 new run, 200 idempotent replay of the same attempt.
+ * 201 new run, 200 idempotent replay of the same attempt (keyed on the binding;
+ * same binding + different body/note -> 409 factoryReplayMismatch).
  */
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -36,10 +37,7 @@ export async function POST(request: Request) {
       origin: request.headers.get("origin"),
       url: request.url,
       body: await request.json().catch(() => null),
-      enabled:
-        issueMutationsEnabled() &&
-        process.env.MIKKA_FACTORY_ROUTING_ENABLED === "1" &&
-        process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === "1",
+      enabled: factoryDispatchEnabled(issueMutationsEnabled()),
     },
   );
   return NextResponse.json(result.body, {
