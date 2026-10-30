@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -45,14 +45,16 @@ export function SettingsSection({
 }) {
   return (
     <section className="flex flex-col gap-1" aria-labelledby={id}>
-      <header className="flex items-baseline justify-between gap-3 px-1">
-        <div className="flex flex-col gap-0.5">
+      {/* The title is inset like the row text; the action has no inset so its
+          right edge lines up with the card's right edge below it. */}
+      <header className="flex items-end justify-between gap-3 pl-1">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <h2 id={id} className="text-sm font-medium">
             {title}
           </h2>
           {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
-        {action}
+        {action && <div data-settings-section-action className="flex shrink-0 items-center gap-2">{action}</div>}
       </header>
       <div data-settings-card className="overflow-hidden rounded-2xl border bg-card">
         <div data-settings-rows className="divide-y divide-border">{children}</div>
@@ -87,3 +89,6 @@ export function SettingRow({
     </div>
   )
 }
+
+/** Spread on the Button in a section header (添加, 打开设置…): gray-filled secondary, small. */
+export const settingsSectionAction = { variant: 'secondary', size: 'sm' } as const satisfies Pick<ComponentProps<typeof Button>, 'variant' | 'size'>
