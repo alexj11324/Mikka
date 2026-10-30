@@ -229,6 +229,6 @@ export async function getThreadName(runId: string): Promise<string | null> {
 }
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
-export async function stopRun(runId: string): Promise<void> {
-  await requestRunStop(await getUserId(), runId)
+export async function stopRun(runId: string): Promise<{ stoppedRunIds: string[] }> {
+  return requestRunStop(await getUserId(), runId)
 }

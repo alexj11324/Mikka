@@ -14,6 +14,7 @@ import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { revokeRunTokens } from '@/lib/mcp/worker'
 import { stopRecordingsAfter } from '@/lib/captures/run-end'
 import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATTEMPTS, pickTakeover, RETRY_QUEUE_WAIT_MS, retryPrompt, type TakeoverCandidate } from '@/lib/run-retry'
+import { afterRunEnded } from '@/lib/run-completion-effects'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -148,6 +149,7 @@ async function reclaimLostRun(run: Run, now: Date) {
   if (retried) {
     await revokeRunTokens(run.id)
     stopRecordingsAfter([run.id])
+    await afterRunEnded(run.userId, run.id)
   }
 }
 
@@ -165,5 +167,6 @@ async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {
   await revokeRunTokens(run.id)
   stopRecordingsAfter([run.id])
   await recordCoordinatorEvent(db, runFinishedEvent({ ...run, stopReason: 'device_lost', report: null }))
+  await afterRunEnded(run.userId, run.id)
   after(() => wakeCoordinator(run.userId))
 }

@@ -15,7 +15,7 @@ if (process.env.REQUIRE_DB === '1' && !connection) throw new Error('Run chain DB
 
 test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { skip: !connection, timeout: 120_000 }, async t => {
   const pool = new Pool({ connectionString: connection, max: 4 })
-  const { listIssueRunChains, readRunChain, resolveStopTarget } = await import('../lib/run-chain')
+  const { listIssueRunChains, readRunChain, resolveStopTargets } = await import('../lib/run-chain')
   const { requestRunStop } = await import('../lib/agent-runs')
   const users: string[] = []
   t.after(async () => {
@@ -39,26 +39,32 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Chain CI worker\')', [agentId, userId, deviceId])
     return { userId, agentId, issue: () => issue(userId) }
   }
-  async function issue(userId: string) {
+  async function issue(userId: string, scope = 'personal') {
     const id = randomUUID()
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Chain task\',$3,\'todo\',\'normal\',\'personal\')', [id, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1 } }, content: [] })])
+    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope,"scopeSetBy") VALUES ($1,$2,\'Chain task\',$4,\'todo\',\'normal\',$3,\'user\')', [id, userId, scope, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1 } }, content: [] })])
     return id
   }
   let clock = Date.parse('2026-10-01T00:00:00Z')
-  async function run(o: { userId: string; agentId: string }, issueId: string, status: string, origin?: string) {
-    const id = randomUUID()
-    clock += 1000
-    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt,"createdAt","finishedAt","questionContinuation")
-      VALUES ($1,$2,$3,$4,$5,'Synthetic chain run',$6,$7,$8)`, [id, o.userId, issueId, o.agentId, status, new Date(clock),
-      ['succeeded', 'failed', 'cancelled'].includes(status) ? new Date(clock + 500) : null,
-      origin ? JSON.stringify({ questionId: randomUUID(), originRunId: origin, originSessionId: 'session', followUp: 'answer', requireSessionResume: true }) : null])
+  const ENDED = ['succeeded', 'failed', 'cancelled', 'stopped']
+  async function run(o: { userId: string; agentId: string }, issueId: string, status: string, link?: { origin?: string; retryOf?: string; at?: number; id?: string }) {
+    const id = link?.id ?? randomUUID()
+    if (link?.at === undefined) clock += 1000
+    const at = link?.at ?? clock
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt,"createdAt","finishedAt","questionContinuation","retryOf")
+      VALUES ($1,$2,$3,$4,$5,'Synthetic chain run',$6,$7,$8,$9)`, [id, o.userId, issueId, o.agentId, status, new Date(at),
+      ENDED.includes(status) ? new Date(at + 500) : null,
+      link?.origin ? JSON.stringify({ questionId: randomUUID(), originRunId: link.origin, originSessionId: 'session', followUp: 'answer', requireSessionResume: true }) : null,
+      link?.retryOf ?? null])
     return id
   }
-  const stopRequested = async (id: string) => (await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [id])).rows[0].stopRequestedAt !== null
+  const cont = (origin: string) => ({ origin })
+  const row = async (id: string) => (await pool.query('SELECT status,"stopRequestedAt" FROM agent_runs WHERE id=$1', [id])).rows[0] as { status: string; stopRequestedAt: Date | null }
+  const stopRequested = async (id: string) => (await row(id)).stopRequestedAt !== null
+  const ids = (chain: { attempts: { runId: string }[] } | null | undefined) => chain?.attempts.map(x => x.runId)
 
-  await t.test('three-level chain resolves root, latest and ordered attempts; stop on A or B lands on C', async () => {
+  await t.test('three-level chain resolves root, latest and ordered attempts from any member', async () => {
     const me = await owner(), issueId = await me.issue()
-    const a = await run(me, issueId, 'succeeded'), b = await run(me, issueId, 'succeeded', a), c = await run(me, issueId, 'running', b)
+    const a = await run(me, issueId, 'succeeded'), b = await run(me, issueId, 'succeeded', cont(a)), c = await run(me, issueId, 'running', cont(b))
     const chains = await listIssueRunChains(pool, issueId, [me.userId], 20)
     assert.equal(chains.length, 1)
     assert.equal(chains[0].rootRunId, a)
@@ -68,74 +74,170 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
       const chain = await readRunChain(pool, me.userId, from)
       assert.equal(chain?.rootRunId, a); assert.equal(chain?.latestRunId, c)
     }
-    assert.deepEqual(await resolveStopTarget(pool, me.userId, a), { kind: 'stop', runId: c, forwardedFrom: a })
-    assert.deepEqual(await resolveStopTarget(pool, me.userId, b), { kind: 'stop', runId: c, forwardedFrom: b })
-    await requestRunStop(me.userId, b)
-    assert.equal(await stopRequested(c), true, 'stop on B is forwarded to the live C')
+    assert.deepEqual(await requestRunStop(me.userId, a), { stoppedRunIds: [c] }, 'stop on an ended old run reaches the live tail')
+    assert.equal(await stopRequested(c), true)
+  })
+
+  await t.test('QA 1: middle alive + tail alive -> stop on B stops B and C', async () => {
+    const me = await owner(), issueId = await me.issue()
+    const a = await run(me, issueId, 'succeeded'), b = await run(me, issueId, 'running', cont(a)), c = await run(me, issueId, 'running', cont(b))
+    assert.deepEqual(await requestRunStop(me.userId, b), { stoppedRunIds: [b, c] })
+    assert.equal(await stopRequested(b), true); assert.equal(await stopRequested(c), true)
+    assert.equal(await stopRequested(a), false)
+  })
+
+  await t.test('QA 2: middle alive + tail ended -> only B stops, stoppedRunIds=[B], not 409', async () => {
+    const me = await owner(), issueId = await me.issue()
+    const a = await run(me, issueId, 'succeeded'), b = await run(me, issueId, 'running', cont(a)), c = await run(me, issueId, 'failed', cont(b))
+    assert.deepEqual(await requestRunStop(me.userId, b), { stoppedRunIds: [b] })
+    assert.equal(await stopRequested(b), true)
+    assert.equal(await stopRequested(c), false)
+    assert.deepEqual(await requestRunStop(me.userId, a), { stoppedRunIds: [b] }, 'from A too: B is the only unfinished run onward')
+  })
+
+  await t.test('QA 3: whole chain ended -> 409 runChainEnded with latestRunId; nothing written', async () => {
+    const me = await owner(), issueId = await me.issue()
+    const a = await run(me, issueId, 'succeeded'), b = await run(me, issueId, 'failed', cont(a)), c = await run(me, issueId, 'succeeded', cont(b))
+    assert.deepEqual(await resolveStopTargets(pool, me.userId, a), { kind: 'chainEnded', latestRunId: c })
+    for (const from of [a, b, c]) await assert.rejects(requestRunStop(me.userId, from), (e: { code?: string; params?: unknown }) => e.code === 'runChainEnded')
+    for (const id of [a, b, c]) assert.equal(await stopRequested(id), false)
+  })
+
+  await t.test('QA 4: a chain with a retryOf rerun (continuation + retryOf mixed)', async () => {
+    const me = await owner(), issueId = await me.issue()
+    const a = await run(me, issueId, 'succeeded'), b = await run(me, issueId, 'failed', cont(a)), c = await run(me, issueId, 'running', { retryOf: b }), d = await run(me, issueId, 'queued', cont(c))
+    const chains = await listIssueRunChains(pool, issueId, [me.userId], 20)
+    assert.equal(chains.length, 1, 'the rerun does not open a second thread')
+    assert.deepEqual(ids(chains[0]), [a, b, c, d])
+    assert.equal(chains[0].latestRunId, d)
+    assert.equal((await readRunChain(pool, me.userId, c))?.rootRunId, a)
+    assert.deepEqual(await requestRunStop(me.userId, b), { stoppedRunIds: [c, d] })
+    assert.equal(await stopRequested(c), true)
+    assert.equal((await row(d)).status, 'stopped', 'a queued latest is ended directly (#467)')
+  })
+
+  await t.test('retryOf across issues (another workspace/scope) is not linked', async () => {
+    const me = await owner(), issueA = await me.issue(), issueB = await me.issue()
+    const a = await run(me, issueA, 'failed'), b = await run(me, issueB, 'running', { retryOf: a })
+    assert.deepEqual(ids((await listIssueRunChains(pool, issueA, [me.userId], 20))[0]), [a])
+    assert.deepEqual(ids((await listIssueRunChains(pool, issueB, [me.userId], 20))[0]), [b])
+    await assert.rejects(requestRunStop(me.userId, a), (e: { code?: string }) => e.code === 'runChainEnded')
     assert.equal(await stopRequested(b), false)
   })
 
-  await t.test('all-ended chain returns 409 runChainEnded with latestRunId', async () => {
-    const me = await owner(), issueId = await me.issue()
-    const a = await run(me, issueId, 'succeeded'), b = await run(me, issueId, 'failed', a), c = await run(me, issueId, 'succeeded', b)
-    assert.deepEqual(await resolveStopTarget(pool, me.userId, a), { kind: 'chainEnded', latestRunId: c })
-    await assert.rejects(requestRunStop(me.userId, a), (error: { code?: string; params?: Record<string, unknown> }) => error.code === 'runChainEnded' && error.params?.latestRunId === c)
-  })
-
-  await t.test('more than 20 roots: continuations do not use up slots, LIMIT applies after folding', async () => {
+  await t.test('LIMIT applies to roots after folding: 22 chains with continuations still give 20 threads', async () => {
     const me = await owner(), issueId = await me.issue()
     const roots: string[] = []
-    for (let i = 0; i < 22; i++) roots.push(await run(me, issueId, 'succeeded'))
-    // Newest 20 roots each get two newer continuations: 60 runs newer than the 20th root.
-    for (const root of roots.slice(2)) await run(me, issueId, 'running', await run(me, issueId, 'succeeded', root))
+    for (let i = 0; i < 22; i++) { const r = await run(me, issueId, 'succeeded'); roots.push(r); await run(me, issueId, 'succeeded', cont(r)); await run(me, issueId, 'succeeded', i % 2 ? { retryOf: r } : cont(r)) }
     const chains = await listIssueRunChains(pool, issueId, [me.userId], 20)
     assert.equal(chains.length, 20)
-    assert.deepEqual(chains.map(chain => chain.rootRunId), roots.slice(2).reverse())
-    assert.ok(chains.every(chain => chain.attempts.length === 3 && chain.attempts.at(-1)!.runId === chain.latestRunId))
+    assert.deepEqual(chains.map(c => c.rootRunId), roots.slice(2).reverse())
+    assert.ok(chains.every(c => c.attempts.length === 3))
   })
 
-  await t.test('cross-chain stop: another owner\'s or issue\'s run is never a forward target', async () => {
-    const me = await owner(), other = await owner()
-    const issueId = await me.issue(), elsewhere = await me.issue(), theirIssue = await other.issue()
+  await t.test('links never cross owners, issues or chains', async () => {
+    const me = await owner(), other = await owner(), issueId = await me.issue(), otherIssue = await me.issue(), theirIssue = await other.issue()
+    const a = await run(me, issueId, 'succeeded')
+    const otherChainLive = await run(me, issueId, 'running')
+    const crossIssue = await run(me, otherIssue, 'running', cont(a))
+    const crossOwner = await run(other, theirIssue, 'running', cont(a))
+    assert.deepEqual(ids(await readRunChain(pool, me.userId, a)), [a])
+    assert.equal(await readRunChain(pool, me.userId, crossOwner), null)
+    await assert.rejects(requestRunStop(me.userId, a), (e: { code?: string }) => e.code === 'runChainEnded')
+    await assert.rejects(requestRunStop(me.userId, crossOwner), (e: { code?: string }) => e.code === 'runNotFound')
+    for (const id of [otherChainLive, crossIssue, crossOwner]) assert.equal(await stopRequested(id), false)
+  })
+
+  await t.test('same issue, different owner: a teammate run pointing at my run is a separate thread', async () => {
+    const me = await owner(), mate = await owner(), issueId = await issue(me.userId, 'workspace')
     const mine = await run(me, issueId, 'succeeded')
-    // A foreign owner's live run claiming my run as origin does not join my chain.
-    const foreign = await run(other, theirIssue, 'running', mine)
-    // My own live run on another issue claiming it as origin does not join either.
-    const otherIssue = await run(me, elsewhere, 'running', mine)
-    assert.deepEqual(await resolveStopTarget(pool, me.userId, mine), { kind: 'chainEnded', latestRunId: mine })
-    await assert.rejects(requestRunStop(me.userId, mine), /runChainEnded/)
-    assert.equal(await stopRequested(foreign), false)
-    assert.equal(await stopRequested(otherIssue), false)
-    // Their run is not mine to stop at all: 404, not a forward.
-    const theirs = await run(other, theirIssue, 'succeeded'), theirLive = await run(other, theirIssue, 'running', theirs)
-    assert.deepEqual(await resolveStopTarget(pool, me.userId, theirs), { kind: 'notFound' })
-    await assert.rejects(requestRunStop(me.userId, theirs), /runNotFound/)
-    assert.equal(await stopRequested(theirLive), false)
-    assert.equal((await listIssueRunChains(pool, issueId, [me.userId], 20)).map(chain => chain.attempts.length).join(), '1')
+    const theirs = await run(mate, issueId, 'running', cont(mine)), theirRerun = await run(mate, issueId, 'running', { retryOf: mine })
+    const chains = await listIssueRunChains(pool, issueId, [me.userId, mate.userId], 20)
+    assert.equal(chains.length, 3)
+    assert.deepEqual(chains.map(c => c.attempts.length), [1, 1, 1])
+    await assert.rejects(requestRunStop(me.userId, mine), (e: { code?: string }) => e.code === 'runChainEnded')
+    assert.equal(await stopRequested(theirs), false); assert.equal(await stopRequested(theirRerun), false)
   })
 
-  await t.test('a corrupt cyclic link terminates', async () => {
+  await t.test('cycle A <-> B (+ C off B): terminates, root falls back to earliest createdAt, thread still listed', async () => {
     const me = await owner(), issueId = await me.issue()
-    const a = await run(me, issueId, 'succeeded'), b = await run(me, issueId, 'running', a)
-    await pool.query('UPDATE agent_runs SET "questionContinuation"=jsonb_build_object(\'originRunId\',$2::text) WHERE id=$1', [a, b])
-    const chain = await readRunChain(pool, me.userId, a)
-    assert.deepEqual(new Set(chain?.attempts.map(x => x.runId)), new Set([a, b]))
-    assert.equal(chain?.attempts.length, 2)
+    const a = randomUUID(), b = randomUUID()
+    await run(me, issueId, 'succeeded', { id: a, origin: b })
+    await run(me, issueId, 'succeeded', { id: b, retryOf: a })
+    const c = await run(me, issueId, 'running', cont(b))
+    const chains = await listIssueRunChains(pool, issueId, [me.userId], 20)
+    assert.equal(chains.length, 1)
+    assert.equal(chains[0].rootRunId, a)
+    assert.deepEqual(ids(chains[0]), [a, b, c])
+    for (const from of [a, b, c]) assert.equal((await readRunChain(pool, me.userId, from))?.rootRunId, a)
+    assert.deepEqual(await requestRunStop(me.userId, a), { stoppedRunIds: [c] })
   })
 
-  await t.test('the list read takes no row locks', async () => {
+  await t.test('cycle with tied createdAt: root falls back to the smaller uuid', async () => {
     const me = await owner(), issueId = await me.issue()
-    const a = await run(me, issueId, 'succeeded'); await run(me, issueId, 'running', a)
+    const [x, y] = [randomUUID(), randomUUID()].sort()
+    clock += 1000
+    await run(me, issueId, 'succeeded', { id: y, origin: x, at: clock })
+    await run(me, issueId, 'succeeded', { id: x, origin: y, at: clock })
+    const chains = await listIssueRunChains(pool, issueId, [me.userId], 20)
+    assert.equal(chains.length, 1); assert.equal(chains[0].rootRunId, x); assert.equal(chains[0].latestRunId, y)
+  })
+
+  await t.test('fork with tied createdAt: latest is the larger uuid, deterministically', async () => {
+    const me = await owner(), issueId = await me.issue()
+    const a = await run(me, issueId, 'succeeded')
+    const [lo, hi] = [randomUUID(), randomUUID()].sort()
+    clock += 1000
+    await run(me, issueId, 'running', { id: hi, origin: a, at: clock })
+    await run(me, issueId, 'running', { id: lo, retryOf: a, at: clock })
+    for (let i = 0; i < 3; i++) {
+      const chain = await readRunChain(pool, me.userId, a)
+      assert.deepEqual(ids(chain), [a, lo, hi]); assert.equal(chain?.latestRunId, hi)
+    }
+    assert.equal((await listIssueRunChains(pool, issueId, [me.userId], 20))[0].latestRunId, hi)
+  })
+
+  await t.test('malformed originRunId is ignored, not a cast error', async () => {
+    const me = await owner(), issueId = await me.issue()
+    const a = await run(me, issueId, 'succeeded')
+    const b = await run(me, issueId, 'running')
+    await pool.query(`UPDATE agent_runs SET "questionContinuation"='{"originRunId":"not-a-uuid"}' WHERE id=$1`, [b])
+    assert.equal((await listIssueRunChains(pool, issueId, [me.userId], 20)).length, 2)
+    assert.equal(await readRunChain(pool, me.userId, 'not-a-uuid'), null)
+    void a
+  })
+
+  await t.test('race: the requested run ends between the chain read and its stop -> runChainEnded, not 404', async () => {
+    const me = await owner(), issueId = await me.issue()
+    const a = await run(me, issueId, 'running')
     const holder = await pool.connect()
     try {
-      await holder.query('BEGIN'); await holder.query('SELECT id FROM agent_runs WHERE "issueId"=$1 FOR UPDATE', [issueId])
-      const reader = await pool.connect()
-      try {
-        await reader.query('BEGIN'); await reader.query("SET LOCAL lock_timeout='500ms'")
-        assert.equal((await listIssueRunChains(reader, issueId, [me.userId], 20)).length, 1)
-        await reader.query('ROLLBACK')
-      } finally { reader.release() }
-      await holder.query('ROLLBACK')
+      // Hold the row so the stop reads the chain (no locks), then blocks in stopOwnedRun's
+      // FOR UPDATE; the daemon's end commits first, so the stop sees an ended run.
+      await holder.query('BEGIN')
+      await holder.query('SELECT 1 FROM agent_runs WHERE id=$1 FOR UPDATE', [a])
+      const stop = requestRunStop(me.userId, a).then(() => null, (e: { code?: string }) => e.code ?? 'other')
+      for (let i = 0; i < 100 && !(await pool.query(`SELECT 1 FROM pg_locks WHERE NOT granted AND locktype IN ('transactionid','tuple')`)).rowCount; i++) await new Promise(r => setTimeout(r, 20))
+      await holder.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`, [a])
+      await holder.query('COMMIT')
+      assert.equal(await stop, 'runChainEnded')
+      assert.equal(await stopRequested(a), false)
     } finally { holder.release() }
+  })
+
+  await t.test('reads take no row locks', async () => {
+    const me = await owner(), issueId = await me.issue()
+    const a = await run(me, issueId, 'running')
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query('SELECT 1 FROM agent_runs WHERE id=$1 FOR UPDATE NOWAIT', [a])
+      const other = new Pool({ connectionString: connection, max: 1 })
+      try {
+        assert.equal((await listIssueRunChains(other, issueId, [me.userId], 20)).length, 1)
+        assert.equal((await readRunChain(other, me.userId, a))?.rootRunId, a)
+      } finally { await other.end() }
+      await client.query('ROLLBACK')
+    } finally { client.release() }
   })
 })

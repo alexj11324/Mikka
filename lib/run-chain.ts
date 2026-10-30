@@ -1,16 +1,21 @@
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 
 /**
- * Run chains (BE-18). Answering a Factory question queues a continuation as a new
- * agent_run whose "questionContinuation"->>'originRunId' points at the run it resumes,
- * so one conversation can be A → B → C. Like GitHub Actions' run_id + run_attempt, the
- * chain is identified by its root and each run in it is one attempt.
+ * Run chains (BE-18), the GitHub Actions run_id + run_attempt model. A run's parent is
+ * the run it resumes after an answered Factory question ("questionContinuation"->>'originRunId')
+ * or the run it reruns ("retryOf"); a chain is a root and every run reachable from it.
  *
- * No column and no migration: the chain is resolved on the read path with recursive
- * CTEs over the existing link. A link is followed only between runs of the same owner
- * on the same issue, so another person's, issue's or workspace's run can never join a
- * chain. Every recursion carries a path array (a run is never visited twice) and a
- * depth cap, so a corrupt cyclic link terminates. Reads are plain SELECTs, no row locks.
+ * No column and no migration: chains are resolved on the read path with a recursive CTE
+ * over those two links. A link counts only between runs of the same owner on the same
+ * issue (an issue belongs to exactly one personal or workspace scope, so this also keeps a
+ * chain inside one workspace). The recursion carries a path array (no run is visited
+ * twice) and a depth cap, so corrupt cyclic links terminate.
+ *
+ * Each run's root is its earliest parentless ancestor. Cycle members with no parentless
+ * ancestor (corrupt data such as A ↔ B) fall back to the earliest run of the cycle by
+ * createdAt, uuid as tiebreak, so the thread still shows. Within a chain, attempts are
+ * ordered by createdAt then uuid; the last one is latestRunId (deterministic on ties).
+ * Reads are plain SELECTs: no row locks.
  */
 export interface RunChainQueryable {
   query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>
@@ -20,7 +25,7 @@ export const RUN_CHAIN_MAX_DEPTH = 64
 
 export interface RunAttempt {
   runId: string
-  /** 1-based, in creation order: the root is attempt 1. */
+  /** 1-based, in chain order: the root is attempt 1. */
   attempt: number
   status: string
   stopRequestedAt: Date | null
@@ -30,39 +35,55 @@ export interface RunAttempt {
 
 export interface RunChain {
   rootRunId: string
-  /** The chain's newest run: what stop, status and send act on. */
+  /** The chain's newest run: what status and send act on. */
   latestRunId: string
   attempts: RunAttempt[]
 }
 
-const active = (status: string) => (UNFINISHED_RUN_STATUSES as readonly string[]).includes(status)
-
-/** The parent link of `r`, restricted to the same owner and issue. */
-const SAME_CHAIN = `o."userId" = r."userId" AND o."issueId" IS NOT DISTINCT FROM r."issueId"`
+const UUID = `'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'`
+/** The continuation origin as a uuid, only when well-formed, so it compares to the primary key. */
+const ORIGIN = (alias: string) => `(CASE WHEN ${alias}."questionContinuation"->>'originRunId' ~ ${UUID} THEN (${alias}."questionContinuation"->>'originRunId')::uuid END)`
 
 /**
- * The newest `limit` chains on an issue among `userIds`' runs. Chains are folded by
- * root first and the limit applies to roots, so continuations never use up a slot.
+ * Every run in scope with its chain root. `scope` filters agent_runs aliased `r`;
+ * parameters $1..$n belong to the caller, `depth` is the depth-cap placeholder.
+ */
+function chainSql(scope: string, depth: string) {
+  return `
+    runs AS (
+      SELECT r.id, r."userId", r."issueId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf" FROM agent_runs r WHERE ${scope}
+    ), edges AS (
+      SELECT DISTINCT c.id AS child, p.id AS parent FROM runs c JOIN runs p
+        ON p.id IN (c.origin, c."retryOf") AND p.id <> c.id
+        AND p."userId" = c."userId" AND p."issueId" IS NOT DISTINCT FROM c."issueId"
+    ), up AS (
+      SELECT id AS start, id AS node, ARRAY[id] AS path, 0 AS depth FROM runs
+      UNION ALL
+      SELECT u.start, e.parent, u.path || e.parent, u.depth + 1
+      FROM up u JOIN edges e ON e.child = u.node
+      WHERE NOT e.parent = ANY(u.path) AND u.depth < ${depth}
+    ), assigned AS (
+      SELECT DISTINCT ON (u.start) u.start AS id, u.node AS root
+      FROM up u JOIN runs n ON n.id = u.node
+      ORDER BY u.start, (NOT EXISTS (SELECT 1 FROM edges e WHERE e.child = u.node)) DESC, n."createdAt", n.id
+    )`
+}
+
+const SELECT_ATTEMPTS = `a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x."stopRequestedAt", x."createdAt", x."finishedAt"`
+
+/**
+ * The newest `limit` chains on an issue among `userIds`' runs. Runs are folded by root
+ * first and the limit applies to roots, so continuations and reruns never use up a slot.
  */
 export async function listIssueRunChains(q: RunChainQueryable, issueId: string, userIds: readonly string[], limit: number): Promise<RunChain[]> {
   const { rows } = await q.query(`
-    WITH RECURSIVE roots AS (
-      SELECT r.id, r."createdAt" FROM agent_runs r
-      WHERE r."issueId" = $1 AND r."userId" = ANY($2::text[])
-        AND NOT EXISTS (SELECT 1 FROM agent_runs o WHERE o.id::text = r."questionContinuation"->>'originRunId' AND ${SAME_CHAIN})
-      ORDER BY r."createdAt" DESC, r.id DESC
-      LIMIT $3
-    ), chain AS (
-      SELECT roots.id AS root, roots.id, ARRAY[roots.id] AS path, 0 AS depth FROM roots
-      UNION ALL
-      SELECT c.root, r.id, c.path || r.id, c.depth + 1
-      FROM chain c JOIN agent_runs o ON o.id = c.id
-      JOIN agent_runs r ON r."questionContinuation"->>'originRunId' = c.id::text AND ${SAME_CHAIN}
-      WHERE NOT r.id = ANY(c.path) AND c.depth < $4
+    WITH RECURSIVE ${chainSql(`r."issueId" = $1 AND r."userId" = ANY($2::text[])`, '$4')},
+    roots AS (
+      SELECT DISTINCT a.root, n."createdAt" FROM assigned a JOIN runs n ON n.id = a.root
+      ORDER BY n."createdAt" DESC, a.root DESC LIMIT $3
     )
-    SELECT DISTINCT ON (c.root, c.id) c.root::text AS "rootRunId", r.id::text AS "runId", r.status, r."stopRequestedAt", r."createdAt", r."finishedAt", roots."createdAt" AS "rootCreatedAt"
-    FROM chain c JOIN agent_runs r ON r.id = c.id JOIN roots ON roots.id = c.root
-    ORDER BY c.root, c.id`, [issueId, [...userIds], limit, RUN_CHAIN_MAX_DEPTH])
+    SELECT ${SELECT_ATTEMPTS}, roots."createdAt" AS "rootCreatedAt"
+    FROM assigned a JOIN roots ON roots.root = a.root JOIN agent_runs x ON x.id = a.id`, [issueId, [...userIds], limit, RUN_CHAIN_MAX_DEPTH])
   return foldChains(rows)
 }
 
@@ -74,9 +95,9 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
     entry.runs.push({ runId: String(row.runId), status: String(row.status), stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
     byRoot.set(root, entry)
   }
-  const order = (a: { createdAt: Date; runId: string }, b: { createdAt: Date; runId: string }) => a.createdAt.getTime() - b.createdAt.getTime() || a.runId.localeCompare(b.runId)
+  const order = (a: { createdAt: Date; runId: string }, b: { createdAt: Date; runId: string }) => a.createdAt.getTime() - b.createdAt.getTime() || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0)
   return [...byRoot.entries()]
-    .sort(([ra, a], [rb, b]) => b.rootCreatedAt.getTime() - a.rootCreatedAt.getTime() || rb.localeCompare(ra))
+    .sort(([ra, a], [rb, b]) => b.rootCreatedAt.getTime() - a.rootCreatedAt.getTime() || (rb < ra ? -1 : rb > ra ? 1 : 0))
     .map(([rootRunId, { runs }]) => {
       const rest = runs.filter(run => run.runId !== rootRunId).sort(order)
       const attempts = [...runs.filter(run => run.runId === rootRunId), ...rest].map((run, index) => ({ ...run, attempt: index + 1 }))
@@ -86,50 +107,36 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
 
 /** The whole chain containing `runId`, if `userId` owns that run; null otherwise. */
 export async function readRunChain(q: RunChainQueryable, userId: string, runId: string): Promise<RunChain | null> {
+  if (!new RegExp(UUID.slice(1, -1)).test(runId)) return null
   const { rows } = await q.query(`
-    WITH RECURSIVE up AS (
-      SELECT r.id, ARRAY[r.id] AS path, 0 AS depth FROM agent_runs r WHERE r.id = $1::uuid AND r."userId" = $2
-      UNION ALL
-      SELECT o.id, u.path || o.id, u.depth + 1
-      FROM up u JOIN agent_runs r ON r.id = u.id
-      JOIN agent_runs o ON o.id::text = r."questionContinuation"->>'originRunId' AND ${SAME_CHAIN}
-      WHERE NOT o.id = ANY(u.path) AND u.depth < $3
-    ), root AS (
-      SELECT id FROM up ORDER BY depth DESC LIMIT 1
-    ), chain AS (
-      SELECT root.id AS root, root.id, ARRAY[root.id] AS path, 0 AS depth FROM root
-      UNION ALL
-      SELECT c.root, r.id, c.path || r.id, c.depth + 1
-      FROM chain c JOIN agent_runs o ON o.id = c.id
-      JOIN agent_runs r ON r."questionContinuation"->>'originRunId' = c.id::text AND ${SAME_CHAIN}
-      WHERE NOT r.id = ANY(c.path) AND c.depth < $3
-    )
-    SELECT DISTINCT ON (c.id) c.root::text AS "rootRunId", r.id::text AS "runId", r.status, r."stopRequestedAt", r."createdAt", r."finishedAt", now() AS "rootCreatedAt"
-    FROM chain c JOIN agent_runs r ON r.id = c.id ORDER BY c.id`, [runId, userId, RUN_CHAIN_MAX_DEPTH])
+    WITH RECURSIVE start AS (
+      SELECT "issueId" FROM agent_runs WHERE id = $1::uuid AND "userId" = $2
+    ), ${chainSql(`r."userId" = $2 AND EXISTS (SELECT 1 FROM start s WHERE r."issueId" IS NOT DISTINCT FROM s."issueId")`, '$3')}
+    SELECT ${SELECT_ATTEMPTS}, now() AS "rootCreatedAt"
+    FROM assigned a JOIN agent_runs x ON x.id = a.id
+    WHERE a.root = (SELECT root FROM assigned WHERE id = $1::uuid)`, [runId, userId, RUN_CHAIN_MAX_DEPTH])
   const [chain] = foldChains(rows)
   return chain && chain.attempts.some(attempt => attempt.runId === runId) ? chain : null
 }
 
-export type StopTarget =
-  | { kind: 'stop'; runId: string; forwardedFrom: string | null }
+export type StopTargets =
+  | { kind: 'stop'; runIds: string[]; latestRunId: string }
   | { kind: 'notFound' }
   | { kind: 'chainEnded'; latestRunId: string }
 
 /**
- * Where a stop for `runId` goes. Never silently does nothing:
- * - the run is unknown or not the caller's → notFound (404, `runNotFound`);
- * - the run itself is unfinished → stop it;
- * - it has ended but its chain's latest run is unfinished → forward the stop there
- *   (a stale page still holding attempt A or B stops the live attempt C);
- * - every run in the chain has ended → chainEnded (409, `runChainEnded`, with latestRunId).
- * Forwarding stays inside one owner's chain on one issue, so it cannot reach another chain.
+ * What a stop on `runId` stops (Tech Lead, BE-18): the requested run and every later attempt
+ * of its chain that is still unfinished. A(succeeded)→B(running)→C(running): stop B stops B
+ * and C; stop A stops B and C. B(running)→C(ended): stop B stops only B.
+ * - unknown run, or not the caller's → notFound (404, `runNotFound`);
+ * - nothing unfinished from the requested run onward → chainEnded (409, `runChainEnded`,
+ *   with latestRunId). Never a silent no-op.
+ * Only the caller's own chain on one issue is considered, so another chain is never reached.
  */
-export async function resolveStopTarget(q: RunChainQueryable, userId: string, runId: string): Promise<StopTarget> {
+export async function resolveStopTargets(q: RunChainQueryable, userId: string, runId: string): Promise<StopTargets> {
   const chain = await readRunChain(q, userId, runId)
   if (!chain) return { kind: 'notFound' }
-  const requested = chain.attempts.find(attempt => attempt.runId === runId)!
-  if (active(requested.status)) return { kind: 'stop', runId, forwardedFrom: null }
-  const latest = chain.attempts.find(attempt => attempt.runId === chain.latestRunId)!
-  if (active(latest.status)) return { kind: 'stop', runId: latest.runId, forwardedFrom: runId }
-  return { kind: 'chainEnded', latestRunId: chain.latestRunId }
+  const from = chain.attempts.findIndex(attempt => attempt.runId === runId)
+  const runIds = chain.attempts.slice(from).filter(attempt => (UNFINISHED_RUN_STATUSES as readonly string[]).includes(attempt.status)).map(attempt => attempt.runId)
+  return runIds.length ? { kind: 'stop', runIds, latestRunId: chain.latestRunId } : { kind: 'chainEnded', latestRunId: chain.latestRunId }
 }
