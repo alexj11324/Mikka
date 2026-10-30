@@ -129,28 +129,31 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
   const answer = use(ReplyAnswer)
   const { send, sent, pending, error, status } = useAgentDecision()
   const [picked, setPicked] = useState<string | null>(null)
-  const chosen = picked ?? options.find(option => option.label === answer?.trim())?.value ?? null
+  const chosen = picked ?? options.find(option => [option.label, option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : null].includes(answer?.trim() ?? ''))?.value ?? null
   const answered = sent || answer !== null
+  // Dispatch options are localized by value (BE-13 sends English labels); anything else shows as written.
+  const copy = (option: { value: string; label: string; action?: 'cloudKeySettings' }) => option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup
+    : option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : option.label
   return <div role="group" aria-label={title} data-slot="choice-card" className="flex w-full max-w-xl min-w-0 flex-col gap-2">
     <p className={cn('w-fit max-w-full min-w-0', bubbles ? 'rounded-2xl bg-muted px-4 py-2.5' : 'font-medium')}>
       {task && <><CitationChip id={task.toLowerCase()} kind="issue" />{' '}</>}{title}
     </p>
-    <div role={answered && !pending ? 'list' : undefined} className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5">
       {options.map((option, index) => {
         const selected = chosen === option.value
-        const label = option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup : option.label
-        const body = <>
-          <ItemMedia><Kbd>{String.fromCharCode(65 + index)}</Kbd></ItemMedia>
+        const label = copy(option)
+        const letter = String.fromCharCode(65 + index)
+        // No E2B key yet (and not answered): this row opens the settings where the key is set instead of answering.
+        if (option.action === 'cloudKeySettings' && !answered) return <Item key={option.value} size="sm" variant="muted" render={<Link href={CLOUD_KEY_SETTINGS} />}>
+          <ItemMedia><Kbd>{letter}</Kbd></ItemMedia>
           <ItemContent><ItemTitle>{label}</ItemTitle></ItemContent>
-          {selected && <ItemActions>{pending ? <Spinner aria-label={agentCopy.sendingChoice} /> : <Check aria-hidden="true" />}</ItemActions>}
-        </>
-        // Answered: the rows are a record, not controls.
-        if (answered && !pending) return <Item key={option.value} role="listitem" size="sm" variant={selected ? 'muted' : 'default'} aria-current={selected || undefined}>{body}</Item>
-        // No E2B key yet: this option opens the settings where the key is set instead of answering.
-        if (option.action === 'cloudKeySettings') return <Item key={option.value} size="sm" variant="outline" render={<Link href={CLOUD_KEY_SETTINGS} />}>{body}<ItemActions><ChevronRight aria-hidden="true" /></ItemActions></Item>
-        return <Button key={option.value} type="button" variant={selected ? 'default' : 'outline'} aria-pressed={selected}
-          disabled={status !== 'pending'} onClick={() => { setPicked(option.value); void send(option.label) }}>
-          <Kbd data-icon="inline-start">{String.fromCharCode(65 + index)}</Kbd>{label}{selected && <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} />}
+          <ItemActions><ChevronRight aria-hidden="true" /></ItemActions>
+        </Item>
+        // Answered rows stay the same Button, disabled, so nothing changes height or colour.
+        return <Button key={option.value} type="button" variant={selected ? 'default' : 'secondary'} aria-pressed={selected}
+          disabled={answered || status !== 'pending'} onClick={() => { setPicked(option.value); void send(label) }}>
+          <Kbd data-icon="inline-start">{letter}</Kbd>{label}
+          {selected && (pending ? <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} /> : answered && <Check data-icon="inline-end" aria-hidden="true" />)}
         </Button>
       })}
     </div>

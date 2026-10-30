@@ -2492,7 +2492,9 @@
     "creating": "正在创建…",
     "createWorkspace": "创建工作区",
     "sendingChoice": "发送中",
-    "cloudKeySetup": "去设置 E2B 密钥"
+    "cloudKeySetup": "去设置 E2B 密钥",
+    "dispatchWait": "等它上线",
+    "dispatchCloud": "用你的 E2B 运行"
   },
   "IssueThreads": {
     "title": "线程",

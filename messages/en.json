@@ -2492,7 +2492,9 @@
     "creating": "Creating…",
     "createWorkspace": "Create workspace",
     "sendingChoice": "Sending",
-    "cloudKeySetup": "Set up your E2B key"
+    "cloudKeySetup": "Set up your E2B key",
+    "dispatchWait": "Wait for it",
+    "dispatchCloud": "Run on your E2B"
   },
   "IssueThreads": {
     "title": "Threads",
