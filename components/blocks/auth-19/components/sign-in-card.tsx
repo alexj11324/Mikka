@@ -19,6 +19,8 @@ type SignInCardProps = {
   pending: boolean
   googleEnabled: boolean
   githubEnabled: boolean
+  /** Off while email sign-in is switched off in PostHog: GitHub and Google only. */
+  emailEnabled?: boolean
   showGoogleLinkHint: boolean
   error: string
   notice: string
@@ -30,7 +32,7 @@ type SignInCardProps = {
   onGitHubSignIn: () => Promise<void>
 }
 
-export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, showGoogleLinkHint, error, notice, googleCallbackURL, githubCallbackURL, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, notice, googleCallbackURL, githubCallbackURL, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn }: SignInCardProps) {
   const t = useTranslations('Auth')
   function authHref(path: string) {
     const params = new URLSearchParams()
@@ -71,6 +73,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           {!githubEnabled && githubCallbackURL && <details className="text-muted-foreground text-xs"><summary className="cursor-pointer">{t('viewCallback')}</summary><code className="mt-2 block break-all select-all">{githubCallbackURL}</code></details>}
           {notice && <p role="status" className="text-xs leading-5">{notice}</p>}
         </div>
+        {emailEnabled ? <>
         <div className="flex items-center gap-3">
           <Separator className="flex-1" />
           <span className="text-muted-foreground text-xs">{t('orEmail')}</span>
@@ -116,6 +119,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           {registering ? t('haveAccount') : t('noAccountShort')}{' '}
           <Link href={authHref(registering ? '/sign-in' : '/sign-up')} className="text-foreground underline underline-offset-4">{registering ? t('signIn') : t('createAccount')}</Link>
         </p>
+        </> : error && <p id="auth-error" role="alert" className="text-destructive text-sm">{error}</p>}
       </CardContent>
     </Card>
   )
