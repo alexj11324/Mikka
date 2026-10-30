@@ -44,7 +44,11 @@ for (const scheme of ['light', 'dark'] as const) {
         // The identifier never truncates: its full width is visible inside the clipped breadcrumb.
         await expect.poll(async () => id.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
         const [i, c] = await Promise.all([box(id), box(root.locator(':scope > div').first())])
+        // EBFC-1 sits fully inside the left container, so overflow-hidden never clips it (incl. 390px mobile).
+        expect(i.left).toBeGreaterThanOrEqual(c.left - 0.5)
         expect(i.right).toBeLessThanOrEqual(c.right + 0.5)
+        expect(i.right - i.left).toBeGreaterThan(0)
+        await expect(id).toHaveText(/^[A-Z]+-\d+$/)
         // One line: nothing wraps below the 48px bar.
         expect((await box(crumbs)).bottom - (await box(crumbs)).top).toBeLessThanOrEqual(32)
         await page.screenshot({ path: testInfo.outputPath(`shots/fe6-${width}-${sidebar}-${scheme}.png`) })
