@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { gunzipSync, gzipSync } from 'node:zlib'
 import test from 'node:test'
-import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedBot, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, flag: process.env.MIKKA_BYO_E2B_KEY }
@@ -135,6 +135,61 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     assert.ok(error, 'FK violation expected')
     const seen = `${String(error)} ${(error as Error).stack} ${JSON.stringify(error)} ${String((error as { cause?: unknown }).cause)}`
     assert.ok(!seen.includes(SECRET), 'masked before the query: the secret is not in the error')
+  })
+
+  await t.test('subagent: step / needs from the model are masked in bot_subagents and subagent_events', async () => {
+    const { SubagentStore } = await import('../lib/cloud-computer/subagents')
+    const subagents = new SubagentStore(pool)
+    const actor = { userId: admin, workspaceId: ws.id }
+    const bot = await seedBot(pool, ws.id, admin)
+    const created = await subagents.create(actor, bot, 'look up the order')
+    await pool.query(`update bot_subagents set status='running' where id=$1`, [created.id])
+    await subagents.update(actor, bot, created.id, 'needs_you', `typed ${SECRET} into the form`, { kind: 'approval', actionId: randomUUID(), summary: `confirm ${SECRET}` })
+    const { rows: [row] } = await pool.query(`select step,needs from bot_subagents where id=$1`, [created.id])
+    noPlain('bot_subagents', JSON.stringify(row))
+    assert.match(row.step, /\[secret:API_TOKEN\]/)
+    const { rows: events } = await pool.query(`select event from subagent_events where "subagentId"=$1`, [created.id])
+    assert.ok(events.length > 0, 'an event was published')
+    noPlain('subagent_events', JSON.stringify(events))
+    assert.match(JSON.stringify(events), /\[secret:API_TOKEN\]/)
+  })
+
+  await t.test('mailbox: a run\'s peer message is masked in run_messages and coordinator_events', async () => {
+    // The mailbox schema is still review-only (docs/backend/personal-mailbox-schema.review.sql), so the
+    // write goes to a throwaway local _e2e database with that SQL applied, never to the shared test DB.
+    const { maskWorkerMailboxInput } = await import('../lib/personal-mailbox-runtime')
+    const { SessionMailbox } = await import('../lib/session-mailbox')
+    const { execFileSync } = await import('node:child_process')
+    const { readFileSync } = await import('node:fs')
+    const base = new URL(dbUrl!)
+    const name = `mailbox_mask_${randomBytes(8).toString('hex')}_e2e`
+    const throwaway = new URL(base); throwaway.pathname = `/${name}`
+    await pool.query(`create database ${name}`)
+    const mailboxPool = new Pool({ connectionString: throwaway.toString(), max: 3 })
+    try {
+      execFileSync(process.execPath, ['scripts/setup-e2e-db.mjs'], { env: { ...process.env, E2E_DATABASE_URL: throwaway.toString() }, stdio: 'ignore' })
+      await mailboxPool.query(readFileSync('docs/backend/personal-mailbox-schema.review.sql', 'utf8'))
+      const runId = await newRun()
+      const input = await maskWorkerMailboxInput(runId, { to: '', key: randomUUID(), text: `use ${SECRET} for the deploy` }) as { to: string; key: string; text: string }
+      // Same ids in the throwaway DB, so the run is live there too.
+      await mailboxPool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [admin, `${admin}@example.invalid`])
+      await mailboxPool.query(`insert into devices (id,name,"ownerId",kind,enabled) values ($1,'cloud',$2,'cloud',true)`, [device, admin])
+      await mailboxPool.query(`insert into agents (id,"userId",harness,name) values ($1,$2,'codex','a')`, [agent, admin])
+      await mailboxPool.query(`insert into agent_runs (id,"agentId","userId","deviceId",status,"leaseExpiresAt") values ($1,$2,$3,$4,'running',now()+interval '10 minutes')`, [runId, agent, admin, device])
+      const mailbox = new SessionMailbox(mailboxPool, ws.id)
+      const sender = await mailbox.run(admin, runId)
+      const coordinator = await mailbox.conversation(admin, 'coordinator')
+      await mailbox.send(sender, { ...input, to: coordinator.mailboxId })
+      const { rows: messages } = await mailboxPool.query(`select text from run_messages where "senderMailboxId"=$1`, [sender.mailboxId])
+      assert.equal(messages.length, 1)
+      noPlain('run_messages', JSON.stringify(messages))
+      assert.equal(messages[0].text, 'use [secret:API_TOKEN] for the deploy')
+      const { rows: events } = await mailboxPool.query(`select payload from coordinator_events where "runId"=$1`, [runId])
+      noPlain('coordinator_events', JSON.stringify(events))
+    } finally {
+      await mailboxPool.end()
+      await pool.query(`drop database if exists ${name} with (force)`)
+    }
   })
 
   // E is covered in lib/agent-tool-approval/store.db.test.ts (needs that suite's policy fixture).
