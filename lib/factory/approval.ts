@@ -268,6 +268,32 @@ async function validApproval(
   return { a, current };
 }
 
+/** What the transaction's row locks cannot freeze: the clock, the granting session and an
+ * external policy authority. Re-asked right before the provider call, without rereading
+ * or rehashing the evidence validApproval already checked in this transaction. */
+async function grantStillLive(
+  tx: PoolClient,
+  a: any,
+  authority?: FactoryDecisionAuthority,
+) {
+  const {
+    rows: [live],
+  } = await tx.query("SELECT $1::timestamptz>clock_timestamp() AS ok", [
+    a.expiresAt,
+  ]);
+  if (!live.ok) fail("factoryApprovalInvalid");
+  if (!a.decisionCredentialId)
+    return humanApproval(tx, { userId: a.userId, sessionId: a.humanSessionId });
+  const decision = await authorizeFactoryDecision(
+    tx,
+    authority,
+    a.decisionCredentialId,
+    a.decisionScope,
+  );
+  if (digest(decision) !== digest(a.decisionEvidence))
+    fail("factoryPolicyDecisionMismatch");
+}
+
 function gatesFor(authority?: FactoryDecisionAuthority) {
   const approvalGate: FactoryGate = async (tx, task, _attempt, change) => {
     const parsed = output.safeParse(change.output);
@@ -294,42 +320,27 @@ function gatesFor(authority?: FactoryDecisionAuthority) {
       !parsed.data.publicationId
     )
       return false;
-    // Authorization happened when the publication was reserved; finishing it (publish or a
-    // later reconcile) only needs the approval still bound to this candidate and attempt.
-    const a = await boundApproval(tx, task, parsed.data.approvalId, true);
-    const current = await approvedEvidence(tx, task, a);
+    // complete() authorized the approval and verified this receipt against it earlier in the
+    // same locked transaction; the gate only confirms the named publication is that row.
     const {
       rows: [p],
     } = await tx.query(
-      `SELECT * FROM factory_publications WHERE id=$1 AND "approvalId"=$2 AND status='succeeded' AND receipt IS NOT NULL`,
-      [parsed.data.publicationId, a.id],
+      `SELECT p.receipt,p."createdAt" FROM factory_publications p JOIN factory_approvals a ON a.id=p."approvalId" AND a."taskId"=p."taskId"
+        WHERE p.id=$1 AND p."approvalId"=$2 AND p."taskId"=$3 AND p."candidateId"=$4 AND p.status='succeeded' AND p.receipt IS NOT NULL
+          AND a."publishAttemptId"=$5 AND a."revokedAt" IS NULL`,
+      [
+        parsed.data.publicationId,
+        parsed.data.approvalId,
+        task.id,
+        task.candidateId,
+        task.attemptId,
+      ],
     );
-    if (p) {
-      const receipt = publicationAdapterReceipt.safeParse(p.receipt);
-      if (!receipt.success) return false;
-      providerBinding(receipt.data, providerInput(task, a, p.request, p.id));
-      assertPublicationTarget(
-        receipt.data,
-        a.candidate,
-        a.action,
-        a.target,
-        a.request.targetEnvironment,
-        p.id,
-        publicationBindingHash(providerInput(task, a, p.request, p.id)),
-      );
-      if (
-        new Date(receipt.data.verifiedTarget.observedAt).getTime() <
+    const receipt = publicationAdapterReceipt.safeParse(p?.receipt);
+    return (
+      receipt.success &&
+      new Date(receipt.data.verifiedTarget.observedAt).getTime() >=
         p.createdAt.getTime()
-      )
-        return false;
-    }
-    return Boolean(
-      p &&
-      p.taskId === task.id &&
-      p.candidateId === task.candidateId &&
-      p.action === a.action &&
-      p.target === a.target &&
-      digest(change.evidence) === digest(current.evidence),
     );
   };
 
@@ -924,10 +935,10 @@ export function createFactoryApprovals(
             authority,
           );
           const trustedInput = providerInput(task, a, req, publicationId);
+          // Authorized once above; the task and approval rows stay locked until COMMIT.
           trustedInput.beforeCreate = async () => {
-            const latest = await owned(tx, actor, task.id);
-            fence(latest, req.binding);
-            await validApproval(tx, latest, req.approvalId, true, authority);
+            fence(await owned(tx, actor, task.id), req.binding);
+            await grantStillLive(tx, a, authority);
           };
           const receipt = publicationAdapterReceipt.parse(
             await adapter.execute(trustedInput, tx),
