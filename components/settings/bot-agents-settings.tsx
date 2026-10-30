@@ -135,7 +135,12 @@ export function BotAgentsSettings() {
 /** The fixed fallback: every column 自动. It cannot be changed or deleted, so it has no controls. */
 function DefaultRow({ t }: { t: T }) {
   return <TableRow className={ROW} data-rule="default">
-    <TableCell className={cn(CELL, 'text-muted-foreground')}>{t('default')}</TableCell>
+    <TableCell className={CELL}>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate text-sm">{t('default')}</span>
+        <span className="text-xs text-muted-foreground">{t('defaultHint')}</span>
+      </span>
+    </TableCell>
     <TableCell className={CELL}><AutoLabel /></TableCell>
     <TableCell className={CELL}><AutoLabel /></TableCell>
     <TableCell className={CELL}><AutoLabel /></TableCell>
@@ -242,7 +247,10 @@ function BotRow({ t, botId, name, rows, onSave, onRefresh }: {
     <TableCell className={CELL} colSpan={3}>
       <span className="flex min-w-0 items-center gap-2.5">
         {name ? <BotAvatar color={name.color} shape={name.shape} size="row" label={name.name} /> : <CoordinatorAvatar size="row" />}
-        <span className="truncate text-sm">{title}</span>
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate text-sm">{title}</span>
+          {!name && <span className="truncate text-xs text-muted-foreground">{t('coordinatorHint')}</span>}
+        </span>
       </span>
     </TableCell>
     <TableCell className={CELL}>

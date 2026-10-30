@@ -2127,7 +2127,9 @@
         "harness": "Harness",
         "model": "模型",
         "actions": "操作"
-      }
+      },
+      "coordinatorHint": "和你对话，分派任务",
+      "defaultHint": "没匹配到标签时"
     }
   },
   "TelegramBot": {

@@ -2127,7 +2127,9 @@
         "harness": "Harness",
         "model": "Model",
         "actions": "Actions"
-      }
+      },
+      "coordinatorHint": "Talks with you and hands out tasks",
+      "defaultHint": "When no label matches"
     }
   },
   "TelegramBot": {
