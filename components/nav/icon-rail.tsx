@@ -2,9 +2,9 @@
 
 import { useTranslations } from 'next-intl'
 import type { ComponentType } from 'react'
-import { Blocks, Columns3, House, Lightbulb } from 'lucide-react'
+import { Columns3, House, Lightbulb } from 'lucide-react'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
-import { ArtifactFilled, BlocksFilled, Columns3Filled, HouseFilled, LightbulbFilled } from '@/components/icons/rail-filled-icons'
+import { ArtifactFilled, Columns3Filled, HouseFilled, LightbulbFilled, PlugCircle, PlugCircleFilled } from '@/components/icons/rail-filled-icons'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Sidebar } from '@/components/ui/sidebar'
@@ -20,7 +20,7 @@ export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: Ra
   { id: 'chats', icon: House, selectedIcon: HouseFilled, label: 'Nav.home' },
   { id: 'suggestions', icon: Lightbulb, selectedIcon: LightbulbFilled, label: 'Nav.suggestions' },
   { id: 'board', icon: Columns3, selectedIcon: Columns3Filled, label: 'Nav.board' },
-  { id: 'plugins', icon: Blocks, selectedIcon: BlocksFilled, label: 'Nav.plugins' },
+  { id: 'plugins', icon: PlugCircle, selectedIcon: PlugCircleFilled, label: 'Nav.plugins' },
   { id: 'artifacts', icon: ArtifactIcon, selectedIcon: ArtifactFilled, label: 'Nav.artifacts' },
 ]
 

@@ -32,10 +32,28 @@ export function Columns3Filled(props: IconProps) {
   </Solid>
 }
 
-/** Plugins: three blocks with the fourth lifted off the corner, as lucide Blocks. */
-export function BlocksFilled(props: IconProps) {
+/**
+ * Plugins, as ChatGPT draws apps: a plug inside a circle, its cord running to
+ * the rim. Outline on the lucide grid and stroke, so it sits beside lucide icons.
+ */
+export function PlugCircle({ size, strokeWidth = 2, ...props }: IconProps) {
+  return <svg xmlns="http://www.w3.org/2000/svg" width={size ?? 24} height={size ?? 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M10 6.5V9" /><path d="M14 6.5V9" />
+    <path d="M8 9h8v2.5a4 4 0 0 1-8 0Z" />
+    <path d="M12 15.5V22" />
+  </svg>
+}
+
+/** The plug cut out of a solid disc. */
+export function PlugCircleFilled(props: IconProps) {
+  const mask = useId()
   return <Solid {...props}>
-    <rect x="2" y="7" width="7" height="7" rx="1.5" /><rect x="2" y="15" width="7" height="7" rx="1.5" /><rect x="10" y="15" width="7" height="7" rx="1.5" /><rect x="14" y="2" width="8" height="8" rx="1.5" />
+    <defs><mask id={mask} maskUnits="userSpaceOnUse">
+      <rect width="24" height="24" fill="#fff" />
+      <g fill="#000"><rect x="9" y="5.5" width="2" height="4.5" rx="1" /><rect x="13" y="5.5" width="2" height="4.5" rx="1" /><path d="M7.5 9h9v2.5a4.5 4.5 0 0 1-9 0Z" /><rect x="11" y="15" width="2" height="9" /></g>
+    </mask></defs>
+    <circle cx="12" cy="12" r="11" mask={`url(#${mask})`} />
   </Solid>
 }
 
