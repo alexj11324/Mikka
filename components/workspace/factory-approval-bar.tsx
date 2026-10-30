@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Ban, Check, CircleCheck, CircleX, Clock, ExternalLink, RefreshCw, Server, Upload, type LucideIcon } from 'lucide-react'
+import { Ban, Check, CircleCheck, CircleX, Clock, ExternalLink, GitMerge, RefreshCw, Server, Upload, type LucideIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
@@ -29,11 +29,15 @@ export type ApprovalBarProps = {
   onReconcile?: () => void
   /** Only passed when the server can take a send-back; otherwise the action is hidden. */
   onReject?: () => void
+  /** A code candidate (#528): its one action merges the PR as this person (验收并合并). */
+  onAccept?: () => void
+  /** The candidate's PR, opened from the merged state. */
+  pullRequestUrl?: string
 }
 
 function StateIcon({ state }: { state: AcceptanceState }) {
-  if (state === 'publishing' || state === 'checking') return <Spinner />
-  if (state === 'approved' || state === 'live') return <CircleCheck aria-hidden="true" />
+  if (state === 'publishing' || state === 'checking' || state === 'merging') return <Spinner />
+  if (state === 'approved' || state === 'live' || state === 'merged') return <CircleCheck aria-hidden="true" />
   if (state === 'failed') return <CircleX aria-hidden="true" />
   if (state === 'expired') return <Clock aria-hidden="true" />
   if (state === 'revoked' || state === 'invalidated' || state === 'unavailable') return <Ban aria-hidden="true" />
@@ -51,7 +55,7 @@ function ActionIcon({ icon: Icon, busy }: { icon: LucideIcon; busy: boolean }) {
  * the right. While it waits for you the header's state chip says so, so the
  * bar carries no title; every later state names itself. Purely presentational.
  */
-export function ApprovalBar({ state, isSkill, environment, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile, onReject }: ApprovalBarProps) {
+export function ApprovalBar({ state, isSkill, environment, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile, onReject, onAccept, pullRequestUrl }: ApprovalBarProps) {
   const t = useTranslations('FactoryAcceptance')
   const icon = StateIcon({ state })
   return <Item variant="muted" data-state={state}>
@@ -66,7 +70,10 @@ export function ApprovalBar({ state, isSkill, environment, sha, busy = false, ca
     </ItemContent>
     <ItemActions>
       {state === 'pending' && onReject && <Button size="sm" variant="secondary" disabled={busy} onClick={onReject}>{t('reject')}</Button>}
-      {state === 'pending' && canApprove && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onApprove}><ActionIcon icon={Check} busy={busy} />{isSkill ? t('enable') : t('approve')}</Button>}
+      {state === 'pending' && canApprove && (onAccept
+        ? <Button size="sm" disabled={busy} aria-busy={busy} onClick={onAccept}><ActionIcon icon={GitMerge} busy={busy} />{t('accept')}</Button>
+        : <Button size="sm" disabled={busy} aria-busy={busy} onClick={onApprove}><ActionIcon icon={Check} busy={busy} />{t('enable')}</Button>)}
+      {state === 'merged' && pullRequestUrl && <Button size="sm" variant="outline" render={<a href={pullRequestUrl} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-end" />{t('openOnGitHub')}</Button>}
       {state === 'approved' && <>
         <Button size="sm" variant="secondary" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
         {canPublish && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onPublish}><ActionIcon icon={Upload} busy={busy} />{t('publish')}</Button>}

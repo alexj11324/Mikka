@@ -149,7 +149,7 @@ test('验收 on the thread: criteria with their evidence, independent results, t
   const results = thread.getByRole('region', { name: '独立结果' })
   await expect(results.getByText('建议合并', { exact: true })).toBeVisible()
   await expect(results.getByRole('listitem').filter({ hasText: '验证' }).getByText('3/3', { exact: true })).toBeVisible()
-  await expect(thread.getByRole('button', { name: '批准并发布' })).toBeVisible()
+  await expect(thread.getByRole('button', { name: '验收并合并' })).toBeVisible()
   await expect(thread.getByRole('button', { name: '退回修改' })).toBeVisible()
   await expect(thread.getByText(/有效/)).toHaveCount(0)
   await shoot(page, 'list')

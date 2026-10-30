@@ -15,7 +15,7 @@ import { FactoryAcceptancePane, request, useAcceptance, type FactoryTask } from 
 
 export type { FactoryTask } from './factory-acceptance-pane'
 
-const tone = (state: AcceptanceState) => state === 'live' ? 'success' : state === 'pending' ? 'warning' : state === 'failed' ? 'destructive' : state === 'revoked' || state === 'expired' || state === 'invalidated' ? 'neutral' : 'info'
+const tone = (state: AcceptanceState) => state === 'live' || state === 'merged' ? 'success' : state === 'pending' ? 'warning' : state === 'failed' ? 'destructive' : state === 'revoked' || state === 'expired' || state === 'invalidated' ? 'neutral' : 'info'
 
 /** A task the person can accept or follow: waiting for approval, or being published. */
 const accepting = (task: FactoryTask) => (task.stage === 'approval' && ['pending', 'waiting'].includes(task.status)) || task.stage === 'publish'

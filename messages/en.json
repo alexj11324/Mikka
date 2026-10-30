@@ -3277,14 +3277,15 @@
       "expired": "Expired",
       "unavailable": "Cannot approve",
       "failed": "Publish failed",
-      "invalidated": "Invalidated"
+      "invalidated": "Invalidated",
+      "merging": "Merging",
+      "merged": "Merged"
     },
     "stage": {
       "execute": "Execute",
       "review": "Review",
       "verify": "Verify"
     },
-    "approve": "Approve and publish",
     "enable": "Enable",
     "publish": "Publish",
     "reconcile": "Check publication",
@@ -3352,7 +3353,19 @@
       "preview": "Preview",
       "production": "Production"
     },
-    "textLabel": "{stage} {kind}"
+    "textLabel": "{stage} {kind}",
+    "accept": "Accept and merge",
+    "openOnGitHub": "Open on GitHub",
+    "cannotMerge": "Can't merge",
+    "mergeRefusal": {
+      "githubMergeAuthorizationRequired": "GitHub merge not authorized",
+      "githubMergeForbidden": "No permission to merge",
+      "githubMergeBlocked": "Checks or reviews required",
+      "githubMergeConflict": "Merge conflicts",
+      "githubMergeHeadMoved": "New commits on the PR",
+      "githubMergeClosed": "PR closed",
+      "githubUnavailable": "GitHub unavailable"
+    }
   },
   "AccountEmail": {
     "exportSubject": "Your Mikka data export",

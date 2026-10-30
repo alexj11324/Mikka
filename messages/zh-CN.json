@@ -3277,14 +3277,15 @@
       "expired": "已过期",
       "unavailable": "不可批准",
       "failed": "发布失败",
-      "invalidated": "已失效"
+      "invalidated": "已失效",
+      "merging": "合并中",
+      "merged": "已合并"
     },
     "stage": {
       "execute": "执行",
       "review": "审查",
       "verify": "验证"
     },
-    "approve": "批准并发布",
     "enable": "启用",
     "publish": "发布",
     "reconcile": "核对发布",
@@ -3352,7 +3353,19 @@
       "preview": "Preview",
       "production": "Production"
     },
-    "textLabel": "{stage}{kind}"
+    "textLabel": "{stage}{kind}",
+    "accept": "验收并合并",
+    "openOnGitHub": "在 GitHub 打开",
+    "cannotMerge": "无法合并",
+    "mergeRefusal": {
+      "githubMergeAuthorizationRequired": "未授权 GitHub 合并",
+      "githubMergeForbidden": "没有合并权限",
+      "githubMergeBlocked": "检查或审批未通过",
+      "githubMergeConflict": "有合并冲突",
+      "githubMergeHeadMoved": "PR 有新提交",
+      "githubMergeClosed": "PR 已关闭",
+      "githubUnavailable": "GitHub 暂不可用"
+    }
   },
   "AccountEmail": {
     "exportSubject": "你的 Mikka 数据导出",
@@ -3470,7 +3483,7 @@
       "codeEmail": "邮件验证码",
       "captchaRequired": "需要你亲自完成网站的人机验证",
       "needsUser": "需要你亲自完成登录",
-      "outcomeUnknown": "没能确认是否已登录",
+      "outcomeUnknown": "无法确认是否已登录",
       "waiting": "已提交，等待网站结果…",
       "submissionInvalid": "提交内容无效，再试一次",
       "denied": "这里不允许登录",

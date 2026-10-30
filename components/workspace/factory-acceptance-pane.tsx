@@ -4,13 +4,13 @@ import { useCallback, useReducer, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { CircleCheck, CircleDashed, CircleX, ExternalLink, GitCommitHorizontal, Server } from 'lucide-react'
-import { Alert, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { withBasePath } from '@/lib/base-path'
 import { cn } from '@/lib/utils'
-import { MIKKA_VERCEL, publicationActionFor, vercelTarget, type PublicationEnvironment } from '@/lib/factory/vercel-target'
-import { acceptanceState } from '@/lib/factory/acceptance-state'
+import type { PublicationEnvironment } from '@/lib/factory/vercel-target'
+import { acceptanceState, mergeAcceptance, type AcceptanceMerge, type AcceptanceState } from '@/lib/factory/acceptance-state'
 import { canReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
 import { evidenceEntries, orderEvidence, type EvidenceEntry } from '@/lib/factory/evidence-view'
 import { bareUrl, criterionGroups, pullNumber, resultRows, type AcceptanceDetail, type CriterionGroup, type ResultRow } from '@/lib/factory/acceptance-view'
@@ -25,7 +25,7 @@ export type FactoryTask = { id: string; issueId: string; stage: string; status: 
 type Evidence = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; manifest: { candidate: Candidate; artifacts: EvidenceEntry[] } }
 type Approval = { id: string; candidateId: string; candidate: Candidate; action: string; target: string; targetEnvironment: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 type Publication = { id: string; approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed'; request: Record<string, unknown>; receipt?: { verifiedTarget?: { reference?: string } } }
-type Ledger = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; approvals: Approval[]; publications: Publication[]; capabilities?: { reject?: boolean } }
+type Ledger = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; approvals: Approval[]; publications: Publication[]; merges?: AcceptanceMerge[]; capabilities?: { reject?: boolean } }
 
 export class RequestError extends Error {
   constructor(readonly code: string, readonly status: number, readonly body: Record<string, unknown>) { super(code) }
@@ -54,10 +54,16 @@ const ERROR_KEYS: Record<string, ErrorKey> = {
 /** The approve call still takes an expiry until #517 lands; approving publishes at once, so the bar shows none. */
 const APPROVAL_HOURS = 1
 
-/** List, header and pane read the same ledger and the same state machine, so they always agree. */
+/** GitHub's refusals of a merge (#528): the task keeps waiting, and the person can open the PR on GitHub. */
+const MERGE_REFUSALS = new Set(['githubMergeAuthorizationRequired', 'githubMergeForbidden', 'githubMergeBlocked', 'githubMergeConflict', 'githubMergeHeadMoved', 'githubMergeClosed', 'githubUnavailable'])
+type Derived = { state: AcceptanceState; active?: unknown; publication?: unknown; superseded?: unknown; refusal?: string }
+
+/** List, header and pane read the same ledger and the same state machine, so they always agree. A code candidate is accepted by merging its PR; a skill is enabled. */
 export function useAcceptance(task: FactoryTask) {
   const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(`/api/factory/tasks/${task.id}/approval?view=ledger`, request, { refreshInterval: 5000 })
-  const derived = ledger ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals: Array.isArray(ledger.approvals) ? ledger.approvals : [], publications: Array.isArray(ledger.publications) ? ledger.publications : [], now: Date.now() }) : undefined
+  const derived: Derived | undefined = !ledger ? undefined : task.isSkillCandidate
+    ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals: Array.isArray(ledger.approvals) ? ledger.approvals : [], publications: Array.isArray(ledger.publications) ? ledger.publications : [], now: Date.now() })
+    : mergeAcceptance({ stage: task.stage, status: task.status, candidateId: task.candidateId, merges: Array.isArray(ledger.merges) ? ledger.merges : [] })
   return { ledger, reload, ledgerError, derived }
 }
 
@@ -91,11 +97,11 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
         <span className="truncate">{bareUrl(delivery.previewUrl)}</span><ExternalLink aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
       </a>
     </div>}
-    <div className="flex min-w-0 items-center gap-2">
+    {(isSkill || environment) && <div className="flex min-w-0 items-center gap-2">
       <Label>{t('environmentLabel')}</Label>
       <Server aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-      <span className="truncate text-sm">{isSkill ? t('internalSkill') : environment ?? t('state.unavailable')}</span>
-    </div>
+      <span className="truncate text-sm">{isSkill ? t('internalSkill') : environment}</span>
+    </div>}
     {isSkill && <div className="flex min-w-0 items-center gap-2">
       <Label>{t('target')}</Label>
       <code className="truncate text-xs">mikka-builtin:run-report</code>
@@ -160,10 +166,12 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<{ group: number; index: number } | null>(null)
   const [reject, dispatchReject] = useReducer(rejectFlow, closedReject)
+  // A refusal with no recorded attempt (no GitHub authorization) lives only in this pane.
+  const [refused, setRefused] = useState<string | null>(null)
 
   const approvals = ledger && Array.isArray(ledger.approvals) ? ledger.approvals : []
   const latest = approvals[approvals.length - 1]
-  const derived = acceptance ?? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals, publications: [], now: Date.now() })
+  const derived: Derived = acceptance ?? (task.isSkillCandidate ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals, publications: [], now: Date.now() }) : mergeAcceptance({ stage: task.stage, status: task.status, candidateId: task.candidateId, merges: [] }))
   const state = derived.state
   const active = derived.active as Approval | undefined
   const publication = derived.publication as Publication | undefined
@@ -174,6 +182,8 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const environment = environmentOf(candidate)
   const reference = publication?.receipt?.verifiedTarget?.reference
   const checks = Array.isArray(detail?.checks) ? detail.checks : []
+  const pullRequestUrl = detail?.delivery?.pullRequest?.url ?? null
+  const refusal = state === 'pending' ? refused ?? derived.refusal ?? null : null
 
   async function run(operation: 'approve' | 'publish' | 'reconcile' | 'revoke', input: Record<string, unknown>) {
     setBusy(true); setError(null)
@@ -188,11 +198,28 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
     } finally { setBusy(false) }
   }
 
+  /** 验收并合并 (#528): the server merges the PR as this person, bound to the candidate commit. */
+  async function accept() {
+    if (!ledger) return
+    setBusy(true); setError(null); setRefused(null)
+    try {
+      await request(`/api/factory/tasks/${task.id}/approval`, { operation: 'accept', input: { binding: ledger.binding, eventId: crypto.randomUUID() } })
+    } catch (caught) {
+      const code = caught instanceof RequestError ? caught.code : 'factoryUnavailable'
+      if (MERGE_REFUSALS.has(code)) setRefused(code)
+      else setError(code)
+    } finally {
+      await reload().catch(() => {})
+      setBusy(false)
+    }
+  }
+
+  /** A skill candidate has no PR: it is still enabled through the approval. */
   async function approve() {
     const approvedCandidate = evidence?.manifest?.candidate
-    if (!evidence || !approvedCandidate || !environment) return
-    const action = task.isSkillCandidate ? 'activate_skill' : publicationActionFor(environment)
-    const target = task.isSkillCandidate ? 'mikka-builtin:run-report' : vercelTarget({ ...MIKKA_VERCEL, environment })
+    if (!task.isSkillCandidate || !evidence || !approvedCandidate || !environment) return
+    const action = 'activate_skill'
+    const target = 'mikka-builtin:run-report'
     const binding = evidence.binding
     const approved = await run('approve', {
       binding, eventId: crypto.randomUUID(), candidate: approvedCandidate, action, target,
@@ -251,11 +278,17 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
         <h4 className="pl-3 text-xs font-medium text-muted-foreground">{t('results')}</h4>
         <ul className="flex flex-col gap-1">{results.map(row => <ResultLine key={row.stage} row={row} onOpenThread={onOpenThread} />)}</ul>
       </section>}
+      {refusal && <Alert variant="destructive">
+        <AlertTitle>{t('cannotMerge')}</AlertTitle>
+        <AlertDescription>{t(`mergeRefusal.${refusal}` as 'mergeRefusal.githubUnavailable')}</AlertDescription>
+        {pullRequestUrl && <AlertAction><Button size="sm" variant="outline" render={<a href={pullRequestUrl} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-start" aria-hidden="true" />{t('openOnGitHub')}</Button></AlertAction>}
+      </Alert>}
       {state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
       {error && <p role="alert" className="text-xs text-destructive">{t(ERROR_KEYS[error] ?? 'error')}</p>}
     </div>
     {state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
-      <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={Boolean(evidence && environment)} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
+      <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(pullRequestUrl)}
+        onAccept={task.isSkillCandidate ? undefined : () => { void accept() }} pullRequestUrl={pullRequestUrl ?? undefined} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
         environment={envChip ?? undefined}
         sha={candidate?.sha} superseded={superseded?.candidate?.sha}
         reference={reference ? { href: reference, label: publication?.request?.targetEnvironment === 'production' ? t('production') : t('preview') } : undefined}
