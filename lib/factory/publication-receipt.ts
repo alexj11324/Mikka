@@ -170,7 +170,7 @@ export async function readFactoryPublicationReceiptV2(
     ORDER BY p."finishedAt" DESC LIMIT 1`,
     [userId, taskId, candidateId],
   );
-  if (!p) throw new FactoryError("factoryPublicationReceiptRequired");
+  if (!p?.receipt) throw new FactoryError("factoryPublicationReceiptRequired");
   const receipt = p.receipt as PublicationAdapterReceipt;
   return {
     version: 2 as const,

@@ -413,6 +413,7 @@ test(
             service = f.service();
           const request = await x.publication();
           const result = await service.publish(actor, request);
+          assert.ok(result);
           const tx = await pool.connect();
           const read = () =>
             readFactoryPublicationReceiptV2(
