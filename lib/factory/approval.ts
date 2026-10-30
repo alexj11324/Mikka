@@ -341,10 +341,10 @@ export function createFactoryApprovals(
     const checkpoint =
       error instanceof PublicationDeferred ? error.checkpoint : null;
     await pool.query(
-      `UPDATE factory_publications SET status=$2,receipt=coalesce($3::jsonb,receipt),"finishedAt"=clock_timestamp() WHERE id=$1 AND status<>'succeeded'`,
+      `UPDATE factory_publications SET status=$2,receipt=coalesce($3::jsonb,receipt),"finishedAt"=clock_timestamp() WHERE id=$1 AND status NOT IN ('succeeded','failed')`,
       [
         publicationId,
-        state === "pending" ? "reserved" : "uncertain",
+        state === "pending" ? "reserved" : state,
         checkpoint == null ? null : JSON.stringify(checkpoint),
       ],
     );
@@ -407,7 +407,7 @@ export function createFactoryApprovals(
       return transaction(async (tx) => {
         const task = await owned(tx, actor, taskId, true);
         const { rows: approvals } = await tx.query(
-          'SELECT id,"candidateId","userId",candidate,action,target,request->>\'targetEnvironment\' AS "targetEnvironment","evidenceDigest",evidence,"expiresAt","revokedAt","createdAt" FROM factory_approvals WHERE "taskId"=$1 ORDER BY "createdAt"',
+          'SELECT id,"candidateId","userId",candidate,action,target,request->>\'targetEnvironment\' AS "targetEnvironment","evidenceDigest",evidence,"expiresAt","revokedAt","invalidatedAt","invalidationReason","createdAt" FROM factory_approvals WHERE "taskId"=$1 ORDER BY "createdAt"',
           [task.id],
         );
         const { rows: publications } = await tx.query(
@@ -781,6 +781,9 @@ export function createFactoryApprovals(
           );
           if (!p) fail("factoryPublicationReceiptRequired");
           if (digest(p.request) !== digest(req)) fail("factoryReplayMismatch");
+          // Terminal: a confirmed provider failure is not asked again (B2).
+          if (p.status === "failed")
+            throw new PublicationDeferred(p.id, "failed", p.receipt);
           if (p.status === "succeeded") {
             if (
               task.stage !== "publish" ||

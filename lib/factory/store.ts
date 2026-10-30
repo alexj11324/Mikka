@@ -738,6 +738,11 @@ export function createFactoryStore(
           );
         }
         task.revision++;
+        // B4: an approval stops counting the moment its candidate is no longer current.
+        await tx.query(
+          `UPDATE factory_approvals SET "invalidatedAt"=clock_timestamp(),"invalidationReason"='candidateSuperseded' WHERE "taskId"=$1 AND "candidateId" IS DISTINCT FROM $2::uuid AND "invalidatedAt" IS NULL`,
+          [task.id, task.candidateId],
+        );
         await tx.query(
           'UPDATE factory_tasks SET stage=$2,status=$3,revision=$4,"attemptId"=$5,"candidateId"=$6,reason=$7,"updatedAt"=now() WHERE id=$1',
           [
