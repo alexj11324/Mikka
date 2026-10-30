@@ -230,4 +230,140 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     const listed = await botAdmin.workspaceBots(ws.id)
     assert.deepEqual(listed.map(bot => [bot.id, bot.status, bot.runningThreads, bot.ownerName]), [[idle, 'idle', 0, admin], [busy, 'running', 2, member]])
   })
+
+  // ---- BE-15 concurrency. The workspace-row FOR UPDATE in requireWorkspace(..., true) is the main
+  // guarantee (saves on one workspace run one after the other); the expectedVersion CAS is the second
+  // layer for a stale version across sessions. The mutants below are copies of the real modules with
+  // one guard removed, written next to the originals and deleted afterwards, so this is re-runnable.
+  const { readFile, writeFile, rm } = await import('node:fs/promises')
+  const { resolve } = await import('node:path')
+  const { pathToFileURL } = await import('node:url')
+  const mutantFiles: string[] = []
+  t.after(async () => { await Promise.all(mutantFiles.map(file => rm(file, { force: true }))) })
+  const LOCK_ANCHOR = ".for('update').limit(1)\n  if (!row || (admin"
+  const CAS_ANCHOR = `    const match = expectedVersion === undefined
+      ? eq(workspaceSettings.workspaceId, workspaceId)
+      : and(eq(workspaceSettings.workspaceId, workspaceId), eq(workspaceSettings.botDefaultsVersion, expectedVersion))`
+  // Mutant N2: compare the version in JS, then write by workspaceId only (not atomic).
+  const CAS_MUTANT = `    const seen = await versionedBotDefaults(workspaceId)
+    if (expectedVersion !== undefined && seen.version !== expectedVersion) throw new BotDefaultsConflictError(seen)
+    const match = eq(workspaceSettings.workspaceId, workspaceId)`
+  const mutate = (source: string, anchor: string, replacement: string, label: string) => {
+    if (!source.includes(anchor)) throw new Error(`BE-15 mutant ${label}: anchor not found in the real module; update the mutant`)
+    return source.replace(anchor, replacement)
+  }
+  const botsMutant = async (guards: { lock: boolean; cas: boolean }): Promise<typeof botAdmin> => {
+    const id = randomUUID().slice(0, 8)
+    let bots = await readFile('lib/workspace-admin/bots.ts', 'utf8')
+    if (!guards.lock) {
+      const access = mutate(await readFile('lib/workspace-access.ts', 'utf8'), LOCK_ANCHOR, ".limit(1)\n  if (!row || (admin", 'no-lock')
+      const accessFile = resolve(`lib/.be15-mutant-access-${id}.ts`)
+      mutantFiles.push(accessFile)
+      await writeFile(accessFile, access)
+      bots = mutate(bots, "from '@/lib/workspace-access'", `from '../.be15-mutant-access-${id}'`, 'no-lock')
+    }
+    if (!guards.cas) bots = mutate(bots, CAS_ANCHOR, CAS_MUTANT, 'no-cas')
+    const botsFile = resolve(`lib/workspace-admin/.be15-mutant-bots-${id}.ts`)
+    mutantFiles.push(botsFile)
+    await writeFile(botsFile, bots)
+    return await import(pathToFileURL(botsFile).href) as typeof botAdmin
+  }
+  type Waiter = { pid: number; query: string }
+  const lockWaiters = async (): Promise<Waiter[]> => (await pool.query<Waiter>(
+    `select pid, query from pg_stat_activity
+     where datname = current_database() and wait_event_type = 'Lock' and pid <> pg_backend_pid()`)).rows
+  const waitUntil = async <T>(probe: () => Promise<T | undefined>, what: string): Promise<T> => {
+    for (const deadline = Date.now() + 10_000; Date.now() < deadline; await new Promise(r => setTimeout(r, 20))) {
+      const hit = await probe()
+      if (hit !== undefined) return hit
+    }
+    throw new Error(`timed out waiting for ${what}`)
+  }
+  // pg_stat_activity truncates long queries, so match on the leading text. Only a locking read waits on a lock.
+  const waitsOnWorkspaceRow = (w: Waiter) => /^select\b[\s\S]*"mikka_workspaces"/i.test(w.query)
+  // The second writer queues behind the first on the tuple lock, so count writers, not the holder's direct waiters.
+  const settingsWriters = (waiters: Waiter[]) => waiters.filter(w => /^update "workspace_settings"/i.test(w.query)).length
+  const conflictCode = (r: PromiseSettledResult<unknown>) => r.status === 'rejected' ? (r.reason as { code?: string }).code : 'ok'
+  // A workspace whose settings row exists at version 1.
+  const seedDefaults = async () => {
+    const admin = await seedUser(pool, 'admin')
+    const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    assert.equal((await botAdmin.saveBotDefaults(admin, ws.id, { defaultModel: 'claude' })).version, 1)
+    return { admin, ws: ws.id }
+  }
+  // Hold the workspace_settings row so both saves reach their write before either can finish.
+  const holdSettingsRow = async (ws: string) => {
+    const holder = await pool.connect()
+    await holder.query('begin')
+    await holder.query('select 1 from workspace_settings where "workspaceId" = $1 for update', [ws])
+    return { release: async () => { try { await holder.query('commit') } finally { holder.release() } } }
+  }
+
+  // Combined mutant: no workspace lock. Both saves read version 1 and both reach the UPDATE.
+  const raceWithoutWorkspaceLock = async (mod: typeof botAdmin) => {
+    const { admin, ws } = await seedDefaults()
+    const held = await holdSettingsRow(ws)
+    let saves: Promise<unknown>[] = []
+    try {
+      saves = [mod.saveBotDefaults(admin, ws, { defaultModel: 'codex', expectedVersion: 1 }), mod.saveBotDefaults(admin, ws, { defaultModel: 'mikka', expectedVersion: 1 })]
+      saves.forEach(save => save.catch(() => undefined))
+      await waitUntil(async () => settingsWriters(await lockWaiters()) >= 2 || undefined, 'both saves to wait at the UPDATE')
+    } finally { await held.release() }
+    const results = await Promise.allSettled(saves)
+    return { codes: results.map(conflictCode).sort(), version: (await mod.botDefaultOptions(ws)).version }
+  }
+
+  await t.test('BE-15 mutant: without the workspace lock the CAS alone lets exactly one concurrent save win', async () => {
+    const casOnly = await raceWithoutWorkspaceLock(await botsMutant({ lock: false, cas: true }))
+    assert.deepEqual(casOnly.codes, ['botDefaultsConflict', 'ok'], 'CAS without the lock: exactly one 409')
+    assert.equal(casOnly.version, 2)
+    // Same scenario with the CAS removed too (mutant N2): both saves win, so the assertion above would fail.
+    const neither = await raceWithoutWorkspaceLock(await botsMutant({ lock: false, cas: false }))
+    assert.deepEqual(neither.codes, ['ok', 'ok'], 'the scenario must catch a non-atomic version check')
+    assert.notDeepEqual(neither.codes, casOnly.codes)
+  })
+
+  // Normal path: save A holds the workspace lock (stuck behind the held settings row); does B wait on it?
+  const secondSaveWaitsOnWorkspaceLock = async (mod: typeof botAdmin) => {
+    const { admin, ws } = await seedDefaults()
+    const held = await holdSettingsRow(ws)
+    let saves: Promise<unknown>[] = []
+    let waited: boolean
+    try {
+      const first = mod.saveBotDefaults(admin, ws, { defaultModel: 'codex', expectedVersion: 1 })
+      first.catch(() => undefined)
+      await waitUntil(async () => settingsWriters(await lockWaiters()) >= 1 || undefined, 'the first save to reach the UPDATE')
+      const second = mod.saveBotDefaults(admin, ws, { defaultModel: 'mikka', expectedVersion: 1 })
+      second.catch(() => undefined)
+      saves = [first, second]
+      waited = await waitUntil(async () => {
+        const waiters = await lockWaiters()
+        if (waiters.some(waitsOnWorkspaceRow)) return true
+        if (settingsWriters(waiters) >= 2) return false
+        return undefined
+      }, 'the second save to block')
+    } finally { await held.release() }
+    const results = await Promise.allSettled(saves)
+    return { waited, codes: results.map(conflictCode) }
+  }
+
+  await t.test('BE-15 lock: a second save on the same workspace waits on the workspace row lock', async () => {
+    const real = await secondSaveWaitsOnWorkspaceLock(botAdmin)
+    assert.equal(real.waited, true, 'second save must be blocked on the workspace FOR UPDATE (Lock wait in pg_stat_activity)')
+    assert.deepEqual(real.codes, ['ok', 'botDefaultsConflict'], 'lock serialises the saves; the waiter then sees the new version')
+    // The detector is not vacuous: with the lock removed it reports no workspace-lock wait.
+    assert.equal((await secondSaveWaitsOnWorkspaceLock(await botsMutant({ lock: false, cas: true }))).waited, false)
+  })
+
+  await t.test('BE-15 stale form across sessions: save with an old version after another session saved is a 409', async () => {
+    const { admin, ws } = await seedDefaults()
+    const formA = await botAdmin.botDefaultOptions(ws)
+    const formB = await botAdmin.botDefaultOptions(ws)
+    assert.equal(formA.version, 1)
+    assert.deepEqual(await botAdmin.saveBotDefaults(admin, ws, { defaultModel: 'codex', expectedVersion: formB.version }), { defaultModel: 'codex', defaultRepository: null, version: 2 })
+    const stale = await botAdmin.saveBotDefaults(admin, ws, { defaultModel: 'mikka', expectedVersion: formA.version }).then(() => null, (error: unknown) => error as { code?: string; current?: unknown })
+    assert.equal(stale?.code, 'botDefaultsConflict')
+    assert.deepEqual(stale?.current, { defaultModel: 'codex', defaultRepository: null, version: 2 })
+    assert.deepEqual(await botAdmin.workspaceBotDefaults(ws), { defaultModel: 'codex', defaultRepository: null }, 'stale form wrote nothing')
+  })
 })
