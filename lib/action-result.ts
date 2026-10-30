@@ -4,6 +4,7 @@ export const ACTION_ERROR_CODES = [
   'secretLimitReached',
   'secretsUnavailable',
   'egressDomainInvalid',
+  'egressTooManyDomains',
   'e2bKeyInvalid',
   'e2bKeyUnverifiable',
   'e2bKeyRateLimited',

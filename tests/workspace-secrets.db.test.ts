@@ -96,7 +96,7 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     assert.deepEqual(await store.getNetworkPolicy(admin, ws.id), { mode: 'open', allowedDomains: [], updatedAt: null })
     const saved = await store.updateNetworkPolicy(admin, ws.id, { mode: 'allowlist', allowedDomains: ['github.com', '*.mikka.app', ''] })
     assert.deepEqual([saved.mode, saved.allowedDomains], ['allowlist', ['github.com', '*.mikka.app']])
-    await assert.rejects(store.updateNetworkPolicy(admin, ws.id, { mode: 'allowlist', allowedDomains: ['ok.com', 'bad domain'] }), (error: unknown) => error instanceof store.EgressDomainError && error.lines.join() === '1')
+    await assert.rejects(store.updateNetworkPolicy(admin, ws.id, { mode: 'allowlist', allowedDomains: ['ok.com', 'bad domain'] }), (error: unknown) => error instanceof store.EgressDomainError && error.lines.join() === '2')
     await assert.rejects(store.updateNetworkPolicy(admin, ws.id, { mode: 'deny', allowedDomains: [] }))
     for (const mode of ['deny', 'all', '', 'OPEN'])
       await assert.rejects(pool.query(`update workspace_network_policy set mode=$1 where "workspaceId"=$2`, [mode, ws.id]), (error: { code?: string }) => error.code === '23514', mode)
@@ -181,5 +181,145 @@ test('workspace secrets, egress and E2B key', { skip: !dbUrl }, async t => {
     await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
     await e2b.recordE2BKeyError(other.id, 'invalid')
     assert.equal((await e2b.getE2BKeyStatus(admin, other.id)).lastErrorCode, 'invalid')
+  })
+
+  // ---- #436 QA round (cases from qa-pr436.db.test.ts) ----
+  const crypto = await import('../lib/secrets/crypto')
+  const captureLogs = async <T>(work: () => Promise<T>) => {
+    const lines: string[] = [], original = { log: console.log, info: console.info, warn: console.warn, error: console.error, debug: console.debug }
+    for (const k of Object.keys(original) as (keyof typeof original)[]) console[k] = (...args: unknown[]) => { lines.push(args.map(a => a instanceof Error ? `${a.stack} ${JSON.stringify(a)} ${String((a as { cause?: unknown }).cause)}` : typeof a === 'string' ? a : JSON.stringify(a)).join(' ')) }
+    try { return { result: await work().then(v => ({ ok: v }), (e: unknown) => ({ error: e })), lines } } finally { Object.assign(console, original) }
+  }
+
+  await t.test('crypto: same plaintext twice gives different iv and ciphertext; AAD binds workspace, scope, kind and name', () => {
+    const aad = crypto.secretAad({ workspaceId: ws.id, kind: 'secret', scopeType: 'workspace', scopeRef: '', name: 'N' })
+    const one = crypto.sealSecret(SECRET, aad), two = crypto.sealSecret(SECRET, aad)
+    assert.notEqual(one.iv, two.iv); assert.notEqual(one.ciphertext, two.ciphertext)
+    assert.equal(Buffer.from(one.iv, 'base64').length, 12)
+    assert.equal(crypto.openSecret(one, aad), SECRET); assert.equal(crypto.openSecret(two, aad), SECRET)
+    for (const moved of [{ workspaceId: other.id }, { name: 'M' }, { kind: 'env' as const }, { scopeType: 'repository' as const, scopeRef: 'o/r' }])
+      assert.throws(() => crypto.openSecret(one, crypto.secretAad({ workspaceId: ws.id, kind: 'secret', scopeType: 'workspace', scopeRef: '', name: 'N', ...moved })), JSON.stringify(moved))
+  })
+
+  await t.test('moved ciphertext (other workspace / other scope) fails to decrypt: row marked unavailable, rest of the list works, one id-only log line', async () => {
+    const a = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), b = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const V = 'moved_' + randomBytes(12).toString('hex')
+    const source = await store.createWorkspaceSecret(admin, a.id, { name: 'SRC', kind: 'env', value: V })
+    const okRow = await store.createWorkspaceSecret(admin, b.id, { name: 'FINE', kind: 'env', value: 'still-readable' })
+    const crossWs = await store.createWorkspaceSecret(admin, b.id, { name: 'SRC', kind: 'env', value: 'placeholder-1' })
+    const crossScope = await store.createWorkspaceSecret(admin, a.id, { name: 'SRC', kind: 'env', value: 'placeholder-2', scope: { type: 'repository', repository: 'o/r' } })
+    await pool.query('update workspace_secrets t set ciphertext=s.ciphertext, iv=s.iv from workspace_secrets s where s.id=$1 and t.id = any($2)', [source.id, [crossWs.id, crossScope.id]])
+    for (const [workspaceId, brokenId] of [[b.id, crossWs.id], [a.id, crossScope.id]]) {
+      const { result, lines } = await captureLogs(() => store.listWorkspaceSecrets(admin, workspaceId))
+      assert.ok('ok' in result, 'list still works')
+      const rows = (result as { ok: Awaited<ReturnType<typeof store.listWorkspaceSecrets>> }).ok
+      const broken = rows.find(row => row.id === brokenId)!
+      assert.deepEqual([broken.unavailable, broken.value], [true, null])
+      assert.ok(rows.filter(row => row.id !== brokenId).every(row => !row.unavailable && row.value), 'other rows decrypt')
+      assert.deepEqual(lines, [`[secrets] secretDecryptFailed id=${brokenId}`])
+    }
+    assert.equal((await store.listWorkspaceSecrets(admin, b.id)).find(row => row.id === okRow.id)?.value, 'still-readable')
+    assert.equal((await store.listWorkspaceSecrets(admin, a.id)).find(row => row.id === source.id)?.value, V)
+  })
+
+  await t.test('moved E2B key fails to decrypt: e2b_unavailable, never the raw crypto Error, one id-only log line', async () => {
+    await pool.query('delete from workspace_e2b_verify_attempts')
+    const a = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), b = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const K = 'e2b_' + randomBytes(16).toString('hex'), on = { MIKKA_BYO_E2B_KEY: '1', WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
+    await e2b.setE2BKey(admin, a.id, { apiKey: K }, { verify: async () => ({ ok: true }) })
+    assert.equal(await e2b.getWorkspaceE2BApiKey(a.id, on), K)
+    await pool.query(`insert into workspace_e2b_keys select $1,ciphertext,iv,"keyVersion",last4,"e2bTeamHint","verifiedAt","lastErrorCode","lastErrorAt","createdBy","updatedBy","createdAt","updatedAt" from workspace_e2b_keys where "workspaceId"=$2`, [b.id, a.id])
+    const { result, lines } = await captureLogs(() => e2b.getWorkspaceE2BApiKey(b.id, on))
+    const error = (result as { error?: unknown }).error
+    assert.ok(error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable', 'mapped, not the raw crypto Error')
+    assert.deepEqual(lines, [`[secrets] e2b_unavailable id=${b.id}`])
+    assert.ok(!JSON.stringify([error, String((error as Error).stack), lines]).includes(K))
+    await pool.query('delete from workspace_e2b_verify_attempts')
+  })
+
+  await t.test('DB failures become a generic SecretsStoreError: params, ciphertext and iv never reach logs or the caller', async () => {
+    const V = 'leak_' + randomBytes(12).toString('hex')
+    const { db } = await import('../lib/db')
+    const { sql } = await import('drizzle-orm')
+    // Raw drizzle failure carries the bound params; the guard must drop them.
+    const raw = await db.execute(sql`select ${V}::int`).then(() => null, (e: unknown) => e)
+    assert.ok(String((raw as Error).message).includes(V), 'precondition: DrizzleQueryError leaks params')
+    // Real store path: a temporary trigger fails the insert after the value has been sealed into params.
+    await pool.query(`create or replace function pg_temp_boom() returns trigger language plpgsql as $$ begin if new.name = 'BOOM' then raise exception 'boom' using errcode = 'P0001'; end if; return new; end $$`)
+    await pool.query('create trigger qa_boom before insert or update on workspace_secrets for each row execute function pg_temp_boom()')
+    try {
+      for (const work of [
+        () => store.guardSecretsDb(() => db.execute(sql`select ${V}::int`)),
+        () => store.createWorkspaceSecret(admin, other.id, { name: 'BOOM', kind: 'secret', value: V }),
+      ]) {
+        let caught: unknown
+        const { lines } = await captureLogs(async () => { try { await work() } catch (error) { caught = error; console.error(error) } })
+        assert.ok(caught instanceof store.SecretsStoreError, String(caught))
+        assert.equal((caught as { cause?: unknown }).cause, undefined)
+        const blob = [String((caught as Error).stack), JSON.stringify(caught), ...lines].join('\n')
+        assert.ok(!blob.includes(V) && !/params:|insert into|select /i.test(blob), blob.slice(0, 300))
+      }
+    } finally {
+      await pool.query('drop trigger if exists qa_boom on workspace_secrets'); await pool.query('drop function if exists pg_temp_boom()')
+    }
+  })
+
+  await t.test('500 cap holds under 30 concurrent creates from 490 rows (advisory lock store.ts)', async () => {
+    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const filler = crypto.sealSecret('x', 'filler')
+    await pool.query(`insert into workspace_secrets (id,"workspaceId",name,kind,"scopeType","scopeRef",ciphertext,iv,"keyVersion","createdBy","updatedBy") select gen_random_uuid(),$1,'N'||g,'env','workspace','',$2,$3,1,$4,$4 from generate_series(1,490) g`, [w.id, filler.ciphertext, filler.iv, admin])
+    const results = await Promise.allSettled(Array.from({ length: 30 }, (_, i) => store.createWorkspaceSecret(admin, w.id, { name: 'C' + i, kind: 'secret', value: 'valuevalue' })))
+    const { rows } = await pool.query('select count(*)::int n from workspace_secrets where "workspaceId"=$1', [w.id])
+    assert.equal(rows[0].n, 500)
+    assert.equal(results.filter(r => r.status === 'fulfilled').length, 10)
+    assert.deepEqual([...new Set(results.flatMap(r => r.status === 'rejected' ? [r.reason instanceof WorkspaceError ? r.reason.code : String(r.reason)] : []))], ['secretLimitReached'])
+  })
+
+  await t.test('E2B verify limiter admits exactly 5 of 10 concurrent attempts (advisory lock e2b.ts)', async () => {
+    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    let calls = 0
+    const now = new Date()
+    const results = await Promise.allSettled(Array.from({ length: 10 }, () => e2b.setE2BKey(admin, w.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { now, verify: async () => { calls++; return { ok: false, code: 'invalid' } } })))
+    const codes = results.map(r => r.status === 'rejected' && r.reason instanceof WorkspaceError ? r.reason.code : 'other')
+    assert.equal(codes.filter(c => c === 'e2bKeyInvalid').length, 5); assert.equal(codes.filter(c => c === 'e2bKeyRateLimited').length, 5); assert.equal(calls, 5)
+    await pool.query('delete from workspace_e2b_verify_attempts where "workspaceId"=$1', [w.id])
+  })
+
+  await t.test('egress: admin check before validation, 200-domain limit with real count, 1-based lines, no IPs, open/none keep the allowlist', async () => {
+    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
+    await rejects(store.updateNetworkPolicy(member, w.id, { mode: 'bogus', allowedDomains: ['bad domain'] }), 'workspaceAccessDenied')
+    await rejects(store.updateNetworkPolicy(member, w.id, { mode: 'allowlist', allowedDomains: Array.from({ length: 300 }, (_, i) => `d${i}.com`) }), 'workspaceAccessDenied')
+    const many = (n: number) => Array.from({ length: n }, (_, i) => `d${i}.com`)
+    assert.equal((await store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: [...many(200), '', 'D0.COM', 'd1.com.'] })).allowedDomains.length, 200)
+    await assert.rejects(store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: [...many(205), '', 'd0.com'] }), (error: unknown) => error instanceof store.EgressTooManyDomainsError && error.code === 'egressTooManyDomains' && error.count === 205)
+    await assert.rejects(store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: ['ok.com', '1.2.3.4', 'x.com', '::1'] }), (error: unknown) => error instanceof store.EgressDomainError && error.lines.join() === '2,4')
+    const list = ['github.com', '*.mikka.app']
+    await store.updateNetworkPolicy(admin, w.id, { mode: 'allowlist', allowedDomains: list })
+    for (const mode of ['open', 'none'] as const) {
+      const saved = await store.updateNetworkPolicy(admin, w.id, { mode, allowedDomains: ['ignored.com'] })
+      assert.deepEqual([saved.mode, saved.allowedDomains], [mode, list], `${mode} keeps the stored allowlist`)
+    }
+    const fresh = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    assert.deepEqual((await store.updateNetworkPolicy(admin, fresh.id, { mode: 'none' })).allowedDomains, [])
+  })
+
+  await t.test('repository scope: . and .. rejected; owner/repo stored and compared lowercase', async () => {
+    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    for (const repository of ['../x', 'o/..', './.', 'o/.']) await assert.rejects(store.createWorkspaceSecret(admin, w.id, { name: 'R', kind: 'env', value: 'repo-value', scope: { type: 'repository', repository } }), repository)
+    const saved = await store.createWorkspaceSecret(admin, w.id, { name: 'R', kind: 'env', value: 'repo-value', scope: { type: 'repository', repository: 'AlexJ/Mikka' } })
+    assert.deepEqual(saved.scope, { type: 'repository', repository: 'alexj/mikka' })
+    await rejects(store.createWorkspaceSecret(admin, w.id, { name: 'R', kind: 'env', value: 'repo-value', scope: { type: 'repository', repository: 'alexj/MIKKA' } }), 'secretNameTaken')
+    for (const ref of ['Alex/Mikka', 'o/..', '../x'])
+      await assert.rejects(pool.query(`insert into workspace_secrets (id,"workspaceId",name,kind,"scopeType","scopeRef",ciphertext,iv,"keyVersion","createdBy","updatedBy") values (gen_random_uuid(),$1,'Q','env','repository',$2,'x','x',1,'u','u')`, [w.id, ref]), (error: { code?: string }) => error.code === '23514', ref)
+  })
+
+  await t.test('short-value warning counts code points', async () => {
+    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const warn = async (value: string) => (await store.createWorkspaceSecret(admin, w.id, { name: 'W' + randomBytes(4).toString('hex'), kind: 'secret', value })).warning
+    assert.equal(await warn('🔑🔑🔑🔑'), 'shortValueNotMasked', '4 code points, 8 UTF-16 units')
+    assert.equal(await warn('1234567'), 'shortValueNotMasked')
+    assert.equal(await warn('12345678'), null)
+    assert.equal(await warn('🔑🔑🔑🔑🔑🔑🔑🔑'), null)
+    assert.equal(store.isShortSecretValue('密钥密钥密钥密'), true)
   })
 })
