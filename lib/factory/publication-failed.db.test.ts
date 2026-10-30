@@ -175,7 +175,7 @@ test('B2/B4 migrations: failed publications are terminal and a superseded candid
       const q = c.query.bind(c);
       (c as any).query = async (...args: any[]) => {
         const r = await (q as any)(...args);
-        if (typeof args[0] === 'string' && args[0].startsWith('SELECT * FROM factory_approvals WHERE id=$1')) approvalRows.push(r.rowCount);
+        if (typeof args[0] === 'string' && /^SELECT \*.* FROM factory_approvals WHERE id=\$1/.test(args[0])) approvalRows.push(r.rowCount);
         return r;
       };
       return c;

@@ -185,17 +185,21 @@ async function unusedEvent(tx: PoolClient, taskId: string, eventId: string) {
   if (rows.length) fail("factoryReplayMismatch");
 }
 
-async function validApproval(
+/** The approval as bound to this task's current candidate and attempt. Revocation and a
+ * superseded candidate always void it. Expiry and the approver's session do not: they gate
+ * only a new reservation (validApproval). Once a publication is reserved, checking or
+ * replaying its outcome needs only the caller's normal acceptance auth (owned), as on
+ * GitHub/Vercel where a started deployment is still reported after the approver signs out. */
+async function boundApproval(
   tx: PoolClient,
   task: FactoryTask,
   id: string,
   publish: boolean,
-  authority?: FactoryDecisionAuthority,
 ) {
   const {
     rows: [a],
   } = await tx.query(
-    'SELECT * FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL AND "invalidatedAt" IS NULL AND "expiresAt">clock_timestamp() FOR UPDATE',
+    'SELECT *,"expiresAt">clock_timestamp() AS unexpired FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL AND "invalidatedAt" IS NULL FOR UPDATE',
     [id, task.id, task.userId, task.candidateId],
   );
   if (
@@ -208,6 +212,11 @@ async function validApproval(
       : a.approvedRevision !== task.revision || a.attemptId !== task.attemptId)
   )
     fail("factoryApprovalInvalid");
+  return a;
+}
+
+/** The task's evidence, which must still be exactly what was approved. */
+async function approvedEvidence(tx: PoolClient, task: FactoryTask, a: any) {
   const current = await approvalEvidence(tx, task);
   if (
     current.evidenceDigest !== a.evidenceDigest ||
@@ -215,6 +224,21 @@ async function validApproval(
     digest(current.manifest) !== digest(a.evidence)
   )
     fail("factoryApprovalInvalid");
+  return current;
+}
+
+/** Full authorization for a new decision or reservation: bound, unexpired, same evidence,
+ * and the granting human session or policy decision still valid. */
+async function validApproval(
+  tx: PoolClient,
+  task: FactoryTask,
+  id: string,
+  publish: boolean,
+  authority?: FactoryDecisionAuthority,
+) {
+  const a = await boundApproval(tx, task, id, publish);
+  if (!a.unexpired) fail("factoryApprovalInvalid");
+  const current = await approvedEvidence(tx, task, a);
   // A row without policy fields is a human approval: the live linked session
   // that granted it is the authority, exactly as in the Warp-aligned model.
   if (!a.decisionCredentialId && !a.decisionScope && !a.decisionEvidence) {
@@ -270,13 +294,10 @@ function gatesFor(authority?: FactoryDecisionAuthority) {
       !parsed.data.publicationId
     )
       return false;
-    const { a, current } = await validApproval(
-      tx,
-      task,
-      parsed.data.approvalId,
-      true,
-      authority,
-    );
+    // Authorization happened when the publication was reserved; finishing it (publish or a
+    // later reconcile) only needs the approval still bound to this candidate and attempt.
+    const a = await boundApproval(tx, task, parsed.data.approvalId, true);
+    const current = await approvedEvidence(tx, task, a);
     const {
       rows: [p],
     } = await tx.query(
@@ -828,18 +849,19 @@ export function createFactoryApprovals(
           if (replay.status !== "succeeded" || !replay.result)
             fail("factoryPublicationAlreadyClaimed");
           // Historical receipts never reopen a later candidate, retry or revoked task.
+          // A revoked approval blocks the replay; its expiry does not (boundApproval).
           if (
             task.stage !== "publish" ||
             task.status !== "passed" ||
+            replay.candidateId !== task.candidateId ||
             digest(bindingOf(task)) !== digest(replay.result.binding)
           )
             fail("factoryStale");
-          await validApproval(
+          await boundApproval(
             tx,
             { ...task, revision: req.binding.revision },
             req.approvalId,
             true,
-            authority,
           );
           return {
             result: replay.result as {
@@ -937,19 +959,22 @@ export function createFactoryApprovals(
           // Terminal: a confirmed provider failure is not asked again (B2).
           if (p.status === "failed")
             throw new PublicationDeferred(p.id, "failed", p.receipt);
+          // Reconcile reports an already reserved publication: the caller's normal acceptance
+          // auth (owned) is enough, so an expired grant or a signed-out approver never hides a
+          // deployment the provider already made. Revocation still blocks (boundApproval).
           if (p.status === "succeeded") {
             if (
               task.stage !== "publish" ||
               task.status !== "passed" ||
+              p.candidateId !== task.candidateId ||
               digest(bindingOf(task)) !== digest(p.result?.binding)
             )
               fail("factoryStale");
-            await validApproval(
+            await boundApproval(
               tx,
               { ...task, revision: req.binding.revision },
               req.approvalId,
               true,
-              authority,
             );
             return p.result as {
               publicationId: string;
@@ -960,13 +985,8 @@ export function createFactoryApprovals(
           fence(task, req.binding);
           if (task.stage !== "publish" || task.status !== "pending")
             fail("factoryTransition");
-          const { a, current } = await validApproval(
-            tx,
-            task,
-            req.approvalId,
-            true,
-            authority,
-          );
+          const a = await boundApproval(tx, task, req.approvalId, true);
+          const current = await approvedEvidence(tx, task, a);
           const adapter = adapters.find(
             (x) =>
               x.action === a.action &&
