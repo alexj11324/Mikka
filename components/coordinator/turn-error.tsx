@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { Link, useRouter } from '@/i18n/navigation'
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { settingsHref } from '@/lib/settings-sections'
 import { parseBotModelRefusal } from '@/lib/workspace-admin/bot-model-policy'
 
@@ -39,7 +39,7 @@ export function TurnError({ error, botId = null }: { error: string; botId?: stri
     <AlertTitle>{t('failedTitle')}</AlertTitle>
     <AlertDescription>{refusal.reason === 'binding_required' ? allT('Settings.botSettings.subscriptionMissing', { model }) : t('modelUnavailableHere', { model })}</AlertDescription>
     <AlertAction>{refusal.reason === 'binding_required'
-      ? <Button variant="outline" size="sm" nativeButton={false} render={<Link href={settingsHref('models')} />}>{allT('Settings.sections.models.title')}</Button>
+      ? <Link href={settingsHref('models')} className={buttonVariants({ variant: 'outline', size: 'sm' })}>{allT('Settings.sections.models.title')}</Link>
       : <Button variant="outline" size="sm" onClick={changeModel}>{t('changeModel')}</Button>}
     </AlertAction>
   </Alert>
