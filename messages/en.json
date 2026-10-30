@@ -2740,7 +2740,9 @@
     "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
     "send": "Send",
     "retryStop": "Try stopping again",
-    "waiting": "Waiting for you"
+    "waiting": "Waiting for you",
+    "chatTab": "Chat",
+    "acceptanceTab": "Acceptance"
   },
   "Computer": {
     "status": {
@@ -3328,7 +3330,30 @@
     "previous": "Previous evidence",
     "next": "Next evidence",
     "download": "Download",
-    "allEvidence": "All evidence"
+    "allEvidence": "All evidence",
+    "pullRequest": "PR",
+    "commitLabel": "Commit",
+    "previewLabel": "Preview",
+    "environmentLabel": "Environment",
+    "criteria": "Acceptance criteria",
+    "results": "Independent results",
+    "otherEvidence": "Other evidence",
+    "passed": "Passed",
+    "notPassed": "Not passed",
+    "reviewPassed": "Merge suggested",
+    "reviewFailed": "Changes needed",
+    "inProgress": "In progress",
+    "opinions": "{count} comments",
+    "review": "Review",
+    "verify": "Verify",
+    "reviewThread": "Independent review",
+    "verifyThread": "Independent verify",
+    "envChip": {
+      "preview": "Preview",
+      "production": "Production"
+    },
+    "validFor": "Valid for {hours} h",
+    "textLabel": "{stage} {kind}"
   },
   "AccountEmail": {
     "exportSubject": "Your Mikka data export",

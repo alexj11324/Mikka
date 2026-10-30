@@ -14,6 +14,7 @@ test('the issue page reviews Factory evidence, enables the skill and reconciles 
   const calls: { operation: string; input: Record<string, unknown> }[] = []
   let ledger: Record<string, unknown> = { binding, approvals: [], publications: [] }
   await page.route('**/api/factory/tasks?issueId=*', route => route.fulfill({ json: { tasks: [{ id: taskId, issueId, stage: 'approval', status: 'pending', reason: '独立检查通过', candidateId, candidateRunId: null, isSkillCandidate: true }] } }))
+  await page.route(`**/api/factory/tasks/${taskId}`, route => route.fulfill({ json: { checks: [], delivery: { candidateSha: candidate.sha, pullRequest: null, repository: candidate.repository, environment: null, previewUrl: null, databaseBranch: null, deploymentEnvironment: null } } }))
   await page.route(`**/api/factory/tasks/${taskId}/approval*`, async route => {
     const url = new URL(route.request().url())
     if (route.request().method() === 'GET') {
@@ -35,10 +36,12 @@ test('the issue page reviews Factory evidence, enables the skill and reconciles 
     return route.fulfill({ json: { publicationId, receipt: { verifiedTarget: { reference } }, binding: publishBinding } })
   })
   await openIssueFromSearch(page, title)
-  await page.getByRole('button', { name: /技能验收/ }).click()
-  const dialog = page.getByRole('dialog')
+  await page.getByRole('button', { name: '技能验收', exact: true }).click()
+  const dialog = page.getByRole('region', { name: '技能验收', exact: true })
   await expect(dialog.getByRole('heading', { name: '技能验收' })).toBeVisible()
-  await dialog.getByRole('button', { name: /run-report:fixture/ }).click()
+  // Text evidence is named by its stage and kind, never by its raw reference.
+  await expect(dialog.getByText('run-report:fixture')).toHaveCount(0)
+  await dialog.getByRole('button', { name: '审查报告' }).click()
   await expect(page.getByText('independent review evidence')).toBeVisible()
   await page.getByRole('button', { name: '关闭证据' }).click()
   await dialog.getByRole('button', { name: '启用' }).click()

@@ -151,7 +151,7 @@
     "test:account": "node --import tsx --test lib/account/account.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/account/mail.test.ts tests/account-actions.test.ts",
     "test:account-db": "node --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test lib/account/store.db.test.ts",
     "test:issue-readonly-dom": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/issue-readonly-dom.test.tsx",
-    "test:factory-acceptance-ui": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/factory/acceptance-state.test.ts lib/factory/reject-flow.test.ts components/workspace/factory-acceptance.test.tsx lib/factory/evidence-media.test.ts scripts/factory-acceptance-ui.test.tsx scripts/factory-evidence-ui.test.tsx"
+    "test:factory-acceptance-ui": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/factory/acceptance-state.test.ts lib/factory/acceptance-view.test.ts lib/factory/reject-flow.test.ts components/workspace/factory-acceptance.test.tsx lib/factory/evidence-media.test.ts scripts/factory-acceptance-ui.test.tsx scripts/factory-evidence-ui.test.tsx"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Ban, Check, CircleCheck, CircleX, Clock, ExternalLink, RefreshCw, Upload, type LucideIcon } from 'lucide-react'
+import { Ban, Check, CircleCheck, CircleX, Clock, ExternalLink, RefreshCw, Server, Upload, type LucideIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
@@ -12,6 +12,8 @@ import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptan
 export type ApprovalBarProps = {
   state: AcceptanceState
   isSkill: boolean
+  /** Where it ships, as Figma's chip names it (Preview / Production / 内置技能). */
+  environment?: string
   details: string[]
   /** The candidate's full sha, shown short (hover for full, click to copy). */
   sha?: string
@@ -44,17 +46,23 @@ function ActionIcon({ icon: Icon, busy }: { icon: LucideIcon; busy: boolean }) {
   return busy ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" aria-hidden="true" />
 }
 
-/** The publication decision for one candidate (Figma 358:6855). Purely presentational. */
-export function ApprovalBar({ state, isSkill, details, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile, onReject }: ApprovalBarProps) {
+/**
+ * The publication decision for one candidate (Figma 358:6855), pinned under
+ * the 验收 tab: environment, commit and validity on the left, the actions on
+ * the right. While it waits for you the header's state chip says so, so the
+ * bar carries no title; every later state names itself. Purely presentational.
+ */
+export function ApprovalBar({ state, isSkill, environment, details, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile, onReject }: ApprovalBarProps) {
   const t = useTranslations('FactoryAcceptance')
   const icon = StateIcon({ state })
   return <Item variant="muted" data-state={state}>
     {icon && <ItemMedia variant="icon">{icon}</ItemMedia>}
     <ItemContent>
-      <ItemTitle>{t(acceptanceStateKey(state, isSkill))}</ItemTitle>
-      {(details.length > 0 || sha || superseded) && <div className="flex flex-wrap gap-1">
-        {details.map(detail => <Badge key={detail} variant="outline">{detail}</Badge>)}
+      {state !== 'pending' && <ItemTitle>{t(acceptanceStateKey(state, isSkill))}</ItemTitle>}
+      {(details.length > 0 || sha || superseded || environment) && <div className="flex flex-wrap items-center gap-1">
+        {environment && <Badge variant="outline"><Server aria-hidden="true" />{environment}</Badge>}
         {sha && <ShortSha sha={sha} />}
+        {details.map(detail => <Badge key={detail} variant="outline">{detail}</Badge>)}
         {superseded && <ShortSha sha={superseded} tone="neutral">{short => t('superseded', { sha: short })}</ShortSha>}
       </div>}
     </ItemContent>

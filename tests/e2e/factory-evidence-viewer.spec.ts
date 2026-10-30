@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { deflateSync } from 'node:zlib'
 import type { Page, Route } from '@playwright/test'
+import { Pool } from 'pg'
 import { test, expect, register, seedTask, openIssueFromSearch, app } from './fixtures'
 
-// A3: the acceptance window's evidence viewer over run captures (Figma
-// 357:4750 frames 06, 12, 13, 14, 15). Server responses are fixtures; the
-// capture route's authorization is covered by
-// lib/factory/evidence-media.test.ts and the approval DB test. Each state is
-// shot in light and dark, desktop and phone, for design review.
+// A3: acceptance on the thread that produced the candidate (Figma 357:4750,
+// frame 06 and phone 365:12779) and the evidence viewer (frames 12, 13, 14).
+// The thread is a real seeded run; Factory responses are fixtures. The capture
+// route's authorization is covered by lib/factory/evidence-media.test.ts and
+// the approval DB test. Each state is shot in light and dark, desktop and
+// phone, for design review.
 
 /** A real PNG (solid tone with a darker band), so the image viewer decodes it. */
 function png(width: number, height: number) {
@@ -42,20 +44,44 @@ async function shoot(page: Page, name: string) {
   await page.emulateMedia({ colorScheme: 'light' })
 }
 
+const THREAD = '首页加载提速'
+
+/** The thread that produced the candidate: a finished run on the issue, in the isolated E2E database. */
+async function seedThread(email: string, title: string) {
+  const connectionString = process.env.E2E_DATABASE_URL
+  if (!connectionString) throw new Error('Acceptance on a thread requires an isolated E2E_DATABASE_URL')
+  const target = new URL(connectionString)
+  if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) || !target.pathname.endsWith('_e2e')) throw new Error('Refusing to seed a business database')
+  const pool = new Pool({ connectionString, max: 1 })
+  try {
+    const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
+    const { rows: [issue] } = await pool.query<{ id: string }>('SELECT id FROM issues WHERE "userId" = $1 AND title = $2', [user.id, title])
+    const agentId = randomUUID(), runId = randomUUID()
+    await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Mikka Frontend'])
+    await pool.query('INSERT INTO agent_runs (id, "userId", "issueId", "agentId", status, prompt, "startedAt", "finishedAt") VALUES ($1, $2, $3, $4, $5, $6, now(), now())', [runId, user.id, issue.id, agentId, 'succeeded', THREAD])
+    await pool.query('INSERT INTO run_chunks (id, "runId", seq, chunk) VALUES ($1, $2, 1, $3)', [randomUUID(), runId, JSON.stringify({ type: 'text-delta', id: runId, delta: '首屏图片改成懒加载，字体做了子集。' })])
+    return runId
+  } finally {
+    await pool.end()
+  }
+}
+
 type Media = (route: Route, captureId: string) => Promise<void>
-async function open(page: Page, artifacts: Record<string, unknown>[], media: Media, taskId = randomUUID()) {
+type Detail = { checks: unknown[]; delivery: unknown }
+async function open(page: Page, artifacts: Record<string, unknown>[], media: Media, detail: (candidateId: string) => Detail, taskId = randomUUID()) {
   await page.setViewportSize({ width: 1440, height: 960 })
-  await register(page)
+  const { email } = await register(page)
   const title = `Factory A3 ${randomUUID()}`
   const issueId = await seedTask(page, title)
+  const runId = await seedThread(email, title)
   const candidateId = randomUUID()
   const binding = { taskId, issueId, attemptId: randomUUID(), revision: 1, candidateId }
-  const candidate = { sha: 'a3f9c2e' + 'b'.repeat(33), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'home page' }
-  await page.route('**/api/factory/tasks?issueId=*', route => route.fulfill({ json: { tasks: [{ id: taskId, issueId, stage: 'approval', status: 'pending', reason: '独立检查通过', candidateId, candidateRunId: null, isSkillCandidate: false }] } }))
+  await page.route('**/api/factory/tasks?issueId=*', route => route.fulfill({ json: { tasks: [{ id: taskId, issueId, stage: 'approval', status: 'pending', reason: '独立检查通过', candidateId, candidateRunId: runId, isSkillCandidate: false }] } }))
+  await page.route(`**/api/factory/tasks/${taskId}`, route => route.fulfill({ json: detail(candidateId) }))
   await page.route(`**/api/factory/tasks/${taskId}/approval*`, route => {
     const url = new URL(route.request().url())
-    if (url.searchParams.has('artifact')) return route.fulfill({ json: { raw: '$ pnpm e2e home-cls\n\nRunning 2 tests using 1 worker\n\n  ✓  1 home-cls.spec.ts:9:3 › 首屏 CLS < 0.1 (4.1 s)\n  ✓  2 home-cls.spec.ts:27:3 › 懒加载图片有固定宽高 (3.7 s)\n\n  2 passed (8.6 s)' } })
-    if (url.searchParams.get('view') === 'ledger') return route.fulfill({ json: { binding, approvals: [], publications: [] } })
+    if (url.searchParams.has('artifact')) return route.fulfill({ json: { raw: 'BASE_URL=https://mikka-8quhtq3c9-mikka-dev.vercel.app\n\n> playwright test e2e/home-cls.spec.ts --project=mobile-4g\n\nRunning 2 tests using 1 worker\n\n  ✓  1 home-cls.spec.ts:9:3 › 首屏 CLS < 0.1 (4.1 s)\n  ✓  2 home-cls.spec.ts:27:3 › 懒加载图片有固定宽高 (3.7 s)\n\n  2 passed (8.6 s)' } })
+    if (url.searchParams.get('view') === 'ledger') return route.fulfill({ json: { binding, approvals: [], publications: [], capabilities: { reject: true } } })
     return route.fulfill({ json: { binding, evidenceReadId: randomUUID(), evidenceDigest: 'b'.repeat(64), manifest: { candidate, artifacts } } })
   })
   const served: string[] = []
@@ -65,20 +91,36 @@ async function open(page: Page, artifacts: Record<string, unknown>[], media: Med
     return media(route, captureId)
   })
   await openIssueFromSearch(page, title)
-  await page.getByRole('button', { name: /Factory 验收/ }).click()
-  const acceptance = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Factory 验收' }) })
-  await expect(acceptance.getByRole('heading', { name: 'Factory 验收' })).toBeVisible()
-  return { acceptance, served }
+  await page.getByRole('button', { name: 'Factory 验收', exact: true }).click()
+  const thread = page.getByRole('region', { name: THREAD, exact: true })
+  await expect(thread.getByRole('tab', { name: '验收' })).toHaveAttribute('aria-selected', 'true')
+  return { thread, served }
 }
 
-const base = { runId: randomUUID(), sessionId: 's1', candidateId: null, sha: null, environment: 'preview', recordedAt: '2026-10-28T06:20:00.000Z' }
-const shot1 = randomUUID(), shot2 = randomUUID(), clip = randomUUID()
+const sha = 'a3f9c2e' + 'b'.repeat(33)
+const candidate = { sha, repository: 'alexj11324/Mikka', environment: 'preview', scope: 'home page' }
+const base = { runId: 'verify-run', sessionId: 's1', candidateId: null, sha: null, environment: 'preview', recordedAt: '2026-10-28T06:20:00.000Z' }
+const shot1 = randomUUID(), shot2 = randomUUID(), shot3 = randomUUID(), clip = randomUUID()
+const log = 'run-chunk:7d1c2a40-0000-4000-8000-000000000001'
 const manifest = [
   { ...base, stage: 'verify', kind: 'screenshot', artifact: `run-capture:${shot1}`, captureId: shot1, title: '首页首屏', contentType: 'image/png', size: 1, durationMs: null },
-  { ...base, stage: 'verify', kind: 'screenshot', artifact: `run-capture:${shot2}`, captureId: shot2, title: '图片加载完成', contentType: 'image/png', size: 1, durationMs: null },
   { ...base, stage: 'verify', kind: 'video', artifact: `run-capture:${clip}`, captureId: clip, title: '向下滚动', contentType: 'video/mp4', size: 1, durationMs: 9000 },
-  { ...base, stage: 'verify', kind: 'log', artifact: 'run-chunk:7d1c2a40-0000-4000-8000-000000000001' },
+  { ...base, stage: 'verify', kind: 'log', artifact: log },
+  { ...base, stage: 'verify', kind: 'screenshot', artifact: `run-capture:${shot2}`, captureId: shot2, title: '图片加载完成', contentType: 'image/png', size: 1, durationMs: null },
+  { ...base, stage: 'verify', kind: 'screenshot', artifact: `run-capture:${shot3}`, captureId: shot3, title: 'Lighthouse 移动端', contentType: 'image/png', size: 1, durationMs: null },
 ]
+const criteria = [
+  { criterionId: 'k1', text: '首页 2 秒内可交互（4G）', passed: true, evidence: `run-capture:${shot1} run-capture:${clip} ${log}` },
+  { criterionId: 'k2', text: '首屏图片懒加载后无布局跳动', passed: true, evidence: `run-capture:${shot2}` },
+  { criterionId: 'k3', text: 'Lighthouse 性能分 ≥ 90', passed: true, evidence: `run-capture:${shot3}` },
+]
+const figma = (candidateId: string): Detail => ({
+  checks: [
+    { attemptId: randomUUID(), stage: 'review', status: 'passed', candidateId, candidateSha: sha, runId: randomUUID(), independent: true, criteria: [], verify: null },
+    { attemptId: randomUUID(), stage: 'verify', status: 'passed', candidateId, candidateSha: sha, runId: 'verify-run', independent: true, criteria, verify: { status: 'passed', command: 'pnpm e2e home-cls', exitCode: 0 } },
+  ],
+  delivery: { candidateSha: sha, pullRequest: { url: 'https://github.com/alexj11324/Mikka/pull/418', state: 'open' }, repository: 'alexj11324/Mikka', environment: 'device:mac', previewUrl: 'https://mikka-8quhtq3c9-mikka-dev.vercel.app', databaseBranch: null, deploymentEnvironment: 'preview' },
+})
 const image = png(1280, 800)
 const serveImages: Media = (route, id) => id === clip ? route.fulfill({ status: 409, body: '' }) : route.fulfill({ status: 200, contentType: 'image/png', body: image })
 
@@ -90,17 +132,37 @@ test.describe(() => {
   // oxlint-disable-next-line no-empty-pattern -- Playwright fixture functions require destructured arguments.
   test.use({ expectedConsoleErrors: async ({}, use) => { await use([{ path: refused, message: conflict }, { path: `${refused}?attempt=1`, message: conflict }]) } })
 
-test('evidence viewer: captures as thumbnails, image, recording error, text, keyboard and filmstrip', async ({ page }) => {
-  const { acceptance, served } = await open(page, manifest, serveImages, viewerTask)
-  const thumb = acceptance.getByRole('button', { name: '截图 · 首页首屏' })
-  await expect(thumb).toBeVisible()
-  await expect(acceptance.getByRole('button', { name: '录屏 · 向下滚动' })).toContainText('0:09')
-  await expect(acceptance.getByRole('button', { name: /run-chunk:/ })).toBeVisible()
+test('验收 on the thread: criteria with their evidence, independent results, the viewer by criterion', async ({ page }) => {
+  const { thread, served } = await open(page, manifest, serveImages, figma, viewerTask)
+  await expect(thread.getByText('待你确认', { exact: true }).first()).toBeVisible()
+  const card = thread.getByRole('region', { name: '候选版本' })
+  await expect(card.getByRole('link', { name: '#418' })).toHaveAttribute('href', 'https://github.com/alexj11324/Mikka/pull/418')
+  await expect(card.getByText('mikka-8quhtq3c9-mikka-dev.vercel.app')).toBeVisible()
+  await expect(card.getByText('Preview', { exact: true })).toHaveCount(2)
+  const list = thread.getByRole('region', { name: '验收标准' })
+  await expect(list.getByText('3/3', { exact: true })).toBeVisible()
+  const first = list.getByRole('listitem').filter({ hasText: '首页 2 秒内可交互（4G）' })
+  await expect(first.getByText('通过', { exact: true })).toBeVisible()
+  await expect(first.getByRole('button', { name: '录屏 · 向下滚动' })).toContainText('0:09')
+  await expect(first.getByRole('button', { name: 'pnpm e2e home-cls' })).toContainText('exit 0')
+  await expect(thread.getByText(/run-chunk:|run-capture:/)).toHaveCount(0)
+  const results = thread.getByRole('region', { name: '独立结果' })
+  await expect(results.getByText('建议合并', { exact: true })).toBeVisible()
+  await expect(results.getByRole('listitem').filter({ hasText: '验证' }).getByText('3/3', { exact: true })).toBeVisible()
+  await expect(thread.getByRole('button', { name: '批准发布' })).toBeVisible()
+  await expect(thread.getByRole('button', { name: '退回修改' })).toBeVisible()
+  await expect(thread.getByText('1 小时内有效', { exact: true })).toBeVisible()
   await shoot(page, 'list')
 
-  await thumb.click()
+  // 对话 shows the thread itself; 验收 comes back with the same content.
+  await thread.getByRole('tab', { name: '对话' }).click()
+  await expect(thread.getByText('首屏图片改成懒加载，字体做了子集。')).toBeVisible()
+  await thread.getByRole('tab', { name: '验收' }).click()
+
+  await first.getByRole('button', { name: '截图 · 首页首屏' }).click()
   const viewer = page.getByRole('dialog').filter({ has: page.getByTestId('evidence-counter') })
-  await expect(viewer.getByTestId('evidence-counter')).toHaveText('1 / 4')
+  await expect(viewer.getByRole('heading', { name: '首页 2 秒内可交互（4G）' })).toBeVisible()
+  await expect(viewer.getByTestId('evidence-counter')).toHaveText('1 / 3')
   const shown = viewer.getByRole('img', { name: '首页首屏' })
   await expect(shown).toBeVisible()
   await expect.poll(() => shown.evaluate(node => (node as HTMLImageElement).naturalWidth)).toBe(1280)
@@ -108,10 +170,7 @@ test('evidence viewer: captures as thumbnails, image, recording error, text, key
   await shoot(page, 'image')
 
   await page.keyboard.press('ArrowRight')
-  await expect(viewer.getByTestId('evidence-counter')).toHaveText('2 / 4')
-  await expect(viewer.getByRole('img', { name: '图片加载完成' })).toBeVisible()
-  await page.keyboard.press('ArrowRight')
-  await expect(viewer.getByTestId('evidence-counter')).toHaveText('3 / 4')
+  await expect(viewer.getByTestId('evidence-counter')).toHaveText('2 / 3')
   // A capture the server refuses: error with retry.
   await expect(viewer.getByRole('alert')).toContainText('证据打开失败')
   await shoot(page, 'video-error')
@@ -120,38 +179,37 @@ test('evidence viewer: captures as thumbnails, image, recording error, text, key
   await expect.poll(() => served.filter(id => id === clip).length).toBeGreaterThan(before)
 
   // The retry button leaves with the error, so move on from the filmstrip.
-  await viewer.getByRole('group', { name: '全部证据' }).getByRole('button', { name: /run-chunk:/ }).click()
-  await expect(viewer.getByTestId('evidence-counter')).toHaveText('4 / 4')
+  await viewer.getByRole('group', { name: '全部证据' }).getByRole('button', { name: 'pnpm e2e home-cls' }).click()
+  await expect(viewer.getByTestId('evidence-counter')).toHaveText('3 / 3')
+  await expect(viewer.getByText('$ pnpm e2e home-cls').first()).toBeVisible()
   await expect(viewer.getByText('2 passed (8.6 s)')).toBeVisible()
   await expect(viewer.getByRole('button', { name: '下一条证据' })).toBeDisabled()
   await shoot(page, 'text')
 
-  await viewer.getByRole('group', { name: '全部证据' }).getByRole('button', { name: '截图 · 图片加载完成' }).click()
-  await expect(viewer.getByTestId('evidence-counter')).toHaveText('2 / 4')
   await page.keyboard.press('Home')
-  await expect(viewer.getByTestId('evidence-counter')).toHaveText('1 / 4')
+  await expect(viewer.getByTestId('evidence-counter')).toHaveText('1 / 3')
   await expect(viewer.getByRole('button', { name: '上一条证据' })).toBeDisabled()
   await expect(viewer.getByRole('link', { name: '下载' })).toHaveAttribute('href', new RegExp(`/api/factory/tasks/[^/]+/evidence/${shot1}$`))
 
   await viewer.getByRole('button', { name: '关闭证据' }).click()
   await expect(viewer).toHaveCount(0)
-  await expect(acceptance.getByRole('heading', { name: 'Factory 验收' })).toBeVisible()
+  await expect(list).toBeVisible()
 })
 })
 
 test('evidence viewer: media keeps a placeholder while it loads', async ({ page }) => {
   let release: () => void = () => {}
   const held = new Promise<void>(resolve => { release = resolve })
-  const { acceptance } = await open(page, manifest.slice(0, 1), async route => { await held; await route.fulfill({ status: 200, contentType: 'image/png', body: image }) })
-  await acceptance.getByRole('button', { name: '截图 · 首页首屏' }).click()
+  const { thread } = await open(page, manifest.slice(0, 1), async route => { await held; await route.fulfill({ status: 200, contentType: 'image/png', body: image }) }, figma)
+  await thread.getByRole('button', { name: '截图 · 首页首屏' }).click()
   await expect(page.getByTestId('evidence-loading')).toBeVisible()
   await shoot(page, 'loading')
   release()
   await expect(page.getByTestId('evidence-loading')).toHaveCount(0)
 })
 
-test('evidence viewer: no evidence is one line', async ({ page }) => {
-  const { acceptance } = await open(page, [], serveImages)
-  await expect(acceptance.getByText('没有证据', { exact: true })).toBeVisible()
+test('no evidence and no checks is one line', async ({ page }) => {
+  const { thread } = await open(page, [], serveImages, () => ({ checks: [], delivery: { candidateSha: sha, pullRequest: null, repository: 'alexj11324/Mikka', environment: null, previewUrl: null, databaseBranch: null, deploymentEnvironment: null } }))
+  await expect(thread.getByText('没有证据', { exact: true })).toBeVisible()
   await shoot(page, 'empty')
 })

@@ -98,7 +98,9 @@ test('approval bar uses component defaults and the Figma copy for each state', (
     assert.match(html, /data-slot="item"/)
     assert.doesNotMatch(html, /bg-control|rounded-\[14px\]|line-through|bg-blue|bg-destructive/)
   }
-  assert.match(bar('pending', true), />待启用<.*>启用</)
+  // While it waits for you the header's chip names the state; the bar carries only the scope and the action.
+  assert.doesNotMatch(bar('pending', true), />待启用</)
+  assert.match(bar('pending', true), />启用</)
   assert.match(bar('live', true), />已启用</)
   assert.match(bar('failed'), />发布失败<.*>撤销批准<.*>发布</)
   assert.match(bar('invalidated'), />已失效</)

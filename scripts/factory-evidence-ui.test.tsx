@@ -4,10 +4,11 @@ import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, useState, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
-import type { EvidenceEntry } from '../lib/factory/evidence-view'
+import type { AcceptanceItem } from '../lib/factory/acceptance-view'
 
-// A3 evidence viewer: thumbnails and chips, the stage, keyboard and filmstrip
-// navigation, and the loading / error / retry states for media and text.
+// A3 evidence (Figma 357:4750, frames 06 and 12–14): a criterion's thumbnails
+// and command chips, the viewer's header, keyboard and filmstrip navigation,
+// and the loading / error / retry states for media and text.
 const zh = JSON.parse(readFileSync(new URL('../messages/zh-CN.json', import.meta.url), 'utf8')).FactoryAcceptance
 const lookup = (key: string, args?: Record<string, string>) => {
   const value = key.split('.').reduce((node, part) => node?.[part], zh)
@@ -26,10 +27,10 @@ let createRoot: typeof import('react-dom/client')['createRoot']
 let mod: typeof import('../components/workspace/factory-evidence')
 
 const base = { runId: 'r1', recordedAt: '2026-10-28T06:20:00.000Z' }
-const entries: EvidenceEntry[] = [
-  { ...base, artifact: 'run-report:r1', kind: 'report', stage: 'execute' },
-  { ...base, artifact: 'run-capture:c1', kind: 'screenshot', stage: 'verify', captureId: 'c1', title: '首页', contentType: 'image/png' },
-  { ...base, artifact: 'run-capture:c2', kind: 'video', stage: 'verify', captureId: 'c2', title: '滚动', contentType: 'video/mp4', durationMs: 9000 },
+const items: AcceptanceItem[] = [
+  { entry: { ...base, artifact: 'run-chunk:7d1c2a40-0000-4000-8000-000000000001', kind: 'log', stage: 'verify' }, command: { text: 'pnpm e2e home-cls', exitCode: 0 } },
+  { entry: { ...base, artifact: 'run-capture:c1', kind: 'screenshot', stage: 'verify', captureId: 'c1', title: '首页', contentType: 'image/png' }, command: null },
+  { entry: { ...base, artifact: 'run-capture:c2', kind: 'video', stage: 'verify', captureId: 'c2', title: '滚动', contentType: 'video/mp4', durationMs: 9000 }, command: null },
 ]
 
 before(async () => {
@@ -52,29 +53,36 @@ const byLabel = (label: string) => document.querySelector(`[aria-label="${label}
 const counter = () => document.querySelector('[data-testid="evidence-counter"]')?.textContent
 const key = async (name: string) => act(async () => { document.querySelector('[role="dialog"]')!.dispatchEvent(new browser.KeyboardEvent('keydown', { key: name, bubbles: true }) as unknown as Event) })
 
-test('the window lists captures as thumbnails and text as chips, grouped by stage', async () => {
+test('a criterion shows captures as thumbnails and text as its command, never a raw id', async () => {
   const opened: number[] = []
-  await act(async () => root.render(<mod.EvidenceList taskId="t1" entries={entries} onOpen={index => opened.push(index)} />))
-  const headings = [...document.querySelectorAll('h5')].map(h => h.textContent)
-  assert.deepEqual(headings, ['执行', '验证'])
+  const report: AcceptanceItem = { entry: { ...base, artifact: 'run-report:r1', kind: 'report', stage: 'review' }, command: null }
+  await act(async () => root.render(<mod.CriterionEvidence taskId="t1" items={[...items, report]} onOpen={index => opened.push(index)} />))
+  assert.doesNotMatch(container.textContent ?? '', /run-chunk:|run-report:/)
+  const chip = byLabel('pnpm e2e home-cls')!
+  assert.match(chip.textContent ?? '', /pnpm e2e home-cls·exit 0/)
+  assert.ok(byLabel('审查报告'), 'text with no command reads as its stage and kind')
   const shot = byLabel('截图 · 首页')!
   assert.equal(shot.querySelector('img')?.getAttribute('src'), '/api/factory/tasks/t1/evidence/c1')
   const clip = byLabel('录屏 · 滚动')!
   assert.match(clip.textContent ?? '', /0:09/)
   assert.equal(clip.querySelector('video'), null, 'a recording thumbnail never downloads the file')
-  await act(async () => { byLabel('run-report:r1')!.click(); clip.click() })
+  await act(async () => { chip.click(); clip.click() })
   assert.deepEqual(opened, [0, 2])
-})
-
-test('no evidence is one line', async () => {
-  await act(async () => root.render(<mod.EvidenceList taskId="t1" entries={[]} onOpen={() => {}} />))
-  assert.equal(container.textContent, '没有证据')
 })
 
 function Viewer({ start = 0, readText }: { start?: number; readText: (name: string) => Promise<string> }) {
   const [index, setIndex] = useState(start)
-  return <mod.EvidenceViewer taskId="t1" entries={entries} index={index} onIndex={setIndex} onClose={() => {}} readText={readText} sha={'a'.repeat(40)} environment="预览" />
+  return <mod.EvidenceViewer taskId="t1" items={items} index={index} title="首屏图片懒加载后无布局跳动" passed onIndex={setIndex} onClose={() => {}} readText={readText} sha={'a'.repeat(40)} environment="Preview" />
 }
+
+test('the viewer is titled with the criterion and its result; text shows its command and exit code', async () => {
+  await act(async () => root.render(<Viewer readText={async () => '2 passed (8.6 s)'} />))
+  assert.equal(document.querySelector('h2')?.textContent, '首屏图片懒加载后无布局跳动')
+  assert.ok(document.querySelector('header svg.text-success'), 'a passed criterion shows the green check')
+  assert.match(container.textContent ?? '', /\$ pnpm e2e home-clsexit 0/)
+  const tile = [...document.querySelectorAll('[role="group"] button')][0]
+  assert.match(tile.textContent ?? '', /^\$ pnpm e2e home-clsexit 0$/, 'the filmstrip shows text as a terminal tile')
+})
 
 test('text loads, then arrows, Home/End and the filmstrip move through every entry', async () => {
   const reads: string[] = []
@@ -97,7 +105,7 @@ test('text loads, then arrows, Home/End and the filmstrip move through every ent
   assert.equal(counter(), '3 / 3', 'the last entry stays put')
   await key('Home')
   assert.equal(counter(), '1 / 3')
-  assert.deepEqual(reads, ['run-report:r1'], 'text read once, then cached')
+  assert.deepEqual(reads, ['run-chunk:7d1c2a40-0000-4000-8000-000000000001'], 'text read once, then cached')
   const strip = document.querySelector('[role="group"]')!
   await act(async () => { (strip.querySelector('[aria-label="录屏 · 滚动"]') as unknown as HTMLButtonElement).click() })
   assert.equal(counter(), '3 / 3')

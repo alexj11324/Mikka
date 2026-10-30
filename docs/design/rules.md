@@ -239,6 +239,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   has an 「Artifact · N」 entry. Opening an Artifact shows a window with the
   acceptance content on the left (PR, checks, screenshots and recordings),
   the thread's chat on the right, and 打回 / 通过 at the top.
+  Factory acceptance is different: it is the 「验收」 tab of the thread that
+  produced the candidate (header 对话 | 验收; Figma `358:8511`), with the
+  decision bar pinned at its bottom (`decisions.md`, 2026-10-30).
 - **R-57** The local 浏览器 is an icon-only globe toggle at the right of the
   top bar, with no 「浏览器」 label. Turned on, it opens a right column with
   the browser (URL bar and page). Selecting an element and annotating it puts

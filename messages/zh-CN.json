@@ -2740,7 +2740,9 @@
     "moreOutputsAria": "还有 {count} 个输出",
     "send": "发送",
     "retryStop": "重试停止",
-    "waiting": "等你回复"
+    "waiting": "等你回复",
+    "chatTab": "对话",
+    "acceptanceTab": "验收"
   },
   "Computer": {
     "status": {
@@ -3328,7 +3330,30 @@
     "previous": "上一条证据",
     "next": "下一条证据",
     "download": "下载",
-    "allEvidence": "全部证据"
+    "allEvidence": "全部证据",
+    "pullRequest": "PR",
+    "commitLabel": "提交",
+    "previewLabel": "Preview",
+    "environmentLabel": "环境",
+    "criteria": "验收标准",
+    "results": "独立结果",
+    "otherEvidence": "其他证据",
+    "passed": "通过",
+    "notPassed": "未通过",
+    "reviewPassed": "建议合并",
+    "reviewFailed": "需要修改",
+    "inProgress": "进行中",
+    "opinions": "{count} 条意见",
+    "review": "审阅",
+    "verify": "验证",
+    "reviewThread": "独立审阅",
+    "verifyThread": "独立验证",
+    "envChip": {
+      "preview": "Preview",
+      "production": "Production"
+    },
+    "validFor": "{hours} 小时内有效",
+    "textLabel": "{stage}{kind}"
   },
   "AccountEmail": {
     "exportSubject": "你的 Mikka 数据导出",

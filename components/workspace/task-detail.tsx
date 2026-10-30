@@ -20,7 +20,8 @@ import { IssueMembers } from './issue-members'
 import { IssueDetailProperties } from './issue-detail-properties'
 import { IssueThreads, ThreadEvents } from './issue-threads'
 import { IssueThreadPanel } from './issue-thread-panel'
-import { FactoryAcceptance } from './factory-acceptance'
+import { cn } from '@/lib/utils'
+import { FactoryAcceptance, FactoryAcceptancePanel, type FactoryTask } from './factory-acceptance'
 import { IssueActivityFeed } from './issue-activity-feed'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -114,6 +115,14 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   const [editSequence, setEditSequence] = useState(0)
   const [metadataSaving, setMetadataSaving] = useState(false)
   const [openThread, setOpenThread] = useState<string | null>(null)
+  // 验收 opens on the thread that produced the candidate (Figma 357:4750, frame 06); a task with no known thread opens alone.
+  const [threadTab, setThreadTab] = useState<'chat' | 'acceptance'>('chat')
+  const [openAcceptance, setOpenAcceptance] = useState<FactoryTask | null>(null)
+  const showThread = useCallback((runId: string | null) => { setOpenAcceptance(null); setThreadTab('chat'); setOpenThread(runId) }, [])
+  const showAcceptance = useCallback((task: FactoryTask) => {
+    if (task.candidateRunId) { setOpenAcceptance(null); setThreadTab('acceptance'); setOpenThread(task.candidateRunId) }
+    else { setOpenThread(null); setOpenAcceptance(task) }
+  }, [])
   const wide = useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false)
   const [error, setError] = useState('')
   const [history, setHistory] = useState(false)
@@ -219,7 +228,9 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
     : <IssueActivityFeed versions={versions ?? []} children={subtasks} />
 
   const properties = <IssueDetailProperties task={saved} onMetadataSaved={adopt} metadataDisabled={false} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={false} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={<IssueRelations viewerId={user.id} mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} />
-  const threadPanel = openThread && <IssueThreadPanel key={openThread} issueId={saved.id} runId={openThread} onClose={() => setOpenThread(null)} />
+  const threadPanel = openThread
+    ? <IssueThreadPanel key={`${openThread}:${threadTab}`} issueId={saved.id} runId={openThread} initialTab={threadTab} onOpenThread={showThread} onClose={() => showThread(null)} />
+    : openAcceptance && <FactoryAcceptancePanel key={openAcceptance.id} task={openAcceptance} onOpenThread={showThread} onClose={() => setOpenAcceptance(null)} />
 
   // R-61: one line under the header, one before the properties or an open thread; the page scrolls, the right column stays.
   return <div className="flex min-w-0 flex-1">
@@ -233,17 +244,17 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
           <div className="flex min-w-0 flex-col gap-7">
             <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">{t('titleLabel')}</FieldLabel><Textarea id="task-title" aria-label={t('titleLabel')} rows={1} placeholder={t('titleLabel')} value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent px-0 py-0 text-2xl leading-snug font-semibold tracking-tight shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring md:text-3xl dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
             {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
-    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted content={content} disabled={readOnly} layout={documentTools ? 'document' : 'issue'} activity={activity} threadEvents={<ThreadEvents issueId={saved.id} onOpen={setOpenThread} />} afterDescription={<><IssueRelations viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} /><IssueThreads issueId={saved.id} openId={openThread} onOpen={setOpenThread} /><FactoryAcceptance issueId={saved.id} identifier={saved.identifier} /></>} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
+    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted content={content} disabled={readOnly} layout={documentTools ? 'document' : 'issue'} activity={activity} threadEvents={<ThreadEvents issueId={saved.id} onOpen={showThread} />} afterDescription={<><IssueRelations viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} /><IssueThreads issueId={saved.id} openId={openThread} onOpen={showThread} /><FactoryAcceptance issueId={saved.id} onOpen={showAcceptance} /></>} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
           </div>
           {syncState.error && <p role="alert" className="text-xs text-destructive">{t('syncRetryNotice')}</p>}
         </div>
       </div>
     </div>
     </div>
-    {wide && <div className="sticky top-0 flex h-[calc(100svh-3.25rem)] shrink-0 flex-col self-start border-l border-rule">
-      {threadPanel ? <div className="flex h-full w-108 flex-col">{threadPanel}</div> : <div className="w-80 overflow-y-auto px-6 py-10"><SectionBoundary onClose={onClose}>{properties}</SectionBoundary></div>}
+    {/* One element for both widths: crossing the breakpoint restyles the open thread instead of remounting it (its tab, viewer and draft stay). */}
+    {(wide || threadPanel) && <div className={cn(wide ? 'sticky top-0 flex h-[calc(100svh-3.25rem)] shrink-0 flex-col self-start border-l border-rule' : 'fixed inset-0 z-30 flex flex-col bg-background')}>
+      {threadPanel ? <div className={cn('flex h-full flex-col', wide && 'w-108')}>{threadPanel}</div> : <div className="w-80 overflow-y-auto px-6 py-10"><SectionBoundary onClose={onClose}>{properties}</SectionBoundary></div>}
     </div>}
-    {!wide && threadPanel && <div className="fixed inset-0 z-30 flex flex-col bg-background">{threadPanel}</div>}
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await getIssue(saved.id)) }} /></DialogContent></Dialog>
     <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={versions} loadingError={!!historyError} onRetry={() => { void refreshVersions() }} onRestore={restore} />
   </div>

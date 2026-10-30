@@ -37,13 +37,6 @@ export function formatDuration(ms: number | null | undefined) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
-/** Entries by the stage that produced them, in stage order; each keeps its manifest index. */
-export function groupByStage(entries: readonly EvidenceEntry[]) {
-  return STAGES
-    .map(stage => ({ stage, items: entries.map((entry, index) => ({ entry, index })).filter(item => item.entry.stage === stage) }))
-    .filter(group => group.items.length > 0)
-}
-
 /** The manifest's entries, or none when the body is not the expected shape. */
 export const evidenceEntries = (manifest: unknown): EvidenceEntry[] => {
   const artifacts = (manifest as { artifacts?: unknown } | null | undefined)?.artifacts
