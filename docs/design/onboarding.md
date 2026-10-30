@@ -30,13 +30,13 @@
 
 | # | 阶段 | 屏幕上 / Bot 说什么 | 用户的回答（气泡） | 跳过时 |
 | --- | --- | --- | --- | --- |
-| 0 | 开场 | 屏幕用 3 秒慢慢暗下来，铺一层光。然后 Bot 的「一滴颜色」（默认形状和颜色）落在屏幕中间，轻轻呼吸，像在想事情；「欢迎来到 Mikka」和 **开始** 依次浮出来。不点的话 8 秒后自己开始，不显示倒计时 | 点「开始」 | — |
-| 1 | 孵化（Figma 01） | 那滴颜色从中间移到顶部，带着整段对话；后面整个引导都在同一段对话里。Bot 先交代：「你好，我是你的第一个 Bot。有事交给我，我用你连上的应用和我自己的电脑去做。」「先花一分钟，做三件小事。」「第一件：给我挑个样子，起个名字。」下面一张卡片：16 种形状（`bot-shapes.ts`）、12 种颜色、名字输入框和 **就叫这个**。挑的时候，顶部那个 Bot 当场变形、变色 | 「就叫你小满」→ 顶部 Bot 缩小，名字出现在旁边；承接「小满，好名字。」 | 不能跳过：这一步就是建 Bot。名字没存上 → 卡片里就地报错「名字没能保存，再试一次。」 |
-| 2a | 云电脑 | 「第二件：我可以有一台自己的云电脑，用它开浏览器、跑代码。要开一台吗？」下面两个按钮，跟 Bot 的话左对齐，主选项在前：**好，开一台** / **先不用** | 「好，开一台」或「先不用」 | 「先不用」→「好。以后想用，在设置 › 云电脑里填上你的 E2B Key 就行。」直接进第 3 步 |
-| 2b | 填 E2B Key（只在选了「好，开一台」时） | 一张卡片：一个 Key 输入框（密码样式）、「去 E2B 拿 Key」的外链、**连接** 按钮。连接时先用这个 Key 向 E2B 校验一次 | 「已连接 E2B」（不回显 Key） | 「先不用」→ 同 2a 的跳过；Key 不对 →「这个 Key 用不了」；E2B 连不上 →「暂时连不上 E2B，稍后再试。」都在卡片里就地报错，可以重填或跳过 |
+| 0 | 开场 | 屏幕用 3 秒慢慢暗下来，铺一层光。然后一颗蛋（bloub 的 `egg` 状态，默认颜色）落在屏幕中间，眼睛跟着鼠标；「这是你的第一个 Bot」和 **孵出来** 依次浮出来。不点的话 8 秒后自己开始，不显示倒计时 | 点「孵出来」→ 蛋睁大眼睛（`wide`），变成默认形状 | | — |
+| 1 | 孵化（Figma 01） | 那滴颜色从中间移到顶部，带着整段对话；后面整个引导都在同一段对话里。Bot 先交代：「你好！我是你的第一个 Bot。有事交给我，我用你连上的应用和我自己的电脑去做。」「我还缺三样东西：名字、电脑，还有你的应用。」「先给我起个名字，再挑个样子。」下面一张卡片：16 种形状（`bot-shapes.ts`）、12 种颜色、名字输入框和 **就叫这个**。挑的时候，顶部那个 Bot 当场变形、变色 | 「就叫你小满」→ 顶部 Bot 缩小，名字出现在旁边，眨一下眼（`wink`）。不另说一句承接 | 不能跳过：这一步就是建 Bot。名字没存上 → Bot 冒出感叹号（`exclaim`），卡片里就地报错「没存上，再点一次试试。」 |
+| 2a | 云电脑 | 「然后是电脑。我可以有一台自己的云电脑，开浏览器、跑代码都靠它。要开一台吗？」下面两个按钮，跟 Bot 的话左对齐，主选项在前：**好，开一台** / **先不用** | 「好，开一台」或「先不用」 | 「先不用」→「好。以后想用，在设置 › 云电脑里填上你的 E2B Key 就行。」直接进第 3 步 |
+| 2b | 填 E2B Key（只在选了「好，开一台」时） | 一张卡片：一个 Key 输入框（密码样式）、「去 E2B 拿 Key」的外链、**连接** 按钮。连接时先用这个 Key 向 E2B 校验一次，校验中 Bot 在想（`thinking`），成功眨眼，Key 不对冒感叹号 | 「已连接 E2B」（不回显 Key） | 「先不用」→ 同 2a 的跳过；Key 不对 →「这个 Key 用不了」；E2B 连不上 →「暂时连不上 E2B，稍后再试。」都在卡片里就地报错，可以重填或跳过 |
 | 2c | 它的电脑亮起来（Figma 02，只在 Key 连上后） | 「等我一下，我去把电脑打开。」下面一块屏幕，用户自己的 E2B 账号真的在开机（「● 正在开机」→ 桌面）；屏幕下方写「小满 的屏幕」 | — | 用户可以不等开机直接往下走；电脑在后台继续开 |
-| 3 | 连应用（Figma 03） | 「第三件：连上你常用的应用，里面的事我就能直接帮你做。」下面是一张应用列表：Gmail、Google 日历、Google Drive、Notion、Slack，每行有图标、名字、一句说明（「日程和会议」）和 连接 / 连接中… / 已连接。列表加载时先用占位行撑住高度，不跳；登录在浏览器里进行时，列表下写「在浏览器里登录 Gmail，完成后回到这里。」 | 「已连接 Gmail、Google 日历」；承接：「好，Gmail、Google 日历 连上了。用得上的时候我直接用，今天的简报我先去整理。」同时在后台开始整理第一份简报 | 「跳过」→「没关系，之后随时可以在设置里连接。」 |
-| 4 | 收尾 | 有项目被跳过时，先提醒一句：「还没开的：云电脑、连接应用。随时都能开。」停 1.2 秒，对话退下去，一道光从下往上扫过屏幕，光到最深；顶部的 Bot 移回屏幕中间，变大。下面依次出现「小满 准备好了。」「有事直接交给它。」和 **开始聊天** | 点「开始聊天」→ 这一页往上淡出，蒙层退去，用户落在小满的对话里，输入框亮一下 | — |
+| 3 | 连应用（Figma 03） | 「最后是你的应用。连上之后，里面的事我就能直接帮你做。」下面是一张应用列表：Gmail、Google 日历、Google Drive、Notion、Slack，每行有图标、名字、一句说明（「收发邮件」「日程」「文件」「笔记和文档」「工作消息」）和 连接 / 连接中… / 已连接。列表加载时先用占位行撑住高度，不跳；登录在浏览器里进行时，列表下写「Gmail 的登录页开在浏览器里了，登完回来就行。」每连上一个，Bot 眨一下眼 | 「已连接 Gmail、Google 日历」；承接：「好，Gmail、Google 日历 连上了。用得上的时候我直接用，今天的简报我先去整理。」同时在后台开始整理第一份简报 | 「跳过」→「好，先这样。想连的时候去设置 › 应用。」 |
+| 4 | 收尾 | 有项目被跳过时，先提醒一句：「电脑和应用还没开，想用的时候去设置里打开就行。」停 1.2 秒，对话退下去，一道光从下往上扫过屏幕，光到最深；顶部的 Bot 移回屏幕中间，变大。Bot 眨一下眼，下面依次出现「小满 出生了。」「去跟它说第一句话吧。」和 **跟小满聊聊** | 点「跟小满聊聊」→ 这一页往上淡出，蒙层退去，用户落在小满的对话里，输入框亮一下 | — |
 
 - 每完成一步，背景光就深一层；跳过的步骤不加深。
 - 右上角一直有「跳过引导」：直接用当前的形状、颜色和名字建好 Bot，然后到第 4 步的欢迎页。
@@ -45,7 +45,7 @@
 ## 5. 动效
 
 - 光：深色蒙层，底部涌上来一层光，两角各有一团慢慢漂移的柔光，只做 opacity 和 transform 动画。有气泡在飞的时候光暂停，减少重绘。
-- Bot 本身是贯穿全程的同一个元素：开场在屏幕中间，然后移到对话顶部，最后回到欢迎页中间。每次移动 0.64 秒；眼睛一直跟着鼠标；等着要说话时轻轻呼吸，代替「正在输入」。换形状时当场变形（bloub 本身就支持形状之间的过渡）。
+- Bot 本身是贯穿全程的同一个元素：开场在屏幕中间，然后移到对话顶部，最后回到欢迎页中间。每次移动 0.64 秒；眼睛一直跟着鼠标；用真的 bloub 组件（和应用里的头像同一个），所以它自己会眨眼、视线会飘；用到的状态：`egg` 开场、`wide` 刚孵出来、`idle` 平时、`wink` 起好名字和每连上一样东西、`thinking` 校验 Key 和开机时、`exclaim` 出错。换形状时当场变形。
 - 对话立在屏幕底部（不可见的）输入框上：新内容从下面进来，旧内容从顶部淡出去。有东西进来或离开时，整段对话用 0.44 秒滑到新位置，不跳。
 - 用户的回答从底部输入框的位置飞上去，用和正式聊天发消息一样的弹簧动画。
 - 卡片出现：0.15 秒淡入，同时从下方 8px、缩小一点的位置弹到位（0.25 秒）。卡片离开：先用 0.15 秒淡出，回答再发出去；离开中的卡片点不了。
@@ -54,19 +54,18 @@
 
 ## 6. 文案（中文为准，英文同步）
 
-只用一种口吻（R-46）。Comma 的六种语气第一版不做。
+只用一种口吻（R-46）。Comma 的六种语气第一版不做。文案是我们自己的，不照搬 Comma 的句子。
 
 | 位置 | 中文 | English |
 | --- | --- | --- |
-| 开场 | 欢迎来到 Mikka / 开始 | Welcome to Mikka / Start |
-| 孵化 | 你好，我是你的第一个 Bot。有事交给我，我用你连上的应用和我自己的电脑去做。 | Hi, I'm your first Bot. Hand things to me, and I'll get them done with your apps and my own computer. |
-| 交代 | 先花一分钟，做三件小事。 | Let's take a minute for three small things. |
-| 第一件 | 第一件：给我挑个样子，起个名字。 | First: pick how I look, and give me a name. |
-| 起名承接 | {name}，好名字。 | {name}. Good name. |
-| 起名失败 | 名字没能保存，再试一次。 | Couldn't save the name. Try again. |
+| 开场 | 这是你的第一个 Bot / 孵出来 | This is your first Bot / Hatch it |
+| 孵化 | 你好！我是你的第一个 Bot。有事交给我，我用你连上的应用和我自己的电脑去做。 | Hi! I'm your first Bot. Hand things to me, and I'll get them done with your apps and my own computer. |
+| 交代 | 我还缺三样东西：名字、电脑，还有你的应用。 | I'm missing three things: a name, a computer, and your apps. |
+| 起名 | 先给我起个名字，再挑个样子。 | First, give me a name, then pick how I look. |
+| 起名失败 | 没存上，再点一次试试。 | Didn't save. Try once more. |
 | 名字输入框占位 | 给它起个名字 | Give it a name |
 | 起名按钮 | 就叫这个 | That's the one |
-| 问云电脑 | 第二件：我可以有一台自己的云电脑，用它开浏览器、跑代码。要开一台吗？ | Second: I can have my own cloud computer to open a browser and run code. Want me to set one up? |
+| 问云电脑 | 然后是电脑。我可以有一台自己的云电脑，开浏览器、跑代码都靠它。要开一台吗？ | Next, a computer. I can have my own cloud computer to open a browser and run code. Want me to set one up? |
 | 按钮 | 好，开一台 / 先不用 | Yes, set one up / Not now |
 | 跳过云电脑 | 好。以后想用，在设置 › 云电脑里填上你的 E2B Key 就行。 | OK. If you want one later, add your E2B key in Settings › Cloud computer. |
 | Key 输入框标签 | E2B Key | E2B key |
@@ -79,13 +78,13 @@
 | 电脑状态 | 正在开机 | Starting up |
 | 开机失败 | 电脑稍后再开 | Computer will start later |
 | 屏幕标签 | {name} 的屏幕 | {name}'s screen |
-| 应用 | 第三件：连上你常用的应用，里面的事我就能直接帮你做。 | Connect the apps you use, and I can take care of things in them directly. |
+| 应用 | 最后是你的应用。连上之后，里面的事我就能直接帮你做。 | Last, your apps. Once they're connected, I can take care of things in them directly. |
 | 应用承接 | 好，{apps} 连上了。用得上的时候我直接用，今天的简报我先去整理。 | Got it, {apps} connected. I'll use them whenever they help. Starting on today's briefing now. |
-| 应用跳过承接 | 没关系，之后随时可以在设置里连接。 | No problem. Connect them anytime in Settings. |
-| 提醒 | 还没开的：{missing}。随时都能开。 | Still off: {missing}. Turn them on anytime. |
-| 应用登录中 | 在浏览器里登录 {app}，完成后回到这里。 | Sign in to {app} in your browser, then come back here. |
-| 欢迎页 | {name} 准备好了。/ 有事直接交给它。 | {name} is ready. / Hand it anything. |
-| 欢迎页按钮 | 开始聊天 | Start chatting |
+| 应用跳过承接 | 好，先这样。想连的时候去设置 › 应用。 | OK, that's fine for now. Connect them in Settings › Apps whenever you like. |
+| 提醒 | {missing}还没开，想用的时候去设置里打开就行。（{missing}：电脑、应用，用「和」连） | {missing} still off. Turn them on in Settings whenever you want. |
+| 应用登录中 | {app} 的登录页开在浏览器里了，登完回来就行。 | {app} sign-in is open in your browser. Come back when you're done. |
+| 欢迎页 | {name} 出生了。/ 去跟它说第一句话吧。 | {name} is here. / Go say your first hello. |
+| 欢迎页按钮 | 跟{name}聊聊 | Talk to {name} |
 | 按钮 | 好了 / 跳过 | Done / Skip |
 | 跳过引导 | 跳过引导 | Skip setup |
 | 设置行 | 重新播放引导 | Replay onboarding |
