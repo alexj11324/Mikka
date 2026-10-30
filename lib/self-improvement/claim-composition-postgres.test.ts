@@ -18,7 +18,7 @@ test('retained PG claim composition: Factory terminal/lineage fence and native b
  const applicationName=`skill-claim-${randomUUID()}`
  const pool=new Pool({connectionString:target.toString(),max:3,application_name:applicationName});pools.push(pool)
  for(const sql of [
-  'CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"issueId" uuid,"agentId" uuid,"retryOf" uuid,status text,"stopRequestedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz)',
+  'CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"issueId" uuid,"agentId" uuid,"retryOf" uuid,status text,"stopRequestedAt" timestamptz,"ciContinuation" jsonb,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz)',
   'CREATE TABLE factory_tasks(id uuid PRIMARY KEY,"userId" text,"issueId" uuid,status text,stage text,"attemptId" uuid)',
   'CREATE TABLE factory_attempts(id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid,stage text,status text)',
   'CREATE TABLE computer_run_bindings("runId" uuid PRIMARY KEY)',

@@ -50,6 +50,9 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
   }
   async function select(tx: PoolClient, userId: string, run: Awaited<ReturnType<typeof owned>>, versionId: string,
     purpose?: EvaluationPurpose | ActivePurpose) {
+    // CI resumes the original session and cannot acquire a new skill grant.
+    // Skill-bearing origin runs are excluded until their provenance is carried.
+    if (run.ciContinuation) throw new ImprovementError('runUnavailable')
     const { rows:[prior] } = await tx.query('SELECT * FROM improvement_skill_selections WHERE "runId"=$1',[run.id])
     if (!prior && (run.status !== 'queued' || run.startedAt)) throw new ImprovementError('runUnavailable')
     if (versionId === BASELINE_ARTIFACT.versionId) await baseline(tx)

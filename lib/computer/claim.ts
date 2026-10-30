@@ -12,7 +12,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
     const run = (await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND status=$3 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, 'queued'])).rows[0]
     if (!run) { await client.query('COMMIT'); return 'unavailable' }
     if(await prepareLocalClaimBinding(client,runId,subscriptionBindingId)==='cloud-required'){await client.query('COMMIT');return 'cloud-required'}
-    await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
+    await client.query(`UPDATE agent_runs SET status=$2,"startedAt"=CASE WHEN "ciContinuation" IS NOT NULL AND "leaseExpiresAt"=$3 THEN coalesce("startedAt",now()) ELSE now() END,"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1`, [runId, 'preparing', leaseExpiresAt])
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
     return 'claimed'

@@ -45,12 +45,12 @@ export type LostRunOutcome =
   | { kind: 'failed'; error: string }
 
 /** What to do with a run whose lease ran out. */
-export function lostRunOutcome(run: { attempt: number; stopRequestedAt: Date | null; issueId: string | null; deviceRepoId: string | null; questionContinuation?: unknown }): LostRunOutcome {
+export function lostRunOutcome(run: { attempt: number; stopRequestedAt: Date | null; issueId: string | null; deviceRepoId: string | null; questionContinuation?: unknown; ciContinuation?: unknown }): LostRunOutcome {
   // The person already asked it to stop; losing the machine finished the job.
   if (run.stopRequestedAt) return { kind: 'stopped' }
   // An answer may already have reached its original session. Generic device
   // takeover cannot preserve that guarantee and must never replay the answer.
-  if (run.questionContinuation != null) return { kind: 'failed', error: 'The device went offline during an original-session question continuation; explicit recovery is required.' }
+  if (run.questionContinuation != null || run.ciContinuation != null) return { kind: 'failed', error: 'The device went offline during an original-session continuation; explicit recovery is required.' }
   if (!run.issueId || !run.deviceRepoId) return { kind: 'failed', error: 'The device went offline, and the run cannot be queued again without its issue and repository.' }
   if (run.attempt >= MAX_RUN_ATTEMPTS) return { kind: 'failed', error: `The device went offline ${run.attempt} times; automatic retries are used up.` }
   return { kind: 'retry', attempt: run.attempt + 1 }

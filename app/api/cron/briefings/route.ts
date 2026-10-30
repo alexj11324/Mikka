@@ -16,12 +16,23 @@ async function handleGET(request: Request) {
   const secret = process.env.CRON_SECRET
   if (!secret) return Response.json({ error: 'Cron is not configured' }, { status: 503 })
   if (!await verifyBearer(request.headers.get('authorization'), secret)) return new Response(null, { status: 401 })
-  const { result, pushed } = await writeDueBriefings({ deadline: Date.now() + BUDGET_MS })
+  const deadline = Date.now() + BUDGET_MS
+  const [briefings, ci] = await Promise.all([
+    writeDueBriefings({ deadline }),
+    (async () => {
+      try {
+        const [{ pool }, { reconcileCi }, { retryPendingCiEscalations }] = await Promise.all([import('@/lib/db'), import('@/lib/github/ci/reconcile'), import('@/lib/github/ci/escalation-recovery')])
+        const [observations, escalations] = await Promise.all([reconcileCi({ pool, deadline, limit: 4 }), retryPendingCiEscalations({ pool, deadline })])
+        return { ...observations, failed: observations.failed + escalations.failed, escalationsRetried: escalations.attempted }
+      } catch { return { failed: 1 } }
+    })(),
+  ])
+  const { result, pushed } = briefings
   // Each written briefing waits in the person's Coordinator inbox; waking it has the Coordinator write it to them.
   for (let index = 0; index < pushed.length; index += WAKE_CONCURRENCY) {
     await Promise.all(pushed.slice(index, index + WAKE_CONCURRENCY).map(userId => wakeCoordinator(userId)))
   }
-  return Response.json({ ...result, pushed: pushed.length }, { headers: { 'Cache-Control': 'no-store' } })
+  return Response.json({ ...result, pushed: pushed.length, ci }, { status: ci.failed ? 502 : 200, headers: { 'Cache-Control': 'no-store' } })
 }
 
 export const GET = withRequestLog('/api/cron/briefings', handleGET)

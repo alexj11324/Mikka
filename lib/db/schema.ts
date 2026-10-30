@@ -1,6 +1,6 @@
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import type { SendKey } from '../send-key'
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, foreignKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -323,6 +323,7 @@ export const agentRuns = pgTable('agent_runs', {
   /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
   source: text('source').$type<'mcp' | null>(),
   questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true} | null>(),
+  ciContinuation: jsonb('ciContinuation').$type<import('@/lib/ci-continuation-contract').CiContinuation | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
   attempt: integer('attempt').notNull().default(1),
@@ -362,6 +363,30 @@ export const runPublications = pgTable('run_publications', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('run_publications_issue_repo_idx').on(table.issueId, table.remoteKey), index('run_publications_pending_idx').on(table.status, table.leaseExpiresAt)])
+
+/** Task-bound CI observation and bounded reconciliation state; no provider credentials. */
+export const githubCiObservations = pgTable('github_ci_observations', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  remoteKey: text('remoteKey').notNull(), prNumber: integer('prNumber').notNull(),
+  originRunId: uuid('originRunId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  scopeVersion: integer('scopeVersion').notNull(), head: text('head'), fingerprint: text('fingerprint'),
+  firstSeenAt: timestamp('firstSeenAt', { withTimezone: true }), deliveredFingerprint: text('deliveredFingerprint'),
+  nextCheckAt: timestamp('nextCheckAt', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(), lastError: text('lastError'),
+  watchId: uuid('watchId').notNull().defaultRandom(),
+  generation: bigint('generation', { mode: 'number' }).notNull().default(0),
+  chainDepth: integer('chainDepth').notNull().default(0),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.issueId, table.remoteKey, table.prNumber] }), index('github_ci_observations_due_idx').on(table.nextCheckAt)])
+
+/** Monotonic workflow attempt receipts for bounded CI reconciliation. */
+export const githubCiWorkflowAttempts = pgTable('github_ci_workflow_attempts', {
+  userId: text('userId').notNull(), issueId: uuid('issueId').notNull(), remoteKey: text('remoteKey').notNull(),
+  prNumber: integer('prNumber').notNull(), runId: text('runId').notNull(), head: text('head').notNull(),
+  attempt: integer('attempt').notNull(), state: text('state').$type<'requested' | 'in_progress' | 'completed'>().notNull(),
+}, table => [primaryKey({ columns: [table.userId, table.issueId, table.remoteKey, table.prNumber, table.runId] }),
+  foreignKey({ columns: [table.userId, table.issueId, table.remoteKey, table.prNumber], foreignColumns: [githubCiObservations.userId, githubCiObservations.issueId, githubCiObservations.remoteKey, githubCiObservations.prNumber] }).onDelete('cascade')])
 
 /** The run's event stream, one row per chunk; `seq` dedupes re-sent batches. */
 export const runChunks = pgTable('run_chunks', {

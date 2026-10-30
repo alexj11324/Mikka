@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createVerify, generateKeyPairSync } from 'node:crypto'
 import { test } from 'node:test'
-import { failedDeliveries, githubAppJwt, nextCursor, redeliverFailedGitHubWebhooks, type GitHubDelivery } from './github-redelivery'
+import { failedDeliveries, fairRedeliveries, githubAppJwt, nextCursor, redeliverFailedGitHubWebhooks, type GitHubDelivery } from './github-redelivery'
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs1', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } })
 const decode = (part: string) => JSON.parse(Buffer.from(part, 'base64url').toString())
@@ -34,6 +34,7 @@ test('only failed suggestion deliveries in the window are redelivered, once per 
   ], since)
   assert.deepEqual(picked.map(item => item.id), ['1', '103'])
   assert.equal(failedDeliveries([delivery(1, 'a', 30, 503), delivery(2, 'b', 31, 503)], since, 1).length, 1)
+  assert.equal(failedDeliveries([delivery(7, 'ci', 30, 503, 'workflow_run')], since)[0]?.id, '7')
 })
 
 test('reads the next page cursor from the Link header', () => {
@@ -134,4 +135,11 @@ test('rejects an incomplete delivery scan without posting redeliveries', async (
   }) as typeof fetch
   await assert.rejects(redeliverFailedGitHubWebhooks({ now, env: { GITHUB_APP_ID: '4840908', GITHUB_APP_PRIVATE_KEY: privateKey }, fetcher }), /GitHub delivery log answered 403/)
   assert.equal(pages, 2)
+})
+
+test('CI failures and business notifications share the bounded redelivery budget', () => {
+  const rows = [...Array.from({ length: 30 }, (_, i) => delivery(i, `ci-${i}`, 30, 503, 'workflow_run')), delivery(100, 'business', 1, 503)]
+  const picked = fairRedeliveries(rows)
+  assert.equal(picked.length, 25)
+  assert.ok(picked.some(row => row.guid === 'business'))
 })

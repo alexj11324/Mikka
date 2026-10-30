@@ -71,6 +71,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
+  let ciGeneration: string | undefined
+  if (run.ciContinuation) {
+    const { preflightCiClaim, retireStaleCiRun } = await import('@/lib/ci-continuation')
+    const ciStatus = await preflightCiClaim(caller.userId, run.ciContinuation)
+    if (ciStatus.kind === 'stale') {
+      const retired = await retireStaleCiRun(caller.userId, runId, run.ciContinuation, ciStatus.generation)
+      return NextResponse.json({ error: retired ? 'CI result is no longer current.' : 'CI status changed; retry.' }, { status: retired ? 409 : 503 })
+    }
+    if (ciStatus.kind === 'unavailable') return NextResponse.json({ error: 'CI status is temporarily unavailable.' }, { status: 503 })
+    ciGeneration = ciStatus.generation
+  }
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
   try { await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts) } catch (error) {
     if (!(error instanceof ImprovementError)) throw error
@@ -91,14 +102,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   let cliPolicy: Awaited<ReturnType<typeof readCliRunPolicy>>
   try { cliPolicy = await readCliRunPolicy(pool, runId, caller.userId) }
   catch { return NextResponse.json({ error: 'Agent policy unavailable.' }, { status: 409 }) }
-  const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
+  // A CI claim whose response was fenced reuses its unexpired provisional lease
+  // so any already prepared skill receipt retains its immutable lease binding.
+  const leaseExpiresAt = run.ciContinuation && run.leaseExpiresAt && run.leaseExpiresAt.getTime() > Date.now()
+    ? run.leaseExpiresAt.toISOString() : new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let factoryClaim: Record<string, unknown> = {}
+  let ciClaim: Record<string, unknown> = {}
+  let ciFenceChanged = false
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
   const beforeClaim = async (tx: import('pg').PoolClient) => {
-    if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return true
-    const { guardFactoryClaim } = await import('@/lib/factory/runtime')
-    try { factoryClaim = await guardFactoryClaim(tx,caller.userId,deviceId,runId,leaseExpiresAt); return true }
-    catch (error) { if (error instanceof FactoryError) return false; throw error }
+    if (process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1') {
+      const { guardFactoryClaim } = await import('@/lib/factory/runtime')
+      try { factoryClaim = await guardFactoryClaim(tx,caller.userId,deviceId,runId,leaseExpiresAt) }
+      catch (error) { if (error instanceof FactoryError) return false; throw error }
+    }
+    if (run.ciContinuation) {
+      const { guardCiClaim } = await import('@/lib/ci-continuation')
+      const guarded = ciGeneration ? await guardCiClaim(tx, caller.userId, deviceId, runId, run.ciContinuation, ciGeneration) : null
+      if (!guarded || Object.keys(factoryClaim).length) { ciFenceChanged = true; return false }
+      ciClaim = guarded
+    }
+    return true
   }
   const afterClaim = async (tx: import('pg').PoolClient) => {
     if (factoryClaim.preserveQuestionWorktree === true) {
@@ -112,7 +136,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   if (device.kind === 'cloud') {
     if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id, beforeClaim, afterClaim)
-    if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
+    if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: ciFenceChanged ? 503 : 409 })
   } else {
     const { prepareRunPublication, persistRunCompletion } = await import('@/lib/run-publications')
     try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
@@ -123,7 +147,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
       return NextResponse.json({ error: error.message, code: error.code }, { status: 409 })
     }
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim)
-    if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
+    if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: ciFenceChanged ? 503 : 409 })
   }
   if (device.kind !== 'cloud' && device.computerUse?.installed) {
     const current = await localComputerAuthority(pool, caller.userId, deviceId, runId)
@@ -197,9 +221,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(localComputer ? { localComputer } : {}),
     ...retry,
     ...factoryClaim,
+    ...ciClaim,
     ...skillAssignment,
     ...benchmarkAssignment,
     policy: assignmentPolicy,
-  }))
+  }), ciGeneration)
+  if (!response && run.ciContinuation) {
+    const { retryUnsentCiClaim } = await import('@/lib/ci-continuation')
+    if (await retryUnsentCiClaim(caller.userId, runId, run.ciContinuation, leaseExpiresAt)) return NextResponse.json({ error: 'CI status changed; retry.' }, { status: 503 })
+  }
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }
