@@ -17,7 +17,7 @@ export const WORKSPACE_ID = '00000000-0000-4000-8000-000000000001'
 export const DEVICE_ONLINE_WINDOW_MS = 60_000
 
 /** Run states where the daemon may still be working: not terminal. */
-const LIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
+const LIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
 
 export function newDeviceToken(): string {
   return `orv_${randomBytes(32).toString('base64url')}`

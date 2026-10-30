@@ -46,6 +46,8 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027164502_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
+    await pool.query(await readFile(new URL('../../drizzle/20261030233000_run_human_control_pause.sql', import.meta.url), 'utf8'))
+    await pool.query('ALTER TABLE agent_runs ADD COLUMN "sessionId" text')
     await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz, "createdAt" timestamptz NOT NULL DEFAULT now())')
     const scopeMigration = await readFile(new URL('../../drizzle/20261027164511_cloud_device_scope.sql', import.meta.url), 'utf8')
     await pool.query(scopeMigration); await pool.query(scopeMigration)
@@ -207,6 +209,9 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(queuedBinding.status, 'queued')
     assert.match(queuedBinding.prompt, /Use the desktop/)
     assert.equal(await claimLocalRun(pool, queued.runId, worker.deviceId, new Date(Date.now() + 30000)), 'cloud-required')
+    await store.operate(actor, bot.id, 'takeover')
+    assert.equal(await claimCloudRun(pool, actor, queued.runId, worker.deviceId, new Date(Date.now() + 30000), cloudSubscription), null, 'a queued run cannot claim while its desktop is controlled')
+    await store.operate(actor, bot.id, 'handback')
     assert.deepEqual(await claimCloudRun(pool, actor, queued.runId, worker.deviceId, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'allow' })
     const idempotent = { ...cloudInput, idempotencyKey: 'durable-tool-call-1' }
     const [first, retry] = await Promise.all([queueCloudRun(pool, actor, idempotent), queueCloudRun(pool, actor, idempotent)])
@@ -359,7 +364,12 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await assert.rejects(store.operate(bob,bot.id,'viewer'),{status:404})
     await assert.rejects(store.operate(actor, bot.id, 'viewer', 'control'), { status: 403 })
     assert.equal((await pool.query('SELECT state FROM cloud_machines WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0].state, 'running', 'denied control must not mark a working machine as failed')
+    await pool.query(`UPDATE agent_runs SET status='running',"sessionId"='same-session',"leaseExpiresAt"=now()+interval '1 hour' WHERE id=$1`, [runId])
+    const beforePause = (await pool.query('SELECT "sessionId","leaseExpiresAt" FROM agent_runs WHERE id=$1', [runId])).rows[0]
     await store.operate(actor, bot.id, 'takeover')
+    await store.operate(actor, bot.id, 'takeover')
+    const paused = (await pool.query('SELECT status,"pauseReason","resumeStatus","sessionId","leaseExpiresAt" FROM agent_runs WHERE id=$1', [runId])).rows[0]
+    assert.deepEqual(paused, { status: 'paused', pauseReason: 'human_control', resumeStatus: 'running', ...beforePause })
     const taken = epoch
     assert.equal((await store.state(actor, bot.id)).control, 'user')
     // Takeover pauses the bot: the desktop lease names the person, and the
@@ -370,6 +380,12 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.ok(held.controlUntil > Date.now() / 1000)
     assert.equal(held.computerAllowed, true, 'default allow does not override the takeover hold')
     await store.operate(actor, bot.id, 'handback')
+    await store.operate(actor, bot.id, 'handback')
+    assert.deepEqual((await pool.query('SELECT status,"pauseReason","resumeStatus","sessionId","leaseExpiresAt" FROM agent_runs WHERE id=$1', [runId])).rows[0], { status: 'running', pauseReason: null, resumeStatus: null, ...beforePause })
+    await store.operate(actor, bot.id, 'takeover')
+    await pool.query(`UPDATE agent_runs SET status='stopped',"finishedAt"=now() WHERE id=$1`, [runId])
+    await store.operate(actor, bot.id, 'handback')
+    assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'stopped', 'handback never revives a run that ended while paused')
     assert.ok(epoch > taken)
     assert.equal((syncedLeases.at(-1) as unknown as { controlledBy: string | null }).controlledBy, null)
     failSync = true

@@ -94,7 +94,7 @@ export class SubscriptionService {
   }
   async check(use: SubscriptionUse, signal?: AbortSignal) { return authorizeSubscriptionUse(use, await this.access(use, signal)) }
   async nativeRun(ownerId: string, deviceId: string, runId: string) {
-    const { rows } = await this.repository.pool.query(`select b.id,b."workspaceId",b."consumerId",b.route,b."modelId",r."agentDefinition",a.harness from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join devices d on d.id=r."deviceId" and d."ownerId"=r."userId" and d.enabled=true join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and b."ownerId"=$2 and b."consumerId"=a.id::text and d.harnesses @> jsonb_build_array(jsonb_build_object('harness',coalesce(r."agentDefinition"->>'harness',a.harness),'installed',true,'subscriptionBroker',true)) and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, [runId,ownerId,deviceId])
+    const { rows } = await this.repository.pool.query(`select b.id,b."workspaceId",b."consumerId",b.route,b."modelId",r."agentDefinition",a.harness from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join devices d on d.id=r."deviceId" and d."ownerId"=r."userId" and d.enabled=true join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and b."ownerId"=$2 and b."consumerId"=a.id::text and d.harnesses @> jsonb_build_array(jsonb_build_object('harness',coalesce(r."agentDefinition"->>'harness',a.harness),'installed',true,'subscriptionBroker',true)) and r.status in ('preparing','running','paused','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, [runId,ownerId,deviceId])
     if (!rows[0]) throw new SubscriptionRefusal('account_unavailable')
     const row=rows[0]
     if (!workerSubscriptionMatches(row.agentDefinition,row.harness,row)) throw new SubscriptionRefusal('binding_mismatch')
@@ -114,7 +114,7 @@ export class SubscriptionService {
     if(!request.body || typeof request.body!=='object' || Array.isArray(request.body) || !('model' in request.body) || typeof request.body.model!=='string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(request.body.model))throw new SubscriptionRefusal('binding_mismatch')
     let selectedModel: string | undefined = binding.modelId
     if (use.runId) {
-      const row=(await this.repository.pool.query(`SELECT r."agentDefinition" FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id WHERE r.id=$1 AND r."userId"=$2 AND r."agentId"::text=$3 AND n."bindingId"=$4 AND r.status IN ('preparing','running','waiting_input') AND r."leaseExpiresAt">now() AND r."stopRequestedAt" IS NULL`,[use.runId,use.ownerId,use.consumerId,use.bindingId])).rows[0]
+      const row=(await this.repository.pool.query(`SELECT r."agentDefinition" FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id WHERE r.id=$1 AND r."userId"=$2 AND r."agentId"::text=$3 AND n."bindingId"=$4 AND r.status IN ('preparing','running','paused','waiting_input') AND r."leaseExpiresAt">now() AND r."stopRequestedAt" IS NULL`,[use.runId,use.ownerId,use.consumerId,use.bindingId])).rows[0]
       if (!row) throw new SubscriptionRefusal('binding_mismatch')
       if (row.agentDefinition?.cliModelSelection==='auto') selectedModel=undefined
       if (row.agentDefinition?.cliModelSelection==='explicit') selectedModel=row.agentDefinition.model

@@ -1193,7 +1193,7 @@ export class RunSupervisor {
       const current = this.deps.journal.get(runId)
       assertMailboxRunAuthority({ held: this.active.get(runId) === run, state: current?.state, stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted, lease })
     }
-    const mailbox = await this.deps.prepareRunMailbox?.(assignment, run.abort.signal, checkMailbox)
+    let mailbox = await this.deps.prepareRunMailbox?.(assignment, run.abort.signal, checkMailbox)
     run.mailbox = mailbox
     // A STOP/lease transition may win the handshake's final Promise handoff.
     // Own the returned callback before refusing; never start a CLI first.
@@ -1202,6 +1202,14 @@ export class RunSupervisor {
     if (mailbox) checkMailbox()
     const toolApproval = await this.deps.prepareRunToolApproval?.(assignment, run.abort.signal, checkMailbox, worktree)
     run.toolApproval = toolApproval
+    if (mailbox && toolApproval) {
+      const original = mailbox
+      mailbox = { ...original, request: async (body, signal) => {
+        if (!await toolApproval.checkLive()) throw new Error('Run tool approval unavailable')
+        return original.request(body, signal)
+      } }
+      run.mailbox = mailbox
+    }
     // Cancellation or lease loss may win while the gate is being prepared.
     // Revoke it before refusing, and never launch a CLI with stale authority.
     if (this.stopping) { toolApproval?.revoke(); return }

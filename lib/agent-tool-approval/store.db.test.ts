@@ -152,3 +152,27 @@ test('unbound workers configure safely and only owned cloud devices receive open
  await pool.query('UPDATE devices SET "ownerId"=$2 WHERE id=$1',[device,'someone-else'])
  await assert.rejects(readCliAgentPolicy(pool,user,worker,null,guard),/agentPolicyUnavailable/)
 })
+
+
+test('human control preserves pending approval and existing lease, then expires through the existing liveness poll', async () => {
+  await pool.query(`ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "resumeStatus" text, ADD COLUMN "updatedAt" timestamptz`)
+  await pool.query(`CREATE TABLE computer_run_bindings ("runId" uuid, "botId" uuid, "ownerId" text, "workspaceId" uuid);
+    CREATE TABLE bot_desktops ("botId" uuid, "ownerId" text, "workspaceId" uuid, control text, "controlUntil" timestamptz)`)
+  const bot = randomUUID(), workspace = randomUUID()
+  await pool.query(`INSERT INTO computer_run_bindings VALUES ($1,$2,$3,$4)`, [runId,bot,actor.userId,workspace])
+  await pool.query(`INSERT INTO bot_desktops VALUES ($1,$2,$3,'user',now()+interval '5 minutes')`, [bot,actor.userId,workspace])
+  await pool.query(`UPDATE agent_runs SET status='running',"stopRequestedAt"=NULL,"leaseExpiresAt"=now()+interval '1 hour' WHERE id=$1`, [runId])
+  const revision = (await readCliRunPolicy(pool,runId,actor.userId)).revision
+  const approval = await store.propose(actor,{ ...payload('pause-boundary'),policyRevision:revision })
+  await pool.query(`UPDATE agent_runs SET status='paused',"pauseReason"='human_control',"resumeStatus"='running' WHERE id=$1`, [runId])
+  const lease = (await pool.query('SELECT "leaseExpiresAt" FROM agent_runs WHERE id=$1',[runId])).rows[0].leaseExpiresAt
+  assert.deepEqual(await store.checkState(actor,runId,revision),{live:true,paused:true})
+  assert.equal(await store.take(actor,runId,approval.id,approval.digest),'pending')
+  assert.equal((await pool.query('SELECT status FROM agent_tool_approvals WHERE id=$1',[approval.id])).rows[0].status,'pending')
+  await pool.query(`UPDATE bot_desktops SET "controlUntil"=now()-interval '1 second' WHERE "botId"=$1`, [bot])
+  assert.deepEqual(await store.checkState(actor,runId,revision),{live:true,paused:false})
+  const resumed = (await pool.query('SELECT status,"pauseReason","resumeStatus","leaseExpiresAt" FROM agent_runs WHERE id=$1',[runId])).rows[0]
+  assert.deepEqual(resumed,{status:'running',pauseReason:null,resumeStatus:null,leaseExpiresAt:lease})
+  await store.decide(actor.userId,runId,approval.id,approval.digest,'approve')
+  assert.equal(await store.take(actor,runId,approval.id,approval.digest),'allow')
+})
