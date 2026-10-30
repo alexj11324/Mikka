@@ -13,6 +13,7 @@ export interface UsageRow { id: string; name: string; threads: number; seconds: 
 export interface BotUsageRow extends UsageRow { color: string; shape: string; ownerId: string }
 export interface WorkspaceUsage {
   month: string
+  hosted?: Awaited<ReturnType<typeof import('../abuse/runtime')['hostedUsage']['status']>>
   /** Admins see every bot and member; members only their own bots (S-A). */
   scope: 'workspace' | 'own'
   totals: { threads: number; seconds: number }
@@ -49,7 +50,9 @@ export async function workspaceUsage(actorId: string, workspaceId: string, month
     return { id: ownerId, name: names.get(ownerId) ?? ownerId, threads: mine.reduce((sum, bot) => sum + bot.threads, 0), seconds: mine.reduce((sum, bot) => sum + bot.seconds, 0) }
   }).sort((a, b) => b.threads - a.threads || b.seconds - a.seconds)
   const byDay = new Map(daily.map(row => [row.date, row.threads]))
+  if (admin) await (await import('../abuse/runtime')).ensureLegacyVerification(workspaceId)
   return {
+    ...(admin ? {hosted:await (await import('../abuse/runtime')).hostedUsage.status(workspaceId)} : {}),
     month, scope: admin ? 'workspace' : 'own',
     totals: { threads: botUsage.reduce((sum, bot) => sum + bot.threads, 0), seconds: botUsage.reduce((sum, bot) => sum + bot.seconds, 0) },
     bots: botUsage, members: memberUsage,

@@ -9,6 +9,8 @@ let flag: () => Promise<boolean | string | undefined> = async () => true
 const generateText = mock.fn(async (_options: unknown) => ({ text: '{"facts": [{"kind": "tool", "subject": "Cloudflare Tunnel", "confidence": 0.7}]}', usage: { inputTokens: 100, outputTokens: 20 } }))
 const store = { memoryEnabled: mock.fn(async () => true), claimExtractionCall: mock.fn(async () => true), recordExtractionTokens: mock.fn(async () => {}), recordFacts: mock.fn(async (_userId: string, facts: unknown[]) => facts.length), usageDay: () => '2026-10-28' }
 const captured: unknown[] = []
+mock.module(new URL('../abuse/model.ts',import.meta.url).href,{namedExports:{hostedModel:async(_ws:string,_id:string,model:unknown)=>model}})
+mock.module(new URL('../execution-settings.ts',import.meta.url).href,{namedExports:{executionWorkspace:async()=> 'fixture-workspace'}})
 mock.module('ai', { namedExports: { generateText, createGateway: () => (model: string) => model } })
 mock.module('posthog-node', { namedExports: { PostHog: class { getFeatureFlag() { return flag() } capture(message: unknown) { captured.push(message) } async flush() {} } } })
 mock.module(new URL('./store.ts', import.meta.url).href, { namedExports: store })
