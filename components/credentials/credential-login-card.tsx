@@ -38,6 +38,9 @@ export function CredentialLoginCard({ prefix, origin, name, onSignedIn }: { pref
   const otp = useRef<HTMLInputElement>(null)
   const refocusPill = useRef(false)
 
+  // A new credential API (or unmount) invalidates anything still in flight for the old one.
+  useEffect(() => () => { generation.current += 1 }, [prefix])
+
   useEffect(() => {
     if (step === 'password') email.current?.focus()
     if (step === 'code') otp.current?.focus()
@@ -55,8 +58,8 @@ export function CredentialLoginCard({ prefix, origin, name, onSignedIn }: { pref
     const mine = generation.current
     setPending(true)
     const next = await request()
-    if (mine !== generation.current) return
     setPending(false)
+    if (mine !== generation.current) return
     settle(next)
   }
   function close() {
