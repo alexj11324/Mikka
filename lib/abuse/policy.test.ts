@@ -6,7 +6,13 @@ import {
   FREE_ALLOWANCE_MICRO_USD,
   gatewayCost,
 } from './policy'
-import { normalizedEmail, disposableEmail, verifyTurnstile } from './signup'
+import {
+  signupClientIP,
+  signupLimits,
+  normalizedEmail,
+  disposableEmail,
+  verifyTurnstile,
+} from './signup'
 test('fixed $1 allowance, invalid caps never mean unlimited', () => {
   assert.equal(FREE_ALLOWANCE_MICRO_USD, 1e6)
   for (const value of ['', undefined, '0', '-1', 'NaN', 'Infinity', '1.2'])
