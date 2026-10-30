@@ -77,3 +77,11 @@ test('runtime separates the desktop shell and still drops other client details',
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: { runtime: 'electron', isDesktop: true, userAgent: 'private', platform: 'Mozilla/5.0' } })
   assert.deepEqual(event.properties, { runtime: 'electron' })
 })
+
+test('smoke accounts are recognised only by their +mikka-smoke tag, and the tag survives sanitizing', async () => {
+  const { isSmokeAccountEmail } = await import('../lib/smoke-account.ts')
+  for (const email of ['alex+mikka-smoke@gmail.com', 'alex+mikka-smoke-owner@gmail.com', 'ALEX+MIKKA-SMOKE-PEER@example.com']) assert.equal(isSmokeAccountEmail(email), true, email)
+  for (const email of ['alex@gmail.com', 'alex+mikka-smoker@gmail.com', 'mikka-smoke@gmail.com', 'alex+other+mikka-smoke@@gmail.com', '', null, undefined]) assert.equal(isSmokeAccountEmail(email), false, String(email))
+  const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: { distinct_id: 'opaque-user-id', test_account: true } })
+  assert.deepEqual(event.properties, { distinct_id: 'opaque-user-id', test_account: true })
+})
