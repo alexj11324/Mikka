@@ -56,7 +56,12 @@ test('dispatch failure, status and exactly-once re-dispatch on a real database',
     assert.equal(await record(running.runId), null, 'a claimed run is not a dispatch failure');
 
     // GET is strictly read-only (BE-16): reasonCode computed live, table unchanged.
-    const snapshot = async () => (await pool.query(`SELECT id,kind,"dedupeKey","deliveredAt" FROM coordinator_events ORDER BY id`)).rows;
+    // Full-row hash of every table the status read could plausibly touch: coordinator_events, agent_runs, devices and all factory_* tables.
+    const { rows: watched } = await pool.query(`SELECT table_name AS t FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'
+      AND (table_name IN ('coordinator_events','agent_runs','devices') OR table_name LIKE 'factory\\_%') ORDER BY 1`);
+    assert.ok(watched.length >= 5 && ['agent_runs', 'devices', 'coordinator_events', 'factory_tasks', 'factory_attempts'].every(t => watched.some(w => w.t === t)), 'snapshot covers the expected tables');
+    const snapshot = async () => Object.fromEntries(await Promise.all(watched.map(async ({ t }) =>
+      [t, (await pool.query(`SELECT count(*)::int AS n, md5(coalesce(string_agg(x::text, '|' ORDER BY x::text), '')) AS h FROM "${t}" x`)).rows[0]])));
     const before = await snapshot();
     assert.equal(await recovery.status('other', a.taskId), null, 'other owner sees nothing');
     const first = await recovery.status('owner', b.taskId);
