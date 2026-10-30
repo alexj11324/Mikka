@@ -48,8 +48,7 @@ export type AuditAction = keyof typeof AUDIT_ACTIONS
 
 // Per-action metadata allowlist. Every key an action may store is listed here
 // (and nothing else is accepted), so UI ICU templates can use them as named
-// params. Values are flat scalars. Key names must stay clear of the secret-key
-// rules below (no *key suffix, no token/secret/auth wording); a unit test checks.
+// params. Values are flat scalars.
 const label = z.string().trim().min(1).max(120)
 const role = z.enum(['owner', 'admin', 'member', 'guest'])
 const access = z.enum(['allow', 'ask', 'deny', 'read', 'write', 'none'])
@@ -85,16 +84,6 @@ export const AUDIT_METADATA = {
   'billing.auto_recharge_changed': z.object({ enabled: z.boolean(), thresholdCents: cents.nullable(), amountCents: cents.nullable() }).partial().strict(),
   'billing.limits_changed': z.object({ fromCents: cents.nullable(), toCents: cents.nullable() }).partial().strict(),
 } as const satisfies Record<AuditAction, z.ZodType>
-
-/**
- * Keys that contain a strong secret word (see STRONG_KEY_PARTS) are rejected
- * everywhere, whatever their suffix. An action that genuinely needs such a key
- * names it here AND in its zod schema above; the exemption applies only to that
- * action's top-level metadata keys.
- */
-export const AUDIT_SECRET_KEY_EXEMPT: Partial<Record<AuditAction, readonly string[]>> = {
-  'token.created': ['tokenName'],
-}
 
 /** Allowlisted metadata for one action (named params for that action's ICU template). */
 export type AuditMetadata<A extends AuditAction> = z.infer<(typeof AUDIT_METADATA)[A]>
@@ -144,44 +133,6 @@ export class AuditEventError extends Error {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-// The per-action allowlist (AUDIT_METADATA) is the real gate; this blacklist is a
-// backstop for keys that could carry a secret. Keys are split into words
-// (camelCase / separators) and also normalised (lowercased, separators removed).
-// - Allowed first: names ending in Name/Id/Label/Count/Prefix/Changed/Enabled
-//   describe a secret, they do not hold one (secretName, tokenId, otpEnabled).
-// - Blocked: exact value/plaintext/cardnumber/cvc/cvv; substrings token, secret,
-//   passw, pwd, apikey, credential, jwt, bearer, cookie, connectionstring,
-//   privatekey, accesskey; whole words otp and dsn; a trailing `key` word except
-//   benign ones (idempotencyKey, primaryKey, …); authorization / auth header-style
-//   names. oauth, author, footprint and pan pass.
-const SAFE_KEY_SUFFIXES = ['name', 'id', 'label', 'count', 'prefix', 'changed', 'enabled']
-const FORBIDDEN_KEY_EXACT = new Set(['value', 'plaintext', 'cardnumber', 'cvc', 'cvv'])
-const FORBIDDEN_KEY_PARTS = ['token', 'secret', 'passw', 'pwd', 'apikey', 'credential', 'jwt', 'bearer', 'cookie', 'connectionstring', 'privatekey', 'accesskey']
-const STRONG_KEY_PARTS = ['token', 'secret', 'passw', 'privatekey', 'apikey']
-const FORBIDDEN_KEY_WORDS = new Set(['otp', 'dsn'])
-const BENIGN_KEY_SUFFIXED = new Set(['idempotencykey', 'primarykey', 'foreignkey', 'sortkey', 'cachekey', 'partitionkey', 'lookupkey', 'groupkey'])
-const FORBIDDEN_AUTH = /authoriz|^(?:x|basic|proxy|http)?auth(?:header|code|z)?$/
-
-export const normaliseAuditKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '')
-const keyWords = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
-
-/** True when a metadata key name could carry a secret. */
-export function isSecretBearingKey(key: string): boolean {
-  const k = normaliseAuditKey(key)
-  if (!k) return false
-  const words = keyWords(key)
-  // Strong words win over any safe suffix: tokenValueName, apiKeyPrefix, secretKeyId…
-  if (STRONG_KEY_PARTS.some(part => k.includes(part))) return true
-  if (words.length > 1 && SAFE_KEY_SUFFIXES.includes(words.at(-1)!)) return false
-  if (FORBIDDEN_KEY_EXACT.has(k)) return true
-  if (FORBIDDEN_KEY_PARTS.some(part => k.includes(part))) return true
-  if (words.some(word => FORBIDDEN_KEY_WORDS.has(word))) return true
-  // `key` / `keys` must be its own word (signingKey, signing_key, SIGNING_KEYS); monkey/monkeys/hockey pass.
-  if (['key', 'keys'].includes(k.toLowerCase())) return true
-  if (words.length > 1 && ['key', 'keys'].includes(words.at(-1)!) && !BENIGN_KEY_SUFFIXED.has(k)) return true
-  return FORBIDDEN_AUTH.test(k)
-}
-
 // Credential shapes, matched anywhere in a string (e.g. "token=sk_live_…").
 const NOT_WORD = '(?<![A-Za-z0-9])'
 const SECRET_VALUE_PATTERNS: RegExp[] = [
@@ -228,16 +179,6 @@ const clip = (value: string | null | undefined, max: number) => {
   return text ? [...text].slice(0, max).join('') : null
 }
 
-function assertNoSecrets(value: unknown, path: string, exempt: readonly string[] = []) {
-  if (typeof value === 'string') { if (looksLikeSecretValue(value)) throw new AuditEventError(`audit metadata must not contain a secret-bearing value at ${path}`); return }
-  if (Array.isArray(value)) { value.forEach((item, i) => assertNoSecrets(item, `${path}[${i}]`)); return }
-  if (value && typeof value === 'object') {
-    for (const [key, inner] of Object.entries(value)) {
-      if (!exempt.includes(key) && isSecretBearingKey(key)) throw new AuditEventError(`audit metadata must not contain secret-bearing key ${path}.${key}`)
-      assertNoSecrets(inner, `${path}.${key}`)
-    }
-  }
-}
 
 /** Validates an event and turns it into the exact row to insert. Throws AuditEventError. */
 export function toAuditRow(event: AuditEvent): AuditRow {
@@ -254,10 +195,12 @@ export function toAuditRow(event: AuditEvent): AuditRow {
   if (target && !targetType) throw new AuditEventError('audit target type is required')
   const metadata = event.metadata ?? {}
   if (typeof metadata !== 'object' || Array.isArray(metadata)) throw new AuditEventError('audit metadata must be an object')
-  assertNoSecrets(metadata, 'metadata', AUDIT_SECRET_KEY_EXEMPT[event.action])
   if (Buffer.byteLength(JSON.stringify(metadata)) > MAX_METADATA_BYTES) throw new AuditEventError('audit metadata is too large')
+  // The per-action .strict() schema is the gate: only listed keys, flat scalars.
   const allowed = AUDIT_METADATA[event.action].safeParse(metadata)
   if (!allowed.success) throw new AuditEventError(`audit metadata does not match the allowlist for ${event.action}: ${allowed.error.issues.map(issue => issue.code === 'unrecognized_keys' ? `unexpected ${issue.keys.join(',')}` : `${issue.path.join('.')} ${issue.code}`).join('; ')}`)
+  for (const [key, value] of Object.entries(allowed.data as Record<string, unknown>))
+    if (typeof value === 'string' && looksLikeSecretValue(value)) throw new AuditEventError(`audit metadata must not contain a secret-bearing value at metadata.${key}`)
   const ip = clip(event.ip, 64)
   return {
     workspaceId: event.workspaceId.toLowerCase(),
