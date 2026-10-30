@@ -1966,7 +1966,10 @@
       "stopSharing": "Stop sharing",
       "stopping": "Stopping…",
       "links": "{count} links",
-      "linksLoading": "Reading shared links…"
+      "linksLoading": "Reading shared links…",
+      "exportReady": "Email isn’t available, so your export is ready to download here (valid for {hours, plural, one {# hour} other {# hours}}).",
+      "exportDownload": "Download export",
+      "manageNone": "You have no shared links right now"
     },
     "activity": {
       "filtersLabel": "Filter activity",

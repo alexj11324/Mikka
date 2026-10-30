@@ -1966,7 +1966,10 @@
       "stopSharing": "停止分享",
       "stopping": "正在停止…",
       "links": "{count} 个链接",
-      "linksLoading": "正在读取共享链接…"
+      "linksLoading": "正在读取共享链接…",
+      "exportReady": "邮件服务暂不可用，导出文件已准备好，可以直接下载（{hours} 小时内有效）。",
+      "exportDownload": "下载导出文件",
+      "manageNone": "目前没有共享中的链接"
     },
     "activity": {
       "filtersLabel": "筛选活动",

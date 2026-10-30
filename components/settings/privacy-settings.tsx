@@ -18,6 +18,7 @@ export function PrivacySettings() {
   const [exporting, setExporting] = useState(false)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [downloadPath, setDownloadPath] = useState<string | null>(null)
   const [managing, setManaging] = useState(false)
   const [stopping, setStopping] = useState<string | null>(null)
   const [stopError, setStopError] = useState<string | null>(null)
@@ -29,6 +30,7 @@ export function PrivacySettings() {
     setExporting(true)
     setExportMessage(null)
     setExportError(null)
+    setDownloadPath(null)
     try {
       const result = await requestDataExport()
       if (result.error === 'dataExportRateLimited') {
@@ -36,6 +38,11 @@ export function PrivacySettings() {
         return
       }
       if (result.error) { setExportError(actionError(result.error)); return }
+      if (result.downloadPath) {
+        setDownloadPath(result.downloadPath)
+        setExportMessage(t('exportReady', { hours: Math.max(1, Math.round((Date.parse(result.expiresAt) - Date.now()) / 3_600_000)) }))
+        return
+      }
       setExportMessage(t('exportSent', { email: result.email }))
     } catch {
       setExportError(actionError())
@@ -63,13 +70,18 @@ export function PrivacySettings() {
       <SettingRow title={t('export')} description={t('exportDescription')}>
         <Button type="button" variant="secondary" size="sm" disabled={exporting} onClick={() => { void exportData() }}>{exporting ? t('exporting') : t('exportButton')}</Button>
       </SettingRow>
-      {exportMessage && <p role="status" className="px-5 pb-3 text-sm text-muted-foreground">{exportMessage}</p>}
+      {exportMessage && <p role="status" className="px-5 pb-3 text-sm text-muted-foreground">
+        {exportMessage}
+        {downloadPath && <> <a href={downloadPath} download className="font-medium text-foreground underline underline-offset-4">{t('exportDownload')}</a></>}
+      </p>}
       {exportError && <p role="alert" className="px-5 pb-3 text-sm text-destructive">{exportError}</p>}
     </SettingsSection>
 
     <SettingsSection id="shared-heading" title={t('sharing')}>
       <SettingRow title={t('sharedLinks')} description={total > 0 ? t('sharedLinksCount', { count: total }) : t('sharedLinksNone')}>
-        <Button type="button" variant="secondary" size="sm" disabled={total === 0} onClick={() => setManaging(true)}>{t('manage')}</Button>
+        <span title={total === 0 ? t('manageNone') : undefined}>
+          <Button type="button" variant="secondary" size="sm" disabled={total === 0 || links.isLoading} onClick={() => setManaging(true)}>{t('manage')}</Button>
+        </span>
       </SettingRow>
     </SettingsSection>
 

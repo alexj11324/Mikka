@@ -162,24 +162,28 @@ export async function revokeOtherSessions(): Promise<ActionResult<{ revoked: num
  * JSON. The link works for 24 hours and only while signed in as them. One
  * request per hour. Says it was sent only once the email provider accepted it.
  */
-export async function requestDataExport(): Promise<ActionResult<{ email: string; expiresAt: string }>> {
+export async function requestDataExport(): Promise<ActionResult<{ email: string; expiresAt: string; downloadPath?: string }>> {
   return runAction(async () => {
     const { user } = await requireSession()
-    if (!accountMailConfigured() || !appOrigin) throw new ActionFailureError('emailUnavailable')
     const reservation = await reserveExport(user.id)
     if (!reservation.ok) throw new ActionFailureError('dataExportRateLimited', { minutes: reservation.retryAfterMinutes })
-    const url = `${appOrigin}${withBasePath(`/api/account/export/${reservation.token}`)}`
+    const path = withBasePath(`/api/account/export/${reservation.token}`)
+    const expiresAt = reservation.expiresAt.toISOString()
+    // Without mail the link is handed straight to this signed-in page; the
+    // download route still only opens for this account and until it expires.
+    if (!accountMailConfigured() || !appOrigin) return { email: user.email, expiresAt, downloadPath: path }
     const t = await getTranslations('AccountEmail')
     const outcome = await sendAccountMail({
       to: user.email,
       subject: t('exportSubject'),
-      text: t('exportBody', { url, email: user.email, hours: EXPORT_LINK_TTL_MS / 3_600_000 }),
+      text: t('exportBody', { url: `${appOrigin}${path}`, email: user.email, hours: EXPORT_LINK_TTL_MS / 3_600_000 }),
     })
+    if (outcome === 'unavailable') return { email: user.email, expiresAt, downloadPath: path }
     if (outcome !== 'sent') {
       await releaseExport(user.id, reservation.id)
-      throw new ActionFailureError(outcome === 'unavailable' ? 'emailUnavailable' : 'emailDeliveryFailed')
+      throw new ActionFailureError('emailDeliveryFailed')
     }
-    return { email: user.email, expiresAt: reservation.expiresAt.toISOString() }
+    return { email: user.email, expiresAt }
   })
 }
 

@@ -141,7 +141,7 @@ test('devices: listed for the session\'s user; another device signs out by id, t
   assert.equal(calls.revokeOtherSessions.mock.callCount(), 1)
 })
 
-test('data export: emailed to the account\'s address, never claimed as sent when it was not, once an hour', async () => {
+test('data export: emailed to the account\'s address, offered as a download when mail is off, once an hour', async () => {
   const sent = await account.requestDataExport()
   assert.deepEqual(sent, { email: 'Alice@Example.com', expiresAt: '2026-10-30T00:00:00.000Z' })
   assert.equal(calls.reserveExport.mock.calls[0].arguments[0], 'alice')
@@ -150,14 +150,16 @@ test('data export: emailed to the account\'s address, never claimed as sent when
   assert.match(message.text, /https:\/\/app\.example\.com\/api\/account\/export\/mkx_token/)
 
   mailConfigured = false
-  assert.equal((await account.requestDataExport()).error, 'emailUnavailable')
+  const sendsBefore = calls.sendMail.mock.callCount()
+  assert.deepEqual(await account.requestDataExport(), { email: 'Alice@Example.com', expiresAt: '2026-10-30T00:00:00.000Z', downloadPath: '/api/account/export/mkx_token' })
+  assert.equal(calls.sendMail.mock.callCount(), sendsBefore)
   mailConfigured = true
 
   mailOutcome = 'failed'
   assert.equal((await account.requestDataExport()).error, 'emailDeliveryFailed')
   assert.deepEqual(calls.releaseExport.mock.calls.at(-1)?.arguments, ['alice', 'r1'])
   mailOutcome = 'unavailable'
-  assert.equal((await account.requestDataExport()).error, 'emailUnavailable')
+  assert.equal((await account.requestDataExport()).downloadPath, '/api/account/export/mkx_token')
 
   reservation = { ok: false, retryAfterMinutes: 42 }
   assert.deepEqual(await account.requestDataExport(), { error: 'dataExportRateLimited', params: { minutes: 42 } })
