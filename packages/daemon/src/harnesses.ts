@@ -5,6 +5,7 @@ import { execa } from "execa"
 
 import { buildChildEnv } from "./env"
 import { daemonTestMode } from "@mikka/protocol/repository"
+import { detectHarnessModels } from "./harness-models"
 import { DAEMON_VERSION } from "./paths"
 
 /** Candidate binaries per harness, tried in order. */
@@ -35,7 +36,10 @@ export async function detectHarnesses(): Promise<HarnessInfo[]> {
       async (harness): Promise<HarnessInfo> => {
         for (const binary of HARNESS_BINARIES[harness]) {
           const version = await versionOf(binary)
-          if (version) return { harness, installed: true, version }
+          if (version) {
+            const models = await detectHarnessModels(harness,binary)
+            return { harness, installed: true, version, ...(models?.length ? {models} : {}) }
+          }
         }
         return { harness, installed: false, version: null }
       }

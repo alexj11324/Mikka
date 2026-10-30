@@ -140,17 +140,20 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       }),
     } : {}),
     dispatch_run: tool({
-      description: 'Queue a thread for an issue on the selected computer. Its daemon clones the repository into its own cache and runs the selected coding harness. Returns the run id at once; an [Event] message arrives when the run ends.',
+      description: 'Queue a thread for an issue using the saved label execution rules. The rules select the place, coding harness and model. Returns the run id and queued or waiting-device state; an [Event] message arrives when the run ends.',
       inputSchema: z.object({
-        issueId: id, agentId: id,
+        issueId: id, agentId: id.optional(),
         repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
       }),
-      execute: input => options.taskEventId
-        ? options.approvedRepositoryKey
-          ? steps.dispatchRun(userId, input, scope, botId, execution ?? undefined, options.taskEventId, options.approvedRepositoryKey)
-          : steps.dispatchRun(userId, input, scope, botId, execution ?? undefined, options.taskEventId)
-        : steps.dispatchRun(userId, input, scope, botId, execution ?? undefined),
+      execute: (input,call) => {
+        const request={...input,requestKey:`dispatch:${call.toolCallId}`}
+        return options.taskEventId
+          ? options.approvedRepositoryKey
+            ? steps.dispatchRun(userId, request, scope, botId, execution ?? undefined, options.taskEventId, options.approvedRepositoryKey)
+            : steps.dispatchRun(userId, request, scope, botId, execution ?? undefined, options.taskEventId)
+          : steps.dispatchRun(userId, request, scope, botId, execution ?? undefined)
+      },
     }),
     list_runs: tool({
       description: 'List recent runs, newest first, optionally for one issue or only those still going.',

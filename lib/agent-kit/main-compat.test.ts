@@ -73,11 +73,17 @@ beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;clou
 const request=()=>claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+randomUUID()+'/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1'}}),{params:Promise.resolve({deviceId,runId:randomUUID()})})
 const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.equal(body.policy.permissions.git_push,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}
 test('local claim uses frozen harness and exact subscription despite Agent edits',async()=>{
+ definition={...frozen(),model:'frozen-model',cliModelSelection:'explicit'}
  const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.equal(body.remoteUrl,'https://github.com/example/repo.git');assert.equal(body.baseBranch,undefined);assert.deepEqual(bindingById.mock.calls[0].arguments,[owner,binding.id]);assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1);assert.equal(typeof (claimed.mock.calls[0].arguments as unknown[])[5],'function','Factory lineage guard remains attached')
  assert.equal(prepared.mock.callCount(),1)
  const [run,remoteUrl]=prepared.mock.calls[0].arguments
  assert.equal(run.userId,owner);assert.equal(run.issueId,issueId);assert.equal(run.baseBranch,null);assert.equal(remoteUrl,'https://github.com/example/repo.git')
  assert.equal(body.pushBranch,publicationAssignment.pushBranch);assertCliPolicy(body);assert.equal(completed.mock.callCount(),0)
+})
+test('auto model is omitted from a subscription assignment; historical snapshots retain their saved binding model',async()=>{
+ let response=await request();assert.equal(response.status,200);assert.equal(Object.hasOwn(await response.json(),'model'),false)
+ definition=frozen();delete definition.cliModelSelection;selectIndex=0
+ response=await request();assert.equal(response.status,200);assert.equal((await response.json()).model,'frozen-model')
 })
 test('an old local daemon gets an upgrade response without consuming the queued run',async()=>{
  protocolVersion=2;const response=await request();assert.equal(response.status,409);assert.equal((await response.json()).code,'daemonUpgradeRequired');assert.equal(selectIndex,0);assert.equal(claimed.mock.callCount(),0)

@@ -6,6 +6,7 @@ import { resolveAgentExecutionModel } from './agent-execution-model'
 import type { SubscriptionService } from './subscription-service'
 
 export const hostedSubscriptionSnapshotSchema = z.strictObject({
+  coordinator: z.literal(true).optional(),
   type: z.literal('subscription'), bindingId: z.uuid(), ownerId: z.string().min(1),
   consumerId: z.uuid(), workspaceId: z.uuid(), connectionId: z.uuid(),
   connectionRevision: z.number().int().positive(), modelId: z.string().min(1).max(128),
@@ -27,17 +28,18 @@ function cancelled(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Model resolution cancelled', 'AbortError')
 }
 function checkScope(scope: HostedModelScope, value: HostedSubscriptionSnapshot) {
-  if (scope.ownerId !== value.ownerId || scope.botId !== value.consumerId || scope.workspaceId !== value.workspaceId) throw refuse()
+  if (scope.ownerId !== value.ownerId || (scope.botId === null ? value.coordinator !== true : scope.botId !== value.consumerId || value.coordinator === true) || scope.workspaceId !== value.workspaceId) throw refuse()
 }
 /** Called only inside first execution reservation, never before replay lookup. */
 export async function freezeHostedModelSelection(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, selection: unknown, dependencies: HostedModelDependencies): Promise<HostedRuntimeSnapshot> {
   if (selection === undefined) return { harness: runtime.harness, model: runtime.model }
-  if (runtime.harness !== 'ai_sdk' || !scope.botId || !scope.workspaceId) throw refuse()
+  if (runtime.harness !== 'ai_sdk' || !scope.workspaceId) throw refuse()
   const requested = agentModelSourceSchema.safeParse(selection)
   if (!requested.success) throw refuse()
   const service = dependencies.service()
   const binding = await service.repository.binding(scope.ownerId, requested.data.bindingId)
   const value = hostedSubscriptionSnapshotSchema.parse({
+    ...(scope.botId === null ? {coordinator:true} : {}),
     type: 'subscription', bindingId: binding.id, ownerId: binding.ownerId,
     consumerId: binding.consumerId, workspaceId: binding.workspaceId,
     connectionId: binding.connectionId, connectionRevision: binding.connectionRevision,

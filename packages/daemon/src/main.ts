@@ -60,6 +60,7 @@ import {
 } from "./errors"
 import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
 import { restartService } from "./service"
+import { detectDeviceType } from "./device-type"
 import { detectHarnesses } from "./harnesses"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
@@ -212,6 +213,7 @@ export class Daemon {
   private refusedRuns = new Set<string>()
   private quota: QuotaPoller | null = null
   /** Ends the commands long-poll when the daemon stops. */
+  private redetectedAt: string | undefined
   private commandsAbort = new AbortController()
   private commandsLoop: Promise<void> = Promise.resolve()
   private fsLoop: Promise<void> = Promise.resolve()
@@ -647,6 +649,21 @@ export class Daemon {
   private async applyCommands(commands: RunCommand[]): Promise<boolean> {
     let acted = false
     for (const command of commands) {
+      if (command.kind === "redetect") {
+        if (!this.options.hostedSubscriptions) {
+          const detected = await detectHarnesses()
+          const localIsolation = this.ownedSandbox !== null && this.sandbox === this.ownedSandbox
+          const runApprovalTransport = typeof this.options.link.prepareRunToolApproval === 'function'
+          this.harnesses = detected.filter(info=>this.adapters.has(info.harness)).map(info=>({
+            ...info, coordinator:coordinatorCapable(info),
+            toolApproval: runApprovalTransport && localIsolation && (info.harness === 'claude_code' || (info.harness === 'codex' && /(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(info.version ?? ''))) ? true as const : undefined,
+          }))
+          this.redetectedAt = command.requestedAt
+          await this.syncWithServer()
+          acted = true
+        }
+        continue
+      }
       const entry = this.journal.get(command.runId)
       // Not a run of this daemon (yet), or one that already ended.
       if (!entry) continue
@@ -826,6 +843,7 @@ export class Daemon {
     const { deviceId } = await this.options.link.registerDevice(
       credential,
       {
+        deviceType: await detectDeviceType(),
         name: hostname(),
         hostname: hostname(),
         platform: platform(),
@@ -834,6 +852,7 @@ export class Daemon {
         protocolVersion: DAEMON_PROTOCOL_VERSION,
         deviceType: process.env.MIKKA_DEVICE_TYPE === "server" ? "server" : "laptop",
         harnesses: this.harnesses,
+        ...(this.redetectedAt ? {redetectedAt:this.redetectedAt} : {}),
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
         ...(this.device.workspaceId
           ? { workspaceId: this.device.workspaceId }
@@ -888,6 +907,7 @@ export class Daemon {
         completedDeviceCommands: this.device.completedDeviceCommands,
         failedDeviceCommands: this.device.failedDeviceCommands,
         harnesses: this.harnesses,
+        ...(this.redetectedAt ? {redetectedAt:this.redetectedAt} : {}),
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
         runs: this.supervisor.heartbeatRuns(),
         worktreeDiskBytes: await this.worktrees.diskUsage(),

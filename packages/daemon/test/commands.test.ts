@@ -11,14 +11,16 @@ import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
 const DEVICE = "device-1"
 const daemons: Daemon[] = []
 
-async function setup() {
+async function setup(configure?:(link:ReturnType<MemoryServer["link"]>)=>void) {
   const repo = await makeRepo()
   const server = new MemoryServer(DEVICE)
   server.addRepo(DEVICE, { repoId: "repo-1", name: "sandbox", path: repo })
+  const link=server.link()
+  configure?.(link)
   const daemon = await new Daemon({
     dataDir: tempDir(),
     flavor: "dev",
-    link: server.link(),
+    link,
     credential: "cred-1",
     harnesses: [{ harness: "mock", installed: true, version: "test" }],
     mockSpeed: 2,
@@ -50,6 +52,24 @@ function text(chunks: RunChunk[]) {
 afterEach(async () => {
   for (const daemon of daemons.splice(0)) await daemon.stop()
   cleanupTempDirs()
+})
+
+it("redetect refreshes harnesses and acknowledges the request in a heartbeat", async()=>{
+  const requestedAt=new Date().toISOString()
+  let pending=true
+  const reports: {redetectedAt?:string;harnesses:{version:string|null}[]}[]=[]
+  await setup(link=>{
+    const fetch=link.fetchCommands.bind(link)
+    link.fetchCommands=async(...args)=>{
+      if (pending) {pending=false;return [{kind:'redetect',requestedAt}]}
+      return fetch(...args)
+    }
+    const heartbeat=link.heartbeat.bind(link)
+    link.heartbeat=async(deviceId,status)=>{reports.push(status);return heartbeat(deviceId,status)}
+  })
+  await waitFor(()=>reports.some(report=>report.redetectedAt===requestedAt))
+  const refreshed=reports.find(report=>report.redetectedAt===requestedAt)!
+  expect(refreshed.harnesses.every(info=>info.version!=='test')).toBe(true)
 })
 
 describe("run commands", () => {

@@ -10,6 +10,7 @@ import { SubscriptionRepository } from '@/lib/subscription-repository'
 import { agents, agentRuns, bots, deviceRepos, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
+import { isDeviceOnline } from '@mikka/protocol/device'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { workspaceRunView } from '@/lib/run-visibility'
@@ -28,6 +29,7 @@ import { runBotName } from '@/lib/run-bot-name'
 
 export interface RunView {
   id: string
+  waitFor?: string
   issueId: string | null
   agentId: string
   agentName: string
@@ -61,7 +63,7 @@ export const runViewColumns = {
  * `note` is extra direction for this run only, after the issue.
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
-type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string }
+type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string }
 export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string) {
   return queueAdmittedRun(userId, input, botId, execution, requestEventId, source, approvedRepositoryKey)
 }
@@ -110,7 +112,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string,
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
   const executor = internal?.executor ?? db
-  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional() }).safeParse(input)
+  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   let requestedRepositoryKey: string
   try { requestedRepositoryKey = normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }).key } catch { throw new ActionFailureError('repoPathInvalid') }
@@ -136,7 +138,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
     mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, mailboxEnabled, mailboxScope })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope })
     : null
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
     deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
@@ -149,15 +151,15 @@ export async function visibleRuns(userId: string, input: { issueId?: string; run
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
   const visibility = await issueVisibility(userId)
   const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
-  const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId }).from(agentRuns)
-    .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
+  const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt }).from(agentRuns)
+    .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
       or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), visibility.predicate)), and(visibility.predicate, shared)),
       input.issueId ? eq(agentRuns.issueId, input.issueId) : undefined,
       input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
       input.activeOnly ? inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]) : undefined,
     )).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
-  return rows.map(({ ownerId, ...run }) => ownerId === userId ? run : workspaceRunView(run))
+  return rows.map(({ ownerId,waitDeviceId,lastSeenAt, ...run }) => ownerId === userId ? {...run,...(run.status==='queued' && waitDeviceId && !isDeviceOnline(lastSeenAt) ? {waitFor:waitDeviceId} : {})} : workspaceRunView(run))
 }
 
 export async function readRun(userId: string, runId: string): Promise<RunDetail | null> {

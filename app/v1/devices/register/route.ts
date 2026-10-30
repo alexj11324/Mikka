@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     hostname: info.hostname ?? null, platform: info.platform, arch: info.arch,
     daemonVersion: info.daemonVersion, protocolVersion: info.protocolVersion,
     computerUse: info.computerUse ?? { installed: false, version: null },
-    harnesses: info.harnesses, lastSeenAt: now, updatedAt: now,
+    ...(info.deviceType ? { deviceType: info.deviceType } : {}), harnesses: info.harnesses, lastSeenAt: now, updatedAt: now,
   }
   if (info.deviceId && await linkDeviceToken(caller, info.deviceId)) {
     // A name the person chose in settings outlives the daemon's hostname.

@@ -6,7 +6,7 @@ import { daemonTestMode } from '@mikka/protocol/repository'
 
 export function localExecutionHarnesses(infos: readonly HarnessInfo[], env: Record<string, string | undefined> = process.env): string[] {
   return [...new Set(infos.filter(info => info.installed &&
-    (info.harness === 'claude_code' || info.harness === 'codex' || (info.harness === 'mock' && daemonTestMode(env))))
+    (info.harness === 'claude_code' || info.harness === 'codex' || info.harness === 'cursor' || (info.harness === 'mock' && daemonTestMode(env))))
     .map(info => info.harness))].sort()
 }
 

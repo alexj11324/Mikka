@@ -270,10 +270,25 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
 }
 
 /** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => ({ ...(await queueRun(userId, input, botId, execution, requestEventId, null, approvedRepositoryKey)), status: 'queued' }))
+  return asToolResult(async () => {
+    const target = await (await import('@/lib/rule-dispatch')).resolveIssueExecution(userId,botId,input.issueId)
+    if (target.place === 'cloud') {
+      if (requestEventId) {
+        const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
+        if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
+      }
+      if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
+      const runtime=(await pool.query(`SELECT "botId",harness FROM bot_cloud_runtimes WHERE ($1::uuid IS NULL OR "botId"=$1) AND "ownerId"=$2 AND "workspaceId"=$3 AND ($4='auto' OR harness=$4) ORDER BY harness,"botId" LIMIT 1`,[botId,userId,target.workspaceId,target.harness])).rows[0]
+      if (!runtime) throw new Error('cloudComputerUnavailable')
+      return dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,reportToCoordinator:botId===null},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution)
+    }
+    if (!('agentId' in target)) throw new Error('agentNoDevice')
+    const result=await queueRun(userId,{...input,agentId:target.agentId,model:target.model,pinnedDeviceId:target.pinnedDeviceId},botId,execution,requestEventId,null,approvedRepositoryKey)
+    return {...result,status:target.waitFor ? 'waiting_device' : 'queued',...(target.waitFor ? {waitFor:target.waitFor} : {})}
+  })
 }
 
 /** Only the person's own Bots in workspaces they still belong to are listed. */
@@ -318,12 +333,13 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
-export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; suggestionId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
+export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model?:string; repo?:string; reportToCoordinator?:boolean; suggestionId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
-  const target = (await pool.query(`SELECT b."workspaceId",r."agentId",r."repoId" FROM bots b
+  const target = (await pool.query(`SELECT b."workspaceId",r."agentId",r."repoId",a."deviceId" FROM bots b
     JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
+    JOIN agents a ON a.id=r."agentId" AND a."userId"=b."ownerId"
     WHERE b.id=$1 AND b."ownerId"=$2 AND r.harness=$3`, [input.botId, userId, input.harness])).rows[0]
   if (!target) return { error: 'cloudComputerUnavailable' }
   try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, target.workspaceId) } catch { return { error: 'cloudComputerUnavailable' } }
@@ -331,7 +347,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   if (!issue) return { error: 'issueNotFound' }
   try {
     if (input.suggestionId && !(await pool.query('SELECT 1 FROM suggestion_executions WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("botId" IS NULL OR "botId"=$4)', [input.suggestionId, userId, target.workspaceId, input.botId])).rowCount) return { error: 'suggestionUnavailable' }
-    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution })
+    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.model, reportToCoordinator:input.reportToCoordinator, ...(input.repo ? {deviceRepoId:(await (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo)).id} : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution })
     if (input.suggestionId) await pool.query('UPDATE suggestion_executions SET "botId"=$4,"runId"=$5,status=\'running\' WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("runId" IS NULL OR "runId"=$5)', [input.suggestionId, userId, target.workspaceId, input.botId, result.runId])
     if (process.env.MIKKA_CLOUD_THREAD_MACHINES === '1') {
       const actor = { userId, workspaceId: target.workspaceId as string }

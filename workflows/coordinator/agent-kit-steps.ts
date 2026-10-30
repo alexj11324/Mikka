@@ -1,4 +1,4 @@
-import { freezeHostedModelSelection } from '@/lib/subscription-model-snapshot'
+import { freezeBotModel } from '@/lib/bot-model-selection'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
 import type { CoordinatorRuntime } from '@mikka/protocol/coordinator'
 import { agentKitEnabled, agentKitStore, agentScope, agentKitDefaults } from '@/lib/agent-kit/service'
@@ -8,9 +8,6 @@ import type { FailureCode } from '@/lib/agent-kit/improvement'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { personalCoordinatorInstructions } from '@/lib/coordinator/native-prompt'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
-import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
-import { personalWritesEnabled } from '@/lib/operations/write-feature'
-import { runtimeForWritePlanning } from '@/lib/operations/write-planning-model'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 
 export async function beginAgentExecution(userId: string, botId: string | null, holder: string, round: number, runtime: CoordinatorRuntime): Promise<AgentExecution | null> {
@@ -18,8 +15,12 @@ export async function beginAgentExecution(userId: string, botId: string | null, 
   if (!agentKitEnabled()) return null
   const scope = await agentScope(userId,botId)
   const instructions = await botInstructions(userId,botId,runtime.harness === 'ai_sdk' ? COORDINATOR_INSTRUCTIONS : personalCoordinatorInstructions())
-  const configured = { harness:runtime.harness,model:runtime.harness === 'ai_sdk' ? COORDINATOR_MODEL : ('model' in runtime ? runtime.model ?? null : null) }
-  return agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,definition => freezeHostedModelSelection(scope,runtimeForWritePlanning(configured,definition.tools,personalWritesEnabled(),Boolean(definition.modelSelection)),definition.modelSelection,{ service:() => subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace }),agentKitDefaults())
+  return agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,() => runtime.harness === 'ai_sdk' ? freezeBotModel(scope,{service:()=>subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace}) : Promise.resolve({harness:runtime.harness,model:'model' in runtime ? runtime.model ?? null : null}),agentKitDefaults())
+}
+/** Durable model selection also applies when versioned definitions are disabled. */
+export async function botRuntime(userId:string,botId:string|null) {
+  'use step'
+  return freezeBotModel({ownerId:userId,botId,workspaceId:null},{service:()=>subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace})
 }
 export async function beforeAgentTool(userId: string, botId: string | null, executionId: string, callId: string, name: string, nativeScope?: NativeToolScope) {
   'use step'

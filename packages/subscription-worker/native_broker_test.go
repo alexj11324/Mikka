@@ -168,3 +168,35 @@ func TestNativeRunLedgerAndLeaseRefuseUseBeforeVaultReads(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeRunModelChoiceUsesFrozenServerSnapshot(t *testing.T) {
+	w, _, _ := fixtureWorker(t, "codex")
+	initial := mustAcquire(t, w)
+	run := bindNativeRunFixture(t, w, initial.Revision, "codex_cli")
+	ctx := context.Background()
+	if w.authorizeRuntime(ctx, initial.Revision, "native", "unselected-model") == nil {
+		t.Fatal("historical binding accepted a different model")
+	}
+	for _, choice := range []struct {
+		snapshot, model string
+		allowed         bool
+	}{
+		{`{"cliModelSelection":"auto"}`, "cli-default-model", true},
+		{`{"cliModelSelection":"explicit","model":"chosen-model"}`, "chosen-model", true},
+		{`{"cliModelSelection":"explicit","model":"chosen-model"}`, "different-model", false},
+	} {
+		if _, err := w.Repo.DB.Exec(`UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1`, run, choice.snapshot); err != nil {
+			t.Fatal(err)
+		}
+		err := w.authorizeRuntime(ctx, initial.Revision, "native", choice.model)
+		if (err == nil) != choice.allowed {
+			t.Fatalf("model selection: allowed=%v err=%v", choice.allowed, err)
+		}
+	}
+	if _, err := w.Repo.DB.Exec(`UPDATE agent_runs SET status='succeeded',"agentDefinition"='{"cliModelSelection":"auto"}' WHERE id=$1`, run); err != nil {
+		t.Fatal(err)
+	}
+	if w.authorizeRuntime(ctx, initial.Revision, "native", "cli-default-model") == nil {
+		t.Fatal("ended run retained model authority")
+	}
+}

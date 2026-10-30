@@ -1,3 +1,6 @@
+import { db } from '@/lib/db'
+import { devices } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 import { COMMANDS_MAX_SKIP, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_PARAM } from '@mikka/protocol/device'
 import { authenticateDevice, ownedDevice, pendingCommands, sleep, waitSeconds } from '@/lib/device-link'
@@ -20,7 +23,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
   const deadline = Date.now() + wait * 1000
   for (;;) {
     const commands = await pendingCommands(deviceId, skip)
-    if (commands.length > 0 || Date.now() >= deadline) return NextResponse.json({ commands })
+    const [device] = await db.select({requestedAt:devices.redetectRequestedAt}).from(devices).where(eq(devices.id,deviceId)).limit(1)
+    if (device?.requestedAt) commands.unshift({kind:"redetect",requestedAt:device.requestedAt.toISOString()})
+    if (commands.length > 0 || Date.now() >= deadline) return NextResponse.json({ commands:commands.slice(0,500) })
     await sleep(Math.min(1_000, Math.max(50, deadline - Date.now())))
   }
 }
