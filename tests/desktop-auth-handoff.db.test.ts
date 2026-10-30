@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 
 const dbUrl = process.env.MIKKA_DATABASE_URL ?? process.env.DATABASE_URL
 let sessionUser: string | null = null
-const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { exports, namedExports: exports } as never)
+const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports } as never)
 mock.module('next/headers', { namedExports: { headers: async () => new Headers() } } as never)
 stub('../lib/request-log.ts', { noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
 stub('../lib/auth.ts', { auth: { api: {
