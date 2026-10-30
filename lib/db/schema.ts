@@ -953,7 +953,7 @@ export const mobilePushTokens = pgTable('mobile_push_tokens', {
 
 export const PUSH_WHEN = ['always', 'away'] as const
 export type PushWhen = (typeof PUSH_WHEN)[number]
-export { SEND_KEYS, type SendKey } from '../send-key'
+export type { SendKey } from '../send-key'
 
 /**
  * The app's 通知 and 记忆 settings (docs/design/mobile.md). The push flags pick
