@@ -11,6 +11,7 @@ import { linearTeams } from '@/lib/linear-sync/client'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync, dispatchLinearWebhook } from '@/lib/linear-sync/dispatch'
 import { linearSyncEnabled } from '@/lib/linear-sync/flags'
+import { runAction } from '@/lib/action-error'
 
 export async function getLinearIntegrationState() {
   if (!await linearSyncEnabled()) return { enabled: false, configured: false, connected: false, organizationName: null, syncs: [], errors: [], inboundErrors: [] }
@@ -29,6 +30,18 @@ export async function getLinearIntegrationState() {
     .where(and(eq(linearSyncInbox.status, 'failed'), isNull(linearConnections.revokedAt)))
     .orderBy(desc(linearSyncInbox.receivedAt)).limit(20)
   return { enabled: true, configured: linearOAuthConfigured(), connected: Boolean(connection), organizationName: connection?.organizationName ?? null, syncs, errors, inboundErrors }
+}
+
+/** True when the board's refresh is a Linear sync: connected, with an active team sync. */
+export async function getLinearBoardSync() {
+  return runAction(async () => {
+    if (!await linearSyncEnabled()) return { synced: false }
+    const user = await requireUser()
+    const [row] = await db.select({ id: linearTeamSyncs.id }).from(linearTeamSyncs)
+      .innerJoin(linearConnections, and(eq(linearConnections.userId, linearTeamSyncs.ownerId), isNull(linearConnections.revokedAt)))
+      .where(and(eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.active, true))).limit(1)
+    return { synced: Boolean(row) }
+  })
 }
 
 export async function startLinearOAuth() {

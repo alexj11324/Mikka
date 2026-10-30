@@ -5,6 +5,7 @@ import { useRef, useState, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createWorkspace } from '@/app/actions/workspace'
+import { workspaceSlug, workspaceSlugSuffix } from '@/lib/workspace-slug'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -16,6 +17,7 @@ export function CreateWorkspaceForm() {
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [slugEdited, setSlugEdited] = useState(false)
+  const [slugSuffix] = useState(workspaceSlugSuffix)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const inFlight = useRef(false)
@@ -41,7 +43,7 @@ export function CreateWorkspaceForm() {
     <FieldGroup className="gap-6">
       <Field>
         <FieldLabel htmlFor="workspace-name">{i18nText("FeatureCopy.c_3a0522a8")}</FieldLabel>
-        <Input id="workspace-name" name="name" autoFocus autoComplete="organization" required maxLength={120} value={name} placeholder={i18nText("FeatureCopy.c_88f2a723")} disabled={pending} onChange={event => { const value = event.target.value; setName(value); setError(''); if (!slugEdited) setSlug(value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64).replace(/-+$/g, '')) }} />
+        <Input id="workspace-name" name="name" autoFocus autoComplete="organization" required maxLength={120} value={name} placeholder={i18nText("FeatureCopy.c_88f2a723")} disabled={pending} onChange={event => { const value = event.target.value; setName(value); setError(''); if (!slugEdited) setSlug(workspaceSlug(value, slugSuffix)) }} />
       </Field>
       <Field>
         <FieldLabel htmlFor="workspace-slug">{i18nText("FeatureCopy.c_c4726adf")}</FieldLabel>

@@ -68,6 +68,9 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await expect(page.getByRole('button', { name: /^Coordinator/ })).toHaveAttribute('aria-current', 'page')
   await rail(page, '看板').click()
   await expect(page.getByRole('heading', { name: '看板', exact: true })).toBeVisible()
+  // Without Linear the toolbar button is a plain refresh, not a success state.
+  await expect(page.getByRole('button', { name: '刷新', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '已与 Linear 同步', exact: true })).toHaveCount(0)
   // The issue-tool gate is off in this suite; the request must not be queued.
   const dialog = await openCreateIssue(page)
   const request = `把群聊未读数接到侧栏 ${randomUUID()}`
@@ -81,8 +84,9 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await expect(dialog).not.toBeVisible()
   const title = `按钮回归 ${randomUUID()}`
   await seedTask(page, title, { status: 'doing' })
+  // The board is in the URL, so a reload reopens it instead of the chat.
+  await expect(page).toHaveURL(url => url.searchParams.get('section') === 'all-issues')
   await page.reload()
-  await rail(page, '看板').click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
   await openIssueFromSearch(page, title)
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
@@ -109,4 +113,15 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   await captureAuthenticationCookies(page.context())
   await rail(page, '看板').click()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
+})
+
+test('打开不存在或无权访问的任务链接显示任务不可用，不返回 500', async ({ page }) => {
+  await register(page)
+  const serverErrors: string[] = []
+  page.on('response', response => { if (response.status() >= 500) serverErrors.push(`${response.status()} ${response.request().method()}`) })
+  await page.goto(app(`/?issue=${randomUUID()}`))
+  await expect(page.getByRole('heading', { name: '任务不可用', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '重新读取', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '任务不可用', exact: true })).toBeVisible()
+  expect(serverErrors).toEqual([])
 })

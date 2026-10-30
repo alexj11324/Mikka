@@ -94,6 +94,8 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     const destination = taskDestinationSchema.optional().safeParse(taskDestination)
     if (!destination.success) throw new ActionFailureError('validationGeneric')
     if (destination.data && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
+    // A new task is handed to the Coordinator to create; with no Coordinator here, say so instead of queueing it silently.
+    if (destination.data && !coordinatorEnabled()) throw new ActionFailureError('coordinatorUnavailable')
     if (destination.data && !parsed.data.submissionId) throw new ActionFailureError('validationGeneric')
     if (destination.data?.kind === 'device') {
       const [device] = await db.select({ id: devices.id }).from(devices)
