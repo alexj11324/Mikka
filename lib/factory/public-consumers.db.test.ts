@@ -8,7 +8,7 @@ import { factory194Target } from '../../tests/helpers/factory194-target'
 const connectionString=process.env.E2E_DATABASE_URL
 
 test('tracked public consumer upgrade preserves historical grants and enforces new principal/credential constraints', {skip:!connectionString,timeout:120000},async()=>{
-  assert.equal(process.env.CI,'true');assert.equal(process.env.GITHUB_ACTIONS,'true');assert.equal(process.env.REQUIRE_DB,'1')
+  assert.equal(process.env.REQUIRE_DB,'1')
   const config=factory194Target(connectionString!,true),admin=new Pool({...config,max:1})
   const schema=`factory_public_upgrade_${randomUUID().replaceAll('-','')}`
   await admin.query(`CREATE SCHEMA "${schema}"`)

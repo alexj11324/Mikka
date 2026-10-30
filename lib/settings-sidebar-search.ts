@@ -2,7 +2,7 @@
  * its page. Model subscriptions (ChatGPT / Claude and their quota) are on
  * Integrations for now; translated words come from `Settings.sections.<id>.keywords`. */
 export const SETTINGS_SECTION_KEYWORDS: Partial<Record<string, readonly string[]>> = {
-  integrations: ['model subscriptions', 'subscription', 'quota', 'usage', 'ChatGPT', 'OpenAI', 'Codex', 'Claude', 'Anthropic'],
+  models: ['model subscriptions', 'subscription', 'quota', 'usage', 'ChatGPT', 'OpenAI', 'Codex', 'Claude', 'Anthropic'],
 }
 
 /** Whether a settings sidebar item stays visible for the current search query. */

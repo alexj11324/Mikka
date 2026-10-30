@@ -1,6 +1,6 @@
 import { expect, test } from './test-account-fixtures'
 
-const sections = ['偏好设置', '个人资料', '工作区']
+const sections = ['偏好设置', '账户', '常规']
 
 /**
  * A settings card groups rows; its divider lines must reach the card edges.

@@ -55,19 +55,23 @@ credentials belong to the release pipeline, never the repository.
 ## Sign-in
 
 Google and GitHub sign-in open in the system browser, never in an embedded
-window. The browser finishes OAuth on the web app, mints a one-minute,
-single-use token and returns through the `mikka-desktop://auth` protocol. The
-shell loads `/api/desktop/finish`, exchanges that token for its own session
-cookie and continues to the requested page. The packaged app declares the URL
-scheme in `electron-builder.yml`; the shell also registers it at launch.
+window. Before opening it, the shell binds a one-shot HTTP listener to
+`127.0.0.1` on a random port. The browser finishes OAuth on the web app, which
+mints a one-minute, single-use token and redirects it to that loopback
+listener; the shell then loads `/api/desktop/finish`, exchanges the token for
+its own session cookie and continues to the requested page. No custom URL
+scheme is registered.
 
 ## Release
 
-Bump `apps/desktop/package.json`, push a tag named `desktop-vX.Y.Z`, and run the
-**Desktop release** workflow (or start it manually with that tag). It builds the
-Apple Silicon macOS installer, signs and notarizes it, and attaches the DMG,
-ZIP and `SHA256SUMS.txt` to a **draft** GitHub Release. Publish the draft only
-after installing it on Apple Silicon.
+Bump `apps/desktop/package.json`, create a tag named `desktop-vX.Y.Z`, then run
+the **Desktop release** workflow **from `main`** with that tag as its input.
+Do not trigger it by pushing the tag: GitHub scopes Actions caches per ref, so
+a tag run starts with an empty pnpm and electron-builder cache every time,
+while a run dispatched from `main` reuses the previous release's. The workflow
+builds the Apple Silicon macOS installer, signs and notarizes it, and attaches
+the DMG, ZIP and `SHA256SUMS.txt` to a **draft** GitHub Release. Publish the
+draft only after installing it on Apple Silicon.
 
 Repository secrets used by the workflow:
 

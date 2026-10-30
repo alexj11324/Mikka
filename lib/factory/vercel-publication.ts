@@ -181,7 +181,10 @@ export function createVercelPublicationAdapter(
         input.idempotencyKey,
         ["BUILDING", "QUEUED", "INITIALIZING"].includes(d.readyState)
           ? "pending"
-          : "uncertain",
+          : // Vercel's terminal non-READY states: the deployment will never serve.
+            ["ERROR", "CANCELED"].includes(d.readyState)
+            ? "failed"
+            : "uncertain",
         saved,
       );
     if (

@@ -124,3 +124,15 @@ test('response authorization retries only rolled-back serialization or deadlock 
   await assert.rejects(claim(unexpected),error=>error===unknown)
   assert.equal(unexpected.transactions,1)
 })
+
+test('4e3: a cloud claim reads the task secrets (workspace + repo scope) before the claim',async()=>{
+  const saved={...process.env}
+  Object.assign(process.env,{MIKKA_CLOUD_COMPUTER_TASKS:'1',MIKKA_BYOS_ENABLED:'1',MIKKA_BYO_E2B_KEY:'1'})
+  try{
+    const probe=fixture()
+    Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:'ws'},cloud:{subscription:{id:'binding',workspaceId:'ws'}}})
+    Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
+    const response=await claim(probe,['skill-preflight','policy','secrets','claim','skill-claim','benchmark-claim','token'])
+    assert.equal(response.status,200)
+  } finally { for(const key of ['MIKKA_CLOUD_COMPUTER_TASKS','MIKKA_BYOS_ENABLED','MIKKA_BYO_E2B_KEY'])if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key] }
+})

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 // R-73: a profile belongs to one person. Teammates in the same workspace never
 // see, delete or correct each other's facts; repeats merge; corrections stick.
@@ -9,10 +10,7 @@ import test from 'node:test'
 let databaseUrl: string | undefined
 try {
   const target = new URL(process.env.E2E_DATABASE_URL ?? '')
-  if (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true'
-    && ['postgres:', 'postgresql:'].includes(target.protocol)
-    && target.hostname === '127.0.0.1' && target.port === '5432' && target.pathname === '/mikka_e2e'
-    && !target.search && !target.hash && process.env.MIKKA_DATABASE_URL === target.href
+  if (isE2eTarget(target.href) && process.env.MIKKA_DATABASE_URL === target.href
     && process.env.DATABASE_URL === target.href) databaseUrl = target.href
 } catch { /* no eligible disposable CI database */ }
 if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')
@@ -104,7 +102,10 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
     const morning = new Date('2026-10-28T04:30:00Z')
     // Entitlement comes from PostHog (lib/profile/entitlement.ts); here Alex and Dana are entitled, a third person is not.
     await store.recordFacts(outsider, [seen('2026-10-01T01:00:00Z', 'o1')])
-    const entitled = async (userId: string) => userId !== outsider
+    // The DB is shared with other suites (lib/account/store.db.test.ts also writes user_facts), and the
+    // nightly merge reads every user. Only this test's people count; anyone else is treated as not entitled.
+    const mine = new Set([alex, dana, outsider])
+    const entitled = async (userId: string) => mine.has(userId) && userId !== outsider
     const first = await store.consolidateDueFacts({ entitled, now: morning })
     assert.equal(first.written, 1, 'only Alex: Dana has 记忆 off, the outsider is not entitled')
     assert.ok((await store.listFacts(alex)).some(item => item.kind === 'interest' && item.subject === '川菜'), 'scattered purchases become an interest')
@@ -113,7 +114,9 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
     assert.equal(settings.consolidatedOn, '2026-10-28')
     assert.equal((await db.select().from(schema.userFactConsolidations).where(eq(schema.userFactConsolidations.userId, outsider))).length, 0, 'not entitled: not merged or claimed')
     const again = await store.consolidateDueFacts({ entitled, now: morning })
-    assert.deepEqual([again.written, again.due], [0, 1], 'once per local day; only the outsider stays due, and is skipped')
+    assert.equal(again.written, 0, 'once per local day')
+    assert.equal(again.due - again.skipped, 0, 'whoever is still due is skipped (the outsider and other suites\' users), nobody is merged twice')
+    assert.equal((await db.select().from(schema.userFactConsolidations).where(eq(schema.userFactConsolidations.userId, outsider))).length, 0, 'the outsider stays unclaimed')
     assert.equal(await store.memoryEnabled(dana), false)
     assert.equal(await store.memoryEnabled(alex), true)
   })

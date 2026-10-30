@@ -5,8 +5,9 @@
 // present pg/DB test files must map to a package script or inventory fails closed.
 import { spawnSync } from 'node:child_process'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { posix, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
   { marker: 'lib/run-publications.ts', file: 'tests/run-publications.db.test.ts', script: 'test:run-publication-db' },
@@ -25,6 +26,7 @@ export const REQUIRED_SUITES = [
   { marker: 'scripts/migration-steps.mjs', file: 'tests/migration-steps.db.test.mjs', script: 'test:migration-steps-db' },
   { marker: 'lib/factory/store.ts', file: 'lib/factory/routing.db.test.ts', script: 'test:factory-routing-db' },
   { marker: 'lib/run-admission-store.ts', file: 'tests/factory-admission.db.test.ts', script: 'test:factory-routing-db' },
+  { marker: 'lib/run-chain.ts', file: 'tests/run-chain.db.test.ts', script: 'test:factory-routing-db' },
   { marker: 'lib/agent-kit/store.ts', file: 'lib/agent-kit/store.db.test.ts', script: 'test:agent-kit-db' },
   { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/captures/store.ts', file: 'lib/captures/store.db.test.ts', script: 'test:captures-db' },
@@ -32,7 +34,11 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/active-agents.ts', file: 'lib/active-agents.test.ts', script: 'test:active-agents' },
   { marker: 'lib/coordinator/group-turns.ts', file: 'lib/coordinator/group-turns.test.ts', script: 'test:group-turns' },
   { marker: 'lib/profile/store.ts', file: 'lib/profile/store.db.test.ts', script: 'test:user-facts-db' },
+  { marker: 'lib/secrets/store.ts', file: 'tests/workspace-secrets.db.test.ts', script: 'test:secrets-db' },
+  { marker: 'lib/suggestions/time-zone.ts', file: 'tests/settings-preferences.db.test.ts', script: 'test:settings-prefs-db' },
+  { marker: 'lib/tokens/store.ts', file: 'tests/personal-access-tokens.db.test.ts', script: 'test:pat-db' },
   { marker: 'lib/coordinator/bot-instructions.ts', file: 'lib/coordinator/bot-chats.db.test.ts', script: 'test:bot-chats-db' },
+  { marker: 'lib/workspace-admin/bot-threads.ts', file: 'tests/bot-threads.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/coordinator/store.ts', file: 'tests/coordinator-task-binding.db.ts', script: 'test:coordinator-task-binding-db' },
   { marker: 'lib/coordinator/native-store.ts', file: 'lib/coordinator/native-store.test.ts', script: 'test:coordinator-native' },
   { marker: 'lib/coordinator/issue-create.ts', file: 'tests/coordinator-issue-create.db.test.ts', script: 'test:coordinator-issue-create-db' },
@@ -43,7 +49,14 @@ export const REQUIRED_SUITES = [
   { marker: 'tests/workspace-migration.test.mjs', file: 'tests/workspace-migration.test.mjs', script: 'test:workspace-migration-db' },
   { marker: 'tests/local-repository-migration.db.test.mjs', file: 'tests/local-repository-migration.db.test.mjs', script: 'test:local-repository-migration-db' },
   { marker: 'drizzle/20261027164500_artifact_legacy_compat.sql', file: 'tests/artifact-legacy-migration.test.mjs', script: 'test:artifact-migration-db' },
+  { marker: 'lib/workspace-admin/general.ts', file: 'tests/workspace-admin.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/app-policy/store.ts', file: 'tests/app-policy.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/usage/read.ts', file: 'tests/usage.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/billing/service.ts', file: 'tests/billing.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/audit/query.ts', file: 'tests/audit-query.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
+  { marker: 'lib/audit/record.ts', file: 'tests/audit-record.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/account/delete.ts', file: 'lib/account/store.db.test.ts', script: 'test:account-db' },
 ]
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.
@@ -63,6 +76,7 @@ export const BROWSER_SUITES = [
 // filesystem destruction denied. They run in the existing pure scope gate.
 export const OFFLINE_GUARDED = [
   {file:'scripts/scope-native-offline.test.mjs',script:'test:scope-acceptance-guard',guard:'scripts/credential-diagnostics-offline.mjs',reason:'real pg/Drizzle API and denied-startup tests; no server SQL'},
+  {file:'lib/personal-mailbox-runtime-off.test.ts',script:'test:personal-mailbox-core',guard:'scripts/credential-diagnostics-offline.mjs',reason:'spies on pg Pool/Client to assert the mailbox-off path submits no SQL; transport denied'},
   {file:'scripts/scope-fresh.test.mjs',script:'test:scope-acceptance-guard',guard:'scripts/credential-diagnostics-offline.mjs',reason:'fresh target models and native connection rejection; no server SQL'},
 ]
 // This destructive empty-database bootstrap must stay BEFORE test:e2e:setup.
@@ -85,13 +99,15 @@ export function checkSummary(script, status, totals) {
 }
 
 export function validateTarget(env) {
-  if (env.CI !== 'true' || env.GITHUB_ACTIONS !== 'true') throw new Error('DB gates require GitHub Actions ephemeral PG17')
-  let url
-  try { url = new URL(env.E2E_DATABASE_URL) } catch { throw new Error('Missing/invalid E2E_DATABASE_URL') }
-  if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hostname !== '127.0.0.1' || url.port !== '5432' || url.pathname !== '/mikka_e2e' || url.search || url.hash) throw new Error('DB gates require the loopback mikka_e2e service without URL options')
+  if (!env.E2E_DATABASE_URL) throw new Error('Missing/invalid E2E_DATABASE_URL')
+  if (!isE2eTarget(env.E2E_DATABASE_URL)) throw new Error(E2E_DB_RULE)
   for (const name of ['MIKKA_DATABASE_URL', 'DATABASE_URL']) if (env[name] !== env.E2E_DATABASE_URL) throw new Error(`${name} must match the ephemeral E2E_DATABASE_URL`)
   if (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL) throw new Error('Legacy database fallback must not point outside ephemeral service')
 }
+
+// Shell steps of a package script: split on && / || / ; so a guard must sit on
+// the same step that runs the guarded file, not merely somewhere in the script.
+export const scriptSteps = command => (command ?? '').split(/&&|\|\||;/).map(step => step.trim()).filter(Boolean)
 
 export function inventory(files, scripts, expected = [], required = REQUIRED_SUITES, selfManaged = SELF_MANAGED, offlineGuarded = OFFLINE_GUARDED) {
   const has = path => Object.hasOwn(files, path)
@@ -110,8 +126,9 @@ export function inventory(files, scripts, expected = [], required = REQUIRED_SUI
   const offline = new Set()
   for(const {file,script,guard,reason} of offlineGuarded){
     if(!has(file))continue
-    const localGuard='./'+guard.split('/').at(-1)
-    if(!reason||!has(guard)||!files[file].includes(`import '${localGuard}'`)||!commandHas(scripts[script],file)||!scripts[script].includes(`--import ./${guard}`))throw Error(`Offline suite ${file} requires its source guard and explicit guarded pure script`)
+    const rel=posix.relative(posix.dirname(file),guard)
+    const localGuard=rel.startsWith('.')?rel:'./'+rel
+    if(!reason||!has(guard)||!files[file].includes(`import '${localGuard}'`)||!scriptSteps(scripts[script]).some(step=>commandHas(step,file)&&step.split(/\s+/).some((t,i,a)=>t==='--import'&&a[i+1]===`./${guard}`)))throw Error(`Offline suite ${file} requires its source guard and explicit guarded pure script`)
     offline.add(file)
   }
   for (const { file, runner, reason } of selfManaged) {
@@ -173,7 +190,7 @@ export function main({ root = '.', env = process.env, run = spawnSync } = {}) {
     let failed = false
     for (const script of plan.scripts) {
       console.log(`::group::pnpm ${script}`)
-      const result = run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: { ...env, REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', MIKKA_TEST_DB_PORT: '5432' }, maxBuffer: 64 << 20 })
+      const result = run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: { ...env, REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', MIKKA_TEST_DB_PORT: new URL(env.E2E_DATABASE_URL).port || '5432' }, maxBuffer: 64 << 20 })
       process.stdout.write(result.stdout ?? ''); process.stderr.write(result.stderr ?? '')
       console.log('::endgroup::')
       const error = checkSummary(script, result.status, parseSummary(`${result.stdout}\n${result.stderr}`))

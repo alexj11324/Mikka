@@ -5,7 +5,7 @@ Three schedules keep the 建议 page and each person's profile current (R-21, R-
 | Cron (UTC) | Endpoint | What it does |
 | --- | --- | --- |
 | `*/15 * * * *` | `GET /mikka/api/cron/briefings` | Writes the daily briefing for everyone whose local time is past 08:00 and who has none for today yet, and has the Coordinator push it |
-| `0 * * * *` | `GET /mikka/api/cron/suggestions-reconcile` | Backfills events a webhook may have missed in the last 26 hours |
+| `0 * * * *` | `GET /mikka/api/cron/suggestions-reconcile` | Backfills events a webhook may have missed in the last 26 hours, and, in parallel, sweeps Factory monitor completions (see below) |
 | `30 * * * *` | `GET /mikka/api/cron/user-facts` | Merges the profile facts of everyone whose local time is past 04:00 and who has not been merged today |
 
 All three endpoints answer 503 without `CRON_SECRET`, 401 for a wrong bearer, and otherwise a JSON summary of counts (no personal data). Reconciliation also returns 503 when GitHub is unconfigured, or 502 when a source fails. Each stops starting new people after about 40–45 seconds; the next run picks up whoever is left.
@@ -14,7 +14,7 @@ All three endpoints answer 503 without `CRON_SECRET`, 401 for a wrong bearer, an
 
 The briefing is delivered by the Coordinator, not shown in 建议 (R-21). Writing a briefing with something in it queues a `daily_briefing` event in the person's Coordinator inbox (dedupe key `daily_briefing:<userId>:<localDate>:<daily|first>`, so at most one push per kind and day) and wakes the Coordinator. The event is triaged as needing the person; the Coordinator writes the briefing in its chat in the person's language, names the most important items, and asks before acting on any of them. An empty day pushes nothing. Where the Coordinator does not run (no AI Gateway), the event waits in the inbox for the next turn.
 
-- Each person's IANA time zone is stored in `user_time_zones` (`drizzle/20261027011046_user_time_zones.sql`). The browser's zone, sent as `tz` when the suggestions list loads, replaces any earlier value. The connect callbacks' IP-derived zone (`x-vercel-ip-timezone`) only fills a gap. A person without a stored zone gets no scheduled briefing; the lazy path below still serves them.
+- Each person's IANA time zone is stored in `user_time_zones` (`drizzle/20261027011046_user_time_zones.sql`). The browser's zone, sent as `tz` when the suggestions list loads, replaces any earlier value. The connect callbacks' IP-derived zone (`x-vercel-ip-timezone`) only fills a gap. A person without a stored zone gets no scheduled briefing; the lazy path below still serves them. A zone the person picks in Settings (`source = 'manual'`, `drizzle/20261029213936_settings_preferences.sql`) is never replaced by either; people with 每日建议 off, or 记忆 off, are skipped (docs/settings-backend/prefs.md).
 - A zone is due from 08:00 until its local midnight. Every run writes the briefing for due people that have no row for their local date, so a briefing lands within 15 minutes of 08:00 and a missed run is caught up by the next one the same day. The `(userId, localDate)` primary key keeps it to one per day, even with overlapping runs.
 - A day with nothing to report still gets a row with `total = 0`, so it is not recomputed every 15 minutes; nothing is pushed for it.
 - Connecting an app still writes a `first` briefing at once (`writeFirstBriefing`) and the Coordinator pushes it. One written before 08:00 is replaced by that day's daily briefing, which is pushed too; one written after 08:00 is today's briefing.
@@ -39,6 +39,22 @@ Proactive work is behind four switches (`docs/design/proactive.md` § 3), and an
 Set the environment values in Infisical, never in source.
 
 Facts the person corrected in 记忆 are never faded or overwritten. A person is due from 04:00 their time (the zone in `user_time_zones`, UTC without one); `user_fact_consolidations.consolidatedOn` holds the local date of the last merge and is claimed before merging, so overlapping runs merge a person once a day. A person with 记忆 off is not merged and nothing is extracted for them. The run starts no new people after about 40 seconds; the next hourly run picks up whoever is left.
+
+## Cron GET exception and the Factory monitor sweep
+
+Mikka's rule is that GET is strictly read-only. Cron endpoints are the one documented exception
+(the Vercel Cron pattern, which only issues GET): `/api/cron/*` handlers may write, provided that
+they accept nothing but the exact `CRON_SECRET` bearer (503 when unset, 401 otherwise, checked
+before any read or write) and every write is idempotent, so a repeated or overlapping run converges.
+
+The hourly `suggestions-reconcile` run also sweeps the Factory monitor stage when
+`MIKKA_FACTORY_ROUTING_ENABLED=1` and `MIKKA_FACTORY_LIFECYCLE_ENABLED=1` (otherwise it reports
+`factoryMonitor.enabled: false` and does nothing). It finds `run_finished` events of monitor
+attempts that no `factory_monitor_observations` row records, and hands each (user, Bot) scope to that
+Bot's `monitor.reconcile`, until 50 seconds after the request started. Observed events are skipped
+and replays create no new transition. The response carries
+`factoryMonitor: { enabled, scopes, observed, failed, deferred }`; any failed scope answers 502. The backfill and the sweep run independently (`Promise.allSettled`): if either throws, the other still finishes, the answer is 502, `outcome: { suggestions, factoryMonitor }` reports `ok` or `failed` for each, and the failure is logged by name only.
+No Worker change, redeploy or new secret is needed: the Worker already calls this fixed path.
 
 ## Backfill
 

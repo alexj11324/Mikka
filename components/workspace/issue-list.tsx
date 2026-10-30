@@ -48,7 +48,7 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
                 <span className="min-w-0 flex-1 truncate font-medium">{issue.title}</span>
                 <span className="hidden w-24 shrink-0 text-xs text-muted-foreground sm:block">{priorityLabel(issue.priority)}</span>
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">v{issue.revision}</span>
-                <time dateTime={new Date(issue.updatedAt).toISOString()} className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground md:block">{format.dateTime(new Date(issue.updatedAt), { month: 'numeric', day: 'numeric', timeZone: 'UTC' })}</time>
+                <time suppressHydrationWarning dateTime={new Date(issue.updatedAt).toISOString()} className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground md:block">{format.dateTime(new Date(issue.updatedAt), { month: 'numeric', day: 'numeric' })}</time>
               </span>
             </Button>
           </li>)}

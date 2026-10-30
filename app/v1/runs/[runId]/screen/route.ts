@@ -1,5 +1,6 @@
 import { screenCaptureRequest } from '@mikka/protocol/capture'
 import { screenCaptures } from '@/lib/captures/screen'
+import { maskForWorkspace } from '@/lib/secrets/runtime'
 import { captureFailure, captureJson, deviceRun } from '@/lib/captures/device'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +19,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   const parsed = screenCaptureRequest.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return captureJson({ error: 'Invalid request.' }, 400)
   const caller = { userId: found.owner.userId, workspaceId: found.caller.scopeWorkspaceId, deviceId: found.deviceId, tokenId: found.caller.tokenId }
-  const input = parsed.data
+  // 4e2 item 4: capture titles come from the agent; the pixels themselves cannot be masked.
+  const input = 'title' in parsed.data && typeof parsed.data.title === 'string' ? { ...parsed.data, title: await maskForWorkspace(caller.workspaceId, parsed.data.title) } : parsed.data
   if (input.action === 'screenshot') {
     const result = await screenCaptures.screenshot(caller, found.owner.runId, input.title, request.signal)
     return 'error' in result ? captureFailure(result) : captureJson({ action: input.action, capture: result })

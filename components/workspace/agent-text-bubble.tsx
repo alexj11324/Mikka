@@ -15,5 +15,5 @@ export function AgentTextBubble({ children }: { children: ReactNode }) {
   const bubbles = use(ReplyBubbles)
   const nested = use(InsideBlock)
   if (!bubbles || nested) return children
-  return <div data-agent-text className="w-fit max-w-[82%] min-w-0 rounded-2xl bg-muted px-4 py-2.5">{children}</div>
+  return <div data-agent-text className="w-fit max-w-[82%] min-w-0 rounded-2xl bg-muted px-4 py-2.5 wrap-break-word">{children}</div>
 }

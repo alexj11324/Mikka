@@ -21,6 +21,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
+import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
@@ -136,6 +137,8 @@ export async function pushToPhones(userId: string, botId: string | null, text: s
  */
 export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
+  // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
+  // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1') {
     const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     await factoryRuntimeForBot(botId).reconcile(userId)
@@ -162,7 +165,8 @@ export async function preparePrompt(userId: string, botId: string | null = null,
   const base = snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS)
   const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
   const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
-  return { instructions: instructionsWithMemory(instructions, memory) + factoryPolicy, messages: promptMessages(summary, messages, summaryTrust) }
+  // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
+  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions), memory) + factoryPolicy, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
@@ -201,15 +205,28 @@ export async function forget(userId: string, input: { text: string }, scope?: Na
   }, botId)
 }
 
-export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope, accountId?: string) {
+/** 团队权限 › 允许使用的应用: a workspace can block an app for its bots. The personal Coordinator (no botId) is not governed. */
+async function appBlockedForBot(botId: string | null | undefined, action: ComposioActionName) {
+  if (!botId) return false
+  const { botMayUseApp } = await import('@/lib/app-policy/store')
+  const { isPolicyApp } = await import('@/lib/app-policy/apps')
+  // Loaded here, not at module top: steps.ts is imported by suites that stub 'ai', which composio-actions needs.
+  const { COMPOSIO_ACTIONS } = await import('@/lib/composio-actions')
+  const toolkit = COMPOSIO_ACTIONS[action]?.toolkit
+  return Boolean(toolkit && isPolicyApp(toolkit) && !(await botMayUseApp(botId, toolkit)))
+}
+
+export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return accountId ? runComposioAction(userId, action, input, accountId) : runComposioAction(userId, action, input)
 }
 
-export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string) {
+export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return accountId ? proposeAction(userId, action, input, accountId) : proposeAction(userId, action, input)
 }
 
@@ -455,6 +472,12 @@ export async function startWebSubagent(userId: string, input: { botId: string; t
 export async function personalWrite(userId:string, botId:string | null, executionId:string, call:import('@/lib/operations/model-write-tools').ModelWriteCall, scope?:NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  const { WRITE_TOOL_APPS } = await import('@/lib/app-policy/apps')
+  const app = WRITE_TOOL_APPS[call.action]
+  if (botId && app) {
+    const { botMayUseApp } = await import('@/lib/app-policy/store')
+    if (!(await botMayUseApp(botId, app))) return { error: 'integrationBlockedByWorkspace' }
+  }
   const { personalWriteFromRun } = await import('@/lib/operations/write-runtime')
   return personalWriteFromRun(userId,botId,executionId,call,scope)
 }

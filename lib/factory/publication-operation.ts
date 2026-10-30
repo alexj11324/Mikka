@@ -75,13 +75,16 @@ export function publicationBindingHash(input: PublicationInput) {
 export class PublicationDeferred extends FactoryError {
   constructor(
     public publicationId: string,
-    public state: "pending" | "uncertain",
+    /** failed = the provider confirmed a terminal failure (BE-4/B2); never reconciled again. */
+    public state: "pending" | "uncertain" | "failed",
     public checkpoint: unknown = null,
   ) {
     super(
       state === "pending"
         ? "factoryPublicationPending"
-        : "factoryPublicationUncertain",
+        : state === "failed"
+          ? "factoryPublicationFailed"
+          : "factoryPublicationUncertain",
     );
   }
 }

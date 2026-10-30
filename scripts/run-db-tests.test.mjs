@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { browserArguments } from './ci-browser-tests.mjs'
-import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
+import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, scriptSteps, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
 
 const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
 const env = { CI: 'true', GITHUB_ACTIONS: 'true', E2E_DATABASE_URL: target, MIKKA_DATABASE_URL: target, DATABASE_URL: target }
@@ -23,7 +24,11 @@ test('parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or fai
 })
 test('only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess', () => {
   assert.doesNotThrow(() => validateTarget(env))
-  for (const changes of [{ CI: '' }, { GITHUB_ACTIONS: '' }, { E2E_DATABASE_URL: '' }, { E2E_DATABASE_URL: 'postgres://business/db' }, { DATABASE_URL: 'postgres://business/db' }, { ORVILO_DATABASE_URL: 'postgres://business/db' }, { E2E_DATABASE_URL: target + '?options=x' }]) assert.throws(() => validateTarget({ ...env, ...changes }))
+  // CI is no longer required; any loopback *_e2e database on any port is allowed.
+  assert.doesNotThrow(() => validateTarget({ ...env, CI: '', GITHUB_ACTIONS: '' }))
+  const local = 'postgresql://e2e:local@127.0.0.1:55594/fac_overnight_e2e'
+  assert.doesNotThrow(() => validateTarget({ E2E_DATABASE_URL: local, MIKKA_DATABASE_URL: local, DATABASE_URL: local }))
+  for (const changes of [{ E2E_DATABASE_URL: '' }, { E2E_DATABASE_URL: target.replace('mikka_e2e', 'mikka') }, { E2E_DATABASE_URL: target.replace('127.0.0.1', 'db.internal') }, { E2E_DATABASE_URL: 'postgres://business/db' }, { DATABASE_URL: 'postgres://business/db' }, { ORVILO_DATABASE_URL: 'postgres://business/db' }, { E2E_DATABASE_URL: target + '?options=x' }]) assert.throws(() => validateTarget({ ...env, ...changes }))
   let called = false
   assert.equal(main({ env: {}, run() { called = true } }), 1)
   assert.equal(called, false)
@@ -92,6 +97,39 @@ test('real-driver offline exclusions require the actual source guard and the exp
   assert.throws(()=>inventory({...tree,[entry.file]:"import pg from 'pg'"},commands,[],REQUIRED_SUITES,[],[entry]),/source guard/)
   assert.throws(()=>inventory(tree,{...commands,[entry.script]:`node --test ${entry.file}`},[],REQUIRED_SUITES,[],[entry]),/source guard/)
   assert.throws(()=>inventory(tree,commands,[],REQUIRED_SUITES,[],[{...entry,reason:''}]),/source guard/)
+})
+test('offline guard must be on the same step that runs the guarded file (GM3)',()=>{
+  const entry={file:'scripts/offline.test.mjs',script:'test:offline',guard:'scripts/guard.mjs',reason:'reviewed zero-transport test'}
+  const tree={...files,[entry.file]:"import './guard.mjs'; import pg from 'pg'",[entry.guard]:'deny native transport'}
+  const run=command=>inventory(tree,{...scripts,[entry.script]:command},[],REQUIRED_SUITES,[],[entry])
+  assert.deepEqual(run(`node --test a.test.mjs; r1=$?; node --import ./${entry.guard} --test ${entry.file}; r2=$?; exit $((r1|r2))`).offlineGuarded,[entry.file])
+  for (const sep of ['&&',';','||']) assert.throws(()=>run(`node --test ${entry.file} ${sep} node --import ./${entry.guard} --test other.test.mjs`),/source guard/)
+  assert.throws(()=>run(`node --import ./${entry.guard}x --test ${entry.file}`),/source guard/)
+  assert.deepEqual(scriptSteps('a && b; c || d'),['a','b','c','d'])
+})
+test('test:personal-mailbox-core runs the runtime-off step even when the first step fails, and still fails overall',()=>{
+  const command=JSON.parse(readFileSync('package.json','utf8')).scripts['test:personal-mailbox-core']
+  const steps=command.split(/;\s*/)
+  const nodeSteps=steps.filter(step=>/^node\s/.test(step))
+  assert.equal(nodeSteps.length,2)
+  assert.ok(nodeSteps[1].includes('lib/personal-mailbox-runtime-off.test.ts'))
+  const run=(first,second)=>{
+    let i=0
+    const stubbed=steps.map(step=>/^node\s/.test(step)?(i++===0?`echo first; ${first}`:`echo second; ${second}`):step).join('; ')
+    return spawnSync('sh',['-c',stubbed],{encoding:'utf8'})
+  }
+  for (const [first,second,code] of [['true','true',0],['false','true',1],['true','false',1],['false','false',1]]) {
+    const r=run(first,second)
+    assert.equal(r.stdout,'first\nsecond\n',`both steps run (${first},${second})`)
+    assert.equal(r.status===0?0:1,code,`exit for (${first},${second})`)
+  }
+})
+test('offline guard import is resolved relative to the suite file',()=>{
+  const entry={file:'lib/nested/offline.test.ts',script:'test:offline',guard:'scripts/guard.mjs',reason:'reviewed zero-transport test'}
+  const tree={...files,[entry.file]:"import '../../scripts/guard.mjs'\nimport pg from 'pg'",[entry.guard]:'deny native transport'}
+  const commands={...scripts,[entry.script]:`node --import ./${entry.guard} --test ${entry.file}`}
+  assert.deepEqual(inventory(tree,commands,[],REQUIRED_SUITES,[],[entry]).offlineGuarded,[entry.file])
+  assert.throws(()=>inventory({...tree,[entry.file]:"import './guard.mjs'\nimport pg from 'pg'"},commands,[],REQUIRED_SUITES,[],[entry]),/source guard/)
 })
 test('this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')).scripts

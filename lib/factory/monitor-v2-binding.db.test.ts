@@ -10,10 +10,10 @@ import type { FactoryTask, FactoryAttempt } from "./store";
 import { consumeMonitorObservation } from "./monitor-incidents";
 import { validateMonitorV2Observation } from "./monitor-v2-binding";
 import { factoryEventId } from "./event-id";
+import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 const db = process.env.E2E_DATABASE_URL;
 test("actual V2 reader and monitor consumer on ephemeral PG; synthetic upstream/provider", { skip: !db, timeout: 120000 }, async () => {
-  assert.equal(process.env.GITHUB_ACTIONS, "true");
-  const u = new URL(db!); assert.equal(u.hostname, "127.0.0.1"); assert.equal(u.port, "5432"); assert.equal(u.pathname, "/mikka_e2e");
+  assertE2eTarget(db);
   const f = await factory194Fixture(db!);
   try {
     const x = await f.prepare();

@@ -1,0 +1,304 @@
+{
+  "topNode": "doc",
+  "nodes": [
+    [
+      "paragraph",
+      {
+        "content": "inline*",
+        "group": "block",
+        "attrs": {
+          "textAlign": {
+            "default": null
+          }
+        }
+      }
+    ],
+    [
+      "mention",
+      {
+        "group": "inline",
+        "inline": true,
+        "atom": true,
+        "attrs": {
+          "id": {
+            "default": null
+          },
+          "label": {
+            "default": null
+          },
+          "mentionSuggestionChar": {
+            "default": "@"
+          }
+        }
+      }
+    ],
+    [
+      "blockquote",
+      {
+        "content": "block+",
+        "group": "block"
+      }
+    ],
+    [
+      "bulletList",
+      {
+        "content": "listItem+",
+        "group": "block list"
+      }
+    ],
+    [
+      "codeBlock",
+      {
+        "content": "text*",
+        "marks": "",
+        "group": "block",
+        "attrs": {
+          "language": {
+            "default": null
+          }
+        }
+      }
+    ],
+    [
+      "doc",
+      {
+        "content": "block+"
+      }
+    ],
+    [
+      "hardBreak",
+      {
+        "group": "inline",
+        "inline": true
+      }
+    ],
+    [
+      "heading",
+      {
+        "content": "inline*",
+        "group": "block",
+        "attrs": {
+          "textAlign": {
+            "default": null
+          },
+          "level": {
+            "default": 1
+          }
+        }
+      }
+    ],
+    [
+      "horizontalRule",
+      {
+        "group": "block"
+      }
+    ],
+    [
+      "listItem",
+      {
+        "content": "paragraph block*"
+      }
+    ],
+    [
+      "orderedList",
+      {
+        "content": "listItem+",
+        "group": "block list",
+        "attrs": {
+          "start": {
+            "default": 1
+          },
+          "type": {
+            "default": null
+          }
+        }
+      }
+    ],
+    [
+      "text",
+      {
+        "group": "inline"
+      }
+    ],
+    [
+      "taskList",
+      {
+        "content": "taskItem+",
+        "group": "block list"
+      }
+    ],
+    [
+      "taskItem",
+      {
+        "content": "paragraph block*",
+        "attrs": {
+          "checked": {
+            "default": false
+          }
+        }
+      }
+    ],
+    [
+      "table",
+      {
+        "content": "tableRow+",
+        "group": "block"
+      }
+    ],
+    [
+      "tableCell",
+      {
+        "content": "block+",
+        "attrs": {
+          "colspan": {
+            "default": 1
+          },
+          "rowspan": {
+            "default": 1
+          },
+          "colwidth": {
+            "default": null
+          },
+          "align": {
+            "default": null
+          }
+        }
+      }
+    ],
+    [
+      "tableHeader",
+      {
+        "content": "block+",
+        "attrs": {
+          "colspan": {
+            "default": 1
+          },
+          "rowspan": {
+            "default": 1
+          },
+          "colwidth": {
+            "default": null
+          },
+          "align": {
+            "default": null
+          }
+        }
+      }
+    ],
+    [
+      "tableRow",
+      {
+        "content": "(tableCell | tableHeader)*"
+      }
+    ],
+    [
+      "richTextOutline",
+      {
+        "group": "block",
+        "atom": true
+      }
+    ]
+  ],
+  "marks": [
+    [
+      "link",
+      {
+        "attrs": {
+          "href": {
+            "default": null
+          },
+          "target": {
+            "default": "_blank"
+          },
+          "rel": {
+            "default": "noopener noreferrer nofollow"
+          },
+          "class": {
+            "default": null
+          },
+          "title": {
+            "default": null
+          }
+        },
+        "inclusive": true
+      }
+    ],
+    [
+      "bold",
+      {}
+    ],
+    [
+      "code",
+      {
+        "excludes": "_"
+      }
+    ],
+    [
+      "italic",
+      {}
+    ],
+    [
+      "strike",
+      {}
+    ],
+    [
+      "underline",
+      {}
+    ],
+    [
+      "highlight",
+      {
+        "attrs": {
+          "color": {
+            "default": null
+          }
+        }
+      }
+    ],
+    [
+      "suggestionInsert",
+      {
+        "attrs": {
+          "id": {
+            "default": null
+          },
+          "author": {
+            "default": null
+          },
+          "time": {
+            "default": null
+          }
+        },
+        "inclusive": false
+      }
+    ],
+    [
+      "suggestionDelete",
+      {
+        "attrs": {
+          "id": {
+            "default": null
+          },
+          "author": {
+            "default": null
+          },
+          "time": {
+            "default": null
+          }
+        },
+        "inclusive": false
+      }
+    ],
+    [
+      "comment",
+      {
+        "attrs": {
+          "id": {
+            "default": null
+          }
+        },
+        "inclusive": false
+      }
+    ]
+  ]
+}

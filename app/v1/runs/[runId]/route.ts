@@ -4,6 +4,7 @@ import { runPatchSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
+import { maskForWorkspace } from '@/lib/secrets/runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +29,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ru
   if (!await ownedRun(runId, caller.userId)) return NextResponse.json({ error: 'Unknown run.' }, { status: 404 })
   const parsed = runPatchSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid patch.' }, { status: 400 })
-  const patch = parsed.data
+  // 4e2 item 4: the error text is agent/harness output; mask it like run events.
+  const patch = parsed.data.error !== undefined ? { ...parsed.data, error: await maskForWorkspace(caller.scopeWorkspaceId, parsed.data.error) } : parsed.data
   if (!(LIVE_STATES as readonly string[]).includes(patch.state)) return new NextResponse(null, { status: 204 })
   await db.update(agentRuns)
     .set({

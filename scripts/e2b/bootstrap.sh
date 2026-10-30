@@ -39,3 +39,6 @@ gpasswd -d user sudo >/dev/null 2>&1 || true
 # only one include is insufficient. Only root infrastructure may execute sudo.
 chown root:root /usr/bin/sudo
 chmod 0700 /usr/bin/sudo
+# A public template must not ship SSH host private keys: every sandbox would
+# share them. Keys are generated per sandbox at boot (start-container-runtime.sh).
+rm -f /etc/ssh/ssh_host_*

@@ -1,12 +1,14 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { and, eq, gt, isNull } from 'drizzle-orm'
 
 import { auth } from '@/lib/auth'
+import { db } from '@/lib/db'
+import { desktopAuthRequests } from '@/lib/db/schema'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { withBasePath } from '@/lib/base-path'
-import { desktopAuthState } from '@/lib/desktop-auth'
-import en from '@/messages/en.json'
-import zh from '@/messages/zh-CN.json'
+import { DESKTOP_AUTH_EXCHANGE_TTL_MS, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
+import { newExchangeCode, sha256Hex } from '@/lib/desktop-auth-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,43 +17,63 @@ const safeHeaders = {
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
   'X-Robots-Tag': 'noindex, nofollow',
-  'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
 }
-const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!)
 
 /**
  * OAuth lands here in the system browser after the provider callback. The
- * browser holds the web session; the desktop app does not. Mint a one-minute,
- * single-use token and hand it to the app's custom protocol, together with the
- * nonce the app stored before opening the browser. The app exchanges the token
- * for its own session cookie; the token never becomes an app credential.
+ * browser holds the web session; the desktop app does not. Bind the pending
+ * request to this person, park a one-minute sign-in token on it and send the
+ * Electron loopback listener a one-time code. The desktop trades the code and
+ * its verifier for the token, then the token for its own session cookie.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const state = desktopAuthState(url.searchParams.get('state')) ?? ''
+  const state = desktopAuthState(url.searchParams.get('state'))
+  const callback = desktopLoopbackCallback(url.searchParams.get('callback'))
   const next = safeAuthReturn(url.searchParams.get('next') ?? '/')
   const fail = () => {
     const query = new URLSearchParams({ oauth: 'failed' })
-    if (state) query.set('desktop', '1')
-    if (state) query.set('desktop_state', state)
-    if (state) query.set('desktop_next', next)
+    if (state) {
+      query.set('desktop', '1')
+      query.set('desktop_state', state)
+      query.set('desktop_next', next)
+    }
+    if (callback) query.set('desktop_callback', callback)
     return NextResponse.redirect(new URL(withBasePath(`/sign-in?${query}`), url.origin), { status: 303, headers: safeHeaders })
   }
 
-  if (!state) return fail()
+  if (!state || !callback) return fail()
 
   const requestHeaders = await headers()
   const session = await auth.api.getSession({ headers: requestHeaders })
   if (!session) return fail()
 
+  const stateHash = sha256Hex(state)
   try {
+    // Mint the sign-in token with this browser's session, then bind the
+    // pending row to this person exactly once. A row someone else already
+    // bound, a used or expired row, or a different callback all fail.
     const { token } = await auth.api.generateOneTimeToken({ headers: requestHeaders })
     if (!token) return fail()
-    const deepLink = `mikka-desktop://auth?${new URLSearchParams({ token, state, next })}`
-    const chinese = request.headers.get('accept-language')?.startsWith('zh')
-    const copy = (chinese ? zh : en).DesktopHandoff
-    const html = `<!doctype html><html lang="${chinese ? 'zh-CN' : 'en'}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(copy.returnTitle)}</title><style>body{font:16px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f5f4;color:#1c1917}main{max-width:28rem;padding:2rem;text-align:center}a{display:inline-block;margin-top:1rem;padding:.7rem 1.2rem;border-radius:.75rem;background:#1c1917;color:#fff;text-decoration:none}</style><main><h1>${escapeHtml(copy.returnTitle)}</h1><p>${escapeHtml(copy.returnBody)}</p><a href="${escapeHtml(deepLink)}">${escapeHtml(copy.openApp)}</a></main><script>location.replace(${JSON.stringify(deepLink)})</script></html>`
-    return new NextResponse(html, { headers: { ...safeHeaders, 'Content-Type': 'text/html; charset=utf-8' } })
+    const code = newExchangeCode()
+    const now = new Date()
+    const bound = await db.update(desktopAuthRequests).set({
+      userId: session.user.id,
+      boundAt: now,
+      codeHash: sha256Hex(code),
+      token,
+      expiresAt: new Date(now.getTime() + DESKTOP_AUTH_EXCHANGE_TTL_MS),
+    })
+      .where(and(eq(desktopAuthRequests.stateHash, stateHash), eq(desktopAuthRequests.callback, callback), isNull(desktopAuthRequests.boundAt), isNull(desktopAuthRequests.usedAt), gt(desktopAuthRequests.expiresAt, now)))
+      .returning({ stateHash: desktopAuthRequests.stateHash })
+    if (!bound.length) return fail()
+    // The loopback gets a code, never the token: only the desktop that holds
+    // the verifier can trade it (/api/desktop/exchange).
+    const target = new URL(callback)
+    target.searchParams.set('code', code)
+    target.searchParams.set('state', state)
+    target.searchParams.set('next', next)
+    return NextResponse.redirect(target, { status: 303, headers: safeHeaders })
   } catch {
     return fail()
   }

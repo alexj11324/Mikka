@@ -2,23 +2,24 @@
 // the UI reads through `window.mikka`. The renderer is treated as untrusted;
 // every privileged call goes through the validated IPC surface in `./bridge`.
 
-import { app, BrowserWindow, Menu, Notification, dialog, session, shell } from 'electron'
+import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, session, shell } from 'electron'
 import { autoUpdater } from 'electron-updater'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 
 import { IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
+import { offlineRetryDelay } from './offline'
+import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { NotificationCenter } from './notification-center'
-import { appExternalUrl, desktopAuthFinishUrl, externalUrl, navigationDecision } from './security'
+import { appExternalUrl, desktopAuthState, externalUrl, navigationDecision } from './security'
 
 const APP_URL = __MIKKA_APP_URL__
 const APP_VERSION = __MIKKA_APP_VERSION__
 const FLAVOR = __MIKKA_FLAVOR__
 const PARTITION = FLAVOR === 'dev' ? 'persist:mikka-dev' : 'persist:mikka'
 const APP_ORIGIN = new URL(APP_URL).origin
-const AUTH_PROTOCOL = 'mikka-desktop'
 
 app.setName(FLAVOR === 'dev' ? 'Mikka Dev' : 'Mikka')
 if (process.platform === 'win32') app.setAppUserModelId('com.aspectlylabs.mikka')
@@ -30,28 +31,41 @@ app.on('web-contents-created', (_event, contents) => {
 
 let mainWindow: BrowserWindow | null = null
 let pendingClick: string | null = null
-let pendingProtocol: string | null = null
 let retrying: NodeJS.Timeout | null = null
+let authServer: LoopbackAuthServer | null = null
+let authTimer: NodeJS.Timeout | null = null
 
-function handleProtocolUrl(raw: string): void {
-  const finish = desktopAuthFinishUrl(raw, APP_URL)
-  if (!finish) return
-  if (!app.isReady() || !mainWindow || mainWindow.isDestroyed()) {
-    pendingProtocol = finish
-    return
-  }
-  if (mainWindow.isMinimized()) mainWindow.restore()
-  mainWindow.show()
-  mainWindow.focus()
-  void mainWindow.loadURL(finish)
+function closeAuthServer(): void {
+  if (authTimer) { clearTimeout(authTimer); authTimer = null }
+  if (authServer) { authServer.close(); authServer = null }
 }
 
-function registerProtocol(): void {
-  if (process.defaultApp && process.argv[1]) {
-    app.setAsDefaultProtocolClient(AUTH_PROTOCOL, process.execPath, [resolve(process.argv[1])])
-    return
-  }
-  app.setAsDefaultProtocolClient(AUTH_PROTOCOL)
+/**
+ * Starts a one-shot HTTP listener bound to 127.0.0.1 and returns its callback.
+ * The renderer registers that callback with the web app before opening the
+ * browser, so the token can only be delivered to this process. No custom URL
+ * scheme is registered.
+ */
+async function prepareAuth(rawState: unknown): Promise<string> {
+  const state = desktopAuthState(rawState)
+  if (!state) throw new Error('prepareAuth needs a desktop nonce')
+  closeAuthServer()
+  const listener = await startLoopbackAuth({
+    state,
+    appUrl: APP_URL,
+    onFinish: finish => {
+      authServer = null
+      if (authTimer) { clearTimeout(authTimer); authTimer = null }
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+      void mainWindow.loadURL(finish)
+    },
+  })
+  authServer = listener
+  authTimer = setTimeout(closeAuthServer, 10 * 60_000)
+  return listener.callback
 }
 
 function deliverClick(href: string): void {
@@ -114,6 +128,7 @@ function openChild(url: string): void {
   const child = new BrowserWindow({
     width: 1100,
     height: 800,
+    autoHideMenuBar: true,
     parent: mainWindow ?? undefined,
     webPreferences: {
       contextIsolation: true,
@@ -146,12 +161,28 @@ function openWindow(url: string): void {
   }
 }
 
-function retryLater(): void {
-  if (retrying) return
-  retrying = setTimeout(() => {
-    retrying = null
-    if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(APP_URL)
-  }, 5_000)
+let offlineAttempt = 0
+
+function loadApp(): void {
+  if (retrying) { clearTimeout(retrying); retrying = null }
+  if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(APP_URL)
+}
+
+function showOffline(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  const delay = offlineRetryDelay(offlineAttempt++)
+  if (!mainWindow.webContents.getURL().startsWith('file:')) {
+    void mainWindow.loadFile(join(__dirname, 'offline.html'), { query: { app: APP_URL } })
+  }
+  if (retrying) clearTimeout(retrying)
+  retrying = setTimeout(() => { retrying = null; loadApp() }, delay)
+}
+
+/** Reload goes back to the app, never to the offline file it is showing. */
+function reloadApp(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.webContents.getURL().startsWith('file:')) loadApp()
+  else mainWindow.webContents.reload()
 }
 
 function createMainWindow(): void {
@@ -161,7 +192,10 @@ function createMainWindow(): void {
     minWidth: 900,
     minHeight: 600,
     show: false,
-    backgroundColor: '#f5f5f4',
+    // The page paints its own top bar, so the native one must not show as a separate band.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#000000' : '#f5f5f4',
+    autoHideMenuBar: true,
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 14 } } : {}),
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -178,6 +212,7 @@ function createMainWindow(): void {
       additionalArguments: [`--mikka-app-origin=${APP_ORIGIN}`],
     },
   })
+  mainWindow.setMenuBarVisibility(false)
   mainWindow.once('ready-to-show', () => mainWindow?.show())
   mainWindow.on('closed', () => { mainWindow = null })
   mainWindow.webContents.setWindowOpenHandler(details => {
@@ -188,12 +223,21 @@ function createMainWindow(): void {
   mainWindow.webContents.on('will-redirect', (event, url) => handleNavigation(event, url))
   mainWindow.webContents.on('did-finish-load', () => {
     const loaded = mainWindow?.webContents.getURL() ?? ''
-    if (retrying && loaded.startsWith(APP_ORIGIN)) { clearTimeout(retrying); retrying = null }
+    if (loaded.startsWith(APP_ORIGIN)) {
+      offlineAttempt = 0
+      if (retrying) { clearTimeout(retrying); retrying = null }
+    }
+  })
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !mainWindow?.webContents.getURL().startsWith('file:')) return
+    const reload = input.key === 'F5' || ((input.control || input.meta) && input.key.toLowerCase() === 'r')
+    if (!reload) return
+    event.preventDefault()
+    loadApp()
   })
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, _description, validatedURL, isMainFrame) => {
     if (!isMainFrame || errorCode === -3 || !validatedURL.startsWith(APP_ORIGIN)) return
-    void mainWindow?.loadFile(join(__dirname, 'offline.html'))
-    retryLater()
+    showOffline()
   })
   void mainWindow.loadURL(APP_URL)
 }
@@ -271,8 +315,28 @@ async function checkForUpdates(interactive: boolean): Promise<void> {
   await autoUpdater.checkForUpdates().catch(reportUpdateError)
 }
 
+/**
+ * Ctrl/Cmd+= zooms in without Shift (Electron's default is Plus, which needs
+ * Shift on US layouts); a hidden Plus item keeps Ctrl/Cmd+Shift+= and keypad +.
+ */
+const ZOOM_ITEMS: Electron.MenuItemConstructorOptions[] = [
+  { role: 'resetZoom' },
+  { role: 'zoomIn', accelerator: 'CommandOrControl+=' },
+  { role: 'zoomIn', accelerator: 'CommandOrControl+Plus', visible: false },
+  { role: 'zoomIn', accelerator: 'CommandOrControl+numadd', visible: false },
+  { role: 'zoomOut' },
+  { role: 'zoomOut', accelerator: 'CommandOrControl+numsub', visible: false },
+]
+
 function installMenu(): void {
-  if (process.platform !== 'darwin') return
+  if (process.platform !== 'darwin') {
+    // Windows and Linux show no menu bar; the menu stays only to keep its shortcuts.
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
+      { label: 'View', submenu: [{ label: 'Reload', accelerator: 'CommandOrControl+R', click: reloadApp }, ...ZOOM_ITEMS, ...(app.isPackaged ? [] : [{ role: 'forceReload' as const }, { role: 'toggleDevTools' as const }])] },
+    ]))
+    return
+  }
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     {
       label: app.name,
@@ -299,10 +363,10 @@ function installMenu(): void {
     {
       label: 'View',
       submenu: [
-        { role: 'reload' }, { role: 'forceReload' },
+        { label: 'Reload', accelerator: 'CommandOrControl+R', click: reloadApp }, { role: 'forceReload' },
         ...(app.isPackaged ? [] : [{ role: 'toggleDevTools' as const }]),
         { type: 'separator' },
-        { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' },
+        ...ZOOM_ITEMS,
         { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
@@ -317,7 +381,6 @@ function installMenu(): void {
 }
 
 function start(): void {
-  registerProtocol()
   registerSession()
   registerBridge({
     appUrl: APP_URL,
@@ -326,6 +389,7 @@ function start(): void {
       if (!target) throw new Error('openExternal accepts only app-origin HTTP(S) URLs')
       return shell.openExternal(target)
     },
+    prepareAuth,
     localDevice: localDeviceStatus,
     quota: localQuota,
     notifications,
@@ -336,11 +400,6 @@ function start(): void {
     },
   })
   createMainWindow()
-  if (pendingProtocol) {
-    const finish = pendingProtocol
-    pendingProtocol = null
-    void mainWindow?.loadURL(finish)
-  }
   installMenu()
   setupUpdates()
   if (app.isPackaged) setTimeout(() => { void checkForUpdates(false) }, 15_000)
@@ -352,24 +411,15 @@ function start(): void {
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('open-url', (event, url) => {
-    event.preventDefault()
-    handleProtocolUrl(url)
-  })
-  app.on('second-instance', (_event, argv) => {
-    for (const argument of argv) {
-      if (argument.startsWith(`${AUTH_PROTOCOL}://`)) handleProtocolUrl(argument)
-    }
+  app.on('second-instance', () => {
     if (!mainWindow) return
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
     mainWindow.focus()
   })
+  app.on('before-quit', closeAuthServer)
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })
-  for (const argument of process.argv) {
-    if (argument.startsWith(`${AUTH_PROTOCOL}://`)) handleProtocolUrl(argument)
-  }
   void app.whenReady().then(start)
 }

@@ -37,6 +37,7 @@ next-env.d.ts
 /playwright-report/
 /test-results/
 /playwright-performance-report/
+/playwright-report-smoke/
 /performance-results/
 /blob-report/
 

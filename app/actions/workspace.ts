@@ -10,6 +10,9 @@ import { requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaceInvitations, workspaces } from '@/lib/db/workspace-schema'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
+import { slugIsReserved } from '@/lib/workspace-admin/general'
+import { transferOnSuspend } from '@/lib/workspace-admin/members'
+import { auditRequestContext, recordAuditSafe } from '@/lib/audit/record'
 
 const roleSchema = z.enum(['admin', 'member'])
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/)
@@ -50,6 +53,8 @@ export async function createWorkspace(input: string | { name: string; slug: stri
     const { name, slug } = z.object({ name: z.string().trim().min(1).max(120), slug: workspaceSlug }).parse(value)
     const workspaceId = crypto.randomUUID()
     await workspaceDb.transaction(async tx => {
+      // An old slug of another workspace keeps redirecting there, so it cannot be reused.
+      if (await slugIsReserved(tx, slug)) throw new WorkspaceError(i18nText('FeatureCopy.c_a56de3c3'))
       const [created] = await tx.insert(workspaces).values({ id: workspaceId, userId: user.id, name, slug }).onConflictDoNothing({ target: workspaces.slug }).returning({ id: workspaces.id })
       if (!created) throw new WorkspaceError(i18nText('FeatureCopy.c_a56de3c3'))
       await tx.insert(workspaceMembers).values({ workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: 'admin' })
@@ -101,16 +106,26 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; em
         links.push({ email, path: `/invite/${token}` })
       }
       return links
+    }).then(async links => {
+      // Workspace rows live in DATABASE_URL: the audit rows follow the commit (lib/audit/record.ts).
+      const request = auditRequestContext(await headers())
+      for (const link of links) await recordAuditSafe({ workspaceId: input.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.invited', target: { type: 'invitation', label: link.email }, metadata: { role }, ...request })
+      return links
     })
   })
 }
 
-export async function updateWorkspaceMember(input: { workspaceId: string; userId: string; role: string; status: string }) {
+/**
+ * Role and status. When suspending, `transferTo` (optional, another active
+ * member) takes over the suspended member's bots in this workspace.
+ */
+export async function updateWorkspaceMember(input: { workspaceId: string; userId: string; role: string; status: string; transferTo?: string }) {
   return result(async () => {
     const user = await requireUser()
     const role = roleSchema.parse(input.role)
     const status = z.enum(['active', 'suspended']).parse(input.status)
     z.string().min(1).max(200).parse(input.userId)
+    if (input.transferTo !== undefined && status !== 'suspended') throw new WorkspaceError('validationGeneric')
     await workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, input.workspaceId, user.id, true)
       const [target] = await tx.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId))).limit(1)
@@ -119,7 +134,14 @@ export async function updateWorkspaceMember(input: { workspaceId: string; userId
         const others = await tx.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), ne(workspaceMembers.userId, input.userId), eq(workspaceMembers.role, 'admin'), eq(workspaceMembers.status, 'active'))).limit(1)
         if (!others.length) throw new WorkspaceError('workspaceLastAdmin')
       }
+      if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
       await tx.update(workspaceMembers).set({ role, status }).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId)))
+      return target
+    }).then(async target => {
+      const request = auditRequestContext(await headers())
+      const base = { workspaceId: input.workspaceId, actor: { type: 'user' as const, id: user.id, name: user.name }, target: { type: 'member', id: target.userId, label: target.name || target.email }, ...request }
+      if (target.role !== role) await recordAuditSafe({ ...base, action: 'member.role_changed', metadata: { oldRole: target.role, newRole: role } })
+      if (target.status !== status) await recordAuditSafe({ ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
     })
   })
 }

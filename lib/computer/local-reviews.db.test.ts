@@ -4,13 +4,13 @@ import { createHash, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { decideLocalComputerReview, pendingLocalComputerReviews } from './local-reviews'
 import { localComputerAuthority } from './local-authority'
+import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 const url = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !url) throw new Error('Computer database test URL required')
 test('local decisions bind owner, device, live run and exact digest, and cannot be replayed', { skip: !url }, async () => {
   const target = new URL(url!)
-  assert.equal(process.env.CI, 'true')
-  assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) && ['/computer_test', '/mikka_e2e'].includes(target.pathname))
+  assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) && (target.pathname === '/computer_test' || isE2eTarget(url)))
   const schema = `local_review_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: url })
   await admin.query(`CREATE SCHEMA ${schema}`)
