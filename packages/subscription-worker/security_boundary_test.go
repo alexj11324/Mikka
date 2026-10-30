@@ -482,6 +482,9 @@ func TestCleanupFailuresCannotStarveLaterArtifacts(t *testing.T) {
 		} else {
 			last = name
 		}
+		if err := retainFixtureValue(name, []byte("synthetic")); err != nil {
+			t.Fatal(err)
+		}
 		inf.mu.Lock()
 		inf.values[name] = []byte("synthetic")
 		inf.mu.Unlock()

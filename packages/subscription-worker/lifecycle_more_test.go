@@ -136,6 +136,9 @@ func TestInfisicalRedirectAndIntegrityFailuresDoNotPublish(t *testing.T) {
 	w, inf, _ := fixtureWorker(t, "codex")
 	initial := mustAcquire(t, w)
 	record, _ := w.Repo.Lookup(context.Background(), w.Scope)
+	if err := retainFixtureValue(record.AccessName, []byte(`{"schema":1,"ownerId":"bob"}`)); err != nil {
+		t.Fatal(err)
+	}
 	inf.mu.Lock()
 	inf.values[record.AccessName] = []byte(`{"schema":1,"ownerId":"bob"}`)
 	inf.mu.Unlock()

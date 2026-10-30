@@ -206,7 +206,11 @@ func TestEnrollmentCleanupUnknownAndLateCreatesNeverReportFullyDeleted(t *testin
 				t.Fatal(err)
 			}
 			if legacy {
-				delete(claims.values, enrollmentCreationName(start.ID))
+				name := enrollmentCreationName(start.ID)
+				if err := retainFixtureValue(name, claims.values[name]); err != nil {
+					t.Fatal(err)
+				}
+				delete(claims.values, name)
 			}
 			meta, err := b.Bind(ctx, "operator:fixture-principal", start.ID, "fixture-owner-"+newID(), newID())
 			if err != nil || meta.Cleanup.Enrollment.State != "creation_outcome_unknown" || meta.Cleanup.Uncertain == 0 {
@@ -216,6 +220,9 @@ func TestEnrollmentCleanupUnknownAndLateCreatesNeverReportFullyDeleted(t *testin
 				t.Fatal("first cleanup did not delete")
 			}
 			if !legacy {
+				if err := retainFixtureValue(late.lateName, late.lateRaw); err != nil {
+					t.Fatal(err)
+				}
 				grants.mu.Lock()
 				grants.values[late.lateName] = late.lateRaw
 				grants.mu.Unlock()

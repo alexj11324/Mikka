@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { randomUUID, createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, appendFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createServer } from 'node:https'
@@ -35,6 +35,7 @@ test('authenticated binding migrates one escrow through actual canonical publica
   const h = receiptDigest.subarray(0,16).toString('hex')
   const receiptName = `mikka-byos-${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`
   values.set(`/claims/${receiptName}`, JSON.stringify({schema:'mikka.byos.creation-result.v1',principal,id,digest:createHash('sha256').update(values.get(`/pending/mikka-byos-${id}`)).digest('hex'),grantUncertain:false,attemptSettled:true}))
+  if(process.env.MIKKA_PRESERVE_BYOS_FIXTURES==='1')await appendFile(join(directory,'retained-vault.jsonl'),[...values].map(([name,value])=>JSON.stringify({name,value})).join('\n')+'\n',{mode:0o600})
   let failProjection = true, failSourceDeletes = true
   const vault = createServer({ key: await readFile(key), cert: await readFile(certificate) }, async (request, response) => {
     assert.equal(request.headers.authorization, 'Bearer fixture-custody')
@@ -45,8 +46,9 @@ test('authenticated binding migrates one escrow through actual canonical publica
     if (request.method === 'POST') {
       if (failProjection && path === '/access') { response.writeHead(503).end(); return }
       if (values.has(lookup)) { response.writeHead(409).end(); return }
+      if(process.env.MIKKA_PRESERVE_BYOS_FIXTURES==='1')await appendFile(join(directory,'retained-vault.jsonl'),JSON.stringify({name:lookup,value:body.secretValue})+'\n',{mode:0o600})
       values.set(lookup, body.secretValue)
-    } else if (request.method === 'DELETE') { if (failSourceDeletes && ['/pending','/attempts'].includes(path)) { response.writeHead(503).end(); return }; values.delete(lookup); response.writeHead(200).end('{}'); return } else assert.equal(request.method, 'GET')
+    } else if (request.method === 'DELETE') { if (failSourceDeletes && ['/pending','/attempts'].includes(path)) { response.writeHead(503).end(); return }; if(process.env.MIKKA_PRESERVE_BYOS_FIXTURES==='1')await appendFile(join(directory,'retained-vault.jsonl'),JSON.stringify({name:lookup,value:values.get(lookup)})+'\n',{mode:0o600}); values.delete(lookup); response.writeHead(200).end('{}'); return } else assert.equal(request.method, 'GET')
     if (!values.has(lookup)) { response.writeHead(404).end(); return }
     response.setHeader('content-type', 'application/json')
     response.end(JSON.stringify({ secret: { secretKey: name, secretValue: values.get(lookup), version: 1 } }))
@@ -105,7 +107,7 @@ test('authenticated binding migrates one escrow through actual canonical publica
   } finally {
     if (oldCA === undefined) delete process.env.SSL_CERT_FILE; else process.env.SSL_CERT_FILE = oldCA
     if (oldNoProxy === undefined) delete process.env.NO_PROXY; else process.env.NO_PROXY = oldNoProxy
-    vault.closeAllConnections(); await new Promise(resolve => vault.close(resolve)); await pool.end(); await rm(directory, { recursive: true, force: true })
+    vault.closeAllConnections(); await new Promise(resolve => vault.close(resolve)); await pool.end(); if (process.env.MIKKA_PRESERVE_BYOS_FIXTURES !== '1') await rm(directory, { recursive: true, force: true }); else console.log(`Retained BYOS fixture: ${directory}`)
   }
 })
 
@@ -125,5 +127,5 @@ test('source cleanup migration backfills legacy published transfers and replays 
     const {rows} = await client.query('select t."connectionId",t."boundAt",t."canonicalPublishedAt",t."sourceCreationState",count(s.*)::int copies from byos_enrollment_transfers t join byos_enrollment_sources s using("enrollmentId") group by t."enrollmentId"')
     assert.equal(rows.length,2)
     for(const row of rows){assert.equal(row.copies,2);assert.equal(row.sourceCreationState,'unknown');assert.equal(row.canonicalPublishedAt?.toISOString(),row.boundAt?.toISOString())}
-  } finally {await client.query('rollback');await client.query('set search_path to public');await client.query(`drop schema if exists ${schema} cascade`);client.release();await pool.end()}
+  } finally {await client.query('rollback');await client.query('set search_path to public');if (process.env.MIKKA_PRESERVE_BYOS_FIXTURES !== '1') await client.query(`drop schema if exists ${schema} cascade`); else console.log(`Retained BYOS schema: ${schema}`);client.release();await pool.end()}
 })

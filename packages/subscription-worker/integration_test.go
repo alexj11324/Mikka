@@ -95,6 +95,10 @@ func newFakeInfisical(t *testing.T) (*fakeInfisical, *Infisical) {
 				return
 			}
 			value = []byte(p.Value)
+			if err := retainFixtureValue(name, value); err != nil {
+				w.WriteHeader(500)
+				return
+			}
 			f.values[name] = append([]byte(nil), value...)
 			if f.loseCreate {
 				f.unreadableName = name
@@ -110,6 +114,10 @@ func newFakeInfisical(t *testing.T) (*fakeInfisical, *Infisical) {
 			}
 			if _, ok := f.values[name]; !ok {
 				w.WriteHeader(404)
+				return
+			}
+			if err := retainFixtureValue(name, f.values[name]); err != nil {
+				w.WriteHeader(500)
 				return
 			}
 			delete(f.values, name)
@@ -301,6 +309,9 @@ func fixtureWorker(t *testing.T, provider string) (*Worker, *fakeInfisical, *fak
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
+		if os.Getenv("MIKKA_PRESERVE_BYOS_FIXTURES") == "1" {
+			return
+		}
 		_, _ = db.Exec(`delete from byos_bindings where "connectionId"=$1`, s.ConnectionID)
 		_, _ = db.Exec(`delete from byos_oauth_attempts where "connectionId"=$1`, s.ConnectionID)
 		_, _ = db.Exec(`delete from byos_connections where id=$1`, s.ConnectionID)
@@ -501,6 +512,9 @@ func TestRejectedStoreAndRawProviderErrorsFailClosed(t *testing.T) {
 }
 
 func TestPostgresPublishFailureRecoversStoredBundle(t *testing.T) {
+	if os.Getenv("MIKKA_PRESERVE_BYOS_FIXTURES") == "1" {
+		t.Skip("requires removal of its fault trigger")
+	}
 	w, _, issuer := fixtureWorker(t, "codex")
 	ctx := context.Background()
 	name := "fixture_fail_" + strings.ReplaceAll(w.Scope.ConnectionID, "-", "")
@@ -571,9 +585,12 @@ func TestPrivateIPCDoesNotExposeCredentialsOrAcceptTenantOverrides(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	inf.mu.Lock()
 	projection, _ := accessProjection(b)
 	raw, digest, _ = encodeBundle(projection)
+	if err := retainFixtureValue(record.AccessName, raw); err != nil {
+		t.Fatal(err)
+	}
+	inf.mu.Lock()
 	inf.values[record.AccessName] = raw
 	inf.mu.Unlock()
 	if _, err = w.Repo.DB.Exec(`update byos_connections set "accessDigest"=$2 where id=$1`, w.Scope.ConnectionID, digest); err != nil {

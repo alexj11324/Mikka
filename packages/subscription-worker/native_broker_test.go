@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -38,6 +39,9 @@ func bindNativeRunFixture(t *testing.T, w *Worker, revision int64, route string)
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
+		if os.Getenv("MIKKA_PRESERVE_BYOS_FIXTURES") == "1" {
+			return
+		}
 		_, _ = db.Exec(`delete from agent_runs where id=$1`, run)
 		_, _ = db.Exec(`delete from agents where id=$1`, agent)
 		_, _ = db.Exec(`delete from devices where id=$1`, device)

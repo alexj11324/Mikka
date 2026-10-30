@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -238,6 +239,9 @@ func TestEnrollmentBindingRefusesReconnectAndIndependentTargetDatabase(t *testin
 	}
 }
 func TestEnrollmentBindingGlobalClaimSurvivesMetadataLoss(t *testing.T) {
+	if os.Getenv("MIKKA_PRESERVE_BYOS_FIXTURES") == "1" {
+		t.Skip("requires deletion of the transfer fixture")
+	}
 	b, _, id, canonical, _ := enrollmentBindingFixture(t)
 	ctx := context.Background()
 	owner, workspace := "fixture-owner-"+newID(), newID()

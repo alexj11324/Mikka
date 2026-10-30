@@ -94,6 +94,13 @@ try {
     DATABASE_URL: url
   }
   await run(process.execPath, ["scripts/migrate.mjs"], migrationEnv)
+  if (process.env.MIKKA_PRESERVE_BYOS_FIXTURES === "1") {
+    // Test-only synthetic DB: retain committed before/after rows, including
+    // production cleanup operations. Rolled-back transactions are not audited.
+    await pool.query(`CREATE TABLE fixture_audit_events(id bigserial primary key, recorded_at timestamptz not null default now(), relation text not null, operation text not null, prior jsonb, current jsonb);
+      CREATE FUNCTION fixture_audit_capture() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN INSERT INTO fixture_audit_events(relation,operation,prior,current) VALUES(TG_TABLE_NAME,TG_OP,CASE WHEN TG_OP='INSERT' THEN NULL ELSE to_jsonb(OLD) END,CASE WHEN TG_OP='DELETE' THEN NULL ELSE to_jsonb(NEW) END); IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW; END $$;
+      DO $$ DECLARE r record; BEGIN FOR r IN SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename <> 'fixture_audit_events' LOOP EXECUTE format('CREATE TRIGGER fixture_audit BEFORE INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION fixture_audit_capture()',r.tablename); END LOOP; END $$`)
+  }
   mkdirSync(`${worker}.cache/build`, { recursive: true })
   mkdirSync(`${worker}.cache/mod`, { recursive: true })
   const ca = "/etc/ssl/certs/ca-certificates.crt"
@@ -120,6 +127,7 @@ try {
     "-e",
     "MIKKA_BYOS_WORKER_BINARY=/work/bin/mikka-subscription-worker"
   ]
+  if (process.env.MIKKA_PRESERVE_BYOS_FIXTURES === '1') dockerArgs.push('-e', 'MIKKA_PRESERVE_BYOS_FIXTURES=1', '-e', 'MIKKA_BYOS_ARCHIVE_PATH=/work/.cache/retained-vault.jsonl')
   if (existsSync(ca))
     dockerArgs.push(
       "-v",
@@ -134,8 +142,8 @@ try {
     "CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-enrollment ./cmd/mikka-subscription-enrollment && CGO_ENABLED=0 go build -mod=readonly -tags mikka_byos_fixture -o bin/mikka-subscription-fixture ./testfixture && go test -mod=readonly -race -timeout 90s -count=1 -v ./... && go vet -mod=readonly ./... && ./bin/mikka-subscription-worker --version"
   )
   await run("docker", dockerArgs)
-  await run(process.execPath, ["--import", "tsx", "--test", "tests/byos-application.test.mjs", "tests/byos-enrollment-binding.test.mjs"], {
-    ...baseEnv, NODE_ENV: "test", MIKKA_BYOS_BACKEND_ONLY: process.env.MIKKA_BYOS_BACKEND_ONLY ?? "", MIKKA_BYOS_TEST_DATABASE_URL: url,
+  await run(process.execPath, ["--import", "./tests/support/server-only.mjs", "--import", "tsx", "--test", "tests/byos-application.test.mjs", "tests/byos-enrollment-binding.test.mjs"], {
+    ...baseEnv, NODE_ENV: "test", MIKKA_PRESERVE_BYOS_FIXTURES: process.env.MIKKA_PRESERVE_BYOS_FIXTURES ?? "", MIKKA_BYOS_BACKEND_ONLY: process.env.MIKKA_BYOS_BACKEND_ONLY ?? "", MIKKA_BYOS_TEST_DATABASE_URL: url,
     MIKKA_BYOS_FIXTURE_BINARY: `${worker}bin/mikka-subscription-fixture`
   })
   await run(process.execPath, ["scripts/migrate.mjs"], migrationEnv)

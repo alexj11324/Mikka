@@ -60,6 +60,9 @@ func (s *enrollmentMemory) Create(_ context.Context, name string, raw []byte) er
 	if _, ok := s.values[name]; ok {
 		return ErrStore
 	}
+	if err := retainFixtureValue(name, raw); err != nil {
+		return err
+	}
 	s.values[name] = append([]byte{}, raw...)
 	if s.commitThenFail {
 		return ErrCreateUncertain
@@ -82,6 +85,9 @@ func (s *enrollmentMemory) Delete(_ context.Context, name string) error {
 	s.deletes++
 	if s.deleteFail {
 		return ErrStore
+	}
+	if err := retainFixtureValue(name, s.values[name]); err != nil {
+		return err
 	}
 	delete(s.values, name)
 	return nil

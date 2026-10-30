@@ -52,10 +52,16 @@ func TestEnrollmentHandoffBindsFullCeremonyAndRetainsGlobalCredentials(t *testin
 			changed.ExpiresAt = changed.ExpiresAt.Add(time.Minute)
 		}
 		bad, _ := json.Marshal(changed)
+		if err := retainFixtureValue("mikka-byos-"+start.ID, bad); err != nil {
+			t.Fatal(err)
+		}
 		a.values["mikka-byos-"+start.ID] = bad
 		if _, err = e.Handoff(ctx, start.ID, "claude", start.HandoffKey, enrollmentCallback(start)); err == nil {
 			t.Fatal("stored ownership/PKCE binding bypass", field)
 		}
+	}
+	if err := retainFixtureValue("mikka-byos-"+start.ID, raw); err != nil {
+		t.Fatal(err)
 	}
 	a.values["mikka-byos-"+start.ID] = raw
 	e.Now = func() time.Time { return saved.ExpiresAt }
@@ -121,6 +127,9 @@ func TestEnrollmentHandoffRefusesLegacyAttemptsWithoutWeakeningLegacyOperator(t 
 	old.Provider = ""
 	old.HandoffDigest = ""
 	raw, _ := json.Marshal(old)
+	if err := retainFixtureValue("mikka-byos-"+start.ID, raw); err != nil {
+		t.Fatal(err)
+	}
 	a.values["mikka-byos-"+start.ID] = raw
 	if _, err = e.Handoff(ctx, start.ID, "claude", start.HandoffKey, enrollmentCallback(start)); err == nil || o.calls.Load() != 0 {
 		t.Fatal("unscoped legacy attempt accepted")

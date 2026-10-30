@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, readFile, rm, chmod, mkdir } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, chmod, mkdir, appendFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { createServer as httpsServer } from 'node:https'
@@ -126,9 +126,10 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
         const body = JSON.parse(Buffer.concat(chunks).toString())
         assert.equal(body.projectId, 'fixture-project'); assert.equal(body.secretPath, '/byos-cpa')
         if (secrets.has(name)) { response.writeHead(409).end(); return }
+        if(process.env.MIKKA_PRESERVE_BYOS_FIXTURES==='1')await appendFile(join(directory,'retained-vault.jsonl'),JSON.stringify({name,value:body.secretValue})+'\n',{mode:0o600})
         secrets.set(name, body.secretValue)
       } else if(request.method==='DELETE') {
-        const chunks=[];for await(const chunk of request)chunks.push(chunk);const body=JSON.parse(Buffer.concat(chunks).toString());assert.equal(body.secretPath,'/byos-cpa');assert.equal(body.projectId,'fixture-project');if(blockedDeletes.has(name)){response.writeHead(503).end();return};secrets.delete(name);response.writeHead(204).end();return
+        const chunks=[];for await(const chunk of request)chunks.push(chunk);const body=JSON.parse(Buffer.concat(chunks).toString());assert.equal(body.secretPath,'/byos-cpa');assert.equal(body.projectId,'fixture-project');if(blockedDeletes.has(name)){response.writeHead(503).end();return};if(process.env.MIKKA_PRESERVE_BYOS_FIXTURES==='1')await appendFile(join(directory,'retained-vault.jsonl'),JSON.stringify({name,value:secrets.get(name)})+'\n',{mode:0o600});secrets.delete(name);response.writeHead(204).end();return
       } else {
         assert.equal(request.method, 'GET'); assert.equal(url.searchParams.get('version'), '1')
         assert.equal(url.searchParams.get('includeImports'), 'false'); assert.equal(url.searchParams.get('expandSecretReferences'), 'false')
@@ -274,10 +275,10 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
         await pool.query('update agent_runs set "stopRequestedAt"=now() where id=$1',[runId])
         assert.equal((await nativePost(runId,{action:'context'})).status,409)
         assert.equal(providerCalls,before)
-        await pool.query('delete from agent_runs where id=$1',[runId])
+        if(process.env.MIKKA_PRESERVE_BYOS_FIXTURES!=='1')await pool.query('delete from agent_runs where id=$1',[runId])
       }
       assert.equal(secretMethods.filter(method=>method==='POST').length,noLoginCreates,'hosted tasks must reuse the original OAuth connection')
-      await pool.query('delete from agents where id=$1',[agentId]);await pool.query('delete from devices where id=$1',[deviceId])
+      if(process.env.MIKKA_PRESERVE_BYOS_FIXTURES!=='1'){await pool.query('delete from agents where id=$1',[agentId]);await pool.query('delete from devices where id=$1',[deviceId])}
       const native = await post({ action: 'bind', connectionId, revision, consumerId, route: nativeRoute, modelId: 'fixture-model' })
       const runtime = join(directory, `native-${provider}`); await mkdir(runtime)
       const cwd = join(runtime, 'project'); await mkdir(cwd)
@@ -330,6 +331,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       const name = `mikka-byos-${randomUUID()}`
       await pool.query(`insert into byos_connections(id,"ownerId","workspaceId",provider,state) values($1,'fairness-owner',$2,'codex','disconnected')`, [id, workspaceId])
       await pool.query(`insert into byos_secret_artifacts(name,"connectionId","ownerId","workspaceId",provider,kind,"notBefore","publishedAt","createStarted","createSettled") values($1,$2,'fairness-owner',$3,'codex','grant',now(),now(),true,true)`, [name,id,workspaceId])
+      if(process.env.MIKKA_PRESERVE_BYOS_FIXTURES==='1')await appendFile(join(directory,'retained-vault.jsonl'),JSON.stringify({name,value:'synthetic-fairness-value'})+'\n',{mode:0o600})
       secrets.set(name, 'synthetic-fairness-value'); if(i<2) blockedDeletes.add(name); fairness.push(name)
     }
     for(let pass=0;pass<4;pass++) await service.cleanupBatch()
@@ -421,6 +423,6 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     if (browserServer) await new Promise(resolve => browserServer.close(resolve))
     await new Promise(resolve => infisical.close(resolve))
     await pool.end()
-    await rm(directory, { recursive: true, force: true })
+    if (process.env.MIKKA_PRESERVE_BYOS_FIXTURES !== '1') await rm(directory, { recursive: true, force: true }); else console.log(`Retained BYOS fixture: ${directory}`)
   }
 })
