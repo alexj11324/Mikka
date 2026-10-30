@@ -17,11 +17,6 @@ export interface SettingsSectionDef {
   adminOnly?: boolean
   /** Has its own route instead of `?section=`. */
   routed?: boolean
-  /**
-   * Not built yet: the page only says so. Kept out of the sidebar and its search
-   * until it has content; a direct `?section=` link still resolves.
-   */
-  placeholder?: boolean
 }
 
 export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
@@ -36,16 +31,16 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
   { id: 'activity', group: 'personal', title: 'Activity' },
   { id: 'computers', group: 'personal', title: 'Computers' },
-  { id: 'developer', group: 'personal', title: 'Developer', placeholder: true },
+  { id: 'developer', group: 'personal', title: 'Developer' },
   { id: 'general', group: 'workspace', title: 'General' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
-  { id: 'bots', group: 'workspace', title: 'Bots', placeholder: true },
+  { id: 'bots', group: 'workspace', title: 'Bots' },
   { id: 'permissions', group: 'workspace', title: 'Permissions', adminOnly: true },
-  { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true, placeholder: true },
-  { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true, placeholder: true },
-  { id: 'usage', group: 'workspace', title: 'Usage', placeholder: true },
-  { id: 'billing', group: 'workspace', title: 'Billing', adminOnly: true, placeholder: true },
+  { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true },
+  { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
+  { id: 'usage', group: 'workspace', title: 'Usage' },
+  { id: 'billing', group: 'workspace', title: 'Billing', adminOnly: true },
 ]
 
 /** Section ids from before v4. Old links open the page that now holds the content. */
@@ -78,5 +73,5 @@ export function settingsHref(id: SettingsSectionId, workspaceId?: string): strin
 }
 
 export function visibleSettingsSections({ admin }: { admin: boolean }): SettingsSectionDef[] {
-  return SETTINGS_SECTIONS.filter(s => !s.placeholder && (admin || !s.adminOnly))
+  return SETTINGS_SECTIONS.filter(s => admin || !s.adminOnly)
 }
