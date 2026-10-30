@@ -43,11 +43,19 @@ async function questionStatus(id: string) {
   finally { await pool.end() }
 }
 
+async function startContinuation(originRunId: string) {
+  const pool = isolatedPool()
+  try { await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now() WHERE "questionContinuation"->>'originRunId'=$1`, [originRunId]) }
+  finally { await pool.end() }
+}
+
 async function expireQuestion(id: string) {
   const pool = isolatedPool()
   try { await pool.query("UPDATE factory_questions SET status='expired',\"updatedAt\"=now() WHERE id=$1", [id]) }
   finally { await pool.end() }
 }
+
+test.use({ video: process.env.E2E_EVIDENCE_DIR ? 'on' : 'off' })
 
 test('a thread that stopped on a question waits for your reply and takes the answer', async ({ page }, testInfo) => {
   test.skip(process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1' || process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1', 'Factory questions are behind the lifecycle flags')
@@ -85,7 +93,25 @@ test('a thread that stopped on a question waits for your reply and takes the ans
   await expect(panel.getByRole('textbox')).toBeVisible()
   await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeDisabled()
   await expect(panel.getByRole('button', { name: /停止/ })).toHaveCount(0)
+  // The resumed run is the same thread: no extra 排队中 row, no raw markdown name (Design Lead #447 blocker).
+  await expect(threads.getByRole('listitem')).toHaveCount(2)
+  await expect(threads.getByText(/^#\s/)).toHaveCount(0)
+  await expect(threads.getByText('排队中', { exact: true })).toHaveCount(0)
+  await expect(threads.getByText(/后$/)).toHaveCount(0)
   await shoot(page, testInfo, 'resuming')
+
+  // Once the continuation actually starts, send and stop come back at once.
+  await startContinuation(waiting.runId)
+  await expect(panel.getByRole('button', { name: /停止/ })).toBeVisible({ timeout: 40_000 })
+  // The composer shows stop while empty; typing brings back an enabled send (not 运行中-disabled).
+  await panel.getByRole('textbox').fill('one more thing')
+  await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeEnabled()
+  await panel.getByRole('textbox').fill('')
+  await expect(threads.getByRole('listitem')).toHaveCount(2)
+  await shoot(page, testInfo, 'resumed')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await shoot(page, testInfo, 'resumed-mobile')
+  await page.setViewportSize({ width: 1440, height: 960 })
 
   // An expired question takes no answer: an ordinary finished thread.
   await threads.getByRole('button', { name: '打开线程 Too late to answer', exact: true }).click()
