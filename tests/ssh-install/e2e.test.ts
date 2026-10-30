@@ -69,7 +69,8 @@ test('real SSH key confirmation → tarball install → systemd → registration
     let bridge!: MikkaBridge
     runInNewContext(await readFile(new URL('../../apps/desktop/dist/preload.cjs', import.meta.url), 'utf8'), {
       window: { location: { origin: new URL(appUrl).origin } },
-      process: { argv: [`--mikka-app-origin=${new URL(appUrl).origin}`] },
+      document: { documentElement: { dataset: {} } },
+      process: { platform: 'linux', argv: [`--mikka-app-origin=${new URL(appUrl).origin}`] },
       require: () => ({
         contextBridge: { exposeInMainWorld: (_name: string, value: MikkaBridge) => { bridge = value } },
         ipcRenderer: {

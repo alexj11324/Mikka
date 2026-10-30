@@ -119,3 +119,26 @@ frontend screenshots and #504's remove flow require separate acceptance.
   systemd service PID, re-registration and acknowledgment after restart.
   The final desktop lint cleanup was additionally checked with real child
   process success, failure and timeout tests and a rebuilt desktop bundle.
+
+### Integration review against main `a367418b`
+
+The integration review preserved main's locked device names and token revocation
+on removal. It also fixed three concrete paths before merge:
+
+- Removed-device command admission: occurrence 6/10 × impact 4/10 = 24.
+  `removeOwnedDevice` retains a tombstone, so filtering only by owner and kind
+  still queued unusable commands. Admission now excludes `removedAt` rows;
+  PostgreSQL tests exercise the removed target.
+- Reinstalling a running systemd unit: occurrence 7/10 × impact 6/10 = 42.
+  `enable --now` leaves an already-running process on its old arguments even
+  after the unit is rewritten. Installation now explicitly restarts the unit;
+  SSH acceptance checks a changed PID on reinstallation.
+- Receipt replay: occurrence 10/10 × impact 3/10 = 30. The daemon retains its
+  last receipt across heartbeats; an unconditional UPDATE changed completion
+  time every heartbeat. Completion updates now affect pending commands only;
+  the database replay test verifies a stable timestamp.
+
+Main's preload additionally marks the document's platform. The IPC fixture now
+provides that minimal document surface; the post-rebase SSH acceptance passed
+locally, including reinstallation. All 29 desktop unit tests passed after the
+rebase. PR #511 carries the Git-linked CI evidence for the final revision.
