@@ -75,7 +75,8 @@ class VisualGatewayAcceptance(unittest.IsolatedAsyncioTestCase):
         status,_=await self.call({'action':'type','text':'do-not-insert','actionId':str(uuid.uuid4()),'expectedObservationId':observation['observationId']});self.assertEqual(status,403)
         self.b.guard='credential-insertion-active'
         status,_=await self.call({'action':'observe'});self.assertEqual(status,409)
-        bad=self.endpoint[:-1]+('A' if self.endpoint[-1]!='A' else 'B')
+        # Corrupt the payload; the signature's last base64url char may hold only ignored padding bits.
+        bad=self.endpoint.replace('token=','token=x')
         async with self.client.post(bad,json={'action':'observe'}) as response:self.assertEqual(response.status,401)
     async def test_unknown_receipt_cannot_reexecute_and_scroll_is_real(self):
         observation,_=await self.observe()
