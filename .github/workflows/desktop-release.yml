@@ -34,6 +34,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
   NODE_VERSION: '24'
   PNPM_VERSION: '10.34.3'
 

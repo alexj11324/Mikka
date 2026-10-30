@@ -25,6 +25,12 @@ concurrency:
   # Superseded branch pushes are cancelled; every commit on main finishes.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+env:
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+
 jobs:
   changes:
     name: Changed files
