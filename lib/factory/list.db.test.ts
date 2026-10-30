@@ -82,6 +82,7 @@ test("list: candidate sha + newest publication of the current candidate only", {
     assert.equal(after.publication?.createdAt, "2026-10-30T05:00:00.000Z");
   } finally {
     await pool.end();
+    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     await admin.end();
   }
 });
