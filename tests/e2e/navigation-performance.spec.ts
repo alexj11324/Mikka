@@ -80,7 +80,7 @@ async function measureNavigation(page: Page, info: TestInfo, name: string, desti
 const members: Destination = { path: '/settings/members', selectors: ['[data-settings-state="ready"]', 'input[aria-label="搜索成员或邀请"]', 'main table tbody'], text: '回归测试成员' }
 const teams: Destination = { path: '/settings/teams', selectors: ['[data-settings-state="ready"]', 'input[aria-label="搜索团队"]'], text: '创建第一个团队' }
 const preferences: Destination = { path: '/settings', query: 'section=preferences', selectors: ['main [aria-label="界面主题"]', 'main button[aria-label="浅色"]'] }
-const profile: Destination = { path: '/settings', query: 'section=profile', selectors: ['main section[aria-labelledby="profile-heading"]'], text: '回归测试成员' }
+const profile: Destination = { path: '/settings', query: 'section=account', selectors: ['main h1'], text: '账户' }
 const workspace: Destination = { path: '/settings', query: 'section=general', selectors: ['main input[aria-label="名称"]'] }
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
@@ -107,7 +107,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
         await measureNavigation(page, info, `首次进入${name}`, destination, () => link.click())
       }
       for (let round = 1; round <= 3; round++) {
-        for (const [name, destination] of [['个人资料', profile], ['成员', members], ['团队', teams], ['常规', workspace], ['偏好设置', preferences]] as const) {
+        for (const [name, destination] of [['账户', profile], ['成员', members], ['团队', teams], ['常规', workspace], ['偏好设置', preferences]] as const) {
           const link = await sidebarLink(name)
           await measureNavigation(page, info, `${name}-缓存返回-${round}`, destination, () => link.click())
         }
