@@ -1,6 +1,6 @@
 {
   "name": "@mikka/daemon",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Local Mikka daemon: runs agents through the user's own CLIs",
   "type": "module",
   "private": true,
