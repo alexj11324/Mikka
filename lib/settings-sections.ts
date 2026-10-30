@@ -55,6 +55,11 @@ const LEGACY: Record<string, SettingsSectionId> = {
 
 const ids = new Set<string>(SETTINGS_SECTIONS.map(s => s.id))
 
+/** True for any `?section=` value settings can open, current or pre-v4. */
+export function isSettingsSectionParam(section: string): boolean {
+  return ids.has(section) || Object.hasOwn(LEGACY, section)
+}
+
 /** The section a settings URL shows. `/settings/members` and `/settings/teams` win over `?section=`. */
 export function resolveSettingsSection(pathname: string, section: string | null | undefined): SettingsSectionId {
   if (pathname.endsWith('/settings/members')) return 'members'

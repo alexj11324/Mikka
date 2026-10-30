@@ -62,7 +62,7 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
 
 test.describe('工作区访问拒绝', () => {
   // oxlint-disable-next-line no-empty-pattern -- Playwright fixture functions require destructured arguments.
-  test.use({ expectedConsoleErrors: async ({}, use) => { await use(['/api/workspace', '/api/teams/directory', '/api/workspace'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' }))) } })
+  test.use({ expectedConsoleErrors: async ({}, use) => { await use(['/api/workspace', '/api/teams/directory', '/api/workspace', '/api/workspace'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' }))) } })
 
 test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', async ({ page }) => {
   await register(page, '/settings/members')
@@ -142,8 +142,8 @@ test('团队子页切换复用目录，历史记录和刷新可恢复当前视�
   await page.getByRole('link', { name: '全部团队', exact: true }).click()
   await expect(page.getByRole('heading', { name: '团队', exact: true })).toBeVisible()
   await page.getByRole('row').filter({ hasText: '导航性能团队' }).getByRole('button', { name: '导航性能团队 的操作', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Settings', exact: true }).hover()
-  await page.getByRole('menuitem', { name: 'General', exact: true }).click()
+  await page.getByRole('menuitem', { name: '设置', exact: true }).hover()
+  await page.getByRole('menuitem', { name: '常规', exact: true }).click()
   await expect(page).toHaveURL(/view=general/)
   expect(navigations).toEqual([])
   await page.unroute('**/settings/teams?**')
@@ -199,7 +199,7 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   const teamCard = form.locator('[data-slot="field-group"]')
   await expect(teamCard).toHaveCSS('background-color', preferenceCardBackground)
   const teamCardBounds = await teamCard.boundingBox()
-  const headingBounds = await page.getByRole('heading', { name: 'Create a new team', exact: true }).boundingBox()
+  const headingBounds = await page.getByRole('heading', { name: '创建新团队', exact: true }).boundingBox()
   expect(teamCardBounds!.x).toBe(preferenceCardBounds!.x)
   expect(teamCardBounds!.width).toBe(preferenceCardBounds!.width)
   expect(headingBounds!.x).toBe(teamCardBounds!.x)
@@ -236,14 +236,14 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(sidebar.getByRole('link', { name: '设置回归团队', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(sidebar.locator('[data-slot="sidebar-group-label"]')).toHaveText(['个人', '工作区', '你的团队'])
   const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^工作区$/ }) })
-  await expect(administration.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['常规', '成员', '团队', 'Bot', '权限与审批', '密钥与环境', '审计日志', '用量', '计费'])
+  await expect(administration.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['常规', '成员', '团队', 'Bot 管理', '权限与审批', '密钥与环境', '审计日志', '用量', '计费'])
   await expect(sidebar.locator('[data-slot="sidebar-menu-sub"]')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '团队常规设置', exact: true })).toHaveCount(0)
   const settings = page.getByRole('region', { name: '团队设置选项', exact: true })
   await expect(settings.getByLabel('1 位成员', { exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['Issues, projects, and documents', 'Workflow', 'AI & agents', 'Team hierarchy', 'Danger zone'])
-  await expect(page.getByText('Slack notifications', { exact: true })).toBeVisible()
-  await expect(page.getByText('Issue statuses', { exact: true })).toHaveCount(1)
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['任务、项目和文档', '工作流', 'AI 与 Bot', '团队层级', '危险操作'])
+  await expect(page.getByText('Slack 通知', { exact: true })).toBeVisible()
+  await expect(page.getByText('任务状态', { exact: true })).toHaveCount(1)
   await page.getByRole('button', { name: '退出团队', exact: true }).click()
   const confirmation = page.getByRole('alertdialog')
   await expect(confirmation).toBeVisible()
