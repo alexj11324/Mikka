@@ -68,7 +68,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.deepEqual((res.body as { questions: unknown[] }).questions.map((q) => { const { reference: _r, ...rest } = q as Record<string, unknown>; return rest; }), [{
         questionId: a.questionId, taskId: a.taskId, runId: a.runId, status: "open", type: "decision",
         originalText: "Which API should we keep?", question: "Which API should we keep?", header: "Decision",
-        options: [{ label: "REST", description: "" }, { label: "GraphQL", description: "" }], multiSelect: false,
+        options: [{ label: "REST", description: "", value: "REST" }, { label: "GraphQL", description: "", value: "GraphQL" }], multiSelect: false,
       }]);
     });
 

@@ -4,7 +4,7 @@ import { handleFactoryQuestionList, toAskUserQuestion } from "./ask-user";
 
 const base = { id: "q1", taskId: "t1", originRunId: "r1", status: "open", question: "Pick one", options: ["A"], reference: { questionId: "q1" } };
 
-test("headers are short chips for every question kind; options carry an empty description", () => {
+test("headers are short chips for every question kind; options carry an empty description and value = label", () => {
   for (const [kind, header] of [["context", "Context"], ["decision", "Decision"], ["permission", "Permission"], ["external", "External"], ["somethingverylong", "somethingver"]]) {
     const q = toAskUserQuestion({ ...base, kind });
     assert.equal(q.header, header);
@@ -12,7 +12,7 @@ test("headers are short chips for every question kind; options carry an empty de
     assert.equal(q.type, kind);
   }
   assert.deepEqual(toAskUserQuestion({ ...base, kind: "decision", options: null }).options, []);
-  assert.deepEqual(toAskUserQuestion({ ...base, kind: "decision" }).options, [{ label: "A", description: "" }]);
+  assert.deepEqual(toAskUserQuestion({ ...base, kind: "decision" }).options, [{ label: "A", description: "", value: "A" }]);
   assert.equal(toAskUserQuestion({ ...base, kind: "decision" }).multiSelect, false);
 });
 

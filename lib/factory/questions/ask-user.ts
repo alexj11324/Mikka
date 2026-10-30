@@ -16,7 +16,9 @@ type QuestionView = {
 
 /** One pending Factory question in AskUserQuestion shape plus Mikka metadata.
  * The question text is kept verbatim (`originalText`); options become
- * `{label, description}` with an empty description (Factory stores labels only). */
+ * `{label, description, value}` with an empty description (Factory stores labels only).
+ * `value` is the option's stable identifier: it currently equals `label` and
+ * switches to a real option id if options get one later. */
 export function toAskUserQuestion(q: QuestionView) {
   return {
     questionId: q.id,
@@ -27,7 +29,7 @@ export function toAskUserQuestion(q: QuestionView) {
     originalText: q.question,
     question: q.question,
     header: HEADERS[q.kind] ?? q.kind.slice(0, 12),
-    options: (q.options ?? []).map((label) => ({ label, description: "" })),
+    options: (q.options ?? []).map((label) => ({ label, description: "", value: label })),
     multiSelect: false,
     reference: q.reference,
   };
