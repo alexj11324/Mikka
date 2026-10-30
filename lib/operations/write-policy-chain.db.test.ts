@@ -27,7 +27,7 @@ try {
  create table agent_kit_heads (owner_id text, bot_key text, workspace_id uuid, active_version uuid, primary key (owner_id,bot_key));
  create table agent_kit_versions (owner_id text, bot_key text, id uuid, definition jsonb, digest text);
  create table agent_kit_executions (owner_id text, bot_key text, id uuid, status text, snapshot jsonb, version_id uuid)`)
- for (const name of ['20261025043000_pending_actions.sql','20261028143920_operation_ledger.sql','20261028143921_approved_write_binding.sql','20261027164515_workspace_computer_policy.sql','20261029043646_agent_external_write_policy.sql','20261029043647_workspace_external_write_policy.sql']) await scopedPool.query(await readFile(new URL('../../drizzle/'+name,import.meta.url),'utf8'))
+ for (const name of ['20261025043000_pending_actions.sql','20261028143920_operation_ledger.sql','20261028143921_approved_write_binding.sql','20261027164515_workspace_computer_policy.sql','20261029010447_workspace_computer_policy_allow.sql','20261029043646_agent_external_write_policy.sql','20261029043647_workspace_external_write_policy.sql','20261030204751_workspace_computer_policy_default_allow.sql']) await scopedPool.query(await readFile(new URL('../../drizzle/'+name,import.meta.url),'utf8'))
 const owner='fixture-owner', runId=randomUUID(), revision=randomUUID(), action='append_notion_paragraph', actor={userId:owner,sessionId:'fixture-session'}
 const definition={...DEFAULT_AGENT_DEFINITION,tools:[action]}
 const snapshot=makeSnapshot(revision,1,definition,'host',{harness:'ai_sdk',model:'openai/gpt-6-luna'})
