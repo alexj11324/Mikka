@@ -1,0 +1,8603 @@
+[
+ {
+  "profile": "owner",
+  "route": "/",
+  "label": "home-chats",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings/members?invite=1",
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?section=coordinator",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?section=suggestions",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?section=plugins",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?section=artifacts",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-004-owner-home-chats-timeout-新建_Bot.png"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?section=coordinator",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|打开线程 QA 线程：测一下首页#0",
+    "role": "button",
+    "name": "打开线程 QA 线程：测一下首页",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "file|添加文件#0",
+    "role": "file",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "skip",
+    "note": "文件选择器"
+   },
+   {
+    "key": "button|添加文件#0",
+    "role": "button",
+    "name": "添加文件",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-005-owner-home-chats-button-添加文件.png"
+   },
+   {
+    "key": "textbox|给 Coordinator 发消息#0",
+    "role": "textbox",
+    "name": "给 Coordinator 发消息",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|发送#0",
+    "role": "button",
+    "name": "发送",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "tab|概览#0",
+    "role": "tab",
+    "name": "概览",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "tab|全部线程#0",
+    "role": "tab",
+    "name": "全部线程",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|搜索#0",
+    "role": "button",
+    "name": "搜索",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|加宽右栏#0",
+    "role": "button",
+    "name": "加宽右栏",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|关闭右栏#0",
+    "role": "button",
+    "name": "关闭右栏",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "tab|详情#0",
+    "role": "tab",
+    "name": "详情",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "tab|线程#0",
+    "role": "tab",
+    "name": "线程",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "tab|PR#0",
+    "role": "tab",
+    "name": "PR",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|TEST-1 QA 扫描任务 A#0",
+    "role": "button",
+    "name": "TEST-1 QA 扫描任务 A",
+    "errors": [],
+    "verdict": "vanished"
+   }
+  ],
+  "finalUrl": "/mikka",
+  "loadShot": "flags-003-owner-home-chats-load.png",
+  "elementCount": 28
+ },
+ {
+  "profile": "owner",
+  "route": "/?section=suggestions",
+  "label": "suggestions",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|刷新建议#0",
+    "role": "button",
+    "name": "刷新建议",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [
+     "建议已刷新"
+    ],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|回复 GmailQA 建议：回复邮件#0",
+    "role": "button",
+    "name": "回复 GmailQA 建议：回复邮件",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|打开线程 QA 线程：测一下首页#0",
+    "role": "button",
+    "name": "打开线程 QA 线程：测一下首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "file|添加文件#0",
+    "role": "file",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "skip",
+    "note": "文件选择器"
+   },
+   {
+    "key": "button|添加文件#0",
+    "role": "button",
+    "name": "添加文件",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|给 Coordinator 发消息#0",
+    "role": "textbox",
+    "name": "给 Coordinator 发消息",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|发送#0",
+    "role": "button",
+    "name": "发送",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|后退#1",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|前进#1",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|刷新#0",
+    "role": "button",
+    "name": "刷新",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "textbox|地址#0",
+    "role": "textbox",
+    "name": "地址",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|选择元素#0",
+    "role": "button",
+    "name": "选择元素",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|关闭浏览器#0",
+    "role": "button",
+    "name": "关闭浏览器",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka?section=suggestions",
+  "loadShot": "flags-006-owner-suggestions-load.png",
+  "elementCount": 23
+ },
+ {
+  "profile": "owner",
+  "route": "/?section=projects",
+  "label": "board",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建项目#0",
+    "role": "button",
+    "name": "新建项目",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|搜索项目#0",
+    "role": "textbox",
+    "name": "搜索项目",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "combobox|筛选项目状态#0",
+    "role": "combobox",
+    "name": "筛选项目状态",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|新建项目#1",
+    "role": "button",
+    "name": "新建项目",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka?section=projects",
+  "loadShot": "flags-007-owner-board-load.png",
+  "elementCount": 18
+ },
+ {
+  "profile": "owner",
+  "route": "/?section=agent",
+  "label": "threads-agent",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka?section=agent",
+  "loadShot": "flags-008-owner-threads-agent-load.png",
+  "elementCount": 14
+ },
+ {
+  "profile": "owner",
+  "route": "/?section=plugins",
+  "label": "plugins",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "tab|插件#0",
+    "role": "tab",
+    "name": "插件",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "tab|技能#0",
+    "role": "tab",
+    "name": "技能",
+    "errors": [
+     {
+      "kind": "http",
+      "msg": "503 GET /mikka/api/skills/search"
+     },
+     {
+      "kind": "console",
+      "msg": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+     }
+    ],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [
+     "暂时无法加载 skills.sh 技能目录。\n目录内容未显示，不代表没有匹配的技能。\n重试\n打开 skills.sh"
+    ],
+    "verdict": "error",
+    "shot": "flags-010-owner-plugins-tab-技能.png"
+   },
+   {
+    "key": "button|管理设备#0",
+    "role": "button",
+    "name": "管理设备",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?section=devices",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|关联 Google#0",
+    "role": "button",
+    "name": "关联 Google",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|刷新 GitHub 状态#0",
+    "role": "button",
+    "name": "刷新 GitHub 状态",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|在设置中管理#0",
+    "role": "link",
+    "name": "在设置中管理",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?section=connections",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|Gmail 重要邮件进建议，发信前要你确认#0",
+    "role": "link",
+    "name": "Gmail 重要邮件进建议，发信前要你确认",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|连接#0",
+    "role": "button",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|打开 Gmail#0",
+    "role": "link",
+    "name": "打开 Gmail",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|Google 日历 查看日程，改动前要你确认#0",
+    "role": "link",
+    "name": "Google 日历 查看日程，改动前要你确认",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|连接#1",
+    "role": "button",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|打开 Google 日历#0",
+    "role": "link",
+    "name": "打开 Google 日历",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|Notion 搜索和阅读你的 Notion 页面#0",
+    "role": "link",
+    "name": "Notion 搜索和阅读你的 Notion 页面",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|连接#2",
+    "role": "button",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|打开 Notion#0",
+    "role": "link",
+    "name": "打开 Notion",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|Slack 搜索消息，阅读讨论串#0",
+    "role": "link",
+    "name": "Slack 搜索消息，阅读讨论串",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|连接#3",
+    "role": "button",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|打开 Slack#0",
+    "role": "link",
+    "name": "打开 Slack",
+    "errors": [],
+    "verdict": "skip-destructive"
+   }
+  ],
+  "finalUrl": "/mikka?section=plugins",
+  "loadShot": "flags-009-owner-plugins-load.png",
+  "elementCount": 32
+ },
+ {
+  "profile": "owner",
+  "route": "/?section=artifacts",
+  "label": "artifacts",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|全部#0",
+    "role": "button",
+    "name": "全部",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-012-owner-artifacts-button-全部.png"
+   },
+   {
+    "key": "button|文档#0",
+    "role": "button",
+    "name": "文档",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|网页#0",
+    "role": "button",
+    "name": "网页",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|QA 产物 QA Frontend · TEST-1 2分钟前#0",
+    "role": "button",
+    "name": "QA 产物 QA Frontend · TEST-1 2分钟前",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka?section=artifacts",
+  "loadShot": "flags-011-owner-artifacts-load.png",
+  "elementCount": 14
+ },
+ {
+  "profile": "owner",
+  "route": "/?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4",
+  "label": "issue-detail",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开或收起侧栏#0",
+    "role": "button",
+    "name": "展开或收起侧栏",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|看板#1",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|TEST-1#0",
+    "role": "link",
+    "name": "TEST-1",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|收藏任务#0",
+    "role": "button",
+    "name": "收藏任务",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [
+     "已加入收藏"
+    ],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|更多任务操作#0",
+    "role": "button",
+    "name": "更多任务操作",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|上一个任务#0",
+    "role": "button",
+    "name": "上一个任务",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-014-owner-issue-detail-timeout-上一个任务.png"
+   },
+   {
+    "key": "button|下一个任务#0",
+    "role": "button",
+    "name": "下一个任务",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|关闭任务详情#0",
+    "role": "button",
+    "name": "关闭任务详情",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|任务标题#0",
+    "role": "textbox",
+    "name": "任务标题",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|任务描述#0",
+    "role": "textbox",
+    "name": "任务描述",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|选区评论#0",
+    "role": "button",
+    "name": "选区评论",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|子任务 0 / 0#0",
+    "role": "button",
+    "name": "子任务 0 / 0",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|添加现有任务#0",
+    "role": "button",
+    "name": "添加现有任务",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|创建子任务#0",
+    "role": "button",
+    "name": "创建子任务",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|添加子任务#0",
+    "role": "button",
+    "name": "添加子任务",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|打开线程 QA 线程：测一下首页#0",
+    "role": "button",
+    "name": "打开线程 QA 线程：测一下首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|打开线程 QA 线程：测一下首页#1",
+    "role": "button",
+    "name": "打开线程 QA 线程：测一下首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|评论内容#0",
+    "role": "textbox",
+    "name": "评论内容",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|发送评论#0",
+    "role": "button",
+    "name": "发送评论",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|任务状态：待办#0",
+    "role": "button",
+    "name": "任务状态：待办",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|任务优先级：中#0",
+    "role": "button",
+    "name": "任务优先级：中",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|归属：个人#0",
+    "role": "button",
+    "name": "归属：个人",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|负责人：未分配#0",
+    "role": "button",
+    "name": "负责人：未分配",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|添加标签#0",
+    "role": "button",
+    "name": "添加标签",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|所属项目：未设置#0",
+    "role": "button",
+    "name": "所属项目：未设置",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "combobox|团队#0",
+    "role": "combobox",
+    "name": "团队",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|#0",
+    "role": "textbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-015-owner-issue-detail-timeout-textbox.png"
+   }
+  ],
+  "finalUrl": "/mikka?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4",
+  "loadShot": "flags-013-owner-issue-detail-load.png",
+  "elementCount": 41
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=account",
+  "label": "settings-account",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=account",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=security",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=preferences",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=notifications",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=memory",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=models",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=logins",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=privacy",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=activity",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=computers",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=general",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings/members?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings/teams?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=permissions",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings/teams?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&create=1",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "file|更换#0",
+    "role": "file",
+    "name": "更换",
+    "errors": [],
+    "verdict": "skip",
+    "note": "文件选择器"
+   },
+   {
+    "key": "button|更换#0",
+    "role": "button",
+    "name": "更换",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-017-owner-settings-account-button-更换.png"
+   },
+   {
+    "key": "textbox|名称#0",
+    "role": "textbox",
+    "name": "名称",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|保存#0",
+    "role": "button",
+    "name": "保存",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|退出登录#0",
+    "role": "button",
+    "name": "退出登录",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|删除账户#0",
+    "role": "button",
+    "name": "删除账户",
+    "errors": [],
+    "verdict": "skip-destructive"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=account",
+  "loadShot": "flags-016-owner-settings-account-load.png",
+  "elementCount": 26
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=security",
+  "label": "settings-security",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|修改密码#0",
+    "role": "button",
+    "name": "修改密码",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|关联 Google#0",
+    "role": "button",
+    "name": "关联 Google",
+    "errors": [],
+    "verdict": "skip-destructive"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=security",
+  "loadShot": "flags-018-owner-settings-security-load.png",
+  "elementCount": 22
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=preferences",
+  "label": "settings-preferences",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浅色#0",
+    "role": "button",
+    "name": "浅色",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|深色#0",
+    "role": "button",
+    "name": "深色",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|跟随系统#0",
+    "role": "button",
+    "name": "跟随系统",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|简体中文#0",
+    "role": "button",
+    "name": "简体中文",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-020-owner-settings-preferences-button-简体中文.png"
+   },
+   {
+    "key": "button|English#0",
+    "role": "button",
+    "name": "English",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "textbox|前缀#0",
+    "role": "textbox",
+    "name": "前缀",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-021-owner-settings-preferences-textbox-前缀.png"
+   },
+   {
+    "key": "button|保存#0",
+    "role": "button",
+    "name": "保存",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=preferences",
+  "loadShot": "flags-019-owner-settings-preferences-load.png",
+  "elementCount": 27
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=notifications",
+  "label": "settings-notifications",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "switch|主动消息#0",
+    "role": "switch",
+    "name": "主动消息",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "checkbox|#0",
+    "role": "checkbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-023-owner-settings-notifications-timeout-checkbox.png"
+   },
+   {
+    "key": "switch|需要你决策#0",
+    "role": "switch",
+    "name": "需要你决策",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "checkbox|#1",
+    "role": "checkbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-024-owner-settings-notifications-timeout-checkbox.png"
+   },
+   {
+    "key": "switch|待审阅#0",
+    "role": "switch",
+    "name": "待审阅",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "checkbox|#2",
+    "role": "checkbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-025-owner-settings-notifications-timeout-checkbox.png"
+   },
+   {
+    "key": "switch|线程完成#0",
+    "role": "switch",
+    "name": "线程完成",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "checkbox|#3",
+    "role": "checkbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-026-owner-settings-notifications-timeout-checkbox.png"
+   },
+   {
+    "key": "switch|每日简报#0",
+    "role": "switch",
+    "name": "每日简报",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "checkbox|#4",
+    "role": "checkbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-027-owner-settings-notifications-timeout-checkbox.png"
+   },
+   {
+    "key": "button|立即#0",
+    "role": "button",
+    "name": "立即",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-028-owner-settings-notifications-button-立即.png"
+   },
+   {
+    "key": "button|电脑不在用时#0",
+    "role": "button",
+    "name": "电脑不在用时",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=notifications",
+  "loadShot": "flags-022-owner-settings-notifications-load.png",
+  "elementCount": 32
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=memory",
+  "label": "settings-memory",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "switch|从已连接的 App 中学习#0",
+    "role": "switch",
+    "name": "从已连接的 App 中学习",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "checkbox|#0",
+    "role": "checkbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-030-owner-settings-memory-timeout-checkbox.png"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=memory",
+  "loadShot": "flags-029-owner-settings-memory-load.png",
+  "elementCount": 22
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=connections",
+  "label": "settings-connections",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|刷新 GitHub 状态#0",
+    "role": "button",
+    "name": "刷新 GitHub 状态",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|Gmail 重要邮件进建议，发信前要你确认#0",
+    "role": "link",
+    "name": "Gmail 重要邮件进建议，发信前要你确认",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|连接#0",
+    "role": "button",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|打开 Gmail#0",
+    "role": "link",
+    "name": "打开 Gmail",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|Google 日历 查看日程，改动前要你确认#0",
+    "role": "link",
+    "name": "Google 日历 查看日程，改动前要你确认",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|连接#1",
+    "role": "button",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|打开 Google 日历#0",
+    "role": "link",
+    "name": "打开 Google 日历",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|Notion 搜索和阅读你的 Notion 页面#0",
+    "role": "link",
+    "name": "Notion 搜索和阅读你的 Notion 页面",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|连接#2",
+    "role": "button",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|打开 Notion#0",
+    "role": "link",
+    "name": "打开 Notion",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|Slack 搜索消息，阅读讨论串#0",
+    "role": "link",
+    "name": "Slack 搜索消息，阅读讨论串",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|连接#3",
+    "role": "button",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|打开 Slack#0",
+    "role": "link",
+    "name": "打开 Slack",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|连接 Linear#0",
+    "role": "button",
+    "name": "连接 Linear",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|生成链接#0",
+    "role": "button",
+    "name": "生成链接",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|刷新状态#0",
+    "role": "button",
+    "name": "刷新状态",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-032-owner-settings-connections-button-刷新状态.png"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=connections",
+  "loadShot": "flags-031-owner-settings-connections-load.png",
+  "elementCount": 36
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=models",
+  "label": "settings-models",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=models",
+  "loadShot": "flags-033-owner-settings-models-load.png",
+  "elementCount": 20
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=logins",
+  "label": "settings-logins",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|在对话里添加登录#0",
+    "role": "button",
+    "name": "在对话里添加登录",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=logins",
+  "loadShot": "flags-034-owner-settings-logins-load.png",
+  "elementCount": 21
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=privacy",
+  "label": "settings-privacy",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|导出#0",
+    "role": "button",
+    "name": "导出",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|管理#0",
+    "role": "button",
+    "name": "管理",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=privacy",
+  "loadShot": "flags-035-owner-settings-privacy-load.png",
+  "elementCount": 22
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=activity",
+  "label": "settings-activity",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|全部#0",
+    "role": "button",
+    "name": "全部",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-037-owner-settings-activity-button-全部.png"
+   },
+   {
+    "key": "button|用了我的账户#0",
+    "role": "button",
+    "name": "用了我的账户",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|提醒#0",
+    "role": "button",
+    "name": "提醒",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=activity",
+  "loadShot": "flags-036-owner-settings-activity-load.png",
+  "elementCount": 23
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=computers",
+  "label": "settings-computers",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|连接设备#0",
+    "role": "button",
+    "name": "连接设备",
+    "errors": [],
+    "verdict": "skip-destructive"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=computers",
+  "loadShot": "flags-038-owner-settings-computers-load.png",
+  "elementCount": 21
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=general",
+  "label": "settings-general",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|名称#0",
+    "role": "textbox",
+    "name": "名称",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|工作区 ID#0",
+    "role": "textbox",
+    "name": "工作区 ID",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-040-owner-settings-general-textbox-工作区_ID.png"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=general",
+  "loadShot": "flags-039-owner-settings-general-load.png",
+  "elementCount": 22
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=permissions",
+  "label": "settings-permissions",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=permissions",
+  "loadShot": "flags-041-owner-settings-permissions-load.png",
+  "elementCount": 20
+ },
+ {
+  "profile": "owner",
+  "route": "/settings/members",
+  "label": "settings-members",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索成员或邀请#0",
+    "role": "textbox",
+    "name": "搜索成员或邀请",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "combobox|成员状态筛选#0",
+    "role": "combobox",
+    "name": "成员状态筛选",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|#0",
+    "role": "textbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-043-owner-settings-members-timeout-textbox.png"
+   },
+   {
+    "key": "button|导出 CSV#0",
+    "role": "button",
+    "name": "导出 CSV",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|邀请成员#0",
+    "role": "button",
+    "name": "邀请成员",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|按姓名降序排列#0",
+    "role": "button",
+    "name": "按姓名降序排列",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|管理 Test owner#0",
+    "role": "button",
+    "name": "管理 Test owner",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|管理 Test peer#0",
+    "role": "button",
+    "name": "管理 Test peer",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka/settings/members",
+  "loadShot": "flags-042-owner-settings-members-load.png",
+  "elementCount": 28
+ },
+ {
+  "profile": "owner",
+  "route": "/settings/teams",
+  "label": "settings-teams",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索团队#0",
+    "role": "textbox",
+    "name": "搜索团队",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "combobox|团队范围#0",
+    "role": "combobox",
+    "name": "团队范围",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|#0",
+    "role": "textbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-045-owner-settings-teams-timeout-textbox.png"
+   },
+   {
+    "key": "button|导出团队 CSV#0",
+    "role": "button",
+    "name": "导出团队 CSV",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|新建团队#0",
+    "role": "button",
+    "name": "新建团队",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings/teams?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&create=1",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|新建团队#1",
+    "role": "button",
+    "name": "新建团队",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/settings/teams",
+  "loadShot": "flags-044-owner-settings-teams-load.png",
+  "elementCount": 26
+ },
+ {
+  "profile": "owner",
+  "route": "/settings?section=billing",
+  "label": "settings-hidden-billing",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队权限#0",
+    "role": "link",
+    "name": "团队权限",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浅色#0",
+    "role": "button",
+    "name": "浅色",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|深色#0",
+    "role": "button",
+    "name": "深色",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|跟随系统#0",
+    "role": "button",
+    "name": "跟随系统",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|简体中文#0",
+    "role": "button",
+    "name": "简体中文",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-047-owner-settings-hidden-billing-button-简体中文.png"
+   },
+   {
+    "key": "button|English#0",
+    "role": "button",
+    "name": "English",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "textbox|前缀#0",
+    "role": "textbox",
+    "name": "前缀",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-048-owner-settings-hidden-billing-textbox-前缀.png"
+   },
+   {
+    "key": "button|保存#0",
+    "role": "button",
+    "name": "保存",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=billing",
+  "loadShot": "flags-046-owner-settings-hidden-billing-load.png",
+  "elementCount": 27
+ },
+ {
+  "profile": "owner",
+  "route": "/workspaces/new",
+  "label": "workspaces-new",
+  "load": [],
+  "items": [
+   {
+    "key": "link|返回#0",
+    "role": "link",
+    "name": "返回",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|工作区名称#0",
+    "role": "textbox",
+    "name": "工作区名称",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|工作区网址#0",
+    "role": "textbox",
+    "name": "工作区网址",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|工作区数据区域#0",
+    "role": "textbox",
+    "name": "工作区数据区域",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-050-owner-workspaces-new-textbox-工作区数据区域.png"
+   },
+   {
+    "key": "button|创建工作区#0",
+    "role": "button",
+    "name": "创建工作区",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka/workspaces/new",
+  "loadShot": "flags-049-owner-workspaces-new-load.png",
+  "elementCount": 5
+ },
+ {
+  "profile": "owner",
+  "route": "/device",
+  "label": "device",
+  "load": [],
+  "items": [
+   {
+    "key": "link|Mikka 首页#0",
+    "role": "link",
+    "name": "Mikka 首页",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|终端验证码#0",
+    "role": "textbox",
+    "name": "终端验证码",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|继续#0",
+    "role": "button",
+    "name": "继续",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka/device",
+  "loadShot": "flags-051-owner-device-load.png",
+  "elementCount": 3
+ },
+ {
+  "profile": "owner",
+  "route": "/dashboard",
+  "label": "dashboard",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|打开线程 QA 线程：测一下首页#0",
+    "role": "button",
+    "name": "打开线程 QA 线程：测一下首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "file|添加文件#0",
+    "role": "file",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "skip",
+    "note": "文件选择器"
+   },
+   {
+    "key": "button|添加文件#0",
+    "role": "button",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|给 Coordinator 发消息#0",
+    "role": "textbox",
+    "name": "给 Coordinator 发消息",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|发送#0",
+    "role": "button",
+    "name": "发送",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "tab|概览#0",
+    "role": "tab",
+    "name": "概览",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "tab|全部线程#0",
+    "role": "tab",
+    "name": "全部线程",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|搜索#0",
+    "role": "button",
+    "name": "搜索",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|加宽右栏#0",
+    "role": "button",
+    "name": "加宽右栏",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|关闭右栏#0",
+    "role": "button",
+    "name": "关闭右栏",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "tab|详情#0",
+    "role": "tab",
+    "name": "详情",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "tab|线程#0",
+    "role": "tab",
+    "name": "线程",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "tab|PR#0",
+    "role": "tab",
+    "name": "PR",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|TEST-1 QA 扫描任务 AQA测试#0",
+    "role": "button",
+    "name": "TEST-1 QA 扫描任务 AQA测试",
+    "errors": [],
+    "verdict": "vanished"
+   }
+  ],
+  "finalUrl": "/mikka",
+  "loadShot": "flags-052-owner-dashboard-load.png",
+  "elementCount": 28
+ },
+ {
+  "profile": "owner",
+  "route": "/acceptance",
+  "label": "acceptance",
+  "load": [],
+  "items": [
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/acceptance",
+  "loadShot": "flags-053-owner-acceptance-load.png",
+  "elementCount": 1
+ },
+ {
+  "profile": "owner",
+  "route": "/preview/credential-login",
+  "label": "preview-credential-login",
+  "load": [],
+  "items": [
+   {
+    "key": "button|登录 Cloudflare#0",
+    "role": "button",
+    "name": "登录 Cloudflare",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka/preview/credential-login",
+  "loadShot": "flags-054-owner-preview-credential-login-load.png",
+  "elementCount": 1
+ },
+ {
+  "profile": "owner",
+  "route": "/preview/subagent-login",
+  "label": "preview-subagent-login",
+  "load": [],
+  "items": [],
+  "finalUrl": "/mikka/preview/subagent-login",
+  "loadShot": "flags-055-owner-preview-subagent-login-load.png",
+  "elementCount": 0
+ },
+ {
+  "profile": "owner",
+  "route": "/does-not-exist",
+  "label": "not-found",
+  "load": [],
+  "items": [
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/does-not-exist",
+  "loadShot": "flags-056-owner-not-found-load.png",
+  "elementCount": 1
+ },
+ {
+  "profile": "owner",
+  "route": "/",
+  "label": "issue-board",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|全部#0",
+    "role": "button",
+    "name": "全部",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|工作区#0",
+    "role": "button",
+    "name": "工作区",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|个人#0",
+    "role": "button",
+    "name": "个人",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|筛选#0",
+    "role": "button",
+    "name": "筛选",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|移除负责人筛选#0",
+    "role": "button",
+    "name": "移除负责人筛选",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|已与 Linear 同步#0",
+    "role": "button",
+    "name": "已与 Linear 同步",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|看板视图#0",
+    "role": "button",
+    "name": "看板视图",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|列表视图#0",
+    "role": "button",
+    "name": "列表视图",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|显示#0",
+    "role": "button",
+    "name": "显示",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|新建任务#0",
+    "role": "button",
+    "name": "新建任务",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|待整理列选项#0",
+    "role": "button",
+    "name": "待整理列选项",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|待办列选项#0",
+    "role": "button",
+    "name": "待办列选项",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|负责人：未分配#0",
+    "role": "button",
+    "name": "负责人：未分配",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|任务状态：待办#0",
+    "role": "button",
+    "name": "任务状态：待办",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|任务优先级：中#0",
+    "role": "button",
+    "name": "任务优先级：中",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|进行中列选项#0",
+    "role": "button",
+    "name": "进行中列选项",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|负责人：未分配#1",
+    "role": "button",
+    "name": "负责人：未分配",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|任务状态：进行中#0",
+    "role": "button",
+    "name": "任务状态：进行中",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|任务优先级：中#1",
+    "role": "button",
+    "name": "任务优先级：中",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|评审中列选项#0",
+    "role": "button",
+    "name": "评审中列选项",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|展开已完成列#0",
+    "role": "button",
+    "name": "展开已完成列",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|收起对话#0",
+    "role": "button",
+    "name": "收起对话",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|打开线程 QA 线程：测一下首页#0",
+    "role": "button",
+    "name": "打开线程 QA 线程：测一下首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "file|添加文件#0",
+    "role": "file",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "skip",
+    "note": "文件选择器"
+   },
+   {
+    "key": "button|添加文件#0",
+    "role": "button",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|给 Coordinator 发消息#0",
+    "role": "textbox",
+    "name": "给 Coordinator 发消息",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|发送#0",
+    "role": "button",
+    "name": "发送",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka",
+  "loadShot": "flags-057-owner-issue-board-load.png",
+  "elementCount": 37
+ },
+ {
+  "profile": "owner",
+  "route": "/",
+  "label": "issue-list",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|全部#0",
+    "role": "button",
+    "name": "全部",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区#0",
+    "role": "button",
+    "name": "工作区",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|个人#0",
+    "role": "button",
+    "name": "个人",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|筛选#0",
+    "role": "button",
+    "name": "筛选",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|移除负责人筛选#0",
+    "role": "button",
+    "name": "移除负责人筛选",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|已与 Linear 同步#0",
+    "role": "button",
+    "name": "已与 Linear 同步",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|看板视图#0",
+    "role": "button",
+    "name": "看板视图",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|列表视图#0",
+    "role": "button",
+    "name": "列表视图",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|显示#0",
+    "role": "button",
+    "name": "显示",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建任务#0",
+    "role": "button",
+    "name": "新建任务",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开对话#0",
+    "role": "button",
+    "name": "展开对话",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|TEST-1 QA 扫描任务 AQA测试 中 v4 10/30#0",
+    "role": "button",
+    "name": "TEST-1 QA 扫描任务 AQA测试 中 v4 10/30",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|TEST-2 QA 扫描任务 B 中 v1 10/30#0",
+    "role": "button",
+    "name": "TEST-2 QA 扫描任务 B 中 v1 10/30",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?issue=b2249726-a652-449d-b1eb-bb5af5379224",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|TEST-3 QA 扫描任务 C 中 v1 10/30#0",
+    "role": "button",
+    "name": "TEST-3 QA 扫描任务 C 中 v1 10/30",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?issue=10207822-5bc8-4835-a541-78ce6d68aa7f",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka",
+  "loadShot": "flags-058-owner-issue-list-load.png",
+  "elementCount": 24
+ },
+ {
+  "profile": "owner",
+  "route": "/",
+  "label": "thread-view",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|打开右栏#0",
+    "role": "button",
+    "name": "打开右栏",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|返回 Coordinator#0",
+    "role": "button",
+    "name": "返回 Coordinator",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|产物 · 1#0",
+    "role": "button",
+    "name": "产物 · 1",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "file|添加文件#0",
+    "role": "file",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "skip",
+    "note": "文件选择器"
+   },
+   {
+    "key": "button|添加文件#0",
+    "role": "button",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|告诉 QA Frontend 下一步做什么…#0",
+    "role": "textbox",
+    "name": "告诉 QA Frontend 下一步做什么…",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|停止#0",
+    "role": "button",
+    "name": "停止",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka",
+  "loadShot": "flags-059-owner-thread-view-load.png",
+  "elementCount": 21
+ },
+ {
+  "profile": "owner",
+  "route": "/",
+  "label": "search-palette",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|打开线程 QA 线程：测一下首页#0",
+    "role": "button",
+    "name": "打开线程 QA 线程：测一下首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "file|添加文件#0",
+    "role": "file",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "skip",
+    "note": "文件选择器"
+   },
+   {
+    "key": "button|添加文件#0",
+    "role": "button",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|给 Coordinator 发消息#0",
+    "role": "textbox",
+    "name": "给 Coordinator 发消息",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|发送#0",
+    "role": "button",
+    "name": "发送",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "tab|概览#0",
+    "role": "tab",
+    "name": "概览",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "tab|全部线程#0",
+    "role": "tab",
+    "name": "全部线程",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|搜索#0",
+    "role": "button",
+    "name": "搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|加宽右栏#0",
+    "role": "button",
+    "name": "加宽右栏",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|关闭右栏#0",
+    "role": "button",
+    "name": "关闭右栏",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "tab|详情#0",
+    "role": "tab",
+    "name": "详情",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-061-owner-search-palette-timeout-详情.png"
+   },
+   {
+    "key": "tab|线程#0",
+    "role": "tab",
+    "name": "线程",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-062-owner-search-palette-timeout-线程.png"
+   },
+   {
+    "key": "tab|PR#0",
+    "role": "tab",
+    "name": "PR",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-063-owner-search-palette-timeout-PR.png"
+   },
+   {
+    "key": "button|TEST-1 QA 扫描任务 AQA测试#0",
+    "role": "button",
+    "name": "TEST-1 QA 扫描任务 AQA测试",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-064-owner-search-palette-timeout-TEST-1_QA_扫描任务_AQA测试.png"
+   },
+   {
+    "key": "combobox|全局搜索#0",
+    "role": "combobox",
+    "name": "全局搜索",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "option|Coordinator QA测试#0",
+    "role": "option",
+    "name": "Coordinator QA测试",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "option|TEST-3 QA 扫描任务 C 已完成#0",
+    "role": "option",
+    "name": "TEST-3 QA 扫描任务 C 已完成",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "option|TEST-2 QA 扫描任务 B 进行中#0",
+    "role": "option",
+    "name": "TEST-2 QA 扫描任务 B 进行中",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "option|TEST-1 QA 扫描任务 AQA测试 待办#0",
+    "role": "option",
+    "name": "TEST-1 QA 扫描任务 AQA测试 待办",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka",
+  "loadShot": "flags-060-owner-search-palette-load.png",
+  "elementCount": 33
+ },
+ {
+  "profile": "peer",
+  "route": "/",
+  "label": "home-chats",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?section=coordinator",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?section=suggestions",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?section=plugins",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?section=artifacts",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-066-peer-home-chats-timeout-新建_Bot.png"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?section=coordinator",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "file|添加文件#0",
+    "role": "file",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "skip",
+    "note": "文件选择器"
+   },
+   {
+    "key": "button|添加文件#0",
+    "role": "button",
+    "name": "添加文件",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|给 Coordinator 发消息#0",
+    "role": "textbox",
+    "name": "给 Coordinator 发消息",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|发送#0",
+    "role": "button",
+    "name": "发送",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "tab|概览#0",
+    "role": "tab",
+    "name": "概览",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "tab|全部线程#0",
+    "role": "tab",
+    "name": "全部线程",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|搜索#0",
+    "role": "button",
+    "name": "搜索",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|加宽右栏#0",
+    "role": "button",
+    "name": "加宽右栏",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "button|关闭右栏#0",
+    "role": "button",
+    "name": "关闭右栏",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "tab|详情#0",
+    "role": "tab",
+    "name": "详情",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "tab|线程#0",
+    "role": "tab",
+    "name": "线程",
+    "errors": [],
+    "verdict": "vanished"
+   },
+   {
+    "key": "tab|PR#0",
+    "role": "tab",
+    "name": "PR",
+    "errors": [],
+    "verdict": "vanished"
+   }
+  ],
+  "finalUrl": "/mikka",
+  "loadShot": "flags-065-peer-home-chats-load.png",
+  "elementCount": 26
+ },
+ {
+  "profile": "peer",
+  "route": "/?section=projects",
+  "label": "board",
+  "load": [],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建项目#0",
+    "role": "button",
+    "name": "新建项目",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|搜索项目#0",
+    "role": "textbox",
+    "name": "搜索项目",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "combobox|筛选项目状态#0",
+    "role": "combobox",
+    "name": "筛选项目状态",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|新建项目#1",
+    "role": "button",
+    "name": "新建项目",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|后退#1",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|前进#1",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|刷新#0",
+    "role": "button",
+    "name": "刷新",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "textbox|地址#0",
+    "role": "textbox",
+    "name": "地址",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|选择元素#0",
+    "role": "button",
+    "name": "选择元素",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|关闭浏览器#0",
+    "role": "button",
+    "name": "关闭浏览器",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka?section=projects",
+  "loadShot": "flags-067-peer-board-load.png",
+  "elementCount": 24
+ },
+ {
+  "profile": "peer",
+  "route": "/?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4",
+  "label": "issue-detail-owner-issue",
+  "load": [
+   {
+    "kind": "http",
+    "msg": "500 POST /mikka?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4"
+   },
+   {
+    "kind": "console",
+    "msg": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+   },
+   {
+    "kind": "http",
+    "msg": "500 POST /mikka?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4"
+   },
+   {
+    "kind": "console",
+    "msg": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+   }
+  ],
+  "items": [
+   {
+    "key": "button|后退#0",
+    "role": "button",
+    "name": "后退",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|前进#0",
+    "role": "button",
+    "name": "前进",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|全局搜索#0",
+    "role": "button",
+    "name": "全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浏览器#0",
+    "role": "button",
+    "name": "浏览器",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|主页#0",
+    "role": "button",
+    "name": "主页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|建议#0",
+    "role": "button",
+    "name": "建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|看板#0",
+    "role": "button",
+    "name": "看板",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|插件#0",
+    "role": "button",
+    "name": "插件",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|产物#0",
+    "role": "button",
+    "name": "产物",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|收起 Bot 列表#0",
+    "role": "button",
+    "name": "收起 Bot 列表",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建 Bot#0",
+    "role": "button",
+    "name": "新建 Bot",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Coordinator#0",
+    "role": "button",
+    "name": "Coordinator",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|展开或收起侧栏边轨#0",
+    "role": "button",
+    "name": "展开或收起侧栏边轨",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|重新读取#0",
+    "role": "button",
+    "name": "重新读取",
+    "errors": [
+     {
+      "kind": "http",
+      "msg": "500 POST /mikka?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4"
+     },
+     {
+      "kind": "console",
+      "msg": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+     }
+    ],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "error",
+    "shot": "flags-069-peer-issue-detail-owner-issue-button-重新读取.png"
+   },
+   {
+    "key": "button|返回工作台#0",
+    "role": "button",
+    "name": "返回工作台",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4",
+  "loadShot": "flags-068-peer-issue-detail-owner-issue-load.png",
+  "elementCount": 16
+ },
+ {
+  "profile": "peer",
+  "route": "/settings?section=general",
+  "label": "settings-general",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=account",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=security",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=preferences",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=notifications",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=memory",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=models",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=logins",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=privacy",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=activity",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=computers",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&section=general",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings/members?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings/teams?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings/teams?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&create=1",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|名称#0",
+    "role": "textbox",
+    "name": "名称",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-071-peer-settings-general-textbox-名称.png"
+   },
+   {
+    "key": "textbox|工作区 ID#0",
+    "role": "textbox",
+    "name": "工作区 ID",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-072-peer-settings-general-textbox-工作区_ID.png"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=general",
+  "loadShot": "flags-070-peer-settings-general-load.png",
+  "elementCount": 21
+ },
+ {
+  "profile": "peer",
+  "route": "/settings/members",
+  "label": "settings-members",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索成员或邀请#0",
+    "role": "textbox",
+    "name": "搜索成员或邀请",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "combobox|成员状态筛选#0",
+    "role": "combobox",
+    "name": "成员状态筛选",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|#0",
+    "role": "textbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-074-peer-settings-members-timeout-textbox.png"
+   },
+   {
+    "key": "button|导出 CSV#0",
+    "role": "button",
+    "name": "导出 CSV",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|邀请成员#0",
+    "role": "button",
+    "name": "邀请成员",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|按姓名降序排列#0",
+    "role": "button",
+    "name": "按姓名降序排列",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka/settings/members",
+  "loadShot": "flags-073-peer-settings-members-load.png",
+  "elementCount": 25
+ },
+ {
+  "profile": "peer",
+  "route": "/settings/teams",
+  "label": "settings-teams",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索团队#0",
+    "role": "textbox",
+    "name": "搜索团队",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "combobox|团队范围#0",
+    "role": "combobox",
+    "name": "团队范围",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|#0",
+    "role": "textbox",
+    "name": "",
+    "errors": [],
+    "verdict": "timeout",
+    "note": "locator.click: Timeout 4000ms exceeded.",
+    "shot": "flags-076-peer-settings-teams-timeout-textbox.png"
+   },
+   {
+    "key": "button|导出团队 CSV#0",
+    "role": "button",
+    "name": "导出团队 CSV",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|新建团队#0",
+    "role": "button",
+    "name": "新建团队",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/settings/teams?workspace=46cbec2c-9f23-40ff-8a50-c6887fe56cd4&create=1",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|新建团队#1",
+    "role": "button",
+    "name": "新建团队",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/settings/teams",
+  "loadShot": "flags-075-peer-settings-teams-load.png",
+  "elementCount": 25
+ },
+ {
+  "profile": "peer",
+  "route": "/settings?section=permissions",
+  "label": "settings-permissions-hidden",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=permissions",
+  "loadShot": "flags-077-peer-settings-permissions-hidden-load.png",
+  "elementCount": 19
+ },
+ {
+  "profile": "peer",
+  "route": "/settings?section=preferences",
+  "label": "settings-preferences",
+  "load": [],
+  "items": [
+   {
+    "key": "button|工作区菜单#0",
+    "role": "button",
+    "name": "工作区菜单",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|搜索设置#0",
+    "role": "textbox",
+    "name": "搜索设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|账户#0",
+    "role": "link",
+    "name": "账户",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|安全#0",
+    "role": "link",
+    "name": "安全",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|通知#0",
+    "role": "link",
+    "name": "通知",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|记忆与建议#0",
+    "role": "link",
+    "name": "记忆与建议",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|连接#0",
+    "role": "link",
+    "name": "连接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|模型与额度#0",
+    "role": "link",
+    "name": "模型与额度",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|登录与密钥#0",
+    "role": "link",
+    "name": "登录与密钥",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|数据与隐私#0",
+    "role": "link",
+    "name": "数据与隐私",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|活动#0",
+    "role": "link",
+    "name": "活动",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|设备#0",
+    "role": "link",
+    "name": "设备",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|常规#0",
+    "role": "link",
+    "name": "常规",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|成员#0",
+    "role": "link",
+    "name": "成员",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|团队#0",
+    "role": "link",
+    "name": "团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建团队#0",
+    "role": "link",
+    "name": "创建团队",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|Toggle Sidebar#0",
+    "role": "button",
+    "name": "Toggle Sidebar",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|浅色#0",
+    "role": "button",
+    "name": "浅色",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|深色#0",
+    "role": "button",
+    "name": "深色",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|跟随系统#0",
+    "role": "button",
+    "name": "跟随系统",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|简体中文#0",
+    "role": "button",
+    "name": "简体中文",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-079-peer-settings-preferences-button-简体中文.png"
+   },
+   {
+    "key": "button|English#0",
+    "role": "button",
+    "name": "English",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "textbox|前缀#0",
+    "role": "textbox",
+    "name": "前缀",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-080-peer-settings-preferences-textbox-前缀.png"
+   },
+   {
+    "key": "button|保存#0",
+    "role": "button",
+    "name": "保存",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=preferences",
+  "loadShot": "flags-078-peer-settings-preferences-load.png",
+  "elementCount": 26
+ },
+ {
+  "profile": "mobile",
+  "route": "/",
+  "label": "home-chats",
+  "load": [],
+  "items": [
+   {
+    "key": "button|展开或收起侧栏#0",
+    "role": "button",
+    "name": "展开或收起侧栏",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|Coordinator#0",
+    "role": "link",
+    "name": "Coordinator",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|打开全局搜索#0",
+    "role": "button",
+    "name": "打开全局搜索",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|打开线程 QA 线程：测一下首页#0",
+    "role": "button",
+    "name": "打开线程 QA 线程：测一下首页",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [
+     "停止未确认\n重试停止"
+    ],
+    "verdict": "ok"
+   },
+   {
+    "key": "file|添加文件#0",
+    "role": "file",
+    "name": "添加文件",
+    "errors": [],
+    "verdict": "skip",
+    "note": "文件选择器"
+   },
+   {
+    "key": "button|添加文件#0",
+    "role": "button",
+    "name": "添加文件",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-082-mobile-home-chats-button-添加文件.png"
+   },
+   {
+    "key": "textbox|给 Coordinator 发消息#0",
+    "role": "textbox",
+    "name": "给 Coordinator 发消息",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|发送#0",
+    "role": "button",
+    "name": "发送",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka",
+  "loadShot": "flags-081-mobile-home-chats-load.png",
+  "elementCount": 8
+ },
+ {
+  "profile": "mobile",
+  "route": "/?section=projects",
+  "label": "board",
+  "load": [],
+  "items": [
+   {
+    "key": "button|展开或收起侧栏#0",
+    "role": "button",
+    "name": "展开或收起侧栏",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|项目#0",
+    "role": "link",
+    "name": "项目",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|打开全局搜索#0",
+    "role": "button",
+    "name": "打开全局搜索",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|新建项目#0",
+    "role": "button",
+    "name": "新建项目",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|搜索项目#0",
+    "role": "textbox",
+    "name": "搜索项目",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "combobox|筛选项目状态#0",
+    "role": "combobox",
+    "name": "筛选项目状态",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|新建项目#1",
+    "role": "button",
+    "name": "新建项目",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka?section=projects",
+  "loadShot": "flags-083-mobile-board-load.png",
+  "elementCount": 7
+ },
+ {
+  "profile": "mobile",
+  "route": "/?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4",
+  "label": "issue-detail",
+  "load": [],
+  "items": [
+   {
+    "key": "button|展开或收起侧栏#0",
+    "role": "button",
+    "name": "展开或收起侧栏",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|更多位置#0",
+    "role": "button",
+    "name": "更多位置",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|TEST-1#0",
+    "role": "link",
+    "name": "TEST-1",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|取消收藏任务#0",
+    "role": "button",
+    "name": "取消收藏任务",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [
+     "已取消收藏"
+    ],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|更多任务操作#0",
+    "role": "button",
+    "name": "更多任务操作",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|上一个任务#0",
+    "role": "button",
+    "name": "上一个任务",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka?issue=b2249726-a652-449d-b1eb-bb5af5379224",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|下一个任务#0",
+    "role": "button",
+    "name": "下一个任务",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|关闭任务详情#0",
+    "role": "button",
+    "name": "关闭任务详情",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|属性与任务关系#0",
+    "role": "button",
+    "name": "属性与任务关系",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|任务标题#0",
+    "role": "textbox",
+    "name": "任务标题",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|任务描述#0",
+    "role": "textbox",
+    "name": "任务描述",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|选区评论#0",
+    "role": "button",
+    "name": "选区评论",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|子任务 0 / 0#0",
+    "role": "button",
+    "name": "子任务 0 / 0",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|添加现有任务#0",
+    "role": "button",
+    "name": "添加现有任务",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|创建子任务#0",
+    "role": "button",
+    "name": "创建子任务",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|添加子任务#0",
+    "role": "button",
+    "name": "添加子任务",
+    "errors": [],
+    "changed": true,
+    "overlay": true,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|打开线程 QA 线程：测一下首页#0",
+    "role": "button",
+    "name": "打开线程 QA 线程：测一下首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|打开线程 QA 线程：测一下首页#1",
+    "role": "button",
+    "name": "打开线程 QA 线程：测一下首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|评论内容#0",
+    "role": "textbox",
+    "name": "评论内容",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|发送评论#0",
+    "role": "button",
+    "name": "发送评论",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4",
+  "loadShot": "flags-084-mobile-issue-detail-load.png",
+  "elementCount": 20
+ },
+ {
+  "profile": "mobile",
+  "route": "/settings?section=preferences",
+  "label": "settings",
+  "load": [],
+  "items": [
+   {
+    "key": "button|展开或收起侧栏#0",
+    "role": "button",
+    "name": "展开或收起侧栏",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|偏好设置#0",
+    "role": "link",
+    "name": "偏好设置",
+    "errors": [],
+    "verdict": "disabled"
+   },
+   {
+    "key": "button|浅色#0",
+    "role": "button",
+    "name": "浅色",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|深色#0",
+    "role": "button",
+    "name": "深色",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|跟随系统#0",
+    "role": "button",
+    "name": "跟随系统",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|简体中文#0",
+    "role": "button",
+    "name": "简体中文",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-086-mobile-settings-button-简体中文.png"
+   },
+   {
+    "key": "button|English#0",
+    "role": "button",
+    "name": "English",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "textbox|前缀#0",
+    "role": "textbox",
+    "name": "前缀",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-087-mobile-settings-textbox-前缀.png"
+   },
+   {
+    "key": "button|保存#0",
+    "role": "button",
+    "name": "保存",
+    "errors": [],
+    "verdict": "disabled"
+   }
+  ],
+  "finalUrl": "/mikka/settings?section=preferences",
+  "loadShot": "flags-085-mobile-settings-load.png",
+  "elementCount": 9
+ },
+ {
+  "profile": "dark",
+  "route": "/",
+  "label": "home-chats",
+  "load": [],
+  "items": [],
+  "finalUrl": "/mikka",
+  "loadShot": "flags-088-dark-home-chats-load.png",
+  "elementCount": 28,
+  "truncated": 28
+ },
+ {
+  "profile": "dark",
+  "route": "/?section=projects",
+  "label": "board",
+  "load": [],
+  "items": [],
+  "finalUrl": "/mikka?section=projects",
+  "loadShot": "flags-089-dark-board-load.png",
+  "elementCount": 18,
+  "truncated": 18
+ },
+ {
+  "profile": "dark",
+  "route": "/?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4",
+  "label": "issue-detail",
+  "load": [],
+  "items": [],
+  "finalUrl": "/mikka?issue=90c2416c-fa0b-4a79-84e8-4f2cfd2700a4",
+  "loadShot": "flags-090-dark-issue-detail-load.png",
+  "elementCount": 41,
+  "truncated": 41
+ },
+ {
+  "profile": "dark",
+  "route": "/settings?section=preferences",
+  "label": "settings",
+  "load": [],
+  "items": [],
+  "finalUrl": "/mikka/settings?section=preferences",
+  "loadShot": "flags-091-dark-settings-load.png",
+  "elementCount": 27,
+  "truncated": 27
+ },
+ {
+  "profile": "anon",
+  "route": "/sign-in",
+  "label": "sign-in",
+  "load": [],
+  "items": [
+   {
+    "key": "link|Mikka 首页#0",
+    "role": "link",
+    "name": "Mikka 首页",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|创建账号#0",
+    "role": "link",
+    "name": "创建账号",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/sign-up",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|使用 Google 继续#0",
+    "role": "button",
+    "name": "使用 Google 继续",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|使用 GitHub 继续#0",
+    "role": "button",
+    "name": "使用 GitHub 继续",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "textbox|邮箱#0",
+    "role": "textbox",
+    "name": "邮箱",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "link|忘记密码？#0",
+    "role": "link",
+    "name": "忘记密码？",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/forgot-password",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|密码#0",
+    "role": "textbox",
+    "name": "密码",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|登录工作台#0",
+    "role": "button",
+    "name": "登录工作台",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-093-anon-sign-in-button-登录工作台.png"
+   },
+   {
+    "key": "link|创建账号#1",
+    "role": "link",
+    "name": "创建账号",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/sign-in",
+  "loadShot": "flags-092-anon-sign-in-load.png",
+  "elementCount": 9
+ },
+ {
+  "profile": "anon",
+  "route": "/sign-up",
+  "label": "sign-up",
+  "load": [],
+  "items": [
+   {
+    "key": "link|Mikka 首页#0",
+    "role": "link",
+    "name": "Mikka 首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|去登录#0",
+    "role": "link",
+    "name": "去登录",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/sign-in",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "button|使用 Google 继续#0",
+    "role": "button",
+    "name": "使用 Google 继续",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|使用 GitHub 继续#0",
+    "role": "button",
+    "name": "使用 GitHub 继续",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "textbox|称呼#0",
+    "role": "textbox",
+    "name": "称呼",
+    "errors": [],
+    "changed": true,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   },
+   {
+    "key": "textbox|邮箱#0",
+    "role": "textbox",
+    "name": "邮箱",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|密码#0",
+    "role": "textbox",
+    "name": "密码",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|创建账号并进入#0",
+    "role": "button",
+    "name": "创建账号并进入",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-095-anon-sign-up-button-创建账号并进入.png"
+   },
+   {
+    "key": "link|去登录#1",
+    "role": "link",
+    "name": "去登录",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/sign-up",
+  "loadShot": "flags-094-anon-sign-up-load.png",
+  "elementCount": 9
+ },
+ {
+  "profile": "anon",
+  "route": "/forgot-password",
+  "label": "forgot-password",
+  "load": [],
+  "items": [
+   {
+    "key": "link|Mikka 首页#0",
+    "role": "link",
+    "name": "Mikka 首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建账号#0",
+    "role": "link",
+    "name": "创建账号",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|邮箱#0",
+    "role": "textbox",
+    "name": "邮箱",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|发送重置链接#0",
+    "role": "button",
+    "name": "发送重置链接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|返回登录#0",
+    "role": "link",
+    "name": "返回登录",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/sign-in",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka/forgot-password",
+  "loadShot": "flags-096-anon-forgot-password-load.png",
+  "elementCount": 5
+ },
+ {
+  "profile": "anon",
+  "route": "/reset-password",
+  "label": "reset-password",
+  "load": [],
+  "items": [
+   {
+    "key": "link|Mikka 首页#0",
+    "role": "link",
+    "name": "Mikka 首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建账号#0",
+    "role": "link",
+    "name": "创建账号",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|重新获取链接#0",
+    "role": "link",
+    "name": "重新获取链接",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/forgot-password",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka/reset-password",
+  "loadShot": "flags-097-anon-reset-password-load.png",
+  "elementCount": 3
+ },
+ {
+  "profile": "anon",
+  "route": "/verify-email",
+  "label": "verify-email",
+  "load": [],
+  "items": [
+   {
+    "key": "link|Mikka 首页#0",
+    "role": "link",
+    "name": "Mikka 首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建账号#0",
+    "role": "link",
+    "name": "创建账号",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|邮箱#0",
+    "role": "textbox",
+    "name": "邮箱",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|发送验证链接#0",
+    "role": "button",
+    "name": "发送验证链接",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "link|返回登录#0",
+    "role": "link",
+    "name": "返回登录",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/verify-email",
+  "loadShot": "flags-098-anon-verify-email-load.png",
+  "elementCount": 5
+ },
+ {
+  "profile": "anon",
+  "route": "/",
+  "label": "anon-root",
+  "load": [],
+  "items": [
+   {
+    "key": "link|Mikka 首页#0",
+    "role": "link",
+    "name": "Mikka 首页",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|创建账号#0",
+    "role": "link",
+    "name": "创建账号",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|使用 Google 继续#0",
+    "role": "button",
+    "name": "使用 Google 继续",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "button|使用 GitHub 继续#0",
+    "role": "button",
+    "name": "使用 GitHub 继续",
+    "errors": [],
+    "verdict": "skip-destructive"
+   },
+   {
+    "key": "textbox|邮箱#0",
+    "role": "textbox",
+    "name": "邮箱",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "link|忘记密码？#0",
+    "role": "link",
+    "name": "忘记密码？",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "textbox|密码#0",
+    "role": "textbox",
+    "name": "密码",
+    "errors": [],
+    "verdict": "dup"
+   },
+   {
+    "key": "button|登录工作台#0",
+    "role": "button",
+    "name": "登录工作台",
+    "errors": [],
+    "changed": false,
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "noop",
+    "shot": "flags-100-anon-anon-root-button-登录工作台.png"
+   },
+   {
+    "key": "link|创建账号#1",
+    "role": "link",
+    "name": "创建账号",
+    "errors": [],
+    "verdict": "dup"
+   }
+  ],
+  "finalUrl": "/mikka/sign-in",
+  "loadShot": "flags-099-anon-anon-root-load.png",
+  "elementCount": 9
+ },
+ {
+  "profile": "anon",
+  "route": "/invite/not-a-token",
+  "label": "invite-bad-token",
+  "load": [],
+  "items": [
+   {
+    "key": "link|返回工作台#0",
+    "role": "link",
+    "name": "返回工作台",
+    "errors": [],
+    "changed": true,
+    "urlAfter": "/mikka/sign-in",
+    "overlay": false,
+    "toasts": [],
+    "alerts": [],
+    "verdict": "ok"
+   }
+  ],
+  "finalUrl": "/mikka/invite/not-a-token",
+  "loadShot": "flags-101-anon-invite-bad-token-load.png",
+  "elementCount": 1
+ }
+]

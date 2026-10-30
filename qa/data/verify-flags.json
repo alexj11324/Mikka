@@ -1,0 +1,502 @@
+[
+ {
+  "name": "invite-peer-via-ui",
+  "errors": [],
+  "notes": [
+   "peer url after accept: http://localhost:3100/mikka/settings/members?workspace=360dc6e7-bd1f-4e97-8d43-fe9ff2309c73"
+  ],
+  "result": "pass",
+  "shot": "flags-v001-invite-peer-via-ui.png"
+ },
+ {
+  "name": "home-new-bot-dialog",
+  "errors": [],
+  "notes": [
+   "新建 Bot count=1 visible=true",
+   "dialogs=1 text=新建 Bot /  / 给 Bot 起名，选一个形状和颜色。 /  / 取消 / 创建 / 关闭"
+  ],
+  "result": "pass",
+  "shot": "flags-v002-home-new-bot-dialog.png"
+ },
+ {
+  "name": "home-new-bot-create",
+  "errors": [],
+  "notes": [
+   "dialog open=0 bot in list: 4 url=/mikka?section=coordinator&bot=a6d8fc58-c3b6-4445-89bc-0adcfd6257a2",
+   "db bots=[\"column \\\"userId\\\" does not exist\"]"
+  ],
+  "result": "pass",
+  "shot": "flags-v003-home-new-bot-create.png"
+ },
+ {
+  "name": "board-rail",
+  "errors": [],
+  "notes": [
+   "url=/mikka",
+   "buttons=[\"工作区菜单\",\"全部\",\"工作区\",\"个人\",\"筛选\",\"移除负责人筛选\",\"已与 Linear 同步\",\"看板视图\",\"列表视图\",\"显示\",\"新建任务\",\"待整理列选项\",\"待办列选项\",\"负责人：未分配\",\"任务状态：待办\",\"任务优先级：中\",\"进行中列选项\",\"负责人：未分配\",\"任务状态：进行中\",\"任务优先级：中\",\"评审中列选项\",\"展开已完成列\",\"收起对话\",\"打开线程 QA 线程：测一下首页\",\"Scroll to end\",\"添加文件\",\"发送\"]",
+   "after typing url=/mikka",
+   "created rows=0",
+   "after reload url=/mikka boardVisible=0"
+  ],
+  "result": "pass",
+  "shot": "flags-v005-board-rail.png"
+ },
+ {
+  "name": "board-list-toggle",
+  "errors": [],
+  "notes": [
+   "list toggle count=1",
+   "rows QA=3"
+  ],
+  "result": "pass",
+  "shot": "flags-v007-board-list-toggle.png"
+ },
+ {
+  "name": "composer-attach-filechooser",
+  "errors": [],
+  "notes": [
+   "locator.click: Timeout 30000ms exceeded. Call log:   - waiting for getByRole('button', { name: '添加文件', exact: true }).first()"
+  ],
+  "result": "fail",
+  "shot": "flags-v008-composer-attach-filechooser.png"
+ },
+ {
+  "name": "composer-send-message",
+  "errors": [],
+  "notes": [
+   "tail: Coordinator /  / 首页很慢 /  / QA Frontend 已接手。 /  / QA 线程：测一下首页 / 你好，QA 测试消息 / Scroll to end / 添加文件"
+  ],
+  "result": "pass",
+  "shot": "flags-v009-composer-send-message.png"
+ },
+ {
+  "name": "thread-open-and-tabs",
+  "errors": [],
+  "notes": [
+   "url=/mikka",
+   "tabs=[\"概览\",\"全部线程\",\"详情\",\"线程\",\"PR\"]",
+   "buttons=[\"Coordinator\",\"产物 · 1\"]"
+  ],
+  "result": "pass",
+  "shot": "flags-v012-thread-open-and-tabs.png"
+ },
+ {
+  "name": "thread-computer-tab",
+  "errors": [],
+  "notes": [
+   "computer tab count=0"
+  ],
+  "result": "pass",
+  "shot": "flags-v013-thread-computer-tab.png"
+ },
+ {
+  "name": "thread-stop",
+  "errors": [],
+  "notes": [
+   "stop count=1",
+   "status: running"
+  ],
+  "result": "pass",
+  "shot": "flags-v014-thread-stop.png"
+ },
+ {
+  "name": "board-create-issue",
+  "errors": [],
+  "notes": [
+   "buttons=[\"搜索 Bot、对话、群聊、任务和项目\\nCtrl\\nK\",\"主页\",\"建议\",\"看板\",\"插件\",\"产物\",\"T\\nTest owner的工作区\",\"Coordinator\\n你好，QA 测试消息\",\"QA Bot\",\"新建项目\",\"新建项目\"]",
+   "new task count=0"
+  ],
+  "result": "pass",
+  "shot": "flags-v015-board-create-issue.png"
+ },
+ {
+  "name": "board-new-project",
+  "errors": [],
+  "notes": [
+   "dialog=项目 / 新建项目 /  / 设置项目名称、描述、属性和里程碑，保存到工作区。 /  / 项目名称 / 待规划 / 无优先级 / 负责人 / 成员 / 开始日期 / 目标日期 / 标签 / 依赖 / 主责团队 / 无团队 · 私有项目 /  / 未关联团队的项目仅创建者可见。 /  / 描述 / 文本 /  /  /  /  / 里程碑 / Ctrl / Enter / 创建 / 创建项目",
+   "projects=relation \"projects\" does not exist"
+  ],
+  "result": "pass",
+  "shot": "flags-v016-board-new-project.png"
+ },
+ {
+  "name": "issue-status-change",
+  "errors": [],
+  "notes": [
+   "menu=[\"待整理\",\"待办\",\"进行中\",\"评审中\",\"已完成\",\"已取消\",\"重复\"][]",
+   "db status=doing"
+  ],
+  "result": "pass",
+  "shot": "flags-v017-issue-status-change.png"
+ },
+ {
+  "name": "issue-prev-next",
+  "errors": [],
+  "notes": [
+   "prev enabled=true next enabled=false",
+   "url changed=true"
+  ],
+  "result": "pass",
+  "shot": "flags-v018-issue-prev-next.png"
+ },
+ {
+  "name": "issue-comment",
+  "errors": [],
+  "notes": [
+   "comment visible=1"
+  ],
+  "result": "pass",
+  "shot": "flags-v019-issue-comment.png"
+ },
+ {
+  "name": "issue-team-combobox",
+  "errors": [],
+  "notes": [
+   "opts=[\"无团队\"]",
+   "unnamed inputs=[\"<input id=\\\"base-ui-_r_1a_-hidden-input\\\" tabindex=\\\"-1\\\" aria-hidden=\\\"true\\\" value=\\\"none\\\" style=\\\"clip-path: inset(50%); overflow: hidden; white-space: nowrap; border: 0px; padding: 0px; width: 1px; height\"]"
+  ],
+  "result": "pass",
+  "shot": "flags-v020-issue-team-combobox.png"
+ },
+ {
+  "name": "issue-more-menu",
+  "errors": [],
+  "notes": [
+   "menu=[\"设置状态\",\"设置优先级\",\"分配负责人…\",\"移动到项目…\",\"添加或移除标签…\",\"设置截止日期…\",\"设置工作量估算…\",\"创建子任务…\",\"添加现有子任务…\",\"设置父任务…\",\"添加任务关系\",\"复制\",\"在新标签页中打开\",\"创建任务副本…\",\"添加到收藏\",\"关注任务活动\",\"显示描述历史…\",\"管理关联 PR…\",\"管理协作成员…\",\"高级文档工具\",\"删除任务…\"]"
+  ],
+  "result": "pass",
+  "shot": "flags-v021-issue-more-menu.png"
+ },
+ {
+  "name": "search-palette-select",
+  "errors": [],
+  "notes": [
+   "options=[\"TEST-2 QA 任务 B\\n进行中\"]",
+   "url=/mikka?section=projects&issue=fc8fffec-337b-4bf2-98e6-e033b68dbf89"
+  ],
+  "result": "pass",
+  "shot": "flags-v022-search-palette-select.png"
+ },
+ {
+  "name": "search-palette-click-option",
+  "errors": [],
+  "notes": [
+   "aria-disabled=false data-disabled=false",
+   "url=/mikka?section=projects&issue=ccc044b4-e990-4cee-b71e-9eea96c6218d"
+  ],
+  "result": "pass",
+  "shot": "flags-v023-search-palette-click-option.png"
+ },
+ {
+  "name": "suggestion-actions",
+  "errors": [],
+  "notes": [
+   "buttons=[\"回复\\nGmailQA 建议：回复邮件\",\"Scroll to end\"]",
+   "aria=[\"后退\",\"前进\",\"全局搜索\",\"浏览器\",\"主页\",\"建议\",\"看板\",\"插件\",\"产物\",\"工作区菜单\",\"刷新建议\",\"回复\\nGmailQA 建议：回复邮件\",\"打开线程 QA 线程：测一下首页\",\"Scroll to end\",\"添加文件\",\"发送\"]"
+  ],
+  "result": "pass",
+  "shot": "flags-v024-suggestion-actions.png"
+ },
+ {
+  "name": "artifacts-open",
+  "errors": [],
+  "notes": [
+   "artifact listed=1",
+   "after open: 搜索 Bot、对话、群聊、任务和项目 / Ctrl / K / 主页 / 建议 / 看板 / 插件 / 产物 / T / Test owner的工作区 / 产物 / 全部 / 文档 / 网页 / 全部 / 名称 / 来源 / 上次活动 / QA 产物 / QA Frontend · TEST-1 / 2分钟前 / QA 产物 / v1 / 分享 / QA 产物 /  / QA Frontend · 10月30日 13:20 更新 /  / 3.8s /  / QA 线程：测一下首页 / 正在停止… / 开始于 13:20 /  / QA 线程：测一下首页 / 先测量。 /  / 首页加载 3.8s。 /  / 添加文件 / 停止未确认 / 重试停止"
+  ],
+  "result": "pass",
+  "shot": "flags-v025-artifacts-open.png"
+ },
+ {
+  "name": "account-rename",
+  "errors": [],
+  "notes": [
+   "db name=QA Owner"
+  ],
+  "result": "pass",
+  "shot": "flags-v026-account-rename.png"
+ },
+ {
+  "name": "account-avatar-filechooser",
+  "errors": [],
+  "notes": [
+   "locator.click: Error: strict mode violation: getByRole('button', { name: '更换', exact: true }) resolved to 2 elements:     1) <input type=\"file\" aria-label=\"更换\" data-slot=\"input\" id=\"base-ui-_R_a6deelubtaivb_\" accept=\"image/png,image/jpeg,image/webp\" class=\"h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6"
+  ],
+  "result": "fail",
+  "shot": "flags-v027-account-avatar-filechooser.png"
+ },
+ {
+  "name": "security-change-password-wrong",
+  "errors": [],
+  "notes": [
+   "dialog=修改密码 /  / 修改后，当前设备保持登录。 /  / 当前密码 / 新密码 / 再输入一次 / 同时退出其他设备 / 取消 / 保存 / 关闭",
+   "pw inputs=3",
+   "after=修改密码 /  / 修改后，当前设备保持登录。 /  / 当前密码 / 新密码 / 再输入一次 / 同时退出其他设备 /  / 当前密码不正确。 /  / 取消 / 保存 / 关闭"
+  ],
+  "result": "pass",
+  "shot": "flags-v028-security-change-password-wrong.png"
+ },
+ {
+  "name": "preferences-theme-language",
+  "errors": [],
+  "notes": [
+   "controls=[\"button:浅色\",\"button:深色\",\"button:跟随系统\",\"button:简体中文\",\"button:English\",\"button:保存\"]",
+   "html class=fontsans_4c0513b9-module__NScu2q__variable dark"
+  ],
+  "result": "pass",
+  "shot": "flags-v030-preferences-theme-language.png"
+ },
+ {
+  "name": "notifications-unnamed-checkboxes",
+  "errors": [],
+  "notes": [
+   "[{\"html\":\"<input id=\\\"base-ui-_r_1_\\\" tabindex=\\\"-1\\\" aria-hidden=\\\"true\\\" type=\\\"checkbox\\\" checked=\\\"\\\" style=\\\"clip-path: inset(50%); overflow: hidden; white-space: nowrap; borde\",\"ariaHidden\":\"true\"},{\"html\":\"<input id=\\\"base-ui-_r_4_\\\" tabindex=\\\"-1\\\" aria-hidden=\\\"true\\\" type=\\\"checkbox\\\" checked=\\\"\\\" style=\\\"clip-path: inset(50%); overflow: hidden; white-space: nowrap; borde\",\"ariaHidden\":\"true\"},{\"html\":\"<input id=\\\"base-ui-_r_7_\\\" tabindex=\\\"-1\\\" aria-hidden=\\\"true\\\" type=\\\"checkbox\\\" checked=\\\"\\\" style=\\\"clip-path: inset(50%); overflow: hidden; white-space: nowrap; borde\",\"ariaHidden\":\"true\"}]",
+   "switch persisted: before=true after-reload=false"
+  ],
+  "result": "pass",
+  "shot": "flags-v031-notifications-unnamed-checkboxes.png"
+ },
+ {
+  "name": "notifications-delivery-buttons",
+  "errors": [],
+  "notes": [
+   "立即 count=1 pressed=true checked=null state=null"
+  ],
+  "result": "pass",
+  "shot": "flags-v032-notifications-delivery-buttons.png"
+ },
+ {
+  "name": "connections-refresh-status",
+  "errors": [],
+  "notes": [
+   "requests=[\"POST /mikka/settings\"]"
+  ],
+  "result": "pass",
+  "shot": "flags-v033-connections-refresh-status.png"
+ },
+ {
+  "name": "privacy-export",
+  "errors": [],
+  "notes": [
+   "page=数据与隐私 / 数据 / 导出我的数据 /  / 包含资料、Bot、线程、任务和记忆，不含密码和密钥。 /  / 导出 / 共享 / 已共享的链接 /  / 没有公开访问的链接。 /  / 管理"
+  ],
+  "result": "pass",
+  "shot": "flags-v034-privacy-export.png"
+ },
+ {
+  "name": "activity-filters",
+  "errors": [],
+  "notes": [
+   "page=活动 / 全部 / 用了我的账户 / 提醒 /  / 还没有活动记录。这里只记录 Bot 用你的登录、你批准或拒绝的操作，以及协调员发给你的提醒；普通对话和任务不会出现在这里。"
+  ],
+  "result": "pass",
+  "shot": "flags-v035-activity-filters.png"
+ },
+ {
+  "name": "models-page",
+  "errors": [],
+  "notes": [
+   "page=模型与额度 /  / 这个部署还没有开启模型订阅，Bot 会使用工作区默认的模型额度。"
+  ],
+  "result": "pass",
+  "shot": "flags-v036-models-page.png"
+ },
+ {
+  "name": "logins-page",
+  "errors": [],
+  "notes": [
+   "page=登录与密钥 / 网站登录 /  / Bot 只在你批准的操作里使用这些登录。密码和验证码不会显示。 /  / 还没有保存的网站登录。Bot 在对话里需要登录某个网站时，会先问你，你同意后才会保存在这里。 /  / 在对话里添加登录"
+  ],
+  "result": "pass",
+  "shot": "flags-v037-logins-page.png"
+ },
+ {
+  "name": "computers-page",
+  "errors": [],
+  "notes": [
+   "page=设备 / 连接设备 / 还没有设备 /  / 这个分区还在设计中，暂时没有可用的操作。"
+  ],
+  "result": "pass",
+  "shot": "flags-v038-computers-page.png"
+ },
+ {
+  "name": "permissions-page",
+  "errors": [],
+  "notes": [
+   "page=团队权限 /  / 这个部署还没有开启云电脑任务，暂时没有需要审批的操作。",
+   "controls=[]"
+  ],
+  "result": "pass",
+  "shot": "flags-v039-permissions-page.png"
+ },
+ {
+  "name": "teams-create",
+  "errors": [],
+  "notes": [
+   "identifier auto=QA",
+   "url=/mikka/settings/teams?workspace=360dc6e7-bd1f-4e97-8d43-fe9ff2309c73&team=db5fc758-e398-4feb-8812-21ea37497be2 alerts=[\"\"]",
+   "teams in db=[\"relation \\\"teams\\\" does not exist\"]"
+  ],
+  "result": "pass",
+  "shot": "flags-v040-teams-create.png"
+ },
+ {
+  "name": "members-manage-peer",
+  "errors": [],
+  "notes": [
+   "opened=设为管理员 / 停用成员",
+   "unnamed inputs=[\"<input id=\\\"base-ui-_r_h_-hidden-input\\\" tabindex=\\\"-1\\\" aria-hidden=\\\"true\\\" value=\\\"all\\\" style=\\\"clip-path: inset(50%); overflow: hidden; white-space: nowrap; border: 0px; padding: 0px; width: 1px; height: \"]"
+  ],
+  "result": "pass",
+  "shot": "flags-v041-members-manage-peer.png"
+ },
+ {
+  "name": "members-export-csv",
+  "errors": [],
+  "notes": [
+   "download=members.csv"
+  ],
+  "result": "pass",
+  "shot": "flags-v042-members-export-csv.png"
+ },
+ {
+  "name": "workspace-new-create",
+  "errors": [],
+  "notes": [
+   "auto slug for CJK name=qa",
+   "url=/mikka"
+  ],
+  "result": "pass",
+  "shot": "flags-v043-workspace-new-create.png"
+ },
+ {
+  "name": "workspace-switch-back",
+  "errors": [],
+  "notes": [
+   "menu=[\"设置\\nCtrl\\n,\",\"切换工作区\",\"退出登录\"]"
+  ],
+  "result": "pass",
+  "shot": "flags-v044-workspace-switch-back.png"
+ },
+ {
+  "name": "device-code-invalid",
+  "errors": [
+   "http 400 GET /mikka/api/auth/device?user_code=ABCD-EFGH",
+   "console: Failed to load resource: the server responded with a status of 400 (BAD_REQUEST)"
+  ],
+  "notes": [
+   "page=Mikka / 连接这台电脑 /  / test-19ee448e-01ad-4552-a176-f12c5ceb1eb6@example.test /  / 验证码无效或已过期 /  / 重新输入"
+  ],
+  "result": "pass",
+  "shot": "flags-v045-device-code-invalid.png"
+ },
+ {
+  "name": "plugins-tab-skills",
+  "errors": [],
+  "notes": [
+   "page=插件与技能 / 插件 / 技能 / 线程运行环境 / 电脑 /  / 支持运行 Codex 与 Claude Code 的设备。 /  / 管理设备 / Google 登录 /  / 将已验证的 Google 账号关联到此 Mikka 账号，以便之后使用 Google 登录。 /  / Google 账号 /  / 使用经过验证且匹配的邮箱，将此 Mikka 账号关联到 Google。 /  / 关联 Google /  / Google 登录尚未配置。 /  / GitHub / GitHub /  / 此部署尚未配置 GitHub 集成。 /  / 刷新 GitHub 状态 /  / 请在服务器设置 COMPOSIO_API_KEY 后启用连接。 /  / 已连接的应用 / 在设置中管理 / Gmail / 重要邮件进"
+  ],
+  "result": "pass",
+  "shot": "flags-v046-plugins-tab-skills.png"
+ },
+ {
+  "name": "acceptance-route",
+  "errors": [],
+  "notes": [
+   "page=404 /  / 页面不存在 /  / 你访问的页面不存在或已被移动。 /  / 返回工作台"
+  ],
+  "result": "pass",
+  "shot": "flags-v047-acceptance-route.png"
+ },
+ {
+  "name": "issue-factory-acceptance-button",
+  "errors": [],
+  "notes": [
+   "技能验收 buttons=0"
+  ],
+  "result": "pass",
+  "shot": "flags-v048-issue-factory-acceptance-button.png"
+ },
+ {
+  "name": "factory-route-and-view",
+  "errors": [],
+  "notes": [
+   "route api={\"status\":200,\"body\":\"{\\\"taskId\\\":\\\"53b15809-a3fd-4cf3-a5a7-a6de5b93255b\\\",\\\"stage\\\":\\\"execute\\\",\\\"status\\\":\\\"pending\\\",\\\"binding\\\":{\\\"taskId\\\":\\\"53b15809-a3fd-4cf3-a5a7-a6de5b93255b\\\",\\\"issueId\\\":\\\"fc8fffec-337b-4bf2-98e6-e033b68dbf89\\\",\\\"attemptId\\\":\\\"337e95a3-47c6-47de-9dc9-5a12e339004d\\\",\\\"candidateId\\\":null,\\\"revision\\\":1},\\\"task\\\":{\\\"id\\\":\\\"53b15809\"}",
+   "list api={\"status\":200,\"body\":\"{\\\"contractVersion\\\":1,\\\"issueId\\\":\\\"fc8fffec-337b-4bf2-98e6-e033b68dbf89\\\",\\\"tasks\\\":[{\\\"id\\\":\\\"53b15809-a3fd-4cf3-a5a7-a6de5b93255b\\\",\\\"issueId\\\":\\\"fc8fffec-337b-4bf2-98e6-e033b68dbf89\\\",\\\"stage\\\":\\\"execute\\\",\\\"status\\\":\\\"pending\\\",\\\"revision\\\":1,\\\"attemptId\\\":\\\"337e95a3-47c6-47de-9dc9-5a12e339004d\\\",\\\"candidateId\\\":null,\\\"reason\"}",
+   "factory UI text=undefined",
+   "buttons=[\"收起 Bot 列表\",\"新建 Bot\",\"Coordinator\",\"展开或收起侧栏边轨\",\"展开或收起侧栏\",\"看板\",\"收藏任务\",\"更多任务操作\",\"上一个任务\",\"下一个任务\",\"关闭任务详情\",\"选区评论\",\"子任务\\n0 / 0\",\"添加现有任务\",\"创建子任务\",\"添加子任务\",\"发送评论\",\"任务状态：进行中\",\"任务优先级：中\",\"归属：个人\",\"负责人：未分配\",\"添加标签\",\"所属项目：未设置\",\"无团队\"]"
+  ],
+  "result": "pass",
+  "shot": "flags-v049-factory-route-and-view.png"
+ },
+ {
+  "name": "factory-acceptance-open",
+  "errors": [],
+  "notes": [
+   "count=0"
+  ],
+  "result": "pass",
+  "shot": "flags-v050-factory-acceptance-open.png"
+ },
+ {
+  "name": "board-new-task-submit",
+  "errors": [],
+  "notes": [
+   "dialog=E2B / E2B / 新建任务 /  / 用一句话描述要做的事，会自动建好任务。 /  / 任务描述 / 添加文件 / 创建任务 / 关闭",
+   "create enabled=true",
+   "after url=/mikka dialogOpen=0 toasts=[]",
+   "issues created=0"
+  ],
+  "result": "pass",
+  "shot": "flags-v051-board-new-task-submit.png"
+ },
+ {
+  "name": "chat-reply-after-send",
+  "errors": [],
+  "notes": [
+   "chat tail=搜索 Bot、对话、群聊、任务和项目 / Ctrl / K / 主页 / 建议 / 看板 / 插件 / 产物 / Q / QA 第二工作区 / Mikka / Coordinator / 帮我新建一个任务（在 E2B 上做）：QA 新建任务：检查首页 /  / Coordinator /  / 首页很慢 /  / QA Frontend 已接手。 /  / QA 线程：测一下首页 / 你好，QA 测试消息 / QA factory request / 帮我新建一个任务（在 E2B 上做）：QA 新建任务：检查首页 / Scroll to end / 添加文件 / 概览 / 全部线程 / Coordinator / 详情 / 线程 / PR / 进行中（1） / TEST-1 QA 任务 A"
+  ],
+  "result": "pass",
+  "shot": "flags-v052-chat-reply-after-send.png"
+ },
+ {
+  "name": "peer-issue-owner-private",
+  "errors": [
+   "http 500 POST /mikka?issue=d14a5951-d30a-40f6-bb18-da564adace76",
+   "console: Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+  ],
+  "notes": [
+   "page=搜索 Bot、对话、群聊、任务和项目 / Ctrl / K / 主页 / 建议 / 看板 / 插件 / 产物 / T / Test owner的工作区 / Mikka / Coordinator / 任务不可用 /  / 任务可能已删除，或你没有访问权限。 /  / 重新读取 / 返回工作台"
+  ],
+  "result": "pass",
+  "shot": "flags-v053-peer-issue-owner-private.png"
+ },
+ {
+  "name": "peer-members-readonly",
+  "errors": [],
+  "notes": [
+   "invite enabled=false",
+   "download=members.csv"
+  ],
+  "result": "pass",
+  "shot": "flags-v054-peer-members-readonly.png"
+ },
+ {
+  "name": "peer-permissions-hidden",
+  "errors": [],
+  "notes": [
+   "heading=团队权限"
+  ],
+  "result": "pass",
+  "shot": "flags-v055-peer-permissions-hidden.png"
+ },
+ {
+  "name": "peer-teams-create",
+  "errors": [],
+  "notes": [
+   "dialog=none"
+  ],
+  "result": "pass",
+  "shot": "flags-v056-peer-teams-create.png"
+ }
+]
