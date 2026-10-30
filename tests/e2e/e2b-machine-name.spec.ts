@@ -35,7 +35,9 @@ test.describe('E2B 机器名截图', () => {
 })
 
 // The real ComputerCard from a stored agent reply. The reply lives only in this fixture; a demo- bot id uses
-// the existing client-side mock computer (?computer-mock=sleep starts it asleep, 唤醒 moves it to waking).
+// the existing client-side mock computer: ?computer-mock=sleep opens it asleep, ?computer-mock=waking mid-wake.
+// Asleep or waking the chat card is only the 「E2B · 休眠中/唤醒中」 chip (no screen, so no 唤醒 cover to click);
+// waking happens from the bot's screen, so each state is its own page load.
 async function seedReply(email: string, content: string) {
   const { randomUUID } = await import('node:crypto')
   const { Pool } = await import('pg')
@@ -58,16 +60,12 @@ for (const colorScheme of schemes) {
     await page.setViewportSize({ width: 1280, height: 800 })
     const { email } = await register(page)
     await seedReply(email, 'root = Stack([computer])\ncomputer = ComputerCard("demo-fe7", "run-demo-fe7", "打开预览部署，用测试账号登录，截一张首页。", "working", "Mikka Frontend", "预览部署检查")')
-    await page.goto(app('/?section=coordinator&computer-mock=sleep'))
     const region = page.getByRole('region', { name: 'Coordinator', exact: true })
-    await expect(region.getByText('休眠中', { exact: true }).first()).toBeVisible()
-    await expect(region.getByText('E2B', { exact: true }).first()).toBeVisible()
-    await page.screenshot({ path: testInfo.outputPath(`shots/fe7-card-sleeping-${colorScheme}.png`) })
-    // The 唤醒 cover sits inside the card's open-screen button, so it is a presentational child in the
-    // accessibility tree; reach it by text and close the viewer the outer button opens.
-    await region.locator('button', { hasText: '唤醒' }).last().click()
-    if (await page.getByRole('dialog').isVisible()) await page.keyboard.press('Escape')
-    await expect(region.getByText('唤醒中', { exact: true }).first()).toBeVisible()
-    await page.screenshot({ path: testInfo.outputPath(`shots/fe7-card-waking-${colorScheme}.png`) })
+    for (const [mock, status] of [['sleep', '休眠中'], ['waking', '唤醒中']] as const) {
+      await page.goto(app(`/?section=coordinator&computer-mock=${mock}`))
+      await expect(region.getByText(status, { exact: true }).first()).toBeVisible()
+      await expect(region.getByText('E2B', { exact: true }).first()).toBeVisible()
+      await page.screenshot({ path: testInfo.outputPath(`shots/fe7-card-${mock === 'sleep' ? 'sleeping' : 'waking'}-${colorScheme}.png`) })
+    }
   })
 }
