@@ -71,6 +71,8 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', as
   // Without Linear the toolbar button is a plain refresh, not a success state.
   await expect(page.getByRole('button', { name: '刷新', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '已与 Linear 同步', exact: true })).toHaveCount(0)
+  // With task creation off the board offers no 新建任务 that would open a dead-end dialog.
+  await expect(page.getByRole('button', { name: '新建任务', exact: true })).toHaveCount(0)
   // The issue-tool gate is off in this suite; the request must not be queued.
   const dialog = await openCreateIssue(page)
   const request = `把群聊未读数接到侧栏 ${randomUUID()}`

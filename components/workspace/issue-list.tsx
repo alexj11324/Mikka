@@ -12,7 +12,8 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
   issues: Awaited<ReturnType<typeof listIssues>>
   searching: boolean
   onOpen: (id: string) => void
-  onCreate: () => void
+  /** Absent when this workspace cannot create tasks; the empty state then has no button. */
+  onCreate?: () => void
 }) {
   const t = useTranslations('Issue.list')
   const tIssue = useTranslations('Issue')
@@ -25,7 +26,7 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
       <EmptyTitle>{searching ? t('noResults') : t('emptyTitle')}</EmptyTitle>
       <EmptyDescription>{searching ? t('noResultsHint') : t('emptyHint')}</EmptyDescription>
     </EmptyHeader>
-    {!searching && <EmptyContent><Button size="sm" onClick={onCreate}><Plus data-icon="inline-start" />{t('newTask')}</Button></EmptyContent>}
+    {!searching && onCreate && <EmptyContent><Button size="sm" onClick={onCreate}><Plus data-icon="inline-start" />{t('newTask')}</Button></EmptyContent>}
   </Empty>
 
   return <div aria-label={t('label')} className="flex flex-col">

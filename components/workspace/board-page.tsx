@@ -9,6 +9,7 @@ import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
 import { listTaskRuns } from '@/app/actions/task-runs'
 import { getLinearBoardSync } from '@/app/actions/linear-sync'
+import { issueCreationAvailable } from '@/app/actions/coordinator'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { ConversationPill } from '@/components/nav/conversation-pill'
@@ -119,6 +120,8 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const openPanel = () => { setSidebar(true); if (!window.matchMedia('(min-width: 64rem)').matches) setSheet(true) }
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const [newTask, setNewTask] = useState(false)
+  // Owner decision (W1): without task creation the board shows no 新建任务 instead of a dialog that cannot create.
+  const { data: canCreate = false } = useSWR('issue-creation-available', () => issueCreationAvailable(), { revalidateOnFocus: false })
   const { data: agents } = useSWR('agents', () => listAgents(), { revalidateOnFocus: false })
   const { data: linear } = useSWR('linear-board-sync', () => getLinearBoardSync(), { revalidateOnFocus: false })
   // Without a connected Linear team, the button only reloads the board.
@@ -235,13 +238,13 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
               </div>
             </PopoverContent>
           </Popover>
-          <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask(true)}><Plus data-icon="inline-start" />{t('newTask')}</Button>
+          {canCreate && <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask(true)}><Plus data-icon="inline-start" />{t('newTask')}</Button>}
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'lg:hidden')} aria-expanded={sheet} aria-label={t('expand')} onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}</TooltipContent></Tooltip>
         </div>
       </div>
       {view === 'board'
         ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} narrow={sidebar ? ['done'] : undefined} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
-        : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
+        : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={canCreate ? () => setNewTask(true) : undefined} /></div>}
     </section>
     {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l lg:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
