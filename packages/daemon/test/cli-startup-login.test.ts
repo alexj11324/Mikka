@@ -28,7 +28,7 @@ function daemon(dataDir: string) {
   const process = new Daemon({ dataDir, flavor: 'prod', link, harnesses: [{ harness: 'mock', installed: true, version: 'fixture' }],
     quotaSource: null, heartbeatMs: 60_000, log: createLogger({ level: 'silent' }) })
   daemons.push(process)
-  return { process, register }
+  return { process, register, link, server }
 }
 
 it('keeps the no-daemon login persisted for a later normal start', async () => {
@@ -77,6 +77,57 @@ it.each([undefined, oldCredential])('hands login to a daemon paused after readin
     expect(process.status().server).toBe('unregistered')
     expect(register).toHaveBeenCalledTimes(count)
   } finally { release(); await startup }
+})
+
+it.each(['replace', 'clear', 'workspace'] as const)('discards an in-flight registration after %s changes the device session', async change => {
+  const root = tempDir()
+  const workspaceId = '11111111-1111-4111-8111-111111111111'
+  const nextWorkspaceId = '22222222-2222-4222-8222-222222222222'
+  writeJsonAtomic(daemonPaths(root).device, { credential: oldCredential, workspaceId })
+  vi.spyOn(Daemon.prototype as unknown as { createAgentSandbox(): Promise<null> }, 'createAgentSandbox').mockResolvedValue(null)
+  const { process, register, link, server } = daemon(root)
+  let release!: () => void, entered!: () => void, releaseNext!: () => void, enteredNext!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const paused = new Promise<void>(resolve => { entered = resolve })
+  const nextGate = new Promise<void>(resolve => { releaseNext = resolve })
+  const nextPaused = new Promise<void>(resolve => { enteredNext = resolve })
+  register.mockImplementationOnce(async () => { entered(); await gate; return { deviceId: 'stale-device' } })
+  register.mockImplementationOnce(async (...args) => { enteredNext(); await nextGate; return server.link().registerDevice(...args) })
+  const heartbeat = vi.spyOn(link, 'heartbeat')
+  await process.start()
+  const oldSync = process.syncWithServer()
+  const client = await connectDaemonInDataDir(root, { name: 'registration-test', version: 'fixture' })
+  try {
+    await paused
+    if (change === 'clear') await client.request('device.clearCredential')
+    else await client.request('device.setCredential', {
+      credential: change === 'replace' ? credential : oldCredential,
+      workspaceId: change === 'workspace' ? nextWorkspaceId : workspaceId,
+    })
+    release()
+    await oldSync
+    const saved = JSON.parse(readFileSync(daemonPaths(root).device, 'utf8'))
+    expect(saved.deviceId).toBeUndefined()
+    expect(saved.credential).toBe(change === 'clear' ? undefined : change === 'replace' ? credential : oldCredential)
+    expect(saved.workspaceId).toBe(change === 'workspace' ? nextWorkspaceId : workspaceId)
+    expect(heartbeat).not.toHaveBeenCalled()
+    expect(register.mock.calls[0]?.[1].workspaceId).toBe(workspaceId)
+    if (change === 'clear') {
+      await process.syncWithServer()
+      expect(process.status().server).toBe('unregistered')
+      expect(register).toHaveBeenCalledTimes(1)
+    } else {
+      await nextPaused
+      expect(register.mock.calls[1]?.[0]).toBe(change === 'replace' ? credential : oldCredential)
+      expect(register.mock.calls[1]?.[1].workspaceId).toBe(change === 'workspace' ? nextWorkspaceId : workspaceId)
+      expect(register.mock.calls[1]?.[2]).toBeUndefined()
+      releaseNext()
+      await process.syncWithServer()
+      expect(JSON.parse(readFileSync(daemonPaths(root).device, 'utf8')).deviceId).toBe('startup-device')
+      expect(heartbeat.mock.calls.every(([deviceId]) => deviceId === 'startup-device')).toBe(true)
+      expect(process.status().server).toBe('online')
+    }
+  } finally { release(); releaseNext(); client.close(); await oldSync }
 })
 
 it('does not report success when a live holder never opens its RPC socket', async () => {
