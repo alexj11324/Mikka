@@ -4,6 +4,7 @@ const TOP_LEVEL_COMPONENTS = [
   'BeFollowUps', 'BeBadge', 'BeStat', 'BeResponse', 'BeApproval', 'BeQuestions', 'BeTodoList', 'AgentIcon',
   'InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'ComputerCard', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert',
   'ShadcnProgress', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame',
+  'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BeTimeline', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'BeFileTree', 'BeCitations', 'BeFileDiff',
 ]
 
 /**

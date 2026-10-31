@@ -235,3 +235,7 @@ authority. Track the concrete rollout prerequisites and verification in
 ## 2026-10-30 — First-run onboarding spec
 
 Alex approved the first-run onboarding spec ([onboarding.md](onboarding.md), #129); its Figma page 241:4483 (「Onboarding · 我们的版本（Claude · 2026-10-25）」) is accepted.
+
+## 2026-10-31 — Icon rail without labels; Codex dark surfaces
+
+Alex asked to drop the small names under the rail icons: each rail item is now an icon button whose name shows as a tooltip on hover (and stays its accessible name). Dark mode follows Codex's surfaces: page rgb(24 24 24), cards and popovers rgb(35 35 35).
