@@ -72,16 +72,23 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const { retryLinearIssue } = await import('../app/actions/linear-sync')
   const { AfterContext } = await import('next/dist/server/after/after-context')
   const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
+  const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
+  const { createRequestStoreForAPI } = await import('next/dist/server/async-storage/request-store')
+  const { NextRequest } = await import('next/server')
   // Native HTTP has no Next request context. Run the same after callbacks that
   // Next runs when a request closes, and fail if an asynchronous effect fails.
   async function withRequestContext<T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) {
     const waits: Promise<unknown>[] = [], errors: unknown[] = []
-    let close = () => {}
-    const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: callback => { close = callback }, onTaskError: error => { errors.push(error) } })
-    return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, async () => {
+    const closes: Array<() => void> = []
+    const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: callback => { closes.push(callback) }, onTaskError: error => { errors.push(error) } })
+    const request = new NextRequest('http://127.0.0.1/mikka')
+    // Next 16.4 adds an optional HMR hash to the API request-store factory;
+    // supplying it also works with the local 16.1 acceptance dependencies.
+    const requestStore: ReturnType<typeof createRequestStoreForAPI> = Reflect.apply(createRequestStoreForAPI, undefined, [request, new URL(request.url), { tags: [], expirationsByCacheKind: new Map() }, undefined, undefined, undefined])
+    return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, () => workUnitAsyncStorage.run(requestStore, async () => {
       try { const result = await fn(); await beforeClose?.(); return result }
-      finally { close(); await Promise.all(waits); assert.deepEqual(errors, []) }
-    })
+      finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
+    }))
   }
   const action = <T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) => withRequestContext(() => actAs(owner, fn), beforeClose)
   const { issueForUser } = await import('../lib/issue-access')

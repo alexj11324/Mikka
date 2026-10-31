@@ -69,13 +69,19 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   const {exchangeDocument}=await import('../app/actions/collaboration')
   const {AfterContext}=await import('next/dist/server/after/after-context')
   const {workAsyncStorage}=await import('next/dist/server/app-render/work-async-storage.external')
+  const {workUnitAsyncStorage}=await import('next/dist/server/app-render/work-unit-async-storage.external')
+  const {createRequestStoreForAPI}=await import('next/dist/server/async-storage/request-store')
+  const {NextRequest}=await import('next/server')
   const Y=await import('yjs')
   async function withAfter<T>(fn:()=>Promise<T>) {
-    const waits:Promise<unknown>[]=[],errors:unknown[]=[];let close=()=>{}
-    const afterContext=new AfterContext({waitUntil:promise=>{waits.push(promise)},onClose:callback=>{close=callback},onTaskError:error=>{errors.push(error)}})
-    return workAsyncStorage.run({afterContext} as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,async()=>{
-      try{return await fn()}finally{close();await Promise.all(waits);assert.deepEqual(errors,[])}
-    })
+    const waits:Promise<unknown>[]=[],errors:unknown[]=[],closes:Array<()=>void>=[]
+    const afterContext=new AfterContext({waitUntil:promise=>{waits.push(promise)},onClose:callback=>{closes.push(callback)},onTaskError:error=>{errors.push(error)}})
+    const request=new NextRequest('http://127.0.0.1/mikka')
+    // Include Next 16.4's optional HMR argument; local 16.1 ignores it.
+    const requestStore:ReturnType<typeof createRequestStoreForAPI>=Reflect.apply(createRequestStoreForAPI,undefined,[request,new URL(request.url),{tags:[],expirationsByCacheKind:new Map()},undefined,undefined,undefined])
+    return workAsyncStorage.run({afterContext} as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,()=>workUnitAsyncStorage.run(requestStore,async()=>{
+      try{return await fn()}finally{for(const close of closes)close();await Promise.all(waits);assert.deepEqual(errors,[])}
+    }))
   }
   const {retryLinearIssue}=await import('../app/actions/linear-sync')
   const {syncAppIssueToLinear}=await import('../lib/linear-sync/issue-sync')
