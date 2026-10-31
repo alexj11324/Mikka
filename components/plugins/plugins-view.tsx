@@ -80,9 +80,10 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
   const tTelegram = useTranslations('Settings.telegram')
   const [tab, setTab] = useState<'apps' | 'skills'>('apps')
   const apps = useConnectedApps()
-  const { data: ownStates, mutate: refreshOwnStates } = useSWR('plugin-own-app-states', fetchOwnAppStates, { revalidateOnFocus: true })
   // The open app's page is in the URL (&app=gmail), so back, reload and shared links land on it.
   const [app, setApp] = useState<PluginAppId | null>(linearNotice ? 'linear' : null)
+  // Read on the list only; an app's own page reads its full state itself.
+  const { data: ownStates } = useSWR(app ? null : 'plugin-own-app-states', fetchOwnAppStates)
   useEffect(() => {
     const read = () => { const value = new URL(window.location.href).searchParams.get('app'); if (isPluginAppId(value) || !linearNotice) setApp(isPluginAppId(value) ? value : null) }
     read()
@@ -97,7 +98,6 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
     else url.searchParams.delete('app')
     window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
     setApp(next)
-    if (!next) void refreshOwnStates()
   }
 
   const [query, setQuery] = useState('')
