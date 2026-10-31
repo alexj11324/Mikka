@@ -472,6 +472,8 @@ test('run result publication commits one owner-scoped result through retries and
       // do not turn an action_decided event into an automatic runtime tier.
       const {seedWorkspace}=await import('./support/workspace-admin-db')
       const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])
+      // The person's own workspace: work with no workspace of its own bills it (decision 2026-10-31-2130).
+      await pool.query(`update mikka_workspaces set kind='personal' where id=$1`,[workspace.id])
       const {hostedUsage}=await import('../lib/abuse/runtime')
       await hostedUsage.verify(workspace.id,'cus_synthetic_admission',`card_admission_${randomUUID()}`)
       const { triageInbox } = await import('../lib/coordinator/wake')

@@ -49,7 +49,8 @@ export async function freezeHostedModelSelection(scope: HostedModelScope, runtim
   checkScope(scope, value)
   await dependencies.workspace(scope.ownerId, value.workspaceId)
   const connection = await service.repository.connection(scope.ownerId, value.connectionId)
-  if (connection.ownerId !== scope.ownerId || connection.workspaceId !== value.workspaceId || Number(connection.epoch) !== value.connectionRevision || connection.state !== 'connected') throw refuse()
+  // The connection is the owner's, from any workspace (decision 2026-10-31-2130); the binding carries the run's workspace.
+  if (connection.ownerId !== scope.ownerId || Number(connection.epoch) !== value.connectionRevision || connection.state !== 'connected') throw refuse()
   return { harness: 'ai_sdk', model: value.modelId, modelSelection: value }
 }
 /** Re-check the frozen identity, not the latest/default binding, on every model call. */
@@ -72,7 +73,7 @@ export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime:
       if (binding[key as keyof typeof binding] !== expected) throw refuse()
     }
     const connection = await service.repository.connection(scope.ownerId, frozen.connectionId)
-    if (connection.ownerId !== frozen.ownerId || connection.workspaceId !== frozen.workspaceId || Number(connection.epoch) !== frozen.connectionRevision || connection.state !== 'connected') throw refuse()
+    if (connection.ownerId !== frozen.ownerId || Number(connection.epoch) !== frozen.connectionRevision || connection.state !== 'connected') throw refuse()
     cancelled(signal)
   }
   await verify()

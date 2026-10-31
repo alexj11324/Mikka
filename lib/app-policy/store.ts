@@ -1,6 +1,7 @@
 import 'server-only'
 import { and, eq } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { personalResourceAllowed } from '@/lib/personal-policy'
 import { workspaceAppPolicies } from '@/lib/db/app-policy-schema'
 import { bots } from '@/lib/db/schema'
 import { recordAudit } from '@/lib/audit/record'
@@ -49,5 +50,7 @@ export async function botMayUseApp(botId: string | null | undefined, app: string
     .leftJoin(workspaceAppPolicies, and(eq(workspaceAppPolicies.workspaceId, bots.workspaceId), eq(workspaceAppPolicies.app, app)))
     .where(eq(bots.id, botId)).limit(1)
   if (!row) return false
-  return row.access !== 'deny'
+  if (row.access === 'deny') return false
+  // App connections are the member's own; a team admin can switch them off here (decision 2026-10-31-2130).
+  return personalResourceAllowed(pool, row.workspaceId, 'apps')
 }

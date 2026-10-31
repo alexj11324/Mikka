@@ -48,6 +48,8 @@ test(
       await pool.query(migration);
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
+      const personalPolicyMigration = await readFile(new URL("../drizzle/20261031213105_workspace_personal_policies.sql",import.meta.url),"utf8");
+      await pool.query(personalPolicyMigration); await pool.query(personalPolicyMigration);
       const explicitMigration = await readFile(new URL("../drizzle/20261031054017_explicit_execution.sql",import.meta.url),"utf8");
       const settings = new ExecutionSettings(pool),
         alice = { ownerId: "alice", workspaceId: randomUUID() },
@@ -268,7 +270,8 @@ test(
       });
       assert.deepEqual(refreshed.map(row=>row.modelId).sort(), ['provider-model','second-provider-model']);
       await assert.rejects(settings.refreshBotModels(bob, connection, async () => { throw new Error('must not discover foreign account') }), { code: 'executionAccountUnavailable' });
-      await assert.rejects(settings.refreshBotModels(other, connection, async () => []), { code: 'executionAccountUnavailable' });
+      // A subscription belongs to the account: its owner refreshes it from any workspace (decision 2026-10-31-2130).
+      await settings.refreshBotModels(other, connection, async () => []);
       await settings.refreshBotModels(alice, connection, async () => [{id:'fresh-only'}]);
       assert.deepEqual((await settings.botModels(alice)).map(row=>row.modelId),['fresh-only']);
       assert.equal(await settings.botModel(alice,secondBot),copiedBinding,'refresh preserves saved binding');
@@ -349,6 +352,28 @@ test(
       assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:revokedBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'a saved choice whose account was disconnected, with nothing else bound, replies on Mikka 默认');
       assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'the Coordinator with no bound subscription replies on Mikka 默认');
       await pool.query(`UPDATE byos_connections SET state='connected' WHERE id=ANY($1::uuid[])`,[[revoked.id,...others.rows.map(row=>row.id)]]);
+
+      // Decision 2026-10-31-2130: a subscription connected once, in alice's first workspace, runs her Bot in team B.
+      const teamB = { ownerId: alice.ownerId, workspaceId: randomUUID() };
+      const teamBot = randomUUID();
+      await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3)',[teamBot,alice.ownerId,teamB.workspaceId]);
+      const inTeam = await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies);
+      assert.equal(inTeam.modelSelection?.workspaceId,teamB.workspaceId,'the run and its binding belong to team B');
+      assert.equal(inTeam.modelSelection?.consumerId,teamBot);
+      const { rows: [teamBinding] } = await pool.query('SELECT b."workspaceId",c."workspaceId" AS "connectionWorkspace" FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" WHERE b.id=$1',[inTeam.modelSelection!.bindingId]);
+      assert.deepEqual(teamBinding,{workspaceId:teamB.workspaceId,connectionWorkspace:alice.workspaceId},'the connection keeps the workspace it was made in; nothing is re-issued');
+      const teamCoordinator = await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:null},dependencies);
+      assert.equal(teamCoordinator.modelSelection?.workspaceId,teamB.workspaceId,'the Coordinator in team B uses her subscription too');
+      assert.equal((await settings.botModels({ownerId:'bob',workspaceId:teamB.workspaceId})).length,0,'another member of team B never sees or uses it');
+      await assert.rejects(settings.bindingForBot({ownerId:'bob',workspaceId:teamB.workspaceId},null,catalogue.bindingId),{code:'executionModelUnknown'});
+      // Team B's admin switches personal subscriptions off: the Bot and the Coordinator reply on Mikka 默认.
+      await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)',[teamB.workspaceId]);
+      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'switch off: Mikka 默认, not her subscription');
+      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL});
+      assert.deepEqual(await settings.botModels(teamB),[],'Bot 与 Agents in team B offers no personal subscription');
+      assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies)).modelSelection,'the switch is per workspace');
+      await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1',[teamB.workspaceId]);
+      assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies)).modelSelection,'switch on again: her subscription');
       sessionOwner = null;
       await assert.rejects(actions.listExecutionRules());
       sessionOwner = "bob";

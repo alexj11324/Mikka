@@ -27,10 +27,12 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 			return ErrUnavailable
 		}
 	}
+	// The binding belongs to the run's workspace; the connection keeps the one it was made in
+	// (decision 2026-10-31-2130). Both stay fenced to the owner.
 	var route, boundModel, state string
 	var current int64
 	var quota []byte
-	err := w.Repo.DB.QueryRowContext(ctx, `select b.route,b."modelId",c.state,c.epoch,c.quota from byos_bindings b join byos_connections c on c.id=b."connectionId" where b.id=$1 and b."consumerId"=$2 and b."ownerId"=$3 and b."workspaceId"=$4 and c.id=$5 and c."ownerId"=$3 and c."workspaceId"=$4 and c.provider=$6 and b."connectionRevision"=$7 and c.epoch=$7`, w.Use.BindingID, w.Use.ConsumerID, w.Scope.OwnerID, w.Scope.WorkspaceID, w.Scope.ConnectionID, w.Scope.Provider, epoch).Scan(&route, &boundModel, &state, &current, &quota)
+	err := w.Repo.DB.QueryRowContext(ctx, `select b.route,b."modelId",c.state,c.epoch,c.quota from byos_bindings b join byos_connections c on c.id=b."connectionId" where b.id=$1 and b."consumerId"=$2 and b."ownerId"=$3 and c.id=$5 and c."ownerId"=$3 and c."workspaceId"=$4 and c.provider=$6 and b."connectionRevision"=$7 and c.epoch=$7`, w.Use.BindingID, w.Use.ConsumerID, w.Scope.OwnerID, w.Scope.WorkspaceID, w.Scope.ConnectionID, w.Scope.Provider, epoch).Scan(&route, &boundModel, &state, &current, &quota)
 	if err != nil || current != epoch || (state != "connected" && state != "refreshing" && state != "publication_pending") {
 		return ErrUnavailable
 	}

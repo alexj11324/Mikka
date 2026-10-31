@@ -4,7 +4,7 @@ import { withBasePath } from '@/lib/base-path'
 export type SettingsRead =
   | 'password' | 'sessions' | 'preferences' | 'saved-logins'
   | 'workspace-general' | 'transfer-targets' | 'deletion-impact'
-  | 'app-policy' | 'secrets' | 'e2b-key' | 'usage' | 'billing' | 'credit-billing' | 'card-verification' | 'audit'
+  | 'app-policy' | 'personal-policy' | 'secrets' | 'e2b-key' | 'usage' | 'billing' | 'credit-billing' | 'card-verification' | 'audit'
   | 'execution-rules' | 'execution-fallbacks' | 'execution-places' | 'bot-models' | 'bots'
 
 /**

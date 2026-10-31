@@ -44,16 +44,16 @@ export class SubscriptionRepository {
     if (!rowCount) throw new SubscriptionRefusal('account_unavailable')
   }
   /** Bots whose current binding uses each connection revision (Settings 「使用中」). */
-  async connectionBots(ownerId: string, workspaceId: string) {
+  async connectionBots(ownerId: string) {
     const { rows } = await this.pool.query<{ connectionId: string; id: string; name: string; color: string; shape: string }>(`select u."connectionId",u.id,u.name,u.color,u.shape from (
         select distinct on (b."consumerId",b.route) b."connectionId",b."connectionRevision",bot.id,bot.name,bot.color,bot.shape
         from byos_bindings b
         join bot_cloud_runtimes r on r."agentId"::text=b."consumerId" and r."ownerId"=b."ownerId" and r."workspaceId"::text=b."workspaceId"
         join bots bot on bot.id=r."botId" and bot."ownerId"=b."ownerId"
-        where b."ownerId"=$1 and b."workspaceId"=$2
+        where b."ownerId"=$1
         order by b."consumerId",b.route,b."createdAt" desc,b.id desc) u
       join byos_connections c on c.id=u."connectionId" and c.epoch=u."connectionRevision" and c."ownerId"=$1
-      order by u.name limit 200`, [ownerId, workspaceId])
+      order by u.name limit 200`, [ownerId])
     return rows
   }
   async defaultModelBinding(ownerId: string, consumerId: string): Promise<string | null> {

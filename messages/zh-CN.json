@@ -2246,6 +2246,13 @@
         "notion": "Notion"
       }
     },
+    "personalPolicy": {
+      "loading": "正在加载成员的个人账号",
+      "heading": "成员的个人账号",
+      "subscriptions": "个人订阅",
+      "apps": "个人应用连接",
+      "devices": "个人设备"
+    },
     "appPolicy": {
       "loading": "正在加载应用权限",
       "heading": "允许使用的应用",

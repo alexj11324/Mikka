@@ -4,6 +4,7 @@ import type { getPreferences } from '@/app/actions/preferences'
 import type { listSavedLogins } from '@/app/actions/settings-activity'
 import type { getWorkspaceDeletionImpact, getWorkspaceGeneral, getWorkspaceTransferTargets } from '@/app/actions/workspace-settings'
 import type { getAppPolicy } from '@/app/actions/app-policy'
+import type { getPersonalPolicy } from '@/app/actions/personal-policy'
 import type { getE2BKeyCapability, listSecrets } from '@/app/actions/workspace-secrets'
 import type { getUsage } from '@/app/actions/usage'
 import type { getBilling } from '@/app/actions/billing'
@@ -36,7 +37,7 @@ const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: un
     [['workspace:transfer-targets', id], () => settingsRead<Result<typeof getWorkspaceTransferTargets>>('transfer-targets', { workspace: id })],
     [['workspace:deletion-impact', id], () => settingsRead<Result<typeof getWorkspaceDeletionImpact>>('deletion-impact', { workspace: id })],
   ],
-  permissions: id => [[computerPolicyKey(id), () => readComputerPolicy(id)], [['settings:app-policy', id], () => settingsRead<Result<typeof getAppPolicy>>('app-policy', { workspace: id })]],
+  permissions: id => [[computerPolicyKey(id), () => readComputerPolicy(id)], [['settings:personal-policy', id], () => settingsRead<Result<typeof getPersonalPolicy>>('personal-policy', { workspace: id })], [['settings:app-policy', id], () => settingsRead<Result<typeof getAppPolicy>>('app-policy', { workspace: id })]],
   secrets: id => [[['settings:secrets', id], () => settingsRead<Result<typeof listSecrets>>('secrets', { workspace: id })], [['settings:e2b-key', id], () => settingsRead<Result<typeof getE2BKeyCapability>>('e2b-key', { workspace: id })]],
   usage: id => { const month = currentMonth(); return [[['settings:usage', id, month], () => settingsRead<Result<typeof getUsage>>('usage', { month, workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)]] },
   billing: id => [[['settings:billing', id], () => settingsRead<Result<typeof getBilling>>('billing', { workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)], [cardVerificationKey(id), () => readCardVerification(id)]],

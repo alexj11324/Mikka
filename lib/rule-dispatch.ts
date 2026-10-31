@@ -6,6 +6,7 @@ import { resolveExecution, type ExecutionDevice } from "./execution-rules";
 import { ExecutionSettings, executionWorkspace } from "./execution-settings";
 import { isDeviceOnline } from "@mikka/protocol/device";
 import { ActionFailureError } from "./action-error";
+import { personalResourceAllowed } from "./personal-policy";
 
 export async function resolveIssueExecution(
   ownerId: string,
@@ -21,10 +22,13 @@ export async function resolveIssueExecution(
     ownerId,
     workspaceId,
   });
-  const { rows } = await pool.query(
-    `SELECT id,enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "lastSeenAt" DESC NULLS LAST,id`,
-    [ownerId],
-  );
+  // A team admin can switch personal devices off for this workspace (decision 2026-10-31-2130).
+  const { rows } = (await personalResourceAllowed(pool, workspaceId, "devices"))
+    ? await pool.query(
+        `SELECT id,enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "lastSeenAt" DESC NULLS LAST,id`,
+        [ownerId],
+      )
+    : { rows: [] };
   const devices: ExecutionDevice[] = rows.map((row) => ({
     ...row,
     online: isDeviceOnline(row.lastSeenAt),

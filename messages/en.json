@@ -2246,6 +2246,13 @@
         "notion": "Notion"
       }
     },
+    "personalPolicy": {
+      "loading": "Loading members' personal accounts",
+      "heading": "Members' personal accounts",
+      "subscriptions": "Personal subscriptions",
+      "apps": "Personal app connections",
+      "devices": "Personal devices"
+    },
     "appPolicy": {
       "loading": "Loading app permissions",
       "heading": "Apps bots may use",

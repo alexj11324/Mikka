@@ -102,6 +102,19 @@ export async function seedHostedVerification(page: Page, remaining: number) {
   await db.query('INSERT INTO hosted_allowances ("workspaceId", remaining) VALUES ($1, $2) ON CONFLICT ("workspaceId") DO UPDATE SET remaining = $2', [member.workspaceId, remaining])
 }
 
+/** A team workspace the signed-in person administers, beside their personal one (decision 2026-10-31-2130). */
+export async function seedTeamWorkspace(page: Page, name = 'E2E 团队') {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedTeamWorkspace 需要已登录的页面。')
+  const db = database()
+  const { rows: [user] } = await db.query<{ id: string; name: string; email: string }>('SELECT u.id,u.name,u.email FROM session s JOIN "user" u ON u.id = s."userId" WHERE s.token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!user) throw new Error('找不到当前登录会话。')
+  const id = randomUUID()
+  await db.query(`INSERT INTO mikka_workspaces (id, "userId", name, kind) VALUES ($1, $2, $3, 'team')`, [id, user.id, name])
+  await db.query(`INSERT INTO mikka_workspace_members ("workspaceId", "userId", name, email, role) VALUES ($1, $2, $3, $4, 'admin')`, [id, user.id, user.name, user.email.toLowerCase()])
+  return id
+}
+
 /** The current conversation's title pill over the chat (desktop). */
 export function conversationPill(page: Page) {
   // Conversations opened earlier stay mounted but hidden; only the current one is visible.

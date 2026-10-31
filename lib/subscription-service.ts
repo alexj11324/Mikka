@@ -172,8 +172,8 @@ export class SubscriptionService {
   }
   /** Account catalogue refresh; no inference, no static model names or binding required. */
   async models(ownerId: string, id: string, signal?: AbortSignal): Promise<{ id: string; name: string }[]> {
+    // The owner's own account-level read: no workspace membership needed (decision 2026-10-31-2130).
     const row = await this.repository.connection(ownerId, id)
-    await this.workspace(ownerId, row.workspaceId)
     if (row.state !== 'connected') throw new SubscriptionRefusal('account_unavailable')
     const result = await this.worker(this.repository.scope(row)).call<unknown>('models', { revision: Number(row.epoch) }, signal)
     const current = await this.repository.connection(ownerId, id)
