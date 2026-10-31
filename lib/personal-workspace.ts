@@ -31,7 +31,7 @@ export async function ensurePersonalWorkspace(user: { id: string; email: string;
 }
 
 const shared = new Set<string>()
-/** A personal workspace uses its owner's subscriptions without a share step (decision 2026-10-31-2330). */
+/** A personal workspace uses its owner's subscriptions without a share step (decision 2026-10-31-2225). */
 export async function ensurePersonalShare(userId: string, workspaceId: string) {
   const key = `${userId}:${workspaceId}`
   if (shared.has(key)) return

@@ -435,7 +435,7 @@ export class ExecutionSettings {
     return [...labels.values()].sort((a,b) => a.name.localeCompare(b.name));
   }
   /** The owner's connected subscriptions, from any workspace: a subscription belongs to the account.
-   * None unless the owner shared them into this workspace and its admin allows it (decision 2026-10-31-2330). */
+   * None unless the owner shared them into this workspace and its admin allows it (decision 2026-10-31-2225). */
   private async connectedBindings(
     scope: ExecutionSettingsScope,
     bindingId?: string,
@@ -605,7 +605,7 @@ export class ExecutionSettings {
 /** Bot scope is exact. Work with no bot of its own (the Coordinator's triage,
  * memory extraction) runs and bills in the owner's first active workspace, as
  * before: it is charged where it happens, never moved to a new personal
- * workspace (decision 2026-10-31-2330). */
+ * workspace (decision 2026-10-31-2225). */
 export async function executionWorkspace(
   ownerId: string,
   botId: string | null,

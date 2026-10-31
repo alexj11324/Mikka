@@ -19,7 +19,7 @@ test('管理员可以禁止某个应用，刷新后保持', async ({ page }, tes
   await attachLightDark(page, testInfo, 'team-permissions-slack-blocked')
 })
 
-// Decision 2026-10-31-2330: members share their own subscriptions into a team; an admin has one switch, on by default.
+// Decision 2026-10-31-2225: members share their own subscriptions into a team; an admin has one switch, on by default.
 test('团队管理员可以不允许成员使用个人订阅，成员自己的共享开关随之关闭', async ({ page }) => {
   await register(page, '/')
   const workspace = await seedTeamWorkspace(page)

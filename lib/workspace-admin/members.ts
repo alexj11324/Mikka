@@ -58,7 +58,7 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
 }
 
 /**
- * §8.3 (decision 2026-10-31-2330): when someone leaves a team or is suspended,
+ * §8.3 (decision 2026-10-31-2225): when someone leaves a team or is suspended,
  * their subscription share leaves with them and their bots there pause until an
  * admin takes one over. Runs frozen on that subscription stop at their next
  * model call (the share and the membership are checked on every call).

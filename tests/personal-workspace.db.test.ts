@@ -70,7 +70,7 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.deepEqual(row, { userId: invited, kind: 'personal' })
     assert.deepEqual((await pool.query('SELECT "userId",role,status FROM mikka_workspace_members WHERE "workspaceId"=$1', [personal])).rows, [{ userId: invited, role: 'admin', status: 'active' }], 'only that user')
     assert.equal(await ensurePersonalWorkspace({ id: invited, email: `${invited}@example.invalid`, name: 'invited' }, 'zh-CN'), personal, 'created once')
-    // Decision 2026-10-31-2330: the Coordinator's triage keeps billing the workspace it already used; nothing moves to the new personal one.
+    // Decision 2026-10-31-2225: the Coordinator's triage keeps billing the workspace it already used; nothing moves to the new personal one.
     assert.equal(await executionWorkspace(invited, null), team.id)
     const personalBot = randomUUID()
     await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,$4)', [personalBot, invited, personal, 'Mine'])
@@ -101,7 +101,7 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     const team = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
     await hostedUsage.verify(team.id, 'cus_synthetic_team', `card_${randomUUID()}`)
     const personal = await ensurePersonalWorkspace({ id: owner, email: `${owner}@example.invalid`, name: 'verified' }, 'zh-CN')
-    // Decision 2026-10-31-2330: verification is per person, and a new personal workspace starts like a new sign-up.
+    // Decision 2026-10-31-2225: verification is per person, and a new personal workspace starts like a new sign-up.
     const balance = await canUseMikkaPaid(personal)
     assert.equal(balance.verified, true)
     assert.ok(balance.free > 0, 'the free allowance')

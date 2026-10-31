@@ -356,7 +356,7 @@ test(
       assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'the Coordinator with no bound subscription replies on Mikka 默认');
       await pool.query(`UPDATE byos_connections SET state='connected' WHERE id=ANY($1::uuid[])`,[[revoked.id,...others.rows.map(row=>row.id)]]);
 
-      // Decision 2026-10-31-2330: a subscription connected once, in alice's first workspace, runs her Bot in team B only after she shares it there.
+      // Decision 2026-10-31-2225: a subscription connected once, in alice's first workspace, runs her Bot in team B only after she shares it there.
       const teamB = { ownerId: alice.ownerId, workspaceId: randomUUID() };
       const teamBot = randomUUID(), bobBot = randomUUID();
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3),($4,$5,$3)',[teamBot,alice.ownerId,teamB.workspaceId,bobBot,'bob']);

@@ -12,7 +12,7 @@ import { useActionError } from '@/lib/use-action-error'
 /**
  * 在这里使用我的订阅: a member shares their own subscriptions into this team
  * workspace, for their own bots only. A personal workspace always uses them,
- * so it shows nothing here (decision 2026-10-31-2330).
+ * so it shows nothing here (decision 2026-10-31-2225).
  */
 export function SubscriptionShareSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.subscriptionShare')

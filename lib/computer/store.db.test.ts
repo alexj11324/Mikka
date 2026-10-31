@@ -161,7 +161,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId") VALUES ($1,$2,$3,$4),($5,$6,$3,$4)', [cloudSubscription, actor.userId, actor.workspaceId, consumer, wrongSubscription, bob.userId])
     const connectionId = randomUUID()
     await pool.query('INSERT INTO byos_connections (id,"ownerId","workspaceId",state,epoch,provider) VALUES ($1,$2,$3,$4,$5,$6)', [connectionId, actor.userId, actor.workspaceId, 'connected', 1, 'codex'])
-    // Shared where it was connected, as the migration does for existing subscriptions (decision 2026-10-31-2330).
+    // Shared where it was connected, as the migration does for existing subscriptions (decision 2026-10-31-2225).
     await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)', [actor.userId, actor.workspaceId])
     await pool.query('UPDATE byos_bindings SET route=$2,"connectionId"=$3,"connectionRevision"=1 WHERE id=$1', [cloudSubscription, 'codex_cli', connectionId])
     const projectionName = `mikka-byos-${randomUUID()}`

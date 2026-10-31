@@ -2,7 +2,7 @@ import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 
 /**
- * Decision 2026-10-31-2330: a subscription belongs to its owner. Their personal
+ * Decision 2026-10-31-2225: a subscription belongs to its owner. Their personal
  * workspace uses it automatically; a team workspace uses it only after the owner
  * shares it there (在这里使用我的订阅), only for the owner's own bots, and only
  * while that workspace's admin leaves 允许成员使用个人订阅 on (the default).

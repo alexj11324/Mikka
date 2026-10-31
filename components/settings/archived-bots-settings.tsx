@@ -12,7 +12,7 @@ import { useActionError } from '@/lib/use-action-error'
 /**
  * Bots of people who left the team or were suspended stay paused here until an
  * admin takes one over; it then runs on that admin's own resources (§8.3,
- * decision 2026-10-31-2330). Members and empty lists show nothing.
+ * decision 2026-10-31-2225). Members and empty lists show nothing.
  */
 export function ArchivedBotsSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.archivedBots')

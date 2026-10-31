@@ -16,7 +16,7 @@ export async function authorizeSubscriptionWorkspace(userId: string, workspaceId
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
 }
 /** A subscription runs in a workspace only for a member who shared it there, and only while that
- * workspace's admin allows it; otherwise a frozen run stops, never falls back (decision 2026-10-31-2330). */
+ * workspace's admin allows it; otherwise a frozen run stops, never falls back (decision 2026-10-31-2225). */
 export async function authorizeSubscriptionUse(userId: string, workspaceId: string) {
   await authorizeSubscriptionWorkspace(userId, workspaceId)
   if (!(await subscriptionsUsable(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')

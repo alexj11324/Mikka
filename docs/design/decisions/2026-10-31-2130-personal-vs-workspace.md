@@ -6,6 +6,7 @@
   「可以按你的建议来」. Research and audit:
   [personal vs workspace](../research/2026-10-31-personal-vs-workspace.md)
 - Rule: —
+- Superseded by: [bindings belong to the person](2026-10-31-2225-bindings-belong-to-the-person.md), for the admin switches, where subscriptions run and who pays for work with no workspace of its own
 - Replaces: subscriptions stored and resolved per (owner, workspace); the
   Coordinator and memory extraction billed to the oldest workspace
 

@@ -5,7 +5,7 @@ import { HostedUsageStore } from './store'
 export const hostedUsage = new HostedUsageStore(pool)
 /**
  * The legacy snapshot lives with workspaces, not in the application's DB.
- * Verification also belongs to the person (decision 2026-10-31-2330): a
+ * Verification also belongs to the person (decision 2026-10-31-2225): a
  * personal workspace counts as verified once its owner verified any workspace
  * they own, legacy ones included, and then starts like a new sign-up, with the
  * free allowance. Without it, someone whose verified workspace became a team

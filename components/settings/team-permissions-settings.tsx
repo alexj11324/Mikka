@@ -24,7 +24,7 @@ export function TeamPermissionsSettings({ workspaceId }: { workspaceId: string }
   </>
 }
 
-/** 允许成员使用个人订阅: one switch, on by default; members share their own subscriptions themselves (decision 2026-10-31-2330). */
+/** 允许成员使用个人订阅: one switch, on by default; members share their own subscriptions themselves (decision 2026-10-31-2225). */
 function PersonalPolicySettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.personalPolicy')
   const appT = useTranslations('Settings.appPolicy')

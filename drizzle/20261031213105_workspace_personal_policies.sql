@@ -1,4 +1,4 @@
--- Decision 2026-10-31-2330: subscriptions belong to the person. A member
+-- Decision 2026-10-31-2225: subscriptions belong to the person. A member
 -- shares theirs into a team workspace themselves (在这里使用我的订阅), for
 -- their own bots only; a team admin has one switch, 允许成员使用个人订阅, on by
 -- default (an absent row means on), and never sees or uses the subscription.
