@@ -40,9 +40,11 @@ They are write-only in APIs and never enter execution snapshots. Missing vault
 configuration refuses credential writes and authenticated calls.
 
 Skills are Markdown guidance. The backend resolves the source repository HEAD
-to a commit, selects one matching `SKILL.md`, and stores the exact body, path,
+to a commit, selects one `SKILL.md` by its frontmatter name (which may differ
+from its directory), and stores the exact body, path,
 commit and hash. Truncated trees, ambiguous matches and oversized bodies fail.
-No installer, repository hook, script or relative asset is executed or fetched.
+It inspects at most 200 pinned Markdown files, six at a time within the source
+deadline. No installer, repository hook, script or relative asset is executed or fetched.
 Uninstall then install is an explicit way to adopt a newer source revision.
 Source kinds reserve built-in and self-improvement provenance, but this endpoint
 installs skills.sh sources only; it does not automatically promote experiment

@@ -57,6 +57,19 @@ test('skill installation fetches one pinned Markdown body, rejects ambiguous and
   duplicate = false; truncated = true; await assert.rejects(fetchSkillSource(source, fetcher), /skillSourceUnavailable/)
 })
 
+test('skills.sh names resolve frontmatter rather than assuming the repository directory has that name', async () => {
+  const sha = 'c'.repeat(40)
+  const skill = await fetchSkillSource({ source: 'vercel-labs/agent-skills', slug: 'vercel-react-best-practices' }, async input => {
+    const url = String(input)
+    if (url.includes('/commits/')) return Response.json({ sha })
+    if (url.includes('/git/trees/')) return Response.json({ truncated: false, tree: [{ path: 'skills/react-best-practices/SKILL.md', type: 'blob', mode: '100644', size: 100 }] })
+    assert.ok(url.includes(`/${sha}/skills/react-best-practices/SKILL.md`))
+    return new Response('---\nname: vercel-react-best-practices\n---\n# React guidance')
+  })
+  assert.equal(skill.sourcePath, 'skills/react-best-practices/SKILL.md')
+  assert.equal(skill.name, 'vercel-react-best-practices')
+})
+
 for (const type of ['http', 'sse'] as const) test(`real MCP ${type} handshake, discovery, call, masking, live revocation and no retry after uncertain side effects`, async () => {
   const serverId = randomUUID(), secret = 'synthetic-fixture-only-token'
   let enabled = true, revision = 1, calls = 0, loseResponse = false, stream: import('node:http').ServerResponse | undefined
