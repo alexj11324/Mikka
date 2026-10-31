@@ -75,7 +75,7 @@ export const BROWSER_MAIN_SPECS = Object.freeze([
   'coordinator-choice-card.spec.ts', 'coordinator-scroll.spec.ts', 'global-search-scope.spec.ts', 'invalid-issue-content.spec.ts',
   'issue-threads.spec.ts', 'linear-sync-disabled.spec.ts', 'members.spec.ts', 'mobile-handoff.spec.ts',
   'plugins-page.spec.ts',
-  'settings.spec.ts', 'sign-out.spec.ts', 'suggestion-entry-contract.spec.ts', 'suggestions-rail.spec.ts',
+  'settings.spec.ts', 'settings-background-polling.spec.ts', 'sign-out.spec.ts', 'suggestion-entry-contract.spec.ts', 'suggestions-rail.spec.ts',
   'teams.spec.ts', 'thread-cards.spec.ts', 'thread-projection.spec.ts', 'thread-stop.spec.ts',
   'workspace-menu.spec.ts',
   'abuse-ui.spec.ts', 'settings-audit.spec.ts', 'settings-billing.spec.ts', 'settings-general.spec.ts',

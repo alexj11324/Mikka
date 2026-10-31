@@ -123,8 +123,9 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [settingsOpen, setSettingsOpen] = useState(Boolean(initialSettingsSection))
   // While Settings is shown these reads are not on screen. Paused, they cannot queue
   // server actions ahead of a settings save (Next runs a page's actions one at a time).
-  const inSettings = useRef(false)
-  inSettings.current = pathname.startsWith('/settings') || settingsOpen
+  const settingsShown = settingsOpen || pathname.startsWith('/settings')
+  const inSettings = useRef(settingsShown)
+  inSettings.current = settingsShown
   const whileSettings = { isPaused: () => inSettings.current }
   const [settingsTarget, setSettingsTarget] = useState<{ section: SettingsSectionId; invite: boolean }>({ section: initialSettingsSection ? resolveSettingsSection('/settings', initialSettingsSection) : 'preferences', invite: false })
   const [linearNotice, setLinearNotice] = useState<'connected' | 'error' | null>(null)
@@ -139,7 +140,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     window.history.replaceState(null, '', url)
   }, [])
   const [boardBusy, setBoardBusy] = useState(false)
-  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], listIssues, { ...whileSettings, fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
+  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], listIssues, { ...whileSettings, fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy || settingsShown ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   // Keep failed refreshes out of document flow so the board/list never jumps.
   const listErrorMessage = t('listError')
   useEffect(() => {
@@ -153,7 +154,15 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams, whileSettings)
   const { data: bots = [] } = useSWR('bots', listBots, { ...whileSettings, revalidateOnFocus: false })
   const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))
-  const { data: threads = [] } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy ? 0 : 15000, revalidateOnFocus: false })
+  const { data: threads = [], mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : 15000, revalidateOnFocus: false })
+  const settingsWereShown = useRef(settingsShown)
+  useEffect(() => {
+    if (settingsWereShown.current && !settingsShown) {
+      void mutate()
+      void refreshThreads()
+    }
+    settingsWereShown.current = settingsShown
+  }, [settingsShown, mutate, refreshThreads])
   const [creatingBot, setCreatingBot] = useState(false)
   const [createdBot, setCreatedBot] = useState<BotView>()
   const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => getCoordinatorChat(), { ...whileSettings, revalidateOnFocus: false })
