@@ -947,7 +947,7 @@
     "allStatuses": "全部状态"
   },
   "Errors": {
-    "botNotFound": "找不到这个 Bot。",
+    "botNotFound": "这个 Bot 不在当前工作区。",
     "executionPlaceInvalid": "请选择可用设备或云端。",
     "executionHarnessUnavailable": "所选设备上没有这个 Agent。",
     "executionModelUnknown": "此模型不可用。",
@@ -1116,7 +1116,6 @@
     "e2bKeyInvalid": "Key 无效或已被撤销。",
     "e2bKeyUnverifiable": "暂时无法验证，请稍后重试。",
     "e2bKeyRateLimited": "E2B 当前对该密钥限流，请几分钟后再试。",
-    "botNotFound": "这个 Bot 不在当前工作区。",
     "tokenNotFound": "令牌不存在或已被撤销。",
     "tokenLimitReached": "你在当前工作区的有效令牌已达 50 个上限，请先撤销一个。"
   },
@@ -2271,8 +2270,8 @@
       "empty": "这个月没有线程。",
       "minutes": "{count} 分钟",
       "hours": "{count} 小时",
-      "hostedRemaining": "Mikka 默认剩余额度",
-      "hostedUnverified": "未验证"
+      "balance": "余额",
+      "points": "{points} 点"
     },
     "billing": {
       "loading": "正在加载计费",
@@ -3711,30 +3710,50 @@
     }
   },
   "Billing": {
-    "verify": {
-      "title": "验证银行卡",
-      "model": "Mikka 默认",
-      "allowance": "一次性 $1 额度",
-      "verifiedLabel": "已验证",
-      "terms": "$0 验证，不扣款。首次验证获得一次性 $1 额度，用于 Mikka 默认。",
-      "secured": "Secured by Stripe",
-      "submit": "验证",
-      "cancel": "取消",
-      "loading": "正在加载",
-      "confirming": "确认中",
-      "unconfirmed": "验证结果未确认",
-      "failed": "验证失败",
-      "failedWith": "验证失败：{reason}",
+    "allowance": {
+      "section": "免费额度",
+      "title": "银行卡验证",
+      "description": "不扣款；验证后可免费使用 1 美元的 <model><mark></mark> Mikka 默认模型</model>",
+      "verify": "验证",
+      "pending": "正在确认…",
+      "unavailable": "暂不可用",
       "verified": "银行卡已验证",
-      "unavailable": "暂不可用"
+      "claimedElsewhere": "银行卡已验证，这张卡的免费额度已在其他工作区领取"
+    },
+    "balance": {
+      "section": "余额",
+      "points": "{points} 点",
+      "topUp": "充值",
+      "amount": "{amount} · {points} 点",
+      "unavailable": "充值暂不可用",
+      "paid": "付款完成",
+      "history": "账单记录",
+      "date": "日期",
+      "type": "类型",
+      "pointsColumn": "点数",
+      "amountColumn": "金额",
+      "fee": "手续费",
+      "status": "状态",
+      "receipt": "收据",
+      "types": {
+        "topup": "充值",
+        "verification": "验卡赠送",
+        "refund": "退款"
+      },
+      "statuses": {
+        "paid": "已付",
+        "credited": "已入账",
+        "refunded": "已退款"
+      }
     },
     "refusal": {
-      "verification_required": "Mikka 默认需要验证银行卡",
-      "free_allowance_used": "Mikka 默认的 $1 额度已用完",
-      "points_exhausted": "Mikka 默认的点数已用完",
-      "platform_paused": "Mikka 默认已暂停，请稍后重试。",
+      "verification_required": "使用 <model><mark></mark> Mikka 默认模型</model>前需要验证银行卡",
+      "free_allowance_used": "免费额度已用完",
+      "points_exhausted": "点数已用完",
+      "platform_paused": "免费额度暂时停用",
       "unavailable": "Mikka 默认暂不可用，请稍后重试。",
-      "switchModel": "更换模型"
+      "verifyCard": "验证银行卡",
+      "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅"
     }
   }
 }

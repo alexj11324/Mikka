@@ -78,7 +78,7 @@ export function SettingRow({
   children,
 }: {
   title: string
-  description?: string
+  description?: ReactNode
   /** The named thing's icon (R-74), before the title. */
   icon?: ReactNode
   children?: ReactNode

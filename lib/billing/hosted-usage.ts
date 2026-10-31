@@ -1,4 +1,5 @@
-// Hosted-model (Mikka 默认) usage as #531 reports it, and the UI's helpers for it.
+// Hosted-model (Mikka 默认) usage, card verification and the points balance,
+// as the backend reports them (#531, #558, #559), and the UI's helpers for them.
 
 /** Every state `getHostedUsage` reports; a refused model call carries the same code. */
 export const HOSTED_STATES = ['ready', 'verification_required', 'free_allowance_used', 'points_exhausted', 'platform_paused', 'usage_in_progress', 'usage_cost_unavailable'] as const
@@ -19,14 +20,36 @@ export interface HostedUsage {
   balance: HostedBalance
 }
 
-export interface CardSetup {
-  clientSecret: string
-  /** Prefills the person's email so Link can offer saved cards. */
-  paymentElementOptions?: { defaultValues?: { billingDetails?: { email?: string } } }
+/** #558 `cardVerificationStatus`. */
+export interface CardVerificationStatus {
+  status: 'unverified' | 'pending' | 'verified' | 'unavailable'
+  last4?: string | null
+  /** Whether this card granted the allowance, or it was already claimed by another workspace. */
+  allowance?: 'granted' | 'claimed_elsewhere' | null
 }
 
-/** Stripe.js needs the publishable key; #531 does not return it, so it comes from the build (backend gap). */
-export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+/** #559 `getCreditBilling`: one balance (allowance included at 100 points per dollar) and 账单记录. */
+export interface CreditTransaction {
+  id: string
+  date: string
+  type: 'topup' | 'verification' | 'refund'
+  points: number
+  amountCents: number | null
+  currency: string | null
+  stripeFeeCents: number | null
+  status: 'succeeded'
+  receiptUrl: string | null
+}
+
+export interface CreditBillingView {
+  balancePoints: number
+  transactions: CreditTransaction[]
+}
+
+/** #559 `startPointsPurchase` accepts only these USD amounts. */
+export const POINTS_PURCHASE_AMOUNTS = [10, 25, 50] as const
+export const POINTS_PER_USD = 100
+const MICRO_USD_PER_POINT = 10_000
 
 /**
  * The refusal code in a model failure, or null. Failure records carry the code
@@ -38,22 +61,17 @@ export function hostedRefusal(message: string | null | undefined): HostedRefusal
   return match ? match[1] as HostedRefusal : null
 }
 
-/** Microdollars → dollars, rounded down to the cent so the screen never shows more than is left. */
-export function usdFromMicro(micro: number): number {
-  return Math.floor(Math.max(0, micro) / 10_000) / 100
+/** Allowance and purchased points as one balance, rounded down so the screen never shows more than is left. */
+export function balancePoints(balance: HostedBalance): number {
+  return Math.floor(Math.max(0, balance.free + balance.purchased) / MICRO_USD_PER_POINT)
 }
 
-/** What is left to spend on Mikka 默认. */
-export function hostedRemaining(balance: HostedBalance): number {
-  return usdFromMicro(balance.free + balance.purchased)
-}
-
-/** Waits for the webhook to record a confirmed card; false when it has not after `attempts`. */
-export async function waitForVerification(read: () => Promise<HostedUsage | null>, { attempts = 15, interval = 2000, sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms)) } = {}): Promise<HostedUsage | null> {
-  for (let i = 0; i < attempts; i++) {
-    const usage = await read()
-    if (usage?.balance.verified) return usage
-    if (i < attempts - 1) await sleep(interval)
+/** Polls until `done` holds or `attempts` run out; the last read either way. */
+export async function pollUntil<T>(read: () => Promise<T>, done: (value: T) => boolean, { attempts = 10, interval = 2000, sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms)) } = {}): Promise<T> {
+  let value = await read()
+  for (let i = 1; i < attempts && !done(value); i++) {
+    await sleep(interval)
+    value = await read()
   }
-  return null
+  return value
 }

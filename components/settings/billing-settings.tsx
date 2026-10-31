@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { getBilling, openBillingPortal, startPlanCheckout } from '@/app/actions/billing'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
-import { CardVerificationRow } from '@/components/billing/card-verification-row'
+import { BalanceSection, creditBillingKey } from '@/components/billing/balance-section'
+import { FreeAllowanceSection } from '@/components/billing/free-allowance-section'
 import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { useActionError } from '@/lib/use-action-error'
 
@@ -21,6 +22,12 @@ export function BillingSettings({ workspaceId }: { workspaceId: string }) {
   const locale = useLocale()
   const actionError = useActionError()
   const billing = useSWR(['settings:billing', workspaceId], () => getBilling(workspaceId))
+  const { mutate } = useSWRConfig()
+  // 免费额度 and 余额 (#558, #559) come first, whether or not a plan is set up.
+  const credits = <>
+    <FreeAllowanceSection workspaceId={workspaceId} onVerified={() => { void mutate(creditBillingKey(workspaceId)) }} />
+    <BalanceSection workspaceId={workspaceId} />
+  </>
   const [pending, setPending] = useState<'portal' | 'checkout' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const data = billing.data && !billing.data.error ? billing.data : null
@@ -44,8 +51,8 @@ export function BillingSettings({ workspaceId }: { workspaceId: string }) {
   if (!billing.data && !billing.error) return <SettingsLoading label={t('loading')} rows={3} />
   if (!data) return <p role="alert" className="text-sm text-destructive">{actionError(billing.data?.error)}</p>
   if (!data.configured) return <>
+    {credits}
     <p role="status" className="text-sm text-muted-foreground">{actionError('billingNotConfigured')}</p>
-    <CardVerificationRow workspaceId={workspaceId} />
   </>
 
   const planLine = data.live
@@ -53,7 +60,7 @@ export function BillingSettings({ workspaceId }: { workspaceId: string }) {
     : t('noPlan')
 
   return <>
-    <CardVerificationRow workspaceId={workspaceId} />
+    {credits}
     <SettingsSection id="billing-plan" title={t('plan')}>
       <SettingRow title={data.live ? data.plan ?? t('team') : t('free')} description={planLine}>
         {data.live || data.hasCustomer

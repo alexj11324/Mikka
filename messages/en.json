@@ -947,7 +947,7 @@
     "allStatuses": "All statuses"
   },
   "Errors": {
-    "botNotFound": "Bot not found.",
+    "botNotFound": "This bot does not exist in this workspace.",
     "executionPlaceInvalid": "Choose an available device or cloud.",
     "executionHarnessUnavailable": "This harness is unavailable on the selected device.",
     "executionModelUnknown": "This model is unavailable.",
@@ -1116,7 +1116,6 @@
     "e2bKeyInvalid": "This E2B key is invalid or has been revoked.",
     "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
     "e2bKeyRateLimited": "E2B is rate limiting this key right now. Wait a few minutes and try again.",
-    "botNotFound": "This bot does not exist in this workspace.",
     "tokenNotFound": "This token does not exist or was already revoked.",
     "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first."
   },
@@ -2271,8 +2270,8 @@
       "empty": "No threads this month.",
       "minutes": "{count} min",
       "hours": "{count} h",
-      "hostedRemaining": "Mikka Default remaining",
-      "hostedUnverified": "Not verified"
+      "balance": "Balance",
+      "points": "{points} points"
     },
     "billing": {
       "loading": "Loading billing",
@@ -3711,30 +3710,50 @@
     }
   },
   "Billing": {
-    "verify": {
-      "title": "Verify card",
-      "model": "Mikka Default",
-      "allowance": "One-off $1 allowance",
-      "verifiedLabel": "Verified",
-      "terms": "$0 check, nothing is charged. A first verification adds a one-off $1 to use with Mikka Default.",
-      "secured": "Secured by Stripe",
-      "submit": "Verify",
-      "cancel": "Cancel",
-      "loading": "Loading",
-      "confirming": "Confirming",
-      "unconfirmed": "Verification not confirmed yet",
-      "failed": "Verification failed",
-      "failedWith": "Verification failed: {reason}",
+    "allowance": {
+      "section": "Free allowance",
+      "title": "Card verification",
+      "description": "Nothing is charged; verifying adds $1 of free <model><mark></mark> Mikka Default</model> use",
+      "verify": "Verify",
+      "pending": "Confirming…",
+      "unavailable": "Unavailable",
       "verified": "Card verified",
-      "unavailable": "Unavailable"
+      "claimedElsewhere": "Card verified; its free allowance was already claimed in another workspace"
+    },
+    "balance": {
+      "section": "Balance",
+      "points": "{points} points",
+      "topUp": "Top up",
+      "amount": "{amount} · {points} points",
+      "unavailable": "Top-up unavailable",
+      "paid": "Payment complete",
+      "history": "Billing history",
+      "date": "Date",
+      "type": "Type",
+      "pointsColumn": "Points",
+      "amountColumn": "Amount",
+      "fee": "Fee",
+      "status": "Status",
+      "receipt": "Receipt",
+      "types": {
+        "topup": "Top-up",
+        "verification": "Card verification",
+        "refund": "Refund"
+      },
+      "statuses": {
+        "paid": "Paid",
+        "credited": "Credited",
+        "refunded": "Refunded"
+      }
     },
     "refusal": {
-      "verification_required": "Mikka Default needs a verified card",
-      "free_allowance_used": "Mikka Default's $1 allowance is used up",
-      "points_exhausted": "Mikka Default's points are used up",
-      "platform_paused": "Mikka Default is paused. Please try again later.",
+      "verification_required": "<model><mark></mark> Mikka Default</model> needs a verified card",
+      "free_allowance_used": "Free allowance used up",
+      "points_exhausted": "Points used up",
+      "platform_paused": "Free allowance paused",
       "unavailable": "Mikka Default is unavailable. Please try again later.",
-      "switchModel": "Change model"
+      "verifyCard": "Verify card",
+      "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
     }
   }
 }
