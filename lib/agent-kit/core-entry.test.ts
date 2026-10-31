@@ -12,7 +12,8 @@ let mailboxEnabled=false
 let taskEventId:string|undefined
 const record=(name:string)=>(...args:unknown[])=>{calls.push({name,args})}
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
-mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'synthetic-workflow'})}})
+const writable=new WritableStream()
+mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'synthetic-workflow'}),getWritable:()=>writable}})
 stub('../coordinator/model.ts',{COORDINATOR_MODEL:'current-default',coordinatorStep:()=>({}),turnWarning:(_reason:string,text:string)=>text})
 stub('../attention/handoff.ts',{QUIET_REPLY:'__quiet__'})
 stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unknown[])=>{record('hosted')(...args);return {text:'grounded reply',finishReason:'stop',responseMessages:[]}}})
@@ -32,7 +33,8 @@ stub('../../workflows/coordinator/steps.ts',{
   takeInbox:async()=>{const added=!inboxTaken;inboxTaken=true;return {held:true,added,handoffOnly:false,handoffMatterIds:[],telegramTargets:[],...(taskEventId ? {taskEventId} : {})}},
   releaseLease:async()=>false,
   preparePrompt:async(...args:unknown[])=>{record('prompt')(...args);return {prompt:'synthetic request'}},
-  appendMessages:async(...args:unknown[])=>{record('append')(...args)},
+  appendMessages:async(...args:unknown[])=>{record('append')(...args);return 3},
+  writeStreamPart:async(...args:unknown[])=>{record('stream')(...args)},
   settleAttention:async()=>{throw new Error('unexpected attention action')},
   telegramReplyThreads:async()=>{throw new Error('unexpected external message')},
   sendTelegramChunk:async()=>{throw new Error('unexpected external message')},
@@ -52,6 +54,11 @@ test('real workflow entry uses the returned execution snapshot for model, prompt
   assert.equal(calls.find(c=>c.name==='prompt')?.args[2],execution!.snapshot)
   assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{execution,writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[]}])
   assert.equal(calls.filter(c=>c.name==='hosted').length,1)
+  const hosted=calls.find(c=>c.name==='hosted')!.args[2] as {writable:unknown;preventClose:boolean}
+  assert.equal(hosted.writable,writable);assert.equal(hosted.preventClose,true)
+  assert.equal(calls.find(c=>c.name==='append')?.args[5],'synthetic-workflow:0')
+  assert.deepEqual(calls.filter(c=>c.name==='stream').map(c=>c.args[1]),[{type:'coordinator-turn-start',id:'synthetic-workflow:0',quietEligible:false},{type:'coordinator-turn-committed',id:'synthetic-workflow:0',through:3,quiet:false}])
+  assert.ok(calls.findIndex(c=>c.name==='append') < calls.findIndex(c=>c.name==='stream' && (c.args[1] as {type:string}).type==='coordinator-turn-committed'))
   assert.equal(calls.filter(c=>c.name==='failed').length,0)
   assert.equal(calls.filter(c=>c.name==='mailboxCatalogue').length,0, 'flag-off never resolves mailbox persistence')
 })

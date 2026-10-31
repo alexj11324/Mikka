@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
+import { SearchInput } from '@/components/ui/search-input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 /** Apps Mikka links itself, after the Composio toolkits. */
@@ -159,17 +159,14 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
           <TabsTrigger value="skills">{t('skillsTab')}</TabsTrigger>
         </TabsList>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-          <InputGroup className="max-w-64">
-            <InputGroupAddon><Search aria-hidden="true" /></InputGroupAddon>
-            <InputGroupInput
-              aria-label={tab === 'skills' ? t('searchAria') : t('searchAppsAria')}
-              autoComplete="off"
-              maxLength={100}
-              onChange={event => setQuery(event.target.value)}
-              placeholder={tab === 'skills' ? t('searchPlaceholder') : t('searchAppsPlaceholder')}
-              value={query}
-            />
-          </InputGroup>
+          <SearchInput
+            className="max-w-64"
+            aria-label={tab === 'skills' ? t('searchAria') : t('searchAppsAria')}
+            maxLength={100}
+            onChange={event => setQuery(event.target.value)}
+            placeholder={tab === 'skills' ? t('searchPlaceholder') : t('searchAppsPlaceholder')}
+            value={query}
+          />
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="secondary" size="sm" disabled={!addable.length || Boolean(apps.pending)} />}><Plus data-icon="inline-start" />{t('add')}</DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">

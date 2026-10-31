@@ -5,7 +5,7 @@ import { act, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 
-// Interactive checks: retry re-entry, focus after retry, and the window's decision gate.
+// Interactive checks: retry re-entry, focus after retry, and the 验收 pane's decision gate.
 const zh = JSON.parse(readFileSync(new URL('../messages/zh-CN.json', import.meta.url), 'utf8')).FactoryAcceptance
 const lookup = (key: string, args?: Record<string, string>) => String(key.split('.').reduce((node, part) => node?.[part], zh) ?? key).replace(/\{(\w+)\}/g, (_, name) => args?.[name] ?? '')
 type Swr = { data?: unknown; error?: unknown; isLoading: boolean; mutate: () => Promise<unknown> }
@@ -29,6 +29,8 @@ let container: HTMLDivElement
 let root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
 let FactoryAcceptance: typeof import('../components/workspace/factory-acceptance')['FactoryAcceptance']
+let FactoryAcceptancePane: typeof import('../components/workspace/factory-acceptance-pane')['FactoryAcceptancePane']
+let CandidateMachine: typeof import('../components/workspace/factory-acceptance-pane')['CandidateMachine']
 
 before(async () => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
@@ -37,6 +39,7 @@ before(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, HTMLElement: browser.HTMLElement, Element: browser.Element })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ FactoryAcceptance } = await import('../components/workspace/factory-acceptance'))
+  ;({ FactoryAcceptancePane, CandidateMachine } = await import('../components/workspace/factory-acceptance-pane'))
 })
 beforeEach(() => {
   ledger = { binding: {}, approvals: [], publications: [] }; evidence = undefined
@@ -49,6 +52,7 @@ after(() => browser.happyDOM.close())
 
 const task = (patch: Record<string, unknown> = {}) => ({ id: 't1', issueId: 'issue-1', stage: 'approval', status: 'pending', reason: '独立检查通过', candidateId: 'c1', candidateRunId: null, isSkillCandidate: false, ...patch })
 const render = async () => { await act(async () => root.render(<FactoryAcceptance issueId="issue-1" />)) }
+const pane = async (patch: Record<string, unknown> = {}) => { await act(async () => root.render(<FactoryAcceptancePane task={task(patch)} />)) }
 const button = (name: string) => [...document.querySelectorAll('button')].find(item => item.textContent?.trim() === name) as unknown as HTMLButtonElement | undefined
 
 test('retry fires once while a refetch is in flight', async () => {
@@ -73,28 +77,34 @@ test('a successful retry moves focus to the list heading', async () => {
   assert.ok(document.activeElement === heading, `focus is on ${document.activeElement?.tagName}`)
 })
 
-test('the window hides 批准发布 when the candidate has no publishable environment', async () => {
+test('the row opens acceptance for its task', async () => {
+  const opened: unknown[] = []
   list = { data: { tasks: [task()] }, isLoading: false, mutate: async () => undefined }
-  evidence = { binding: {}, evidenceReadId: 'r1', evidenceDigest: 'd', manifest: { candidate: { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'staging', scope: 'x' }, artifacts: [] } }
-  await render()
+  await act(async () => root.render(<FactoryAcceptance issueId="issue-1" onOpen={value => opened.push(value)} />))
   await act(async () => { (document.querySelector('[data-slot="item"] button') as unknown as HTMLButtonElement).click() })
-  assert.match(document.body.textContent ?? '', /待你确认/)
-  assert.equal(Boolean(button('批准发布')), false, '批准发布 is hidden')
-  evidence = { ...(evidence as object), manifest: { ...(evidence as { manifest: object }).manifest, candidate: { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'x' } } }
-  await render()
-  assert.ok(button('批准发布'), 'a complete candidate shows 批准')
+  assert.deepEqual(opened, [task()])
 })
 
-test('the window hides 发布 when the active approval has no publishable environment', async () => {
+test('the pane hides 批准并发布 when the candidate has no publishable environment', async () => {
+  list = { data: { tasks: [task()] }, isLoading: false, mutate: async () => undefined }
+  evidence = { binding: {}, manifest: { candidate: { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'staging', scope: 'x' }, artifacts: [] } }
+  await pane()
+  assert.doesNotMatch(document.body.textContent ?? '', /有效/)
+  assert.equal(Boolean(button('批准并发布')), false, '批准并发布 is hidden')
+  evidence = { ...(evidence as object), manifest: { ...(evidence as { manifest: object }).manifest, candidate: { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'x' } } }
+  await pane()
+  assert.ok(button('批准并发布'), 'a complete candidate shows 批准')
+})
+
+test('the pane hides 发布 when the active approval has no publishable environment', async () => {
   list = { data: { tasks: [task({ stage: 'publish', status: 'running' })] }, isLoading: false, mutate: async () => undefined }
   const approval = { id: 'a1', candidateId: 'c1', candidate: { sha: 'a'.repeat(40), repository: 'r', environment: 'staging', scope: 'x' }, action: 'deploy', target: 't', targetEnvironment: 'staging', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null, createdAt: new Date().toISOString() }
   ledger = { binding: {}, approvals: [approval], publications: [] }
-  await render()
-  await act(async () => { (document.querySelector('[data-slot="item"] button') as unknown as HTMLButtonElement).click() })
+  await pane({ stage: 'publish', status: 'running' })
   assert.ok(button('撤销批准'))
   assert.equal(Boolean(button('发布')), false, '发布 is hidden')
   ledger = { binding: {}, approvals: [{ ...approval, candidate: { ...approval.candidate, environment: 'preview' }, targetEnvironment: 'preview' }], publications: [] }
-  await render()
+  await pane({ stage: 'publish', status: 'running' })
   assert.ok(button('发布'))
 })
 
@@ -102,9 +112,39 @@ test('a failed publication shows 发布失败，批准仍保留 with 撤销批�
   list = { data: { tasks: [task({ stage: 'publish', status: 'running' })] }, isLoading: false, mutate: async () => undefined }
   const approval = { id: 'a1', candidateId: 'c1', candidate: { sha: 'a'.repeat(40), repository: 'r', environment: 'preview', scope: 'x' }, action: 'deploy', target: 't', targetEnvironment: 'preview', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null, createdAt: new Date().toISOString() }
   ledger = { binding: {}, approvals: [approval], publications: [{ id: 'p1', approvalId: 'a1', status: 'failed', request: {} }] }
-  await render()
-  await act(async () => { (document.querySelector('[data-slot="item"] button') as unknown as HTMLButtonElement).click() })
+  await pane({ stage: 'publish', status: 'running' })
   assert.match(document.body.textContent ?? '', /发布失败，批准仍保留/)
   assert.ok(button('撤销批准'))
   assert.ok(button('发布'))
+})
+
+// #541 fixture: the task detail fields the backend adds for frame 06.
+const delivery = { candidateSha: 'a3f9c2e'.padEnd(40, 'b'), pullRequest: { url: 'https://github.com/alexj11324/Mikka/pull/418', state: 'open', title: 'perf(home): 首屏图片懒加载与字体子集' }, repository: 'alexj11324/Mikka', previewUrl: null, previewDatabaseBranch: 'preview/mik-48', machine: { name: 'Alex 的 MacBook', kind: 'device' } }
+
+test('the candidate card shows the PR title and the preview database branch (#541)', async () => {
+  list = { data: { checks: [], delivery }, isLoading: false, mutate: async () => undefined }
+  evidence = { binding: {}, manifest: { candidate: { sha: delivery.candidateSha, repository: 'alexj11324/Mikka', environment: 'preview', scope: '' }, artifacts: [] } }
+  await pane()
+  const card = document.querySelector('section[aria-label="候选版本"]')
+  assert.ok(card?.textContent?.includes('#418perf(home): 首屏图片懒加载与字体子集'))
+  assert.ok(card?.textContent?.includes('Preview · Neon preview/mik-48'))
+  assert.ok(!card?.textContent?.includes('alexj11324/Mikka'), 'the title replaces the repository')
+})
+
+test('without the #541 fields the card falls back to the repository and the bare environment', async () => {
+  list = { data: { checks: [], delivery: { ...delivery, pullRequest: { url: delivery.pullRequest.url, state: 'open' }, previewDatabaseBranch: undefined, machine: undefined } }, isLoading: false, mutate: async () => undefined }
+  evidence = { binding: {}, manifest: { candidate: { sha: delivery.candidateSha, repository: 'alexj11324/Mikka', environment: 'preview', scope: '' }, artifacts: [] } }
+  await pane()
+  const card = document.querySelector('section[aria-label="候选版本"]')
+  assert.ok(card?.textContent?.includes('alexj11324/Mikka'))
+  assert.ok(!card?.textContent?.includes('Neon'))
+})
+
+test('the header names the machine that produced the candidate, and nothing when unknown', async () => {
+  list = { data: { checks: [], delivery }, isLoading: false, mutate: async () => undefined }
+  await act(async () => root.render(<CandidateMachine taskId="t1" />))
+  assert.equal(container.textContent, 'Alex 的 MacBook')
+  list = { data: { checks: [], delivery: { ...delivery, machine: null } }, isLoading: false, mutate: async () => undefined }
+  await act(async () => root.render(<CandidateMachine taskId="t1" />))
+  assert.equal(container.textContent, '')
 })

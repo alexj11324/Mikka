@@ -76,3 +76,21 @@ test('插件 opens on the last state it read: no loading line, no 连接 flip', 
     release()
   }
 })
+
+test('插件 list stays put while the connected apps load', async ({ page }) => {
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/integrations/composio', async route => {
+    if (route.request().method() === 'GET') await held
+    await route.fallback()
+  })
+  await register(page, '/?section=plugins')
+  const gmail = page.getByRole('link', { name: '打开 Gmail', exact: true })
+  await expect(gmail).toBeVisible()
+  // Loading is announced, not drawn: no visible line above the list.
+  await expect(page.getByRole('status').filter({ hasText: '正在读取集成…' })).toHaveClass(/sr-only/)
+  const before = await gmail.boundingBox()
+  release()
+  await expect(page.locator('[data-slot="app-row-pending"]')).toHaveCount(0)
+  expect((await gmail.boundingBox())?.y).toBe(before?.y)
+})

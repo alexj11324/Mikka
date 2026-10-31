@@ -6,5 +6,5 @@ import { EmailRequestForm } from './email-request-form'
 
 export function ForgotPasswordForm() {
   const t = useTranslations('Auth')
-  return <EmailRequestForm title={t('forgotTitle')} description={t('forgotDescription')} submitLabel={t('sendResetLink')} send={requestPasswordReset} />
+  return <EmailRequestForm title={t('forgotTitle')} submitLabel={t('sendResetLink')} send={requestPasswordReset} />
 }

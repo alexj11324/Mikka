@@ -443,7 +443,7 @@ export function InviteMembersDialog({
               <span className="text-xs text-muted-foreground">
                 {recipients.length
                   ? t("pendingCount", { count: recipients.length })
-                  : t("inviteHint")}
+                  : null}
               </span>
               <div className="flex items-center gap-2">
                 <Button

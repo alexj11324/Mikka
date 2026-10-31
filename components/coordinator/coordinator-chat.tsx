@@ -22,6 +22,7 @@ import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
+import { useCoordinatorStream } from './use-coordinator-stream'
 import { ThreadCard } from './thread-card'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
@@ -82,9 +83,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const [viewing, setViewing] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
+  const reconnectStream = useRef<() => void>(() => {})
   const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), () => botId ? getCoordinatorChat(botId) : getCoordinatorChat(), {
     refreshInterval: latest => latest?.working ? 2000 : 10000,
+    onSuccess: () => reconnectStream.current(),
   })
+  const stream = useCoordinatorStream({ botId, runId: data?.streamRunId, cursor: data?.cursor, persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
+  useEffect(() => { reconnectStream.current = stream.reconnect }, [stream.reconnect])
   const [draft, setDraft] = useState('')
   // A draft belongs to the bot it was typed for. Switching bots remounts this
   // component (the page keys it by bot), so keep the text per conversation.
@@ -199,7 +204,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   }
 
   if (openThread) return <section aria-label={name} data-slot="thread-view" className="flex min-h-0 flex-1 flex-col">
-    <IssueThreadPanel issueId={openThread.issueId} runId={openThread.runId} back={name} onClose={() => setOpenThread(null)} />
+    <IssueThreadPanel key={openThread.runId} issueId={openThread.issueId} runId={openThread.runId} back={name} onOpenThread={runId => setOpenThread({ issueId: openThread.issueId, runId })} onClose={() => setOpenThread(null)} />
   </section>
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
@@ -212,7 +217,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')}>
           <MessageScrollerContent className={cn('flex w-full min-w-0 max-w-full flex-col gap-5 pb-6', compact ? 'px-3 pt-4' : 'px-4 pt-18 sm:px-6')}>
-            {data && !items.length && !data.error && (data.enabled
+            {data && !items.length && !stream.replies.length && !data.error && (data.enabled
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
               : <div className="flex flex-1 flex-col items-center justify-center gap-3">{avatar('profile')}<p className="text-sm font-medium">{name}</p></div>)}
             {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
@@ -239,6 +244,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                   </MessageContent></Message>}
             </MessageScrollerItem>
             </Fragment>)}
+            {stream.replies.map(reply => <MessageScrollerItem key={reply.id} messageId={reply.id} data-coordinator-stream-id={reply.id} data-streaming={reply.committedThrough === undefined} className="[content-visibility:visible]">
+              <Message align="start"><MessageContent>
+                <CoordinatorReply text={reply.text} citations={citations} isStreaming={reply.committedThrough === undefined} />
+              </MessageContent></Message>
+            </MessageScrollerItem>)}
             {data?.working && items.length > 0 && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />{t('working')}</p>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
@@ -247,7 +257,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
-      {loadError && <FieldError className="text-xs">{t('loadError')}</FieldError>}
+      {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
       {refusal && <HostedRefusalNotice code={refusal} />}
       {data?.error && !data.working && !refusal && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></>}</Alert>}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
