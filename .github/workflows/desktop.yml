@@ -155,7 +155,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Select Xcode 26 for actool
         run: |
           xcode=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
@@ -176,7 +176,7 @@ jobs:
           test -s "$out/Assets.car"
           test -s "$out/Icon.icns"
           iconutil -c iconset "$out/Icon.icns" -o "$out/Icon.iconset"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-icon
           path: ${{ runner.temp }}/icon
