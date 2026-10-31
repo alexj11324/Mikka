@@ -9,10 +9,10 @@ export type GroupMessage = {
   id: string
   conversationId: string
   position: string
-  authorType: 'user' | 'agent'
+  authorType: 'user' | 'agent' | 'bot'
   authorId: string
   body: string
-  mentions: { memberType: 'user' | 'agent'; memberId: string }[]
+  mentions: { memberType: 'user' | 'agent' | 'bot'; memberId: string }[]
   replyToId: string | null
   createdAt: string
 }

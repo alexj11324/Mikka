@@ -105,6 +105,8 @@ export interface SupervisorDeps {
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
+  /** Authenticated policy validation before repository/setup effects, including resume. */
+  verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
   bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
   /** Resolve only daemon-owned cache paths (or a trusted hosted workspace). */
@@ -1098,6 +1100,8 @@ export class RunSupervisor {
     const log = this.deps.log.child({ run_id: runId })
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
+    if ((assignment.policySnapshotRequired || assignment.policySnapshot) && !this.deps.verifyRunPolicy) throw new Error('Run policy verification unavailable')
+    await this.deps.verifyRunPolicy?.(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal]))
     verifySkillAssignment(assignment)
     if (assignment.skillReceipt && (this.leases.get(runId)??0)<=Date.now())
       throw new Error('Receipted Skill assignment requires a current server lease')
@@ -1247,6 +1251,7 @@ export class RunSupervisor {
       networkAllow: repo.networkAllow,
       gitWritePaths: await worktreeGitWritePaths(repo.path, worktree, runId),
       policy: assignment.policy,
+      policyHash: assignment.policySnapshot?.payload.policyHash,
       skills: assignment.skills,
       skillReceipt: assignment.skillReceipt,
       onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {
