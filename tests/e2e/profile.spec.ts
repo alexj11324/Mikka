@@ -106,7 +106,7 @@ pooledTest('account export downloads owned file versions, captures and checkpoin
     for (const [id, artifactId, version, bytes] of [[firstVersion, ownArtifact, 1, first], [secondVersion, ownArtifact, 2, second], [randomUUID(), peerArtifact, 1, Buffer.from('peer private content')]] as const) {
       await database.query('INSERT INTO artifact_versions(id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") VALUES($1,$2,$3,$4,$5,$6,$7,\'Browser fixture\')', [id, artifactId, version, `browser-export/${id}`, bytes.toString('utf8'), digest(bytes), bytes.length])
     }
-    await database.query('INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,"inlineContent",sha256,size) VALUES($1,$2,$3,\'image\',\'image/png\',\'local\',\'ready\',\'Portable capture\',$4,$5,$6)', [captureId, owner, runId, capture, digest(capture), capture.length])
+    await database.query('INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,"inlineContent",sha256,size,"storageKey") VALUES($1,$2,$3,\'image\',\'image/png\',\'local\',\'ready\',\'Portable capture\',$4,$5,$6,$7)', [captureId, owner, runId, capture, digest(capture), capture.length, `browser-export/${captureId}`])
     await database.query('INSERT INTO run_checkpoints("runId","userId","baseCommit",patch,files,"takenAt") VALUES($1,$2,$3,$4,1,now())', [runId, owner, 'a'.repeat(40), patch])
     await page.goto(app('/settings?section=privacy'))
     await page.getByRole('button', { name: '导出', exact: true }).click()
