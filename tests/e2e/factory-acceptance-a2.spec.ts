@@ -84,7 +84,7 @@ test.describe('send-back', () => {
   })
 })
 
-test('publish failed keeps the approval and offers publish again', async ({ page }) => {
+test('publish failed keeps the approval and offers publish again', { tag: '@smoke' }, async ({ page }) => {
   const id = randomUUID()
   const { dialog } = await setup(page, { ledger: ({ candidateId }) => ({ approvals: [approval(candidateId, id)], publications: [{ id: randomUUID(), approvalId: id, status: 'failed', request: {}, receipt: null }] }) })
   await expect(dialog.getByText('发布失败，批准仍保留')).toBeVisible()

@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, app, leavePage } from './fixtures'
 
 // Real HTTP + database, synthetic accounts on the disposable Actions service.
 // This does not replace real-device / OAuth Preview acceptance.
@@ -23,6 +23,7 @@ test('active agents and heartbeat preserve the claimed-only lease contract over 
     expect(denied.status()).toBe(401)
     expect(denied.headers()['cache-control']).toBe('private, no-store')
     const { email } = await register(page)
+    await leavePage(page)
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email=$1', [email])
     expect(user).toBeTruthy()
     await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,\'Synthetic other\',$2,false,now(),now())', [foreignUser, `${foreignUser}@example.test`])

@@ -194,7 +194,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
   } catch (error) { await cleanup(); throw error }
 }
 
-test('Chat creates a task, the selected real daemon runs it, and the pushed PR returns to chat', async ({ page, testAccounts }, testInfo) => {
+test('Chat creates a task, the selected real daemon runs it, and the pushed PR returns to chat', { tag: '@smoke' }, async ({ page, testAccounts }, testInfo) => {
   const loop = await setup(page, testInfo, testAccounts.scope)
   try {
     const reply = '请保留 README 的现有内容。'
