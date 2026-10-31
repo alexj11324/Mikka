@@ -46,7 +46,7 @@ test('Report components parse, are detected as OpenUI and render through the rea
     assert.doesNotMatch(html, /Unable to|could not be displayed|unsupported/i, name)
   }
   assert.match(render(samples.BarChart), /data-slot="chart"/)
-  assert.match(render(samples.BarChart), /var\(--chart-2\)/)
+  assert.match(render(samples.BarChart), /var\(--chart-1\)/)
   assert.doesNotMatch(render(samples.BarChart) + render(samples.LineChart) + render(samples.AreaChart) + render(samples.DonutChart), /#[0-9a-f]{6}\b|rgb\(/i)
   // ReUI area and donut charts render through the shared chart container.
   assert.match(render(samples.AreaChart), /data-slot="chart"/)
