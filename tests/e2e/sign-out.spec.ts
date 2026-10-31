@@ -57,7 +57,7 @@ for (const path of ['/', '/settings/members', '/en/settings?section=devices']) {
     await hold()
     release(false)
     await expect(page).toHaveURL(url => url.pathname === app(`${english ? '/en' : ''}/sign-in`) && url.searchParams.get('login') === '1')
-    await expect(page.getByRole('heading', { name: english ? 'Welcome back' : '欢迎回来', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: english ? 'Sign in to Mikka' : '登录 Mikka', exact: true })).toBeVisible()
     // Replaying the original cookie proves revocation on the server, beyond browser cookie removal.
     const revoked = await page.request.get(app('/api/auth/get-session'), { headers: { cookie } })
     expect(await revoked.json()).toBeNull()

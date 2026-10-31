@@ -249,3 +249,17 @@ test('新建 Bot 预览跟随所选形状和颜色（减少动态效果时也是
   await expect(preview).toHaveAttribute('data-color', 'rouge')
   await expect.poll(() => preview.locator('path').first().getAttribute('fill')).toBe(await dialog.getByRole('button', { name: '爱心', exact: true }).locator('path').first().getAttribute('fill'))
 })
+
+// One bot, one pose: its avatars in the list, the chat and the panel move through
+// the idle montage together, so the Coordinator is never a circle in one place and
+// a triangle in another.
+test('Coordinator 的几个头像同步变化，并且会轮流变形', async ({ page }) => {
+  await register(page)
+  const avatars = page.locator('[data-slot="bot-avatar"][data-shape="cercle"]')
+  await expect.poll(async () => avatars.count()).toBeGreaterThanOrEqual(2)
+  const poses = () => avatars.evaluateAll(nodes => nodes.filter(node => node.getBoundingClientRect().width > 0).map(node => (node as HTMLElement).dataset.pose ?? ''))
+  // A boundary frame can split them for a moment, so wait for a sample where they agree.
+  await expect.poll(async () => new Set(await poses()).size, { timeout: 10000 }).toBe(1)
+  const seen = new Set<string>()
+  await expect.poll(async () => { const [pose] = await poses(); if (pose) seen.add(pose); return seen.size }, { timeout: 20000 }).toBeGreaterThan(1)
+})

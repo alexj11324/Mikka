@@ -22,7 +22,7 @@ test('旧预览入口和设置入口均跳转到正式页面', { tag: '@smoke' }
 test('匿名访问旧设置入口会重定向到登录页并保留设置路径', { tag: '@smoke' }, async ({ page }) => {
   await page.goto(app('/preview/settings'))
   await expect(page).toHaveURL(url => url.pathname === app('/sign-in') && url.searchParams.get('next') === '/settings/members')
-  await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '登录 Mikka' })).toBeVisible()
   await expect(page.getByLabel('邮箱', { exact: true })).toBeVisible()
 })
 

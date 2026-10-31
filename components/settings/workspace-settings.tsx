@@ -3,7 +3,8 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { deleteWorkspace, getWorkspaceDeletionImpact, getWorkspaceGeneral, getWorkspaceTransferTargets, transferWorkspace, updateWorkspace } from '@/app/actions/workspace-settings'
+import { deleteWorkspace, transferWorkspace, updateWorkspace, type getWorkspaceDeletionImpact, type getWorkspaceGeneral, type getWorkspaceTransferTargets } from '@/app/actions/workspace-settings'
+import { settingsRead } from '@/lib/settings-read'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -42,7 +43,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const general = useSWR(['workspace:general', workspaceId ?? ''], () => getWorkspaceGeneral(workspaceId))
+  const general = useSWR(['workspace:general', workspaceId ?? ''], () => settingsRead<Awaited<ReturnType<typeof getWorkspaceGeneral>>>('workspace-general', { workspace: workspaceId }))
   const data = general.data && !general.data.error ? general.data : null
   const [name, setName] = useState<string | null>(null)
   const [slug, setSlug] = useState<string | null>(null)
@@ -56,6 +57,8 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const fileRef = useRef<HTMLInputElement>(null)
   // One save at a time: Enter followed by the blur from disabling the field must not send it twice.
   const inFlight = useRef(false)
+  // A save asked for while another runs goes next; dropping it would leave a draft that looks saved.
+  const queued = useRef<{ field: Field; value: string | null } | null>(null)
   const host = typeof window === 'undefined' ? '' : `${window.location.host}${withBasePath('/w/')}`
 
   if (!general.data && !general.error) return <SettingsLoading label={t('loading')} rows={3} />
@@ -71,7 +74,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   }
 
   async function save(field: Field, value: string | null) {
-    if (inFlight.current) return
+    if (inFlight.current) { queued.current = { field, value }; return }
     inFlight.current = true
     setSaving(field)
     setFailed(null)
@@ -86,6 +89,9 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
       clearDraft(field)
       setSaving(null)
       inFlight.current = false
+      const next = queued.current
+      queued.current = null
+      if (next) void save(next.field, next.value)
     }
   }
 
@@ -162,7 +168,7 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = tr
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const targets = useSWR(['workspace:transfer-targets', workspaceId], () => getWorkspaceTransferTargets(workspaceId))
+  const targets = useSWR(['workspace:transfer-targets', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getWorkspaceTransferTargets>>>('transfer-targets', { workspace: workspaceId }))
   const people = targets.data && !targets.data.error ? targets.data : null
   const [to, setTo] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -213,7 +219,7 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose, open = true, onOpen
   const computerBilling = useGatedFeature('computerBilling')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const impact = useSWR(['workspace:deletion-impact', workspaceId], () => getWorkspaceDeletionImpact(workspaceId))
+  const impact = useSWR(['workspace:deletion-impact', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getWorkspaceDeletionImpact>>>('deletion-impact', { workspace: workspaceId }))
   const counts = impact.data && !impact.data.error ? impact.data : null
   const [typed, setTyped] = useState('')
   const [pending, setPending] = useState(false)
