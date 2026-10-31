@@ -47,7 +47,7 @@ Drawer, top to bottom:
 | Part | 中文 | What it holds |
 | --- | --- | --- |
 | Top | 搜索 · 新建 | A Liquid Glass search field that filters the drawer, and a compose button (new chat) |
-| Fixed rows | Coordinator · 建议 · 线程 · 任务 | Coordinator chat (first row, unread dot; the 08:00 briefing arrives here); 建议 (normal items, R-21); 线程 (every thread); 任务 (list only, no board) |
+| Fixed rows | Coordinator · 建议 · 线程 · 任务 · 插件 | Coordinator chat (first row, unread dot; the 08:00 briefing arrives here); 建议 (normal items, R-21); 线程 (every thread); 任务 (list only, no board); 插件 (the web's plugins page: 应用 and 技能) |
 | 置顶 | 置顶 | Pinned bots and group chats |
 | 最近 | 最近 | The other bots and group chats, newest first (the web bot list, R-01) |
 | 重启以更新 | 重启以更新 | Only once an update has downloaded; tapping restarts into it ([decision](decisions/2026-10-31-2010-ota-updates.md)) |
@@ -136,7 +136,7 @@ precedent. Figma frames 07, 07a–07e.
 | 推送到手机: 立即 / 电脑不在用时 | 07c | Slack "Notify me on mobile" |
 | 记忆: 使用记忆 toggle + 记忆摘要 row | top → 07d | ChatGPT 记忆 (Reference saved memories, Manage); Claude (Memory from chats, Manage) |
 | 记忆摘要: one Markdown document (headings, prose, lists), updated time, 提问或更新 input at the bottom | 07d → 07f | ChatGPT 记忆摘要 |
-| 已连接的 App | top → 07e | Claude Connectors; ChatGPT 插件; Poke Integrations |
+| 已连接的 App | top → 插件 | Claude Connectors; ChatGPT 插件; Poke Integrations. Opens 插件 (below) |
 | 外观 | top | Claude, ChatGPT, Comma Android |
 | 语言 (opens iOS Settings) | top | Comma iOS |
 | 版本 | top | Comma iOS Version; ChatGPT 关于. Shows the version, the build and, when an update is running, when it was published (「1.0.0 (6) · 10-31 22:51」) |
@@ -211,6 +211,16 @@ mobile drawer.
   button pushes that bot's threads over the chat (Back returns to it); a thread
   card or a push about a thread pushes the thread. The drawer's swipe works
   only where nothing is pushed, so the system's swipe back always wins.
+- **插件:** a system segmented control switches 应用 and 技能, as the web's
+  tabs. 应用 lists what the person connected, then 热门 (Mikka's own GitHub,
+  Linear and Telegram first) and 新品推荐 from the store
+  (`/api/integrations/composio/catalog`), and searches every app. A row opens
+  that app's web page signed in (`/?section=plugins&app=<id>`, through the
+  one-time-token handoff), where 连接 and 管理 run: the provider's sign-in and
+  Composio's callback need the browser session, which the app's keychain
+  cookie is not. The list reloads when the browser closes. 技能 is skills.sh's
+  leaderboard and search (`/api/skills/search`), a page at a time; a row opens
+  the skill on skills.sh.
 - **Workspace:** switching it in 设置 reloads every screen's data at once.
 - **任务:** a row opens the task on the web, signed in (`/?issue=<id>`).
 - **Lists:** 线程, 任务 and 建议 pull to refresh; message text can be selected

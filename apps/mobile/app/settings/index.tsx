@@ -11,6 +11,7 @@ import { Symbol, type SymbolName } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { CloseButton, Group } from '@/components/ui'
 import { authClient } from '@/lib/auth'
+import { switchTo } from '@/lib/navigate'
 import { useSettings } from '@/lib/settings'
 import { versionLabel } from '@/lib/updates'
 import { colors } from '@/lib/theme'
@@ -53,7 +54,7 @@ export default function SettingsScreen() {
           <Group label="Coordinator">
             <Row icon={icon('bell', Bell)} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />
             <Row icon={icon('book', BookOpen)} label="记忆" onPress={() => router.push('/settings/memory')} />
-            <Row icon={icon('square.grid.2x2', Blocks)} label="已连接的 App" onPress={() => router.push('/settings/apps')} />
+            <Row icon={icon('square.grid.2x2', Blocks)} label="已连接的 App" onPress={() => switchTo('/plugins')} />
           </Group>
           <Group label="App">
             <Row icon={icon('globe', Globe)} label="语言" value="简体中文" trailing={<Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}
