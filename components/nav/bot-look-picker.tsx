@@ -6,7 +6,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 import { BOT_COLORS, BOT_SHAPES, BotAvatar, type BotColor, type BotShape } from './bot-avatar'
 
-/** A bot's 16 shapes and 12 colours (Figma 195:3226), shared by 新建 Bot and the right panel's avatar. */
+/** A bot's 16 shapes and 12 colours (Figma 195:3226), shared by 新建 Bot, the right panel's avatar and the first-run guide. */
 export function BotLookPicker({ color, shape, disabled, onColor, onShape }: { color: BotColor; shape: BotShape; disabled?: boolean; onColor: (color: BotColor) => void; onShape: (shape: BotShape) => void }) {
   const t = useTranslations('Shell.newBot')
   return <FieldGroup className="gap-5">

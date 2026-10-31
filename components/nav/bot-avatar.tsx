@@ -10,8 +10,17 @@ export { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotC
  * What the bot is doing, as bloub states (Figma 196:3571): 空闲 idle (it plays
  * its own animations), 工作中 thinking, 等你处理 notify, 完成 wink, 出错
  * exclaim, 离线 sleep.
+ * The rest are one-off moves (wide eyes, play, the hexagon pose, and the
+ * burst, orbit and comet effects) for moments like the first-run guide; they
+ * play at bloub's own length and the caller sets the mood back to idle afterwards.
  */
-export type BotMood = 'idle' | 'thinking' | 'notify' | 'wink' | 'exclaim' | 'sleep'
+export type BotMood = 'idle' | 'thinking' | 'notify' | 'wink' | 'exclaim' | 'sleep' | BotMove
+
+export type BotMove = 'wide' | 'play' | 'hexagon' | 'burst' | 'orbit' | 'comet'
+
+/** How long each mood lasts at bloub's own pace, in seconds. */
+export const BOT_MOOD_SECONDS: Record<BotMood, number> = { idle: 2.4, thinking: 2.6, notify: 2.2, wink: 1.6, exclaim: 2, sleep: 2.4, wide: 1.8, play: 2, hexagon: 1.6, burst: 2.6, orbit: 3.4, comet: 2.4 }
+const BOT_MOVES = new Set<BotMood>(['wide', 'play', 'hexagon', 'burst', 'orbit', 'comet'])
 
 /** A steady colour for something that has a name but no colour of its own, such as an agent assignee. */
 export function colorFor(name: string): BotColor {
@@ -61,7 +70,8 @@ const IDLE_MONTAGE = [
   ['idle', 2.5], ['comet', 2.6], ['idle', 2.5], ['burst', 2.4],
 ] as const
 
-function cycleFor(bloub: Runtime[0], mood: BotMood) {
+function cycleFor(bloub: Runtime[0], mood: BotMood, brisk: boolean) {
+  if (BOT_MOVES.has(mood) || brisk && mood !== 'idle') return [{ state: mood, duration: bloub.clampDuration(mood, BOT_MOOD_SECONDS[mood]) }]
   if (mood !== 'idle') return [{ state: mood, duration: 12 }]
   return IDLE_MONTAGE.map(([state, seconds]) => ({ state, duration: bloub.clampDuration(state, seconds) }))
 }
@@ -105,8 +115,8 @@ type Live = { set: (next: { color: string; shape: string; mood: BotMood }) => vo
  * of remounting it. Small rows and anything `still` hold one pose; the rest
  * animate at 30fps and pause off screen.
  */
-export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, still = size === 'row' }: {
-  color?: string | null; shape?: string | null; size?: keyof typeof SIZES; mood?: BotMood; label?: string; still?: boolean
+export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, still = size === 'row', brisk = false }: {
+  color?: string | null; shape?: string | null; size?: keyof typeof SIZES; mood?: BotMood; label?: string; still?: boolean; brisk?: boolean
 }) {
   const host = useRef<HTMLSpanElement>(null)
   const live = useRef<Live | null>(null)
@@ -135,7 +145,7 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
       if (!alive) return
       const first = latest.current()
       const [state, setState] = createSignal(first)
-      const cycle = cycleFor(bloub, first.mood)
+      const cycle = cycleFor(bloub, first.mood, brisk)
       const length = cycle.reduce((sum, block) => sum + block.duration, 0)
       let player: BloubBotRef | null = null
       const dispose = render(() => createComponent(bloub.BloubBot, {
@@ -147,14 +157,14 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
         onStateChange: (pose: string) => { node.dataset.pose = pose },
         get color() { return state().color },
         get shape() { return state().shape },
-        get cycle() { return cycleFor(bloub, state().mood) },
+        get cycle() { return cycleFor(bloub, state().mood, brisk) },
       }), node)
       // bloub stops its clock while an avatar is hidden (folded list, closed panel,
       // background tab), so on its return it would lag the others; seek it back to
       // the shared clock so every avatar of a bot keeps one pose.
       const resync = () => {
         if (frozen || !player) return
-        const blocks = cycleFor(bloub, state().mood)
+        const blocks = cycleFor(bloub, state().mood, brisk)
         const total = blocks.reduce((sum, block) => sum + block.duration, 0)
         const { index, offset } = blockAt(blocks, phaseFor(latestSeed.current, total))
         player.seek(index, offset)
@@ -175,7 +185,7 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
     const returned = () => { if (document.visibilityState === 'visible') window.dispatchEvent(new Event(RESYNC_EVENT)) }
     document.addEventListener('visibilitychange', returned)
     return () => { alive = false; watch.disconnect(); shown.disconnect(); window.removeEventListener(RESYNC_EVENT, align); document.removeEventListener('visibilitychange', returned); live.current?.dispose(); live.current = null; node.replaceChildren() }
-  }, [px, frozen, label, frozenShape])
+  }, [px, frozen, label, frozenShape, brisk])
 
   useEffect(() => { live.current?.set(latest.current()) }, [tone, form, mood])
 

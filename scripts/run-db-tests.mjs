@@ -102,6 +102,7 @@ export const SELF_MANAGED = [
 // Register exact files so another pg-backed test in the same folder still fails
 // inventory until it has its own explicit gate.
 export const BROWSER_SUITES = [
+  { file: 'tests/mvp/coordinator-streaming.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
   { file: 'tests/mvp/core-loop.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
 ]
 // These import the locked driver to check its API, with native transport and

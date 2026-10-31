@@ -59,7 +59,7 @@ export function AccessTokensSettings({ workspaceId }: { workspaceId?: string }) 
 
   return <>
     <SettingsSection id="tokens-heading" action={<Button {...settingsSectionAction} onClick={() => setCreating(true)}>{t('create')}</Button>}>
-      {!tokens.data && !tokens.error && <SettingsLoading label={t('loading')} rows={2} />}
+      {!tokens.data && !tokens.error && <SettingsLoading label={t('loading')} rows={2} bare />}
       {(tokens.error || tokens.data?.error) && <FieldError className="px-5 py-4">{actionError(tokens.data?.error)}</FieldError>}
       {rows?.length === 0 && <p className="px-5 py-4 text-sm text-muted-foreground">{t('empty')}</p>}
       {rows?.map(token => <SettingRow key={token.id} title={token.name} description={describe(token)}>

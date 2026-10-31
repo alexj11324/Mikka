@@ -94,11 +94,11 @@ export class ScheduleStore {
   })}
   private async lockChat(tx:PoolClient,row:Schedule){await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`bot-chat:${row.owner_id}:${row.bot_id??'coordinator'}`])}
   private async retireEvent(tx:PoolClient,id:string|null){if(id)await tx.query(`UPDATE coordinator_events SET "deliveredAt"=COALESCE("deliveredAt",$2),tier='background' WHERE id=$1`,[id,this.clock()])}
-  private async report(tx:PoolClient,row:Schedule,o:Occurrence,status:string,result:unknown,error:string|null){
+  private async report(tx:PoolClient,row:Schedule,o:Occurrence,status:string,result:unknown,error:string|null,streamId?:string){
     const text=`[Schedule ${row.id}; occurrence ${o.id}; operation ${o.operation_id}] ${o.definition.title}: ${status}\n${result===null?error??'':typeof result==='object'&&result&&'text' in result?String(result.text):JSON.stringify(result)}`
     await this.safeMessage(tx,row.owner_id,text)
     await this.lockChat(tx,row)
-    await tx.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,COALESCE(MAX(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ON CONFLICT(id) DO NOTHING`,[o.operation_id,row.owner_id,row.bot_id,{role:'assistant',content:text}])
+    await tx.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,COALESCE(MAX(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ON CONFLICT(id) DO NOTHING`,[o.operation_id,row.owner_id,row.bot_id,{role:'assistant',content:text,...(streamId?{mikkaStreamId:streamId}:{})}])
     await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier,"deliveredAt") VALUES($1,$2,$3,'run_report',$4,$5,'background',$6) ON CONFLICT("dedupeKey") DO NOTHING`,[o.id,row.owner_id,row.bot_id,`schedule_result:${o.id}`,{source:'schedule_result',scheduleId:row.id,occurrenceId:o.id,operationId:o.operation_id,status,error},this.clock()])
     await tx.query('UPDATE schedule_occurrences SET reported_at=$2,report_attempts=report_attempts+1 WHERE id=$1',[o.id,this.clock()])
   }
@@ -163,7 +163,7 @@ export class ScheduleStore {
     if(!row||row.occurrence_status!=='running'||row.lease_token!==scope.leaseToken||row.lease_until<=this.clock()||row.version!==row.occurrence_version||['paused','cancelled'].includes(row.status)||row.task.kind!=='agent_read'||!isDeepStrictEqual(row.task.allowedActions,scope.allowedActions)||row.task.prompt!==scope.prompt)throw new ScheduleError('scheduleReadAuthorityLost',403)
     await this.workspace(owner,row.workspace_id,()=>this.transaction(tx=>this.conversation(tx,{ownerId:owner,workspaceId:row.workspace_id,botId})))
   }
-  async completeRead(owner:string,botId:string|null,scope:ScheduledRead,text:string){
+  async completeRead(owner:string,botId:string|null,scope:ScheduledRead,text:string,streamId?:string){
     await this.assertRead(owner,botId,scope)
     const row=(await this.pool.query<Schedule>('SELECT s.* FROM user_schedules s JOIN schedule_occurrences o ON o.schedule_id=s.id WHERE o.id=$1',[scope.occurrenceId])).rows[0]
     return this.workspace(owner,row.workspace_id,()=>this.transaction(async tx=>{
@@ -173,7 +173,7 @@ export class ScheduleStore {
       if(!o)throw new ScheduleError('scheduleReadAuthorityLost',403)
       await this.lockChat(tx,row)
       await this.retireEvent(tx,o.event_id)
-      await this.report(tx,row,o,'succeeded',{text},null)
+      await this.report(tx,row,o,'succeeded',{text},null,streamId)
     }))
   }
 }

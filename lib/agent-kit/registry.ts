@@ -41,6 +41,7 @@ export const AGENT_TOOL_IDS = [
   'list_drive_files',
   ...SCHEDULE_TOOL_IDS,
   'search_notion_pages', 'read_notion_page_blocks', 'search_slack_messages', 'read_slack_thread',
+  'list_app_tools', 'call_app_tool',
   'search_gmail', 'read_gmail_message', 'list_calendar_events', 'get_calendar_event', 'send_email',
   'create_calendar_event', 'update_calendar_event', 'web_search', 'list_issues', 'get_issue', 'create_issue', 'update_issue',
   'request_repository_push_approval', 'list_agents', 'dispatch_run', 'list_runs', 'get_run', 'send_to_run', 'remember', 'forget',

@@ -4,7 +4,7 @@ import { cancelMailboxBackend } from '@/lib/mailbox-pg-cancel'
 import { waitForMailboxGuard, type MailboxTransactionGuard, type MailboxTransactionLease } from '@/lib/mailbox-transaction-guard'
 
 export interface WriteActor { userId: string; sessionId: string }
-export interface WriteRequestContext { signal?: AbortSignal; actor?: WriteActor; guard?: MailboxTransactionGuard; modelRun?: { ownerId: string; botId: string | null; workspaceId: string | null; runId: string }; guardForRun?: (run: { ownerId: string; botId: string | null; workspaceId: string | null; runId: string }) => MailboxTransactionGuard | undefined }
+export interface WriteRequestContext { signal?: AbortSignal; actor?: WriteActor; guard?: MailboxTransactionGuard; modelRun?: { ownerId: string; botId: string | null; workspaceId: string | null; runId: string }; /** Judges whether a write no setting names is destructive; absent means ask. */ judgeWrite?: import('./write-judgment').WriteJudge; guardForRun?: (run: { ownerId: string; botId: string | null; workspaceId: string | null; runId: string }) => MailboxTransactionGuard | undefined }
 export interface WriteTransactionOptions<T = unknown> {
   signal?: AbortSignal
   /** Acquired only after work holds APP authorization locks; retained through COMMIT. */

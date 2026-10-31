@@ -216,7 +216,21 @@ export async function captureAuthenticationCookies(context: BrowserContext) {
   }))
 }
 
-export async function register(page: Page, next = '/', email = `e2e-${randomUUID()}@example.com`) {
+/**
+ * A new account opens on the first-run guide, which only the workspace root
+ * shows. Tests about other flows mark it done and skip it in place, without a
+ * reload that would refetch the page's data; tests/e2e/onboarding.spec.ts
+ * covers the guide.
+ */
+export async function skipOnboarding(page: Page, email: string) {
+  await database().query('insert into user_onboarding ("userId") select id from "user" where email = $1 on conflict do nothing', [email])
+  if (new URL(page.url()).pathname.replace(/\/$/, '') !== app('/').replace(/\/$/, '')) return
+  const guide = page.getByRole('dialog', { name: '创建你的第一个 Bot', exact: true })
+  await guide.getByRole('button', { name: '跳过引导', exact: true }).click()
+  await expect(guide).toHaveCount(0)
+}
+
+export async function register(page: Page, next = '/', email = `e2e-${randomUUID()}@example.com`, { onboarding = false } = {}) {
   const password = randomBytes(32).toString('base64url')
   try {
     await page.goto(app(`/sign-up?next=${encodeURIComponent(next)}`))
@@ -227,6 +241,7 @@ export async function register(page: Page, next = '/', email = `e2e-${randomUUID
     await delay(4000)
     await page.getByRole('button', { name: '创建账号并进入', exact: true }).click()
     await expect(page).toHaveURL(url => `${url.pathname}${url.search}` === app(next))
+    if (!onboarding) await skipOnboarding(page, email)
     return { email, password }
   } finally {
     // Existing real signup tests also feed the private artifact scanner. A

@@ -1,4 +1,5 @@
 import { FatalError } from 'workflow'
+import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
 import { SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
 import { FACTORY_QUESTION_INSTRUCTIONS } from '@/lib/factory/instructions'
 import { FACTORY_CHECK_RECOVERY_INSTRUCTIONS } from '@/lib/factory/check-recovery'
@@ -32,7 +33,7 @@ import { webSearch } from '@/lib/search'
 import { issueMembers, issues } from '@/lib/db/schema'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
-import { proposeAction, proposeRepositoryPush } from '@/lib/pending-action-store'
+import { proposeRepositoryPush, writeAccountAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -107,9 +108,15 @@ export async function failTurn(userId: string, holder: string, error: string, bo
   await store.failTurn(userId, holder, error, botId)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null, streamId?: string) {
   'use step'
-  await store.appendMessages(userId, holder, messages, warning, botId)
+  return store.appendMessages(userId, holder, messages, warning, botId, streamId)
+}
+
+export async function writeStreamPart(writable: WritableStream<CoordinatorWorkflowStreamPart>, part: CoordinatorWorkflowStreamPart) {
+  'use step'
+  const writer = writable.getWriter()
+  try { await writer.write(part) } finally { writer.releaseLock() }
 }
 
 /** Every chunk revalidates its source, owner, chat lease and current Telegram
@@ -244,12 +251,25 @@ export async function personalMcp(userId: string, botId: string | null, executio
 // preserve the first uncertain outcome rather than replaying this step.
 personalMcp.maxRetries = 0
 
-export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
+/** Apps connected from the 插件 store, through the tools Composio lists for them (lib/app-tools.ts). */
+export async function appTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (scope?.scheduledRead && operation === 'call') return { error: 'integrationActionNotAllowed' }
+  const { runAppTools } = await import('@/lib/app-tools-server')
+  return runAppTools(userId, botId, operation, input)
+}
+// A write may have happened even when its step fails; never replay it.
+appTools.maxRetries = 0
+
+export async function accountWrite(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
   'use step'
   await assertNativeToolScope(userId,scope)
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
-  return accountId ? proposeAction(userId, action, input, accountId) : proposeAction(userId, action, input)
+  return writeAccountAction(userId, action, input, accountId, botId ?? null)
 }
+// A send has no idempotency key: a replayed step could send it twice.
+accountWrite.maxRetries = 0
 
 export async function proposeRepositoryPushApproval(userId: string, input: { repo: string }, scope?: NativeToolScope, task?: { eventId: string; botId: string | null }) {
   'use step'
@@ -597,10 +617,11 @@ export async function assertScheduleRead(userId:string,botId:string|null,scope:i
   const {assertScheduledRead}=await import('@/lib/schedules/runtime')
   await assertScheduledRead(userId,botId,scope)
 }
-export async function completeScheduleRead(userId:string,botId:string|null,scope:import('@/lib/schedules/contract').ScheduledRead,text:string){
+export async function completeScheduleRead(userId:string,botId:string|null,scope:import('@/lib/schedules/contract').ScheduledRead,text:string,streamId?:string){
   'use step'
   const {schedules}=await import('@/lib/schedules/runtime')
-  await schedules().completeRead(userId,botId,scope,text)
+  await schedules().completeRead(userId,botId,scope,text,streamId)
+  return (await store.conversationForDisplay(userId,1,botId))[0]?.position ?? 0
 }
 export async function failScheduleRead(scope:import('@/lib/schedules/contract').ScheduledRead,denied=false){
   'use step'

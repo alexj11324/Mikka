@@ -75,7 +75,14 @@ for (const surface of surfaces) {
           let matching = isolatedRoot.getByRole(identity.role, { name: identity.name, exact: true }).and(isolatedRoot.locator(controlsSelector))
           if (identity.href !== null) matching = matching.and(isolatedRoot.locator(`[href=${JSON.stringify(identity.href)}]`))
           const candidate = matching.nth(ordinal)
-          const restored = await inspectControl(candidate, isolated)
+          const found = await matching.count() > ordinal
+          const restored = found ? await inspectControl(candidate, isolated) : null
+          if (!restored || restored.label !== label) {
+            // Diagnostics only: the restored page's own control list shows what moved or went missing.
+            const list = await Promise.all((await isolatedRoot.locator(controlsSelector).all()).map(async control => (await inspectControl(control, isolated)).label))
+            await testInfo.attach(`恢复后控件清单-${index}`, { body: JSON.stringify({ expected: label, identity, ordinal, restored: list }, null, 2), contentType: 'application/json' })
+          }
+          if (!restored) throw new Error(`页面恢复后找不到同一身份的控件：${label}`)
           expect(restored.label, '页面恢复后控件身份必须一致').toBe(label)
           expect(restored.identity, '页面恢复后可访问身份与链接目标必须一致').toEqual(identity)
           await clickWithEffect(isolated, candidate)

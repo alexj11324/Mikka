@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Download,
   MoreHorizontal,
-  Search,
   Shield,
   Users,
 } from "lucide-react";
@@ -34,11 +33,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -69,9 +63,10 @@ import {
   Empty,
   EmptyHeader,
   EmptyTitle,
-  EmptyDescription,
+  
   EmptyMedia,
 } from "@/components/ui/empty";
+import { SearchInput } from "@/components/ui/search-input";
 import { fetchSettingsData, memberSettingsKey } from "@/lib/settings-data";
 import { useActionError } from "@/lib/use-action-error";
 import { SettingsDataState } from "@/components/settings/settings-data-state";
@@ -341,17 +336,12 @@ export function MembersSettings({
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="min-w-0 flex-1 sm:w-72">
-                  <InputGroup>
-                    <InputGroupAddon>
-                      <Search />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      aria-label={t("searchLabel")}
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder={t("searchPlaceholder")}
-                    />
-                  </InputGroup>
+                  <SearchInput
+                    aria-label={t("searchLabel")}
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={t("searchPlaceholder")}
+                  />
                 </div>
                 <Select
                   value={filter}
@@ -637,11 +627,6 @@ export function MembersSettings({
                   <EmptyTitle>
                     {query ? t("empty.noResults") : t("empty.noMembers")}
                   </EmptyTitle>
-                  <EmptyDescription>
-                    {query
-                      ? t("empty.noResultsHint")
-                      : t("empty.noMembersHint")}
-                  </EmptyDescription>
                 </EmptyHeader>
               </Empty>
             )}

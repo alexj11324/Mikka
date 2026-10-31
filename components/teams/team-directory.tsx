@@ -6,18 +6,18 @@ import { SettingsLink as Link } from '@/components/settings/settings-link'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { useRouter, useSearchParams } from 'next/navigation'
 import useSWR, { useSWRConfig } from 'swr'
-import { ArrowDown, ArrowUp, ChevronLeft, Search, SquareUserRound } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, SquareUserRound } from 'lucide-react'
 import { changeTeamMember, loadTeamDirectory } from '@/app/actions/teams'
 import { fetchTeamDirectory, isSettingsAccessError, settingsReadOptions, teamDirectoryKey } from '@/lib/settings-data'
 import { SettingsDataState } from '@/components/settings/settings-data-state'
 import { Button } from '@/components/ui/button'
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { memberCsv } from '@/lib/invitation-csv'
 import { TeamDirectoryMenu } from './team-directory-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
+import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
+import { SearchInput } from '@/components/ui/search-input'
 import { TeamForm } from './team-form'
 import { TeamMembersSettings } from './team-members-settings'
 import { TeamSettingsDetails } from './team-settings-details'
@@ -79,11 +79,11 @@ export function TeamDirectory({ workspaceId }: { workspaceId?: string }) {
     {initialView === 'members' ? <section className="flex flex-col gap-8"><Button variant="ghost" size="sm" className="self-start" nativeButton={false} role="link" render={<Link workspaceId={data.workspace.id} href={teamHref(selectedTeam.id)} />}><ChevronLeft data-icon="inline-start" />{i18nText("FeatureCopy.c_212cf650")}</Button><div className="mx-auto flex w-full max-w-3xl flex-col gap-8 pb-12 sm:pt-4"><header className="flex flex-col gap-2"><h1 className="text-2xl font-semibold tracking-tight">{i18nText("FeatureCopy.c_7de0251f")}</h1><p className="text-sm text-muted-foreground">{selectedTeam.name} · {selectedTeam.memberCount}  {i18nText("FeatureCopy.c_b8d0b7f3")}</p></header><TeamMembersSettings key={selectedTeam.id} team={selectedTeam} onUpdated={updated} /></div></section> : <TeamSettingsDetails key={selectedTeam.id} team={selectedTeam} />}
   </div>
   return <div data-settings-state={readError ? 'error' : 'ready'} className="flex w-full flex-col gap-8 px-5 py-10 sm:px-16 sm:py-16">
-    {initialTeamId ? <Empty><EmptyHeader><EmptyTitle>{i18nText("FeatureCopy.c_19b23b31")}</EmptyTitle><EmptyDescription>{i18nText("FeatureCopy.c_616748be")}</EmptyDescription></EmptyHeader><Button variant="outline" onClick={() => navigate(directoryHref)}>{i18nText("FeatureCopy.c_30108106")}</Button></Empty> : <section aria-label={i18nText("FeatureCopy.c_efbc2a6b")} className="flex flex-col gap-6">
+    {initialTeamId ? <Empty><EmptyHeader><EmptyTitle>{i18nText("FeatureCopy.c_19b23b31")}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={() => navigate(directoryHref)}>{i18nText("FeatureCopy.c_30108106")}</Button></Empty> : <section aria-label={i18nText("FeatureCopy.c_efbc2a6b")} className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">{i18nText("Settings.sections.teams.title")}</h1>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <div className="min-w-0 flex-1 sm:w-80"><InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput aria-label={t('searchTeams')} placeholder={t('filterPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></InputGroup></div>
+          <div className="min-w-0 flex-1 sm:w-80"><SearchInput aria-label={t('searchTeams')} placeholder={t('filterPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></div>
           <Select value={view} items={[{ value: 'all', label: t('active') }, { value: 'mine', label: t('joined') }]} onValueChange={value => { if (value) setView(value) }}><SelectTrigger aria-label={i18nText("FeatureCopy.c_ab3ddf8b")}><SelectValue /></SelectTrigger><SelectContent><SelectGroup><SelectItem value="all">{t('active')}</SelectItem><SelectItem value="mine">{t('joined')}</SelectItem></SelectGroup></SelectContent></Select>
         </div>
         <div className="ml-auto flex items-center gap-2"><Button type="button" variant="outline" className="rounded-full" aria-label={i18nText("FeatureCopy.c_3aea5cc4")} onClick={exportTeams}>{t('exportCsv')}</Button><Button type="button" className="rounded-full" aria-label={i18nText("FeatureCopy.c_929d5670")} onClick={createTeam}>{t('createTeam')}</Button></div>
@@ -101,7 +101,7 @@ export function TeamDirectory({ workspaceId }: { workspaceId?: string }) {
             <TableCell><TeamDirectoryMenu team={team} pending={pending} navigate={navigate} teamHref={teamHref} onMembership={membership} /></TableCell>
           </TableRow>)}
         </TableBody>
-      </Table> : <Empty className="min-h-72"><EmptyHeader><EmptyTitle>{query ? i18nText("FeatureCopy.c_24997695") : view === 'mine' ? i18nText("FeatureCopy.c_d82a1158") : i18nText("FeatureCopy.c_e5305647")}</EmptyTitle><EmptyDescription>{query ? i18nText("FeatureCopy.c_630837f3") : i18nText("FeatureCopy.c_28ccb205")}</EmptyDescription></EmptyHeader><Button onClick={createTeam}>{i18nText("FeatureCopy.c_929d5670")}</Button></Empty>}
+      </Table> : <Empty className="min-h-72"><EmptyHeader><EmptyTitle>{query ? i18nText("FeatureCopy.c_24997695") : view === 'mine' ? i18nText("FeatureCopy.c_d82a1158") : i18nText("FeatureCopy.c_e5305647")}</EmptyTitle></EmptyHeader><Button onClick={createTeam}>{i18nText("FeatureCopy.c_929d5670")}</Button></Empty>}
     </section>}
     <a ref={downloadRef} href={downloadUrl} download="teams.csv" className="hidden" tabIndex={-1} aria-hidden="true">{i18nText("FeatureCopy.c_80dbcaf6")}</a>
   </div>
