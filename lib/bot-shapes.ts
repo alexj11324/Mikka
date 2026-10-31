@@ -80,3 +80,6 @@ export const DEFAULT_BOT_COLOR: BotColor = 'encre'
 export const BOT_SHAPES = ['cercle', 'galet', 'squircle', 'capsule', 'triangle', 'hexagone', 'nuage', 'goutte', ...EXTRA_SHAPE_IDS] as const
 export type BotShape = (typeof BOT_SHAPES)[number]
 export const DEFAULT_BOT_SHAPE: BotShape = 'cercle'
+
+/** The longest bot name, in characters (createBot and updateBot). */
+export const BOT_NAME_MAX = 60

@@ -31,6 +31,7 @@ export const ACTION_ERROR_CODES = [
   'agentHarnessMissing',
   'agentDuplicateName',
   'botDuplicateName',
+  'botNameTooLong',
   'agentInvalidInput',
   'agentAddFailed',
   'agentSaveFailed',
