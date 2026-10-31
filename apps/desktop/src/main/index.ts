@@ -14,6 +14,7 @@ import { AppLoadState, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { NotificationCenter } from './notification-center'
 import { appExternalUrl, desktopAuthState, externalUrl, navigationDecision } from './security'
+import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
 
 const APP_URL = __MIKKA_APP_URL__
 const APP_VERSION = __MIKKA_APP_VERSION__
@@ -185,6 +186,8 @@ function reloadApp(): void {
 }
 
 function createMainWindow(): void {
+  // Read once at launch; a changed Reduce transparency setting applies from the next launch.
+  const appearance = windowAppearance(process.platform, { dark: nativeTheme.shouldUseDarkColors, reduceTransparency: nativeTheme.prefersReducedTransparency })
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -192,9 +195,8 @@ function createMainWindow(): void {
     minHeight: 600,
     show: false,
     // The page paints its own top bar, so the native one must not show as a separate band.
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#000000' : '#f5f5f4',
+    ...appearance.options,
     autoHideMenuBar: true,
-    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 14 } } : {}),
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -208,7 +210,7 @@ function createMainWindow(): void {
       experimentalFeatures: false,
       devTools: !app.isPackaged,
       partition: PARTITION,
-      additionalArguments: [`--mikka-app-origin=${APP_ORIGIN}`],
+      additionalArguments: [`--mikka-app-origin=${APP_ORIGIN}`, ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
     },
   })
   mainWindow.setMenuBarVisibility(false)
