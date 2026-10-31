@@ -5,12 +5,21 @@ import { billingPortalUrl, planCheckoutUrl, workspaceBillingView, type BillingVi
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { getLocale } from 'next-intl/server'
+import { pointsPurchaseUrl } from '@/lib/billing/points-purchase'
+import { workspaceCreditBillingView, type CreditBillingView } from '@/lib/billing/history'
 
 /** 设置 › 计费. Admins only. */
 export async function getBilling(workspaceId?: string): Promise<ActionResult<BillingView>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
     return workspaceBillingView(actor.userId, actor.workspaceId)
+  })
+}
+
+export async function getCreditBilling(workspaceId?: string): Promise<ActionResult<CreditBillingView>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return workspaceCreditBillingView(actor.userId, actor.workspaceId)
   })
 }
 
@@ -27,6 +36,14 @@ export async function startPlanCheckout(returnUrl: string, workspaceId?: string)
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
     return planCheckoutUrl(actor.userId, actor.workspaceId, returnUrl)
+  })
+}
+
+/** One-time points purchase. Amount is USD: 10, 25 or 50. */
+export async function startPointsPurchase(workspaceId: string, amount: number): Promise<ActionResult<{ url: string }>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return pointsPurchaseUrl(actor.userId, actor.workspaceId, amount, await getLocale())
   })
 }
 
