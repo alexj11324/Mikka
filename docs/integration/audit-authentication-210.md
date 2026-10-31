@@ -107,3 +107,13 @@ The existing broker build's exact entry points and options were exercised with
 Existing dist/public artifacts were untouched. Log:
 `/tmp/mikka-audit210-broker-build.log`. The ordinary credential scripts also
 pass without the newly added app-only test loader, which has been removed.
+
+
+The broker CI performs an independent `npm ci --workspaces=false --prefix
+services/credential-broker` before that build. Its own manifest and npm lock
+therefore explicitly include the root's existing `drizzle-orm` constraint
+`^0.45.4`, pinned to0.45.4. The lock was resolved with package-lock-only,
+without installing packages; the root pnpm lock is unchanged. This declaration
+closes the service-only installation dependency rather than relying on the
+root installation being present. A fresh independent install was not performed
+locally; the broker CI remains the final installation gate.
