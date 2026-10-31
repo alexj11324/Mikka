@@ -3291,7 +3291,7 @@
         "delete": "删除",
         "agent": {
           "running": "运行中",
-          "waiting": "等你审批",
+          "waiting": "等你处理",
           "failed": "运行失败"
         }
       },
