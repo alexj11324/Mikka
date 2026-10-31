@@ -39,6 +39,7 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
   await pool.query(
     readFileSync('drizzle/20261030230000_hosted_usage.sql', 'utf8'),
   )
+  await pool.query(readFileSync('drizzle/20261031004200_card_verification_checkout.sql', 'utf8'))
   await pool.query(
     readFileSync('drizzle/20261030230001_legacy_hosted_workspaces.sql', 'utf8'),
   )

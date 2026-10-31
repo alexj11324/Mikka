@@ -1,107 +1,74 @@
 import 'server-only'
-import { randomUUID } from 'node:crypto'
 import { pool } from '@/lib/db'
 import { workspaceDb } from '@/lib/workspace-db'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
-import { stripeConfig, stripeGet, stripePost } from '@/lib/billing/stripe'
+import { stripeConfig, stripeGet } from '@/lib/billing/stripe'
 import { hostedUsage } from './runtime'
-/** Admin-only. The intent has no amount and cannot charge the customer. */
-export async function createCardSetup(
-  actorId: string,
-  workspaceId: string,
-  fetchImpl: typeof fetch = fetch,
-  email?: string,
-) {
-  await workspaceDb.transaction((tx) =>
-    requireWorkspace(tx, workspaceId, actorId, true),
-  )
-  const config = stripeConfig()
-  if (!config?.webhookSecret) throw new WorkspaceError('billingNotConfigured')
-  // Stripe idempotency also serializes concurrent first-customer creation.
-  const prior = (
-    await pool.query(
-      'SELECT "customerId" AS id FROM hosted_setup_intents WHERE "workspaceId"=$1 LIMIT 1',
-      [workspaceId],
-    )
-  ).rows[0]
-  const customer =
-    prior ??
-    (await stripePost<{ id: string }>(
-      config,
-      'customers',
-      { metadata: { workspaceId }, ...(email ? { email } : {}) },
-      fetchImpl,
-      `card-customer:${workspaceId}`,
-    ))
-  const intent = await stripePost<{ id: string; client_secret: string }>(
-    config,
-    'setup_intents',
-    {
-      customer: customer.id,
-      usage: 'on_session',
-      metadata: { workspaceId },
-      // Link's card integration returns type=card and card.wallet.type=link.
-      // Adding 'link' here hides the underlying card details needed by #523.
-      allowed_payment_method_types: ['card'],
-    },
-    fetchImpl,
-    `card-setup:${workspaceId}:${randomUUID()}`,
-  )
-  await pool.query(
-    'INSERT INTO hosted_setup_intents (id,"workspaceId","customerId") VALUES ($1,$2,$3)',
-    [intent.id, workspaceId, customer.id],
-  )
-  return {
-    clientSecret: intent.client_secret,
-    // Link authenticates the returning customer when Payment Element receives
-    // their email. No SMS code or Link credential passes through our server.
-    ...(email
-      ? {
-          paymentElementOptions: {
-            defaultValues: { billingDetails: { email } },
-          },
-        }
-      : {}),
-  }
-}
-/** Only invoked AFTER signature verification. Trust the locally recorded intent binding. */
-export async function applyCardSetup(
-  object: Record<string, unknown>,
-  fetchImpl: typeof fetch = fetch,
-) {
-  if (
-    object.status !== 'succeeded' ||
-    typeof object.id !== 'string' ||
-    typeof object.payment_method !== 'string'
-  )
-    return
-  const binding = (
-    await pool.query('SELECT * FROM hosted_setup_intents WHERE id=$1', [
-      object.id,
-    ])
-  ).rows[0]
-  if (!binding || binding.customerId !== object.customer) return
+import { MICRO_USD_PER_POINT } from './policy'
+
+export { createCardSetup } from './card-checkout'
+
+type Binding = { workspaceId: string; customerId: string }
+
+async function applyBoundCardSetup(object: Record<string, unknown>, binding: Binding, fetchImpl: typeof fetch) {
+  if (object.status !== 'succeeded' || typeof object.payment_method !== 'string' || object.customer !== binding.customerId) return
   const config = stripeConfig()
   if (!config) throw new WorkspaceError('billingNotConfigured')
   const method = await stripeGet<{
     type: string
     customer: string
-    card?: { fingerprint?: string; wallet?: { type?: string } }
-  }>(
-    config,
-    `payment_methods/${encodeURIComponent(object.payment_method)}`,
-    fetchImpl,
-  )
-  if (
-    method.type !== 'card' ||
-    method.customer !== binding.customerId ||
-    !method.card?.fingerprint
-  )
-    return
+    card?: { fingerprint?: string; last4?: string; wallet?: { type?: string } }
+  }>(config, `payment_methods/${encodeURIComponent(object.payment_method)}`, fetchImpl)
+  if (method.type !== 'card' || method.customer !== binding.customerId || !method.card?.fingerprint) return
   // Regular cards and Link-saved cards deliberately share the same claim key.
-  await hostedUsage.verify(
-    binding.workspaceId,
-    binding.customerId,
-    method.card.fingerprint,
-  )
+  await hostedUsage.verify(binding.workspaceId, binding.customerId, method.card.fingerprint, /^\d{4}$/.test(method.card.last4 ?? '') ? method.card.last4 : null)
+}
+
+/** Legacy SetupIntent events retain their locally recorded intent/customer binding. */
+export async function applyCardSetup(object: Record<string, unknown>, fetchImpl: typeof fetch = fetch) {
+  if (typeof object.id !== 'string') return
+  const binding = (await pool.query('SELECT * FROM hosted_setup_intents WHERE id=$1', [object.id])).rows[0]
+  if (binding) await applyBoundCardSetup(object, binding, fetchImpl)
+}
+
+/** Only invoked after webhook signature verification; session metadata cannot select the workspace. */
+export async function applyCardCheckout(object: Record<string, unknown>, fetchImpl: typeof fetch = fetch) {
+  if (object.mode !== 'setup' || object.status !== 'complete' || typeof object.id !== 'string' || typeof object.setup_intent !== 'string') return
+  const binding = (await pool.query('SELECT * FROM hosted_setup_intents WHERE id=$1', [object.id])).rows[0] as Binding | undefined
+  if (!binding || object.customer !== binding.customerId) return
+  const config = stripeConfig()
+  if (!config) throw new WorkspaceError('billingNotConfigured')
+  const intent = await stripeGet<Record<string, unknown>>(config, `setup_intents/${encodeURIComponent(object.setup_intent)}`, fetchImpl)
+  if (intent.id !== object.setup_intent) return
+  await applyBoundCardSetup(intent, binding, fetchImpl)
+}
+
+export interface CardVerificationStatus {
+  status: 'unavailable' | 'unverified' | 'pending' | 'verified'
+  last4: string | null
+  allowance: 'granted' | 'claimed_elsewhere' | null
+  remainingAllowanceMicroUsd: number
+  remainingAllowancePoints: number
+}
+
+/** Admin-only, read-only return-page state. Fingerprints never leave the backend. */
+export async function cardVerificationStatus(actorId: string, workspaceId: string, fetchImpl: typeof fetch = fetch): Promise<CardVerificationStatus> {
+  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
+  const empty = { last4: null, allowance: null, remainingAllowanceMicroUsd: 0, remainingAllowancePoints: 0 }
+  const config = stripeConfig()
+  if (!config?.webhookSecret) return { status: 'unavailable', ...empty }
+  const row = (await pool.query(`SELECT v.last4,v.fingerprint IS NOT NULL AS "hasCard",a."workspaceId" IS NOT NULL AS granted,COALESCE(a.remaining,0)::float8 AS remaining,
+    c."workspaceId" IS NOT NULL AND c."workspaceId"<>v."workspaceId" AS "alreadyClaimed"
+    FROM hosted_verifications v LEFT JOIN hosted_allowances a ON a."workspaceId"=v."workspaceId"
+    LEFT JOIN hosted_card_claims c ON c.fingerprint=v.fingerprint WHERE v."workspaceId"=$1`, [workspaceId])).rows[0]
+  if (row) return {
+    status: 'verified', last4: row.last4, allowance: row.granted ? 'granted' : row.hasCard && row.alreadyClaimed ? 'claimed_elsewhere' : null,
+    remainingAllowanceMicroUsd: row.remaining, remainingAllowancePoints: row.remaining / MICRO_USD_PER_POINT,
+  }
+  const binding = (await pool.query('SELECT id,"customerId" FROM hosted_setup_intents WHERE "workspaceId"=$1 ORDER BY "createdAt" DESC,id DESC LIMIT 1', [workspaceId])).rows[0]
+  if (!binding) return { status: 'unverified', ...empty }
+  const resource = binding.id.startsWith('cs_') ? 'checkout/sessions' : 'setup_intents'
+  const setup = await stripeGet<{ customer: string; status: string }>(config, `${resource}/${encodeURIComponent(binding.id)}`, fetchImpl)
+  if (setup.customer !== binding.customerId) return { status: 'unverified', ...empty }
+  return { status: setup.status === 'expired' || setup.status === 'canceled' ? 'unverified' : 'pending', ...empty }
 }
