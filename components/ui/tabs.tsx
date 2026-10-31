@@ -63,8 +63,12 @@ function TabsList({
   )
 }
 
-function TabsTrigger({ className, render, ...props }: TabsPrimitive.Tab.Props) {
-  const list = React.useContext(TabsListContext)
+function TabsTrigger({ className, render, indicator = true, ...props }: TabsPrimitive.Tab.Props & {
+  /** false: no gliding indicator; the call site styles the selected tab itself. */
+  indicator?: boolean
+}) {
+  const context = React.useContext(TabsListContext)
+  const list = indicator ? context : null
   return (
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
