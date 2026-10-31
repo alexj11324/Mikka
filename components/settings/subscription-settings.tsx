@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
+import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -22,10 +23,18 @@ const logos = { codex: OpenAI, claude: Claude } as const
 /** Comma re-reads a plan's windows every 5 minutes while the page is watched. */
 const USAGE_EVERY_MS = 5 * 60_000
 type Usage = Map<string, SubscriptionUsageView> | 'failed' | null
+/** Shown under the provider's row; `again` restarts that provider's sign-in. */
+type Failure = { provider: Provider; message: string; again?: { connectionId?: string } }
 
+class RequestError extends Error {
+  constructor(readonly code: string) { super(code) }
+}
 async function post(body: unknown, signal?: AbortSignal) {
   const response = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal })
-  if (!response.ok) throw new Error('Subscription request failed')
+  if (!response.ok) {
+    const result = await response.json().catch(() => null) as { error?: unknown } | null
+    throw new RequestError(typeof result?.error === 'string' ? result.error : 'subscription_unavailable')
+  }
   return response.json() as Promise<unknown>
 }
 
@@ -37,7 +46,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   const [attempt, setAttempt] = useState<Attempt | null>(null)
   const [callback, setCallback] = useState('')
   const [pending, setPending] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState<Failure | null>(null)
   const [notice, setNotice] = useState('')
   const [usage, setUsage] = useState<Usage>(null)
   const [usageLoading, setUsageLoading] = useState(false)
@@ -51,6 +60,8 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   }, [workspaceId])
 
   useEffect(() => { void refresh().catch(() => { setState(null); setLoadFailed(true) }) }, [refresh])
+  const failureMessage = useCallback((failure: unknown, key: 'startFailed' | 'finishFailed', provider: Provider) =>
+    failure instanceof RequestError && failure.code === 'auth_required' ? t('signedOut') : t(key, { provider: t(provider) }), [t])
   const loadUsage = useCallback(async (force = false) => {
     usageAbort.current?.abort()
     const abort = new AbortController()
@@ -79,61 +90,69 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     let timer: ReturnType<typeof setTimeout>
     const poll = async () => {
       if (stopped) return
-      if (Date.now() >= Date.parse(attempt.expiresAt)) { setAttempt(null); setError(t('expired')); return }
+      const again = { connectionId: attempt.connectionId }
+      if (Date.now() >= Date.parse(attempt.expiresAt)) { setAttempt(null); setError({ provider: attempt.provider, message: t('expired', { provider: t(attempt.provider) }), again }); return }
       try {
         const result = await post({ action: 'poll', connectionId: attempt.connectionId, state: attempt.state }, abort.signal) as { pending?: unknown; state?: unknown }
         if (stopped) return
         if (result.pending === true) { timer = setTimeout(poll, (attempt.interval! + 1) * 1000); return }
         if (result.state !== 'connected') throw new Error('Subscription connection failed')
         setAttempt(null); setNotice(t('connectedNotice')); await refresh()
-      } catch { if (!stopped) { setAttempt(null); setError(t('connectionFailed')); void refresh().catch(() => undefined) } }
+      } catch (failure) { if (!stopped) { setAttempt(null); setError({ provider: attempt.provider, message: failureMessage(failure, 'finishFailed', attempt.provider), again }); void refresh().catch(() => undefined) } }
     }
     timer = setTimeout(poll, (attempt.interval + 1) * 1000)
     return () => { stopped = true; clearTimeout(timer); abort.abort() }
-  }, [attempt, refresh, t])
+  }, [attempt, failureMessage, refresh, t])
 
   async function connect(provider: Provider, existing?: { id: string; revision: number }) {
-    setPending(true); setError(''); setNotice(''); setCallback('')
+    setPending(true); setError(null); setNotice(''); setCallback('')
     try {
       const result = await post(existing ? { action: 'reconnect', connectionId: existing.id, revision: existing.revision } : { action: 'connect', workspaceId, provider })
       const value = existing && result && typeof result === 'object' ? { ...result, connectionId: existing.id } : result
       const next = parseSubscriptionStart(value, provider)
       if (Date.parse(next.expiresAt) <= Date.now()) throw new Error('Authorization expired')
       setAttempt({ ...next, provider })
-      await refresh()
-    } catch { setError(t('connectionFailed')) } finally { setPending(false) }
+    } catch (failure) { setError({ provider, message: failureMessage(failure, 'startFailed', provider), again: existing ? { connectionId: existing.id } : {} }) } finally { setPending(false) }
+    // The started attempt stands even if the list cannot be re-read right now.
+    void refresh().catch(() => undefined)
   }
   async function finishCallback() {
     if (!attempt || attempt.flow !== 'callback_handoff' || !callback.trim()) return
-    setPending(true); setError('')
+    setPending(true); setError(null)
     try {
       const result = await post({ action: 'callback', connectionId: attempt.connectionId, state: attempt.state, callbackUrl: callback.trim() }) as { state?: unknown }
       if (result.state !== 'connected') throw new Error('Subscription connection failed')
       setAttempt(null); setNotice(t('connectedNotice')); await refresh()
-    } catch { setError(t('connectionFailed')); void refresh().catch(() => undefined) } finally { setCallback(''); setPending(false) }
+    } catch (failure) { setAttempt(null); setError({ provider: attempt.provider, message: failureMessage(failure, 'finishFailed', attempt.provider), again: { connectionId: attempt.connectionId } }); void refresh().catch(() => undefined) } finally { setCallback(''); setPending(false) }
   }
-  async function disconnect(connection: { id: string; revision: number }) {
-    setPending(true); setError(''); setNotice('')
+  async function disconnect(connection: { id: string; provider: Provider; revision: number }) {
+    setPending(true); setError(null); setNotice('')
     try { await post({ action: 'disconnect', connectionId: connection.id, revision: connection.revision }); await refresh(); setNotice(t('disconnectedNotice')) }
-    catch { setError(t('disconnectFailed')) } finally { setPending(false) }
+    catch { setError({ provider: connection.provider, message: t('disconnectFailed') }) } finally { setPending(false) }
   }
-  async function remove(connection: { id: string; revision: number }) {
-    setPending(true); setError(''); setNotice('')
+  async function remove(connection: { id: string; provider: Provider; revision: number }) {
+    setPending(true); setError(null); setNotice('')
     try { await post({ action: 'remove', connectionId: connection.id, revision: connection.revision }); await refresh() }
-    catch { setError(t('removeFailed')) } finally { setPending(false) }
+    catch { setError({ provider: connection.provider, message: t('removeFailed') }) } finally { setPending(false) }
+  }
+  /** 重新开始: the same connection when there is one (its revision read now), else a new one. */
+  function startAgain(failure: Failure) {
+    const existing = failure.again?.connectionId ? state?.connections.find(item => item.id === failure.again?.connectionId) : undefined
+    void connect(failure.provider, existing)
   }
 
   if (loadFailed) return <p role="alert" className="px-1 text-sm text-destructive">{t('loadFailed')}</p>
   if (!state) return <p role="status" className="px-1 text-sm text-muted-foreground">{t('loading')}</p>
   if (!state.enabled) return <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p>
   return <div className="flex flex-col gap-3">
-    <SettingsSection id="subscriptions-heading" title={t('heading')} description={t('description')}>
+    <SettingsSection id="subscriptions-heading" title={t('heading')}>
       {(['codex', 'claude'] as const).map(provider => {
         const available = state.providers.some(item => item.provider === provider && item.available)
         const connections = state.connections.filter(item => item.provider === provider)
         const Logo = logos[provider]
+        const failure = error?.provider === provider ? error : null
         return <div key={provider} className="divide-y divide-border">
-          <SettingRow title={t(provider)} description={available ? undefined : t('unavailable')}>
+          <SettingRow icon={<Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />} title={t(provider)} description={available ? undefined : t('unavailable')}>
             <Button type="button" variant="secondary" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider) }}>{connections.some(item => item.state === 'connected') ? t('connectAnother') : t('connect')}</Button>
           </SettingRow>
           {connections.map(connection => {
@@ -152,7 +171,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
             return <div key={connection.id} className="flex flex-col gap-3 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-3">
-                  <Logo className="size-5 text-foreground" />
+                  <Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />
                   <div className="flex min-w-0 flex-col">
                     <span className="truncate text-sm font-medium">{account ?? product}</span>
                     {account && <span className="text-xs text-muted-foreground">{product}</span>}
@@ -184,6 +203,12 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
               </div>}
             </div>
           })}
+          {failure && <div className="px-5 py-3">
+            <Alert variant="destructive" role="alert">
+              <AlertDescription>{failure.message}</AlertDescription>
+              {failure.again && available && <AlertAction><Button variant="outline" size="sm" disabled={pending || !!attempt} onClick={() => startAgain(failure)}>{t('restart')}</Button></AlertAction>}
+            </Alert>
+          </div>}
         </div>
       })}
     </SettingsSection>
@@ -201,7 +226,6 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
       <Button type="button" variant="ghost" size="sm" className="w-fit" disabled={pending} onClick={() => { setAttempt(null); setCallback(''); void refresh().catch(() => undefined) }}>{t('close')}</Button>
     </div>}
     {notice && <p role="status" className="px-1 text-sm">{notice}</p>}
-    {error && <p role="alert" className="px-1 text-sm text-destructive">{error}</p>}
   </div>
 }
 
