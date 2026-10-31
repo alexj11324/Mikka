@@ -23,7 +23,7 @@ import { BotNameEditor } from './bot-name-editor'
 import { GroupHeader } from './group-header'
 import { ThreadList, TWO_LINE_ROW } from './thread-list'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
-import { useCloudComputer } from '@/hooks/use-feature-availability'
+import { useCloudComputer, useComputerTab } from '@/hooks/use-feature-availability'
 import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
@@ -89,10 +89,12 @@ export type PanelConversation = { id?: string | null; name: string; color?: stri
  * 详情 / 线程 / PR / 电脑; 全部线程 lists every bot's threads. ⤢ widens just
  * this column. Picking another bot switches its threads, PRs and computer.
  */
-export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSearch, onClose, sheet = false }: {
+export function ContextPanel({ issues, threads, conversation, workspaceId, onOpenIssue, onSearch, onClose, sheet = false }: {
   issues: Issue[]
   threads: Thread[]
   conversation: PanelConversation
+  /** The current workspace; its E2B key decides whether the 电脑 tab shows the screen or 添加 E2B API Key. */
+  workspaceId?: string
   onOpenIssue: (id: string) => void
   onSearch: () => void
   onClose: () => void
@@ -122,10 +124,12 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   // An older chat without a bot learns its thread from the 电脑 cards in it.
   const cloudComputer = useCloudComputer()
   const registered = useConversationThread(cloudComputer && conversation.kind === 'agent' ? conversation.id : null)
-  const computer = cloudComputer ? botId ?? registered?.botId : undefined
+  // Every bot has the 电脑 tab (Alex, 2026-10-31); without a key it offers 添加 E2B API Key.
+  const computerTab = useComputerTab()
+  const computer = (computerTab ? botId : null) ?? (cloudComputer ? registered?.botId : undefined)
   // A conversation whose bot works on its computer opens on its screen (Figma 103:64).
   useEffect(() => { if (registered?.runId) { setView('overview'); setTab('computer') } }, [registered?.runId])
-  // No computer here (cloud computers off, or the Coordinator): no 电脑 tab.
+  // No computer here (the kill switch is on, or the Coordinator): no 电脑 tab.
   const tabs = computer ? TABS : TABS.filter(item => item !== 'computer')
   const shown = tabs.includes(tab) ? tab : 'threads'
 
@@ -169,7 +173,7 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
             <PullRequests threads={ownThreads} issues={issues} />
           </TabsContent>
           {computer && <TabsContent value="computer" className="min-h-0 overflow-y-auto px-4 pb-4">
-            {botId ? <AgentComputer botId={botId} name={conversation.name} header={false} /> : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} header={false} />}
+            {botId ? <AgentComputer botId={botId} name={conversation.name} header={false} workspaceId={workspaceId} /> : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} header={false} workspaceId={workspaceId} />}
           </TabsContent>}
         </Tabs>
       </TabsContent>

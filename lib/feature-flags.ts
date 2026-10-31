@@ -45,6 +45,8 @@ export const proactiveFeatures = {
 export const killSwitches = {
   /** Email/password sign-in and sign-up; GitHub and Google stay (Alex, 2026-10-30). */
   emailSignIn: 'mikka-email-sign-in-off',
+  /** A bot's 电脑 tab in the right panel; shown for every bot unless this is on (Alex, 2026-10-31). */
+  computerTab: 'mikka-computer-tab-off',
 } as const
 
 /** On only when PostHog says exactly true; unloaded, missing or multivariate values stay off. */

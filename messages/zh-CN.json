@@ -3020,7 +3020,9 @@
       "deny": "拒绝",
       "allow": "允许",
       "failed": "未送达，请重试。"
-    }
+    },
+    "addE2BKey": "添加 E2B API Key",
+    "loading": "正在连接电脑"
   },
   "Shell": {
     "threads": {

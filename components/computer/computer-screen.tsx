@@ -79,9 +79,9 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
   children?: ReactNode
 }) {
   const t = useTranslations('Computer')
-  const { data: state, mutate } = useComputer(botId)
+  const { data: state, error, mutate } = useComputer(botId)
   const running = state?.machine === 'running'
-  const { data: grant } = useViewerGrant(botId, mode, running && live)
+  const { data: grant, error: grantError, mutate: renewGrant } = useViewerGrant(botId, mode, running && live)
   const approval = state?.pendingApproval
   const target = approval?.action.rect ?? (state?.control === 'agent' ? state.lastAction?.rect : undefined)
   const point = approval ? { x: approval.action.x, y: approval.action.y } : state?.control === 'agent' ? { x: state.lastAction?.x, y: state.lastAction?.y } : null
@@ -103,6 +103,12 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
         <p className="text-sm">{t('machineError')}</p>
         <Button size="sm" variant="secondary" className="rounded-lg" onClick={() => { void wake() }}><Power data-icon="inline-start" />{t('retry')}</Button>
       </>}
+    </div>}
+    {/* Never a blank screen: the state or the picture is still on its way, or its read failed. */}
+    {(!state || (running && live && !grant)) && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+      {(state ? grantError : error)
+        ? <Button size="sm" variant="secondary" className="rounded-lg" onClick={() => { void (state ? renewGrant() : mutate()) }}><Power data-icon="inline-start" />{t('retry')}</Button>
+        : <Progress aria-label={t('loading')} value={null} className="w-1/3 max-w-40" />}
     </div>}
     {running && children && <div className="absolute inset-0 flex items-center justify-center">{children}</div>}
   </div>

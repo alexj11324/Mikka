@@ -3020,7 +3020,9 @@
       "deny": "Deny",
       "allow": "Allow",
       "failed": "Not delivered. Try again."
-    }
+    },
+    "addE2BKey": "Add E2B API Key",
+    "loading": "Connecting to the computer"
   },
   "Shell": {
     "threads": {
