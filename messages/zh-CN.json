@@ -1669,7 +1669,6 @@
     "profile": {
       "heading": "账户信息",
       "avatar": "头像",
-      "avatarDescription": "根据账户名称自动生成。",
       "name": "名称",
       "email": "电子邮箱",
       "notSet": "未设置",
@@ -1680,10 +1679,8 @@
       "uploading": "上传中…",
       "sessionHeading": "会话",
       "signOut": "退出登录",
-      "signOutDescription": "这台设备立即退出，其他设备不受影响。",
       "signingOut": "正在退出…",
       "deleteAccount": "删除账户",
-      "deleteAccountDescription": "账户、Bot、线程和记忆都会删除，无法恢复。",
       "deleteTitle": "删除账户",
       "deleteBody": "删除后无法恢复。其他成员不会受到影响，但你自己创建的 Bot 和线程会一并删除。",
       "deleteConfirmLabel": "输入 {email} 确认",
@@ -1736,9 +1733,7 @@
     },
     "computerPolicy": {
       "heading": "电脑操作",
-      "description": "控制工作区内的 Bot 是否可以操作电脑。",
       "label": "Bot 操作电脑",
-      "help": "禁止后，电脑任务会停止，已有授权也会失效。你仍然可以接管电脑。",
       "adminOnly": "只有工作区管理员可以修改此设置。",
       "ask": "操作前审批",
       "deny": "禁止",
@@ -1748,7 +1743,6 @@
     },
     "issuePrefix": {
       "title": "个人任务编号",
-      "description": "个人任务只留在 Mikka，不写进 Linear，编号用你自己的 4 个字母前缀。工作区任务用 Linear 的编号。",
       "label": "前缀",
       "current": "个人任务显示为 {example}。",
       "needsChoice": "还没有可用的前缀：邮箱里的字母不够 4 个，或和已连接的 Linear 团队重名。请填 4 个字母。",
@@ -1835,10 +1829,7 @@
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
-      "googleSignInDescription": "将已验证的 Google 账号关联到此 Mikka 账号，以便之后使用 Google 登录。",
       "googleSignIn": "Google 账号",
-      "googleLinkDescription": "使用经过验证且匹配的邮箱，将此 Mikka 账号关联到 Google。",
-      "googleLinkedDescription": "此 Mikka 账号已可使用 Google 登录。",
       "googleLinked": "已关联 Google",
       "googleLinkSuccess": "Google 已关联，其验证过的邮箱已用于确认此 Mikka 账号。",
       "linkGoogle": "关联 Google",
@@ -1961,7 +1952,6 @@
       "saving": "正在保存…",
       "cancel": "取消",
       "devices": "登录设备",
-      "devicesDescription": "撤销后，该设备需要重新登录。",
       "devicesError": "无法读取登录设备。",
       "devicesLoading": "正在读取登录设备…",
       "unknownDevice": "未知设备",
@@ -1969,13 +1959,11 @@
       "currentDevice": "当前设备",
       "signOut": "退出",
       "signingOut": "正在退出…",
-      "signOutOthers": "全部退出",
-      "signOutOthersDescription": "除这台设备外，其他设备全部退出登录。"
+      "signOutOthers": "全部退出"
     },
     "privacy": {
       "data": "数据",
       "export": "导出我的数据",
-      "exportDescription": "包含资料、Bot、线程、任务和记忆，不含密码和密钥。",
       "exportButton": "导出",
       "exporting": "正在准备…",
       "exportSent": "已发送到 {email}，24 小时内可以下载。",
@@ -1996,7 +1984,6 @@
     },
     "logins": {
       "heading": "网站登录",
-      "description": "Bot 只在你批准的操作里使用这些登录。密码和验证码不会显示。",
       "loading": "正在读取网站登录…",
       "loadError": "网站登录没有读出来。",
       "empty": "还没有保存的网站登录。",

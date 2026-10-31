@@ -44,7 +44,7 @@ export function SavedLoginsSettings() {
   }
 
   return <>
-    <SettingsSection id="saved-logins-heading" title={t('heading')} description={t('description')}>
+    <SettingsSection id="saved-logins-heading" title={t('heading')}>
       {isLoading && <SettingsLoading label={t('loading')} rows={3} />}
       {error && <FieldError className="px-5 py-3">{t('loadError')}</FieldError>}
       {!isLoading && !error && logins.length === 0 && <div className="flex flex-col items-start gap-3 px-5 py-6">
