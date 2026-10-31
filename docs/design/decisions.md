@@ -166,7 +166,8 @@ Only these frames count as a source (file `zPe5LKycb2XuT1ivCLRw07`).
 | Area | Section / frames | Accepted |
 | --- | --- | --- |
 | ~~Nav v3.1 shell~~ | ~~`48:2`~~ moved to 归档 2026-10-25; the shell is what PR #165 built (`components/app-shell.tsx`) | ~~2026-10-24~~ |
-| Kanban v2 | `77:2`, frames `89:2`–`92:2` (updated 2026-10-25) | 2026-10-23 |
+| 看板卡片 v1 · 定稿 (board and card) | page `714:5283`; states `716:5380` (dark) and `717:5713` (light), board 1440 `718:6018` (dark) and `718:6859` (light), board 1024 `718:6961`, parts `714:5286`, handoff table `719:7257` | 2026-10-31 |
+| ~~Kanban v2~~ | ~~`77:2`, frames `89:2`–`92:2`~~ moved to 归档 2026-10-31, superseded by `714:5283` | ~~2026-10-23~~ |
 | Cloud computer | `102:65` | 2026-10-24 06:19 |
 | Style guide | `98:2` | 2026-10-24 |
 | 新建 Bot dialog | `195:3225` | in review |
