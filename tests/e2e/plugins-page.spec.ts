@@ -7,6 +7,8 @@ test('插件 is one list of apps, shared with 设置 › 连接', async ({ page 
   await register(page, '/?section=plugins')
   await expect(page.getByRole('tab', { name: /^应用/ })).toContainText(String(APPS.length))
   for (const name of APPS) await expect(page.getByRole('link', { name: `打开 ${name}`, exact: true })).toBeVisible()
+  // 插件 is a full page: no bot list beside it.
+  await expect(page.getByRole('list', { name: 'Bot', exact: true })).toHaveCount(0)
   // Moved to 设置 › 设备 / 安全, or removed.
   for (const gone of ['线程运行环境', 'Google 登录', '事件接收', '刷新 GitHub 状态', '在设置中管理']) {
     await expect(page.getByText(gone, { exact: true })).toHaveCount(0)

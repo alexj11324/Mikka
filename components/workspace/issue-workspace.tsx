@@ -349,7 +349,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const rail: RailDestination | null = section === 'coordinator' || section === 'agent' || section === 'group' ? 'chats' : section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? section : ['all-issues', 'my-issues', 'team-issues'].includes(section) ? 'board' : null
   // The board, 建议 and Artifact keep only the rail on their left (MIK-45, Figma F2/F8).
-  const fullPage = rail === 'board' || rail === 'suggestions' || rail === 'artifacts'
+  const fullPage = rail === 'board' || rail === 'suggestions' || rail === 'artifacts' || rail === 'plugins'
   const activeBot = section === 'coordinator' && activeBotId ? bots.find(bot => bot.id === activeBotId) ?? (createdBot?.id === activeBotId ? createdBot : undefined) : undefined
   const activeChat: ChatTarget | null = section === 'coordinator' ? activeBot ? { kind: 'bot', botId: activeBot.id } : { kind: 'coordinator' } : section === 'agent' ? { kind: 'agent', sessionId: activeAgentId } : section === 'group' && groupRequest ? { kind: 'group', ...groupRequest } : null
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
