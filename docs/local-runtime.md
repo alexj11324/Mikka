@@ -1,5 +1,12 @@
 # Local thread runtime
 
+> This describes the code at 2026-10-31. Under
+> [`design/orchestration.md`](design/orchestration.md) § 3 a device is a runner
+> like E2B: the daemon installs its own Claude Code and Codex, never uses the
+> person's installs or logins, and reports OS, architecture, disk and Docker
+> instead of detected Agents. The detection below is pending replacement
+> ([conflicts](design/research/2026-10-31-orchestration-conflicts.md) C16–C18).
+
 Local threads run with the installed Claude Code or Codex on a connected
 computer. Registering the daemon or reporting a changed installed-harness set
 creates hidden execution records. Their names include the device UUID to

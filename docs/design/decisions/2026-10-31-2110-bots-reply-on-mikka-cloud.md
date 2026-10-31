@@ -3,6 +3,7 @@
 - Date: 2026-10-31
 - Source: Alex, relayed by the coordinator session for the P0 「未连接账号」 report on 设置 › 工作区 › Bot 与 Agents (Coordinator, 「E2B acceptance 449729」, 「Oracle daemon 测试」): bots with no account can't reply, which takes usability to zero.
 - Rule: —
+- See also: [orchestration](../orchestration.md) § 2, which adds other members' shares before Mikka 默认
 - Replaces: the refusal for a saved choice whose account is gone (`binding_required`), added with group Bot members (c6207c9) and kept in #677.
 
 With no Claude Code or Codex subscription bound, every Bot, the Coordinator
