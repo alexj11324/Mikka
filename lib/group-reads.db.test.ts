@@ -24,7 +24,7 @@ test('group read routes advance actual group history without opening private DMs
   const pool = new Pool({ connectionString: target })
   if (!(await pool.query(`SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='conversations' AND column_name='leadBotId'`)).rowCount) {
     const client = await pool.connect()
-    try { await client.query('BEGIN'); await client.query(await readFile(new URL('../drizzle/20261031132700_group_bot_members.sql', import.meta.url), 'utf8')); await client.query('COMMIT') }
+    try { await client.query('BEGIN'); await client.query(await readFile(new URL('../drizzle/20261031153511_group_bot_members.sql', import.meta.url), 'utf8')); await client.query('COMMIT') }
     catch (error) { await client.query('ROLLBACK'); throw error }
     finally { client.release() }
   }

@@ -107,7 +107,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await scoped.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql', import.meta.url),'utf8'))
     const migration = await readFile(new URL('../../drizzle/20261029043634_group_turns.sql', import.meta.url),'utf8')
     await Promise.all([scoped.query(migration),scoped.query(migration)]); await scoped.query(migration)
-    await scoped.query(await readFile(new URL('../../drizzle/20261031132700_group_bot_members.sql', import.meta.url), 'utf8'))
+    await scoped.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql', import.meta.url), 'utf8'))
     // Minimal real agent_runs columns used by the bridge; full tracked schema
     // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
     await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid)`)

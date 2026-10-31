@@ -206,11 +206,16 @@ The backend now supports explicit `memberType: bot` and `authorType: bot`,
 with a separate nullable `leadBotId`. It retains legacy Agent compatibility,
 but never guesses a global alias from an internal coding-runner identity.
 
-Migration `20261031132700_group_bot_members.sql` widens the existing two type
+Migration `20261031153511_group_bot_members.sql` widens the existing two type
 constraints and adds `conversations.leadBotId`, `group_turns.botId` and a
 non-secret `group_turns.modelSelections` object. No existing history, creator,
 member, read position or link is rewritten. An owner explicitly selects a lead;
 choosing one type clears the other type, and removing that lead clears it.
+
+The earlier isolated PG evidence used the original unmerged filename
+`20261031132700_group_bot_members.sql`. Its SQL is byte-for-byte unchanged;
+the premerge rename keeps this migration later than intervening main migrations.
+Those retained databases and their original migration ledgers are preserved.
 
 Production directory and runtime queries require the real Bot's creator-owner
 and exact source workspace. Another workspace's Bot, or another person's Bot
