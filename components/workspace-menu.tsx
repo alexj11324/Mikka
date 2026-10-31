@@ -30,9 +30,10 @@ function WorkspaceAvatar({ name, large = false }: { name: string; large?: boolea
   return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center rounded-full bg-sidebar-primary-soft font-semibold text-sidebar-primary-soft-foreground', large ? 'size-8 text-sm' : 'size-6 text-xs')}>{name.slice(0, 1)}</span>
 }
 
-/** A workspace's mark inside the menu: the same soft initial as the trigger, at item size. */
+/** A workspace's mark inside the menu: the same soft initial as the trigger, in the 20px box every row's icon uses. */
 function ItemAvatar({ name }: { name: string }) {
-  return <Avatar size="sm" aria-hidden="true" className="size-5"><AvatarFallback className="bg-sidebar-primary-soft text-xs font-semibold text-sidebar-primary-soft-foreground">{name.slice(0, 1)}</AvatarFallback></Avatar>
+  // No `size`: `data-[size=sm]:size-6` outranks `size-5`, which put workspace names 4px right of the action rows.
+  return <Avatar aria-hidden="true" className="size-5"><AvatarFallback className="bg-sidebar-primary-soft text-xs font-semibold text-sidebar-primary-soft-foreground">{name.slice(0, 1)}</AvatarFallback></Avatar>
 }
 
 /** An action row's icon, in a 20px box like the workspace avatars so every row's text starts on one column. */
