@@ -106,7 +106,7 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
     if (session.tokenWorkspaceId && session.tokenWorkspaceId !== workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
     await deps.workspace(session.userId, workspaceId)
-    const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and "removedAt" is null order by "createdAt" desc limit 50', [session.userId, workspaceId])
+    const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and "removedAt" is null and "credentialVersion">0 and state<>\'disconnected\' order by "createdAt" desc limit 50', [session.userId, workspaceId])
     // Which Bots use each connection is a nicety: the list still loads without it.
     const bots = await service.repository.connectionBots(session.userId, workspaceId).catch(() => [])
     // Listing needs custody only; sign-in needs the full runtime (connect). Offer

@@ -182,9 +182,10 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
         const Logo = logos[provider]
         const failure = error?.provider === provider ? error : null
         return <div key={provider} className="divide-y divide-border">
-          <SettingRow icon={<Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />} title={t(provider)} description={available ? undefined : t('unavailable')}>
-            <Button type="button" variant="secondary" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider) }}>{connections.some(item => item.state === 'connected') ? t('connectAnother') : t('connect')}</Button>
-          </SettingRow>
+          {/* An account that needs signing in again has its own 重新连接; a second 连接 is offered only beside a working one. */}
+          {(connections.length === 0 || connections.some(item => item.state === 'connected')) && <SettingRow icon={<Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />} title={t(provider)} description={available ? undefined : t('unavailable')}>
+            <Button type="button" variant="secondary" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider) }}>{connections.length > 0 ? t('connectAnother') : t('connect')}</Button>
+          </SettingRow>}
           {connections.map(connection => {
             const live = connection.state === 'connected'
             const read = live && usage && usage !== 'failed' ? usage.get(connection.id) : undefined
