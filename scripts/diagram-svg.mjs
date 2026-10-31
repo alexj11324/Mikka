@@ -88,9 +88,11 @@ export const LEGEND_TEXT = {
   zh: { lShipped: '已上线', lPlanned: '待完成', lFlow: '数据流', lPlannedFlow: '待完成的数据流' },
 }
 
-export function svg(width, height, title, elements) {
+/** Each file paints its own background, so the dark variant stays readable on a light page and vice versa. */
+export function svg(width, height, title, elements, p) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="${FONT}" role="img" aria-label="${esc(title)}">
   <title>${esc(title)}</title>
+  <rect width="${width}" height="${height}" fill="${p.box}"/>
   ${elements.join('\n  ')}
 </svg>
 `
