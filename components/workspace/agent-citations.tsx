@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, type ComponentProps } from 'react'
 import useSWR from 'swr'
+import { Globe } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
@@ -194,7 +195,7 @@ export function LinkCitation({ url, label, preview }: { url: string; label: stri
   if (!link) return <>{url}</>
   return <InlineCitation>
     <InlineCitationTrigger render={<a href={url} target="_blank" rel="noopener noreferrer" />}>
-      <SourceAvatar source={{ name: link.name, domain: link.host, image: preview?.icon }} />
+      <SourceAvatar source={{ name: link.name, domain: link.host, image: preview?.icon, icon: <Globe /> }} />
       <InlineCitationLabel>{link.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
