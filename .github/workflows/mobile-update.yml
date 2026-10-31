@@ -1,0 +1,50 @@
+name: Mobile OTA update
+
+# Publishes the iOS app's JavaScript as an EAS Update (decision
+# 2026-10-31-2010-ota-updates): main goes to the `production` channel that
+# TestFlight builds read; a pull request gets its own `pr-<n>` branch, which
+# can be opened in a preview build. Needs the EXPO_TOKEN repository secret;
+# without it (or on a fork) the publish step is skipped.
+on:
+  push:
+    branches: [main]
+    paths: ['apps/mobile/**', 'packages/protocol/**']
+  pull_request:
+    paths: ['apps/mobile/**', 'packages/protocol/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-update-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: EAS Update
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @mikka/mobile...
+      - run: pnpm --filter @mikka/mobile typecheck
+      - name: Publish to production
+        if: env.EXPO_TOKEN != '' && github.event_name == 'push'
+        working-directory: apps/mobile
+        run: npx -y eas-cli@27.2.0 update --channel production --platform ios --message "$(git log -1 --format=%s)" --non-interactive
+      - name: Publish to pr-${{ github.event.number }}
+        if: env.EXPO_TOKEN != '' && github.event_name == 'pull_request'
+        working-directory: apps/mobile
+        run: npx -y eas-cli@27.2.0 update --branch pr-${{ github.event.number }} --platform ios --message "${{ github.event.pull_request.title }}" --non-interactive
+      - name: No EXPO_TOKEN
+        if: env.EXPO_TOKEN == ''
+        run: echo "::notice::EXPO_TOKEN is not set; nothing was published."

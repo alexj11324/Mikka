@@ -1,0 +1,36 @@
+import { useEffect } from 'react'
+import { AppState } from 'react-native'
+import * as Updates from 'expo-updates'
+
+let fetching = false
+
+/** Checks for an OTA update and downloads it, at most one at a time; failures wait for the next try. */
+async function prefetch() {
+  if (fetching) return
+  fetching = true
+  try {
+    if ((await Updates.checkForUpdateAsync()).isAvailable) await Updates.fetchUpdateAsync()
+  } catch {
+    // Offline or the update server is down: the next launch or foreground tries again.
+  } finally {
+    fetching = false
+  }
+}
+
+/**
+ * True once a newer JS update has been downloaded (decision
+ * 2026-10-31-2010-ota-updates). Checks on launch and whenever the app comes
+ * back to the foreground; the drawer then offers 重启以更新.
+ */
+export function useUpdateReady(): boolean {
+  const { isUpdatePending } = Updates.useUpdates()
+  useEffect(() => {
+    if (!Updates.isEnabled) return
+    void prefetch()
+    const sub = AppState.addEventListener('change', state => { if (state === 'active') void prefetch() })
+    return () => sub.remove()
+  }, [])
+  return Updates.isEnabled && isUpdatePending
+}
+
+export const restartToUpdate = () => { void Updates.reloadAsync() }
