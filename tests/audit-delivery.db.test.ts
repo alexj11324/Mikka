@@ -38,7 +38,7 @@ async function prepareWorkspace(database: Pool) {
     const keys = [...config.primaryKeys.map(key => `PRIMARY KEY (${key.columns.map(column => ident(column.name)).join(',')})`), ...config.uniqueConstraints.map(key => `UNIQUE (${key.columns.map(column => ident(column.name)).join(',')})`)]
     await database.query(`CREATE TABLE IF NOT EXISTS ${ident(config.name)} (${[...columns, ...keys].join(',')})`)
   }
-  if (!(await database.query("SELECT to_regclass('workspace_audit_outbox') relation")).rows[0].relation) await database.query(await readFile(new URL('../drizzle/20261031052204_workspace_audit_outbox.sql', import.meta.url), 'utf8'))
+  if (!(await database.query("SELECT to_regclass('workspace_audit_outbox') relation")).rows[0].relation) await database.query(await readFile(new URL('../drizzle/20261031053432_workspace_audit_outbox.sql', import.meta.url), 'utf8'))
 }
 
 test('workspace mutations retain and idempotently deliver audit intent across two logical PostgreSQL stores', { skip: !mainURL }, async t => {

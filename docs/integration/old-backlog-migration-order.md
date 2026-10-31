@@ -15,3 +15,13 @@ Earlier isolated databases and CI evidence retain the old names and remain evide
 | `20261031021420_archive_linear_on_personal_scope.sql` | `20261031050735_archive_linear_on_personal_scope.sql` | `9b41bdb2d334786ae83f5e3fe153f0b5d3f4393d73c0c2d60bfb74d0ba2ef7b3` |
 | `20261031022001_ops_monitor_observations.sql` | `20261031050736_ops_monitor_observations.sql` | `686f2d5e0cc42620fe399895750f24e41cded3deefed050a4768667df18a1542` |
 | `20261031022004_account_deletion_warnings.sql` | `20261031050737_account_deletion_warnings.sql` | `2128c56f92e4b5d8ea9f86170d0af07c1c677b1c2e264cffd975851d3dd57cdb` |
+
+## Subsequent nightly batch
+
+The unmerged follow-up and workspace-audit migrations were likewise renamed without SQL changes before integration. Their earlier local test receipts remain historical evidence; no production ledger was edited.
+
+| Earlier filename | Current filename | SQL SHA-256 |
+| --- | --- | --- |
+| `20261031045310_monitor_followup_issues.sql` | `20261031053430_monitor_followup_issues.sql` | `6c77aa85ad7b303220368f408c1d29ee148cdf3afadafec3a544e09d97db3282` |
+| `20261031045910_monitor_github_issue_links.sql` | `20261031053431_monitor_github_issue_links.sql` | `6f903b61355e4221aa2d9c2f2a7cbc785e100bad4f830e670162efd35af11469` |
+| `20261031052204_workspace_audit_outbox.sql` | `20261031053432_workspace_audit_outbox.sql` | `e7c71f4ad884a47d1ef9ec43a0159f9ffd5f494abafda5e4fc6702b231dd0895` |

@@ -15,7 +15,7 @@ if(!target&&process.env.REQUIRE_DB==='1')throw Error('Monitor follow-up tests re
 test('completed deliveries create one private regression issue in the incident transaction', {skip:!target}, async t=>{
   const pool=new Pool({connectionString:target,max:12})
   t.after(async()=>{await pool.end();const {pool:appPool}=await import('../lib/db');await appPool.end()})
-  await pool.query(await readFile(new URL('../drizzle/20261031045310_monitor_followup_issues.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261031053430_monitor_followup_issues.sql',import.meta.url),'utf8'))
   const owner=`monitor-followup-${randomUUID()}`
   await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())',[owner,`${owner}@example.invalid`])
   const agentId=randomUUID()
