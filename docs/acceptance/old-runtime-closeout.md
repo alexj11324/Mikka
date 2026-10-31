@@ -61,6 +61,111 @@ no errors or warnings and its bubblewrap/network isolation probe passed.
 The installed official CLI identifies as `codex-cli 0.163.0`; availability is
 not evidence of a successfully authenticated inference.
 
+## Current runtime attempts
+
+The parent subsequently authorized Next dev against its frozen `375d6709`
+checkout on port 3112. Actual signed application attestation passed against
+the owned database; normal sign-up, session verification and workspace
+initialization returned 200. The initial server bound `127.0.0.1` while its
+attested origin used `localhost`; the absolute locale rewrite encountered a
+second locale redirect. Binding the same `localhost` origin removed that
+immediate redirect loop without changing tracked application source.
+
+The root page's first compilation then exceeded the existing account client's
+30-second request limit. The limit and landing requirement were retained;
+the failed executors' four account pairs remain quarantined. A conservative
+one-GiB Node heap also produced a retained development-compiler OOM. A later
+Turbopack compilation approached the disk limit, so only this runner's owned
+Next processes were stopped and its newly generated development caches were
+removed. No existing database, ledger, Docker resource, production build,
+credential inventory or failure log was removed.
+
+These are failed infrastructure attempts, not passing HTTP or model evidence.
+The release owner then supplied the exact main `375d6709` production build
+from [CI run 41155092993](https://github.com/alexj11324/Mikka/actions/runs/41155092993),
+artifact `13024479664`. ZIP SHA-256:
+`4ac427d1436a031437d34015e6b434c8b2a451bfe664694e24c030983afc466a`.
+Its embedded application SHA matched the full merged revision, and the
+application's actual signed attestation passed after `next start --hostname
+localhost --port 3112`. No source-equivalence assumption or old build was used.
+
+### Passed device HTTP matrix
+
+The actual production artifact passed the normal automatic owner/peer session
+and two independent normal daemon CLI flows at `http://localhost:3112` from
+2026-10-31 02:05:15 to 02:05:40 UTC:
+
+- All 25 current `withDeviceRoute` HTTP methods returned 401 for the revoked
+  credential, including the real register, heartbeat, claim, worker-related,
+  report, checkpoint and capture routes.
+- A command long-poll started before the owner revoked its credential returned
+  401 in 701.6 ms. The actual daemon became unregistered in 1,547.2 ms.
+- Peer, unauthenticated and wrong-Origin revoke requests were rejected;
+  repeated owner revoke returned the same persisted receipt.
+- The separately enrolled sibling daemon remained authorized. An actual
+  restart of the revoked daemon remained signed out and the old credential
+  still returned 401.
+- The process and daemon logs passed the existing credential evidence audit.
+  Retained fixture accounts were explicitly quarantined, not claimed reusable.
+
+Evidence: `/tmp/mikka-runtime-closeout-375d/devices/result.json`,
+`/tmp/mikka-runtime-closeout-ci375-service.log` and
+`/tmp/mikka-runtime-closeout-375d/next-start-ci375.log`.
+
+### Real native attempt: blocked by existing authentication
+
+The subsequent run kept the same exact application version and production
+artifact. It used separate fresh isolated targets for native preparation,
+preserving the prior database and its quarantined identities. The default
+signup rate guard correctly rejected the exhausted earlier hourly fixture
+quota; no rate-limit counter, authentication guard or quarantine was reset.
+Retained additional databases are `mikka_old_native_stop_e2e`,
+`mikka_native_mcp_e2e` and `mikka_native_tls_e2e`, each initialized with all 154
+migrations and Better Auth on the same explicit local PostgreSQL service.
+
+Normal MCP public native-client registration, PKCE, the application-issued signed
+consent query and token exchange passed. The actual test owner's CLI policy
+was configured through its authenticated HTTP endpoint before the existing
+`create_issue` and `dispatch_run` MCP tools were invoked. The initial fixture
+incorrectly configured a web callback, omitted the signed consent query and
+set a worker policy that could only narrow the Agent policy; those failures
+were retained and the test client was corrected to the existing contracts.
+No application authorization was weakened.
+
+The daemon's production `protocol.file.allow=never` correctly refused an early
+local Git URL rewrite. The final fixture instead served a real local HTTPS Git
+repository and passed `git ls-remote` with file transport still forbidden.
+Its temporary TLS private key stayed in process memory; Git verified the
+fixture's public CA with `GIT_SSL_CAINFO`, without disabling verification.
+No real hosted repository or provider business object was written.
+
+The final actual Mikka run `701f0f7c-a4ce-400b-b5c1-ecbe3fde6a98` reached the
+official existing Codex CLI and created a native app-server session. Its first
+provider call failed with:
+
+> Codex: Your access token could not be refreshed because you have since logged
+> out or signed in to another account. Please sign in again.
+
+`codex login status` had reported a ChatGPT login, but that status did not prove
+usable inference. No model substitute was installed and no authentication
+value was read into a report or changed. This failure does not establish a
+live-model report, native cancellation SLA, scheduled read or cross-node
+inference. All owned daemon/Git/proxy processes ended; application source and
+dependencies remained frozen through this attempt, then the parent was given
+an explicit release of that freeze.
+
+Evidence: `/tmp/mikka-native-stop-375d-VXpl5r`,
+`/tmp/mikka-native-stop-tls375-attempt3.log`,
+`/tmp/mikka-native-tls375/environment.json` and its private application log.
+An independently invoked official Codex read-only authentication probe also
+exited 1 with the same refresh rejection and no inference result. It completed
+before the parent's pause instruction; no further model attempts were made.
+Its private output remains in `/tmp/mikka-direct-codex-probe`.
+
+All four issues remain open for the remaining runtime acceptance in the table
+above. In particular, #178's passed infrastructure matrix is not a claim that
+its active real-model stopping requirement passed.
+
 ## Existing minute Worker
 
 The resource is already configured as `mikka-suggestions-cron` in

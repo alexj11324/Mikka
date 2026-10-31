@@ -4,10 +4,12 @@ import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdir, mkdtemp, open, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Pool } from 'pg'
 import { loadEnvironment, assertDeploymentIdentity } from '../test-accounts/environment.mjs'
 import { acquireTestAccounts, recordAuthenticationSecrets, auditEvidence } from '../test-accounts/session.mjs'
+import { TestAccountPool } from '../test-accounts/pool.mjs'
 import { connectDaemonInDataDir } from '../../packages/daemon/src/rpc/client.ts'
 
 // Run with --import tsx against a separately started, matching Next build.
@@ -20,6 +22,7 @@ await mkdir(evidence, { recursive: true, mode: 0o700 })
 const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 2 })
 const children = [], logs = [], observations = []
 const startedAt = new Date().toISOString()
+const childScript = fileURLToPath(new URL('./device-closeout-child.mts', import.meta.url))
 let scope
 let passed = false
 async function waitFor(check, timeout = 30_000) {
@@ -48,7 +51,7 @@ async function boot(label) {
   const logPath = join(directory, 'process.log')
   const log = await open(logPath, 'wx', 0o600)
   logs.push(logPath)
-  const child = spawn(process.execPath, ['--import', 'tsx', 'scripts/acceptance/device-closeout-child.mts'], {
+  const child = spawn(process.execPath, ['--import', 'tsx', childScript], {
     cwd: process.cwd(), env: { ...process.env, MIKKA_CLOSEOUT_ORIGIN: environment.origin, MIKKA_CLOSEOUT_DATA_DIR: directory, MIKKA_CLOSEOUT_RESTART: '0' },
     stdio: ['pipe', log.fd, log.fd],
   })
@@ -64,7 +67,7 @@ async function boot(label) {
   logs.push(join(directory, 'logs', 'daemon.log'))
   assert.ok(state.deviceId && state.credential)
   await recordAuthenticationSecrets([state.credential], { environment })
-  const token = (await pool.query('SELECT id FROM device_tokens WHERE "userId"=$1 AND "boundDeviceId"=$2 AND "revokedAt" IS NULL', [scope.owner.userId, state.deviceId])).rows
+  const token = (await pool.query('SELECT t.id FROM device_tokens t JOIN device_token_devices d ON d."tokenId"=t.id WHERE t."userId"=$1 AND d."deviceId"=$2 AND t."revokedAt" IS NULL', [scope.owner.userId, state.deviceId])).rows
   assert.equal(token.length, 1)
   observations.push({ phase: 'registered', label, deviceId: state.deviceId, tokenId: token[0].id, pid: child.pid })
   return { directory, child, deviceId: state.deviceId, tokenId: token[0].id, credential: state.credential, ready }
@@ -80,6 +83,9 @@ async function stop(child) {
   try { await done } finally { clearTimeout(timer) }
 }
 try {
+  // Earlier failing infrastructure executors remain quarantined. Reserve
+  // explicit fresh capacity rather than recycling their identities.
+  await new TestAccountPool(pool, environment).prepare({ pairs: 5 })
   scope = await acquireTestAccounts({ environment, runId: `device-closeout-${randomUUID()}`, workerId: 'two-processes', requestId: randomUUID() })
   const first = await boot('first'), second = await boot('second')
   assert.notEqual(first.deviceId, second.deviceId)
@@ -133,7 +139,7 @@ try {
   const restartLogPath = join(first.directory, 'restart.log')
   const restartLog = await open(restartLogPath, 'wx', 0o600)
   logs.push(restartLogPath)
-  const restarted = spawn(process.execPath, ['--import', 'tsx', 'scripts/acceptance/device-closeout-child.mts'], {
+  const restarted = spawn(process.execPath, ['--import', 'tsx', childScript], {
     cwd: process.cwd(), env: { ...process.env, MIKKA_CLOSEOUT_ORIGIN: environment.origin, MIKKA_CLOSEOUT_DATA_DIR: first.directory, MIKKA_CLOSEOUT_RESTART: '1' },
     stdio: ['ignore', restartLog.fd, restartLog.fd],
   })
