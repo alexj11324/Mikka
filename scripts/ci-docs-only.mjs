@@ -90,7 +90,7 @@ export const BROWSER_MAIN_SPECS = Object.freeze([
  * slower edge cases, mocked-UI and harness specs waiting to be converted. */
 export const BROWSER_NIGHTLY_SPECS = Object.freeze([
   'agent-performance.spec.ts', 'navigation-performance.spec.ts',
-  'board-layout.spec.ts', 'browser-pane.spec.ts', 'desktop-translucent.spec.ts', 'issue-header-breadcrumb.spec.ts',
+  'board-layout.spec.ts', 'browser-pane.spec.ts', 'desktop-translucent.spec.ts', 'issue-header-breadcrumb.spec.ts', 'side-panel-resize.spec.ts',
   'issue-menu-collision.spec.ts', 'offline-layout.spec.ts', 'settings-surface.spec.ts',
   'workspace-shortcuts.spec.ts', 'controls.spec.ts',
   'artifact-share.spec.ts', 'avatar.spec.ts', 'detail-return.spec.ts', 'github-integration.spec.ts',
@@ -113,6 +113,7 @@ const SCOPED_BROWSER = [
   { area: 'suggestions', paths: [/^lib\/suggestions\//, /^components\/suggestions\//, /^app\/api\/suggestions\//], specs: ['suggestions-rail.spec.ts', 'suggestion-entry-contract.spec.ts'] },
   { area: 'devices', paths: [/^lib\/(?:device|mobile)-/, /^components\/(?:device-authorization\.tsx|devices\/)/, /^app\/api\/(?:devices|mobile)\//, /^app\/\[locale\]\/device\//], specs: ['device-authorization.spec.ts', 'mobile-handoff.spec.ts'] },
   { area: 'auth', paths: [/^lib\/(?:auth|session|email-sign-in)[-.]/, /^lib\/abuse\//, /^app\/api\/auth\//, /^components\/auth(?:\/|-form\.tsx$)/, /^app\/\[locale\]\/(?:sign-in|sign-up|verify-email|forgot-password|reset-password)\//], specs: ['sign-out.spec.ts', 'workspace.spec.ts', 'signup-turnstile.spec.ts'] },
+  { area: 'side panels', paths: [/^components\/nav\/(?:bot-list|context-panel)\.tsx$/, /^hooks\/use-resizable-width\.ts$/], specs: ['side-panel-resize.spec.ts'] },
   { area: 'relations', paths: [/^lib\/issue-relation/, /^components\/workspace\/issue-relations\.tsx$/], specs: ['relations.spec.ts'] },
   { area: 'active agents', paths: [/^lib\/active-agents\./], specs: ['active-agents.spec.ts'] },
   { area: 'account menu', paths: [/^components\/workspace-menu\.tsx$/, /^components\/nav\/icon-rail\.tsx$/], specs: ['workspace-menu.spec.ts', 'workspace.spec.ts', 'sign-out.spec.ts', 'workspace-shortcuts.spec.ts'] },
