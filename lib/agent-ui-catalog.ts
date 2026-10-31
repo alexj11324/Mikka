@@ -208,13 +208,22 @@ export type LegacyAgentComponentRenderers = {
   [Name in LegacyAgentComponentName]: ComponentRenderer<z.infer<(typeof legacyAgentComponentCatalog)[Name]['props']>>
 }
 const LEGACY_NAMES = new Set<string>(Object.keys(legacyAgentComponentCatalog))
+const MODEL_HIDDEN_NAMES = new Set<string>([
+  ...LEGACY_NAMES,
+  // Keep the selected beUI equivalents (docs/design/decisions.md, 2026-10-31).
+  'Card', 'CardHeader', 'MarkDownRenderer', 'Callout', 'TextCallout', 'Image', 'ImageBlock', 'ImageGallery',
+  'CodeBlock', 'Table', 'Col', 'Tabs', 'TabItem', 'Accordion', 'AccordionItem',
+  // OpenUI charts lack the selected theme colours and progressive rendering.
+  'RadarChart', 'HorizontalBarChart', 'Series', 'PieChart', 'SingleStackedBarChart', 'Slice', 'ScatterChart', 'ScatterSeries', 'Point',
+  'ComputerCard', // Task state and approval UI belong to the host.
+])
 
 export const agentComponentGroups: { name: string; components: AgentComponentName[]; notes: string[] }[] = [
   { name: '消息回复', components: ['BeResponse'], notes: ['AI Elements MessageResponse → beUI StreamingResponse；回复正文可嵌套已注册组件。会话和输入框由宿主控制，不由模型创建。'] },
   { name: '审批与问题', components: ['BeApproval', 'BeQuestions'], notes: ['Confirmation → ApprovalCard；选择问题复用 ApprovalCard 提问模式。在回答区直接提交并继续对话，不执行工具、不持久保存审批。ToolApproval 已安装但仅供未来真实工具授权流程使用，不开放给模型伪造授权。'] },
   { name: '任务与进度', components: ['BeTodoList', 'BeStat'], notes: ['Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。'] },
   { name: '图标状态与操作', components: ['AgentIcon', 'BeButton', 'BeFollowUps'], notes: ['Lucide 提供图标；状态标签用 OpenUI Tag；Button 提供操作反馈。不得用图标或标签伪造执行结果。'] },
-  { name: '任务与来源引用', components: ['InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'BeCitations', 'ComputerCard'], notes: ['BeCitations 列出本次真正读取过的网页，不编造来源。', '引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。', 'Agent 用自己的电脑做事时放一张 ComputerCard，画面、状态和审批都在卡片里，正文不再复述操作过程。'] },
+  { name: '任务与来源引用', components: ['InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'BeCitations', 'ComputerCard'], notes: ['BeCitations 列出本次真正读取过的网页，不编造来源。', '引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。', 'ComputerCard 的画面、真实状态和审批由宿主控制，不由模型生成；正文不再复述操作过程。'] },
   { name: '内容、报告与图表', components: ['TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'BeAlert', 'BeTable', 'EditableTable', 'BeTabs', 'BeCollapsible', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'RadialChart', 'Separator', 'BeFileTree', 'BeFileDiff'], notes: ['beUI CodeBlock 用于代码回复；BeFileDiff 只展示建议修改；ToolResult、AgentActivity、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不开放给模型，不自动生成虚构工具记录。', '报告：提示用 BeAlert，表格用 BeTable，标签页用 BeTabs，状态用 Tag，里程碑用 Steps；趋势用 LineChart，分类对比用 BarChart，排行用 BarChart 横向，已用与上限用 RadialChart，图表颜色来自主题图表色，只用用户或工具提供的数字。批量确认多条记录（例如建任务前）用 Form 包 EditableTable，提交按钮的 @ToAssistant 写清要做什么。'] },
 ]
 
@@ -243,14 +252,16 @@ export function createAgentLibrary(renderers: Partial<AgentComponentRenderers & 
   })
 }
 
-type LibrarySpec = { components: Record<string, unknown>; schema: { properties?: Record<string, unknown>; required?: string[]; $defs?: Record<string, unknown> } }
+type LibrarySpec = { components: Record<string, unknown>; componentGroups: { name: string; components: string[]; notes: string[] }[]; schema: { properties?: Record<string, unknown>; required?: string[]; $defs?: Record<string, unknown> } }
 
-/** The library as the model sees it: the legacy names parse saved replies but are never offered. */
+/** One model catalog; hidden components still render saved replies and host content. */
 export function agentPromptSpec<Spec extends LibrarySpec>(spec: Spec): Spec {
-  const keep = (record: Record<string, unknown> = {}) => Object.fromEntries(Object.entries(record).filter(([name]) => !LEGACY_NAMES.has(name)))
+  const keep = (record: Record<string, unknown> = {}, hidden = MODEL_HIDDEN_NAMES) => Object.fromEntries(Object.entries(record).filter(([name]) => !hidden.has(name)))
   return {
     ...spec,
     components: keep(spec.components),
-    schema: { ...spec.schema, properties: keep(spec.schema.properties), required: spec.schema.required?.filter(name => !LEGACY_NAMES.has(name)), $defs: keep(spec.schema.$defs) },
+    componentGroups: spec.componentGroups.map(group => ({ ...group, components: group.components.filter(name => !MODEL_HIDDEN_NAMES.has(name)) })),
+    // Built-in children still reference these type definitions; only offered component calls are hidden.
+    schema: { ...spec.schema, properties: keep(spec.schema.properties), required: spec.schema.required?.filter(name => !MODEL_HIDDEN_NAMES.has(name)), $defs: keep(spec.schema.$defs, LEGACY_NAMES) },
   }
 }

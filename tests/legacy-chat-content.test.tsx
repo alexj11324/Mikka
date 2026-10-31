@@ -18,6 +18,18 @@ test('Every Accordion section and Tab pane remains readable without active contr
   assert.doesNotMatch(html, /<button|<input|<form|<iframe|<canvas|\sinert|aria-hidden/)
 })
 
+test('Saved raw Card and CodeBlock remain readable after their model publication ends', () => {
+  const response = 'root = Card([TextContent("Saved raw card"), CodeBlock("js", "const savedRaw = true")])'
+  const result = legacyChatContent(response)
+  assert.equal(result.format, 'markdown')
+  assert.match(result.text, /Saved raw card/)
+  assert.match(result.text, /const savedRaw = true/)
+  const html = renderToStaticMarkup(<LegacyReplyContent response={response} />)
+  assert.match(html, /Saved raw card/)
+  assert.match(html, /const savedRaw = true/)
+  assert.doesNotMatch(html, /<button|<input|<form|<iframe|<canvas|<script/)
+})
+
 test('Saved Markdown and source URLs are text, not live image or navigation requests', () => {
   const response = 'Saved **body** [source](https://www.iana.org/) ![caption](https://example.org/image.png) <script>execute()</script>'
   const html = renderToStaticMarkup(<LegacyReplyContent response={response} />)
