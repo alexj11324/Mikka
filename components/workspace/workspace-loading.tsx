@@ -15,16 +15,16 @@ export function WorkspaceContentLoading() {
 
 /** The first paint: the same window frame as the app (window bar, rail, one card) so nothing jumps when it arrives. */
 export function WorkspaceLoading() {
-  return <div className="flex h-svh flex-col overflow-hidden bg-shell-chrome text-foreground">
+  return <div className="flex h-svh flex-col overflow-hidden bg-shell-chrome text-foreground in-data-desktop-translucent:bg-transparent">
     <div aria-hidden="true" className="hidden h-11 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center gap-3 pr-2 pl-3 md:grid"><span /><Skeleton className="h-7 w-full rounded-full" /><span /></div>
     <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">
       <div aria-hidden="true" className="hidden w-17 shrink-0 flex-col items-center gap-1 pt-1 md:flex">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="size-9 rounded-lg" />)}</div>
-      <div className="flex min-w-0 flex-1 overflow-hidden bg-background md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">
+      <div className="flex min-w-0 flex-1 overflow-hidden bg-background in-data-desktop-translucent:bg-transparent md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">
         <aside aria-hidden="true" className="hidden w-64 shrink-0 flex-col gap-3 border-r p-3 md:flex">
           <Skeleton className="h-8 w-24" />
           {Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-12 w-full rounded-xl" />)}
         </aside>
-        <main className="flex min-w-0 flex-1 flex-col"><WorkspaceContentLoading /></main>
+        <main className="flex min-w-0 flex-1 flex-col bg-background"><WorkspaceContentLoading /></main>
       </div>
     </div>
   </div>

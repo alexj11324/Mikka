@@ -11,6 +11,7 @@ import { db } from '@/lib/db'
 import { bots, WORKSPACE_BOT_MODELS } from '@/lib/db/schema'
 import { BOT_COLORS, BOT_SHAPES } from '@/lib/bot-shapes'
 import { workspaceAction } from '@/lib/workspace-admin/action'
+import { updateOwnedBot } from '@/lib/bot-update'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { botDefaultOptions, listBotThreadsFor, repositoryAvailable, saveBotDefaults, workspaceBotDefaults, workspaceBots, type BotDefaultOptions, type BotDefaults, type BotThreadPage, type WorkspaceBotView } from '@/lib/workspace-admin/bots'
@@ -62,6 +63,14 @@ export async function createBot(input: { name: string; color: string; shape: str
     throw new ActionFailureError('validationGeneric')
   }
   return bot
+}
+
+/**
+ * Rename a bot or change its shape and colour, from the right panel. Same rules
+ * as createBot; the Coordinator is not a bot row, so it cannot be changed here.
+ */
+export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string }): Promise<ActionResult<BotView>> {
+  return workspaceAction(async () => updateOwnedBot(await getOwner(), input))
 }
 
 /** 设置 › 工作区 › Bot: the defaults a new bot starts with, and the choices. Any member may read. */
