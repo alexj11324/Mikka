@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl'
 import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
-import { getPreferences, updatePreferences } from '@/app/actions/preferences'
+import { updatePreferences, type getPreferences } from '@/app/actions/preferences'
+import { settingsRead } from '@/lib/settings-read'
 import type { Preferences } from '@/lib/preferences'
 import { FieldError } from '@/components/ui/field'
 
@@ -15,7 +16,7 @@ type Flags = Pick<Preferences, 'proactive' | 'pushDecide' | 'pushReview' | 'push
 /** D16: the notification settings the phone already has, on the web Settings page. */
 export function NotificationSettings() {
   const t = useTranslations('Settings.notifications')
-  const { data, error, mutate } = useSWR('preferences', getPreferences)
+  const { data, error, mutate } = useSWR('preferences', () => settingsRead<Awaited<ReturnType<typeof getPreferences>>>('preferences'))
   // The change that did not save, kept so 重试 sends exactly it again.
   const [failed, setFailed] = useState<Partial<Flags> | null>(null)
 

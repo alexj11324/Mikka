@@ -1,37 +1,43 @@
 import { preload, unstable_serialize, type Cache } from 'swr'
-import { listAuditLog } from '@/app/actions/audit-log'
-import { getPasswordStatus, listSessions } from '@/app/actions/account'
-import { getPreferences } from '@/app/actions/preferences'
-import { listSavedLogins } from '@/app/actions/settings-activity'
-import { getWorkspaceGeneral } from '@/app/actions/workspace-settings'
-import { getAppPolicy } from '@/app/actions/app-policy'
-import { getE2BKey, listSecrets } from '@/app/actions/workspace-secrets'
-import { getUsage } from '@/app/actions/usage'
-import { getBilling } from '@/app/actions/billing'
-import { getCreditBilling } from '@/lib/billing/verification-client'
+import type { getPasswordStatus, listSessions } from '@/app/actions/account'
+import type { getPreferences } from '@/app/actions/preferences'
+import type { listSavedLogins } from '@/app/actions/settings-activity'
+import type { getWorkspaceDeletionImpact, getWorkspaceGeneral, getWorkspaceTransferTargets } from '@/app/actions/workspace-settings'
+import type { getAppPolicy } from '@/app/actions/app-policy'
+import type { getE2BKey, listSecrets } from '@/app/actions/workspace-secrets'
+import type { getUsage } from '@/app/actions/usage'
+import type { getBilling } from '@/app/actions/billing'
+import type { listAuditLog } from '@/app/actions/audit-log'
+import { getCreditBilling, readCardVerification } from '@/lib/billing/verification-client'
 import { creditBillingKey } from '@/components/billing/balance-section'
-import { currentMonth } from '@/lib/usage/month'
-import { computerPolicyKey, readComputerPolicy } from '@/components/settings/computer-policy-settings'
 import { cardVerificationKey } from '@/components/billing/free-allowance-section'
-import { cardVerificationStatus } from '@/lib/billing/verification-client'
-import type { SettingsSectionId } from '@/lib/settings-sections'
+import { computerPolicyKey, readComputerPolicy } from '@/components/settings/computer-policy-settings'
+import { currentMonth } from '@/lib/usage/month'
+import { settingsRead } from '@/lib/settings-read'
+import { visibleSettingsSections, type SettingsSectionId } from '@/lib/settings-sections'
+
+type Result<F extends (...args: never[]) => unknown> = Awaited<ReturnType<F>>
 
 /**
- * The first read of each section, with the same SWR keys and calls the section
- * uses, so hovering its sidebar item fills the cache before the click and the
- * section opens without a skeleton. Keep a key here in step with its section.
+ * The first read of each section, with the same SWR keys and GET reads the
+ * section uses, so the cache is filled before the section opens. Keep a key
+ * here in step with its section.
  */
 const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: unknown, read: () => Promise<unknown>][]>> = {
-  security: () => [['account:password', getPasswordStatus], ['account:sessions', listSessions]],
-  notifications: () => [['preferences', getPreferences]],
-  logins: () => [['account:saved-logins', listSavedLogins]],
-  general: id => [[['workspace:general', id], () => getWorkspaceGeneral(id)]],
-  permissions: id => [[computerPolicyKey(id), () => readComputerPolicy(id)], [['settings:app-policy', id], () => getAppPolicy(id)]],
-  secrets: id => [[['settings:secrets', id], () => listSecrets(id)], [['settings:e2b-key', id], () => getE2BKey()]],
-  usage: id => { const month = currentMonth(); return [[['settings:usage', id, month], () => getUsage(month, id)], [creditBillingKey(id), () => getCreditBilling(id)]] },
-  billing: id => [[['settings:billing', id], () => getBilling(id)], [creditBillingKey(id), () => getCreditBilling(id)], [cardVerificationKey(id), () => cardVerificationStatus(id)]],
+  security: () => [['account:password', () => settingsRead<Result<typeof getPasswordStatus>>('password')], ['account:sessions', () => settingsRead<Result<typeof listSessions>>('sessions')]],
+  notifications: () => [['preferences', () => settingsRead<Result<typeof getPreferences>>('preferences')]],
+  logins: () => [['account:saved-logins', () => settingsRead<Result<typeof listSavedLogins>>('saved-logins')]],
+  general: id => [
+    [['workspace:general', id], () => settingsRead<Result<typeof getWorkspaceGeneral>>('workspace-general', { workspace: id })],
+    [['workspace:transfer-targets', id], () => settingsRead<Result<typeof getWorkspaceTransferTargets>>('transfer-targets', { workspace: id })],
+    [['workspace:deletion-impact', id], () => settingsRead<Result<typeof getWorkspaceDeletionImpact>>('deletion-impact', { workspace: id })],
+  ],
+  permissions: id => [[computerPolicyKey(id), () => readComputerPolicy(id)], [['settings:app-policy', id], () => settingsRead<Result<typeof getAppPolicy>>('app-policy', { workspace: id })]],
+  secrets: id => [[['settings:secrets', id], () => settingsRead<Result<typeof listSecrets>>('secrets', { workspace: id })], [['settings:e2b-key', id], () => settingsRead<Result<typeof getE2BKey>>('e2b-key')]],
+  usage: id => { const month = currentMonth(); return [[['settings:usage', id, month], () => settingsRead<Result<typeof getUsage>>('usage', { month, workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)]] },
+  billing: id => [[['settings:billing', id], () => settingsRead<Result<typeof getBilling>>('billing', { workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)], [cardVerificationKey(id), () => readCardVerification(id)]],
   // useSWRInfinite takes a preloaded page by the page's own key: page one of 全部.
-  audit: id => [[['settings:audit', id, 'all', null], () => listAuditLog({ filter: 'all', cursor: null }, id)]],
+  audit: id => [[['settings:audit', id, 'all', null], () => settingsRead<Result<typeof listAuditLog>>('audit', { workspace: id, filter: 'all' })]],
 }
 
 const started = new Set<string>()
@@ -48,4 +54,20 @@ export function prefetchSettingsSection(section: SettingsSectionId, workspaceId:
     if (cache.get(unstable_serialize(key as never)) !== undefined) continue
     void preload(key as never, read).catch(() => {})
   }
+}
+
+/**
+ * Every section the viewer can open, fetched once while the page is idle, so
+ * no section shows a skeleton after Settings has opened. The reads are GETs:
+ * they run alongside a save instead of queuing in front of it. Hover still
+ * fetches a section sooner when the person gets there first.
+ */
+export function prefetchAllSettings(workspaceId: string, admin: boolean, cache: Cache) {
+  const run = () => { for (const { id } of visibleSettingsSections({ admin })) prefetchSettingsSection(id, workspaceId, cache) }
+  if (typeof window.requestIdleCallback === 'function') {
+    const handle = window.requestIdleCallback(run, { timeout: 2000 })
+    return () => window.cancelIdleCallback(handle)
+  }
+  const timer = window.setTimeout(run, 200)
+  return () => window.clearTimeout(timer)
 }
