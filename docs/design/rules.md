@@ -319,7 +319,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   dark grey in dark mode, never white at low opacity.
   Secondary buttons follow the same rule: a grey fill and no stroke, like
   the 「Add folder…」 button in Claude desktop's settings (a light grey pill
-  on a white panel, no outline). `Button variant="outline"` (and the
+  on a white panel, no outline). `Button variant="outline"` and `variant="secondary"` (and the
   `outline` Toggle, the motion `secondary`/`outline` buttons) use the
   `--control` / `--control-hover` tokens, a translucent black (light) or
   white (dark) overlay, so the button still reads on grey cards and
