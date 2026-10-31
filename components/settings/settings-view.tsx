@@ -63,20 +63,20 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const section = activeSection ?? localSection
   const { data: workspace, error: workspaceError } = useWorkspace(userKey ?? user.email, workspaceId)
   const admin = workspace?.role === 'admin'
-  const { mutate } = useSWRConfig()
+  const { cache } = useSWRConfig()
   // Settings opened without ?workspace= still has one: the default the API resolved.
   const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
   const roleKnown = workspace !== undefined
   // Once the role is known, load every section the viewer can open, so none shows a skeleton later.
   useEffect(() => {
     if (preview || !roleKnown || !resolvedWorkspaceId) return
-    return prefetchAllSettings(resolvedWorkspaceId, admin, mutate)
-  }, [preview, roleKnown, resolvedWorkspaceId, admin, mutate])
+    return prefetchAllSettings(resolvedWorkspaceId, admin, cache)
+  }, [preview, roleKnown, resolvedWorkspaceId, admin, cache])
   const title = t(`sections.${section}.title`)
   const routedBody = section === 'members' || section === 'teams'
 
   return <>
-    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, mutate) }} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} />
+    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache) }} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent className="gap-6">

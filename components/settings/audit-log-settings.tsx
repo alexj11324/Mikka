@@ -26,14 +26,6 @@ function params(event: AuditEventView, word: (key: string) => string | null) {
   return values
 }
 
-type AuditPage = Awaited<ReturnType<typeof listAuditLog>>
-
-/** The SWR key of each page; the settings prefetch seeds page one under the same key. */
-export const auditPageKey = (workspaceId: string, filter: AuditFilter) => (index: number, previous: AuditPage | null) => {
-  if (previous && (previous.error || !previous.nextCursor)) return null
-  return ['settings:audit', workspaceId, filter, index === 0 ? null : previous && !previous.error ? previous.nextCursor : null] as const
-}
-
 /** N6 审计日志: admins only, the last 90 days, grouped by day. */
 export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.audit')
@@ -41,7 +33,10 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
   const actionError = useActionError()
   const [filter, setFilter] = useState<AuditFilter>('all')
   const pages = useSWRInfinite(
-    auditPageKey(workspaceId, filter),
+    (index, previous: Awaited<ReturnType<typeof listAuditLog>> | null) => {
+      if (previous && (previous.error || !previous.nextCursor)) return null
+      return ['settings:audit', workspaceId, filter, index === 0 ? null : previous && !previous.error ? previous.nextCursor : null] as const
+    },
     ([, id, segment, cursor]) => listAuditLog({ filter: segment, cursor }, id),
     { revalidateFirstPage: false },
   )
