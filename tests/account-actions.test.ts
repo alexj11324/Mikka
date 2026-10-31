@@ -10,7 +10,7 @@ let authFailure: { body: { code: string } } | null = null
 let mailConfigured = true
 let mailOutcome: 'sent' | 'unavailable' | 'failed' = 'sent'
 let reservation: { ok: true; id: string; token: string; expiresAt: Date } | { ok: false; retryAfterMinutes: number } = { ok: true, id: 'r1', token: 'mkx_token', expiresAt: new Date('2026-10-30T00:00:00Z') }
-let deletion: { ok: true } | { ok: false; soleAdminOf: string[] } | { ok: false; pending: true; id: string; stage: string } = { ok: true }
+let deletion: { ok: true; receipt?: { id: string; warnings: string[] } } | { ok: false; soleAdminOf: string[] } | { ok: false; pending: true; id: string; stage: string } = { ok: true }
 let tokens: Record<string, string> = {}
 
 const calls = {
@@ -189,5 +189,11 @@ test('deleting the account needs the account\'s own email typed again, and a sol
   deletion = { ok: true }
   assert.deepEqual(await account.deleteAccount({ email: '  ALICE@example.com ' }), { deleted: true })
   assert.deepEqual(calls.deleteAccount.mock.calls.at(-1)?.arguments, ['alice', 'Alice@Example.com'])
+  assert.equal(calls.signOut.mock.callCount(), 1)
+})
+
+test('completed deletion forwards non-blocking provider warnings in its private receipt', async () => {
+  deletion = { ok: true, receipt: { id: 'private-job', warnings: ['subscription_upstream_revocation_not_supported_revoke_at_provider'] } }
+  assert.deepEqual(await account.deleteAccount({ email: 'alice@example.com' }), { deleted: true, receipt: deletion.receipt })
   assert.equal(calls.signOut.mock.callCount(), 1)
 })

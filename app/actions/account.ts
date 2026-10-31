@@ -201,7 +201,7 @@ export async function listSharedLinks(): Promise<ActionResult<{ links: SharedArt
  * email. Refused while they are the only active admin of a workspace others belong to.
  * On success this browser is signed out; send the person to the sign-in page.
  */
-export async function deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true }>> {
+export async function deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true; receipt?: { id: string; warnings: string[] } }>> {
   return runAction(async () => {
     const { user, headers: requestHeaders } = await requireSession()
     const typed = z.object({ email: z.string().max(320) }).safeParse(input)
@@ -211,6 +211,6 @@ export async function deleteAccount(input: { email: string }): Promise<ActionRes
     if (!outcome.ok) throw new ActionFailureError('accountSoleAdmin', { workspaces: outcome.soleAdminOf.join(', '), count: outcome.soleAdminOf.length })
     // The sessions went with the user row; this clears the cookie too.
     await auth.api.signOut({ headers: requestHeaders }).catch(() => undefined)
-    return { deleted: true as const }
+    return { deleted: true as const, ...(outcome.receipt ? { receipt: outcome.receipt } : {}) }
   })
 }

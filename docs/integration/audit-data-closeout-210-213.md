@@ -99,8 +99,9 @@ Capture upload grants must expire before final object cleanup; both staging
 and verified keys are retained. Failed old-avatar cleanup retains its key.
 Composio deletion enumerates all states with the trusted owner filter and
 requests upstream revocation through the existing SDK adapter; provider data
-contents are not deleted. BYOS custody artifacts and cloud runtimes without an
-acknowledged teardown adapter explicitly block, preserving their mappings.
+contents are not deleted. BYOS uses owner-scoped worker custody cleanup before removing mappings. Known
+owned cloud computers and snapshots require acknowledged provider deletion;
+unfinished allocation or provider/storage failures keep the job pending.
 
 The restore adapter requires an independently retained **current** deletion
 manifest, its protected digest anchor and an isolated explicit target pair.
@@ -119,8 +120,8 @@ journals cannot prove that no deletion occurred after the backup.
 | Solo workspaces, membership, invitation, owned projects | Workspace commit; invitations matched using normalized email hash | Shared team issues/projects/group messages stay for remaining members |
 | Artifact versions, captures, avatar and known retired avatar objects | Persist keys before removing DB pointers; retry acknowledged object DELETEs after upload grant expiry | Historical unreferenced bucket objects from failed PUT/database transactions need an independently verified bucket inventory/lifecycle policy |
 | Composio connections | Owner-filtered list and managed authorization removal before local mapping deletion | Upstream revocation may be asynchronous; real provider acceptance still required |
-| BYOS Infisical artifacts, native model state | Preserve mapping and report `subscription_custody_cleanup_required` | An owner-bound, acknowledged cleanup adapter is still required |
-| Cloud sandbox files / run runtime | Report `cloud_runtime_cleanup_required` while managed resources remain | Owner-bound runtime teardown acknowledgment is required; user-device files are outside service custody |
+| BYOS Infisical artifacts, native model state | Owner-scoped disconnect fences state/revision; cleanup/status and DB verify all custody copies | Actual custody failures stay pending; unsupported upstream global revocation is disclosed as a non-blocking warning |
+| Cloud sandbox files / run runtime | Fence owned runs/tokens, end dedicated threads and kill only the owner’s `(workspaceId, ownerId)` Bot computers; enumerate/delete their snapshots | Unacknowledged provider cleanup and uncertain allocations remain pending; user-device files are outside service custody |
 | Audit rows, shared message authorship, immutable evaluation ledgers | Existing accountability/team records are retained, not silently rewritten/deleted | Explicit data minimization, legal hold and retention policy remains required; account deletion is not claimed to erase every actor reference |
 | Deletion receipt and restore-suppression guards | Restore must not resurrect an erased account | Default `retentionUntil = NULL`; no destructive expiry without an explicit policy |
 | Backups / provider-held logs and user-owned upstream contents | Recovery replays current tombstones before exposure; it never uses an old dump as proof of current deletion state | Backup expiry, independent storage custody, upstream retention and policy approval remain concrete deployment acceptance requirements |
@@ -168,36 +169,52 @@ writes still use log-only `recordAuditSafe`; its durable event delivery and the
 full event catalogue/failure paths remain concrete #210 gaps, so this component
 work alone does not justify closing #210.
 
-### Owner-bound external cleanup follow-up
+### Owner-bound external cleanup
 
-The account adapter now drives each BYOS connection through its existing
+The account adapter drives each BYOS connection through its existing
 owner-checked repository, worker `disconnect`, connection-scoped `cleanup` and
-`status`; it never invokes the global cleanup batch. It verifies all that
-connection's custody/enrollment artifacts are acknowledged, keeps unresolved
-mappings, and explicitly reports `subscription_provider_revocation_unavailable`
-because the actual worker contract is `providerRevocation: not_implemented`.
-Vault cleanup is not upstream OAuth revocation. Empty never-authorized local
-connection rows do not require a nonexistent remote resource cleanup.
+`status`; it never invokes the global cleanup batch. `Disconnect` advances its
+epoch, sets disconnected and removes grant/access/staged pointers; stale
+bindings/native requests fail the current state/revision check. The adapter
+verifies all custody/enrollment copies are acknowledged. A genuine pending,
+failed or uncertain copy keeps the job pending with its mapping intact.
+
+When Mikka custody is fully removed, `providerRevocation: not_implemented` is
+an external capability exception, not evidence that Mikka retains access.
+Deletion can complete with the non-blocking receipt warning
+`subscription_upstream_revocation_not_supported_revoke_at_provider`. It tells
+the person to revoke the provider grant themselves and never claims global
+provider logout. Composio's requested asynchronous upstream revocation is also
+disclosed separately. Warnings survive deletion and restore in the existing
+receipt; they do not add a new deletion phase. The existing settings server
+action forwards a warning receipt on successful deletion. Its visible
+presentation remains with the existing settings/design owner; the backend
+receipt API already provides the disclosure after sessions are gone.
 
 Dedicated thread machines use the existing owner/workspace-bound `end` path,
 including its run/token fence, recording finalization and acknowledged kill.
-Owner filters exclude peer machines. Pending creation leases remain pending
-including an `ended` row with an unresolved worker lease. An acknowledged
-provider NotFound for the already-owned sandbox is an idempotent delete result.
-No new recording/object is accepted after the account write barrier; account
-deletion intentionally discards that person's remaining capture contents.
-The shared Bot-machine lifecycle and provider snapshots have no existing
-owner teardown entry point, so their references stay and report
-`cloud_runtime_cleanup_required` / `cloud_snapshot_cleanup_required`; the
-adapter does not kill an entire shared workspace on one member's behalf.
-Remote adapters also reject a caller-supplied database target that differs from
-the server's credential scope; isolated restoration uses explicit local replay.
+Pending creation leases remain pending including an ended row with an
+unresolved worker lease. No new recording/object is accepted after the account
+write barrier; deletion intentionally discards the person's remaining content.
 
-Real PostgreSQL component tests verify owner-only BYOS fencing/custody
-acknowledgment while peers stay connected, preservation of the unresolved
-revocation mapping/user/job, retries without a duplicate disconnect revision,
-owner-only thread selection, pending-creation retention and shared machine/
-snapshot blockers. Worker/kill responses in these component tests are explicit
-fixtures, not real provider acceptance. The unimplemented upstream revocation,
-shared-machine/snapshot teardown and real external acceptance remain blockers;
-no account deletion is reported completed while any of them is unresolved.
+The Bot-computer schema has an explicit `(workspaceId, ownerId)` primary key
+(20261029080001). Account cleanup fences only that owner's active runs and
+bound tokens, then kills only their concrete sandbox, preserving peers' live
+machines in the same workspace. It enumerates provider snapshots by those
+owned source sandbox IDs and deletes both currently referenced and discovered
+historical snapshots through the actual SDK. Failed kills/inventory/deletes
+retain all local references for retry. An elapsed provisioning lease alone
+cannot prove no external allocation occurred and remains pending.
+
+Remote adapters reject caller-supplied SQL targets differing from the server's
+credential scope; isolated restoration uses explicit local replay. Historical
+provider resources whose source IDs were already lost before this change still
+require an independent inventory/retention verification, rather than a claim
+that a local database scan proves their absence.
+
+Real PG component tests verify BYOS custody failure then successful deletion
+with a persistent non-blocking provider warning, peer connections remaining
+live, no duplicate disconnect revision, owner-only run/token fencing, pending
+creation retention, retry of failed kill and deletion of discovered snapshots.
+Worker/provider responses are explicit fixtures, not real external acceptance.
+No real external account, sandbox or snapshot was changed by these tests.

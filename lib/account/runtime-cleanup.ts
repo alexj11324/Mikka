@@ -1,5 +1,6 @@
 import 'server-only'
 import type { Pool } from 'pg'
+import { cleanupOwnedCloudMachines } from './cloud-cleanup'
 
 export type EndAccountThread = (database: Pool, actor: { userId: string; workspaceId: string }, runId: string) => Promise<void>
 const end: EndAccountThread = async (database, actor, runId) => {
@@ -11,7 +12,7 @@ const end: EndAccountThread = async (database, actor, runId) => {
   }
 }
 /** Called only by the authorized owner's deletion job, before any runtime mapping is erased. */
-export async function cleanupAccountRuntimes(ownerId: string, database: Pool, endThread = end): Promise<string[]> {
+export async function cleanupAccountRuntimes(ownerId: string, database: Pool, endThread = end, cleanupCloud = cleanupOwnedCloudMachines): Promise<string[]> {
   const reasons = new Set<string>()
   const threads = (await database.query<{ runId: string; workspaceId: string }>(`SELECT "runId","workspaceId" FROM thread_machines WHERE "ownerId"=$1
     AND ("sandboxId" IS NOT NULL OR state<>'ended' OR "workerLeaseId" IS NOT NULL OR "workerLeaseUntil" IS NOT NULL) ORDER BY "runId"`, [ownerId])).rows
@@ -19,9 +20,6 @@ export async function cleanupAccountRuntimes(ownerId: string, database: Pool, en
     try { await endThread(database, { userId: ownerId, workspaceId: thread.workspaceId }, thread.runId) }
     catch { reasons.add('cloud_thread_cleanup_pending') }
   }
-  // The shared Bot-computer lifecycle has no owner teardown entry point. Do not
-  // invoke workspace-wide policy/kill operations on behalf of one member.
-  if ((await database.query('SELECT 1 FROM cloud_machines WHERE "ownerId"=$1 AND ("sandboxId" IS NOT NULL OR "provisionLeaseId" IS NOT NULL OR "provisionLeaseUntil" IS NOT NULL) LIMIT 1', [ownerId])).rowCount) reasons.add('cloud_runtime_cleanup_required')
-  if ((await database.query('SELECT 1 FROM workspace_snapshots WHERE "ownerId"=$1 LIMIT 1', [ownerId])).rowCount) reasons.add('cloud_snapshot_cleanup_required')
+  for (const reason of await cleanupCloud(ownerId, database)) reasons.add(reason)
   return [...reasons]
 }

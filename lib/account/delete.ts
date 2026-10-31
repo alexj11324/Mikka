@@ -52,7 +52,7 @@ const SKIPPED = new Map<string, string>([
 const IMMUTABLE_PREFIX = 'improvement_'
 
 export type AccountDeletion =
-  | { ok: true }
+  | { ok: true; receipt?: { id: string; warnings: string[] } }
   | { ok: false; soleAdminOf: string[] }
   | { ok: false; pending: true; id: string; stage: string }
 
@@ -74,7 +74,8 @@ export async function deleteAccount(userId: string, email: string, options: impo
   const requested = await requestAccountDeletion(userId, email, undefined, options)
   if (!requested.ok) return requested
   const job = await resumeAccountDeletion(requested.id, options)
-  return job.stage === 'completed' ? { ok: true } : { ok: false, pending: true, id: job.id, stage: job.stage }
+  if (job.stage === 'completed') return job.warnings.length ? { ok: true, receipt: { id: job.id, warnings: job.warnings } } : { ok: true }
+  return { ok: false, pending: true, id: job.id, stage: job.stage }
 }
 
 export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<Plan | { soleAdminOf: string[] }> {

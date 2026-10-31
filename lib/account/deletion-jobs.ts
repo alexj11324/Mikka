@@ -7,18 +7,19 @@ import { workspacePool } from '@/lib/workspace-db'
 import { artifactStorage, deleteArtifactObject } from '@/lib/artifacts/storage'
 import { auditDigest } from '@/lib/audit/integrity'
 import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, planWorkspaces, type Plan } from './delete'
+import type { AccountCleanupReport } from './cleanup-result'
 import { cleanupAccountConnections } from './external-cleanup'
 
 export type DeletionStage = 'preparing' | 'requested' | 'external_pending' | 'main_deleted' | 'workspace_deleted' | 'storage_pending' | 'completed' | 'cancelled'
 export interface AccountDeletionJob {
   id: string; subjectUserId: string; subjectEmailHash: string; requestedAt: Date; stage: DeletionStage
   plan: Plan | null; pendingObjects: string[]; storageNotBefore: Date | null
-  blockedReasons: string[]; completedAt: Date | null; retentionUntil: Date | null; updatedAt: Date
+  blockedReasons: string[]; warnings: string[]; completedAt: Date | null; retentionUntil: Date | null; updatedAt: Date
 }
 export interface AccountDeletionOptions {
   mainPool?: Pool; workspacePool?: Pool
   /** Trusted server adapter. Return fixed reason codes for resources that still require cleanup. */
-  externalCleanup?: (subject: string, database: Pool) => Promise<string[]>
+  externalCleanup?: (subject: string, database: Pool) => Promise<string[] | AccountCleanupReport>
   deleteObject?: (key: string) => Promise<void>
   now?: () => Date
   /** Restore-only preservation decision from the independently retained current journal. */
@@ -46,7 +47,7 @@ async function load(database: Pick<Pool, 'query'>, id: string): Promise<AccountD
 /** Deliberately omits subject identity, object names and the workspace preservation plan. */
 export function deletionReceipt(job: AccountDeletionJob) {
   return { id: job.id, stage: job.stage, requestedAt: job.requestedAt.toISOString(), completedAt: job.completedAt?.toISOString() ?? null,
-    remainingObjects: job.pendingObjects.length, blockedReasons: job.blockedReasons }
+    remainingObjects: job.pendingObjects.length, blockedReasons: job.blockedReasons, warnings: job.warnings }
 }
 export async function readAccountDeletion(userId: string, id: string, options: AccountDeletionOptions = {}) {
   const job = await load(targets(options).main, id)
@@ -118,9 +119,13 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
     if (job.stage === 'cancelled') return job
     if (job.stage === 'requested' || job.stage === 'external_pending') {
       await lease.query('UPDATE account_deletion_jobs SET stage=\'external_pending\',"updatedAt"=now() WHERE id=$1', [id])
-      let blocked: string[]
-      try { blocked = await withDatabaseClient(lease, () => (options.externalCleanup ?? cleanupAccountConnections)(job.subjectUserId, main)) }
-      catch { blocked = ['external_cleanup_failed'] }
+      let report: AccountCleanupReport
+      try {
+        const result = await withDatabaseClient(lease, () => (options.externalCleanup ?? cleanupAccountConnections)(job.subjectUserId, main))
+        report = Array.isArray(result) ? { blockedReasons: result, warnings: [] } : result
+      } catch { report = { blockedReasons: ['external_cleanup_failed'], warnings: [] } }
+      const blocked = report.blockedReasons
+      await lease.query('UPDATE account_deletion_jobs SET warnings=$2 WHERE id=$1', [id, JSON.stringify([...new Set([...job.warnings, ...report.warnings])])])
       if (blocked.length) {
         await lease.query('UPDATE account_deletion_jobs SET "blockedReasons"=$2,"updatedAt"=now() WHERE id=$1', [id, JSON.stringify([...new Set(blocked)])])
         return load(lease, id)
@@ -142,9 +147,10 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
         // Include objects written before the request's write barrier, and durable old-avatar references.
         await transaction(main, async client => {
           const objects = await accountStorageKeys(client, job.subjectUserId)
+          const notBefore = !options.deleteObject && artifactStorage() === 'inline' ? (options.now?.() ?? new Date()) : objects.notBefore
           await deleteMainAccountData(client, job.subjectUserId, frozen)
           await client.query('UPDATE account_deletion_jobs SET stage=\'main_deleted\',plan=$4,"pendingObjects"=$2,"storageNotBefore"=$3,"blockedReasons"=\'[]\',"updatedAt"=now() WHERE id=$1',
-            [id, JSON.stringify(objects.keys), objects.notBefore, JSON.stringify(frozen)])
+            [id, JSON.stringify(objects.keys), notBefore, JSON.stringify(frozen)])
         })
         // Workspace row locks remain held across the main commit; this is explicitly two commits.
         await deleteWorkspaceData(drizzle(workspaceClient), job.subjectUserId, job.subjectEmailHash, frozen)
@@ -234,12 +240,12 @@ export async function applyAccountDeletionManifest(manifest: AccountDeletionMani
         await client.query('UPDATE account_deletion_jobs SET plan=$2,stage=CASE WHEN stage=\'preparing\' THEN \'requested\' ELSE stage END WHERE id=$1', [source.id, JSON.stringify(source.plan)])
         return
       }
-      await client.query(`INSERT INTO account_deletion_jobs(id,"subjectUserId","subjectEmailHash","requestedAt",stage,plan,"retentionUntil") VALUES($1,$2,$3,$4,'requested',$5,$6)
+      await client.query(`INSERT INTO account_deletion_jobs(id,"subjectUserId","subjectEmailHash","requestedAt",stage,plan,"retentionUntil",warnings) VALUES($1,$2,$3,$4,'requested',$5,$6,$7)
         ON CONFLICT(id) DO UPDATE SET stage='requested',plan=excluded.plan,"pendingObjects"='[]',"completedAt"=NULL,"blockedReasons"='[]'`,
-      [source.id, source.subjectUserId, source.subjectEmailHash, source.requestedAt, JSON.stringify(source.plan), source.retentionUntil])
+      [source.id, source.subjectUserId, source.subjectEmailHash, source.requestedAt, JSON.stringify(source.plan), source.retentionUntil, JSON.stringify(source.warnings ?? [])])
     })
-    // Remote revocation already completed in the current journal. Restore only replays local deletion against explicit isolated targets.
-    await resumeAccountDeletion(source.id, { ...options, externalCleanup: async () => [], replayPlan: source.plan! })
+    // Managed custody cleanup completed in the current journal; its warnings preserve upstream exceptions. Restore replays only local deletion against explicit isolated targets.
+    await resumeAccountDeletion(source.id, { ...options, externalCleanup: async () => ({ blockedReasons: [], warnings: source.warnings ?? [] }), replayPlan: source.plan! })
   }
   const remaining = (await options.mainPool.query('SELECT id FROM account_deletion_jobs WHERE id=ANY($1::uuid[]) AND stage<>\'completed\'', [[...ids]])).rows
   if (remaining.length) throw new Error('accountDeletionRestoreCleanupPending')
