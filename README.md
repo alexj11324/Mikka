@@ -24,8 +24,8 @@ Every agent, from laptop to cloud, working as one team.
 Mikka connects AI agents across your computers, remote servers and cloud
 infrastructure into one coordinated team. Describe the work to a bot, and it
 organizes coding tasks for Claude Code, Codex and Cursor on connected devices.
-Cloud desktops support viewing, takeover and handback; Agents on E2B with
-a real subscription still await acceptance.
+Cloud desktops support viewing, takeover and handback; Agents on Mikka Cloud
+with a real subscription still await acceptance.
 
 Track progress, respond when needed and review results in one place, on the web
 or in the macOS desktop app.
@@ -38,7 +38,7 @@ or in the macOS desktop app.
   - Each piece of work runs in a **thread**: one work run with its own name,
     usually tied to a task. One bot can run many threads at once.
   - The full definitions are in the [glossary](docs/design/glossary.md).
-  - An **Agent** is the worker that does a thread's work: Claude Code, Codex or Cursor, running on a **computer** (yours, an SSH server, or E2B). Bots are not Agents: every bot chats on Mikka's AI SDK / Workflow loop, the Coordinator's. The retired standalone Agent chat is available only as read-only history. Running the Coordinator itself on Claude Code or Codex ([#312](docs/architecture/native-coordinator.md)) is a deprecated design: the code is kept switched off and must not be enabled.
+  - An **Agent** is the worker that does a thread's work: Claude Code, Codex or Cursor, running on a **computer** (yours, an SSH server, or Mikka Cloud). Bots are not Agents: every bot chats on Mikka's AI SDK / Workflow loop, the Coordinator's. The retired standalone Agent chat is available only as read-only history. Running the Coordinator itself on Claude Code or Codex ([#312](docs/architecture/native-coordinator.md)) is a deprecated design: the code is kept switched off and must not be enabled.
 
 - **The Coordinator and your own bots.**
   - The Coordinator is the built-in bot. It is long-running: it wakes when a
@@ -157,13 +157,13 @@ the pull request is planned in
 
 In early access, behind a flag or switch, or awaiting acceptance:
 
-- **Cloud computer.** Each bot gets its own cloud desktop on the workspace's
-  own E2B key. You can watch it live, take control and hand it back; runs pause
+- **Cloud computer.** Each bot gets its own desktop on Mikka Cloud, running on
+  the workspace's own E2B key. You can watch it live, take control and hand it back; runs pause
   while you hold it, it sleeps when idle and keeps its disk. Bots can start web
   sub-agents there, each in its own browser. Bot desktop actions follow the
   applicable authorization policy.
 - **Your own subscriptions.** Connect a ChatGPT (Codex) or Claude subscription in
-  Settings. Agents on E2B with a real subscription still await acceptance.
+  Settings. Agents on Mikka Cloud with a real subscription still await acceptance.
 - **Saved logins.** When a web sub-agent reaches a login page, the bot sends a
   secure login card. The password goes to a KMS-encrypted vault that the model
   never reads, and is reused for that site; you can delete it in Settings. On
@@ -192,8 +192,8 @@ Work in progress is tracked in
 
 | Area | Planned | Tracking |
 | --- | --- | --- |
-| **Cloud computer** | The per-bot desktop above is in early access. Next: each cloud thread on a machine of its own (built behind a switch, with per-owner and per-workspace spend limits), and Agents on E2B turned on for everyone. | [#172](https://github.com/alexj11324/Mikka/issues/172) |
-| **Hybrid execution** | Local agents offload builds, tests and dev servers to E2B. | [#572](https://github.com/alexj11324/Mikka/issues/572) |
+| **Cloud computer** | The per-bot desktop above is in early access. Next: each cloud thread on a machine of its own (built behind a switch, with per-owner and per-workspace spend limits), and Agents on Mikka Cloud turned on for everyone. | [#172](https://github.com/alexj11324/Mikka/issues/172) |
+| **Hybrid execution** | Agents on your computer offload builds, tests and dev servers to Mikka Cloud. | [#572](https://github.com/alexj11324/Mikka/issues/572) |
 | **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. The backend is on main; the interface is not. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
 | **Factory** | Running in production; next: end-to-end acceptance of each stage, and acceptance by merging the pull request in place of the separate approve-and-publish step. | [#192](https://github.com/alexj11324/Mikka/issues/192), [#193](https://github.com/alexj11324/Mikka/issues/193), [#195](https://github.com/alexj11324/Mikka/issues/195), [#528](https://github.com/alexj11324/Mikka/issues/528) |
 | **Connected apps** | Live acceptance of the approved email, calendar, Notion and Slack writes. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
@@ -233,7 +233,7 @@ Each run uses its own git worktree, so parallel threads stay isolated.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web, desktop and iOS apps, Telegram, Slack, notification sources and MCP clients reach the Next.js app on Vercel, which keeps state in Postgres and takes payments through Stripe. A minute Worker and app events wake the Coordinator, which dispatches runs to the daemon on your Mac, Linux machine or SSH host and wakes each bot's E2B cloud computer. Agents report back through MCP. Factory stages fed by monitoring sit on top of the Coordinator, and approved writes go back to connected apps. Linear sync (switched off), Agents on E2B and the credential vault are dashed.">
+  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web, desktop and iOS apps, Telegram, Slack, notification sources and MCP clients reach the Next.js app on Vercel, which keeps state in Postgres and takes payments through Stripe. A minute Worker and app events wake the Coordinator, which dispatches runs to the daemon on your Mac, Linux machine or SSH host and wakes each bot's Mikka Cloud computer. Agents report back through MCP. Factory stages fed by monitoring sit on top of the Coordinator, and approved writes go back to connected apps. Linear sync (switched off), Agents on Mikka Cloud and the credential vault are dashed.">
 </picture>
 
 The web app, the desktop and iOS apps, Telegram, Slack and MCP clients all reach
@@ -251,7 +251,7 @@ handover remains to be verified.
 The agent reports progress, questions and blocks through Mikka's MCP worker
 tools.
 
-A bot's cloud computer is an E2B sandbox on the workspace's own E2B key, running
+A bot's Mikka Cloud computer is an E2B sandbox on the workspace's own E2B key, running
 the same daemon and a desktop you can view through noVNC. A Go subscription
 worker in [`packages/subscription-worker`](packages/subscription-worker) holds
 the sign-in for subscriptions you connect, with the secrets kept in Infisical.
@@ -269,7 +269,7 @@ second Worker that exchanges changes with Postgres through a durable inbox and
 outbox; it is switched off by a PostHog flag.
 
 Dashed boxes and lines are switched off or awaiting end-to-end acceptance:
-Linear sync, Agents on E2B and the credential vault.
+Linear sync, Agents on Mikka Cloud and the credential vault.
 
 ## Built with
 

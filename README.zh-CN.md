@@ -21,7 +21,7 @@
 
 </div>
 
-Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI agent 连接成一个协同工作的团队。向 Bot 描述需求，它会为已连接设备上的 Claude Code、Codex 和 Cursor 安排编码任务。云端桌面支持查看、接管和交还；使用真实订阅在 E2B 上运行的 Agent 仍待验收。
+Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI agent 连接成一个协同工作的团队。向 Bot 描述需求，它会为已连接设备上的 Claude Code、Codex 和 Cursor 安排编码任务。云端桌面支持查看、接管和交还；使用真实订阅在 Mikka Cloud 上运行的 Agent 仍待验收。
 
 在网页或 macOS 桌面应用中，于同一个地方跟进进展、回应问题并审阅结果。
 
@@ -31,7 +31,7 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
   - Bot 与你对话，制定计划，并将编码任务派发给你电脑上的 Agent。
   - 每项工作在独立的**线程**中运行。线程对应一次工作运行，拥有独立的名称，通常关联一个任务。一个 bot 可以同时管理多个线程。
   - 完整定义参见 [术语表](docs/design/glossary.md)。
-  - **Agent** 是完成线程工作的执行者：Claude Code、Codex 或 Cursor，运行在一台**电脑**上（你的电脑、SSH 服务器或 E2B）。Bot 不是 Agent：所有 bot 都通过 Mikka 的 AI SDK / Workflow 循环（即 Coordinator 的循环）处理对话和工具。旧的独立 Agent 聊天已退役，历史记录仅供查看。让 Coordinator 本身跑在 Claude Code 或 Codex 上（[#312](docs/architecture/native-coordinator.md)）是已废弃的方案：代码保留但保持关闭，不要启用。
+  - **Agent** 是完成线程工作的执行者：Claude Code、Codex 或 Cursor，运行在一台**电脑**上（你的电脑、SSH 服务器或 Mikka Cloud）。Bot 不是 Agent：所有 bot 都通过 Mikka 的 AI SDK / Workflow 循环（即 Coordinator 的循环）处理对话和工具。旧的独立 Agent 聊天已退役，历史记录仅供查看。让 Coordinator 本身跑在 Claude Code 或 Codex 上（[#312](docs/architecture/native-coordinator.md)）是已废弃的方案：代码保留但保持关闭，不要启用。
 
 - **Coordinator 与你自建的 bot。**
   - Coordinator 是内置的 bot，常驻运行。当运行结束、任务状态变更或 worker 提出问题时，它会被唤醒并决定下一步操作，仅在需要你决策时发出通知。来自已连接应用的事项，它每天最多向你提起五次。
@@ -84,8 +84,8 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 
 以下功能处于早期体验阶段，需开启 flag 或开关，或仍待验收：
 
-- **云端电脑。** 每个 bot 拥有自己的云端桌面，使用工作区自己的 E2B key。支持实时查看、接管和交还控制权；你接管期间运行会暂停，空闲时自动休眠并保留磁盘数据。Bot 可以在其中启动网页分身，每个分身使用独立的浏览器。桌面操作遵守适用的授权策略。
-- **使用自己的订阅。** 在设置中连接 ChatGPT（Codex）或 Claude 订阅，使用真实订阅在 E2B 上运行的 Agent 仍待验收。
+- **云端电脑。** 每个 bot 在 Mikka Cloud 上拥有自己的桌面，使用工作区自己的 E2B key。支持实时查看、接管和交还控制权；你接管期间运行会暂停，空闲时自动休眠并保留磁盘数据。Bot 可以在其中启动网页分身，每个分身使用独立的浏览器。桌面操作遵守适用的授权策略。
+- **使用自己的订阅。** 在设置中连接 ChatGPT（Codex）或 Claude 订阅，使用真实订阅在 Mikka Cloud 上运行的 Agent 仍待验收。
 - **已保存的登录。** 网页分身遇到登录页时，bot 会发送安全登录卡片。密码存入 KMS 加密的保管库，模型无法读取，之后同一网站可复用；你可以在设置中删除。默认开启；当前版本的真实环境验收仍待完成。
 - **定时任务。** Bot 可以创建提醒、任务快照和只读 agent 任务，在指定时间或按周期运行。仍待验收（[#179](https://github.com/alexj11324/Mikka/issues/179)）。
 - **关于你的记忆。** Mikka 从已评级的通知中提取关于你的信息，每晚合并，并在「记忆」中展示，每一条都可以修改或删除。
@@ -99,8 +99,8 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 
 | 方向 | 规划内容 | 跟踪 |
 | --- | --- | --- |
-| **云端电脑** | 上文的 bot 专属桌面处于早期体验阶段。下一步：每个云端线程拥有独立的机器（已在开关后完成，并设有按个人和按工作区的费用上限），以及向所有人开放在 E2B 上运行的 Agent。 | [#172](https://github.com/alexj11324/Mikka/issues/172) |
-| **混合执行** | 本地 agent 将构建、测试和开发服务器交给 E2B 运行。 | [#572](https://github.com/alexj11324/Mikka/issues/572) |
+| **云端电脑** | 上文的 bot 专属桌面处于早期体验阶段。下一步：每个云端线程拥有独立的机器（已在开关后完成，并设有按个人和按工作区的费用上限），以及向所有人开放在 Mikka Cloud 上运行的 Agent。 | [#172](https://github.com/alexj11324/Mikka/issues/172) |
+| **混合执行** | 你电脑上的 Agent 将构建、测试和开发服务器交给 Mikka Cloud 运行。 | [#572](https://github.com/alexj11324/Mikka/issues/572) |
 | **群聊** | 支持多个 bot 与多名成员在同一对话中协作，提供轮流发言、@ 提及以及「正在工作」状态栏。后端已合入 main，界面尚未完成。 | [#105](https://github.com/alexj11324/Mikka/issues/105) |
 | **Factory** | 已在生产环境运行；下一步：逐阶段完成端到端验收，并以合并 pull request 作为验收，取代单独的批准与发布步骤。 | [#192](https://github.com/alexj11324/Mikka/issues/192)、[#193](https://github.com/alexj11324/Mikka/issues/193)、[#195](https://github.com/alexj11324/Mikka/issues/195)、[#528](https://github.com/alexj11324/Mikka/issues/528) |
 | **Connected apps** | 邮件、日历、Notion 和 Slack 审批后写入的真实环境验收。 | [#177](https://github.com/alexj11324/Mikka/issues/177) |
@@ -137,20 +137,20 @@ Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和�
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-zh-dark.svg">
-  <img src="docs/assets/architecture-zh-light.svg" alt="Mikka 架构：Web、桌面和 iOS 应用，Telegram、Slack，通知来源和 MCP 客户端接入 Vercel 上的 Next.js 应用，应用状态存储在 Postgres，支付通过 Stripe。每分钟 Worker 和应用事件唤醒 Coordinator，Coordinator 将运行派发给你的 Mac、Linux 主机或 SSH 主机上的 daemon，并唤醒每个 bot 的 E2B 云端电脑。Agent 通过 MCP 回报。Factory 阶段由监控驱动，位于 Coordinator 之上，审批后写入回到已连接应用。Linear 同步（已关闭）、在 E2B 上运行的 Agent 和凭据保管库以虚线表示。">
+  <img src="docs/assets/architecture-zh-light.svg" alt="Mikka 架构：Web、桌面和 iOS 应用，Telegram、Slack，通知来源和 MCP 客户端接入 Vercel 上的 Next.js 应用，应用状态存储在 Postgres，支付通过 Stripe。每分钟 Worker 和应用事件唤醒 Coordinator，Coordinator 将运行派发给你的 Mac、Linux 主机或 SSH 主机上的 daemon，并唤醒每个 bot 的 Mikka Cloud 电脑。Agent 通过 MCP 回报。Factory 阶段由监控驱动，位于 Coordinator 之上，审批后写入回到已连接应用。Linear 同步（已关闭）、在 Mikka Cloud 上运行的 Agent 和凭据保管库以虚线表示。">
 </picture>
 
 Web 应用、桌面和 iOS 应用、Telegram、Slack 和 MCP 客户端均接入部署在 Vercel 上的同一个 Next.js 应用。运行结束、worker 提问、已评级的通知等事件会发送给 Coordinator。Coordinator 是一个持久化 workflow，负责对每个事件进行分诊并决定下一步操作。所有 bot 都运行在同一个 workflow 上，各自拥有独立的对话、记忆和收件箱。
 
 运行在你的设备上执行。Daemon 注册设备后，通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 Agent CLI。执行规则决定任务在哪里运行、使用哪个 Agent 和模型，以及设备离线或额度用尽时如何处理。基于检查点的交接已有实现和测试；真实双机交接仍待验收。Agent 通过 Mikka 的 MCP worker 工具汇报进度、提出问题或报告阻塞。
 
-Bot 的云端电脑是一个使用工作区自己 E2B key 的 E2B sandbox，运行同一个 daemon，并提供可通过 noVNC 查看的桌面。[`packages/subscription-worker`](packages/subscription-worker) 中的 Go 订阅 worker 保管你所连接订阅的登录凭据，密钥存放在 Infisical 中。[`services/credential-broker`](services/credential-broker) 中独立的凭据 broker 是唯一能解密已保存登录的组件，使用 AWS KMS。
+Bot 的 Mikka Cloud 电脑是一个使用工作区自己 E2B key 的 E2B sandbox，运行同一个 daemon，并提供可通过 noVNC 查看的桌面。[`packages/subscription-worker`](packages/subscription-worker) 中的 Go 订阅 worker 保管你所连接订阅的登录凭据，密钥存放在 Infisical 中。[`services/credential-broker`](services/credential-broker) 中独立的凭据 broker 是唯一能解密已保存登录的组件，使用 AWS KMS。
 
 托管模型通过 Vercel AI Gateway 运行并按次计量；验卡和充值通过 Stripe Checkout 及其 webhook 完成。
 
 一个 Cloudflare Worker 每分钟触发一次，调用应用的 cron 路由：到期的 Coordinator 唤醒、定时任务、运行恢复和监控，每 15 分钟的简报，以及每小时的通知对账。Linear 同步运行在另一个 Worker 上，通过持久化的 inbox 和 outbox 与 Postgres 交换变更；它由 PostHog flag 关闭。
 
-虚线框和虚线表示已关闭或仍待端到端验收的部分：Linear 同步、在 E2B 上运行的 Agent 和凭据保管库。
+虚线框和虚线表示已关闭或仍待端到端验收的部分：Linear 同步、在 Mikka Cloud 上运行的 Agent 和凭据保管库。
 
 ## 技术栈
 

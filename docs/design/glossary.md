@@ -63,4 +63,6 @@ Decided by Alex, 2026-10-28.
 - "Agent" when you mean the thing on the left. Say **bot**. **Agent** is the
   right-side worker that runs threads (`agents` table, Claude Code, Codex).
 - "harness" or 「执行器」 in the UI for that worker. Say **Agent** (R-43).
+- 「E2B」 as the cloud machine's name. It is **Mikka Cloud** in both languages,
+  never translated; E2B names only the provider and its API key.
   Code identifiers may keep `harness`.

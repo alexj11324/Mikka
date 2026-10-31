@@ -121,7 +121,7 @@ source wins in a conflict is in [`README.md`](README.md).
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
   shows a machine picker.
-- **R-23** Machine picker order: **E2B** first and selected by
+- **R-23** Machine picker order: **Mikka Cloud** first and selected by
   default; then the group **本机** (this Mac, a local Linux machine); then the
   group **Remote control** (VPS and SSH hosts reached through the user's
   machine). Settings › 设备 uses the same two groups.
@@ -386,7 +386,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   Never 会话 for a left row or a run, and never 任务 for the panel's thread
   tab. The right-side worker that does a thread's work (Claude Code, Codex) is
   an **Agent**, never harness or 执行器 in the UI; it runs on a 电脑 (your
-  computer, an SSH server or E2B). `scripts/check-copy.mjs` rejects harness and
+  computer, an SSH server or Mikka Cloud). `scripts/check-copy.mjs` rejects harness and
   执行器 in `messages/`. 「Artifact」 is never translated. Built-in role names stay English
   (Coordinator).
 - **R-44** The home greeting stays 「早上好，Alex」 (time of day + name).

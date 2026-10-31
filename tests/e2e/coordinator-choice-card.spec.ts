@@ -21,7 +21,7 @@ async function shoot(page: import('@playwright/test').Page, testInfo: import('@p
 }
 
 const clarify = 'root = Stack([intro, q])\nintro = TextContent("好的。")\nq = BeQuestions("官网首页在手机上太慢了，压到 2 秒以内", [{id:"net", title:"先确认一件事：2 秒按哪种网络来算？", options:[{value:"4g", label:"手机 4G（Lighthouse 移动端）"}, {value:"wifi", label:"桌面宽带"}, {value:"both", label:"两种都要到 2 秒"}, {value:"none", label:"不设线，越快越好"}]}])'
-const dispatchFailed = (task: string, noKey = false) => `root = Stack([q])\nq = BeQuestions("派发失败：设备不在线", [{id:"route", title:"派不出去：Alex 的 MacBook 不在线。等它上线，还是用你的 E2B 在云端运行？", options:[{value:"wait", label:"Wait for it"}, {value:"cloud", label:"Run on your E2B"${noKey ? ', action:"cloudKeySettings"' : ''}}]}], "${task}")`
+const dispatchFailed = (task: string, noKey = false) => `root = Stack([q])\nq = BeQuestions("派发失败：设备不在线", [{id:"route", title:"派不出去：Alex 的 MacBook 不在线。等它上线，还是在 Mikka Cloud 上运行？", options:[{value:"wait", label:"Wait for it"}, {value:"cloud", label:"Run on Mikka Cloud"${noKey ? ', action:"cloudKeySettings"' : ''}}]}], "${task}")`
 
 // Dispatch option labels are English on purpose: the card localizes them by value.
 // Visual and interaction coverage of stored replies; the Factory clarify answer itself is the person's next message.
@@ -52,7 +52,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await expect(first.getByRole('button', { name: /手机 4G/ })).toBeDisabled()
     await expect(first.getByRole('button', { name: /桌面宽带/ })).toBeDisabled()
     const second = chat.getByRole('group', { name: /派不出去/ })
-    const cloud = second.getByRole('button', { name: /用你的 E2B 运行/ })
+    const cloud = second.getByRole('button', { name: /在 Mikka Cloud 上运行/ })
     await expect(cloud).toBeEnabled()
     await expect(second.locator('[data-slot]').filter({ hasText: '首页加载提速' }).first()).toBeVisible()
     await shoot(page, testInfo, `choice-${viewport.name}-open`)
@@ -70,7 +70,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await expect(second.getByRole('button', { name: /等它上线/ })).toBeDisabled()
     await shoot(page, testInfo, `choice-${viewport.name}-sending`)
     release()
-    await expect(chat.getByText('用你的 E2B 运行', { exact: true }).last()).toBeVisible()
+    await expect(chat.getByText('在 Mikka Cloud 上运行', { exact: true }).last()).toBeVisible()
     await expect(cloud).toHaveAttribute('aria-pressed', 'true')
     await expect(cloud).toBeDisabled()
     await expect(second.getByRole('button', { name: /等它上线/ })).toBeDisabled()
@@ -88,7 +88,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     const card = page.getByRole('region', { name: 'Coordinator', exact: true }).getByRole('group', { name: /派不出去/ })
     const setup = card.getByRole('link', { name: /去设置 E2B 密钥/ })
     await expect(setup).toHaveAttribute('href', /\/settings\?section=integrations$/)
-    await expect(card.getByText(/Run on your E2B|用你的 E2B 运行/)).toHaveCount(0)
+    await expect(card.getByText(/Run on Mikka Cloud|在 Mikka Cloud 上运行/)).toHaveCount(0)
     await expect(card.getByRole('button', { name: /等它上线/ })).toBeEnabled()
     await shoot(page, testInfo, `choice-${viewport.name}-nokey`)
     await setup.click()

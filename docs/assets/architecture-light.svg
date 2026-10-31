@@ -62,11 +62,11 @@
   <text x="830" y="451" text-anchor="middle" font-size="14" fill="#ffffff">runs</text>
   <path d="M920 520 L1000 520" fill="none" stroke="#111111" stroke-width="2.5"/>
   <path d="M980 512 L988 520 L980 528" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <path d="M1080 410 L1080 490" fill="none" stroke="#111111" stroke-width="2.5" stroke-dasharray="7 5"/>
-  <path d="M1072 430 L1080 422 L1088 430" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <path d="M1072 470 L1080 478 L1088 470" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
-  <rect x="1021.5" y="437" width="117" height="26" fill="#ffffff" stroke="#1a5cff" stroke-width="1.5" stroke-dasharray="4 3"/>
-  <text x="1080" y="455" text-anchor="middle" font-size="14" fill="#1a5cff">Agents on E2B</text>
+  <path d="M1045 410 L1045 490" fill="none" stroke="#111111" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <path d="M1037 430 L1045 422 L1053 430" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M1037 470 L1045 478 L1053 470" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
+  <rect x="956" y="437" width="178" height="26" fill="#ffffff" stroke="#1a5cff" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="1045" y="455" text-anchor="middle" font-size="14" fill="#1a5cff">Agents on Mikka Cloud</text>
   <path d="M1185 410 L1185 650" fill="none" stroke="#111111" stroke-width="2.5" stroke-dasharray="7 5"/>
   <path d="M1177 634 L1185 642 L1193 634" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M1050 550 L1050 600 L500 600 L500 550" fill="none" stroke="#111111" stroke-width="2.5"/>
@@ -119,7 +119,7 @@
   <text x="1100" y="265.5" text-anchor="middle" font-size="15" fill="#111111">Monitoring</text>
   <text x="1100" y="284.5" text-anchor="middle" font-size="15" fill="#111111">incidents to issues</text>
   <rect x="1000" y="350" width="200" height="60" fill="#ffffff" stroke="#111111" stroke-width="2.5"/>
-  <text x="1100" y="375.5" text-anchor="middle" font-size="15" fill="#111111">Cloud computer</text>
+  <text x="1100" y="375.5" text-anchor="middle" font-size="15" fill="#111111">Mikka Cloud</text>
   <text x="1100" y="394.5" text-anchor="middle" font-size="15" fill="#111111">E2B, a desktop per bot</text>
   <rect x="1000" y="490" width="165" height="60" fill="#ffffff" stroke="#111111" stroke-width="2.5"/>
   <text x="1082.5" y="515.5" text-anchor="middle" font-size="15" fill="#111111">Agent CLI</text>

@@ -2951,7 +2951,7 @@
     "sendingChoice": "Sending",
     "cloudKeySetup": "Set up your E2B key",
     "dispatchWait": "Wait for it",
-    "dispatchCloud": "Run on your E2B"
+    "dispatchCloud": "Run on Mikka Cloud"
   },
   "IssueThreads": {
     "title": "Threads",
@@ -2993,7 +2993,7 @@
     },
     "screenOf": "{name}'s screen",
     "computerOf": "{name}'s computer",
-    "cloud": "E2B",
+    "cloud": "Mikka Cloud",
     "card": "Computer task",
     "cardTitle": "Computer",
     "openScreen": "Open {name}'s screen full window",
@@ -3172,7 +3172,7 @@
       "noDevice": "No machine connected",
       "offline": "Offline",
       "online": "Online",
-      "cloud": "E2B",
+      "cloud": "Mikka Cloud",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",

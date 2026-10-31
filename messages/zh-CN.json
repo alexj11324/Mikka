@@ -2951,7 +2951,7 @@
     "sendingChoice": "发送中",
     "cloudKeySetup": "去设置 E2B 密钥",
     "dispatchWait": "等它上线",
-    "dispatchCloud": "用你的 E2B 运行"
+    "dispatchCloud": "在 Mikka Cloud 上运行"
   },
   "IssueThreads": {
     "title": "线程",
@@ -2993,7 +2993,7 @@
     },
     "screenOf": "{name} 的屏幕",
     "computerOf": "{name} 的电脑",
-    "cloud": "E2B",
+    "cloud": "Mikka Cloud",
     "card": "电脑任务",
     "cardTitle": "电脑",
     "openScreen": "全屏查看 {name} 的屏幕",
@@ -3172,7 +3172,7 @@
       "noDevice": "未连接机器",
       "offline": "离线",
       "online": "在线",
-      "cloud": "E2B",
+      "cloud": "Mikka Cloud",
       "contextProject": "项目：{project}",
       "contextSeparator": "，",
       "prompt": "帮我新建一个任务：{text}",
