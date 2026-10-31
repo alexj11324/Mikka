@@ -108,6 +108,10 @@ for (const harness of ["codex", "claude_code"] as const) {
     expect(
       existsSync(join(stateDir, "runs", runId, "runtime-git", ".git")),
     ).toBe(true);
+    // Closing the session leaves no GitHub token cache or CLI login on the machine.
+    expect(existsSync(githubDir)).toBe(false);
+    expect(existsSync(join(stateDir, "runs", runId, "runtime-home", ".codex", "auth.json"))).toBe(false);
+    expect(existsSync(join(stateDir, "runs", runId, "runtime-home", ".claude", ".credentials.json"))).toBe(false);
     connected = false;
     // Completed sessions revoke their own gate. A restart needs a fresh host
     // gate before the independently revoked subscription context is consulted.

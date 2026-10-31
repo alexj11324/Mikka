@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, ChevronRight } from 'lucide-react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
+import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { API_URL } from '@/lib/config'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -44,7 +45,7 @@ export function Row({ icon, label, detail, value, onPress, trailing, destructive
         {detail ? <Text style={styles.detail}>{detail}</Text> : null}
       </View>
       {value ? <Text style={styles.value} numberOfLines={1}>{value}</Text> : null}
-      {trailing !== undefined ? trailing : onPress && !destructive ? <ChevronRight size={18} color={colors.tertiary} strokeWidth={2} /> : null}
+      {trailing !== undefined ? trailing : onPress && !destructive ? <Symbol name="chevron.right" size={13} color={colors.tertiary} web={<ChevronRight size={18} color={colors.tertiary} strokeWidth={2} />} /> : null}
     </>
   )
   // A row without its own action stays a View, so a button in `trailing` is not nested in another button.
@@ -69,7 +70,7 @@ export function ChoiceRow({ label, selected, onPress }: { label: string; selecte
   return (
     <Pressable accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
-      {selected ? <Check size={18} color={colors.accent} strokeWidth={2.4} /> : null}
+      {selected ? <Symbol name="checkmark" size={15} color={colors.accent} web={<Check size={18} color={colors.accent} strokeWidth={2.4} />} /> : null}
     </Pressable>
   )
 }

@@ -6,7 +6,7 @@ import { CardButton, ChatCard, cardText } from '@/components/cards'
 import { Markdown } from '@/components/Markdown'
 import { Text } from '@/components/Text'
 import { useImage, type FoundImage } from '@/lib/images'
-import { arr, inlineMarkdown, isComponent, obj, openUIText, parseOpenUI, str, type Component, type Value } from '@/lib/openui'
+import { arr, inlineMarkdown, isComponent, obj, openUIText, parseOpenUI, splitOpenUI, str, type Component, type Value } from '@/lib/openui'
 import type { CitationSource } from '@/lib/types'
 import { openOnWeb } from '@/lib/web'
 import { colors, font } from '@/lib/theme'
@@ -37,9 +37,14 @@ const useCard = () => {
 /** A reply written as OpenUI cards (lib/openui-lang.ts), drawn natively. */
 export function OpenUIReply({ text, ...context }: CardContext & { text: string }) {
   const root = parseOpenUI(text)
+  // Words the bot wrote before its cards stay in its bubble, above them.
+  const prose = splitOpenUI(text)?.prose
   return (
     <Context.Provider value={context}>
-      <View style={styles.reply}>{root === null ? <WebOnly text={looseText(text)} /> : <Node value={root} />}</View>
+      <View style={styles.reply}>
+        {prose ? <Words text={prose} /> : null}
+        {root === null ? <WebOnly text={looseText(text)} /> : <Node value={root} />}
+      </View>
     </Context.Provider>
   )
 }

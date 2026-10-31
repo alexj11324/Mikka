@@ -7,6 +7,6 @@ import { ChatScreen } from '@/components/ChatScreen'
  * `action` comes from a push about a proposal: its card is marked.
  */
 export default function CoordinatorScreen() {
-  const { draft, action } = useLocalSearchParams<{ draft?: string; action?: string }>()
-  return <ChatScreen botId={null} name="Coordinator" draft={draft} focus={action} />
+  const { draft, action, compose } = useLocalSearchParams<{ draft?: string; action?: string; compose?: string }>()
+  return <ChatScreen botId={null} name="Coordinator" draft={draft} focus={action} compose={compose === '1'} />
 }

@@ -36,6 +36,7 @@ import { decide, runDomains, runPolicy } from "./permissions";
 import { startPublicEgress, type PublicEgress } from "./agents/public-egress";
 import { matchesRunSandboxDomain } from "./agents/run-sandbox-launcher";
 import { GITHUB_CREDENTIAL_SCRIPT } from './agents/github-runtime';
+import { removeRunCredentials } from "./run-scratch";
 
 const exec = promisify(execFile);
 const image = HOSTED_NATIVE_IMAGE;
@@ -394,7 +395,11 @@ export async function createHostedBotRunner(host: {
             if (existsSync(resourceFile)) await removeResource(resourceFile, resource);
           } finally {
             try { await brokerClosed; }
-            finally { offRevoke(); }
+            finally {
+              offRevoke();
+              // The session's runtime-home and GitHub config hold no credential once it closes.
+              removeRunCredentials(host.stateDir, assignment.runId);
+            }
           }
         });
         if (computerGrant) host.computerBroker?.revoke(computerGrant.token);
