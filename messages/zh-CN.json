@@ -177,7 +177,18 @@
       "connected": "已连接",
       "notConnected": "未连接",
       "paused": "已暂停"
-    }
+    },
+    "builtIn": "内置",
+    "popular": "热门",
+    "latest": "新品推荐",
+    "showAll": "查看全部{name}",
+    "appMenu": "{name} 的操作",
+    "connectApp": "连接 {name}",
+    "manage": "管理",
+    "storeLoadFailed": "暂时无法加载应用目录。",
+    "loadingApps": "正在加载应用…",
+    "noConnections": "还没有连接的应用",
+    "openStore": "打开插件"
   },
   "Auth": {
     "haveAccount": "已经有账号？",

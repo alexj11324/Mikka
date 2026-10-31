@@ -178,7 +178,7 @@
     "test:model-admission-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/store.db.test.ts lib/model-admission/subscription.db.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/revocation-postpay.db.test.ts",
     "test:release-security": "node --test scripts/release/security.test.mjs scripts/ops/monitor.test.mjs scripts/ops/recovery-failures.test.mjs scripts/ops/deployment-regression.test.mjs scripts/ops/runtime-outcomes.test.mjs",
     "test:ops-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/ops/monitor.db.test.ts",
-    "test:plugins": "node --import tsx --test lib/plugins/plugins.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/plugins/routes.test.ts",
+    "test:plugins": "node --import tsx --test lib/plugins/plugins.test.ts lib/plugins/store-state.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/plugins/routes.test.ts",
     "test:plugins-db": "node --import tsx --test lib/plugins/store.db.test.ts"
   },
   "dependencies": {
