@@ -4,8 +4,12 @@ export const COMPOSIO_AUTH_CALLBACK_PATH = '/api/integrations/composio/callback'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const internalOrigin = 'https://mikka.invalid'
-/** Apps with a page on 插件 and 设置 › 连接 (`&app=`). */
-const PLUGIN_APPS: readonly string[] = ['gmail', 'googlecalendar', 'notion', 'slack', 'github', 'linear', 'telegram']
+/**
+ * An app with a page on 插件 and 设置 › 连接 (`&app=`): any store app, so a
+ * toolkit slug in the catalog's shape (lib/composio-accounts.ts TOOLKIT_SLUG).
+ * Only the shape is allowed; the value is never a URL or a path.
+ */
+const isPluginApp = (value: string) => /^[a-z][a-z0-9_]{0,63}$/.test(value)
 
 function hasOnlyQueryKeys(url: URL, allowed: readonly string[]) {
   const entries = [...url.searchParams.entries()]
@@ -37,7 +41,7 @@ export function safeAuthReturn(value?: string) {
     // The plugins page and one app's page there (?section=plugins&app=gmail).
     const app = url.searchParams.get('app')
     if (url.searchParams.get('section') === 'plugins' && hasOnlyQueryKeys(url, ['section', 'app'])) {
-      return app === null ? '/?section=plugins' : PLUGIN_APPS.includes(app) ? `/?section=plugins&app=${app}` : '/'
+      return app === null ? '/?section=plugins' : isPluginApp(app) ? `/?section=plugins&app=${app}` : '/'
     }
     const issue = url.searchParams.get('issue')
     return hasOnlyQueryKeys(url, ['issue']) && issue && uuidPattern.test(issue) ? `/?issue=${issue}` : value === '/' ? '/' : '/'
@@ -47,7 +51,7 @@ export function safeAuthReturn(value?: string) {
     const section = url.searchParams.get('section')
     // 设置 › 连接 also opens one app's page (&app=github), like the plugins page.
     const app = url.searchParams.get('app')
-    const appOk = app === null || ((section === 'connections' || section === 'integrations') && PLUGIN_APPS.includes(app))
+    const appOk = app === null || ((section === 'connections' || section === 'integrations') && isPluginApp(app))
     return hasOnlyQueryKeys(url, ['section', 'workspace', 'app']) &&
       (section === null || isSettingsSectionParam(section)) && appOk &&
       optionalUuid(url, 'workspace') ? `${url.pathname}${url.search}` : '/'
