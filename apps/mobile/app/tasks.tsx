@@ -1,8 +1,7 @@
 import { Pressable, RefreshControl, SectionList, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUpRight, Circle, CircleCheck, CircleDashed, CircleDot, CircleX } from 'lucide-react-native'
-import { useDrawer } from '@/components/Drawer'
-import { MenuIcon, Spinner } from '@/components/icons'
+import { Spinner } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -31,14 +30,13 @@ function TaskIcon({ status }: { status: string }) {
 
 /** 任务: a list grouped by status; no board on mobile (mobile.md, out of scope). */
 export default function TasksScreen() {
-  const drawer = useDrawer()
   const insets = useSafeAreaInsets()
   const { data, error, loading, reload } = useApi<{ tasks: Task[] }>('/api/mobile/tasks', 30_000)
   const refresh = useRefresh(reload)
   const sections = SECTIONS.map(s => ({ title: s.title, data: (data?.tasks ?? []).filter(t => s.status.includes(t.status)) })).filter(s => s.data.length)
   return (
     <View style={styles.screen}>
-      <NavBar left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }} title="任务" />
+      <NavBar title="任务" />
       <SectionList
         sections={sections}
         keyExtractor={t => t.id}

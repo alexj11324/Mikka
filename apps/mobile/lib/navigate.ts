@@ -1,18 +1,21 @@
 import { router, type Href } from 'expo-router'
 
+/** A chat's path: the Coordinator's or a bot's. */
+export const chatPath = (botId: string | null) => `/bots/${botId ?? 'coordinator'}`
+
 /**
- * Goes to a drawer screen (a chat, 建议, 线程, 任务), starting the stack over
- * there, as picking a chat does in ChatGPT and Claude: Back and the edge swipe
- * never lead to a screen the person already left through the drawer. Closes
- * 设置 too when it is open.
+ * Opens a chat over 对话, from anywhere (a push, 新线程, a 建议 item): the stack
+ * starts over at the bot list, so Back and the edge swipe return there and
+ * never to a screen the person had left.
  */
-export function switchTo(href: Href) {
+export function openChat(href: Href) {
   if (router.canDismiss()) router.dismissAll()
-  router.replace(href)
+  router.navigate('/chats')
+  router.push(href)
 }
 
-/** Where a tapped push opens (lib/push-route.ts): a thread is pushed over the chat; a chat becomes the screen. */
+/** Where a tapped push opens (lib/push-route.ts): a thread is pushed over what is open; a chat opens over 对话. */
 export function openPush(href: string) {
-  if (href.startsWith('/threads/')) router.push(href as Href)
-  else switchTo(href as Href)
+  if (href.startsWith('/thread/')) router.push(href as Href)
+  else openChat(href as Href)
 }

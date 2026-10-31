@@ -1,8 +1,15 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import * as Clipboard from 'expo-clipboard'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 import { Animated, Image, PanResponder, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
-import { CircleAlert } from 'lucide-react-native'
+import { Check, CircleAlert, Copy, Reply } from 'lucide-react-native'
 import { StatusIcon } from '@/components/icons'
+import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
+import { tap } from '@/lib/haptics'
+import { splitQuoted } from '@/lib/quote'
 import { authHeaders } from '@/lib/api'
 import { API_URL } from '@/lib/config'
 import type { ThreadStatus } from '@/lib/types'
@@ -15,12 +22,14 @@ export function BotBubble({ children }: { children: ReactNode }) {
 
 /** The person's words sit in the blue bubble (R-14); photos they sent sit above it, as in Messages. */
 export function MyBubble({ text, photos }: { text: string; photos?: ImageURISource[] }) {
+  const { quoted, words } = splitQuoted(text)
   return (
     <View style={styles.mine}>
       {photos?.length ? <Photos photos={photos} /> : null}
       {text ? (
         <View style={[styles.myBubble, { maxWidth: '100%' }]}>
-          <Text selectable style={[styles.body, { color: '#fff' }]}>{text}</Text>
+          {quoted ? <Text selectable numberOfLines={3} style={styles.quoted}>{quoted}</Text> : null}
+          {words ? <Text selectable style={[styles.body, { color: '#fff' }]}>{words}</Text> : null}
         </View>
       ) : null}
     </View>
@@ -115,12 +124,64 @@ export function useTimeReveal() {
   return { offset, handlers: responder.panHandlers }
 }
 
-export function TimedRow({ time, offset, children, align = 'left' }: { time?: string; offset: Animated.Value; children: ReactNode; align?: 'left' | 'right' }) {
+/** How far a message is dragged right before letting go quotes it. */
+const QUOTE_AT = 56
+
+/**
+ * A message row. Dragging it from left to right (not from the screen's edge,
+ * which stays the system's swipe back) pulls the message along with a reply
+ * arrow behind it; letting go past the mark quotes it in the composer, with a
+ * tick, as in iMessage and Claude. A spring takes it back on the UI thread.
+ */
+export function TimedRow({ time, offset, children, align = 'left', onQuote }: { time?: string; offset: Animated.Value; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void }) {
+  const drag = useSharedValue(0)
+  const quote = useCallback(() => { tap(); onQuote?.() }, [onQuote])
+  const pan = Gesture.Pan()
+    .enabled(Boolean(onQuote))
+    // Rightward only, and not from the edge: the first 28 points belong to swipe back.
+    .activeOffsetX([-10000, 12])
+    .failOffsetY([-12, 12])
+    .hitSlop({ left: -28 })
+    .onUpdate(event => { drag.value = Math.max(0, Math.min(QUOTE_AT * 1.4, event.translationX * 0.8)) })
+    .onEnd(() => {
+      if (drag.value >= QUOTE_AT) scheduleOnRN(quote)
+      drag.value = withSpring(0, { damping: 22, stiffness: 260 })
+    })
+  const moved = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }] }))
+  const arrow = useAnimatedStyle(() => ({ opacity: Math.min(1, drag.value / QUOTE_AT), transform: [{ scale: 0.6 + 0.4 * Math.min(1, drag.value / QUOTE_AT) }] }))
   return (
-    <Animated.View style={{ transform: [{ translateX: offset }], alignItems: align === 'right' ? 'flex-end' : 'stretch' }}>
-      {children}
-      {time ? <Text style={styles.time}>{time}</Text> : null}
-    </Animated.View>
+    <GestureDetector gesture={pan}>
+      <Reanimated.View>
+        <Reanimated.View style={[styles.quoteArrow, arrow]} pointerEvents="none">
+          <Symbol name="arrowshape.turn.up.left" size={16} color={colors.secondary} web={<Reply size={16} color={colors.secondary} />} />
+        </Reanimated.View>
+        <Reanimated.View style={moved}>
+          <Animated.View style={{ transform: [{ translateX: offset }], alignItems: align === 'right' ? 'flex-end' : 'stretch' }}>
+            {children}
+            {time ? <Text style={styles.time}>{time}</Text> : null}
+          </Animated.View>
+        </Reanimated.View>
+      </Reanimated.View>
+    </GestureDetector>
+  )
+}
+
+/**
+ * Copy under a bot's reply, as in ChatGPT and Claude: the reply's words go to
+ * the clipboard and the icon turns into a tick for a moment.
+ */
+export function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    await Clipboard.setStringAsync(text)
+    tap()
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={copied ? '已复制' : '复制'} hitSlop={10} onPress={() => void copy()} style={styles.copy}>
+      <Symbol name={copied ? 'checkmark' : 'doc.on.doc'} size={15} color={colors.secondary} web={copied ? <Check size={15} color={colors.secondary} /> : <Copy size={15} color={colors.secondary} />} />
+    </Pressable>
   )
 }
 
@@ -128,6 +189,7 @@ const styles = StyleSheet.create({
   body: { fontSize: 16, lineHeight: 25 },
   botBubble: { alignSelf: 'flex-start', maxWidth: '86%', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11 },
   myBubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.accent, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
+  quoted: { fontSize: 14, lineHeight: 20, color: 'rgba(255,255,255,0.75)', borderLeftWidth: 2, borderLeftColor: 'rgba(255,255,255,0.6)', paddingLeft: 8, marginBottom: 6 },
   mine: { alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '78%', gap: 4 },
   photos: { alignItems: 'flex-end', gap: 4 },
   photo: { width: 160, borderRadius: 18, backgroundColor: colors.bubble },
@@ -138,4 +200,6 @@ const styles = StyleSheet.create({
   threadTitle: { flex: 1, fontSize: 16, fontWeight: '500' },
   event: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 17, color: colors.secondary, marginHorizontal: 24 },
   time: { position: 'absolute', right: -REVEAL + 6, bottom: 4, fontSize: 11, color: colors.tertiary },
+  quoteArrow: { position: 'absolute', left: 4, top: 0, bottom: 0, justifyContent: 'center' },
+  copy: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 6, marginTop: 2 },
 })

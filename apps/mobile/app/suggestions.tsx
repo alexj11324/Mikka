@@ -1,12 +1,11 @@
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useDrawer } from '@/components/Drawer'
-import { MenuIcon, SourceIcon, Spinner } from '@/components/icons'
+import { SourceIcon, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { shortWhen } from '@/lib/clock'
 import type { Suggestion, Suggestions } from '@/lib/types'
-import { switchTo } from '@/lib/navigate'
+import { openChat } from '@/lib/navigate'
 import { useApi, useRefresh } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
 
@@ -19,16 +18,15 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
  * (R-21, R-45). Tapping one hands it to the Coordinator, as on the web.
  */
 export default function SuggestionsScreen() {
-  const drawer = useDrawer()
   const insets = useSafeAreaInsets()
   const { data, error, loading, reload } = useApi<Suggestions>(`/api/suggestions?tz=${encodeURIComponent(timeZone)}`)
   const refresh = useRefresh(reload)
   const items = (data?.groups ?? []).flatMap(group => group.items).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
-  const arrange = (item: Suggestion) => switchTo({ pathname: '/', params: { draft: [`${VERB[item.action] ?? ''}：${item.title}`, item.url].filter(Boolean).join('\n') } })
+  const arrange = (item: Suggestion) => openChat({ pathname: '/bots/[id]', params: { id: 'coordinator', draft: [`${VERB[item.action] ?? ''}：${item.title}`, item.url].filter(Boolean).join('\n') } })
 
   return (
     <View style={styles.screen}>
-      <NavBar left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }} title="建议" />
+      <NavBar title="建议" />
       <FlatList
         data={items}
         keyExtractor={item => item.id}

@@ -11,10 +11,10 @@ const id = (value: unknown) => typeof value === 'string' && UUID.test(value) ? v
 export function pushTarget(data: unknown): string {
   const fields = data && typeof data === 'object' ? data as Record<string, unknown> : {}
   const bot = id(fields.botId)
-  const chat = bot ? `/bots/${bot}` : '/'
+  const chat = `/bots/${bot ?? 'coordinator'}`
   const action = id(fields.pendingActionId)
   if (action) return `${chat}?action=${action}`
   const run = id(fields.runId)
-  if (run) return `/threads/${run}`
+  if (run) return `/thread/${run}`
   return chat
 }
