@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
+import { MotionConfig } from "motion/react"
 import { typingOrDialog } from "@/lib/shortcut-guard"
 
 function ThemeProvider({
@@ -17,7 +18,8 @@ function ThemeProvider({
       {...props}
     >
       <ThemeHotkey />
-      {children}
+      {/* Every motion component follows the OS reduced-motion setting, without its own useReducedMotion. */}
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
     </NextThemesProvider>
   )
 }
