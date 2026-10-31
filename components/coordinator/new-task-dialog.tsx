@@ -130,10 +130,10 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
               {own.length > 0 && <SelectGroup><SelectLabel>{tDevices('thisMachine')}</SelectLabel>{own.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudBotId={cloudBotId} /></SelectItem>)}</SelectGroup>}
             </SelectContent>
           </Select>
-          : <span className="flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}
+          : <span className="flex h-7 items-center gap-1.5 rounded-full bg-control px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}
         <ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
         <DialogTitle className="text-sm font-medium">{t('title')}</DialogTitle>
-        {project && <span className="flex h-6 max-w-40 items-center rounded-full border px-2 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}
+        {project && <span className="flex h-7 max-w-40 items-center rounded-full bg-control px-2.5 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}
       </div>
       <DialogDescription className="sr-only">{t('description')}</DialogDescription>
       <FieldGroup>
