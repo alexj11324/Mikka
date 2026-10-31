@@ -49,7 +49,7 @@ export function AppTile({ app, size = 'default', dim = false }: { app: PluginApp
   const Icon = APP_ICONS[app]
   // The brand mark on its own (R-74): no tile behind it, in the same slot and size as before so rows stay aligned.
   return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center', size === 'xl' ? 'size-14' : 'size-10', dim && 'opacity-50 grayscale')}>
-    <Icon className={size === 'xl' ? 'size-7' : 'size-4.5'} />
+    <Icon className={cn(size === 'xl' ? 'size-7' : 'size-4.5')} />
   </span>
 }
 
