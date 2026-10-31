@@ -23,7 +23,7 @@ it('starts computer review sync only for the registered device and cancels it on
     expect(deviceId).toBe('device-1')
     return requests.map(({ id, digest }) => ({ id, digest, approve: true }))
   } })
-  const daemon = await new Daemon({ dataDir: tempDir(), flavor: 'dev', link, credential: 'fixture', computerBroker: broker,
+  const daemon = await new Daemon({ dataDir: tempDir(), flavor: 'dev', agentSandbox: null, link, credential: 'fixture', computerBroker: broker,
     harnesses: [{ harness: 'mock', installed: true, version: 'test' }], quotaSource: null }).start()
   try {
     await daemon.syncWithServer()
@@ -50,7 +50,7 @@ it.each(['device.clearCredential', 'device.setCredential'] as const)('%s discard
     })
   } })
   const dataDir = tempDir()
-  const daemon = await new Daemon({ dataDir, flavor: 'dev', link, credential: 'fixture', computerBroker: broker,
+  const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link, credential: 'fixture', computerBroker: broker,
     harnesses: [{ harness: 'mock', installed: true, version: 'test' }], quotaSource: null }).start()
   try {
     await daemon.syncWithServer()

@@ -67,7 +67,7 @@ export function Header({ left, title, right, subtitle, style }: { left?: ReactNo
  * them), so a failed send loses nothing. Controlled when `value` and
  * `onChangeText` are passed.
  */
-export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight }: {
+export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false }: {
   placeholder: string
   onSend?: (text: string, attachments: Attachment[]) => boolean | void | Promise<boolean | void>
   initial?: string
@@ -78,6 +78,8 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   /** Float over the end of the list, the content fading out beneath it; `onHeight` reports its height so the list leaves room. */
   overlay?: boolean
   onHeight?: (height: number) => void
+  /** Open the keyboard on arrival (新线程, 新建, a 建议 draft). */
+  autoFocus?: boolean
 }) {
   const insets = useSafeAreaInsets()
   const [own, setOwn] = useState(initial)
@@ -137,7 +139,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
         <View style={styles.composerRow}>
           {attach ? <AttachMenu images={images < MAX_IMAGES} onPick={source => void pick(source)} /> : null}
           <Field style={styles.field}>
-            <TextInput value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline
+            <TextInput value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
               placeholderTextColor={colors.tertiary} style={[styles.input, sending && { color: colors.secondary }]} />
             <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: blocked || empty }} onPress={() => void send()} disabled={blocked}
               style={[styles.send, (blocked || empty) && { backgroundColor: colors.tertiary }]}>

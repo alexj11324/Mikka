@@ -66,3 +66,5 @@ Decided by Alex, 2026-10-28.
 - 「E2B」 as the cloud machine's name. It is **Mikka Cloud** in both languages,
   never translated; E2B names only the provider and its API key.
   Code identifiers may keep `harness`.
+- 「Mikka Cloud」 for the hosted model, or 「Mikka 默认」 for the cloud machine.
+  Mikka 默认 is a model, Mikka Cloud is a machine ([orchestration](orchestration.md) § 1).

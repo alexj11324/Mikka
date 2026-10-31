@@ -1,6 +1,6 @@
 import { type ComponentType, useMemo, useState } from 'react'
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, CircleCheck, Hand, List, LoaderCircle, Plus, SlidersHorizontal } from 'lucide-react-native'
 import { useDrawer } from '@/components/Drawer'
@@ -9,7 +9,8 @@ import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Dot } from '@/components/ui'
 import type { Thread, Threads } from '@/lib/types'
-import { useApi } from '@/lib/useApi'
+import { switchTo } from '@/lib/navigate'
+import { useApi, useRefresh } from '@/lib/useApi'
 import { colors, lift } from '@/lib/theme'
 
 // 待审阅 and 已归档 (Figma 03b) wait for the server to track reviews and archiving.
@@ -34,21 +35,26 @@ const rank = (thread: Thread) => (thread.status === 'waiting' ? 0 : thread.statu
 export default function ThreadsScreen() {
   const drawer = useDrawer()
   const router = useRouter()
+  // From a chat's 线程 button: pushed over that chat (back returns to it), showing that bot's threads.
+  const { bot } = useLocalSearchParams<{ bot?: string }>()
+  const pushed = router.canGoBack()
   const insets = useSafeAreaInsets()
-  const { data, loading, error } = useApi<Threads>('/api/mobile/threads', 10_000)
+  const { data, loading, error, reload } = useApi<Threads>('/api/mobile/threads', 10_000)
+  const refresh = useRefresh(reload)
   const [machine, setMachine] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [menu, setMenu] = useState(false)
 
   const list = useMemo(() => (data?.threads ?? [])
-    .filter(t => matches(t, filter) && (!machine || t.device?.id === machine))
-    .sort((a, b) => rank(a) - rank(b)), [data, filter, machine])
+    .filter(t => matches(t, filter) && (!machine || t.device?.id === machine) && (!bot || t.by === bot))
+    .sort((a, b) => rank(a) - rank(b)), [data, filter, machine, bot])
 
   return (
     <View style={styles.screen}>
       <NavBar
-        left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }}
-        title="线程"
+        left={pushed ? undefined : { icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }}
+        back={pushed ? () => router.back() : undefined}
+        title={bot ? `${bot} 的线程` : '线程'}
         right={{ icon: 'line.3.horizontal.decrease', label: '筛选', web: <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />, onOpen: () => setMenu(true),
           items: filters.map(f => ({ label: f.label, icon: f.symbol, on: filter === f.id, onPress: () => setFilter(f.id) })) }}
       />
@@ -56,6 +62,7 @@ export default function ThreadsScreen() {
         data={list}
         keyExtractor={t => t.id}
         {...underBar}
+        refreshControl={<RefreshControl {...refresh} />}
         contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
         ListHeaderComponent={
           <View>
@@ -80,7 +87,7 @@ export default function ThreadsScreen() {
       />
       <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 12) }]} pointerEvents="box-none">
         <View />
-        <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={styles.newThread}>
+        <Pressable accessibilityRole="button" onPress={() => switchTo({ pathname: '/', params: { compose: '1' } })} style={styles.newThread}>
           <Plus size={18} color="#fff" strokeWidth={2.4} />
           <Text style={styles.newThreadText}>新线程</Text>
         </Pressable>

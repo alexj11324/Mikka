@@ -1,5 +1,4 @@
-import { FlatList, Pressable, StyleSheet, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDrawer } from '@/components/Drawer'
 import { MenuIcon, SourceIcon, Spinner } from '@/components/icons'
@@ -7,7 +6,8 @@ import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { shortWhen } from '@/lib/clock'
 import type { Suggestion, Suggestions } from '@/lib/types'
-import { useApi } from '@/lib/useApi'
+import { switchTo } from '@/lib/navigate'
+import { useApi, useRefresh } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
 
 const VERB: Record<string, string> = { reply: '回复', review: '审阅', handle: '处理', read: '查看' }
@@ -20,11 +20,11 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
  */
 export default function SuggestionsScreen() {
   const drawer = useDrawer()
-  const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { data, error, loading } = useApi<Suggestions>(`/api/suggestions?tz=${encodeURIComponent(timeZone)}`)
+  const { data, error, loading, reload } = useApi<Suggestions>(`/api/suggestions?tz=${encodeURIComponent(timeZone)}`)
+  const refresh = useRefresh(reload)
   const items = (data?.groups ?? []).flatMap(group => group.items).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
-  const arrange = (item: Suggestion) => router.replace({ pathname: '/', params: { draft: [`${VERB[item.action] ?? ''}：${item.title}`, item.url].filter(Boolean).join('\n') } })
+  const arrange = (item: Suggestion) => switchTo({ pathname: '/', params: { draft: [`${VERB[item.action] ?? ''}：${item.title}`, item.url].filter(Boolean).join('\n') } })
 
   return (
     <View style={styles.screen}>
@@ -33,6 +33,7 @@ export default function SuggestionsScreen() {
         data={items}
         keyExtractor={item => item.id}
         {...underBar}
+        refreshControl={<RefreshControl {...refresh} />}
         ListHeaderComponent={<>
           {loading ? <View style={styles.center}><Spinner /></View> : null}
           {!loading && error ? <Text style={styles.note}>建议加载失败。</Text> : null}

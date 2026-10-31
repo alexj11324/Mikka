@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { agentImageQuery } from './agent-images'
-import { inlineMarkdown, isComponent, isImageQuery, openUIText, parseOpenUI, type Component } from './openui-lang'
+import { inlineMarkdown, isComponent, isImageQuery, isOpenUI, openUIText, parseOpenUI, splitOpenUI, type Component } from './openui-lang'
 
 const WELCOME = 'root = Stack([TextContent("你好，Alex！我是你的 Coordinator。"), BeQuestions("刚开始使用", [{id:"start", title:"想先从哪里开始？", options:[{value:"a", label:"整理收件箱"}, {value:"b", label:"看看今天的日程"}], allowCustom:true}])])'
 
@@ -57,4 +57,13 @@ test('image search words: the same rule as the server\'s agentImageQuery', () =>
   for (const query of ['Forbidden City', '  故宫  ', 'a', ' a ', 'x'.repeat(160), 'x'.repeat(161), 'line\nbreak', '<b>', 'see https://a.b', 'HTTP://A.B', 'http:/ok']) {
     assert.equal(isImageQuery(query), agentImageQuery.safeParse(query).success, JSON.stringify(query))
   }
+})
+
+test('a reply that opens with prose and then assigns root is a card, with its prose kept', () => {
+  const text = '北京和香港各挑几处。\n\nroot = Stack([TextContent("北京")])'
+  assert.deepEqual(splitOpenUI(text), { prose: '北京和香港各挑几处。', source: 'root = Stack([TextContent("北京")])' })
+  assert.equal(isOpenUI(text), true)
+  assert.ok(parseOpenUI(text))
+  assert.equal(isOpenUI('先看例子：\n```\nroot = Stack([])\n```'), false)
+  assert.equal(isOpenUI('the root = cause'), false)
 })

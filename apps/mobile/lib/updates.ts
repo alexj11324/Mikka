@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { AppState } from 'react-native'
+import Constants from 'expo-constants'
 import * as Updates from 'expo-updates'
 
 let fetching = false
@@ -34,3 +35,16 @@ export function useUpdateReady(): boolean {
 }
 
 export const restartToUpdate = () => { void Updates.reloadAsync() }
+
+/**
+ * 设置 › 版本: the app version and native build, and when the running update
+ * was published if it is not the one built in, e.g. 「1.0.0 (6) · 10-31 22:51」.
+ */
+export function versionLabel() {
+  const build = Constants.platform?.ios?.buildNumber
+  const base = [Constants.expoConfig?.version ?? '', build ? `(${build})` : ''].filter(Boolean).join(' ')
+  if (!Updates.isEnabled || Updates.isEmbeddedLaunch || !Updates.createdAt) return base
+  const at = Updates.createdAt
+  const two = (n: number) => String(n).padStart(2, '0')
+  return `${base} · ${two(at.getMonth() + 1)}-${two(at.getDate())} ${two(at.getHours())}:${two(at.getMinutes())}`
+}

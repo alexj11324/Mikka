@@ -2,7 +2,7 @@ import '../global.css'
 
 import { useEffect } from 'react'
 import { Platform, View } from 'react-native'
-import { Stack, useRouter, type Href } from 'expo-router'
+import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
@@ -12,6 +12,7 @@ import { Spinner } from '@/components/icons'
 import { SignIn } from '@/components/SignIn'
 import { authClient } from '@/lib/auth'
 import { HomeProvider } from '@/lib/home'
+import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
 
 export default function RootLayout() {
@@ -50,15 +51,14 @@ function SessionGate() {
  * app asks after the Coordinator's first message of its own, or from 通知.
  */
 function PushSetup() {
-  const router = useRouter()
   useEffect(() => {
     if (Platform.OS === 'web') return
     let cleanup: (() => void) | undefined
     let gone = false
     void import('@/lib/push').then(push => {
-      if (!gone) cleanup = push.watchPushes(href => router.push(href as Href))
+      if (!gone) cleanup = push.watchPushes(openPush)
     })
     return () => { gone = true; cleanup?.() }
-  }, [router])
+  }, [])
   return null
 }

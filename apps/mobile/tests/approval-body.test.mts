@@ -16,6 +16,8 @@ mock.module(require.resolve('lucide-react-native'), { namedExports: { CalendarCl
 stub('../components/Text.tsx', { Text })
 stub('../components/cards.tsx', { ChatCard: View, Field: View, CardButton: ({ label }: { label: string }) => createElement('button', null, label), cardText: {} })
 stub('../lib/api.ts', { api: async () => {}, ApiError: class extends Error {} })
+stub('../components/Symbol.tsx', { Symbol: () => null })
+stub('../lib/haptics.ts', { tap: () => {} })
 stub('../lib/theme.ts', { colors: { ink: '#000', secondary: '#333' } })
 const { PendingActions } = await import('../components/PendingActions')
 
