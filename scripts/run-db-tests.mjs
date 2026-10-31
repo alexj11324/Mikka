@@ -72,6 +72,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/model-admission/store.ts', file: 'lib/model-admission/store.db.test.ts', script: 'test:model-admission-db' },
   { marker: 'lib/model-admission/runtime.ts', file: 'lib/model-admission/revocation-postpay.db.test.ts', script: 'test:model-admission-db' },
   { marker: 'lib/audit/export.ts', file: 'lib/audit/export.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/audit/retention.ts', file: 'lib/audit/retention.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-jobs.db.test.ts', script: 'test:account-db' },
   { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-restore.db.test.ts', script: 'test:account-db' },
 ]

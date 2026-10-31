@@ -13,7 +13,7 @@ test('every action maps to a known category and security is reachable', () => {
   assert.equal(auditCategory('token.created'), 'security')
   assert.equal(auditCategory('secret.replaced'), 'secret')
   assert.equal(auditCategory('member.role_changed'), 'member')
-  assert.deepEqual(Object.keys(AUDIT_ACTIONS).filter(action => auditCategory(action as keyof typeof AUDIT_ACTIONS) === 'permission').sort(), ['bot.permissions_changed', 'integration.permission_changed', 'team.access_changed'])
+  assert.deepEqual(Object.keys(AUDIT_ACTIONS).filter(action => auditCategory(action as keyof typeof AUDIT_ACTIONS) === 'permission').sort(), ['bot.permissions_changed', 'integration.permission_changed', 'model.policy_changed', 'team.access_changed'])
   assert.deepEqual(new Set(Object.values(AUDIT_ACTIONS)), new Set(AUDIT_CATEGORIES))
 })
 
