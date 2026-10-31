@@ -4,10 +4,11 @@ import { useEffect } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useSearchParams } from 'next/navigation'
 import type { WorkspaceSettings } from '@/lib/workspace-access'
+import { prefetchConnectedApps } from '@/lib/settings-prefetch'
 import { fetchSettingsData, fetchTeamDirectory, fetchTeamMembers, memberSettingsKey, settingsReadOptions, teamDirectoryKey, teamMembersKey } from '@/lib/settings-data'
 
 export function SettingsDataPreloader({ workspaceId, onWorkspaceResolved }: { workspaceId?: string; onWorkspaceResolved: (id: string) => void }) {
-  const { mutate } = useSWRConfig()
+  const { mutate, cache } = useSWRConfig()
   const teamId = useSearchParams().get('team')
   useSWR(teamId ? teamMembersKey(teamId) : null, fetchTeamMembers, settingsReadOptions)
   const { data: members } = useSWR(memberSettingsKey(workspaceId), fetchSettingsData<WorkspaceSettings>, { ...settingsReadOptions, refreshInterval: 60000 })
@@ -19,6 +20,8 @@ export function SettingsDataPreloader({ workspaceId, onWorkspaceResolved }: { wo
     if (directory) void mutate(teamDirectoryKey(directory.workspace.id), directory, { revalidate: false })
     if (members && directory && members.workspace.id === directory.workspace.id) onWorkspaceResolved(members.workspace.id)
   }, [workspaceId, members, directory, mutate, onWorkspaceResolved])
+
+  useEffect(() => prefetchConnectedApps(cache), [cache])
 
   return null
 }

@@ -25,8 +25,8 @@ be supplied in request bodies; all row operations include the authenticated owne
 | `POST /api/skills` | `{source:"owner/repository",slug:"skill-name"}` from a skills.sh search result | `{skill}`; repeated installation returns the existing pinned version |
 | `PATCH /api/skills` | `{id,enabled}` | `{skill}` |
 | `DELETE /api/skills` | `{id}` | `{deleted:true}` |
-| `GET /api/integrations/composio/catalog` | — | `{configured,apps}`; id, provider name/description/icon, supported auth kinds and allowed Mikka action names |
-| `POST /api/integrations/composio` | existing `{toolkit,returnTo?}` | Accepts any current catalog toolkit through the existing Composio hosted connection flow |
+| `GET /api/integrations/composio/catalog` | — | `{configured,apps,popular,latest,categories}`; each app has id, name, one-line description, icon, Composio categories and created date; `popular`, `latest` and each category list app ids |
+| `POST /api/integrations/composio` | existing `{toolkit,returnTo?}` | Accepts any store toolkit (Composio-managed auth) through the existing Composio hosted connection flow |
 
 MCP accepts public HTTPS hostnames on port 443. Credentials in URL userinfo or
 query strings are refused. Authentication headers are Authorization, X-API-Key,
@@ -80,17 +80,35 @@ SDK or Workflow retries. Lost/invalid responses after dispatch return
 `mcpOutcomeUnknown`, rather than claiming failure or retrying a possible effect.
 Literal saved authentication values are masked from remote results.
 
-## Supported application directory
+## Store directory (decision 2026-10-31)
 
-Composio supplies current metadata. The catalog filters it against Mikka's
-registered action allowlists: Gmail, Google Calendar, Notion, Slack and Google
-Drive. Google Drive exposes `list_drive_files` (`GOOGLEDRIVE_LIST_FILES`) only.
-Its query and pagination map to the provider's `q`, `pageSize`, `pageToken`.
-No arbitrary provider action or account id becomes executable. Existing account
-ownership/default selection, disabled-account checks and pinned action versions
-still apply. Google Drive is accepted by the existing workspace app-policy API
-and enforced for named Bots; its settings row belongs to the frontend follow-up.
-GitHub, Linear and Telegram retain their existing native connection paths.
+The 插件 store lists every Composio toolkit a person can connect with
+Composio-managed auth, read from Composio v3 `GET /toolkits?sort_by=usage`
+and cached for an hour per server (`lib/plugins/catalog.ts`). Toolkits that
+need the person's own credentials (no managed auth), no-auth and local
+toolkits are left out for now. Composio's copies of GitHub and Linear are left
+out: Mikka's own GitHub, Linear and Telegram connections keep their native
+paths. 热门 is the first twelve in Composio's usage order, 新品推荐 the twelve
+with the newest `meta.created_at`, and categories are Composio's own; Mikka
+ranks nothing itself.
+
+Connections stay per person (R-35 decision 2026-10-31). A workspace admin can
+turn any store app off for the workspace's Bots through the app-policy API.
+
+Bots and the Coordinator reach a connected store app through two generic tools
+(`lib/app-tools.ts`), not hand-written actions: `list_app_tools` lists the
+toolkit's Composio tools (with `readOnly` from `readOnlyHint`), and
+`call_app_tool` runs one, pinned to its version, in the person's own account.
+Reads run at once. A write follows R-77: an explicit setting in the person's or
+workspace's external-write settings, keyed by the lower-case tool slug or the
+toolkit slug, wins (a workspace setting only narrows); otherwise the shared
+write judge (`lib/operations/write-judgment.ts`: the Decisions API, given the
+tool's MCP hints and the concrete arguments) decides. A call it judges
+destructive becomes an approval card (`pending_actions.action =
+'app_tool_call'`), and so does a call it cannot judge. Every other write runs directly and leaves a
+`pending_actions` record; an unclear outcome stays `running` and is never
+resent. The hand-written Gmail, Calendar, Notion, Slack and Drive tools are
+unchanged.
 
 ## Validation
 

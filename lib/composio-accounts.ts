@@ -40,17 +40,19 @@ type ComposioAccountLike = {
   toolkit: { slug: string }
 }
 
-function isAppId(value: string): value is ComposioToolkitId {
-  return (COMPOSIO_TOOLKIT_IDS as readonly string[]).includes(value)
-}
+/** A Composio toolkit slug as the catalog lists them (lower case, digits, `_`). */
+export const TOOLKIT_SLUG = /^[a-z][a-z0-9_]{0,63}$/
+export const isToolkitSlug = (value: unknown): value is string => typeof value === 'string' && TOOLKIT_SLUG.test(value)
+/** Mikka's own integrations. The store and account lists show ours, never a Composio copy of them. */
+export const OWN_INTEGRATIONS: ReadonlySet<string> = new Set(['github', 'linear', 'telegram'])
 
 /**
- * The account as the page shows it, or null when it is not one of our apps or
- * not a real account yet. Only these fields leave the server; credentials in
+ * The account as the page shows it, or null when its toolkit is malformed or
+ * one of Mikka's own integrations, or it is not a real account yet. Only these fields leave the server; credentials in
  * `state` and `data` never do.
  */
-export function toConnectedAccountView(account: ComposioAccountLike): ConnectedAccountView<ComposioToolkitId> | null {
-  if (!isAppId(account.toolkit.slug) || HIDDEN_STATUSES.has(account.status)) return null
+export function toConnectedAccountView(account: ComposioAccountLike): ConnectedAccountView<string> | null {
+  if (!isToolkitSlug(account.toolkit.slug) || OWN_INTEGRATIONS.has(account.toolkit.slug) || HIDDEN_STATUSES.has(account.status)) return null
   const alias = account.alias?.trim() || null
   return { id: account.id, toolkit: account.toolkit.slug, status: account.status, enabled: !account.isDisabled, alias, createdAt: account.createdAt, email: null, isDefault: false }
 }
@@ -80,10 +82,10 @@ export type ComposioAccountRecord = {
 }
 
 /** Adds what Mikka stores (email, chosen default) to the accounts Composio listed. */
-export function withAccountRecords(accounts: ConnectedAccountView<ComposioToolkitId>[], records: ComposioAccountRecord[]): ConnectedAccountView<ComposioToolkitId>[] {
+export function withAccountRecords(accounts: ConnectedAccountView<string>[], records: ComposioAccountRecord[]): ConnectedAccountView<string>[] {
   const byId = new Map(records.map(record => [record.accountId, record]))
   const defaults = new Map<string, string | null>()
-  for (const app of COMPOSIO_TOOLKIT_IDS) {
+  for (const app of new Set(accounts.map(account => account.toolkit))) {
     const own = accounts.filter(account => account.toolkit === app)
     const chosen = records.find(record => record.isDefault && (record.toolkit === app || own.some(account => account.id === record.accountId)))?.accountId
     defaults.set(app, pickDefaultAccountId(own.map(account => ({ ...account, isDisabled: !account.enabled })), chosen))

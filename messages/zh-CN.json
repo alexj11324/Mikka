@@ -159,7 +159,7 @@
     "skillsTab": "技能",
     "searchAria": "搜索 skills.sh 技能",
     "searchPlaceholder": "搜索技能…",
-    "trending": "热门技能",
+    "leaderboard": "排行榜",
     "results": "搜索结果",
     "loading": "正在加载技能目录…",
     "loadFailed": "暂时无法加载 skills.sh 技能目录。",
@@ -2694,7 +2694,10 @@
       "site": "网站",
       "approveClear": "清空登录字段",
       "approveSubmit": "提交登录",
-      "approveBrowser": "批准操作"
+      "approveBrowser": "批准操作",
+      "app": "应用",
+      "arguments": "内容",
+      "approveRun": "执行"
     },
     "working": "Coordinator 正在处理…",
     "loadError": "对话加载失败，正在重试。",
