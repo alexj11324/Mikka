@@ -12,7 +12,7 @@ test('actual tool adapter keeps host owner/Bot/scope and requires both rollout f
  try{
  delete process.env.MIKKA_FACTORY_ROUTING_ENABLED;process.env.MIKKA_ISSUE_TOOLS_ENABLED='1'
  assert.equal(registry.createCoordinatorRegistry('owner','bot').intake_factory_request,undefined)
- process.env.MIKKA_FACTORY_ROUTING_ENABLED='1';delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+ process.env.MIKKA_FACTORY_ROUTING_ENABLED='1';process.env.MIKKA_ISSUE_TOOLS_ENABLED='0'
  assert.equal(registry.createCoordinatorRegistry('owner','bot').intake_factory_request,undefined)
  process.env.MIKKA_ISSUE_TOOLS_ENABLED='1'
  const scope={holder:'host',turnId:'turn',callId:'call'},input={title:'Task',body:'',sourceEventId:randomUUID(),rationale:'User asked',missingInformation:[],missingPermissions:[],needsSpec:false}
