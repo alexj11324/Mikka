@@ -13,7 +13,8 @@ import (
 
 const expiry = "2030-01-01T00:00:00Z"
 
-func fixtureScope(provider string) Scope { return Scope{"alice", "workspace-a", newID(), provider} }
+// Persisted fixtures use real workspace UUIDs, including workspace-deletion guards.
+func fixtureScope(provider string) Scope { return Scope{"alice", newID(), newID(), provider} }
 func fixturePayload(provider, suffix string) map[string]any {
 	p := map[string]any{"type": provider, "access_token": "fixture-" + provider + "-access-" + suffix, "refresh_token": "fixture-" + provider + "-refresh-" + suffix, "id_token": "fixture-" + provider + "-id-" + suffix, "email": "fixture@example.invalid", "expired": expiry, "last_refresh": "2026-10-24T00:00:00Z"}
 	if provider == "codex" {
