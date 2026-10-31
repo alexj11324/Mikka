@@ -87,3 +87,23 @@ Real OAuth/model/SaaS and end-to-end provider fault-matrix acceptance remain
 unexecuted according to the owner's instructions and belong to #181. No new
 retention UI, legal retention period, SIEM platform or future event catalogue is
 introduced by this closeout.
+
+
+## Isolated credential-broker runtime
+
+PR #660's `isolation` job124598591122 exposed a real packaging regression: the
+CredentialStore's new audit import pulled the app-only `record.ts` facade and
+its default database into the broker, causing esbuild's `server-only` resolution
+failure. The shared transaction writer now lives in `lib/audit/write.ts` with
+only the audit schema/events and a type-only Drizzle executor dependency.
+`record.ts` retains its existing exports, default-database helper and server
+boundary; CredentialStore and AgentToolApprovalStore use the shared writer.
+Every original transaction audit remains mandatory. No marker shim, external
+exception, guard or CI skip was introduced.
+
+The existing broker build's exact entry points and options were exercised with
+`write:false` and `metafile:true`: `fill.js` and `oidc.js` both bundled,
+393 inputs / 2,970,748 output bytes, zero `server-only` or app DB index inputs.
+Existing dist/public artifacts were untouched. Log:
+`/tmp/mikka-audit210-broker-build.log`. The ordinary credential scripts also
+pass without the newly added app-only test loader, which has been removed.

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { recordAudit } from '@/lib/audit/record'
+import { recordAudit } from '@/lib/audit/write'
 import { lockCliRunPolicy, cliPolicyGuard, realCliMembershipGuard, type CliMembershipGuard } from './policy-store'
 import { writeTransaction } from '@/lib/operations/write-transaction'
 

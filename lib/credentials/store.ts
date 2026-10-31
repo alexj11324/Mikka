@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { recordAudit } from '../audit/record'
+import { recordAudit } from '../audit/write'
 import { canonicalOrigin, CredentialError, type Actor, type BrowserCaller, type Envelope } from './contracts'
 import { seal, type Kms } from './kms'
 import { fingerprint } from './fingerprint'
