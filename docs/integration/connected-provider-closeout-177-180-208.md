@@ -2,7 +2,9 @@
 
 Recorded 2026-10-31 UTC. Scope is the existing older issues, with AGENTS.md's
 default-on rule and existing authorization, account, KMS and execution fences.
-No OAuth grant, credential value, IAM resource or live external message was used.
+Implementation tests used no live credentials. The later authorized read-only
+resource preflight below used dedicated credentials only in process memory.
+No OAuth grant, IAM resource or live external message was created or changed.
 
 ## Fixed code and risk evidence
 
@@ -86,6 +88,45 @@ These fixture identities and receivers are not normal application accounts or
 live provider resources. No application browser, real OAuth flow, current-head
 Git-linked CI, production deployment or SaaS acceptance was claimed by this run.
 The integrating parent records those separately at the final merged revision.
+
+## Authorized read-only resource preflight
+
+2026-10-31 01:55–01:56 UTC, using the already configured Infisical Universal Auth
+identity. Login returned 200. Only the dedicated email/password keys in
+`Mikka Test Account Vault` / `dev:/test-account` and the Mikka
+`prod:/vercel/COMPOSIO_API_KEY` were fetched individually. Values and cookies
+remained in memory; no environment file or browser session file was written.
+
+- The provided frozen Production origin
+  `https://mikka-o70hhdy9f-mikka-dev.vercel.app`, associated by the parent with
+  `375d670937ca06c53e47f336870481d38520c1fe`, rejected sign-in with 401. A separate
+  unauthenticated GET returned a 302 Vercel authentication redirect. Neither
+  redirect was followed; no protection or application guard was bypassed.
+- On `https://app.aspectlylabs.com/mikka`, normal email/password sign-in returned
+  200, `get-session` returned 200, and the actual session matched the dedicated
+  identity with `emailVerified=true`. Normal same-origin sign-out returned 200.
+  The canonical domain is a moving deployment, so this does not replace fixed
+  current-head application acceptance.
+- Composio SDK listing used exactly that verified application user ID and
+  `accountType:PRIVATE`, without status filtering. One complete page contained
+  only **Slack** and **Notion** connections, both `ACTIVE`, enabled, with enabled
+  auth configurations. There were no Gmail or Calendar connections for this
+  dedicated identity.
+- Private connection metadata does not identify or authorize an acceptance
+  channel, page or recipient. No specific controlled target was established from
+  the permitted sources. No workspace content, other owner's connections, Slack
+  messages, Notion pages or mailbox contents were read. External writes: **0**.
+
+The locally retained sanitized log is `/tmp/mikka-provider-preflight-safe.log`;
+the parent received the exact dedicated user/connection IDs and request IDs
+privately. Do not publish account details or internal traces from that log.
+The preflight script is source-only at `/tmp/mikka-provider-preflight.mjs`.
+Node needed `--use-env-proxy` to honor the existing managed network path;
+direct Node fetch failed with ECONNREFUSED before any application login.
+
+Remaining resource gates are a fixed admitted application after integration,
+explicit controlled Slack/Notion targets, and authorized Gmail/Calendar linking
+for the two absent connections. No linking or external write was attempted.
 
 ## Provider contract references
 
