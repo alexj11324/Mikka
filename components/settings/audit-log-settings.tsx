@@ -4,7 +4,8 @@ import { useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import { useLocale, useTranslations } from 'next-intl'
 import { Download } from 'lucide-react'
-import { listAuditLog } from '@/app/actions/audit-log'
+import type { listAuditLog } from '@/app/actions/audit-log'
+import { settingsRead } from '@/lib/settings-read'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -37,7 +38,7 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
       if (previous && (previous.error || !previous.nextCursor)) return null
       return ['settings:audit', workspaceId, filter, index === 0 ? null : previous && !previous.error ? previous.nextCursor : null] as const
     },
-    ([, id, segment, cursor]) => listAuditLog({ filter: segment, cursor }, id),
+    ([, id, segment, cursor]) => settingsRead<Awaited<ReturnType<typeof listAuditLog>>>('audit', { workspace: id, filter: segment, cursor }),
     { revalidateFirstPage: false },
   )
   const failure = pages.data?.find(page => page.error)
