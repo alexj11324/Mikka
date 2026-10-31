@@ -17,6 +17,22 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
   convert at 100 points per dollar. The existing admin `workspaceUsage` read
   also exposes the hosted balance and state. Member usage remains scoped to
   their own bots.
+- `startPointsPurchase(workspaceId, amount)` is admin-only and returns a Stripe
+  Checkout URL for one of the server-approved dollar amounts. Checkout metadata
+  and line-item prices are server-owned; 100 points = USD 1. Returning to the
+  settings page never grants points; only a paid, verified webhook does.
+- `getCreditBilling(workspaceId?)` is admin-only and returns `balancePoints`
+  and the newest 50 `transactions`. The balance includes the remaining gift
+  and purchased points after settled usage and pending reservations, using the
+  same calculation as hosted-call admission. It can contain fractional points.
+  Each transaction has `id`, ISO `date`, `type` (`topup`, `verification`, or
+  `refund`), signed `points`, signed `amountCents`, `currency`, nullable
+  `stripeFeeCents`, `status` (`succeeded`), and nullable `receiptUrl`. Dollar
+  charges and refunds use integer USD cents. Refunds deduct points at the same
+  conversion; Stripe fees appear when supplied by Stripe. The one-time gift
+  has 100 points, a zero paid amount, and no receipt; its history remains after
+  spending and also includes the existing-workspace allowance. A verified card
+  that has already claimed its allowance does not create a second gift row.
 - States: `ready`, `verification_required`, `free_allowance_used`,
   `platform_paused`, `usage_in_progress`, `usage_cost_unavailable`. Model
   execution errors carry the stable code as their message/code, including
@@ -66,6 +82,16 @@ The workspace database migration snapshots existing workspace IDs once; lazy
 application-database initialization marks these verified and gives the same
 bounded USD 1 starting allowance without asking existing users to bind a card.
 Replaying the migration does not grandfather later workspaces.
+
+The deployed Stripe webhook endpoint must retain its existing event selection,
+including `setup_intent.succeeded` and subscription events, and additionally
+subscribe to `checkout.session.completed`,
+`checkout.session.async_payment_succeeded`, `charge.refunded`, and `refund.updated` for point
+purchases. Configure these on the existing signature-checked endpoint rather
+than replacing its subscriptions. Purchases are deduplicated by Checkout
+session and refunds by refund ID. Pending refunds are checked against Stripe's
+current state and leave the event retryable. A later successful `refund.updated`
+also applies the debit, including after the original event's retry window expires.
 
 Free credit is spent before purchased points; `plan` grants are ignored.
 One pending/unknown call per workspace bounds concurrent overdraft to the one
@@ -124,6 +150,9 @@ unchanged.
 `test:abuse-db` uses an isolated local PostgreSQL schema, actual migrations,
 concurrent card/admission/settlement calls, rolling-window behavior and signup
 uniqueness/rate limits. It is registered in the required DB inventory.
+`test:workspace-admin-db` also runs the point-purchase webhook and credit-history
+DB tests, including replayed events, refunds, tenant isolation, spent/reserved
+balances, and the one-time gift.
 Tests never use a production database, create a live Stripe charge or start an
 E2B sandbox. Required PR CI supplies the production build, full functionality
 and integration-branch performance acceptance.
