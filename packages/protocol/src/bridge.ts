@@ -226,6 +226,15 @@ export interface MikkaBridge {
     openExternal(url: string): Promise<void>
     /** Start a one-shot loopback listener and return its callback URL. */
     prepareAuth(state: string): Promise<string>
+    /**
+     * The version of an update already downloaded in the background, or null.
+     * Only a downloaded update is surfaced. Absent on older desktop builds.
+     */
+    updateReady?(): Promise<string | null>
+    /** Called once an update finishes downloading; returns an unsubscribe. */
+    onUpdateReady?(listener: (version: string) => void): () => void
+    /** Quits and installs the downloaded update. */
+    installUpdate?(): Promise<void>
   }
   /**
    * Login. The long-lived session token stays in the main process (macOS
