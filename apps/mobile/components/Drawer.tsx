@@ -2,11 +2,12 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, 
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { usePathname, useRouter, type Href } from 'expo-router'
-import { CodeXml, Inbox, ListChecks, PenLine, Search, X } from 'lucide-react-native'
+import { CircleArrowDown, CodeXml, Inbox, ListChecks, PenLine, Search, X } from 'lucide-react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { Dot, RoundButton } from '@/components/ui'
 import { useHome } from '@/lib/home'
+import { restartToUpdate, useUpdateReady } from '@/lib/updates'
 import { colors, font } from '@/lib/theme'
 
 type DrawerState = { open: () => void; close: () => void; isOpen: boolean }
@@ -52,6 +53,7 @@ function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
   const path = usePathname()
   const go = (href: Href) => { onNavigate(); setQuery(null); router.replace(href) }
   const { data } = useHome()
+  const updateReady = useUpdateReady()
   // 最近: newest chat first (mobile.md). Pinning is not on the server yet, so there is no 置顶 group.
   // Search filters the drawer by name, as ChatGPT iOS's drawer search does with its chats.
   const [query, setQuery] = useState<string | null>(null)
@@ -79,6 +81,7 @@ function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
         {shows('线程') ? <Row active={path.startsWith('/threads')} onPress={() => go('/threads')} icon={<CodeXml size={22} color={colors.ink} strokeWidth={1.8} />} label="线程"
           trailing={data?.threads.waiting ? <Dot /> : data?.threads.running ? <Text style={styles.count}>{data.threads.running} 运行中</Text> : null} /> : null}
         {shows('任务') ? <Row active={path === '/tasks'} onPress={() => go('/tasks')} icon={<ListChecks size={22} color={colors.ink} strokeWidth={1.8} />} label="任务" /> : null}
+        {updateReady && !needle ? <Row onPress={restartToUpdate} icon={<CircleArrowDown size={22} color={colors.ink} strokeWidth={1.8} />} label="重启以更新" /> : null}
         {nothing ? <Text style={styles.none}>没有找到「{query?.trim()}」。</Text> : null}
         {bots.length && !needle ? <Text style={styles.section}>最近</Text> : null}
         {bots.map(bot => (

@@ -3,10 +3,9 @@ import type { ConfigContext, ExpoConfig } from 'expo/config'
 /**
  * app.json plus what differs per build. `extra.eas.projectId` is the EAS
  * project the Expo push token is minted for (lib/push.ts): without it the
- * phone cannot register and Settings shows 「推送无法送达」. It comes from
- * EAS_PROJECT_ID (an EAS environment variable, or the shell for a local
- * build) rather than being written here, so forks build against their own
- * EAS project. See README "Push".
+ * phone cannot register and Settings shows 「推送无法送达」. app.json holds
+ * Mikka's; EAS_PROJECT_ID overrides it so a fork builds against its own EAS
+ * project. See README "Push".
  */
 export default ({ config }: ConfigContext): ExpoConfig => {
   const projectId = process.env.EAS_PROJECT_ID ?? (config.extra?.eas as { projectId?: string } | undefined)?.projectId
