@@ -108,7 +108,7 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     await deps.workspace(session.userId, workspaceId)
     // A subscription belongs to the account (decision 2026-10-31-2130): every workspace lists the same
     // connections. The same provider account connected in two workspaces shows once; nothing is deleted.
-    const { rows: all } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel","providerSubject" from byos_connections where "ownerId"=$1 and "removedAt" is null and "credentialVersion">0 and state<>\'disconnected\' order by (state=\'connected\') desc,"createdAt" desc limit 50', [session.userId])
+    const { rows: all } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel","providerSubject" from byos_connections where "ownerId"=$1 and "removedAt" is null and "credentialVersion">0 and state<>\'disconnected\' order by "createdAt" desc limit 50', [session.userId])
     const subjects = new Set<string>()
     const rows = all.filter(row => !row.providerSubject || (subjects.has(`${row.provider}:${row.providerSubject}`) ? false : (subjects.add(`${row.provider}:${row.providerSubject}`), true)))
     // Which Bots use each connection is a nicety: the list still loads without it.
