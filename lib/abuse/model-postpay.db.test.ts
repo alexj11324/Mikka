@@ -104,7 +104,10 @@ test('hosted calls check positive balance, debit only after receipts, and resume
   await credit()
   cost = '0.01'
   const { stream } = await model.doStream({ prompt: [] })
-  for await (const _chunk of stream) { /* Settlement occurs at the real stream finish boundary. */ }
+  const reader = stream.getReader()
+  try {
+    for (;;) { if ((await reader.read()).done) break }
+  } finally { reader.releaseLock() }
   assert.equal(providerCalls, 3)
   assert.equal((await store.balance(workspace)).purchased, 0)
 })
