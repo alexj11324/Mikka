@@ -329,17 +329,16 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   await assertNativeToolScope(userId,scope)
   return asToolResult(async () => {
     const target = await (await import('@/lib/rule-dispatch')).resolveIssueExecution(userId,botId,input.issueId)
-    // Nothing can run it now (decision 2026-10-31-2200-run-machine-fallback): the task waits, never fails.
-    const waitForMachine = async () => {
-      const { recordMachineWait, MACHINE_NEEDED_CARD } = await import('@/lib/machine-waits')
-      await recordMachineWait(pool, { userId, botId, workspaceId: target.workspaceId, request: { issueId: input.issueId, repo: input.repo, ...(input.note ? { note: input.note } : {}), ...(input.requestKey ? { requestKey: input.requestKey } : {}) } })
-      return { status: 'waiting_machine' as const, issueId: input.issueId, card: MACHINE_NEEDED_CARD }
+    // No machine can take it (decision 2026-10-31-2200-run-machine-fallback): an error the person can act on.
+    const noMachine = async () => {
+      const card = 'card' in target ? target.card : await (await import('@/lib/rule-dispatch')).machineUnavailableCardFor(userId)
+      return { error: 'machineUnavailable' as const, issueId: input.issueId, card }
     }
     const queueOnDevice = async (device: { agentId: string; model?: string; pinnedDeviceId?: string; waitFor?: string }) => {
       const result=await queueRun(userId,{...input,agentId:device.agentId,model:device.model,pinnedDeviceId:device.pinnedDeviceId},botId,execution,requestEventId,null,approvedRepositoryKey)
       return {...result,status:device.waitFor ? 'waiting_device' : 'queued',...(device.waitFor ? {waitFor:device.waitFor} : {})}
     }
-    if ('needsMachine' in target) return waitForMachine()
+    if ('needsMachine' in target) return noMachine()
     if (!('agentId' in target)) {
       if (requestEventId) {
         const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
@@ -350,7 +349,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
       const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,reportToCoordinator:botId===null},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
       // The person's own E2B refused (capacity, quota, key): same as no cloud.
       if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
-      return target.fallback ? queueOnDevice(target.fallback) : waitForMachine()
+      return target.fallback ? queueOnDevice(target.fallback) : noMachine()
     }
     return queueOnDevice(target)
   })

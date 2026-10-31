@@ -244,6 +244,8 @@ export const devices = pgTable('devices', {
   computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
   enabled: boolean('enabled').notNull().default(true),
+  /** 「允许自动调度」: null is the type default (servers on, personal computers off); see lib/device-auto-schedule.ts. */
+  autoSchedule: boolean('autoSchedule'),
   /** The person renamed it; a daemon re-register keeps this name. */
   nameLocked: boolean('nameLocked').notNull().default(false),
   /** Removed from settings: a tombstone that keeps run history (lib/device-removal.ts). */
@@ -444,7 +446,7 @@ export const runTokens = pgTable('run_tokens', {
  * (lib/attention): the person has not seen it, and the Coordinator alone
  * decides whether to tell them.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff', 'run_dispatch_failed', 'run_redispatched', 'machine_needed', 'machine_available'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff', 'run_dispatch_failed', 'run_redispatched'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth

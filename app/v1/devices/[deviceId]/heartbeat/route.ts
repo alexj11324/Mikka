@@ -14,7 +14,6 @@ import { renewCloudDeviceToken } from '@/lib/computer/cloud-device'
 import { factoryLifecycleEnabled } from '@/lib/factory/runtime'
 import { factoryDispatchRecovery } from '@/lib/factory/dispatch-recovery-server'
 import { factoryDeviceOnline } from '@/lib/factory/dispatch-recovery'
-import { wakeMachineWaitsForDevice } from '@/lib/machine-waits'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,8 +23,7 @@ export const dynamic = 'force-dynamic'
  * the device reports that is still claimed by it, and the runs it no longer
  * holds, which the daemon stops.
  * Afterwards, runs the owner lost on another device are queued again, and
- * (Factory on) queued Factory runs this device could not take are marked re-dispatched once,
- * and tasks that waited for any machine are woken once.
+ * (Factory on) queued Factory runs this device could not take are marked re-dispatched once.
  */
 async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
@@ -42,8 +40,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
   const factoryOn = factoryLifecycleEnabled()
-  const [prior] = await db.select({ enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses }).from(devices).where(eq(devices.id, deviceId)).limit(1)
-  const cameOnline = !prior || !factoryDeviceOnline(prior)
+  const [prior] = factoryOn ? await db.select({ enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses }).from(devices).where(eq(devices.id, deviceId)).limit(1) : []
   await db.update(devices).set({ ...(parsed.data.deviceType ? { deviceType: parsed.data.deviceType } : {}), harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
   await ensureDeviceAgents(pool, caller.userId, deviceId, parsed.data.harnesses)
   const selected=await skillAssignments.renewHeartbeat(caller.userId,deviceId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1',request.headers.get(TEAM_SKILL_HEADER)==='1')
@@ -53,9 +50,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const cloudCredential = caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId
     ? await renewCloudDeviceToken(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId, deviceId, tokenId: caller.tokenId }).catch(() => null)
     : null
-  // Tasks that waited for any machine dispatch again once this device is back.
-  after(() => wakeMachineWaitsForDevice(pool, caller.userId, deviceId, cameOnline).catch((error: unknown) => console.error('Could not wake waiting tasks', error instanceof Error ? error.message : error)))
-  if (factoryOn) after(() => factoryDispatchRecovery.deviceOnline(caller.userId, deviceId, cameOnline).catch((error: unknown) => console.error('Could not resume Factory dispatch', error instanceof Error ? error.message : error)))
+  if (factoryOn) after(() => factoryDispatchRecovery.deviceOnline(caller.userId, deviceId, !prior || !factoryDeviceOnline(prior)).catch((error: unknown) => console.error('Could not resume Factory dispatch', error instanceof Error ? error.message : error)))
   after(() => reclaimLostRuns(caller.userId).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error)))
   return NextResponse.json({ ...result, deviceCommands: await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? [], parsed.data.failedDeviceCommands ?? []), ...(cloudCredential ? { cloudCredential } : {}) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }

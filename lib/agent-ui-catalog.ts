@@ -64,13 +64,13 @@ export const agentComponentCatalog = {
     props: z.object({ title: z.string().min(1).max(200), description: text, context: z.string().min(1).max(4000) }),
   },
   BeQuestions: {
-    description: 'beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。派发失败的云端选项是在 Mikka Cloud 上运行（云电脑用用户自己的 E2B 密钥），问题写“派不出去：{设备名} 不在线。等它上线，还是在 Mikka Cloud 上运行？”，选项 value 固定为 wait（等它上线）与 cloud（在 Mikka Cloud 上运行），宿主按 value 本地化，不加解释段落；用户未配置 E2B 密钥时该选项设 action:"cloudKeySettings"，宿主显示为去设置密钥的入口，不发送回答。dispatch_run 返回 status=waiting_machine 时任务已排队等电脑，不是失败：按 result.card 原样画一个单选问题（title 与 options 原样，每个选项保留 action：enableThisMac 在这台电脑上启用、connectServer 连接我的服务器、e2bKey 填入 E2B Key），宿主按 action 处理，不发送回答，也不加解释段落。input 可选，用 beUI 控件作答：select 为下拉选择（需 options），switch 为是/否开关，slider 为数值滑块（需 range:{min,max,step?,unit?}），dateRange 为日期区间；未设 input 时单选用 Radio、多选用 Checkbox。',
+    description: 'beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。派发失败的云端选项是在 Mikka Cloud 上运行（云电脑用用户自己的 E2B 密钥），问题写“派不出去：{设备名} 不在线。等它上线，还是在 Mikka Cloud 上运行？”，选项 value 固定为 wait（等它上线）与 cloud（在 Mikka Cloud 上运行），宿主按 value 本地化，不加解释段落；用户未配置 E2B 密钥时该选项设 action:"cloudKeySettings"，宿主显示为去设置密钥的入口，不发送回答。dispatch_run 返回 error=machineUnavailable 时没有电脑能跑这个任务：按 result.card 原样画一个单选问题（title 与 options 原样，每个选项保留 value 和 action），宿主按 action 处理，不加解释段落；用户回答后再调用 dispatch_run。input 可选，用 beUI 控件作答：select 为下拉选择（需 options），switch 为是/否开关，slider 为数值滑块（需 range:{min,max,step?,unit?}），dateRange 为日期区间；未设 input 时单选用 Radio、多选用 Checkbox。',
     props: z.object({
       context: z.string().min(1).max(4000),
       questions: z.array(z.object({
         id: z.string().min(1).max(80),
         title: z.string().min(1).max(200),
-        options: z.array(z.object({ value: z.string().min(1).max(80), label: z.string().min(1).max(200), description: z.string().max(300).optional(), action: z.enum(['cloudKeySettings', 'enableThisMac', 'connectServer', 'e2bKey']).optional() })).min(1).max(6).optional(),
+        options: z.array(z.object({ value: z.string().min(1).max(80), label: z.string().min(1).max(200), description: z.string().max(300).optional(), action: z.enum(['cloudKeySettings', 'enableThisMac', 'connectServer', 'e2bKey', 'allowAutoSchedule', 'serverOnline']).optional() })).min(1).max(6).optional(),
         multiple: z.boolean().optional(),
         allowCustom: z.boolean().optional(),
         input: z.enum(['select', 'switch', 'slider', 'dateRange']).optional(),

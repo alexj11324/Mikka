@@ -23,8 +23,9 @@ async function shoot(page: import('@playwright/test').Page, testInfo: import('@p
 const clarify = 'root = Stack([intro, q])\nintro = TextContent("好的。")\nq = BeQuestions("官网首页在手机上太慢了，压到 2 秒以内", [{id:"net", title:"先确认一件事：2 秒按哪种网络来算？", options:[{value:"4g", label:"手机 4G（Lighthouse 移动端）"}, {value:"wifi", label:"桌面宽带"}, {value:"both", label:"两种都要到 2 秒"}, {value:"none", label:"不设线，越快越好"}]}])'
 const dispatchFailed = (task: string, noKey = false) => `root = Stack([q])\nq = BeQuestions("派发失败：设备不在线", [{id:"route", title:"派不出去：Alex 的 MacBook 不在线。等它上线，还是在 Mikka Cloud 上运行？", options:[{value:"wait", label:"Wait for it"}, {value:"cloud", label:"Run on Mikka Cloud"${noKey ? ', action:"cloudKeySettings"' : ''}}]}], "${task}")`
 
-// What the bot draws from dispatch_run's waiting_machine result (lib/machine-waits.ts MACHINE_NEEDED_CARD).
-const needsMachine = 'root = Stack([q])\nq = BeQuestions("任务在等一台电脑", [{id:"machine", title:"这个任务需要一台电脑来跑", options:[{value:"mac", label:"在这台电脑上启用", action:"enableThisMac"}, {value:"server", label:"连接我的服务器", action:"connectServer"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}]}])'
+// What the bot draws from dispatch_run's machineUnavailable result (lib/rule-dispatch.ts machineUnavailableCard).
+const needsMachine = 'root = Stack([q])\nq = BeQuestions("没有电脑能跑这个任务", [{id:"machine", title:"这个任务需要一台电脑来跑", options:[{value:"computer", label:"在这台电脑上启用", action:"enableThisMac"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}, {value:"server", label:"连接我的服务器", action:"connectServer"}]}])'
+const allowMachine = (deviceId: string) => `root = Stack([q])\nq = BeQuestions("没有电脑能跑这个任务", [{id:"machine", title:"这个任务需要一台电脑来跑", options:[{value:"${deviceId}", label:"允许这台电脑自动调度", action:"allowAutoSchedule"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}, {value:"server", label:"让服务器重新上线", action:"serverOnline"}]}])`
 
 // Dispatch option labels are English on purpose: the card localizes them by value.
 // Visual and interaction coverage of stored replies; the Factory clarify answer itself is the person's next message.
@@ -136,5 +137,27 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     // Nothing was answered, so every row is still open.
     await expect(card.getByRole('button', { name: /填入 E2B Key/ })).toBeEnabled()
     await expect(card.getByRole('button', { name: /在这台电脑上启用/ })).toBeEnabled()
+  })
+
+  test(`no machine with a personal computer online: 允许这台电脑自动调度 switches it on and answers (${viewport.name})`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    const { email } = await register(page)
+    const pool = isolatedPool()
+    const deviceId = randomUUID()
+    try {
+      const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
+      await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt") VALUES ($1,$2,'MacBook','local','laptop',true,now())`, [deviceId, user.id])
+    } finally { await pool.end() }
+    await seed(email, [{ role: 'user', content: '把首页压到 2 秒以内' }, { role: 'assistant', content: allowMachine(deviceId) }])
+    await page.goto(app('/?section=coordinator'))
+    const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
+    const card = chat.getByRole('group', { name: '这个任务需要一台电脑来跑' })
+    await expect(card.getByRole('link', { name: /让服务器重新上线/ })).toHaveAttribute('href', /\/settings\?section=computers$/)
+    const allow = card.getByRole('button', { name: /允许这台电脑自动调度/ })
+    await allow.click()
+    await expect(allow).toHaveAttribute('aria-pressed', 'true')
+    await expect(chat.getByText('允许这台电脑自动调度', { exact: true }).last()).toBeVisible()
+    const check = isolatedPool()
+    try { expect((await check.query('SELECT "autoSchedule" FROM devices WHERE id=$1', [deviceId])).rows[0].autoSchedule).toBe(true) } finally { await check.end() }
   })
 }

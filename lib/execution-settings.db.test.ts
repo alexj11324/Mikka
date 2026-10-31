@@ -24,7 +24,7 @@ test(
     });
     try {
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
-      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
+      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now());
@@ -60,7 +60,7 @@ test(
         binding = randomUUID(),
         connection = randomUUID();
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",kind,enabled,"lastSeenAt",harnesses) VALUES ($1,'alice','local',true,now(),'[{"harness":"codex","installed":true,"models":["explicit-model"],"defaultModelSlot":"default","modelSlots":[{"slot":"default","model":"explicit-model","name":"Explicit model"}]}]'),($2,'bob','local',true,now(),'[]')`,
+        `INSERT INTO devices (id,"ownerId",kind,enabled,"autoSchedule","lastSeenAt",harnesses) VALUES ($1,'alice','local',true,true,now(),'[{"harness":"codex","installed":true,"models":["explicit-model"],"defaultModelSlot":"default","modelSlots":[{"slot":"default","model":"explicit-model","name":"Explicit model"}]}]'),($2,'bob','local',true,true,now(),'[]')`,
         [own, foreign],
       );
       const legacyId = randomUUID();

@@ -1,5 +1,6 @@
 // Where a thread runs when a person has no cloud, no device, or a full cloud
 // (decision 2026-10-31-2200-run-machine-fallback), against a real PostgreSQL.
+// Only devices with 允许自动调度 on are picked; otherwise the bot gets an error card.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -8,14 +9,13 @@ import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/wo
 
 const mac = [{ harness: 'codex', installed: true, models: ['gpt-5'], defaultModelSlot: 'default' }]
 
-test('run machine fallback: cloud, own device, else wait and wake', { skip: !dbUrl }, async t => {
+test('run machine fallback: own E2B, own auto-schedule device, else an actionable error', { skip: !dbUrl }, async t => {
   process.env.MIKKA_CLOUD_COMPUTER_TASKS = '1'
   process.env.MIKKA_BYOS_ENABLED = '1'
   process.env.MIKKA_CLOUD_THREAD_MACHINES = '1'
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const steps = await import('../workflows/coordinator/steps')
-  const { wakeMachineWaits, wakeMachineWaitsForDevice } = await import('../lib/machine-waits')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const users: string[] = []
@@ -41,53 +41,46 @@ test('run machine fallback: cloud, own device, else wait and wake', { skip: !dbU
     await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
     return { id, workspaceId: ws.id, issueId }
   }
-  const onlineMac = async (userId: string) => {
+  const onlineMac = async (userId: string, autoSchedule: boolean | null = true, deviceType = 'laptop') => {
     const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'MacBook','local','laptop',true,now(),$3)`, [deviceId, userId, JSON.stringify(mac)])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"autoSchedule") VALUES ($1,$2,'MacBook','local',$4,true,now(),$3,$5)`, [deviceId, userId, JSON.stringify(mac), deviceType, autoSchedule])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
     return deviceId
   }
   const dispatch = (userId: string, issueId: string) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` })
-  const waits = async (userId: string) => (await pool.query(`SELECT id,tier,"deliveredAt" FROM coordinator_events WHERE "userId"=$1 AND kind='machine_needed'`, [userId])).rows
+  type NoMachine = { error: string; card: { title: string; options: { value: string; action: string }[] } }
+  const actions = (result: NoMachine) => result.card.options.map(option => option.action)
   const runOf = async (runId: string) => (await pool.query('SELECT "deviceId",status FROM agent_runs WHERE id=$1', [runId])).rows[0]
 
-  await t.test('(a) no card, no E2B, no device: the task waits with the card, nothing fails', async () => {
+  await t.test('(a) no card, no E2B, no device: an error card, then a Mac is picked once 允许自动调度 is on', async () => {
     const a = await person('fresh')
-    const result = await dispatch(a.id, a.issueId) as unknown as { status: string; card: { title: string; options: { action: string }[] } }
-    assert.equal(result.status, 'waiting_machine')
+    const result = await dispatch(a.id, a.issueId) as unknown as NoMachine
+    assert.equal(result.error, 'machineUnavailable')
     assert.equal(result.card.title, '这个任务需要一台电脑来跑')
-    assert.deepEqual(result.card.options.map(option => option.action), ['enableThisMac', 'connectServer', 'e2bKey'])
-    const [wait] = await waits(a.id)
-    assert.equal(wait.tier, 'background')
-    assert.ok(wait.deliveredAt, 'the wait itself never wakes the chat')
-    await dispatch(a.id, a.issueId)
-    assert.equal((await waits(a.id)).length, 1, 'a second dispatch reuses the open wait')
+    assert.deepEqual(actions(result), ['enableThisMac', 'e2bKey', 'connectServer'])
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [a.id])).rows[0].n, 0, 'nothing is queued')
 
-    // A device comes online: the bot is woken once to dispatch again.
-    const deviceId = await onlineMac(a.id)
-    assert.deepEqual(await wakeMachineWaitsForDevice(pool, a.id, deviceId, false), [], 'a device that was already online wakes nothing')
-    assert.deepEqual(await wakeMachineWaitsForDevice(pool, a.id, deviceId, true), [wait.id])
-    assert.deepEqual(await wakeMachineWaitsForDevice(pool, a.id, deviceId, true), [], 'each wait is woken once')
-    const woken = (await pool.query(`SELECT tier,"deliveredAt",payload FROM coordinator_events WHERE "dedupeKey"=$1`, [`machine_available:${wait.id}`])).rows[0]
-    assert.equal(woken.tier, 'attention')
-    assert.equal(woken.deliveredAt, null)
-    assert.equal(woken.payload.request.repo, 'octo/repo')
-    const again = await dispatch(a.id, a.issueId) as unknown as { runId: string; status: string }
-    assert.equal(again.status, 'queued')
-    assert.equal((await runOf(again.runId)).deviceId, deviceId)
+    // A personal computer comes online: off by default, so it is offered, not picked.
+    const deviceId = await onlineMac(a.id, null)
+    const offered = await dispatch(a.id, a.issueId) as unknown as NoMachine
+    assert.equal(offered.error, 'machineUnavailable')
+    assert.deepEqual(offered.card.options[0], { value: deviceId, label: '允许这台电脑自动调度', action: 'allowAutoSchedule' })
+    await pool.query('UPDATE devices SET "autoSchedule"=true WHERE id=$1', [deviceId])
+    const queued = await dispatch(a.id, a.issueId) as unknown as { runId: string; status: string }
+    assert.equal(queued.status, 'queued')
+    assert.equal((await runOf(queued.runId)).deviceId, deviceId)
   })
 
-  await t.test('(b) no E2B and an online Mac: a cloud rule runs on the Mac', async () => {
+  await t.test('(b) no E2B and an online Mac with 允许自动调度 on: a cloud rule runs on the Mac', async () => {
     const b = await person('mac')
     const deviceId = await onlineMac(b.id)
     await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), b.id, b.workspaceId])
     const result = await dispatch(b.id, b.issueId) as unknown as { runId: string; status: string }
     assert.equal(result.status, 'queued')
     assert.deepEqual(await runOf(result.runId), { deviceId, status: 'queued' })
-    assert.equal((await waits(b.id)).length, 0)
   })
 
-  await t.test('(c) own E2B refuses at its concurrency cap: the cloud run is ended, the Mac takes it, else it waits', async () => {
+  await t.test('(c) own E2B refuses at its concurrency cap: the cloud run is ended, a server takes it, else an error card', async () => {
     const c = await person('cloud')
     const botId = await seedBot(pool, c.workspaceId, c.id)
     const cloudDevice = randomUUID(), cloudAgent = randomUUID(), repoId = randomUUID(), connection = randomUUID()
@@ -114,27 +107,35 @@ test('run machine fallback: cloud, own device, else wait and wake', { skip: !dbU
       await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'snap',$5,'running')`, [runId, c.workspaceId, teammate, botId, randomUUID()])
     }
 
-    const waiting = await dispatch(c.id, c.issueId) as unknown as { status: string }
-    assert.equal(waiting.status, 'waiting_machine', 'no device: the task waits instead of failing')
+    const refused = await dispatch(c.id, c.issueId) as unknown as NoMachine
+    assert.equal(refused.error, 'machineUnavailable', 'no device: an error the person can act on')
+    assert.deepEqual(actions(refused), ['enableThisMac', 'e2bKey', 'connectServer'])
     const cloudRuns = (await pool.query(`SELECT r.status,m.state FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows
     assert.deepEqual(cloudRuns, [{ status: 'stopped', state: 'ended' }], 'the refused cloud run was queued, then ended instead of left stuck')
-    const [wait] = await waits(c.id)
-    assert.deepEqual(await wakeMachineWaits(pool, null, { workspaceId: randomUUID() }), [], 'another workspace freeing a slot wakes nothing here')
-    assert.deepEqual(await wakeMachineWaits(pool, null, { workspaceId: c.workspaceId }), [wait.id])
-
-    const deviceId = await onlineMac(c.id)
+    // A server comes online: on by default, so it takes the run.
+    const deviceId = await onlineMac(c.id, null, 'server')
     const result = await dispatch(c.id, c.issueId) as unknown as { runId: string; status: string }
     assert.equal(result.status, 'queued')
     assert.equal((await runOf(result.runId)).deviceId, deviceId)
   })
 
-  await t.test('own devices: a server goes ahead of a Mac', async () => {
+  await t.test('own devices: a server goes ahead of a Mac; a Mac with 允许自动调度 off is never picked', async () => {
     const d = await person('devices')
     await onlineMac(d.id)
-    const server = await onlineMac(d.id)
-    await pool.query(`UPDATE devices SET "deviceType"='server',"lastSeenAt"=now()-interval '20 seconds' WHERE id=$1`, [server])
+    const server = await onlineMac(d.id, null, 'server')
+    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '20 seconds' WHERE id=$1`, [server])
     await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), d.id, d.workspaceId])
     const result = await dispatch(d.id, d.issueId) as unknown as { runId: string }
     assert.equal((await runOf(result.runId)).deviceId, server)
+    const e = await person('manual')
+    const mac = await onlineMac(e.id, false)
+    await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), e.id, e.workspaceId])
+    const off = await dispatch(e.id, e.issueId) as unknown as NoMachine
+    assert.deepEqual(actions(off), ['allowAutoSchedule', 'e2bKey', 'connectServer'])
+    assert.equal(off.card.options[0].value, mac)
+    // A rule that names the Mac still runs there: a device the person picks is used as asked.
+    await pool.query('UPDATE execution_rules SET place=$2 WHERE "ownerId"=$1', [e.id, mac])
+    const asked = await dispatch(e.id, e.issueId) as unknown as { runId: string }
+    assert.equal((await runOf(asked.runId)).deviceId, mac)
   })
 })

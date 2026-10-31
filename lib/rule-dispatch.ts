@@ -8,9 +8,11 @@ import { ExecutionSettings, executionWorkspace } from "./execution-settings";
 import { isDeviceOnline } from "@mikka/protocol/device";
 import { ActionFailureError } from "./action-error";
 import type { HarnessInfo } from "@mikka/protocol/harness";
+import { autoScheduleOn } from "./device-auto-schedule";
+import { defaultAgentCopy } from "./agent-copy";
 
 type Query = Pick<Pool, "query">;
-type DeviceRow = ExecutionDevice & { lastSeenAt: Date | null; deviceType?: string | null };
+type DeviceRow = ExecutionDevice & { lastSeenAt: Date | null; deviceType?: string | null; autoSchedule?: boolean | null };
 export type DeviceTarget = {
   place: string;
   harness: string;
@@ -48,9 +50,9 @@ export async function fallbackDevice(
   harness: string | null,
 ): Promise<DeviceTarget | null> {
   const preferred = rules?.find((r) => r.label === null)?.place;
-  // Only devices with 允许调度 on (enabled); servers first, then the default rule's device, then the most recent.
+  // Only devices Mikka may pick on its own (允许调度 and 允许自动调度 on); servers first, then the default rule's device, then the most recent.
   const online = devices
-    .filter((d) => d.online && d.enabled)
+    .filter((d) => d.online && d.enabled && autoScheduleOn(d))
     .sort((a, b) => Number(b.deviceType === "server") - Number(a.deviceType === "server") || Number(b.id === preferred) - Number(a.id === preferred));
   for (const device of online) {
     const installed = (device.harnesses ?? []).filter((h: HarnessInfo) => h.installed);
@@ -77,8 +79,9 @@ export async function fallbackDevice(
 /**
  * Where an issue's run executes (decision 2026-10-31-2200-run-machine-fallback):
  * a matching rule on an online device runs there; otherwise the workspace's own
- * E2B cloud, then the person's online device, then the rule's offline device
- * (queued until it is back), else `needsMachine`, which never fails the request.
+ * E2B cloud, then the person's online device with 允许自动调度 on, then the
+ * rule's offline device (queued until it is back), else `needsMachine` with the
+ * card of what the person can do.
  */
 export async function resolveIssueExecution(
   ownerId: string,
@@ -95,14 +98,7 @@ export async function resolveIssueExecution(
     if (error instanceof ActionFailureError && error.code === "executionModelUnknown") return null;
     throw error;
   });
-  const { rows } = await pool.query(
-    `SELECT id,enabled,"lastSeenAt","deviceType",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "lastSeenAt" DESC NULLS LAST,id`,
-    [ownerId],
-  );
-  const devices: DeviceRow[] = rows.map((row) => ({
-    ...row,
-    online: isDeviceOnline(row.lastSeenAt),
-  }));
+  const devices = await ownDevices(ownerId);
   const labels = readIssueMetadata(issue.content).labels.map(
     (label) => label.name,
   );
@@ -136,7 +132,7 @@ export async function resolveIssueExecution(
   if (resolution && (await cloudReady(pool, { ownerId, workspaceId, botId, harness: resolution.harness })))
     return { ...resolution, place: "cloud" as const, workspaceId, issue, ...(fallback ? { fallback } : {}) };
   if (fallback) return { ...fallback, workspaceId, issue };
-  return { needsMachine: true as const, workspaceId, issue };
+  return { needsMachine: true as const, workspaceId, issue, card: machineUnavailableCard(devices) };
 }
 
 async function deviceTarget(ownerId: string, selected: { place: string; harness: string; model: string }): Promise<DeviceTarget> {
@@ -148,4 +144,37 @@ async function deviceTarget(ownerId: string, selected: { place: string; harness:
   ).rows[0];
   if (!agent) throw new ActionFailureError("agentHarnessMissing");
   return { place: selected.place, harness: selected.harness, model: selected.model, agentId: agent.id };
+}
+
+/**
+ * 这个任务需要一台电脑来跑: what the person can do when no machine can take a new
+ * run. The host handles each row by its action; the value of an
+ * `allowAutoSchedule` row is the device it switches on.
+ */
+export function machineUnavailableCard(devices: readonly DeviceRow[]) {
+  const copy = defaultAgentCopy;
+  const personal = devices.find((d) => d.online && d.enabled && !autoScheduleOn(d));
+  const servers = devices.filter((d) => d.deviceType === "server");
+  const options: { value: string; label: string; action: string }[] = [];
+  if (personal) options.push({ value: personal.id, label: copy.needsMachineAuto, action: "allowAutoSchedule" });
+  else if (!devices.length) options.push({ value: "computer", label: copy.needsMachineMac, action: "enableThisMac" });
+  options.push({ value: "e2b", label: copy.needsMachineE2B, action: "e2bKey" });
+  options.push(servers.length
+    ? { value: "server", label: copy.needsMachineServerOnline, action: "serverOnline" }
+    : { value: "server", label: copy.needsMachineServer, action: "connectServer" });
+  return { title: copy.needsMachineTitle, options };
+}
+
+/** The person's local devices, most recently seen first. */
+async function ownDevices(ownerId: string): Promise<DeviceRow[]> {
+  const { rows } = await pool.query(
+    `SELECT id,enabled,"lastSeenAt","deviceType","autoSchedule",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "lastSeenAt" DESC NULLS LAST,id`,
+    [ownerId],
+  );
+  return rows.map((row) => ({ ...row, online: isDeviceOnline(row.lastSeenAt) }));
+}
+
+/** The card for a person whose cloud refused and who has no device to fall back to. */
+export async function machineUnavailableCardFor(ownerId: string) {
+  return machineUnavailableCard(await ownDevices(ownerId));
 }
