@@ -11,12 +11,12 @@ export interface ModelMenu { groups: ModelGroup[]; current: ModelOption & { kind
 
 const providerName = (provider?: string) => provider === 'claude' ? 'Claude' : 'ChatGPT'
 
-/** A group's heading, as on the web (Figma 754:5189). */
+/** A group's heading, as on the web (Figma 756:5189): the plan names a subscription. */
 export function groupTitle(group: ModelGroup) {
   switch (group.kind) {
     case 'hosted': return 'Mikka'
-    case 'subscription': return `我的 ${providerName(group.provider)} 订阅${group.plan ? ` · ${group.plan}` : ''}`
-    case 'apiKey': return '我的 API Key'
+    case 'subscription': return group.plan ? `${providerName(group.provider)} ${group.plan}` : providerName(group.provider)
+    case 'apiKey': return 'API Key'
     case 'shared': return '团队成员分享的'
   }
 }

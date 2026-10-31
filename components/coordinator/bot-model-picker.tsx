@@ -28,7 +28,8 @@ function providerName(provider: string | undefined) {
 function heading(t: T, group: BotModelMenuGroup) {
   switch (group.kind) {
     case 'hosted': return 'Mikka'
-    case 'subscription': return group.plan ? t('subscriptionPlan', { provider: providerName(group.provider), plan: group.plan }) : t('subscription', { provider: providerName(group.provider) })
+    // The plan names it (Claude Max, ChatGPT Pro): everything but a share is the person's own (Figma 756:5189).
+    case 'subscription': return group.plan ? `${providerName(group.provider)} ${group.plan}` : providerName(group.provider)
     case 'apiKey': return t('apiKey')
     case 'shared': return t('shared')
   }
@@ -50,7 +51,7 @@ function OptionLabel({ t, option }: { t: T; option: Pick<BotModelMenuOption, 'id
 
 /**
  * The model chip in a bot's composer, the Coordinator's included (decision
- * 2026-10-31-2330, Figma 754:5189): the model the bot's next runs use, and a
+ * 2026-10-31-2330, Figma 756:5189): the model the bot's next runs use, and a
  * menu of what this person can use here. The choice is saved per bot; a run
  * already going keeps its model.
  */
@@ -80,20 +81,20 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
   const name = current.id === HOSTED_CHOICE ? t('hosted') : current.modelId || t('unknownModel')
   return <DropdownMenu>
     <DropdownMenuTrigger render={<InputGroupButton type="button" variant="secondary" size="xs" data-testid="bot-model-chip" data-unavailable={!current.available || undefined}
-      className={cn('max-w-56 rounded-full px-2 font-normal', !current.available && 'text-muted-foreground')}
+      className={cn('max-w-56 rounded-full px-2 font-normal', current.available ? 'text-foreground' : 'text-muted-foreground')}
       aria-label={current.available ? t('label', { name }) : t('labelUnavailable', { name })} />}>
       <span className="flex min-w-0"><OptionLabel t={t} option={current} /></span>
       {!current.available && <span className="shrink-0 text-xs">{t('unavailable')}</span>}
       {failed && <span className="shrink-0 text-xs text-destructive">{t('notSaved')}</span>}
       <ChevronDown className="text-muted-foreground" />
     </DropdownMenuTrigger>
-    <DropdownMenuContent side="top" align="start" className="w-80">
+    <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-80">
       <DropdownMenuRadioGroup value={value} onValueChange={id => { void choose(String(id)) }}>
         {groups.map((group, index) => <DropdownMenuGroup key={`${group.kind}-${index}`} data-group={group.kind}>
-          {/* Figma 754:5189: a rule under Mikka 默认 only; the person's own groups follow one another under their headings. */}
+          {/* Figma 756:5189: a rule under Mikka 默认 only; the person's own groups follow one another under their headings. */}
           {index === 1 && <DropdownMenuSeparator />}
           <DropdownMenuLabel className="font-normal">{heading(t, group)}</DropdownMenuLabel>
-          {group.options.map(option => <DropdownMenuRadioItem key={option.id} value={option.id}>
+          {group.options.map(option => <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick>
             <OptionLabel t={t} option={option} />
             {tag(t, group) && <span className="ml-auto shrink-0 pl-3 text-xs text-muted-foreground">{tag(t, group)}</span>}
           </DropdownMenuRadioItem>)}

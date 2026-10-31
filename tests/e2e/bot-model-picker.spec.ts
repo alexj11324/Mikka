@@ -31,7 +31,7 @@ async function seed(page: Page) {
 const choice = async (userId: string) => (await db().query<{ bindingId: string | null; modelId: string | null }>(
   `SELECT c."bindingId", b."modelId" FROM bot_model_choices c LEFT JOIN byos_bindings b ON b.id = c."bindingId" WHERE c."ownerId" = $1 AND c."botKey" = 'coordinator'`, [userId])).rows
 
-test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 保存，账号断开后显示不可用', async ({ page }) => {
+test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 保存，账号断开后显示不可用', async ({ page }, testInfo) => {
   await register(page)
   const { userId, connections } = await seed(page)
   await page.reload()
@@ -45,15 +45,23 @@ test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 
   await chip.click()
   const menu = page.getByRole('menu')
   await expect(menu.getByText('Mikka', { exact: true })).toBeVisible()
-  await expect(menu.getByText('我的 Claude 订阅 · Max', { exact: true })).toBeVisible()
-  await expect(menu.getByText('我的 ChatGPT 订阅', { exact: true })).toBeVisible()
+  await expect(menu.getByText('Claude Max', { exact: true })).toBeVisible()
+  await expect(menu.getByText('ChatGPT', { exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitemradio')).toHaveCount(3)
   // A model picker only: no Agent (Claude Code / Codex) in the Coordinator's menu.
   await expect(menu.getByText(/Claude Code|Codex/)).toHaveCount(0)
   await expect(menu.getByRole('menuitem', { name: /管理 API 与订阅/ })).toBeVisible()
+  // Figma 756:5189: the menu opens just above the chip, left-aligned with it.
+  const placement = async () => {
+    const [chipBox, menuBox] = [await chip.boundingBox(), await menu.boundingBox()]
+    return { left: Math.round(menuBox!.x - chipBox!.x), gap: Math.round(chipBox!.y - (menuBox!.y + menuBox!.height)) }
+  }
+  await expect.poll(placement).toEqual({ left: 0, gap: 8 })
+  await testInfo.attach('model-menu', { body: await page.screenshot(), contentType: 'image/png' })
   await menu.getByRole('menuitemradio', { name: /codex-e2e-model/ }).click()
 
   await expect(chip).toHaveAccessibleName('模型：codex-e2e-model')
+  await expect(page.getByRole('menu')).toHaveCount(0)
   await expect.poll(async () => (await choice(userId)).map(row => row.modelId)).toEqual(['codex-e2e-model'])
   await page.reload()
   await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：codex-e2e-model')
@@ -62,6 +70,7 @@ test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 
   await page.getByTestId('bot-model-chip').click()
   await page.getByRole('menu').getByRole('menuitemradio', { name: /Mikka 默认/ }).click()
   await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：Mikka 默认')
+  await expect(page.getByRole('menu')).toHaveCount(0)
   await expect.poll(async () => (await choice(userId)).map(row => row.bindingId)).toEqual([null])
 
   // The picked account goes away: the chip names it, marked unavailable, and the menu no longer offers it.

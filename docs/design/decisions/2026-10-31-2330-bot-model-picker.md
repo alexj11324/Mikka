@@ -8,14 +8,16 @@
 
 Model choice moves out of settings and into each bot's chat, the
 Coordinator's included. Accepted frame: Figma `zPe5LKycb2XuT1ivCLRw07`, node
-`754:5189` 「v2 · 04 · Bot 对话框里的模型选择器」 (page `746:5189`).
+`756:5189`, which replaces `754:5189` 「v2 · 04 · Bot 对话框里的模型选择器」 (page `746:5189`).
 
 - **Where.** A chip in the composer's bottom bar, beside 「+」: the model's mark,
   its name and ⌄. It opens a menu.
 - **Menu, in order:** 「Mikka 默认」 (点数); one group per subscription the
-  person can use here, named 「我的 Claude 订阅 · Max」 with its plan; 「我的 API
-  Key」 (按量); 「团队成员分享的」, each item named with whose key it is
-  (「林同学的 Key」); then 「管理 API 与订阅 ›」 to the account's 模型 page. A
+  person can use here, named by its plan (「Claude Max」, 「ChatGPT Pro」, no
+  「我的…」: everything but a share is the person's own); 「API Key」 (按量);
+  「团队成员分享的」, each item named with whose key it is (「林同学的 Key」);
+  then 「管理 API 与订阅 ›」 to the account's 模型 page. It opens 8px above
+  the chip, left-aligned with it. A
   group with nothing in it is left out. Only credentials the resolver can use
   in this workspace are listed. The Coordinator only uses its own person's
   credentials, so its menu has no 团队成员分享的 group.
