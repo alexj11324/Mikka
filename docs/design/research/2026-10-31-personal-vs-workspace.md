@@ -1,7 +1,7 @@
 # Personal vs workspace: who owns what
 
-- **Status:** research and proposal, pending Alex's approval
-  ([draft decision](../decisions/2026-10-31-2130-personal-vs-workspace.md))
+- **Status:** accepted by Alex 2026-10-31 (「可以按你的建议来」), with the
+  choices in §8; see [the decision](../decisions/2026-10-31-2130-personal-vs-workspace.md)
 - **Date:** 2026-10-31, audited at `a12adc3`
 - **Why:** many bugs come from unclear ownership between 个人 and 工作区. The
   latest: 设置 › 工作区 › Bot 与 Agents showed 「未连接账号」 on every bot.
@@ -14,7 +14,8 @@
 1. **Three levels, no more.**
    - **Account:** who you are, and what you sign in with or bring: your
      identity, credentials, devices and preferences. These follow you into
-     every workspace.
+     every workspace. Memory is the exception: it is kept per workspace
+     (§8.5).
    - **Personal workspace:** one per person, created with the account, with
      only you as a member. Your own bots, threads and billing live here.
    - **Team workspace:** members, shared settings, policies, secrets and
@@ -30,8 +31,8 @@
    (decision 2026-10-31 「App connections belong to the person」) and for
    saved logins (2026-10-27). Subscriptions join them.
 4. **The workspace limits personal items without owning them.** An admin can:
-   - switch off an app, a device type, or personal subscriptions, for that
-     workspace only;
+   - switch off personal subscriptions, personal app connections or personal
+     devices, for that workspace only (§8.1);
    - cap points.
 
    An admin never sees or uses a member's credential. Everything is on by
@@ -40,11 +41,13 @@
    - a personal subscription pays with the owner's own plan quota;
    - Mikka 默认 (the hosted model) and Mikka Cloud pay with the workspace the
      run belongs to;
-   - work with no workspace of its own (the Coordinator's background jobs,
-     memory extraction) pays with the personal workspace, never with
-     「the oldest workspace」.
+   - the Coordinator and memory extraction pay with the workspace they run
+     in (§8.4, §8.5);
+   - work with no workspace of its own pays with the personal workspace,
+     never with 「the oldest workspace」.
 6. **Leaving a workspace** ends your credentials' use there and nowhere else.
-   Your bots in that workspace stop; what happens to them is open question 3.
+   Your bots in that workspace are archived (paused); an admin can take one
+   over (§8.3).
 
 The difference from ChatGPT and Claude is rule 3/4: they do not let a
 personal Plus/Pro/Max plan pay inside a team workspace (§2.1). Alex asked
@@ -210,16 +213,17 @@ is account-level, it no longer depends on which workspace a page resolved.
 | Item | Today | Target | Move? |
 | --- | --- | --- | --- |
 | Profile, sign-in, preferences, language, notifications | account | account | — |
-| Memory, suggestions, personal instructions | account | account; background model cost to the personal workspace | payer only |
-| Apps, GitHub, Linear, Telegram, skills, personal MCP | account | account; per-workspace admin allowlist (exists) | — |
+| Memory (`user_facts`, `memoryEnabled`) | account | **per workspace** (§8.5) | **yes** |
+| Suggestions, personal instructions | account | account | — |
+| Apps, GitHub, Linear, Telegram, skills, personal MCP | account | account; per-app admin allowlist (exists) plus a team switch for personal connections, default on | switch only |
 | Saved logins | account | account | — |
-| Devices, daemon | account | account; per-workspace computer policy (exists) | — |
+| Devices, daemon | account | account; computer policy (exists) plus a team switch for personal devices, default on | switch only |
 | **Model subscriptions** (`byos_connections`, CPA bindings) | owner + workspace | **account**; per-workspace switch 个人订阅 (default on) | **yes** |
 | Bot model choice (`bot_model_choices`) | owner + workspace + bot | unchanged; a bot already belongs to one workspace | — |
 | 设备离线时 / Bot 额度用完时 | account, shown under 工作区 | account, shown in 个人 › 模型与额度 | UI only |
 | Task defaults, label rules | owner + workspace | unchanged; the page title says 「我的」 rules in this workspace (open question 5) | — |
-| Bots | owner + workspace | unchanged: a person's bot inside a workspace; personal bots live in the personal workspace | — |
-| Coordinator | per workspace (choice row), billed to the oldest workspace | open question 4 | ? |
+| Bots | owner + workspace | unchanged: a person's bot inside a workspace; personal bots live in the personal workspace. Archived when the owner leaves (§8.3) | archive state |
+| Coordinator | per workspace (choice row), billed to the oldest workspace | one per person per workspace, billed to that workspace (§8.4) | payer only |
 | Cloud computer, E2B key, secrets, policies, hosted points, billing, members, teams, audit | workspace | workspace | — |
 | Personal workspace | implicit, sometimes missing | explicit `kind`, one per person, single member | **yes** |
 
@@ -278,7 +282,31 @@ the schema part is one column and one boolean; the work is in the queries.
   「E2B only on the workspace's key」 are unchanged.
 - No earlier decision makes subscriptions workspace-owned.
 
-## 8. Open questions for Alex
+## 8. Decisions (Alex, 2026-10-31)
+
+Alex accepted the recommendations below (「可以按你的建议来」), relayed by
+the coordinator. Where the decision differs from the question as first asked,
+the decision is what counts.
+
+1. **B.** Subscriptions are account-level. A team workspace has admin
+   switches, default on, for personal subscriptions, personal app
+   connections and personal devices. Admins can turn them off but cannot see
+   or use them.
+2. **A personal workspace has exactly one member.** It carries `kind`, and
+   every user gets one, including users who signed up through an invite.
+3. **When a member leaves a team, their bots there are archived (paused).**
+   An admin can take a bot over; it then runs on the admin's or the
+   workspace's resources. The departing member's credentials never stay
+   behind.
+4. **Coordinator: one per person per workspace,** billed to the workspace it
+   runs in.
+5. **Memory is kept per workspace,** as in ChatGPT, so personal memory never
+   reaches a team. Claude keeps memory per account, but its personal and
+   organization accounts are separate, so in practice its memory is
+   separated too (§2.1). Migration: existing `user_facts` go to the user's
+   personal workspace.
+
+The questions as first asked:
 
 1. **A or B?** Recommended: B, with the admin switch on by default.
 2. **Is the personal workspace single-member, like ChatGPT's?** Recommended:
