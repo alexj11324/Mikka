@@ -10,6 +10,7 @@ import { BILLING_LIVE_STATUSES } from '@/lib/workspace-admin/general'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { stripeConfig, stripePost, StripeRequestError, type StripeConfig } from './stripe'
+import { applyPointsEvent, type PointsWebhookOptions } from './points-webhook'
 
 type Env = Readonly<Record<string, string | undefined>>
 
@@ -120,14 +121,15 @@ const subscription = z.object({
 
 /**
  * Applies one verified webhook event. Idempotent by event id. Only
- * subscription events change state; the workspace comes from the metadata
+ * subscription and points events change state; the workspace comes from the metadata
  * Checkout put on the subscription. Returns false for an event already seen.
  */
-export async function applyStripeEvent(raw: unknown): Promise<boolean> {
+export async function applyStripeEvent(raw: unknown, options: PointsWebhookOptions = {}): Promise<boolean> {
   const event = subscriptionEvent.parse(raw)
   return db.transaction(async tx => {
     const inserted = await tx.insert(stripeWebhookEvents).values({ id: event.id, type: event.type }).onConflictDoNothing().returning({ id: stripeWebhookEvents.id })
     if (!inserted.length) return false
+    await applyPointsEvent(tx, event.type, event.data.object, options)
     if (!['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'].includes(event.type)) return true
     const sub = subscription.parse(event.data.object)
     const item = sub.items.data[0]

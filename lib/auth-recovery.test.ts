@@ -12,6 +12,14 @@ test('classifies the backend error responses', () => {
   assert.deepEqual(classifyFailure(500, undefined, null), { ok: false, error: 'failed' })
 })
 
+test('classifies Turnstile refusals on 重新发送验证邮件 (#527)', () => {
+  assert.deepEqual(classifyFailure(400, 'TURNSTILE_INVALID', null), { ok: false, error: 'turnstile_failed' })
+  assert.deepEqual(classifyFailure(400, 'TURNSTILE_REQUIRED', null), { ok: false, error: 'turnstile_failed' })
+  assert.deepEqual(classifyFailure(503, 'SIGNUP_VERIFICATION_UNAVAILABLE', null), { ok: false, error: 'turnstile_unavailable' })
+  assert.equal(recoveryMessageKey('turnstile_failed'), 'signupRefusal.turnstileFailed')
+  assert.equal(recoveryMessageKey('turnstile_unavailable'), 'signupRefusal.turnstileUnavailable')
+})
+
 test('reads the retry delay from a rate limit and falls back to the page cooldown', () => {
   assert.deepEqual(classifyFailure(429, undefined, '42'), { ok: false, error: 'rate_limited', retryAfter: 42 })
   assert.deepEqual(classifyFailure(429, undefined, null), { ok: false, error: 'rate_limited', retryAfter: 60 })

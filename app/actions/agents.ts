@@ -125,7 +125,7 @@ export async function renameDevice(id: string, name: string): Promise<ActionResu
  * while a thread is live on it. Its daemon credentials are revoked at once;
  * past threads keep their device (lib/device-removal.ts).
  */
-export async function removeDevice(id: string): Promise<ActionResult<{ id: string; revokedTokens: number }>> {
+export async function removeDevice(id: string): Promise<ActionResult<{ id: string; revokedTokens: number; uninstall: 'queued' | 'not_possible' }>> {
   return runAction(async () => removeOwnedDevice(await getUserId(), id))
 }
 

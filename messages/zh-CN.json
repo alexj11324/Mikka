@@ -256,7 +256,14 @@
     "retryIn": "{seconds} 秒后可重试",
     "verifyDescription": "输入注册邮箱，我们会发送新的验证链接，链接 15 分钟内有效。",
     "verifyLinkInvalid": "验证链接无效、已过期或已使用。如邮箱尚未验证，请重新发送。",
-    "verifyEmailLink": "验证邮箱或重新发送验证邮件"
+    "verifyEmailLink": "验证邮箱或重新发送验证邮件",
+    "signupRefusal": {
+      "disposableEmail": "不支持临时邮箱，请使用常用邮箱。",
+      "signupRateLimited": "注册请求过多，请稍后重试。",
+      "turnstileFailed": "人机验证未通过",
+      "turnstileUnavailable": "人机验证暂不可用，请稍后重试。",
+      "emailRegistered": "该邮箱已注册，请直接登录。"
+    }
   },
   "Metadata": {
     "title": "Mikka · 任务与文档工作台",
@@ -940,6 +947,14 @@
     "allStatuses": "全部状态"
   },
   "Errors": {
+    "botNotFound": "这个 Bot 不在当前工作区。",
+    "executionPlaceInvalid": "请选择可用设备或云端。",
+    "executionHarnessUnavailable": "所选设备上没有这个 Agent。",
+    "executionModelUnknown": "此模型不可用。",
+    "executionRuleNotFound": "找不到这条执行规则。",
+    "executionRuleOrderInvalid": "执行规则顺序已更改，请刷新后重试。",
+    "executionCommandNotFound": "找不到这次检测。",
+    "executionAccountUnavailable": "此账号不可用。",
     "generic": "操作未成功，请稍后重试。",
     "authRequired": "需要先登录",
     "validationGeneric": "请检查填写内容。",
@@ -1091,7 +1106,18 @@
     "dataExportRateLimited": "每小时只能导出一次，{minutes} 分钟后可再次导出。",
     "accountEmailMismatch": "输入的邮箱与当前账户不一致。",
     "accountSoleAdmin": "你是工作区「{workspaces}」唯一的管理员。先把管理员身份转给其他成员，再删除账户。",
-    "runChainEnded": "此线程的所有尝试都已结束，没有可停止的运行。"
+    "runChainEnded": "此线程的所有尝试都已结束，没有可停止的运行。",
+    "secretNotFound": "该密钥或环境变量已不存在。",
+    "secretNameReserved": "该名称为运行环境保留（例如 PATH、HOME、代理、TLS、加载器、git、E2B 或 MIKKA 相关变量），请换一个名称。",
+    "secretPermissionDenied": "只有工作区管理员可以执行此操作。成员可以添加和编辑仓库级的密钥与环境变量。",
+    "secretNameTaken": "该作用域下已有同名的密钥或环境变量。",
+    "secretLimitReached": "此工作区的密钥和环境变量已达 500 个上限。",
+    "secretsUnavailable": "密钥存储暂时不可用，请稍后重试。",
+    "e2bKeyInvalid": "Key 无效或已被撤销。",
+    "e2bKeyUnverifiable": "暂时无法验证，请稍后重试。",
+    "e2bKeyRateLimited": "E2B 当前对该密钥限流，请几分钟后再试。",
+    "tokenNotFound": "令牌不存在或已被撤销。",
+    "tokenLimitReached": "你在当前工作区的有效令牌已达 50 个上限，请先撤销一个。"
   },
   "Overview": {
     "sections": {
@@ -1683,14 +1709,29 @@
       }
     },
     "workspaceForm": {
-      "id": "工作区 ID",
-      "readOnlyNote": "当前工作区信息为只读。切换或新建工作区，请返回应用后点击左上角的工作区名称。",
-      "label": "工作区基本信息",
       "name": "名称",
-      "invalidSlug": "使用小写字母、数字和单个连字符，不能以连字符开头或结尾。",
-      "urlHelp": "URL 中的标识用于访问工作区。修改地址会影响现有链接。",
-      "previewNote": "表单预览：尚未连接工作区存储，修改不会保存。",
-      "previewLabel": "工作区表单预览"
+      "loading": "正在加载工作区",
+      "icon": "图标",
+      "changeIcon": "更换",
+      "removeIcon": "移除",
+      "address": "地址",
+      "danger": "危险操作",
+      "deleteWorkspace": "删除工作区",
+      "deleting": "正在删除…",
+      "deleteTitle": "删除「{name}」？",
+      "deleteLead": "会永久删除，不能恢复：",
+      "deleteBots": "{count} 个 Bot、它们的线程和云电脑",
+      "deleteTasks": "{tasks} 个任务和 {teams} 个团队",
+      "deletePoints": "未用完的 {points} 点另购点数",
+      "deleteKept": "成员的个人账户和模型订阅不会删除。",
+      "deleteConfirmLabel": "输入 {name} 确认",
+      "transferWorkspace": "转让工作区",
+      "transfer": "转让",
+      "transferTitle": "转让「{name}」",
+      "transferTo": "新的所有者",
+      "transferring": "正在转让…",
+      "transferNoMembers": "没有其他成员",
+      "transferred": "已转让给 {name}"
     },
     "computerPolicy": {
       "heading": "电脑操作",
@@ -2034,7 +2075,233 @@
     },
     "sectionUnavailable": "这个分区还在设计中，暂时没有可用的操作。",
     "workspaceLoading": "正在读取工作区…",
-    "workspaceUnavailable": "无法读取工作区，请刷新后重试。"
+    "workspaceUnavailable": "无法读取工作区，请刷新后重试。",
+    "tokens": {
+      "loading": "正在加载令牌",
+      "create": "新建",
+      "creating": "正在新建…",
+      "createTitle": "新建令牌",
+      "createdTitle": "已新建「{name}」",
+      "name": "名称",
+      "expiryLabel": "过期时间",
+      "expiry": {
+        "30": "30 天",
+        "90": "90 天",
+        "365": "1 年",
+        "never": "永不过期"
+      },
+      "token": "令牌",
+      "copy": "复制",
+      "shownOnce": "只显示这一次。",
+      "done": "完成",
+      "cancel": "取消",
+      "empty": "还没有令牌。",
+      "revoke": "撤销",
+      "revokeTitle": "撤销「{name}」？",
+      "lastUsed": "最近使用 {when}",
+      "neverUsed": "从未使用",
+      "expires": "{date} 过期",
+      "noExpiry": "永不过期",
+      "expired": "已过期"
+    },
+    "secrets": {
+      "heading": "密钥",
+      "add": "添加",
+      "addTitle": "添加密钥",
+      "loading": "正在加载密钥",
+      "empty": "还没有密钥。",
+      "workspaceGroup": "工作区",
+      "repositoryGroup": "仓库 {repository}",
+      "repository": "仓库",
+      "edit": "编辑",
+      "editNamed": "编辑 {name}",
+      "kind": "类型",
+      "kinds": {
+        "secret": "密钥",
+        "env": "环境变量"
+      },
+      "name": "名称",
+      "value": "值",
+      "newValue": "新的值",
+      "scope": "范围",
+      "deleting": "正在删除…",
+      "shortValueNotMasked": "{name} 少于 8 个字符，输出里不会遮住。",
+      "e2b": {
+        "heading": "云电脑",
+        "loading": "正在加载 E2B",
+        "missing": "未设置",
+        "configured": "已设置",
+        "errors": {
+          "invalid": "Key 无效",
+          "rate_limited": "被限流",
+          "template_unavailable": "模板不可用",
+          "unavailable": "E2B 不可用"
+        },
+        "set": "设置",
+        "replace": "更换",
+        "key": "API Key",
+        "newKey": "新的 API Key",
+        "remove": "移除",
+        "removing": "正在移除…",
+        "verifying": "正在验证…"
+      }
+    },
+    "audit": {
+      "loading": "正在加载审计日志",
+      "filter": "筛选",
+      "filters": {
+        "all": "全部",
+        "security": "安全"
+      },
+      "export": "导出",
+      "exportCsv": "导出 CSV",
+      "empty": "最近 90 天没有记录。",
+      "loadMore": "加载更多",
+      "actorTypes": {
+        "bot": "Bot",
+        "token": "令牌"
+      },
+      "categories": {
+        "security": "安全",
+        "secret": "密钥",
+        "permission": "权限",
+        "member": "成员",
+        "billing": "计费"
+      },
+      "actions": {
+        "member": {
+          "invited": "邀请了 {target}",
+          "invitation_revoked": "撤回了对 {target} 的邀请",
+          "joined": "加入了工作区",
+          "removed": "移除了 {target}",
+          "suspended": "停用了 {target}",
+          "reactivated": "恢复了 {target}",
+          "role_changed": "把 {target} 改为{newRole}"
+        },
+        "team": {
+          "access_changed": "修改了团队 {target} 的权限"
+        },
+        "bot": {
+          "permissions_changed": "修改了 {target} 的权限"
+        },
+        "integration": {
+          "permission_changed": "把 {integration} 改为{to}"
+        },
+        "secret": {
+          "created": "添加了密钥 {target}",
+          "replaced": "更新了密钥 {target}",
+          "deleted": "删除了密钥 {target}"
+        },
+        "env": {
+          "created": "添加了环境变量 {target}",
+          "updated": "更新了环境变量 {target}",
+          "deleted": "删除了环境变量 {target}"
+        },
+        "token": {
+          "created": "新建了令牌 {target}",
+          "revoked": "撤销了令牌 {target}"
+        },
+        "auth": {
+          "signed_in": "登录",
+          "sign_in_failed": "登录失败"
+        },
+        "workspace": {
+          "slug_changed": "把地址从 {from} 改为 {to}",
+          "deleted": "删除了工作区",
+          "ownership_transferred": "把工作区转让给 {target}"
+        },
+        "billing": {
+          "checkout_started": "打开了结账",
+          "credits_purchased": "购买了点数",
+          "auto_recharge_changed": "修改了自动充值",
+          "limits_changed": "修改了用量上限"
+        }
+      },
+      "roles": {
+        "admin": "管理员",
+        "owner": "所有者",
+        "member": "成员",
+        "guest": "访客"
+      },
+      "access": {
+        "allow": "允许",
+        "ask": "先问我",
+        "deny": "禁止",
+        "read": "只读",
+        "write": "可写",
+        "none": "不可用"
+      },
+      "apps": {
+        "gmail": "Gmail",
+        "googlecalendar": "Google 日历",
+        "slack": "Slack",
+        "notion": "Notion"
+      }
+    },
+    "appPolicy": {
+      "loading": "正在加载应用权限",
+      "heading": "允许使用的应用",
+      "access": {
+        "allow": "允许",
+        "deny": "禁止"
+      },
+      "apps": {
+        "gmail": "Gmail",
+        "googlecalendar": "Google 日历",
+        "slack": "Slack",
+        "notion": "Notion"
+      }
+    },
+    "usage": {
+      "loading": "正在加载用量",
+      "month": "月份",
+      "groupBy": "分组",
+      "byBot": "按 Bot",
+      "byMember": "按成员",
+      "exportCsv": "导出 CSV",
+      "threads": "线程",
+      "runTime": "运行时长",
+      "runSeconds": "运行秒数",
+      "bot": "Bot",
+      "member": "成员",
+      "yours": "你的用量",
+      "yourBots": "你的 Bot",
+      "chartLabel": "每天的线程数",
+      "empty": "这个月没有线程。",
+      "minutes": "{count} 分钟",
+      "hours": "{count} 小时",
+      "balance": "余额",
+      "points": "{points} 点"
+    },
+    "billing": {
+      "loading": "正在加载计费",
+      "plan": "方案",
+      "team": "Team",
+      "free": "免费",
+      "noPlan": "未订阅",
+      "renews": "下次扣款 {date}",
+      "changePlan": "更改方案",
+      "subscribe": "订阅 Team",
+      "seats": "席位",
+      "seatsUsed": "已用 {used} / {total}",
+      "points": "点数",
+      "planPoints": "本期方案点数",
+      "purchasedPoints": "另购点数",
+      "neverExpires": "不过期",
+      "pointsValue": "{points} 点",
+      "payment": "付款",
+      "paymentMethod": "付款方式",
+      "managePayment": "管理付款方式",
+      "invoices": "发票",
+      "viewInvoices": "查看发票",
+      "status": {
+        "active": "生效中",
+        "trialing": "试用中",
+        "past_due": "付款失败",
+        "unpaid": "未付款",
+        "incomplete": "待完成付款"
+      }
+    }
   },
   "TelegramBot": {
     "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
@@ -3490,6 +3757,53 @@
       "loginPending": "另一次登录还在进行",
       "unavailable": "登录暂时不可用",
       "failed": "没登上，再试一次"
+    }
+  },
+  "Billing": {
+    "allowance": {
+      "section": "免费额度",
+      "title": "银行卡验证",
+      "description": "不扣款；验证后可免费使用 1 美元的 <model><mark></mark> Mikka 默认模型</model>",
+      "verify": "验证",
+      "pending": "正在确认…",
+      "unavailable": "暂不可用",
+      "verified": "银行卡已验证",
+      "claimedElsewhere": "银行卡已验证，这张卡的免费额度已在其他工作区领取"
+    },
+    "balance": {
+      "section": "余额",
+      "points": "{points} 点",
+      "topUp": "充值",
+      "amount": "{amount} · {points} 点",
+      "unavailable": "充值暂不可用",
+      "paid": "付款完成",
+      "history": "账单记录",
+      "date": "日期",
+      "type": "类型",
+      "pointsColumn": "点数",
+      "amountColumn": "金额",
+      "fee": "手续费",
+      "status": "状态",
+      "receipt": "收据",
+      "types": {
+        "topup": "充值",
+        "verification": "验卡赠送",
+        "refund": "退款"
+      },
+      "statuses": {
+        "paid": "已付",
+        "credited": "已入账",
+        "refunded": "已退款"
+      }
+    },
+    "refusal": {
+      "verification_required": "使用 <model><mark></mark> Mikka 默认模型</model>前需要验证银行卡",
+      "free_allowance_used": "免费额度已用完",
+      "points_exhausted": "点数已用完",
+      "platform_paused": "免费额度暂时停用",
+      "unavailable": "Mikka 默认暂不可用，请稍后重试。",
+      "verifyCard": "验证银行卡",
+      "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅"
     }
   }
 }

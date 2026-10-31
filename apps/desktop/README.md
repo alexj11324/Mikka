@@ -64,14 +64,26 @@ scheme is registered.
 
 ## Release
 
-Run the **Desktop release** workflow **from `main`**. There is no version bump
-and no tag to create: the version is the UTC build time, `YYYY.MMDD.HHMM`
-(for example `2026.1030.1834`), stamped into the build, and the release is
-tagged `desktop-<version>` on the built commit. The version in
-`apps/desktop/package.json` is only used for local builds. The workflow
-builds the Apple Silicon macOS installer, signs and notarizes it, and attaches
-the DMG, ZIP and `SHA256SUMS.txt` to a **draft** GitHub Release. Publish the
-draft only after installing it on Apple Silicon.
+Every push to `main`, including each merged PR, runs **Desktop release** and
+publishes a signed, notarized Apple Silicon macOS GitHub Release. The workflow
+can also be run manually from `main`.
+
+There is no version bump or tag to create. The version is
+`2026.10000.<workflow run number>` (for example `2026.10000.42` for run 42).
+The fixed epoch sorts after the earlier `YYYY.MMDD.HHMM` versions. Run numbers
+increase on every push, independent of commit dates, and stay the same on
+retries. The release is tagged `desktop-<version>` on the built commit. The
+version in `apps/desktop/package.json` is only used for local builds.
+
+The workflow attaches the DMG, ZIP, updater metadata and `SHA256SUMS.txt` to
+the published release. It requests GitHub's semantic-version latest selection
+(`make_latest: legacy`) so retrying an older run does not request a downgrade
+of the latest release. Confirm the latest tag and **Check for Updates…** after
+the first automatic release. The updater also checks published releases on launch.
+
+Runs are serialized with a queue of up to 100 pending runs, so a newer merge
+does not replace a pending release. GitHub cancels additional runs if that
+queue fills.
 
 Repository secrets used by the workflow:
 
@@ -83,18 +95,13 @@ Repository secrets used by the workflow:
 | `APPLE_API_KEY_P8_BASE64` / `APPLE_API_KEY_ID` / `APPLE_API_ISSUER` | Alternative notarization auth |
 
 macOS releases fail the workflow when neither notarization credential set is
-present; the manual `skip_notarization` input is for internal builds only.
-The release workflow builds macOS only and does not publish automatically.
-The updater ignores draft releases, so updates reach users only after the draft
-is published.
+present. The manual `skip_notarization` input is for internal builds only;
+those builds remain drafts and are invisible to the updater. The release
+workflow builds macOS ARM64 only.
 
-Before publishing the draft:
-
-1. Confirm the certificate is **Developer ID Application**, not Apple Development.
-2. Add one notarization credential set; without it the macOS job fails by design.
-3. Install the ARM DMG on Apple Silicon, confirm Gatekeeper opens it, sign in
-   through the real provider, and check the Dock badge and a notification.
-4. Publish the draft, then confirm **Check for Updates…** finds it.
+Release acceptance on Apple Silicon: confirm Gatekeeper opens the installed
+DMG, sign in through the real provider, check the Dock badge and a notification,
+and confirm **Check for Updates…** finds the published version.
 
 
 ## Security

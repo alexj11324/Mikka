@@ -30,6 +30,8 @@ export class PublicationError extends Error {
 }
 
 export interface PublishedPullRequest {
+  /** Present for deliveries recorded after #541. */
+  title?: string
   url: string
   state: 'open' | 'draft' | 'merged' | 'closed'
 }

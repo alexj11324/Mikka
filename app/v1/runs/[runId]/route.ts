@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { runPatchSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
@@ -34,12 +34,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ru
   if (!(LIVE_STATES as readonly string[]).includes(patch.state)) return new NextResponse(null, { status: 204 })
   await db.update(agentRuns)
     .set({
-      status: patch.state as (typeof LIVE_STATES)[number],
+      status: sql`CASE WHEN ${agentRuns.status}='paused' THEN 'paused' ELSE ${patch.state} END`,
+      resumeStatus: sql`CASE WHEN ${agentRuns.status}='paused' THEN ${patch.state} ELSE NULL END`,
       ...(patch.sessionId !== undefined ? { sessionId: patch.sessionId } : {}),
       ...(patch.worktree !== undefined ? { worktreePath: patch.worktree } : {}),
       ...(patch.error !== undefined ? { error: patch.error } : {}),
       updatedAt: new Date(),
     })
-    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATES])))
+    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATES, 'paused'])))
   return new NextResponse(null, { status: 204 })
 }

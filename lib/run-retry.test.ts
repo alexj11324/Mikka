@@ -78,3 +78,7 @@ test('no other machine fits: the run waits for its own', () => {
   assert.equal(pickTakeover([candidate('d2', { harnesses: [{ harness: 'claude_code', installed: true }] })], lostRun), null)
   assert.equal(pickTakeover([candidate('d2')], { ...lostRun, remoteUrl: null }), null)
 })
+
+test('a paused run that loses its lease never redispatches on another device', () => {
+  assert.equal(lostRunOutcome({ ...run, status: 'paused' }).kind, 'failed')
+})

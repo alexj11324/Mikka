@@ -14,7 +14,7 @@ import { byoE2BKeyEnabled, E2BKeyError, type E2BKeyErrorCode } from './flag'
 export { byoE2BKeyEnabled, E2BKeyError, type E2BKeyErrorCode }
 
 /** Design update (#436): no last4, verifiedAt or updatedAt in responses (still stored). */
-export interface E2BKeyStatus { configured: boolean; lastErrorCode: string | null; lastErrorAt: string | null }
+export interface E2BKeyStatus { configured: boolean; byoEnabled: boolean; lastErrorCode: string | null; lastErrorAt: string | null }
 
 export type E2BVerifyResult = { ok: true } | { ok: false; code: (typeof E2B_KEY_ERROR_CODES)[number] }
 
@@ -39,9 +39,19 @@ const sealKey = (apiKey: string, workspaceId: string) => {
 export async function getE2BKeyStatus(userId: string, workspaceId: string): Promise<E2BKeyStatus> {
   // Members see whether a key is configured and its last error only; see SECRET_POLICY.memberMayViewE2BStatus.
   await requireSecretPermission(userId, workspaceId, 'e2b.status')
+  return readE2BKeyStatus(workspaceId)
+}
+
+async function readE2BKeyStatus(workspaceId: string): Promise<E2BKeyStatus> {
   const [row] = await guardSecretsDb(() => db.select().from(workspaceE2bKeys).where(eq(workspaceE2bKeys.workspaceId, workspaceId)))
-  if (!row) return { configured: false, lastErrorCode: null, lastErrorAt: null }
-  return { configured: true, lastErrorCode: row.lastErrorCode, lastErrorAt: row.lastErrorAt?.toISOString() ?? null }
+  if (!row) return { configured: false, byoEnabled: byoE2BKeyEnabled(), lastErrorCode: null, lastErrorAt: null }
+  return { configured: true, byoEnabled: byoE2BKeyEnabled(), lastErrorCode: row.lastErrorCode, lastErrorAt: row.lastErrorAt?.toISOString() ?? null }
+}
+
+/** One authorized read for the guide and settings; keys remain write-only. */
+export async function getE2BKeyCapabilityForUser(userId: string, workspaceId: string) {
+  const role = await requireSecretPermission(userId, workspaceId, 'e2b.status')
+  return { canEdit: role === 'admin', ...await readE2BKeyStatus(workspaceId) }
 }
 
 /**

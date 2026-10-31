@@ -157,7 +157,7 @@ async function reclaimLostRun(run: Run, now: Date) {
 /** Ends a run that is still in one of `from`; false when something else ended it first. */
 async function endRun(runId: string, from: readonly Run['status'][], end: { status: 'failed' | 'stopped'; error: string | null }, now: Date): Promise<boolean> {
   const ended = await db.update(agentRuns)
-    .set({ status: end.status, stopReason: 'device_lost', error: end.error, finishedAt: now, updatedAt: now })
+    .set({ status: end.status, pauseReason: null, resumeStatus: null, stopReason: 'device_lost', error: end.error, finishedAt: now, updatedAt: now })
     .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...from])))
     .returning({ id: agentRuns.id })
   return ended.length > 0

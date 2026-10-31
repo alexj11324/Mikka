@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { auth } from '@/lib/api-auth';
 import { factoryLifecycleEnabled, factoryRuntimeForBot } from '@/lib/factory/runtime';
 import { handleFactoryQuestionList } from '@/lib/factory/questions/ask-user';
 export const dynamic = 'force-dynamic';

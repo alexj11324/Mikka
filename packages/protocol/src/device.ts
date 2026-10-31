@@ -145,7 +145,7 @@ export const heartbeatRunSchema = z.object({
 export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
 
 /** `POST /v1/devices/:deviceId/heartbeat` */
-export const deviceManagementCommand = z.object({ id: z.uuid(), kind: z.enum(['redetect', 'restart', 'update']) })
+export const deviceManagementCommand = z.object({ id: z.uuid(), kind: z.enum(['redetect', 'restart', 'update', 'uninstall']) })
 export const deviceHeartbeatSchema = z.object({
   completedDeviceCommands: z.array(z.uuid()).max(100).optional(),
   failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),

@@ -5,10 +5,10 @@ import { ActionFailureError } from "@/lib/action-error";
 import { loadWorkspaceContext } from "@/lib/workspace-access";
 import { pool } from "@/lib/db";
 import { ExecutionSettings } from "@/lib/execution-settings";
-async function context() {
+async function context(workspaceId?: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ActionFailureError("authRequired");
-  const workspace = await loadWorkspaceContext(undefined, session.user);
+  const workspace = await loadWorkspaceContext(workspaceId, session.user);
   return { ownerId: session.user.id, workspaceId: workspace.workspace.id };
 }
 export async function listExecutionRules() {
@@ -70,5 +70,15 @@ export async function setBotModel(
   );
 }
 export async function getBotModel(botId: string | null) {
-  return new ExecutionSettings(pool).botModel(await context(), botId);
+  return new ExecutionSettings(pool).botModelOption(await context(), botId);
+}
+
+export async function listWorkspaceIssueLabels(workspaceId?: string) {
+  return new ExecutionSettings(pool).labels(await context(workspaceId));
+}
+export async function refreshBotModels(connectionId: string, workspaceId?: string) {
+  return new ExecutionSettings(pool).refreshBotModels(await context(workspaceId), connectionId);
+}
+export async function getRedetectDeviceStatus(commandId: string, workspaceId?: string) {
+  return new ExecutionSettings(pool).redetectStatus(await context(workspaceId), commandId);
 }

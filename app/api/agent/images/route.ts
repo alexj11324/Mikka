@@ -1,6 +1,6 @@
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { agentImageQuery, findAgentImage } from '@/lib/agent-images'
 
 async function handleGET(request: Request) {

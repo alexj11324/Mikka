@@ -256,7 +256,14 @@
     "retryIn": "Try again in {seconds}s",
     "verifyDescription": "Enter the email you signed up with to get a new verification link. It works for 15 minutes.",
     "verifyLinkInvalid": "This verification link is invalid, expired or already used. If your email is not verified yet, send a new link.",
-    "verifyEmailLink": "Verify your email or resend the link"
+    "verifyEmailLink": "Verify your email or resend the link",
+    "signupRefusal": {
+      "disposableEmail": "Temporary email addresses aren't supported. Please use a regular address.",
+      "signupRateLimited": "Too many sign-up attempts. Please try again later.",
+      "turnstileFailed": "Human verification failed",
+      "turnstileUnavailable": "Human verification is unavailable. Please try again later.",
+      "emailRegistered": "This email is already registered. Please sign in."
+    }
   },
   "Metadata": {
     "title": "Mikka · Tasks and documents workspace",
@@ -940,6 +947,14 @@
     "allStatuses": "All statuses"
   },
   "Errors": {
+    "botNotFound": "This bot does not exist in this workspace.",
+    "executionPlaceInvalid": "Choose an available device or cloud.",
+    "executionHarnessUnavailable": "This harness is unavailable on the selected device.",
+    "executionModelUnknown": "This model is unavailable.",
+    "executionRuleNotFound": "This execution rule was not found.",
+    "executionRuleOrderInvalid": "The execution rule order has changed. Reload and retry.",
+    "executionCommandNotFound": "This detection command was not found.",
+    "executionAccountUnavailable": "This account is unavailable.",
     "generic": "Something went wrong. Please try again.",
     "authRequired": "Sign in required",
     "validationGeneric": "Please check the information you entered.",
@@ -1091,7 +1106,18 @@
     "dataExportRateLimited": "You can export your data once an hour. Try again in {minutes} min.",
     "accountEmailMismatch": "The email doesn’t match this account.",
     "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
-    "runChainEnded": "Every attempt of this thread has already ended; there is nothing left to stop."
+    "runChainEnded": "Every attempt of this thread has already ended; there is nothing left to stop.",
+    "secretNotFound": "That secret or variable no longer exists.",
+    "secretNameReserved": "This name is reserved by the runtime (for example PATH, HOME, proxy, TLS, loader, git, E2B or MIKKA variables). Choose another name.",
+    "secretPermissionDenied": "Only workspace admins can do this. Members can add and edit repository secrets and variables.",
+    "secretNameTaken": "A secret or variable with this name already exists in this scope.",
+    "secretLimitReached": "This workspace has reached the limit of 500 secrets and variables.",
+    "secretsUnavailable": "Secret storage isn't available right now. Please try again later.",
+    "e2bKeyInvalid": "This E2B key is invalid or has been revoked.",
+    "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
+    "e2bKeyRateLimited": "E2B is rate limiting this key right now. Wait a few minutes and try again.",
+    "tokenNotFound": "This token does not exist or was already revoked.",
+    "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first."
   },
   "Overview": {
     "sections": {
@@ -1683,14 +1709,29 @@
       }
     },
     "workspaceForm": {
-      "id": "Workspace ID",
-      "readOnlyNote": "Workspace information is read-only. To switch or create a workspace, return to the app and select the workspace name at the top left.",
-      "label": "Workspace basics",
       "name": "Name",
-      "invalidSlug": "Use lowercase letters, numbers, and single hyphens; do not start or end with a hyphen.",
-      "urlHelp": "The URL slug identifies the workspace. Changing it affects existing links.",
-      "previewNote": "Form preview: workspace storage is not connected, so changes are not saved.",
-      "previewLabel": "Workspace form preview"
+      "loading": "Loading workspace",
+      "icon": "Icon",
+      "changeIcon": "Change",
+      "removeIcon": "Remove",
+      "address": "Address",
+      "danger": "Danger zone",
+      "deleteWorkspace": "Delete workspace",
+      "deleting": "Deleting…",
+      "deleteTitle": "Delete “{name}”?",
+      "deleteLead": "Permanently deleted, with no way back:",
+      "deleteBots": "{count, plural, one {# bot} other {# bots}}, their threads and cloud computers",
+      "deleteTasks": "{tasks, plural, one {# task} other {# tasks}} and {teams, plural, one {# team} other {# teams}}",
+      "deletePoints": "{points} unused purchased points",
+      "deleteKept": "Members’ personal accounts and model subscriptions are kept.",
+      "deleteConfirmLabel": "Type {name} to confirm",
+      "transferWorkspace": "Transfer workspace",
+      "transfer": "Transfer",
+      "transferTitle": "Transfer “{name}”",
+      "transferTo": "New owner",
+      "transferring": "Transferring…",
+      "transferNoMembers": "No other members",
+      "transferred": "Transferred to {name}"
     },
     "computerPolicy": {
       "heading": "Computer use",
@@ -2034,7 +2075,233 @@
     },
     "sectionUnavailable": "This section is still being designed and has nothing to act on yet.",
     "workspaceLoading": "Loading the workspace…",
-    "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again."
+    "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again.",
+    "tokens": {
+      "loading": "Loading tokens",
+      "create": "New",
+      "creating": "Creating…",
+      "createTitle": "New token",
+      "createdTitle": "Created “{name}”",
+      "name": "Name",
+      "expiryLabel": "Expires",
+      "expiry": {
+        "30": "30 days",
+        "90": "90 days",
+        "365": "1 year",
+        "never": "Never"
+      },
+      "token": "Token",
+      "copy": "Copy",
+      "shownOnce": "Shown this once only.",
+      "done": "Done",
+      "cancel": "Cancel",
+      "empty": "No tokens yet.",
+      "revoke": "Revoke",
+      "revokeTitle": "Revoke “{name}”?",
+      "lastUsed": "Last used {when}",
+      "neverUsed": "Never used",
+      "expires": "Expires {date}",
+      "noExpiry": "Never expires",
+      "expired": "Expired"
+    },
+    "secrets": {
+      "heading": "Secrets",
+      "add": "Add",
+      "addTitle": "Add secret",
+      "loading": "Loading secrets",
+      "empty": "No secrets yet.",
+      "workspaceGroup": "Workspace",
+      "repositoryGroup": "Repository {repository}",
+      "repository": "Repository",
+      "edit": "Edit",
+      "editNamed": "Edit {name}",
+      "kind": "Type",
+      "kinds": {
+        "secret": "Secret",
+        "env": "Environment variable"
+      },
+      "name": "Name",
+      "value": "Value",
+      "newValue": "New value",
+      "scope": "Scope",
+      "deleting": "Deleting…",
+      "shortValueNotMasked": "{name} is shorter than 8 characters and is not masked in output.",
+      "e2b": {
+        "heading": "Cloud computer",
+        "loading": "Loading E2B",
+        "missing": "Not set",
+        "configured": "Set",
+        "errors": {
+          "invalid": "Invalid key",
+          "rate_limited": "Rate limited",
+          "template_unavailable": "Template unavailable",
+          "unavailable": "E2B unavailable"
+        },
+        "set": "Set",
+        "replace": "Replace",
+        "key": "API key",
+        "newKey": "New API key",
+        "remove": "Remove",
+        "removing": "Removing…",
+        "verifying": "Verifying…"
+      }
+    },
+    "audit": {
+      "loading": "Loading audit log",
+      "filter": "Filter",
+      "filters": {
+        "all": "All",
+        "security": "Security"
+      },
+      "export": "Export",
+      "exportCsv": "Export CSV",
+      "empty": "Nothing in the last 90 days.",
+      "loadMore": "Load more",
+      "actorTypes": {
+        "bot": "Bot",
+        "token": "Token"
+      },
+      "categories": {
+        "security": "Security",
+        "secret": "Secrets",
+        "permission": "Permissions",
+        "member": "Members",
+        "billing": "Billing"
+      },
+      "actions": {
+        "member": {
+          "invited": "invited {target}",
+          "invitation_revoked": "revoked the invitation to {target}",
+          "joined": "joined the workspace",
+          "removed": "removed {target}",
+          "suspended": "suspended {target}",
+          "reactivated": "reactivated {target}",
+          "role_changed": "made {target} {newRole}"
+        },
+        "team": {
+          "access_changed": "changed access for team {target}"
+        },
+        "bot": {
+          "permissions_changed": "changed permissions for {target}"
+        },
+        "integration": {
+          "permission_changed": "set {integration} to {to}"
+        },
+        "secret": {
+          "created": "added secret {target}",
+          "replaced": "updated secret {target}",
+          "deleted": "deleted secret {target}"
+        },
+        "env": {
+          "created": "added variable {target}",
+          "updated": "updated variable {target}",
+          "deleted": "deleted variable {target}"
+        },
+        "token": {
+          "created": "created token {target}",
+          "revoked": "revoked token {target}"
+        },
+        "auth": {
+          "signed_in": "signed in",
+          "sign_in_failed": "failed to sign in"
+        },
+        "workspace": {
+          "slug_changed": "changed the address from {from} to {to}",
+          "deleted": "deleted the workspace",
+          "ownership_transferred": "transferred the workspace to {target}"
+        },
+        "billing": {
+          "checkout_started": "opened checkout",
+          "credits_purchased": "bought points",
+          "auto_recharge_changed": "changed auto recharge",
+          "limits_changed": "changed usage limits"
+        }
+      },
+      "roles": {
+        "admin": "an admin",
+        "owner": "the owner",
+        "member": "a member",
+        "guest": "a guest"
+      },
+      "access": {
+        "allow": "allowed",
+        "ask": "ask first",
+        "deny": "blocked",
+        "read": "read only",
+        "write": "read and write",
+        "none": "off"
+      },
+      "apps": {
+        "gmail": "Gmail",
+        "googlecalendar": "Google Calendar",
+        "slack": "Slack",
+        "notion": "Notion"
+      }
+    },
+    "appPolicy": {
+      "loading": "Loading app permissions",
+      "heading": "Apps bots may use",
+      "access": {
+        "allow": "Allow",
+        "deny": "Block"
+      },
+      "apps": {
+        "gmail": "Gmail",
+        "googlecalendar": "Google Calendar",
+        "slack": "Slack",
+        "notion": "Notion"
+      }
+    },
+    "usage": {
+      "loading": "Loading usage",
+      "month": "Month",
+      "groupBy": "Group by",
+      "byBot": "By bot",
+      "byMember": "By member",
+      "exportCsv": "Export CSV",
+      "threads": "Threads",
+      "runTime": "Run time",
+      "runSeconds": "Run seconds",
+      "bot": "Bot",
+      "member": "Member",
+      "yours": "Your usage",
+      "yourBots": "Your bots",
+      "chartLabel": "Threads per day",
+      "empty": "No threads this month.",
+      "minutes": "{count} min",
+      "hours": "{count} h",
+      "balance": "Balance",
+      "points": "{points} points"
+    },
+    "billing": {
+      "loading": "Loading billing",
+      "plan": "Plan",
+      "team": "Team",
+      "free": "Free",
+      "noPlan": "No subscription",
+      "renews": "Next charge {date}",
+      "changePlan": "Change plan",
+      "subscribe": "Subscribe to Team",
+      "seats": "Seats",
+      "seatsUsed": "{used} of {total} used",
+      "points": "Points",
+      "planPoints": "Plan points this period",
+      "purchasedPoints": "Purchased points",
+      "neverExpires": "Never expire",
+      "pointsValue": "{points} points",
+      "payment": "Payment",
+      "paymentMethod": "Payment method",
+      "managePayment": "Manage payment method",
+      "invoices": "Invoices",
+      "viewInvoices": "View invoices",
+      "status": {
+        "active": "Active",
+        "trialing": "Trial",
+        "past_due": "Payment failed",
+        "unpaid": "Unpaid",
+        "incomplete": "Payment pending"
+      }
+    }
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
@@ -3490,6 +3757,53 @@
       "loginPending": "Another sign-in is still running",
       "unavailable": "Sign-in is unavailable right now",
       "failed": "Couldn’t sign in. Try again."
+    }
+  },
+  "Billing": {
+    "allowance": {
+      "section": "Free allowance",
+      "title": "Card verification",
+      "description": "Nothing is charged; verifying adds $1 of free <model><mark></mark> Mikka Default</model> use",
+      "verify": "Verify",
+      "pending": "Confirming…",
+      "unavailable": "Unavailable",
+      "verified": "Card verified",
+      "claimedElsewhere": "Card verified; its free allowance was already claimed in another workspace"
+    },
+    "balance": {
+      "section": "Balance",
+      "points": "{points} points",
+      "topUp": "Top up",
+      "amount": "{amount} · {points} points",
+      "unavailable": "Top-up unavailable",
+      "paid": "Payment complete",
+      "history": "Billing history",
+      "date": "Date",
+      "type": "Type",
+      "pointsColumn": "Points",
+      "amountColumn": "Amount",
+      "fee": "Fee",
+      "status": "Status",
+      "receipt": "Receipt",
+      "types": {
+        "topup": "Top-up",
+        "verification": "Card verification",
+        "refund": "Refund"
+      },
+      "statuses": {
+        "paid": "Paid",
+        "credited": "Credited",
+        "refunded": "Refunded"
+      }
+    },
+    "refusal": {
+      "verification_required": "<model><mark></mark> Mikka Default</model> needs a verified card",
+      "free_allowance_used": "Free allowance used up",
+      "points_exhausted": "Points used up",
+      "platform_paused": "Free allowance paused",
+      "unavailable": "Mikka Default is unavailable. Please try again later.",
+      "verifyCard": "Verify card",
+      "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
     }
   }
 }
