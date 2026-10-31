@@ -8,7 +8,9 @@ by default (decision 2026-10-31): change the code, the R-entry in
 `docs/design/rules.md` and its `lint:ui` / `check-copy` check together. The
 exception is a skill rule that does not fit a dense SaaS product (marketing
 hero type, decorative motion, big whitespace in data views); skip it and say
-why. Where the two skills disagree, `interface-design` decides. The example
+why. Where the two skills disagree, `interface-design` decides. A skill audit
+never changes the shell layout (R-35), and the generated gradient avatar for
+people is intentional (R-36). The example
 code and copy in a skill are illustrations, not Mikka's components or wording.
 
 Vendored on 2026-10-29, unmodified, from these pinned commits:

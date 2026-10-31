@@ -347,16 +347,24 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
   14 approval and list card, 14 dialog (`rounded-xl`, the `DialogContent` /
   `AlertDialogContent` default; a call site does not change it), 999 pill. Spacing is a multiple of 4.
-  Exception: 建议 cards use 16 (R-55).
+  Exception: 建议 cards use 16 (R-55). An `icon-sm` button (28px) extends
+  its hit area to 40px on a coarse pointer with an invisible ring
+  (interface-design, Alex 2026-10-31).
 - **R-34** Status colours come only from the StatusBadge set (Figma
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,
   forward, centred search pill that opens ⌘K, the 浏览器 globe toggle at the
   right, R-57), 72px icon rail with a text label under each icon, in this
   order: 主页, 建议, 看板, 插件, Artifact; and one rounded content card. Build on
-  `components/app-shell.tsx`; no reUI App Shell blocks.
+  `components/app-shell.tsx`; no reUI App Shell blocks. Standing rule: a
+  skill audit (unslop, interface-design) never changes the shell layout;
+  Alex keeps it as it is (2026-10-31).
 - **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`, all 16
-  shapes kept); people use letter avatars.
+  shapes kept); people use letter avatars. A person without an uploaded
+  picture gets a generated gradient avatar (`public/avatars/*.webp`): after
+  adopting the unslop skill Alex still requires it (2026-10-31), so it is
+  intentional and not a violation. A bot's avatars move through the idle
+  montage on one shared clock, so every copy of one bot shows the same pose.
 - **R-37** Animate only when the user's action changes a size or position.
   Position and size move with springs; opacity and colour use a duration.
   Springs settle without visible overshoot (no bouncy springs). No hover
