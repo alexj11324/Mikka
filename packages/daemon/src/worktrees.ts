@@ -46,6 +46,25 @@ export function isInside(parent: string, child: string) {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))
 }
 
+const configWriters = new Map<string, Promise<unknown>>()
+
+/**
+ * Runs `work` alone among this process's writers of `repoPath`'s git
+ * config. Concurrent runs share one clone cache, and `remote set-url`,
+ * `worktree add` (it records the new branch's upstream) and `branch -D` all
+ * take `.git/config.lock`; git fails rather than waits when another holds it.
+ */
+export function withRepoConfig<T>(repoPath: string, work: () => Promise<T>): Promise<T> {
+  const key = resolve(repoPath)
+  const result = (configWriters.get(key) ?? Promise.resolve()).then(work, work)
+  const settled = result.then(() => undefined, () => undefined)
+  configWriters.set(key, settled)
+  void settled.then(() => {
+    if (configWriters.get(key) === settled) configWriters.delete(key)
+  })
+  return result
+}
+
 export class WorktreeManager {
   private usage = 0
   private usageAt = 0
@@ -75,16 +94,18 @@ export class WorktreeManager {
     const path = this.pathFor(runId)
     if (existsSync(join(path, ".git"))) return path
     mkdirSync(this.root, { recursive: true })
-    await simpleGit(repoPath).raw([
-      "worktree",
-      "add",
-      "-B",
-      runBranch(runId),
-      path,
-      // The base branch comes from the server: never let it read as an option.
-      "--end-of-options",
-      baseBranch,
-    ])
+    await withRepoConfig(repoPath, () =>
+      simpleGit(repoPath).raw([
+        "worktree",
+        "add",
+        "-B",
+        runBranch(runId),
+        path,
+        // The base branch comes from the server: never let it read as an option.
+        "--end-of-options",
+        baseBranch,
+      ])
+    )
     return path
   }
 
@@ -289,8 +310,10 @@ export class WorktreeManager {
       branches.push(branch)
     }
     if (path) await this.removePath(path, repoPath)
-    for (const branch of branches)
-      await git.raw(["branch", "-D", "--", branch]).catch(() => undefined)
+    await withRepoConfig(repoPath, async () => {
+      for (const branch of branches)
+        await git.raw(["branch", "-D", "--", branch]).catch(() => undefined)
+    })
     return true
   }
 

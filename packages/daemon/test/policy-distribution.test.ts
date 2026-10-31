@@ -120,7 +120,7 @@ it('registers the saved device session before verifying a signed active journal 
     if(path.endsWith('/coordinator'))return new Response(null,{status:404})
     return json({})
   })
-  const daemon=new Daemon({dataDir,flavor:'dev',link,quotaSource:null,heartbeatMs:60_000,harnesses:[{harness:'mock',installed:true,version:'test'}],log:createLogger({level:'silent'})})
+  const daemon=new Daemon({dataDir,flavor:'dev',agentSandbox:null,link,quotaSource:null,heartbeatMs:60_000,harnesses:[{harness:'mock',installed:true,version:'test'}],log:createLogger({level:'silent'})})
   try {
     await daemon.start()
     await waitFor(()=>{const state=daemon.supervisor.get(run.runId);if(state.error)throw Error(state.error);return state.state==='running'})
