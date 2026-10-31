@@ -49,7 +49,7 @@ test('Coordinator streams before completion, resumes once and isolates bot and o
     expect(botId).toMatch(/^[a-f0-9-]{36}$/)
     await expect.poll(() => holder(botId)).toBeFalsy()
 
-    await bots.getByRole('button', { name: 'Coordinator', exact: true }).click()
+    await bots.getByRole('button', { name: /^Coordinator(?:，正在工作)?$/ }).click()
     const composer = page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })
     await hydrated(composer)
     await composer.fill(primary.marker)
@@ -108,7 +108,7 @@ test('Coordinator streams before completion, resumes once and isolates bot and o
     await expect(botChat.getByText(botLast, { exact: true })).toBeVisible()
     await expect.poll(() => persisted(botId, botFirst)).toBe(1)
 
-    await bots.getByRole('button', { name: 'Coordinator', exact: true }).click()
+    await bots.getByRole('button', { name: /^Coordinator(?:，正在工作)?$/ }).click()
     await expect(live).toBeVisible()
     await page.reload()
     await expect(live).toHaveCount(1)
