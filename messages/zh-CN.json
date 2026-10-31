@@ -1866,6 +1866,7 @@
       "refusedOff": "此部署未开启模型订阅",
       "refusedAccount": "{provider} 账号不可用",
       "refusedProvider": "{provider} 拒绝了授权请求",
+      "refusedStore": "Mikka 的凭据存储暂时不可用,{provider} 没有连接。你的账号没有问题,稍后再试",
       "refusedPage": "{provider} 返回的授权页面无法识别",
       "restart": "重新开始"
     },

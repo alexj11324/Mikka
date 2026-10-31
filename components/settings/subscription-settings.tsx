@@ -66,6 +66,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     if (code === 'auth_required') return t('signedOut')
     if (code === 'backend_unavailable') return t('refusedOff')
     if (code === 'account_unavailable') return t('refusedAccount', { provider: t(provider) })
+    if (code === 'secret_store_unavailable' || code === 'secret_create_outcome_unknown' || code === 'metadata_unavailable') return t('refusedStore', { provider: t(provider) })
     if (code === 'provider_operation_failed') return t('refusedProvider', { provider: t(provider) })
     return t(key, { provider: t(provider) })
   }, [t])

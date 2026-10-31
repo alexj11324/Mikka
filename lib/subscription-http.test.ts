@@ -8,15 +8,16 @@ import type { SubscriptionService } from './subscription-service'
 
 const workspaceId = randomUUID(), connectionId = randomUUID()
 function connect(failure: Error, oauth = true) {
-  const lines: string[] = []
+  const lines: string[] = [], calls: string[] = [], removed: string[] = []
   const service = {
     capabilities: { oauth: { codex: oauth, claude: oauth } },
     repository: {
       create: async () => connectionId,
       connection: async () => ({ id: connectionId, workspaceId, provider: 'codex', epoch: '1' }),
       scope: () => ({}),
+      remove: async (_owner: string, id: string) => { removed.push(id) },
     },
-    worker: () => ({ call: async () => { throw failure } }),
+    worker: () => ({ call: async (method: string) => { calls.push(method); if (method === 'oauthStart') throw failure; return {} } }),
   } as unknown as SubscriptionService
   const deps: SubscriptionHTTPDependencies = {
     session: async () => ({ userId: 'user-1', sessionId: 'session-secret-value' }),
@@ -25,7 +26,7 @@ function connect(failure: Error, oauth = true) {
     log: line => { lines.push(line) },
   }
   const request = new Request('https://mikka.test/api/subscriptions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'connect', workspaceId, provider: 'codex' }) })
-  return { lines, response: subscriptionHTTP(deps)(request) }
+  return { lines, calls, removed, response: subscriptionHTTP(deps)(request) }
 }
 
 test('a refused sign-in start returns and logs the worker code, nothing secret', async () => {
@@ -36,6 +37,13 @@ test('a refused sign-in start returns and logs the worker code, nothing secret',
   assert.equal(lines.length, 1)
   assert.deepEqual(JSON.parse(lines[0]), { level: 'warn', msg: 'subscription_refused', action: 'connect', provider: 'codex', code: 'provider_operation_failed', error: 'WorkerRefusal' })
   assert.doesNotMatch(lines[0], /session-secret-value|user-1|https?:/)
+})
+
+test('a refused sign-in start leaves no connection row', async () => {
+  const { calls, removed, response } = connect(new WorkerRefusal('secret_store_unavailable'))
+  assert.deepEqual(await (await response).json(), { error: 'secret_store_unavailable' })
+  assert.deepEqual(calls, ['oauthStart', 'disconnect'])
+  assert.deepEqual(removed, [connectionId])
 })
 
 test('route refusals keep their code; unknown errors stay generic but are logged by class', async () => {

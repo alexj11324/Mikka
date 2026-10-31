@@ -1866,6 +1866,7 @@
       "refusedOff": "Model subscriptions are off for this deployment",
       "refusedAccount": "{provider} account unavailable",
       "refusedProvider": "{provider} refused the sign-in request",
+      "refusedStore": "Mikka's credential store is unavailable, so {provider} wasn't connected. Your account is fine. Try again later",
       "refusedPage": "{provider} sent an unrecognized sign-in page",
       "restart": "Start over"
     },
