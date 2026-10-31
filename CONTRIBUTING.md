@@ -48,7 +48,11 @@ cannot.
    PR checks run against GitHub's synthetic merge candidate. Same-repository
    branch pushes without a PR do not run a duplicate blocking suite.
    The production build runs in the browser job of a ready pull request,
-   and in the source CI for main and merge-group events.
+   and in the browser build on main. Merge-group events retain a build in source CI.
+   Source checks, two source-test groups and daemon acceptance run independently. Database
+   suites are partitioned across four isolated PostgreSQL jobs; every shard
+   validates the complete inventory before running its share sequentially, and
+   the protected gate requires every shard to succeed.
 3. **Ready pull requests** (CI job "Browser tests (before merge)"): the browser
    smoke set plus the specs of the areas the change touches, against the PR
    merged with main, in one job ("Browser tests (pull request)": install, build,
@@ -62,7 +66,7 @@ cannot.
    | Mapped paths (search, settings, Slack, Factory, threads, suggestions, devices, auth, relations, active agents) | Smoke plus the complete specs of each touched area |
    | An edited spec under `tests/e2e/` | Smoke plus that complete spec |
    | Paths the performance budgets measure (navigation shell, settings, saved history) or a performance spec | Also the desktop/mobile performance suite |
-   | Selection-policy changes (classifier, runner, this workflow) | Also "Browser selection validation": every scoped spec as one real subset |
+   | Selection-policy changes (classifier, runner, this workflow) | Also "Browser selection validation": every scoped spec partitioned across four isolated subsets, each retaining the smoke tag |
    | Unsafe file modes, unavailable comparisons, `integrate/` branches | The full tier (below) before merge |
 
    The smoke set covers anonymous redirects, sign-up (with Cloudflare's public
@@ -77,7 +81,7 @@ cannot.
    other file escalates to the full tier. Failed classification or a
    skipped/failed selected job fails the required gate.
 4. **After merge** (CI, every code-bearing push to main): the functional spec
-   files (the main list) on two shards, plus the runtime gates and both MVP
+   files (the main list) on four shards, plus the runtime gates and both MVP
    tests. A red run opens one issue (or comments on the open one) that names the
    merged pull request's author, who fixes forward or reverts within one working
    day; the issue closes on the next green main run.
@@ -91,15 +95,17 @@ cannot.
    Each sharded job has its own PostgreSQL service, test-account directory and
    artifact name, so no database, lease or fixture is shared concurrently. The
    evidence scanner audits every log and report before any upload, in every
-   tier.
+   tier. Build jobs restore only Next's incremental `.next/cache`; successful
+   main builds seed that cache for later PRs. Runtime artifacts exclude the
+   build cache and retain the application built for the exact tested revision.
 
 A pull request that only changes documentation — non-executable Markdown in
 `docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`,
 the pull request template, or the README diagrams (`docs/assets/*.svg` and their generator scripts) — skips the heavy unit, build and browser jobs. The
 required status checks report success from small gate jobs (also on a docs-only main push). Other changes
 retain every source, migration and database integration gate and a production
-build (in the pull request browser job, and in "Production build and browser
-interactions" on main and merge-group events); only browser
+build (in browser CI for pull requests and main, and source CI for merge-group
+events); only browser
 scenario selection and performance timing are tiered. Test selection
 is printed in the Changed files job and its summary. The browser environment
 remains an isolated PostgreSQL service and the built application on the GitHub

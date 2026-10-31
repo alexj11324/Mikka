@@ -122,6 +122,8 @@ export function auditSource(file, text, policy) {
       // next/font/local 的字体文件与 CSS 变量在调用处对照 typography.localFonts 校验。
       if (/^(?:@base-ui\/|@radix-ui\/|radix-ui$|react\/jsx-runtime|react\/jsx-dev-runtime)/.test(from)) add(node, 'components/no-primitive-bypass', '业务代码只组合已下载组件，不直接使用底层 primitives 或 JSX runtime。')
       if (/^(?:@tabler\/icons|@heroicons\/|react-icons\/|@phosphor-icons\/)/.test(from) && from !== policy.iconLibrary) add(node, 'icons/library', `仅使用配置的 ${policy.iconLibrary}。`)
+      // R-71 (unslop): no sparkle for "AI"; thinking is Brain, a bot is Bot.
+      if (from === policy.iconLibrary) for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Sparkles?|WandSparkles)(?:Icon)?$/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/no-sparkle', 'AI 不用闪光图标（R-71）：思考用 Brain，Bot 用 Bot。')
     }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const entries = variables.get(node.name.text) ?? []
@@ -202,6 +204,11 @@ export function auditSource(file, text, policy) {
     const cssAssertionProperty = /\.spec\.[jt]sx?$/.test(file) && !!node.parent && ts.isCallExpression(node.parent) && ts.isPropertyAccessExpression(node.parent.expression) && node.parent.expression.name.text === 'toHaveCSS' && node.parent.arguments[0] === node
     if (ts.isStringLiteralLike(node) && !cssAssertionProperty) {
       for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|divide-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message), { allowHorizontalRule })
+      const bases = splitUtilities(node.text).map(utilityBase)
+      // R-37 (unslop, interface-design): name the animated properties; transition-all also animates layout.
+      if (bases.includes('transition-all')) add(node, 'motion/transition-all', '过渡写明属性（transition-colors、transition-[transform,opacity]），不用 transition-all（R-37）。')
+      // R-32 (unslop): labels are sentence case; an uppercase label with wide tracking is the AI-template look.
+      if (bases.includes('uppercase') && bases.some(base => /^tracking-(?:wide|wider|widest|\[)/.test(base))) add(node, 'typography/uppercase-label', '标签用句子大小写，不用全大写加宽字距（R-32）。')
     }
     if (ts.isPropertyAssignment(node) && /^(?:fontSize|fontFamily|fontWeight|lineHeight|letterSpacing|fontVariant|fontStyle)$/.test(node.name.getText(source).replaceAll(/['"]/g, ''))) add(node, 'typography/no-inline-values', '排版只能通过预设档位；不允许 style/配置对象手写字体值。')
     if (ts.isCallExpression(node)) {
