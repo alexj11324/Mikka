@@ -5,6 +5,7 @@ import { ActionFailureError } from "@/lib/action-error";
 import { loadWorkspaceContext } from "@/lib/workspace-access";
 import { pool } from "@/lib/db";
 import { ExecutionSettings } from "@/lib/execution-settings";
+import { botModelMenu, botModelScope } from "@/lib/bot-model-menu";
 async function context(workspaceId?: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ActionFailureError("authRequired");
@@ -67,18 +68,22 @@ export async function redetectDevice(deviceId: string) {
 export async function listBotModels() {
   return new ExecutionSettings(pool).botModels(await context());
 }
-export async function setBotModel(
-  botId: string | null,
-  bindingId: string | null,
-) {
-  return new ExecutionSettings(pool).setBotModel(
-    await context(),
-    botId,
-    bindingId,
-  );
+async function chatScope(botId: string | null) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) throw new ActionFailureError("authRequired");
+  return botModelScope(session.user.id, botId);
 }
-export async function getBotModel(botId: string | null) {
-  return new ExecutionSettings(pool).botModelOption(await context(), botId);
+/** The composer's model menu for a bot, or the Coordinator (`null`). */
+export async function getBotModelMenu(botId: string | null) {
+  const scope = await chatScope(botId);
+  return botModelMenu(pool, new ExecutionSettings(pool), scope, botId);
+}
+/** Saves the composer's pick for the bot's next runs; a run already going keeps its model. */
+export async function chooseBotModel(botId: string | null, id: string) {
+  const scope = await chatScope(botId);
+  const settings = new ExecutionSettings(pool);
+  await settings.setBotModel(scope, botId, id);
+  return botModelMenu(pool, settings, scope, botId);
 }
 
 export async function listWorkspaceIssueLabels(workspaceId?: string) {

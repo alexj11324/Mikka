@@ -1,0 +1,78 @@
+import { randomUUID } from 'node:crypto'
+import type { Page } from '@playwright/test'
+import { Pool } from 'pg'
+import { test, expect, register } from './fixtures'
+
+// The model chip in a chat's composer (decision 2026-10-31-2330), against the
+// real application, PostgreSQL and server actions. Only the connected
+// subscriptions are seeded: no provider sign-in runs in the browser suite.
+let pool: Pool | null = null
+const db = () => pool ??= new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 1 })
+test.afterAll(async () => { await pool?.end() })
+
+async function seed(page: Page) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('需要已登录的页面。')
+  const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  const { rows: [member] } = await db().query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId" = $1 AND status = $2 ORDER BY "createdAt" LIMIT 1', [session.userId, 'active'])
+  const connections: Record<string, string> = {}
+  for (const [provider, route, model] of [['claude', 'claude_cpa', 'claude-e2e-model'], ['codex', 'codex_cpa', 'codex-e2e-model']] as const) {
+    const connection = randomUUID()
+    connections[provider] = connection
+    await db().query(`INSERT INTO byos_connections (id, "ownerId", "workspaceId", provider, state, epoch, "secretName", "secretDigest", "providerSubject", quota)
+      VALUES ($1, $2, $3, $4, 'connected', 1, $5, $6, 'e2e-subject', $7)`, [connection, session.userId, member.workspaceId, provider, `e2e-fixture-${connection}`, 'a'.repeat(64),
+      provider === 'claude' ? JSON.stringify({ vendor: 'claude_code', source: 'official', status: 'ok', plan: 'Max', windows: [], observedAt: new Date().toISOString() }) : null])
+    await db().query(`INSERT INTO byos_bindings (id, "ownerId", "workspaceId", "consumerId", "connectionId", "connectionRevision", route, "modelId")
+      VALUES ($1, $2, $3, 'e2e-consumer', $4, 1, $5, $6)`, [randomUUID(), session.userId, member.workspaceId, connection, route, model])
+  }
+  return { userId: session.userId, workspaceId: member.workspaceId, connections }
+}
+
+const choice = async (userId: string) => (await db().query<{ bindingId: string | null; modelId: string | null }>(
+  `SELECT c."bindingId", b."modelId" FROM bot_model_choices c LEFT JOIN byos_bindings b ON b.id = c."bindingId" WHERE c."ownerId" = $1 AND c."botKey" = 'coordinator'`, [userId])).rows
+
+test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 保存，账号断开后显示不可用', async ({ page }) => {
+  await register(page)
+  const { userId, connections } = await seed(page)
+  await page.reload()
+  await page.getByRole('button', { name: 'Coordinator', exact: true }).first().click()
+
+  // Nothing picked: the chip shows what the next run resolves to, a Claude subscription first.
+  const chip = page.getByTestId('bot-model-chip')
+  await expect(chip).toHaveAccessibleName('模型：claude-e2e-model')
+  expect(await choice(userId)).toEqual([])
+
+  await chip.click()
+  const menu = page.getByRole('menu')
+  await expect(menu.getByText('Mikka', { exact: true })).toBeVisible()
+  await expect(menu.getByText('我的 Claude 订阅 · Max', { exact: true })).toBeVisible()
+  await expect(menu.getByText('我的 ChatGPT 订阅', { exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitemradio')).toHaveCount(3)
+  // A model picker only: no Agent (Claude Code / Codex) in the Coordinator's menu.
+  await expect(menu.getByText(/Claude Code|Codex/)).toHaveCount(0)
+  await expect(menu.getByRole('menuitem', { name: /管理 API 与订阅/ })).toBeVisible()
+  await menu.getByRole('menuitemradio', { name: /codex-e2e-model/ }).click()
+
+  await expect(chip).toHaveAccessibleName('模型：codex-e2e-model')
+  await expect.poll(async () => (await choice(userId)).map(row => row.modelId)).toEqual(['codex-e2e-model'])
+  await page.reload()
+  await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：codex-e2e-model')
+
+  // Mikka 默认 on purpose is saved too, as a choice without a binding.
+  await page.getByTestId('bot-model-chip').click()
+  await page.getByRole('menu').getByRole('menuitemradio', { name: /Mikka 默认/ }).click()
+  await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：Mikka 默认')
+  await expect.poll(async () => (await choice(userId)).map(row => row.bindingId)).toEqual([null])
+
+  // The picked account goes away: the chip names it, marked unavailable, and the menu no longer offers it.
+  await page.getByTestId('bot-model-chip').click()
+  await page.getByRole('menu').getByRole('menuitemradio', { name: /codex-e2e-model/ }).click()
+  await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：codex-e2e-model')
+  await db().query(`UPDATE byos_connections SET state = 'disconnected' WHERE id = $1`, [connections.codex])
+  await page.reload()
+  await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：codex-e2e-model，不可用')
+  await expect(page.getByTestId('bot-model-chip')).toHaveAttribute('data-unavailable', 'true')
+  await page.getByTestId('bot-model-chip').click()
+  await expect(page.getByRole('menu').getByRole('menuitemradio')).toHaveCount(2)
+  await expect(page.getByRole('menu').getByRole('menuitemradio', { checked: true })).toHaveCount(0)
+})

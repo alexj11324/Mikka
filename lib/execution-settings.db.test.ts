@@ -275,7 +275,7 @@ test(
       await settings.refreshBotModels(alice, connection, async () => []);
       assert.deepEqual(await settings.botModels(alice),[],'empty provider catalogue remains authoritative');
       await settings.refreshBotModels(alice, connection, async () => [{id:'dynamic-model'}]);
-      assert.equal(await settings.botModelOption(alice,secondBot),(await settings.botModels(alice))[0].bindingId,'UI selection maps the saved copy to its visible option');
+      assert.equal((await (await import('./bot-model-menu')).botModelMenu(pool,settings,alice,secondBot)).current.id,(await settings.botModels(alice))[0].bindingId,'the picker maps the saved copy to its visible option');
       await assert.rejects(settings.refreshBotModels(alice, connection, async () => { throw new Error('raw provider response'); }), {code:'executionAccountUnavailable'});
       await assert.rejects(settings.refreshBotModels(alice, connection, async () => {
         await pool.query(`UPDATE byos_connections SET epoch=2 WHERE id=$1`,[connection]);
@@ -337,7 +337,7 @@ test(
       await settings.setBotModel(alice,null,catalogue.bindingId);
       const coordinator = await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies);
       assert.equal(coordinator.modelSelection?.modelId,'dynamic-model','refreshed catalogue bindings support Coordinator execution');
-      assert.equal(await actions.getBotModel(secondBot),catalogue.bindingId,'action returns the visible option for a saved copied binding');
+      assert.equal((await (await import('./bot-model-menu')).botModelMenu(pool,settings,alice,secondBot)).current.id,catalogue.bindingId,'the picker shows the visible option for a saved copied binding');
       const { COORDINATOR_MODEL } = await import('./coordinator/model');
       const unbound = {ownerId:'bob',workspaceId:randomUUID(),botId:randomUUID()};
       assert.deepEqual(await freezeBotModel(unbound,dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'a bot with no choice and no subscription runs on the hosted default');
