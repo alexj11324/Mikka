@@ -116,14 +116,16 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
 
   const { send, sent, error, status } = useAgentDecision()
   const [summary, setSummary] = useState('')
-  const questions = (props.questions ?? []).map(question => ({ ...question, autoAdvance: false, customPlaceholder: agentCopy.addAnotherAnswer }))
+  // A question with nothing to answer with (no options, control or free text) is a blank step that can never be
+  // answered, so it also kept the submit button disabled; the schema forbids it, but streamed replies are not validated.
+  const questions = (props.questions ?? []).filter(answerable).map(question => ({ ...question, customPlaceholder: agentCopy.addAnotherAnswer }))
 
   if (questions.length === 0) return null
   const [only] = questions
   if (questions.length === 1 && !only.multiple && !only.input && only.options?.length) return <ChoiceCard title={only.title} options={only.options} task={props.task} />
 
-  // Same width cap as ChoiceCard: a question card never stretches across the chat column.
-  return <div className="flex w-full max-w-xl min-w-0 flex-col gap-2">
+  // Same width cap as ChoiceCard: about half the chat column.
+  return <div className="flex w-full max-w-sm min-w-0 flex-col gap-2">
     <ApprovalCard
       questions={questions}
       // A switch or slider always has a value, so it can be submitted untouched.
@@ -145,6 +147,12 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
     />
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
   </div>
+}
+
+type AgentQuestion = NonNullable<Parameters<AgentComponentRenderers['BeQuestions']>[0]['props']['questions']>[number]
+
+function answerable(question: AgentQuestion) {
+  return Boolean(question.options?.length || question.allowCustom || question.input === 'switch' || question.input === 'slider' || question.input === 'dateRange')
 }
 
 /**
@@ -173,7 +181,7 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
   // Dispatch options are localized by value (BE-13 sends English labels); anything else shows as written.
   const copy = (option: { value: string; label: string; action?: 'cloudKeySettings' }) => option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup
     : option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : option.label
-  return <div role="group" aria-label={title} data-slot="choice-card" className="flex w-full max-w-xl min-w-0 flex-col gap-2">
+  return <div role="group" aria-label={title} data-slot="choice-card" className="flex w-full max-w-sm min-w-0 flex-col gap-2">
     <p className={cn('w-fit max-w-full min-w-0', bubbles ? 'rounded-2xl bg-muted px-4 py-2.5' : 'font-medium')}>
       {task && <><CitationChip id={task.toLowerCase()} kind="issue" />{' '}</>}{title}
     </p>

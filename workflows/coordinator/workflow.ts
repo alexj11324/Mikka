@@ -45,7 +45,7 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
         : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...(inbox.approvedRepositoryKey ? { approvedRepositoryKey: inbox.approvedRepositoryKey } : {}) }),botId,execution?.snapshot)
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       if(inbox.scheduledRead){
-        if(!result.text.trim() || result.finishReason==='error') throw new Error('scheduledReadFailed')
+        if(turnWarning(result.finishReason,result.text)) throw new Error('scheduledReadFailed')
         await steps.completeScheduleRead(userId,botId,inbox.scheduledRead,result.text)
       } else await steps.appendMessages(userId,holder,result.responseMessages,quiet ? null : turnWarning(result.finishReason,result.text),botId)
       if (inbox.handoffMatterIds.length) await steps.settleAttention(userId,inbox.handoffMatterIds,inbox.handoffOnly && !quiet)

@@ -5,6 +5,7 @@ import test from 'node:test'
 import { transpileModule, ModuleKind } from 'typescript'
 import * as daemonProtocol from '@mikka/protocol/daemon'
 import * as deviceProtocol from '@mikka/protocol/device'
+import * as policySnapshotProtocol from '@mikka/protocol/policy-snapshot'
 import * as repositoryProtocol from '@mikka/protocol/repository'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy } from '../run-assignment-policy'
@@ -32,6 +33,9 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@mikka/protocol/device':deviceProtocol,
     '@mikka/protocol/daemon':daemonProtocol,
     '@mikka/protocol/repository':repositoryProtocol,
+    '@mikka/protocol/policy-snapshot':policySnapshotProtocol,
+    // This legacy-capability fixture has no managed organization policy.
+    '@/lib/agent-tool-approval/policy-distribution':{},
     '@/lib/device-agents':{localExecutionHarnesses:()=>['codex']},
     '@/lib/device-repositories':{readRepositorySettings:async()=>({verifyCommand:repo.verifyCommand})},
     '@/lib/run-test-fixture':{runTestFixture:()=>undefined},

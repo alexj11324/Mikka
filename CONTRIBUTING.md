@@ -47,18 +47,19 @@ cannot.
    checks, database migrations and integration tests such as thread privacy.
    PR checks run against GitHub's synthetic merge candidate. Same-repository
    branch pushes without a PR do not run a duplicate blocking suite.
-   The production build runs in the browser job of a ready pull request,
-   and in the browser build on main. Merge-group events retain a build in source CI.
+   Each ordinary ready-PR browser lane builds its exact checkout; main and full
+   tiers share one browser build. Merge-group events retain a build in source CI.
    Source checks, two source-test groups and daemon acceptance run independently. Database
    suites are partitioned across four isolated PostgreSQL jobs; every shard
    validates the complete inventory before running its share sequentially, and
    the protected gate requires every shard to succeed.
 3. **Ready pull requests** (CI job "Browser tests (before merge)"): the browser
    smoke set plus the specs of the areas the change touches, against the PR
-   merged with main. One build feeds two parallel jobs with independent PostgreSQL
-   databases: "Browser tests (pull request)" runs smoke/targeted browser tests and
-   Turnstile; "Browser runtime gates" runs HTTP/account checks, the first MVP
-   real-daemon test and any required performance checks. Draft PRs defer this layer.
+   merged with main. Two "Browser tests (pull request)" lanes start directly,
+   each building the same checkout with its own PostgreSQL database and test
+   identities: the browser lane runs smoke/targeted tests and Turnstile; the
+   runtime lane runs HTTP/account checks, the first MVP real-daemon test and any
+   required performance checks. Draft PRs defer this layer.
    The trusted classifier on `main`
    chooses:
 
@@ -84,8 +85,8 @@ cannot.
    fixed CI-only allowlist plus the trusted main classifier's documentation/mode
    checks; it cannot classify its own change as documentation-only, and any
    other file escalates to the full tier. Mapping data is parsed as JSON, never
-   executed; only trusted-main code can choose a narrower tier. The browser,
-   runtime and policy-validation jobs all reuse the exact candidate build.
+   executed; only trusted-main code can choose a narrower tier. Main/full runtime,
+   full browser shards and policy-validation jobs reuse their exact candidate build.
    Failed classification or any skipped/failed required lane fails the gate.
 4. **After merge** (CI, every code-bearing push to main): the functional spec
    files (the main list) on four shards, plus the runtime gates and both MVP

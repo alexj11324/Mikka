@@ -33,6 +33,25 @@ mikka daemon --server https://preview.example/mikka
 Manual test setup can use `mikka daemon login --token <device-token>`; keep the
 token out of screenshots, logs and shell history.
 
+For background operation, install a service after signing in:
+
+```sh
+mikka daemon service install --server https://app.aspectlylabs.com/mikka --device-type laptop
+```
+
+Public npm installations running under launchd or systemd check for a newer
+stable release once per day. The daemon finishes its running threads and
+Coordinator work before installing the exact version and restarting. Version
+checks and installation run in the background so heartbeats remain available.
+The service keeps its server, data directory and device identity. Foreground,
+development and embedded daemons do not update themselves.
+
+Add `--no-auto-update` when installing the service to disable automatic updates.
+The setting is saved in the service definition. Manual updates remain available
+through Mikka. Failed checks or installations wait until the next daily check;
+an installation failure does not request a restart. npm replaces the global
+package in place, so an interrupted installation has no automatic rollback.
+
 ## Release candidate
 
 ```sh

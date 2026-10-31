@@ -48,7 +48,7 @@ const cliPolicy: ReturnType<typeof defaultRunPolicy>={...defaultRunPolicy(),perm
 let cliReadOnly=false
 stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
 const modelAdmissionCheck=mock.fn(async(_scope:{workspaceId:string;ownerId:string},_model:string,_signal?:AbortSignal)=>undefined)
-stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck})
+stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck})
 stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64),workspaceIds:[workspace]})})
 stub('../mcp/worker.ts',{issueRunToken:async()=>{if(stopDuringToken)currentRun.stopRequestedAt=new Date();return {token:'synthetic-only'}}})
 // Task visibility is a separate boundary; do not initialize auth/MCP services
@@ -84,6 +84,7 @@ test('local claim uses frozen harness and exact subscription despite Agent edits
  definition={...frozen(),model:'frozen-model',cliModelSelection:'explicit'}
  const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.equal(body.remoteUrl,'https://github.com/example/repo.git');assert.equal(body.baseBranch,undefined);assert.deepEqual(bindingById.mock.calls[0].arguments,[owner,binding.id]);assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1);assert.equal(typeof (claimed.mock.calls[0].arguments as unknown[])[5],'function','Factory lineage guard remains attached')
  assert.deepEqual(modelAdmissionCheck.mock.calls[0].arguments.slice(0,2),[{workspaceId:workspace,ownerId:owner},'frozen-model'])
+ assert.equal(modelAdmissionCheck.mock.calls[0].arguments[2],binding.route)
  assert.equal(prepared.mock.callCount(),1)
  const [run,remoteUrl]=prepared.mock.calls[0].arguments
  assert.equal(run.userId,owner);assert.equal(run.issueId,issueId);assert.equal(run.baseBranch,null);assert.equal(remoteUrl,'https://github.com/example/repo.git')

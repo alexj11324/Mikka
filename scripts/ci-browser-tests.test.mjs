@@ -264,8 +264,8 @@ test('protected browser gate requires exactly the jobs of the selected tier', ()
         CHANGES_RESULT: options.changes ?? 'success',
         PR_RESULT: options.pr ?? (sharded ? 'skipped' : 'success'),
         SELECTION_RESULT: options.selection ?? (options.verify === 'true' ? 'success' : 'skipped'),
-        BUILD_RESULT: options.build ?? 'success',
-        RUNTIME_RESULT: options.runtime ?? 'success',
+        BUILD_RESULT: options.build ?? (sharded || options.verify === 'true' ? 'success' : 'skipped'),
+        RUNTIME_RESULT: options.runtime ?? (sharded ? 'success' : 'skipped'),
         FULL_RESULT: options.full ?? (sharded ? 'success' : 'skipped'),
         DOCS_ONLY: options.docs ?? 'false',
         BROWSER_TIER: tier,
@@ -275,16 +275,15 @@ test('protected browser gate requires exactly the jobs of the selected tier', ()
       },
     }).status === 0
   }
-  // Pull request tiers: the shared build and both independent acceptance lanes.
+  // Pull request tiers: the direct matrix must pass; shared jobs run only for policy validation.
   for (const tier of ['smoke', 'targeted']) {
     assert(result({ tier }))
     assert(result({ tier, performance: 'true' }))
     for (const value of ['failure', 'cancelled', 'skipped', '']) assert(!result({ tier, pr: value }), `${tier} pr ${value}`)
-    for (const job of ['build', 'runtime']) for (const value of ['failure', 'cancelled', 'skipped', '']) assert(!result({ tier, [job]: value }), `${tier} ${job} ${value}`)
-    assert(!result({ tier, full: 'success' }), `${tier} full must not run`)
+    for (const job of ['build', 'runtime', 'full']) for (const value of ['success', 'failure', 'cancelled', '']) assert(!result({ tier, [job]: value }), `${tier} unexpected ${job} ${value}`)
+    for (const value of ['failure', 'cancelled', 'skipped', '']) assert(!result({ tier, verify: 'true', build: value }), `${tier} policy build ${value}`)
     assert(result({ tier, verify: 'true', selection: 'success' }))
-    assert(!result({ tier, verify: 'true', selection: 'failure' }))
-    assert(!result({ tier, verify: 'true', selection: 'skipped' }))
+    for (const value of ['failure', 'cancelled', 'skipped', '']) assert(!result({ tier, verify: 'true', selection: value }), `${tier} policy selection ${value}`)
     assert(!result({ tier, verify: 'false', selection: 'success' }))
   }
   assert(!result({ changes: 'failure' }))
@@ -319,22 +318,46 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   assert(source.includes('needs: [changes, browser-pr, browser-selection, browser-build, browser-runtime, browser-e2e-full]'))
   const job = name => source.split(`\n  ${name}:\n`)[1].split(/\n  [\w-]+:\n/)[0]
   const pr = job('browser-pr'), runtime = job('browser-runtime'), build = job('browser-build')
-  // One exact build feeds independently isolated browser and runtime acceptance.
-  for (const lane of [pr, runtime, job('browser-selection')]) {
+  // Ordinary PRs start both isolated lanes directly, with no shared-build phase.
+  assert(pr.includes('needs: changes\n'))
+  assert(pr.includes('fail-fast: false\n'))
+  assert(pr.includes('lane: [browser, runtime]'))
+  assert(pr.includes('services:\n      postgres:\n        image: postgres:17'))
+  assert(pr.includes('pnpm exec next build'))
+  assert(!pr.includes('actions/download-artifact') && !pr.includes('tar -xzf'))
+  assert(build.includes("browser_tier == 'main'") && build.includes("browser_tier == 'full'") && build.includes("verify_selection == 'true'"))
+  for (const lane of [runtime, job('browser-selection')]) {
     assert(lane.includes('needs: [changes, browser-build]'))
     assert(lane.includes('name: browser-build-${{ github.sha }}'))
     assert(lane.includes('services:\n      postgres:\n        image: postgres:17'))
     assert(!lane.includes('pnpm exec next build'))
   }
-  assert(build.includes('pnpm exec next build'))
-  assert(!build.includes("browser_tier == 'main'"), 'smoke and targeted also build once')
-  for (const step of ['node scripts/ci-browser-tests.mjs >', 'node scripts/ci-browser-tests.mjs --turnstile', 'node scripts/test-accounts/evidence.mjs']) assert(pr.includes(step), step)
-  for (const step of ['pnpm test:test-accounts-db', 'pnpm test:factory-http', 'node scripts/test-accounts/run-http.mjs', 'pnpm test:e2e:mvp', 'pnpm test:performance']) {
-    assert(runtime.includes(step), step)
-    assert(!pr.includes(step), `${step} must not serialize the browser lane`)
+  assert(runtime.includes("browser_tier == 'main'") && runtime.includes("browser_tier == 'full'"))
+  const steps = pr.split('\n      - ')
+  const step = name => steps.find(value => value.startsWith('name: ' + name + '\n'))
+  for (const name of ['Browser smoke and targeted specs', 'Sign-up through Cloudflare Turnstile with the public test keys']) {
+    assert(step(name)?.includes("matrix.lane == 'browser' && !cancelled()"), name)
   }
-  assert(runtime.includes('case "$BROWSER_TIER" in smoke|targeted) mvp_args=(--grep @smoke) ;; esac'))
-  assert(runtime.includes('pnpm test:e2e:mvp "${mvp_args[@]}"'))
+  for (const name of ['Test account allocation across independent PostgreSQL clients', 'Factory HTTP regressions against the built application (no skips)', 'Real HTTP authentication, account reuse and isolation']) {
+    assert(step(name)?.includes("if: matrix.lane == 'runtime'\n"), name)
+  }
+  for (const name of ['MVP real-daemon core loop (smoke)', 'Audit MVP evidence before the remaining browser suite']) {
+    assert(step(name)?.includes("matrix.lane == 'runtime' && !cancelled()"), name)
+  }
+  assert(step('Preserve audited MVP evidence')?.includes("matrix.lane == 'runtime' && !cancelled() && steps.mvp-evidence-audit.outcome == 'success'"))
+  assert(step('Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)')?.includes("matrix.lane == 'runtime' && needs.changes.outputs.browser_performance == 'true'"))
+  for (const command of ['pnpm test:test-accounts-db', 'pnpm test:factory-http', 'node scripts/test-accounts/run-http.mjs', 'pnpm test:performance']) {
+    assert(pr.includes(command) && runtime.includes(command), command)
+  }
+  assert(pr.includes('pnpm test:e2e:mvp --grep @smoke >'))
+  assert.match(runtime, /^          pnpm test:e2e:mvp > /m)
+  assert(!runtime.includes('mvp_args') && !runtime.includes('BROWSER_TIER:'))
+  const commonBuild = step("Build the application (lint runs once, in the CI workflow's UI policy job)")
+  assert(commonBuild?.includes('node scripts/build-subscription-worker.mjs') && commonBuild.includes('pnpm generate:agent-ui') && commonBuild.includes('pnpm exec next build'))
+  assert(!commonBuild.includes('if:'), 'both lanes build the same checkout')
+  assert(step('Scan account evidence before artifact upload')?.includes('if: ${{ !cancelled() }}'))
+  assert(pr.includes('node scripts/test-accounts/evidence.mjs'))
+  assert(pr.includes('name: browser-test-report-pull-request-${{ matrix.lane }}-${{ github.sha }}'))
   assert(source.split('\njobs:')[0].includes('NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA'), 'the build and all consumers use the same public key')
   assert(!pr.includes('pnpm lint') && !pr.includes('pnpm build'), 'lint runs once, in ui-policy.yml')
   assert(!pr.includes('TURNSTILE_SECRET_KEY'), 'the secret reaches only the keyed run')
@@ -348,7 +371,7 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   assert(selection.includes('node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted --shard=${{ matrix.shard }}/4'))
   assert(source.includes("cron: '17 19 * * *'"))
   assert(source.includes('  workflow_dispatch:\n'))
-  for (const name of ['browser-build-${{ github.sha }}', 'browser-test-report-runtime-${{ github.sha }}', 'browser-test-report-pull-request-${{ github.sha }}',
+  for (const name of ['browser-build-${{ github.sha }}', 'browser-test-report-runtime-${{ github.sha }}', 'browser-test-report-pull-request-${{ matrix.lane }}-${{ github.sha }}',
     'browser-test-report-selection-targeted-${{ github.sha }}-${{ matrix.shard }}', 'browser-test-report-shard-${{ matrix.shard }}-${{ github.sha }}']) assert(source.includes(`name: ${name}`), name)
   // Every uploaded path is one the evidence scanner audits first.
   const scanned = readFileSync('scripts/test-accounts/evidence.mjs', 'utf8')
@@ -380,17 +403,20 @@ test('each browser build restores only compiler cache; only a successful main bu
   const job = name => source.split(`\n  ${name}:\n`)[1].split(/\n  [\w-]+:\n/)[0]
   const key = "next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}"
   const pin = '0057852bfaa89a56745cba8c7296529d2fc39830'
-  assert.equal(source.match(/uses: actions\/cache\/restore@/g).length, 1)
+  assert.equal(source.match(/uses: actions\/cache\/restore@/g).length, 2)
   assert.equal(source.match(/uses: actions\/cache\/save@/g).length, 1)
-  const steps = job('browser-build').split('\n      - ')
-  const restore = steps.find(step => step.startsWith('name: Restore the Next.js build cache\n'))
-  const build = steps.find(step => step.startsWith('name: Build the application'))
-  assert(restore?.includes(`uses: actions/cache/restore@${pin}`))
-  assert.match(restore, /\n          path: \.next\/cache\n/)
-  assert(restore.includes(`key: ${key}\n`))
-  assert(restore.includes(`restore-keys: |\n            ${key.slice(0, -'${{ github.sha }}'.length)}`))
-  assert(steps.indexOf(restore) < steps.indexOf(build))
-  assert(build.includes('pnpm exec next build') && !build.includes('if:'), 'cache hits must still build this checkout')
+  for (const name of ['browser-pr', 'browser-build']) {
+    const steps = job(name).split('\n      - ')
+    const restore = steps.find(step => step.startsWith('name: Restore the Next.js build cache\n'))
+    const build = steps.find(step => step.startsWith('name: Build the application'))
+    assert(restore?.includes(`uses: actions/cache/restore@${pin}`))
+    assert.match(restore, /\n          path: \.next\/cache\n/)
+    assert(restore.includes(`key: ${key}\n`))
+    assert(restore.includes(`restore-keys: |\n            ${key.slice(0, -'${{ github.sha }}'.length)}`))
+    assert(steps.indexOf(restore) < steps.indexOf(build))
+    assert(build.includes('pnpm exec next build') && !build.includes('if:'), 'cache hits must still build this checkout')
+  }
+  assert(!job('browser-pr').includes('actions/cache/save@'))
   const save = job('browser-build').split('\n      - ').find(step => step.startsWith('name: Save the Next.js build cache (main only)\n'))
   assert(save.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.next-cache.outputs.cache-hit != 'true'\n"))
   assert(save.includes(`uses: actions/cache/save@${pin}`))

@@ -7,8 +7,8 @@ import { EFFECT_SCORER,judgeSkillEffect, type SkillEffectAssessment } from './se
 interface Dependencies {
   loadComparison:(request:RegisteredComparisonRequest)=>Promise<RegisteredSkillComparison|null>
   invokeDecision?:typeof invokeDecision
-  /** Host configuration, never an HTTP field or a model answer. This task
-   * explicitly keeps live evaluation OFF; injected synthetic tests may enable. */
+  /** Host configuration, never an HTTP field or a model answer. The production
+   * constructor below keeps this paid comparison off until explicitly enabled. */
   modelEvaluationEnabled?:boolean
 }
 const hash=(value:string)=>createHash('sha256').update(value).digest('hex')
@@ -17,6 +17,12 @@ export interface RegisteredAssessment extends SkillEffectAssessment {
   registeredBinding?:{evaluationId:string;instanceId:string;proposalId:string;issueId:string;candidateVersionId:string;sourceCommit:string}
 }
 export type RegisteredSkillEvaluator=(userId:string,proposal:RegisteredEvaluationProposal)=>Promise<RegisteredAssessment>
+/** This switch controls only the paid semantic-comparison invocation. It does
+ * not dispatch benchmark runs, change their frozen evidence or grant activation. */
+export function createConfiguredSkillEvaluator(dependencies:Omit<Dependencies,'modelEvaluationEnabled'>,
+  env:Readonly<Record<string,string|undefined>>=process.env):RegisteredSkillEvaluator {
+  return createRegisteredSkillEvaluator({...dependencies,modelEvaluationEnabled:env.MIKKA_SKILL_MODEL_EVALUATION==='1'})
+}
 export function createRegisteredSkillEvaluator(dependencies:Dependencies):RegisteredSkillEvaluator {
   return async(userId:string,proposal:RegisteredEvaluationProposal)=>{
     const pending:SkillEffectAssessment={kind:'semantic_skill_comparison',benchmark:REPORT_BENCHMARK,

@@ -18,6 +18,7 @@
 import { z } from "zod"
 
 import { modelNameSchema, runPolicySchema } from "./agent-policy"
+import { signedPolicySnapshotSchema } from "./policy-snapshot"
 import { harnessInfoSchema, harnessSchema } from "./harness"
 import { quotaSnapshotSchema } from "./quota"
 import { runStopReason, runBenchmarkContext } from "./run"
@@ -377,6 +378,9 @@ export const runAssignmentSchema = z.object({
   policy: runPolicySchema.optional(),
   /** Trusted server revision for the exact run policy; older servers omit it. */
   policyRevision: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  /** Only a trusted server context can make a snapshot required. */
+  policySnapshotRequired: z.boolean().optional(),
+  policySnapshot: signedPolicySnapshotSchema.optional(),
   /**
    * The skills mounted on this run's agent and still enabled, resolved at
    * claim time the way `policy` is. The daemon inlines them into the agent's

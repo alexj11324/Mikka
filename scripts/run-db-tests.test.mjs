@@ -258,10 +258,10 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.match(browser, /run: pnpm test:factory-http/ , 'Factory HTTP probes remain mandatory against the built app')
   assert.ok(browser.includes('pnpm exec next build'))
   for (const job of ['\n  browser-pr:\n', '\n  browser-runtime:\n']) {
-    const section = browser.split(job)[1]
+    const section = browser.split(job)[1].split(/\n  [a-z][a-z0-9-]*:\n/)[0]
     assert.ok(section.includes('run: pnpm test:factory-http'), `${job.trim()} runs Factory HTTP against the built app`)
   }
-  const pullRequest = browser.split('\n  browser-pr:\n')[1]
+  const pullRequest = browser.split('\n  browser-pr:\n')[1].split(/\n  [a-z][a-z0-9-]*:\n/)[0]
   assert.ok(pullRequest.indexOf('pnpm exec next build') < pullRequest.indexOf('run: pnpm test:factory-http'))
   for (const { runner } of SELF_MANAGED) {
     const dedicatedScript = Object.entries(pkg).find(([, command]) => command === `node ${runner}`)?.[0]
@@ -289,7 +289,10 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.match(browser, /pnpm test:performance --output=performance-results/)
   assert.ok(browser.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/$BROWSER_SHARDS > "$log_file"'), 'each isolated shard runs the selected layer')
   assert.deepEqual(browserArguments('full', '[]'), ['exec', 'playwright', 'test', '--grep-invert', '@performance'], 'integration retains every non-performance browser spec through the selected-layer runner')
-  assert.match(browser, /^\s*pnpm test:e2e:mvp "\$\{mvp_args\[@\]\}" > "\$log_file" 2>&1 \|\| test_status=\$\?/m, 'the dedicated MVP browser gate remains required')
+  const runtime = browser.split('\n  browser-runtime:\n')[1].split(/\n  [a-z][a-z0-9-]*:\n/)[0]
+  assert.match(runtime, /^\s*pnpm test:e2e:mvp > "\$log_file" 2>&1 \|\| test_status=\$\?/m, 'main and full tiers run both MVP cases')
+  assert.doesNotMatch(runtime, /mvp_args|BROWSER_TIER:/)
+  assert.match(pullRequest, /^\s*pnpm test:e2e:mvp --grep @smoke > /m, 'PR runtime runs the one smoke MVP case')
   assert.match(browser, /log_file=\.cache\/e2e\/playwright-mvp\.log[\s\S]*?audit-evidence --evidence "\$log_file"[\s\S]*?exit "\$test_status"/, 'MVP output is audited before display and the test result is preserved')
   assert.equal(pkg['test:e2e:mvp'], 'playwright test --config=playwright.mvp.config.ts')
   assert.deepEqual(plan.browser, ['tests/mvp/core-loop.spec.ts'])

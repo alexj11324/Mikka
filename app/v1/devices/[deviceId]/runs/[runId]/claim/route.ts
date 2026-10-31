@@ -7,8 +7,10 @@ import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/reposi
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER } from '@mikka/protocol/device'
+import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
+import { issuePolicySnapshot, policyDistributionContext, requestPolicyIssuer } from '@/lib/agent-tool-approval/policy-distribution'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
-import { assertUnmanagedModelTransport } from '@/lib/model-admission/runtime'
+import { assertUnmanagedModelTransport, assertSubscriptionModelTransport } from '@/lib/model-admission/runtime'
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
@@ -120,9 +122,21 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   let cliPolicy: Awaited<ReturnType<typeof readCliRunPolicy>>
   try {
     cliPolicy = await readCliRunPolicy(pool, runId, caller.userId)
-    for (const workspaceId of cliPolicy.workspaceIds) await assertUnmanagedModelTransport({ workspaceId, ownerId: caller.userId }, run.agentDefinition?.model ?? 'native-default', request.signal)
+    for (const workspaceId of Array.from(new Set([...cliPolicy.workspaceIds, ...(subscription ? [subscription.workspaceId] : [])]))) {
+      const scope = { workspaceId, ownerId: caller.userId }
+      const model = run.agentDefinition?.model ?? subscription?.modelId ?? 'native-default'
+      if (subscription) await assertSubscriptionModelTransport(scope, model, subscription.route, request.signal)
+      else await assertUnmanagedModelTransport(scope, model, request.signal)
+    }
   }
   catch (error) { return NextResponse.json({ error: error instanceof ModelAdmissionError ? error.code : 'Agent policy unavailable.' }, { status: 409 }) }
+  const snapshotCapability = request.headers.get(POLICY_SNAPSHOT_HEADER)
+  if ((snapshotCapability !== null && snapshotCapability !== POLICY_SNAPSHOT_VERSION) || (cliPolicy.policySnapshotRequired && snapshotCapability !== POLICY_SNAPSHOT_VERSION)) return NextResponse.json({error:'Signed policy consumer required.',code:'policyConsumerUpgradeRequired'},{status:409})
+  let distribution: ReturnType<typeof policyDistributionContext> | undefined
+  if (snapshotCapability === POLICY_SNAPSHOT_VERSION) {
+    try { distribution = policyDistributionContext(requestPolicyIssuer(request),caller.userId,deviceId,runId,cliPolicy) }
+    catch { return NextResponse.json({error:'Policy signing unavailable.'},{status:503}) }
+  }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let factoryClaim: Record<string, unknown> = {}
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
@@ -241,6 +255,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...skillAssignment,
     ...benchmarkAssignment,
     policy: assignmentPolicy,
+    ...(distribution ? {policySnapshotRequired:distribution.required,policySnapshot:issuePolicySnapshot(distribution,assignmentPolicy)} : {}),
   }))
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }

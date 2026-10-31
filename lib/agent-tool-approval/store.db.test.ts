@@ -24,6 +24,7 @@ before(async () => {
   await pool.query(await readFile('drizzle/20261029011700_agent_tool_approvals.sql', 'utf8'))
   await pool.query(await readFile('drizzle/20261029011701_cli_run_policy.sql', 'utf8'))
   await pool.query(await readFile('drizzle/20261030204836_agent_tool_approval_input_digest.sql', 'utf8'))
+  await pool.query(await readFile('drizzle/20261030204833_workspace_audit_events.sql', 'utf8'))
   const agentId = randomUUID()
   await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`, [agentId,actor.userId,deviceId])
   await pool.query(`INSERT INTO devices (id,"ownerId",enabled) VALUES ($1,$2,true)`, [deviceId,actor.userId])
