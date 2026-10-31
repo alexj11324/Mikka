@@ -404,7 +404,7 @@ export class CodexAdapter implements AgentAdapter {
     let usage = { inputTokens: 0, outputTokens: 0 }
     const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
     const registeredMcpTool = (server: string, tool: string) =>
-      (server === MCP_SERVER_NAME && ['submit','ask_human','report_blocked'].includes(tool)) ||
+      (server === MCP_SERVER_NAME && ['submit','request_help','ask_human','report_blocked'].includes(tool)) ||
       (Boolean(computerMcp) && server === COMPUTER_MCP_SERVER_NAME && ['get_desktop_state','click','type_text','press_key','scroll'].includes(tool))
 
     /** The CLI and everything it started are gone before the exit is told. */

@@ -42,3 +42,13 @@ it('preserves the computer ceiling for every capture transport registration', ()
     expect(toolApprovalDecision(request,{...base,permissions:{...base.permissions,computer_use:undefined}},'/worktree')).toBe('deny')
   }
 })
+
+
+it('permits only registered hand-in transport while context authority stays server-owned', () => {
+  const policy = { ...defaultRunPolicy(), readOnly: true }
+  const request: ToolApprovalRequest = { runId: 'r', requestId: 'context', harness: 'claude_code', method: 'cli/mcp__mikka__request_help', input: { question: 'Existing task context?' } }
+  expect(toolApprovalDecision(request, policy, '/worktree')).toBe('allow')
+  expect(toolApprovalDecision({ ...request, method: 'cli/mcp__other__request_help' }, policy, '/worktree')).toBe('unavailable')
+  expect(toolApprovalDecision({ ...request, method: 'cli/mcp__mikka__arbitrary_tool' }, policy, '/worktree')).toBe('unavailable')
+  expect(toolApprovalDecision(request, undefined, '/worktree')).toBe('unavailable')
+})

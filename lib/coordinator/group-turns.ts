@@ -4,16 +4,17 @@ import type { Pool, PoolClient } from 'pg'
 import { checkedCorrection, GroupJudgmentPendingError, type CorrectionInput, type CorrectionJudgment } from './group-correction'
 export { GroupJudgmentPendingError } from './group-correction'
 import { addsNothing, followUpInstructions, mentionRoute, UnknownMentionError, type GroupMessage, type GroupRoute, type RoutingCorrection, type RoutingMember } from './group-routing'
+import { appendGroupExchange } from './group-exchanges'
 
 export const GROUP_MAX_ROUNDS = 3
 export type GroupAgent = RoutingMember
-export type GroupReply = { text: string; mentions: string[] }
+export type GroupReply = { text: string; mentions: string[]; privateTo?: string | null }
 export type GroupRuntime = {
   agents(ownerId: string, ids: string[], client: PoolClient): Promise<GroupAgent[]>
   authorized(workspaceId: string, userId: string): Promise<boolean>
   route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[]): Promise<GroupRoute>
   correction(input: CorrectionInput): Promise<CorrectionJudgment>
-  generate(agent: GroupAgent, input: { message: GroupMessage; earlier: { author: string; text: string }[]; followUp: string; members: RoutingMember[]; ask?: string }): Promise<GroupReply>
+  generate(agent: GroupAgent, input: { message: GroupMessage; earlier: { author: string; text: string }[]; followUp: string; members: RoutingMember[]; ask?: string; privatePeer?: RoutingMember }): Promise<GroupReply>
 }
 export async function enqueueGroupTurn(client: PoolClient, conversationId: string, messageId: string, userId: string) {
   await client.query('INSERT INTO group_turns ("messageId","conversationId","userId") VALUES ($1,$2,$3)', [messageId, conversationId, userId])
@@ -85,6 +86,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       const unknown = route.responders.filter(id => !members.some(m => m.id === id))
       if (unknown.length) throw new UnknownMentionError(unknown)
       await client.query('UPDATE group_turns SET route=$2 WHERE "messageId"=$1', [messageId, JSON.stringify(route)])
+      const exchangeLinks = new Map<string, string>()
       await runGroupRounds(route, input, {
         eligible,
         generate: (agent, input) => modelScope(() => runtime.generate(agent, input)),
@@ -104,6 +106,21 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
               await client.query('UPDATE group_turns SET "agentId"=NULL,"activeRunId"=NULL,"updatedAt"=now() WHERE "messageId"=$1', [messageId])
             }
             await client.query('COMMIT')
+          } catch (error) { await client.query('ROLLBACK'); throw error }
+        },
+        async publishPrivate(senderId, recipientId, reply) {
+          await client.query('BEGIN')
+          try {
+            await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [conversationId])
+            const current = await eligible()
+            const sender = current.find(a => a.id === senderId), recipient = current.find(a => a.id === recipientId)
+            if (!sender || !recipient || senderId === recipientId) { await client.query('ROLLBACK'); return false }
+            const pair = [senderId, recipientId].sort().join(':')
+            const link = await appendGroupExchange(client, { sourceId: conversationId, anchorId: messageId!, ownerId: root.createdBy, workspaceId: root.workspaceId,
+              senderId, recipientId, text: reply.text, title: `${sender.name} ⇄ ${recipient.name}`, linkId: exchangeLinks.get(pair) })
+            await client.query('COMMIT')
+            exchangeLinks.set(pair, link.linkId)
+            return true
           } catch (error) { await client.query('ROLLBACK'); throw error }
         },
         async publish(id, reply) {
@@ -140,6 +157,7 @@ export async function runGroupRounds(route: GroupRoute, message: GroupMessage, i
   eligible(): Promise<GroupAgent[]>
   generate: GroupRuntime['generate']
   publish(id: string, reply: GroupReply): Promise<boolean>
+  publishPrivate?(senderId: string, recipientId: string, reply: GroupReply): Promise<boolean>
   status(id: string | null, outcome?: 'succeeded' | 'failed'): Promise<void>
 }, deadline = Date.now() + 220000) {
   let next = route.responders
@@ -159,6 +177,32 @@ export async function runGroupRounds(route: GroupRoute, message: GroupMessage, i
       const known = new Set(current.map(a => a.id))
       if (reply.mentions.some(mention => !known.has(mention))) throw new UnknownMentionError(reply.mentions.filter(mention => !known.has(mention)))
       if (!reply.text.trim() || addsNothing(reply.text)) continue
+      if (reply.privateTo) {
+        if (reply.privateTo === id || !known.has(reply.privateTo)) throw new UnknownMentionError([reply.privateTo])
+        if (!io.publishPrivate) throw new Error('group_private_writer_unavailable')
+        const privateEarlier: { author: string; text: string }[] = []
+        let sender = agent, recipientId = reply.privateTo, privateReply = reply
+        for (let privateRound = 0; privateRound < GROUP_MAX_ROUNDS - round; privateRound++) {
+          const peers = await io.eligible(), recipient = peers.find(a => a.id === recipientId)
+          if (!recipient || !peers.some(a => a.id === sender.id)) break
+          if (privateReply.privateTo && privateReply.privateTo !== recipientId || privateReply.mentions.some(id => id !== recipientId)) throw new Error('group_private_peer_mismatch')
+          if (!await io.publishPrivate(sender.id, recipientId, privateReply)) break
+          privateEarlier.push({ author: sender.name, text: privateReply.text })
+          if (privateRound + 1 >= GROUP_MAX_ROUNDS - round) break
+          if (Date.now() > deadline) throw new Error('group_generation_budget_exceeded')
+          await io.status(recipientId)
+          let privateOutcome: 'succeeded' | 'failed' = 'failed'
+          try {
+            privateReply = await io.generate(recipient, { message, earlier: [...privateEarlier], members: peers.map(({ id, name, description }) => ({ id, name, description })),
+              followUp: followUpInstructions(privateEarlier), privatePeer: sender })
+            privateOutcome = 'succeeded'
+          } finally { await io.status(null, privateOutcome) }
+          if (!privateReply.text.trim() || addsNothing(privateReply.text)) break
+          recipientId = sender.id; sender = recipient
+        }
+        // Private transcripts never become public round context or mentions.
+        continue
+      }
       if (!await io.publish(id, reply)) continue
       earlier.push({ author: agent.name, text: reply.text })
       for (const mention of reply.mentions) follow.add(mention)

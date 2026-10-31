@@ -60,8 +60,24 @@ Append `lib/operations/recovery.db.test.ts` to the existing
 `test:approved-writes-db` command. The parent integration owns shared script
 and CI inventory updates and will record the final Git-linked CI revision.
 
-The current Composio adapter still returns no automatic readback receipt.
-Such operations remain uncertain without a verified provider result. No real
+At this increment's base the Composio adapter returned no automatic readback receipt.
+Such operations remained uncertain without a verified provider result. No real
 Notion/Slack/Calendar write, OAuth flow or production action was performed.
 #208 remains open until its real-provider and complete system requirements
 are verified; these tests do not claim universal exactly-once behavior.
+
+## Subsequent merged Slack readback
+
+Main now includes `lib/operations/slack-delivery.ts`. New Slack sends use the
+fixed `slack-message-metadata-v1` proxy contract, binding the stable operation
+key and approved payload digest in Slack message metadata. Readback follows
+provider history cursors, requires both values to match, and obtains the real
+permalink when available. A text match alone never establishes a receipt;
+legacy sends without the correlation metadata stay uncertain. The current
+owner connection is checked before lookup. Other unsupported provider lookup
+paths still return no receipt rather than inventing success.
+
+This supersedes the earlier no-readback statement only for that explicit Slack
+contract. Its PostgreSQL/HTTP and provider-contract evidence does not claim a
+live Slack write/readback. The owner excluded our live third-party acceptance;
+that item stays skipped without requesting another OAuth flow or test target.
