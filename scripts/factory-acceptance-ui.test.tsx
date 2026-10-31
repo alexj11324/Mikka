@@ -15,7 +15,7 @@ let evidence: unknown
 let detail: unknown
 mock.module('swr', { defaultExport: (key: string | null) => {
   if (key === null) return { data: undefined }
-  if (key === '/api/factory/tasks/t1') return { data: detail }
+  if (key === '/api/factory/tasks/t1') return { data: detail, mutate: async () => detail }
   if (key.includes('view=ledger')) return { data: ledger, mutate: async () => ledger }
   if (key.includes('/approval')) return { data: evidence }
   return list
