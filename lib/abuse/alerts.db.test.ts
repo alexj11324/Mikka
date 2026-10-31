@@ -33,7 +33,7 @@ test('first-free-use alerts count actual postpayment receipts and legacy rows on
   await client.query('INSERT INTO hosted_usage (id,"workspaceId",model,state,"reservedFree") VALUES ($1,$2,\'legacy\',\'pending\',1)', [randomUUID(), legacy])
   const { checkAbuseAlerts } = await import('./alerts')
   let externalCalls = 0
-  const check = () => withDatabaseClient(client, () => checkAbuseAlerts({ MIKKA_FREE_MODEL_FIRST_USE_HOURLY: '2' }, async () => {
+  const check = () => withDatabaseClient(client, () => checkAbuseAlerts({ NODE_ENV: 'test', MIKKA_FREE_MODEL_FIRST_USE_HOURLY: '2' }, async () => {
     externalCalls++
     throw Error('External mail is forbidden in this fixture')
   }))
