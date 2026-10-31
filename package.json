@@ -169,10 +169,10 @@
     "test:run-recovery": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test app/api/cron/run-recovery/route.test.ts",
     "test:run-recovery-db": "node --test-force-exit --import tsx --import ./tests/fixtures/activity-runtime.mjs --test tests/run-recovery.db.test.ts && node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/checkpoint-recovery.db.test.ts",
     "test:pat-api-db": "node --test-force-exit --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/personal-access-token-api.db.test.ts",
-    "test:abuse": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/abuse/policy.test.ts lib/abuse/model.test.ts lib/abuse/card.test.ts",
-    "test:abuse-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/abuse/store.db.test.ts",
+    "test:abuse": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/abuse/policy.test.ts lib/abuse/model.test.ts lib/abuse/card.test.ts lib/abuse/card-checkout.test.ts",
+    "test:abuse-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/abuse/store.db.test.ts lib/abuse/card.db.test.ts",
     "test:signup-turnstile": "node --import tsx --test lib/signup-refusal.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/auth/turnstile.test.tsx",
-    "test:hosted-usage": "node --import tsx --test lib/billing/hosted-usage.test.ts"
+    "test:hosted-usage": "node --experimental-test-module-mocks --import tsx --test lib/billing/hosted-usage.test.ts lib/billing/verification-client.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

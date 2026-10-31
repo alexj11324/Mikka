@@ -34,14 +34,21 @@ export class HostedUsageStore {
     workspaceId: string,
     customerId: string | null,
     fingerprint: string | null,
+    last4: string | null = null,
   ) {
     return this.transaction(async (tx) => {
       await this.lock(tx, workspaceId)
       const verified = await tx.query(
-        'INSERT INTO hosted_verifications ("workspaceId","customerId",fingerprint) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING "workspaceId"',
-        [workspaceId, customerId, fingerprint],
+        'INSERT INTO hosted_verifications ("workspaceId","customerId",fingerprint,last4) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING RETURNING "workspaceId"',
+        [workspaceId, customerId, fingerprint, last4],
       )
-      if (!verified.rowCount) return false
+      if (!verified.rowCount) {
+        if (fingerprint) {
+          const filled = await tx.query('UPDATE hosted_verifications SET "customerId"=$2,fingerprint=$3,last4=$4 WHERE "workspaceId"=$1 AND (fingerprint IS NULL OR (fingerprint=$3 AND last4 IS NULL AND $4::text IS NOT NULL)) RETURNING "workspaceId"', [workspaceId, customerId, fingerprint, last4])
+          if (filled.rowCount) await tx.query('INSERT INTO hosted_card_claims (fingerprint,"workspaceId") VALUES ($1,$2) ON CONFLICT DO NOTHING', [fingerprint, workspaceId])
+        }
+        return false
+      }
       const first =
         !fingerprint ||
         Boolean(
