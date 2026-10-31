@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
+import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
 import { Clock, FileText, Maximize2, Minimize2, Search, X, type LucideIcon } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
@@ -12,12 +13,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PR_GROUPS, pullRequestsOf } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
+import { SPRING_SIDEBAR } from '@/lib/ease'
 import { LetterAvatar } from './letter-avatar'
 import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
 import { BotAvatar, COORDINATOR_AVATAR } from './bot-avatar'
 import { GroupHeader } from './group-header'
-import { ThreadList } from './thread-list'
+import { ThreadList, TWO_LINE_ROW } from './thread-list'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
 import { useCloudComputer } from '@/hooks/use-feature-availability'
 
@@ -62,7 +64,7 @@ function PullRequests({ threads, issues }: { threads: Thread[]; issues: Issue[] 
         <ul className="flex flex-col">{list.map(row => {
           const issue = issues.find(item => item.id === row.issueId)
           return <li key={row.url}>
-            <Button variant="ghost" className="flex h-auto w-full flex-col items-stretch justify-start gap-0.5 rounded-lg px-2 py-1.5 text-left font-normal whitespace-normal" render={<a href={row.url} target="_blank" rel="noreferrer" />} nativeButton={false}>
+            <Button variant="ghost" className={TWO_LINE_ROW} render={<a href={row.url} target="_blank" rel="noreferrer" />} nativeButton={false}>
               <span className="truncate text-sm">{issue?.title}</span>
               <span className="truncate text-xs text-muted-foreground"><span className={cn(group === 'review' && 'text-success', group === 'merged' && 'text-label-violet')}>#{row.number}</span>{issue && ` · ${issueIdentifier(issue)}`}</span>
             </Button>
@@ -112,8 +114,10 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   const shown = tabs.includes(tab) ? tab : 'threads'
 
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
-  return <aside aria-label={t('label')} className={cn('min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : cn('hidden border-l bg-background transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90'))}>
-    <Tabs value={view} onValueChange={value => setView(value as PanelView)} className="min-h-0 flex-1 gap-0">
+  // R-37: opening, closing and widening move the width on a spring; the content keeps its
+  // narrow width so it is clipped, not squeezed, while the panel opens or closes.
+  return <motion.aside aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width: wide ? 520 : 360 }} exit={sheet ? undefined : { width: 0 }} transition={SPRING_SIDEBAR} className={cn('min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l bg-background xl:flex')}>
+    <Tabs value={view} onValueChange={value => setView(value as PanelView)} className={cn('min-h-0 flex-1 gap-0', !sheet && 'min-w-90')}>
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
         <TabsList aria-label={t('views')} className="gap-1 bg-transparent p-0">
           <TabsTrigger value="overview" className={pill}>{t('overview')}</TabsTrigger>
@@ -153,5 +157,5 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
         <ThreadList threads={threads} issues={issues} bots={bots} all onOpenIssue={onOpenIssue} />
       </TabsContent>
     </Tabs>
-  </aside>
+  </motion.aside>
 }
