@@ -1936,7 +1936,15 @@
       "turnedOff": "Turned off {name}",
       "madeDefault": "{account} is now the default",
       "linkInBrowser": "Continue in the browser window to finish linking. Return here when you’re done.",
-      "browserUpdateRequired": "Update Mikka before linking accounts from the desktop app."
+      "browserUpdateRequired": "Update Mikka before linking accounts from the desktop app.",
+      "detailLoadFailed": "Couldn't load the app details",
+      "toolsHeading": "Tools",
+      "toolsSummary": "{count} tools ({write} write, {read} read)",
+      "writeTools": "Write {count}",
+      "readTools": "Read {count}",
+      "info": "Information",
+      "category": "Category",
+      "version": "Version"
     },
     "telegram": {
       "title": "Telegram",

@@ -23,8 +23,19 @@ const CATALOG = {
 }
 const GMAIL = { id: 'fixture-gmail', toolkit: 'gmail', status: 'ACTIVE', enabled: true, alias: null, createdAt: '2026-10-01T00:00:00.000Z', email: 'fixture@example.test', isDefault: true }
 
+// One app's page, as Composio describes it (lib/plugins/app-detail.ts).
+const DETAIL = {
+  id: 'hubspot', name: 'HubSpot', description: 'HubSpot is an inbound marketing, sales, and customer service platform.', iconUrl: icon,
+  categories: [{ id: 'crm', name: 'CRM' }, { id: 'marketing', name: 'Marketing' }], website: 'https://www.hubspot.com/', version: '20261029_00',
+  tools: {
+    write: [{ slug: 'HUBSPOT_CREATE_CONTACT', name: 'Create contact', description: 'Creates a contact in HubSpot.' }, { slug: 'HUBSPOT_DELETE_CONTACT', name: 'Delete contact', description: 'Archives a contact.' }],
+    read: [{ slug: 'HUBSPOT_LIST_CONTACTS', name: 'List contacts', description: 'Lists contacts.' }],
+  },
+}
+
 async function controlled(page: Page, options: { hold?: () => Promise<void> } = {}) {
   await page.route('**/api/integrations/composio/catalog', route => route.fulfill({ json: CATALOG }))
+  await page.route('**/api/integrations/composio/catalog/*', route => route.fulfill({ json: { ...DETAIL, id: new URL(route.request().url()).pathname.split('/').pop() } }))
   await page.route('**/api/integrations/composio', async route => {
     if (route.request().method() !== 'GET') return route.fallback()
     await options.hold?.()
@@ -142,4 +153,35 @@ test('插件 store stays put while the connected apps load', async ({ page }) =>
   release()
   await expect(page.locator('[data-slot="app-row-pending"]')).toHaveCount(0)
   expect((await gmail.boundingBox())?.y).toBe(before?.y)
+})
+
+test('an app page shows Composio\'s description, tools and facts before anything is connected', async ({ page }, testInfo) => {
+  await controlled(page)
+  await register(page, '/?section=plugins&app=hubspot')
+  await expect(page.getByRole('heading', { name: 'HubSpot', exact: true })).toBeVisible()
+  // Not connected: 连接 is offered, and the page is full anyway.
+  await expect(page.getByRole('button', { name: '连接', exact: true })).toBeVisible()
+  await expect(page.getByText(DETAIL.description, { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '工具', exact: true })).toBeVisible()
+  await expect(page.getByText('包含 3 个工具（2 个写入，1 个读取）', { exact: true })).toBeVisible()
+  const write = page.getByRole('button', { name: '写入 2', exact: true })
+  await expect(write).toBeVisible()
+  await expect(page.getByRole('button', { name: '读取 1', exact: true })).toBeVisible()
+  await expect(page.getByText('Create contact', { exact: true })).toBeVisible()
+  await expect(page.getByText('Archives a contact.', { exact: true })).toBeVisible()
+  // Groups fold.
+  await write.click()
+  await expect(page.getByText('Create contact', { exact: true })).toBeHidden()
+  await write.click()
+  await expect(page.getByText('Create contact', { exact: true })).toBeVisible()
+  // 信息: only what Composio has.
+  await expect(page.getByRole('heading', { name: '信息', exact: true })).toBeVisible()
+  await expect(page.getByText('CRM · Marketing', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'www.hubspot.com', exact: true })).toHaveAttribute('href', 'https://www.hubspot.com/')
+  await expect(page.getByText('20261029_00', { exact: true })).toBeVisible()
+  await expect(page.getByText('开发者', { exact: true })).toHaveCount(0)
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await testInfo.attach(`plugins-app-page-${scheme}`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+  }
 })

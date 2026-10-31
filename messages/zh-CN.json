@@ -1936,7 +1936,15 @@
       "turnedOff": "已停用 {name}",
       "madeDefault": "{account} 已设为默认",
       "linkInBrowser": "请在刚打开的浏览器窗口中完成关联，完成后回到这里。",
-      "browserUpdateRequired": "请更新 Mikka 后再从桌面端关联账号。"
+      "browserUpdateRequired": "请更新 Mikka 后再从桌面端关联账号。",
+      "detailLoadFailed": "暂时无法读取应用信息",
+      "toolsHeading": "工具",
+      "toolsSummary": "包含 {count} 个工具（{write} 个写入，{read} 个读取）",
+      "writeTools": "写入 {count}",
+      "readTools": "读取 {count}",
+      "info": "信息",
+      "category": "类别",
+      "version": "版本"
     },
     "telegram": {
       "title": "Telegram",
