@@ -32,7 +32,7 @@ export class RepositoryCache {
       signal?.throwIfAborted()
       const git = (args: string[], cwd?: string) => execa('git', [
         ...FETCH_GIT, '-c', `protocol.file.allow=${this.allowFile ? 'always' : 'never'}`, ...args,
-      ], { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, stdin: 'ignore', timeout: FETCH_TIMEOUT_MS, cancelSignal: signal })
+      ], { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, stdin: 'ignore', timeout: FETCH_TIMEOUT_MS, cancelSignal: signal, killDescendants: true })
       if (!existsSync(path)) {
         const temporary = `${path}.clone-${randomUUID()}`
         try {

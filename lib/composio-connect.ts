@@ -1,4 +1,4 @@
-import { COMPOSIO_APP_IDS, pickDefaultAccountId, type ComposioAccountRecord, type ComposioAppId } from '@/lib/composio-accounts'
+import { COMPOSIO_TOOLKIT_IDS, pickDefaultAccountId, type ComposioAccountRecord, type ComposioToolkitId } from '@/lib/composio-accounts'
 
 // What happens around a Composio account after the provider hands it back:
 // a reconnect passes the old account's name and default to the new one, and
@@ -16,23 +16,23 @@ export type ComposioListedAccount = {
 
 export type ComposioEmailDeps = {
   /** The provider's email, null when it gives none; throws when it could not be asked (retry later). */
-  readEmail: (toolkit: ComposioAppId, accountId: string) => Promise<string | null>
-  saveEmail: (toolkit: ComposioAppId, accountId: string, email: string | null) => Promise<void>
+  readEmail: (toolkit: ComposioToolkitId, accountId: string) => Promise<string | null>
+  saveEmail: (toolkit: ComposioToolkitId, accountId: string, email: string | null) => Promise<void>
   rename: (accountId: string, alias: string) => Promise<void>
   /** A try without a final answer, kept for the cooldown. */
-  noteAttempt: (toolkit: ComposioAppId, accountId: string) => Promise<void>
+  noteAttempt: (toolkit: ComposioToolkitId, accountId: string) => Promise<void>
 }
 
 export type ComposioConnectDeps = ComposioEmailDeps & {
   /** Disconnects the old account and forgets Mikka's notes on it. */
   retire: (accountId: string, alias?: string | null) => Promise<void>
-  chooseDefault: (toolkit: ComposioAppId, accountId: string) => Promise<void>
+  chooseDefault: (toolkit: ComposioToolkitId, accountId: string) => Promise<void>
   log: (step: string, error: unknown) => void
 }
 
-function appOf(account: ComposioListedAccount | undefined): ComposioAppId | null {
+function appOf(account: ComposioListedAccount | undefined): ComposioToolkitId | null {
   const slug = account?.toolkit.slug
-  return slug && (COMPOSIO_APP_IDS as readonly string[]).includes(slug) ? slug as ComposioAppId : null
+  return slug && (COMPOSIO_TOOLKIT_IDS as readonly string[]).includes(slug) ? slug as ComposioToolkitId : null
 }
 
 /** The account the bots use for this toolkit now, chosen or not. */
@@ -58,7 +58,7 @@ export function reconnectHandover(items: ComposioListedAccount[], records: Compo
 }
 
 /** Reads, keeps and (when it has no name) names the account after its email. Never throws. */
-async function fillEmail(deps: ComposioEmailDeps & { log?: ComposioConnectDeps['log'] }, account: ComposioListedAccount, toolkit: ComposioAppId, keepAlias: boolean) {
+async function fillEmail(deps: ComposioEmailDeps & { log?: ComposioConnectDeps['log'] }, account: ComposioListedAccount, toolkit: ComposioToolkitId, keepAlias: boolean) {
   let email: string | null
   try {
     email = await deps.readEmail(toolkit, account.id)

@@ -1,5 +1,6 @@
 'use client'
 import { useTranslations } from 'next-intl'
+import { AnimatePresence } from 'motion/react'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
@@ -15,7 +16,7 @@ import { BotList, type ChatTarget } from '@/components/nav/bot-list'
 import { NewBotDialog } from '@/components/nav/new-bot-dialog'
 import type { LegacyChatRequest } from './legacy-chat-archive'
 import { TeamHome } from '@/components/teams/team-home'
-import { AppFrame, AppShell, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'
+import { AppFrame, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'
 import { IssueList } from './issue-list'
 import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
@@ -59,6 +60,7 @@ import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
 import { useWorkspace } from '@/hooks/use-workspace'
+import { usePresence } from '@/lib/use-presence'
 
 // Start the chunk download during module evaluation, before hydration and its effects.
 if (typeof window !== 'undefined') {
@@ -75,6 +77,7 @@ const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module
 // Settings open through history.pushState; without their own fallback a first chunk load suspends
 // up to the route's loading boundary, which can stay stuck on the skeleton.
 const SettingsShell = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsShell), { loading: WorkspaceLoading })
+const SettingsFrame = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsFrame), { loading: WorkspaceLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
 export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false }: { initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {
@@ -219,6 +222,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [creating, setCreating] = useState(false)
   const [typedAhead, setTypedAhead] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  const search = usePresence(searchOpen)
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
       if (event.isComposing || event.keyCode === 229 || boardBusy || settingsOpen || leaving.current) return
@@ -371,7 +375,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
   const pagerId = pendingSelection !== undefined ? pendingSelection : selected
   const pagerIndex = pagerId ? filtered.findIndex(task => task.id === pagerId) : -1
-  if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onBack={() => { const href = teamId ? `/?team=${encodeURIComponent(teamId)}` : '/'; if (!pushSettingsHistory(href)) router.push(href) }} />
+  // The rail leaves routed Settings for the app page, then opens the chosen destination there.
+  if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={destination => { if (pushSettingsHistory('/')) openRail(destination); else router.push('/') }} />
   const isConversation = !selected && section === 'coordinator'
   const savedSessions = new Map((agentHistory?.sessions ?? []).map(session => [session.id, session]))
   for (const session of liveSessions) savedSessions.set(session.id, { ...session, preview: session.preview ?? savedSessions.get(session.id)?.preview })
@@ -380,14 +385,15 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const dialogs = <>
     <NewTaskDialog open={creating} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
     <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />
-    {searchOpen && <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} bots={bots} sessions={conversationSessions} coordinatorLine={lastCoordinatorItem ? sessionPreview(lastCoordinatorItem.text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, ''), null) : undefined} issues={tasks} projects={projects} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
+    {search.value && <GlobalSearch open={search.open} onOpenChange={setSearchOpen} onOpenChangeComplete={search.onOpenChangeComplete} bots={bots} sessions={conversationSessions} coordinatorLine={lastCoordinatorItem ? sessionPreview(lastCoordinatorItem.text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, ''), null) : undefined} issues={tasks} projects={projects} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
       onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}
       onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('projects'); setTeamId(null); setProjectId(id) }) }} />}
   </>
-  if (settingsOpen) return <SignOutBoundary pending={signingOut}><AppShell>
-    <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onBack={closeSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
+  const leaveSettings = (destination: RailDestination) => { closeSettings(); openRail(destination) }
+  if (settingsOpen) return <SignOutBoundary pending={signingOut}><SettingsFrame user={user} onRail={leaveSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>
+    <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
     {dialogs}
-  </AppShell></SignOutBoundary>
+  </SettingsFrame></SignOutBoundary>
   return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider><AppFrame
     bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={<>{isConversation && !browserShown && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}<BrowserToggle open={browserShown} onToggle={() => showBrowser(!browserShown)} /></>} />}
     rail={<IconRail active={rail} onNavigate={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}>
@@ -405,8 +411,9 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       </>}
     </AppShellContent>
     {browserShown && <BrowserPane onClose={() => showBrowser(false)} />}
-    {isConversation && panelOpen && !browserShown && <ContextPanel issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
-      conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}
+    {/* The panel springs only when the person opens or closes it; leaving or entering a conversation shows it at its final width. */}
+    {isConversation && <AnimatePresence initial={false}>{panelOpen && !browserShown && <ContextPanel key="context-panel" issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
+      conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}</AnimatePresence>}
     {isConversation && !browserShown && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
       <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>

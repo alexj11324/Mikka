@@ -128,31 +128,40 @@ Pending refunds are checked against Stripe's current state and leave the event
 retryable. A later successful `refund.updated` also applies the debit, including
 after the original event's retry window expires.
 
-Free credit is spent before purchased points; `plan` grants are ignored.
-One pending/unknown call per workspace bounds concurrent overdraft to the one
-current call, including across processes. Each provider invocation has its own
-ledger ID; settlement is idempotent. Workflow retries cannot silently replay a
-pending call. A call can finish its current step beyond the remaining balance;
-its entire cost remains in the ledger as debt rather than disappearing.
+The user's 2026-10-31 decision supersedes the previous financial reservation
+design: check the current available balance before a call and charge its actual
+receipt afterwards. Any positive balance is sufficient; a model cost estimate
+cannot reject it. There is no new balance freeze or prepayment. Free credit is
+spent before purchased points; `plan` grants are ignored.
+
+One pending/unknown call per workspace is an execution concurrency limit,
+including across processes. The existing `reserve` method records only that
+slot and a receipt ID; all reserved-money fields on new rows are zero. Each
+provider invocation has its own ledger ID; settlement is idempotent. Workflow
+retries cannot silently replay a pending call. A call can finish beyond the
+remaining balance; its entire actual cost remains in the ledger as debt. The
+next call is refused until recorded purchased credit restores a positive net
+balance. Debt never authorizes another call.
 
 The text model caps output at 4,096 tokens and provider time at 60 seconds;
-compaction keeps its existing 30-second timeout. It reserves a conservative
-cost from Gateway's model catalog before calling. Inputs over 16 MB or missing model pricing are refused with
-`usage_cost_unavailable`; inline file/image inputs include a conservative
-128,000-token cushion per part in the reservation. Subscription calls keep
-their existing capabilities.
+compaction keeps its existing 30-second timeout. Inputs over 16 MB are refused;
+these transport bounds do not reserve money. Subscription calls keep their
+existing capabilities.
 Actual Gateway `providerMetadata.gateway.cost` is rounded upwards to integer
 microdollars. Missing cost or an interrupted provider call retains its
-reservation and blocks further workspace calls, rather than treating unknown
+receipt record and blocks further workspace calls, rather than treating unknown
 usage as free. Operators can reconcile the same call ID with
 `HostedUsageStore.settle(id, actualMicroUsd, ...)` after checking the Gateway
 receipt. No automatic retry discards an uncertain charge.
+Already existing rows with prepaid amounts retain their old accounting until
+settled, so changing the admission path cannot charge or refund them twice.
 
 ## Platform breaker and alerts
 
 The default rolling 24-hour free-model budget is USD 25. An admission lock
-serializes free-budget checks and reservations; no database lock spans model
-network I/O. Pending reservations count toward the cap. The pause clears as
+serializes current balance and actual-spend checks; no database lock spans model
+network I/O. Calls already executing can finish beyond the cap; actual receipts
+stop subsequent eligible free calls. The pause clears as
 usage leaves the rolling window. Purchased usage can proceed while free use is
 paused; in that case the free allowance is left untouched. Unpaid overruns of
 the current free-funded call are included in the platform spend total.

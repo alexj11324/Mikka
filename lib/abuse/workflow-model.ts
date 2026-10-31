@@ -33,6 +33,8 @@ export class HostedWorkflowModel implements Model {
       await hostedModel(
         await executionWorkspace(this.ownerId, this.botId),
         this.modelId,
+        undefined,
+        this.ownerId,
       )
     ).doGenerate(options)
   }
@@ -44,6 +46,8 @@ export class HostedWorkflowModel implements Model {
       await hostedModel(
         await executionWorkspace(this.ownerId, this.botId),
         this.modelId,
+        undefined,
+        this.ownerId,
       )
     ).doStream(options)
   }

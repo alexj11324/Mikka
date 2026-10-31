@@ -17,6 +17,7 @@ import { PROJECT_STATUSES, PROJECT_ICON_TINTS, type Project } from './project-pr
 import { ProjectPropertyControl } from './project-property-controls'
 import { useProjectUpdate } from './use-project-update'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { usePresence } from '@/lib/use-presence'
 
 const ProjectForm = dynamic(() => import('./project-form').then(module => module.ProjectForm), {
   loading: () => { const agentCopy = useAgentCopy(); return (<p role="status" className="p-6 text-sm text-muted-foreground">{agentCopy.loadingProjectForm}</p>) },
@@ -30,6 +31,7 @@ export function ProjectWorkspace({ projects, loading, error, projectId, team, in
 }) {
   const i18nText = useTranslations();
   const [creating, setCreating] = useState(false)
+  const createDialog = usePresence(creating)
   const { update, pending, error: saveError } = useProjectUpdate(onUpdated)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
@@ -49,6 +51,6 @@ export function ProjectWorkspace({ projects, loading, error, projectId, team, in
       const completed = linked.filter(issue => issue.status === 'done').length
       return <TableRow key={item.id}><TableCell><Button variant="ghost" className="h-auto w-full justify-start py-3 text-left whitespace-normal" onClick={() => onSelect(item.id)}><Box data-icon="inline-start" className={PROJECT_ICON_TINTS[item.properties.color]} /><span className="line-clamp-2">{item.name}</span></Button></TableCell><TableCell><ProjectPropertyControl field="health" value={item} userName={userName} disabled={pending} plain onChange={changes => void update(item, changes)} /></TableCell>{(['priority', 'lead', 'targetDate'] as const).map(field => <TableCell key={field}><ProjectPropertyControl field={field} value={item} userName={userName} disabled={pending} plain onChange={changes => void update(item, changes)} /></TableCell>)}<TableCell className="text-right">{linked.length}</TableCell><TableCell><div className="inline-flex items-center gap-2"><ProjectPropertyControl field="status" value={item} userName={userName} disabled={pending} plain onChange={changes => void update(item, changes)} /><span className="text-xs text-muted-foreground">{linked.length ? Math.round(completed / linked.length * 100) : 0}%</span></div></TableCell></TableRow>
     })}</TableBody></Table></div> : <Empty className="min-h-80"><EmptyHeader><EmptyMedia variant="icon"><Box /></EmptyMedia><EmptyTitle>{query || status !== 'all' ? i18nText("Projects.noMatchTitle") : i18nText("Projects.emptyTitle")}</EmptyTitle>{(query || status !== 'all') && <EmptyDescription>{i18nText("Projects.noMatchDescription")}</EmptyDescription>}</EmptyHeader><EmptyContent><Button size="sm" onClick={() => setCreating(true)}><Plus data-icon="inline-start" />{i18nText("Projects.form.createTitle")}</Button></EmptyContent></Empty>}
-    {creating && <ProjectForm initialTeamId={initialTeamId} projects={projects} userName={userName} onClose={() => setCreating(false)} onSaved={saved => { setCreating(false); onUpdated(); onSelect(saved.id) }} />}
+    {createDialog.value && <ProjectForm open={createDialog.open} onOpenChangeComplete={createDialog.onOpenChangeComplete} initialTeamId={initialTeamId} projects={projects} userName={userName} onClose={() => setCreating(false)} onSaved={saved => { setCreating(false); onUpdated(); onSelect(saved.id) }} />}
   </div>
 }

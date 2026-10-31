@@ -15,6 +15,7 @@ import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from 
 import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { withBasePath } from '@/lib/base-path'
 import { useActionError } from '@/lib/use-action-error'
+import { usePresence, type PresenceProps } from '@/lib/use-presence'
 
 const ICON_MAX_BYTES = 200 * 1024
 const ICON_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
@@ -48,6 +49,8 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const [failed, setFailed] = useState<FailedSave | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [transferring, setTransferring] = useState(false)
+  const transferDialog = usePresence(transferring)
+  const deleteDialog = usePresence(deleting)
   const [transferredTo, setTransferredTo] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   // One save at a time: Enter followed by the blur from disabling the field must not send it twice.
@@ -147,14 +150,14 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
       </SettingRow>
     </SettingsSection>
     {transferredTo && <p role="status" className="text-sm text-muted-foreground">{t('transferred', { name: transferredTo })}</p>}
-    {transferring && <TransferWorkspaceDialog workspaceId={current.id} name={current.name} onClose={() => setTransferring(false)}
+    {transferDialog.value && <TransferWorkspaceDialog open={transferDialog.open} onOpenChangeComplete={transferDialog.onOpenChangeComplete} workspaceId={current.id} name={current.name} onClose={() => setTransferring(false)}
       onDone={owner => { setTransferring(false); setTransferredTo(owner); void general.mutate() }} />}
-    {deleting && <DeleteWorkspaceDialog workspaceId={current.id} name={current.name} onClose={() => setDeleting(false)} />}
+    {deleteDialog.value && <DeleteWorkspaceDialog open={deleteDialog.open} onOpenChangeComplete={deleteDialog.onOpenChangeComplete} workspaceId={current.id} name={current.name} onClose={() => setDeleting(false)} />}
   </>
 }
 
 /** 转让工作区: pick another active member; they become the owner (and an admin). */
-function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone }: { workspaceId: string; name: string; onClose: () => void; onDone: (owner: string) => void }) {
+function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = true, onOpenChangeComplete }: { workspaceId: string; name: string; onClose: () => void; onDone: (owner: string) => void } & PresenceProps) {
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
@@ -179,7 +182,7 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone }: { works
     }
   }
 
-  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}>
+  return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={open => { if (!open && !pending) onClose() }}>
     <DialogContent>
       <DialogHeader><DialogTitle>{t('transferTitle', { name })}</DialogTitle></DialogHeader>
       <div className="flex flex-col gap-3 text-sm">
@@ -204,7 +207,7 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone }: { works
 }
 
 /** S-I: lists what goes, then the name must be typed exactly. */
-function DeleteWorkspaceDialog({ workspaceId, name, onClose }: { workspaceId: string; name: string; onClose: () => void }) {
+function DeleteWorkspaceDialog({ workspaceId, name, onClose, open = true, onOpenChangeComplete }: { workspaceId: string; name: string; onClose: () => void } & PresenceProps) {
   const t = useTranslations('Settings.workspaceForm')
   const computerBilling = useGatedFeature('computerBilling')
   const commonT = useTranslations('Common')
@@ -228,7 +231,7 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose }: { workspaceId: st
     }
   }
 
-  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}>
+  return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={open => { if (!open && !pending) onClose() }}>
     <DialogContent>
       <DialogHeader><DialogTitle>{t('deleteTitle', { name })}</DialogTitle></DialogHeader>
       <div className="flex flex-col gap-3 text-sm">

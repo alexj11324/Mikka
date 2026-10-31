@@ -38,7 +38,7 @@ function WriteCard({ item, scope, uncertain, busy, onDecide, onSettled, onRecove
   const Icon = calendar ? CalendarClock : slack ? MessageSquare : FileText
   const target = calendar ? input.event_id : slack ? input.channel : input.page_id
   const targetName = calendar ? text(context?.summary) : slack ? text(context?.name) ?? text(context?.user) : null
-  return <li className="flex flex-col gap-3 rounded-[14px] bg-muted/60 px-4 py-3">
+  return <li className="flex flex-col gap-3 rounded-xl bg-muted/60 px-4 py-3">
     <p className="flex items-center gap-2 text-sm font-medium"><Icon className="size-4" />{t(item.action)}</p>
     {!attention && <dl className="flex flex-col gap-1">
       <div className="flex gap-3 text-xs"><dt className="w-14 shrink-0 text-muted-foreground">{t('account')}</dt><dd className="min-w-0 break-words">{view.account.accountId}</dd></div>

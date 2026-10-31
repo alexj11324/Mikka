@@ -1,5 +1,5 @@
 import 'server-only'
-import { createGateway, generateText } from 'ai'
+import { generateText } from 'ai'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { extractionPrompt, factInput, parseFacts } from './facts'
@@ -25,17 +25,21 @@ const FACT_TIMEOUT_MS = 15_000
  */
 export async function extractFacts(notification: ExternalNotification, suggestionId: string): Promise<number> {
   'use step'
-  const { hostedModel } = await import('@/lib/abuse/model')
+  const { hostedModel, createTrustedGatewayModel } = await import('@/lib/abuse/model')
+  const { modelAdmission } = await import('@/lib/model-admission/runtime')
   const { executionWorkspace } = await import('@/lib/execution-settings')
   const key = process.env.DECISION_GATEWAY_API_KEY
   if (!key || !profileEnabled()) return 0
   try {
     if (!await profileEntitled(notification.userId) || !await memoryEnabled(notification.userId)) return 0
+    const workspaceId=await executionWorkspace(notification.userId,null)
+    await modelAdmission.gateway({workspaceId,ownerId:notification.userId},FACT_MODEL,undefined,{auditAllowed:false})
+    const model=await hostedModel(workspaceId,FACT_MODEL,await createTrustedGatewayModel(FACT_MODEL,key),notification.userId)
     const day = usageDay(new Date())
     if (!await claimExtractionCall(notification.userId, day)) return 0
     const { instructions, prompt } = extractionPrompt(notification)
     const started = Date.now()
-    const { text, usage } = await generateText({ model: await hostedModel(await executionWorkspace(notification.userId,null),FACT_MODEL,createGateway({ apiKey: key })(FACT_MODEL)), instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(FACT_TIMEOUT_MS) })
+    const { text, usage } = await generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(FACT_TIMEOUT_MS) })
     const inputTokens = usage.inputTokens ?? 0
     const outputTokens = usage.outputTokens ?? 0
     captureGeneration(notification.userId, { model: FACT_MODEL, inputTokens, outputTokens, latencyMs: Date.now() - started, span: 'profile_extraction' })

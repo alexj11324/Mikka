@@ -25,9 +25,14 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
   if (!key || signal?.aborted) return null
   const { hostedBillingScope } = await import('@/lib/abuse/context')
   const scope = hostedBillingScope.getStore()
-  const usage = scope ? await import('@/lib/abuse/runtime') : null
+  if (!scope) return null
+  const { assertUnmanagedModelTransport } = await import('@/lib/model-admission/runtime')
+  await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
+  const usage = await import('@/lib/abuse/runtime')
   const callId = randomUUID()
-  if (scope && usage) { await usage.canUseMikkaPaid(scope.workspaceId); await usage.hostedUsage.reserve(scope.workspaceId,DECISION_MODEL,callId) }
+  await usage.canUseMikkaPaid(scope.workspaceId)
+  await usage.hostedUsage.reserve(scope.workspaceId,DECISION_MODEL,callId)
+  let requestStarted = false
   try {
     const requestInput = decisionRequestInput(input)
     const requestedQuestions = structuredClone(questions)
@@ -38,15 +43,19 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
       ? [createHash('sha256').update(Buffer.from(part.image_url.slice(part.image_url.indexOf(',') + 1), 'base64')).digest('hex')]
       : []))
     const executionId = randomUUID(), startedAt = new Date().toISOString()
+    await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
+    if (signal?.aborted) throw new DOMException('Model request cancelled', 'AbortError')
+    requestStarted = true
     const response = await fetch(DECISIONS_URL, {
       method: 'POST',
+      redirect: 'error',
       headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
       body,
       signal: AbortSignal.any([AbortSignal.timeout(DECISION_TIMEOUT_MS), ...(signal ? [signal] : [])]),
     })
     if (!response.ok) { await response.body?.cancel(); throw Error('decisionProviderUnavailable') }
     const payload: unknown = await response.json()
-    if (usage) {
+    {
       const receipt = payload as {provider_metadata?:unknown}
       await usage.hostedUsage.settle(callId,gatewayCost(receipt.provider_metadata),0,0,gatewayGenerationId(receipt.provider_metadata))
       await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
@@ -63,7 +72,7 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
     }
     return { answers, execution }
   } catch {
-    if (usage) await usage.hostedUsage.settle(callId,null)
+    await usage.hostedUsage.settle(callId,requestStarted ? null : 0)
     // No upstream text, credentials, image bytes or untrusted purpose in logs.
     console.error('Decision unavailable', { purpose: purpose.replace(/[^a-z0-9_-]/gi, '').slice(0, 80) })
     return null

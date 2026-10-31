@@ -173,7 +173,7 @@ export function artifactSubmittedEvent(
 /** The person approved or declined something an agent proposed in their accounts (lib/pending-actions.ts). */
 export function actionDecidedEvent(
   action: { id: string; userId: string; action: string; input: Record<string, unknown> },
-  decision: { status: 'done' | 'failed' | 'declined'; error: string | null; outcome: Record<string, string> },
+  decision: { status: 'done' | 'failed' | 'declined' | 'running'; error: string | null; outcome: Record<string, string> },
   task?: { eventId: string; botId: string | null; issueId: string | null },
 ): CoordinatorEventInput {
   return {

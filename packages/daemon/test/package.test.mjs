@@ -28,6 +28,7 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
   const npmOptions = ['--userconfig', userConfig, '--globalconfig', globalConfig, '--cache', join(temporary, 'npm-cache'), '--registry', 'https://registry.npmjs.org']
   const packed = JSON.parse(execFileSync('npm', ['pack', buildPath, '--json', '--ignore-scripts', '--pack-destination', temporary, ...npmOptions], { cwd: temporary, encoding: 'utf8', env, timeout: 30_000, killSignal: 'SIGKILL' }))[0]
   assert.ok(packed.files.length > 10)
+  assert.ok(packed.files.some(file => file.path === 'THIRD_PARTY_NOTICES.md'))
   assert.ok(packed.files.every(file => !file.path.endsWith('.ts') && !file.path.startsWith('node_modules/')))
   const installation = join(temporary, 'installation')
   await mkdir(installation)

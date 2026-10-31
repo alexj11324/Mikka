@@ -8,7 +8,7 @@
 // worktree: that would show up in `git status` and be committed with the run's
 // changes, ending up in the pull request.
 import { z } from "zod"
-export { SKILL_ARTIFACT_HEADER, skillArtifactRefSchema, skillAssignmentReceiptSchema, type SkillArtifactRef, type SkillAssignmentReceipt } from './skill-artifact'
+export { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillArtifactRefSchema, skillAssignmentReceiptSchema, type SkillArtifactRef, type SkillAssignmentReceipt } from './skill-artifact'
 export { skillReceiptRevalidationSchema, type SkillReceiptRevalidation } from './skill-artifact'
 
 /** How many skills one run carries; the rest wait for the next run. */

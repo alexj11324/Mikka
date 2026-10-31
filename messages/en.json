@@ -118,6 +118,7 @@
     "sidebarDescription": "Displays the mobile sidebar.",
     "toggleStatusFilter": "Expand or collapse the status filter",
     "workspaceMenu": "Workspace menu",
+    "switchWorkspace": "Switch workspace",
     "workspaceProjects": "Workspace projects",
     "teamHome": "Team home",
     "inbox": "Inbox",
@@ -950,6 +951,7 @@
     "botNotFound": "This bot does not exist in this workspace.",
     "executionPlaceInvalid": "Choose an available device or cloud.",
     "executionHarnessUnavailable": "This harness is unavailable on the selected device.",
+    "executionAutoNotAllowed": "Choose an explicit execution value.",
     "executionModelUnknown": "This model is unavailable.",
     "executionRuleNotFound": "This execution rule was not found.",
     "executionRuleOrderInvalid": "The execution rule order has changed. Reload and retry.",
@@ -1117,7 +1119,9 @@
     "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
     "e2bKeyRateLimited": "E2B is rate limiting this key right now. Wait a few minutes and try again.",
     "tokenNotFound": "This token does not exist or was already revoked.",
-    "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first."
+    "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first.",
+    "accountDeletionPending": "Account deletion is pending cleanup.",
+    "SESSION_NOT_FRESH": "Sign in again before deleting your account."
   },
   "Overview": {
     "sections": {
@@ -1571,7 +1575,6 @@
   },
   "Settings": {
     "title": "Settings",
-    "backToApp": "Back to app",
     "searchLabel": "Search settings",
     "searchPlaceholder": "Search settings…",
     "noResults": "No matching settings",
@@ -1618,9 +1621,6 @@
       },
       "privacy": {
         "title": "Data and privacy"
-      },
-      "activity": {
-        "title": "Activity"
       },
       "computers": {
         "title": "Devices"
@@ -1786,7 +1786,6 @@
     },
     "subscriptions": {
       "heading": "Model subscriptions",
-      "description": "Connect your own subscription for authorized Bot tasks in this workspace.",
       "codex": "ChatGPT / Codex",
       "claude": "Claude",
       "unavailable": "This connection is not available yet.",
@@ -1802,9 +1801,8 @@
       "openProvider": "Open the provider page",
       "finish": "Complete connection",
       "close": "Close",
-      "expired": "The connection attempt expired. Start again.",
+      "expired": "{provider} sign-in expired",
       "loadFailed": "Could not load subscription settings.",
-      "connectionFailed": "The connection could not be completed. Start a new attempt.",
       "disconnectFailed": "The subscription could not be disconnected.",
       "connectedNotice": "Subscription connected.",
       "disconnectedNotice": "Disconnected from Mikka. The provider's authorization may still need to be revoked on its website.",
@@ -1830,7 +1828,11 @@
       "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
       "removeFailed": "The connection could not be removed.",
       "loading": "Loading model subscriptions…",
-      "serviceOff": "Model subscriptions aren't turned on for this deployment. Bots use the workspace's default model quota."
+      "serviceOff": "Model subscriptions aren't turned on for this deployment. Bots use the workspace's default model quota.",
+      "startFailed": "{provider} sign-in could not start",
+      "finishFailed": "{provider} sign-in did not finish",
+      "signedOut": "Your session expired. Sign in again, then connect.",
+      "restart": "Start over"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -2016,33 +2018,6 @@
       "exportDownload": "Download export",
       "manageNone": "You have no shared links right now"
     },
-    "activity": {
-      "filtersLabel": "Filter activity",
-      "filters": {
-        "all": "All",
-        "accounts": "Used my accounts",
-        "reminders": "Reminders"
-      },
-      "loading": "Reading activity…",
-      "empty": "No activity yet.",
-      "loadError": "Activity could not be read.",
-      "loadMore": "Load older activity",
-      "loadingMore": "Loading…",
-      "view": "Open",
-      "credentialUse": "{bot} used the sign-in for {site}",
-      "someBot": "A bot",
-      "approved": "You approved: {action}",
-      "declined": "You declined: {action}",
-      "reminder": "Reminder: {title}",
-      "result": {
-        "input_inserted_guarded": "Filled, not submitted",
-        "password_submitted": "Password submitted",
-        "otp_submitted": "Code submitted",
-        "session_applied": "Session restored",
-        "denied_or_failed": "Refused or failed"
-      },
-      "emptyScope": "No activity yet. This lists bots using your logins, actions you approved or declined, and reminders from the Coordinator. Ordinary chats and tasks don’t show up here."
-    },
     "logins": {
       "heading": "Site sign-ins",
       "description": "Bots use these only in operations you approve. Passwords and codes are never shown.",
@@ -2215,6 +2190,21 @@
           "credits_purchased": "bought points",
           "auto_recharge_changed": "changed auto recharge",
           "limits_changed": "changed usage limits"
+        },
+        "audit": {
+          "exported": "exported audit log",
+          "retention_changed": "changed audit retention",
+          "retention_applied": "applied audit retention"
+        },
+        "model": {
+          "policy_changed": "changed model permissions",
+          "admitted": "allowed a model request",
+          "denied": "blocked a model request"
+        },
+        "skill": {
+          "registered": "registered skill {target}",
+          "reviewed": "approved skill {target}",
+          "withdrawn": "withdrew skill {target}"
         }
       },
       "roles": {
@@ -3760,6 +3750,53 @@
       "unavailable": "Mikka Default is unavailable. Please try again later.",
       "verifyCard": "Verify card",
       "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
+    }
+  },
+  "BeUi": {
+    "dateRange": {
+      "startDate": "Start date",
+      "endDate": "End date",
+      "selectDate": "Select date",
+      "selectEnd": "Select end",
+      "chooseMonth": "Choose month",
+      "chooseYear": "Choose year",
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "previousYear": "Previous year",
+      "nextYear": "Next year",
+      "previousYears": "Previous years",
+      "nextYears": "Next years",
+      "monthsIn": "Choose a month in {year}",
+      "yearsFrom": "Choose a year from {start} to {end}",
+      "keyboardHelp": "Use arrow keys to navigate dates, Home and End for the week, Page Up and Page Down for months, Shift with Page Up or Page Down for years. Enter or Space selects a date. Use the month and year buttons to jump directly. In the month or year choices, use arrow keys to move and Escape to return.",
+      "daysSelected": "{count, plural, one {# day selected} other {# days selected}}",
+      "chooseStartDate": "Choose a start date",
+      "chooseEndDate": "Choose an end date",
+      "clear": "Clear",
+      "clearRange": "Clear date range",
+      "startChosen": "Start date {date}. Choose an end date.",
+      "unavailableRange": "This range includes unavailable dates. Choose another end date.",
+      "rangeSelected": "{from} to {to} selected.",
+      "cleared": "Date range cleared.",
+      "presetSelected": "{name} selected."
+    },
+    "table": {
+      "selectAll": "Select all rows",
+      "selectRow": "Select row {row}",
+      "columnOptions": "{column} column options",
+      "rowOptions": "Row {row} options",
+      "reorderColumn": "Reorder {column} column",
+      "renameColumn": "Rename {column} column",
+      "resizeColumn": "Resize {column} column",
+      "editCell": "{column} for row {row}",
+      "emptyCell": "Empty",
+      "insertBefore": "Insert before",
+      "insertAfter": "Insert after",
+      "deleteColumn": "Delete column",
+      "deleteRow": "Delete row"
+    },
+    "timeline": {
+      "keyboardHint": "Use the left and right arrow keys to move between events."
     }
   }
 }

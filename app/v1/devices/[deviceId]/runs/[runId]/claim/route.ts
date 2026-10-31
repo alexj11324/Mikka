@@ -8,17 +8,20 @@ import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER } from '@mikka/protocol/device'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
+import { assertUnmanagedModelTransport } from '@/lib/model-admission/runtime'
+import { ModelAdmissionError } from '@/lib/model-admission/contract'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
+import { issueForUser } from '@/lib/issue-access'
 import { latestCheckpoint } from '@/lib/run-leases'
 import { checkpointRecoveryError, retryNote } from '@/lib/run-retry'
 import { constrainedAssignmentPolicy } from '@/lib/run-assignment-policy'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
-import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
+import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { claimBenchmarkAssignment, skillAssignments } from '@/lib/self-improvement/server'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
@@ -70,6 +73,15 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId || repo.deviceId !== deviceId) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   if (device.kind === 'local' && !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return NextResponse.json({ error: 'Repository identity must be confirmed before scheduling a new thread.' }, { status: 409 })
   if (repo.remoteUrl && request.headers.get(REPO_ORIGIN_HEADER) !== '1') return NextResponse.json({ error: 'Device update required for repository verification.' }, { status: 409 })
+  const rejectPublication = async (error: PublicationError) => {
+    const { persistRunCompletion } = await import('@/lib/run-publications')
+    await persistRunCompletion(caller.userId, runId, { stopReason: 'error', report: { summary: error.message, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } })
+    after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
+    return NextResponse.json({ error: error.message, code: error.code }, { status: 409 })
+  }
+  // Preserve the task-access denial before narrower policy parsing or any
+  // claim preparation. Publication and the final response recheck it later.
+  if (!await issueForUser(caller.userId, run.issueId)) return rejectPublication(new PublicationError('issue_unavailable'))
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
@@ -88,7 +100,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     return NextResponse.json({ error: recoveryError, code: 'checkpointRecoveryUnavailable' }, { status: 409 })
   }
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
-  try { await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts) } catch (error) {
+  const supportsTeamSkills = request.headers.get(TEAM_SKILL_HEADER) === '1'
+  try { await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts, supportsTeamSkills) } catch (error) {
     if (!(error instanceof ImprovementError)) throw error
     return NextResponse.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 409 })
   }
@@ -105,8 +118,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id || subscription.ownerId !== caller.userId)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   let cliPolicy: Awaited<ReturnType<typeof readCliRunPolicy>>
-  try { cliPolicy = await readCliRunPolicy(pool, runId, caller.userId) }
-  catch { return NextResponse.json({ error: 'Agent policy unavailable.' }, { status: 409 }) }
+  try {
+    cliPolicy = await readCliRunPolicy(pool, runId, caller.userId)
+    for (const workspaceId of cliPolicy.workspaceIds) await assertUnmanagedModelTransport({ workspaceId, ownerId: caller.userId }, run.agentDefinition?.model ?? 'native-default', request.signal)
+  }
+  catch (error) { return NextResponse.json({ error: error instanceof ModelAdmissionError ? error.code : 'Agent policy unavailable.' }, { status: 409 }) }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let factoryClaim: Record<string, unknown> = {}
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
@@ -138,13 +154,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id, beforeClaim, afterClaim)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
   } else {
-    const { prepareRunPublication, persistRunCompletion } = await import('@/lib/run-publications')
+    const { prepareRunPublication } = await import('@/lib/run-publications')
     try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
     catch (error) {
       if (!(error instanceof PublicationError)) throw error
-      await persistRunCompletion(caller.userId, runId, { stopReason: 'error', report: { summary: error.message, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } })
-      after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
-      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 })
+      return rejectPublication(error)
     }
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim)
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
@@ -156,7 +170,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   let skillAssignment
   let benchmarkAssignment
   try {
-    skillAssignment = await skillAssignments.recordClaim(caller.userId, deviceId, runId, leaseExpiresAt, supportsSkillArtifacts)
+    skillAssignment = await skillAssignments.recordClaim(caller.userId, deviceId, runId, leaseExpiresAt, supportsSkillArtifacts, supportsTeamSkills)
     benchmarkAssignment = await claimBenchmarkAssignment(caller.userId, deviceId, runId, leaseExpiresAt)
   } catch (error) {
     await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })

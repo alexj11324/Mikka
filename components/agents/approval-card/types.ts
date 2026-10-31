@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { DateRangePickerProps } from "@/components/motion/date-range-picker";
 
 export type ApprovalCardStatus =
   | "pending"
@@ -58,5 +59,7 @@ export interface ApprovalCardProps {
   approveLabel?: ReactNode;
   submitLabel?: ReactNode;
   result?: ReactNode;
+  /** Mikka: locale and text for `dateRange` questions. */
+  dateRangePicker?: Pick<DateRangePickerProps, "locale" | "labels">;
   className?: string;
 }

@@ -5,6 +5,9 @@ import { z } from 'zod'
 
 export const COMPOSIO_APP_IDS = ['gmail', 'googlecalendar', 'notion', 'slack'] as const
 export type ComposioAppId = (typeof COMPOSIO_APP_IDS)[number]
+/** Backend catalog. The legacy four-app UI keeps its own presentation list. */
+export const COMPOSIO_TOOLKIT_IDS = [...COMPOSIO_APP_IDS, 'googledrive'] as const
+export type ComposioToolkitId = (typeof COMPOSIO_TOOLKIT_IDS)[number]
 
 /**
  * Composio statuses that are not an account the person has: a link that was
@@ -13,9 +16,9 @@ export type ComposioAppId = (typeof COMPOSIO_APP_IDS)[number]
  */
 const HIDDEN_STATUSES = new Set(['INITIALIZING', 'INITIATED', 'REVOKED'])
 
-export type ConnectedAccountView = {
+export type ConnectedAccountView<Toolkit extends string = ComposioAppId> = {
   id: string
-  toolkit: ComposioAppId
+  toolkit: Toolkit
   /** Composio status: ACTIVE, INACTIVE, EXPIRED or FAILED once hidden ones are dropped. */
   status: string
   /** Composio's own switch (`isDisabled`). Disabled accounts are skipped by actions and triggers. */
@@ -37,8 +40,8 @@ type ComposioAccountLike = {
   toolkit: { slug: string }
 }
 
-function isAppId(value: string): value is ComposioAppId {
-  return (COMPOSIO_APP_IDS as readonly string[]).includes(value)
+function isAppId(value: string): value is ComposioToolkitId {
+  return (COMPOSIO_TOOLKIT_IDS as readonly string[]).includes(value)
 }
 
 /**
@@ -46,7 +49,7 @@ function isAppId(value: string): value is ComposioAppId {
  * not a real account yet. Only these fields leave the server; credentials in
  * `state` and `data` never do.
  */
-export function toConnectedAccountView(account: ComposioAccountLike): ConnectedAccountView | null {
+export function toConnectedAccountView(account: ComposioAccountLike): ConnectedAccountView<ComposioToolkitId> | null {
   if (!isAppId(account.toolkit.slug) || HIDDEN_STATUSES.has(account.status)) return null
   const alias = account.alias?.trim() || null
   return { id: account.id, toolkit: account.toolkit.slug, status: account.status, enabled: !account.isDisabled, alias, createdAt: account.createdAt, email: null, isDefault: false }
@@ -77,10 +80,10 @@ export type ComposioAccountRecord = {
 }
 
 /** Adds what Mikka stores (email, chosen default) to the accounts Composio listed. */
-export function withAccountRecords(accounts: ConnectedAccountView[], records: ComposioAccountRecord[]): ConnectedAccountView[] {
+export function withAccountRecords(accounts: ConnectedAccountView<ComposioToolkitId>[], records: ComposioAccountRecord[]): ConnectedAccountView<ComposioToolkitId>[] {
   const byId = new Map(records.map(record => [record.accountId, record]))
   const defaults = new Map<string, string | null>()
-  for (const app of COMPOSIO_APP_IDS) {
+  for (const app of COMPOSIO_TOOLKIT_IDS) {
     const own = accounts.filter(account => account.toolkit === app)
     const chosen = records.find(record => record.isDefault && (record.toolkit === app || own.some(account => account.id === record.accountId)))?.accountId
     defaults.set(app, pickDefaultAccountId(own.map(account => ({ ...account, isDisabled: !account.enabled })), chosen))
@@ -111,7 +114,8 @@ function field(value: unknown, ...path: string[]): unknown {
  * with the account's own token. Slack needs two calls: auth.test for the user
  * id, then users.info for that user's email (needs users:read.email).
  */
-export const PROVIDER_IDENTITY: Record<ComposioAppId, { endpoint: string; headers?: Record<string, string>; email: (data: unknown) => unknown }> = {
+export const PROVIDER_IDENTITY: Record<ComposioToolkitId, { endpoint: string; headers?: Record<string, string>; email: (data: unknown) => unknown }> = {
+  googledrive: { endpoint: 'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', email: data => field(data, 'user', 'emailAddress') },
   gmail: { endpoint: 'https://gmail.googleapis.com/gmail/v1/users/me/profile', email: data => field(data, 'emailAddress') },
   // The primary calendar's id is the account's email address.
   googlecalendar: { endpoint: 'https://www.googleapis.com/calendar/v3/calendars/primary', email: data => field(data, 'id') },

@@ -22,7 +22,7 @@ export async function enqueue(userId: string, holder: string, round: number, sel
   const base = snapshot ? executionInstructions(snapshot) + '\n\n' + coordinatorPresentation() : await botInstructions(userId, botId, personalCoordinatorInstructions())
   const permitted = snapshotMailboxTools(snapshot).filter(name => tools.some(tool => tool.name === name))
   return nativeCoordinatorStore.enqueue(userId,holder,round,selected,{
-    instructions: instructionsWithMemory(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base), memory) + '\n' + SCHEDULE_INSTRUCTIONS,
+    instructions: instructionsWithMemory(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + '\n' + SCHEDULE_INSTRUCTIONS,
     context: nativeCoordinatorContext(promptMessages(summary,messages,{ key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) })), tools,
   })
 }

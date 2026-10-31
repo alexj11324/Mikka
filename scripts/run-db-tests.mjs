@@ -10,12 +10,14 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
   { marker: 'lib/schedules/store.ts', file: 'lib/schedules/store.db.test.ts', script: 'test:schedules-db' },
   { marker: 'lib/run-leases.ts', file: 'tests/run-recovery.db.test.ts', script: 'test:run-recovery-db' },
   { marker: 'app/v1/runs/[runId]/checkpoint/route.ts', file: 'tests/checkpoint-recovery.db.test.ts', script: 'test:run-recovery-db' },
   { marker: 'lib/mcp/worker.ts', file: 'lib/mcp/worker-authorization.db.test.ts', script: 'test:worker-authorization-db' },
   { marker: 'lib/device-revocation.ts', file: 'lib/device-revocation.db.test.ts', script: 'test:device-revocation-db' },
   { marker:'lib/abuse/store.ts',file:'lib/abuse/store.db.test.ts',script:'test:abuse-db' },
+  { marker: 'lib/abuse/alerts.ts', file: 'lib/abuse/alerts.db.test.ts', script: 'test:abuse-db' },
   { marker: 'lib/onboarding.ts', file: 'lib/onboarding.db.test.ts', script: 'test:onboarding-db' },
   { marker: 'lib/device-enrollment.ts', file: 'lib/device-enrollment.db.test.ts', script: 'test:device-enrollment-db' },
   { marker:'lib/execution-settings.ts',file:'lib/execution-settings.db.test.ts',script:'test:execution-settings-db' },
@@ -28,6 +30,7 @@ export const REQUIRED_SUITES = [
   { marker:'lib/self-improvement/evaluation-comparison.ts',file:'lib/self-improvement/evaluation-comparison-postgres.test.ts',script:'test:skill-semantic-db' },
   { marker: 'lib/factory/store.ts', file: 'lib/factory/postgres.test.ts', script: 'test:factory' },
   { marker: 'lib/self-improvement/store.ts', file: 'lib/self-improvement/postgres.test.ts', script: 'test:self-improvement-db' },
+  { marker: 'lib/self-improvement/team-skills.ts', file: 'lib/self-improvement/team-skills.db.test.ts', script: 'test:self-improvement-db' },
   { marker: 'lib/factory/checks.ts', file: 'lib/factory/checks.db.test.ts', script: 'test:factory-checks-db' },
   { marker: 'lib/factory/monitor-v2-binding.ts', file: 'lib/factory/monitor-v2-binding.db.test.ts', script: 'test:factory-monitor-db' },
   { marker: 'lib/factory/check-independence.ts', file: 'lib/factory/check-independence.db.test.ts', script: 'test:factory-check-independence-db' },
@@ -40,6 +43,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/captures/store.ts', file: 'lib/captures/store.db.test.ts', script: 'test:captures-db' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },
+  { marker: 'lib/group-conversations-store.ts', file: 'lib/group-reads.db.test.ts', script: 'test:conversation-reads' },
   { marker: 'lib/active-agents.ts', file: 'lib/active-agents.test.ts', script: 'test:active-agents' },
   { marker: 'lib/coordinator/group-turns.ts', file: 'lib/coordinator/group-turns.test.ts', script: 'test:group-turns' },
   { marker: 'lib/profile/store.ts', file: 'lib/profile/store.db.test.ts', script: 'test:user-facts-db' },
@@ -66,7 +70,20 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/audit/query.ts', file: 'tests/audit-query.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
   { marker: 'lib/audit/record.ts', file: 'tests/audit-record.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/audit/delivery.ts', file: 'tests/audit-delivery.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/account/delete.ts', file: 'lib/account/store.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/agent-tool-approval/task-policy.db.test.ts', file: 'lib/agent-tool-approval/task-policy.db.test.ts', script: 'test:worker-authorization-db' },
+  { marker: 'lib/abuse/store.ts', file: 'lib/abuse/model-postpay.db.test.ts', script: 'test:abuse-db' },
+  { marker: 'lib/model-admission/store.ts', file: 'lib/model-admission/store.db.test.ts', script: 'test:model-admission-db' },
+  { marker: 'lib/model-admission/runtime.ts', file: 'lib/model-admission/revocation-postpay.db.test.ts', script: 'test:model-admission-db' },
+  { marker: 'lib/audit/export.ts', file: 'lib/audit/export.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/audit/retention.ts', file: 'lib/audit/retention.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-jobs.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/account/external-cleanup.ts', file: 'lib/account/owner-cleanup.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/account/runtime-cleanup.ts', file: 'lib/account/cloud-cleanup.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-restore.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/ops/monitor.ts', file: 'lib/ops/monitor.db.test.ts', script: 'test:ops-db' },
+  { marker: 'lib/linear-sync/archive.ts', file: 'tests/linear-archive.db.test.ts', script: 'test:scope-detachment-db' },
 ]
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.

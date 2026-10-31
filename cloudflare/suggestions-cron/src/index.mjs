@@ -6,7 +6,7 @@ export const SCHEDULES = {
   '30 * * * *': '/api/cron/user-facts',
 }
 
-export const MINUTE_ENDPOINTS = ['/api/cron/coordinator-wakes', '/api/cron/schedules', '/api/cron/run-recovery']
+export const MINUTE_ENDPOINTS = ['/api/cron/coordinator-wakes', '/api/cron/schedules', '/api/cron/run-recovery', '/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor']
 
 /** @typedef {{ MIKKA_URL?: string, CRON_SECRET?: string }} Env */
 
@@ -14,12 +14,21 @@ export const MINUTE_ENDPOINTS = ['/api/cron/coordinator-wakes', '/api/cron/sched
  * @param {string} cron
  * @param {Env} env
  * @param {typeof fetch} [fetcher]
+ * @param {number} [scheduledTime]
  */
-export async function runSchedule(cron, env, fetcher = fetch) {
+export async function runSchedule(cron, env, fetcher = fetch, scheduledTime = Date.now()) {
   const endpoint = SCHEDULES[cron]
   if (!endpoint) throw new Error('Unknown suggestions schedule')
   if (!env.MIKKA_URL || !env.CRON_SECRET) throw new Error('MIKKA_URL and CRON_SECRET must be set')
-  const endpoints = cron === '* * * * *' ? MINUTE_ENDPOINTS : [endpoint]
+  const endpoints = cron === '* * * * *' ? [...MINUTE_ENDPOINTS] : [endpoint]
+  if (cron === '* * * * *') {
+    // Cloudflare supplies the scheduled timestamp, so a delayed invocation
+    // still runs the original UTC quarter-hour/hour/half-hour work.
+    const minute = new Date(scheduledTime).getUTCMinutes()
+    if (minute % 15 === 0) endpoints.push(SCHEDULES['*/15 * * * *'])
+    if (minute === 0) endpoints.push(SCHEDULES['0 * * * *'])
+    if (minute === 30) endpoints.push(SCHEDULES['30 * * * *'])
+  }
   // Each durable queue must still get its tick when another endpoint fails.
   const results = await Promise.allSettled(endpoints.map(path => runEndpoint(path, env, fetcher)))
   const failed = results.find(result => result.status === 'rejected')
@@ -55,11 +64,11 @@ async function runEndpoint(endpoint, env, fetcher) {
 export default {
   fetch: () => new Response(null, { status: 404 }),
   /**
-   * @param {{ cron: string }} controller
+   * @param {{ cron: string; scheduledTime: number }} controller
    * @param {Env} env
    * @param {{ waitUntil(promise: Promise<unknown>): void }} ctx
    */
   scheduled(controller, env, ctx) {
-    ctx.waitUntil(runSchedule(controller.cron, env))
+    ctx.waitUntil(runSchedule(controller.cron, env, fetch, controller.scheduledTime))
   },
 }

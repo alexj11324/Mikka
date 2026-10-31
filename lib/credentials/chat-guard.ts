@@ -1,10 +1,11 @@
 import 'server-only'
 import { assertNoSecret } from './fingerprint'
+import { credentialVaultEnabled } from './feature'
 
 /** A pre-migration deployment has no saved secrets yet. Once the vault table
  * exists, database failures fail closed rather than silently disabling scans. */
 export async function assertCredentialSafeChat(userId: string, value: unknown) {
-  if (process.env.CREDENTIAL_VAULT_ENABLED !== '1') return
+  if (!credentialVaultEnabled()) return
   const { pool } = await import('@/lib/db')
   const exists = (await pool.query(`SELECT to_regclass('credential_secrets') IS NOT NULL AS present`)).rows[0].present
   if (!exists) return

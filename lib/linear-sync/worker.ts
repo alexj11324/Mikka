@@ -10,9 +10,10 @@ import { LinearTargetNotVerifiedError } from './publication'
 import { linearComment, linearIssue } from './client'
 import { linearSyncEnabled } from './flags'
 import { processLinearOAuthRevocation } from './oauth-revocation'
+import { processLinearArchiveJob } from './archive'
 
 type InboxRow = typeof linearSyncInbox.$inferSelect
-type OutboxJob = { id: string; issueId: string; attempts: number; scopeVersion: number; claimToken: string }
+type OutboxJob = { id: string; issueId: string; attempts: number; scopeVersion: number; claimToken: string; operation: 'sync' | 'archive'; archiveTarget: unknown }
 type WebhookEvent = {
   action?: string
   type?: string
@@ -30,17 +31,18 @@ function retryDelay(attempts: number) {
   return Math.min(60 * 60, 30 * 2 ** Math.min(attempts, 7))
 }
 
-async function claimOutbox(issueId?: string): Promise<OutboxJob | null> {
+async function claimOutbox(issueId: string | undefined, syncEnabled: boolean): Promise<OutboxJob | null> {
   const client = await pool.connect()
   try {
     await client.query('begin')
-    const predicate = issueId ? `and "issueId" = $1` : ''
-    const { rows } = await client.query<OutboxJob>(`select id, "issueId", attempts, "scopeVersion" from linear_sync_outbox
-      where ((status = 'queued' and "availableAt" <= now()) or (status = 'processing' and "lastAttemptAt" < now() - interval '5 minutes')) ${predicate}
-      order by "availableAt", "createdAt" for update skip locked limit 1`, issueId ? [issueId] : [])
+    const { rows } = await client.query<OutboxJob>(`select id, "issueId", attempts, "scopeVersion",operation,"archiveTarget" from linear_sync_outbox
+      where ((status = 'queued' and "availableAt" <= now()) or (status = 'processing' and "lastAttemptAt" < now() - interval '5 minutes'))
+        and (operation='archive' or ($1::boolean and operation='sync')) and ($2::uuid is null or "issueId"=$2)
+      order by "availableAt", "createdAt" for update skip locked limit 1`, [syncEnabled, issueId ?? null])
     const job = rows[0]
     if (!job) { await client.query('commit'); return null }
     const claimToken = crypto.randomUUID()
+    if (job.operation === 'archive') await client.query("select set_config('mikka.linear_archive_claim',$1,true)", [`${job.id}:${claimToken}`])
     await client.query(`update linear_sync_outbox set status = 'processing', attempts = attempts + 1,
       "lastAttemptAt" = now(), "updatedAt" = now(), "claimToken" = $2 where id = $1`, [job.id, claimToken])
     await client.query('commit')
@@ -83,13 +85,22 @@ async function failOutbox(job: OutboxJob, error: unknown) {
 async function processOutboxOne(issueId?: string) {
   // A claimed job finishes at the existing job boundary. Check again
   // before each claim so disabling never burns queued jobs or retry attempts.
-  if (!await linearSyncEnabled()) return false
-  const job = await claimOutbox(issueId)
+  const job = await claimOutbox(issueId, await linearSyncEnabled())
   if (!job) return false
   try {
-    const result = await syncAppIssueToLinear(job.issueId, job)
-    await finishOutbox(job, result)
-  } catch (error) { await failOutbox(job, error) }
+    if (job.operation === 'archive') await processLinearArchiveJob(job)
+    else {
+      const result = await syncAppIssueToLinear(job.issueId, job)
+      await finishOutbox(job, result)
+    }
+  } catch (error) {
+    if (job.operation === 'archive') {
+      const permanent = error instanceof LinearApiError ? !error.retryable : true
+      await pool.query(`update linear_sync_outbox set status=$3,"claimToken"=null,"availableAt"=$4,"lastError"=$5,"updatedAt"=now()
+        where id=$1 and "claimToken"=$2 and status='processing' and operation='archive'`,
+      [job.id, job.claimToken, permanent || job.attempts >= 8 ? 'failed' : 'queued', new Date(Date.now() + retryDelay(job.attempts) * 1000), errorText(error)])
+    } else await failOutbox(job, error)
+  }
   return true
 }
 
@@ -293,7 +304,7 @@ async function processInboxOne(deliveryId?: string) {
 }
 
 export async function processLinearSyncBatch(limit = 3) {
-  if (!await linearSyncEnabled()) return { inbox: 0, outbox: 0, disabled: true }
+  const syncEnabled = await linearSyncEnabled()
   let inbox = 0
   let outbox = 0
   for (let index = 0; index < limit; index++) {
@@ -304,7 +315,7 @@ export async function processLinearSyncBatch(limit = 3) {
     if (!(await processOutboxOne())) break
     outbox++
   }
-  return { inbox, outbox }
+  return { inbox, outbox, ...(!syncEnabled ? { disabled: true } : {}) }
 }
 
 export async function processLinearIssueOutbox(issueId: string) {

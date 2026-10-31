@@ -30,12 +30,12 @@ test('移动侧栏在水合与尺寸检测完成前不可点击，就绪后首�
 // 本地目标 1000ms；GitHub Actions 共享机器抖动大，CI 上留 20% 余量（MIK-1）。
 const budgetMs = process.env.CI ? 1200 : 1000
 
-type Destination = { path: string; selectors: string[]; text?: string; query?: string }
+type Destination = { path: string; selectors: string[]; text?: string; value?: string; query?: string }
 type NavigationSample = { start: number | null; complete: number | null; pathname: string }
 declare global { interface Window { __navigationSample?: NavigationSample } }
 
 async function measureNavigation(page: Page, info: TestInfo, name: string, destination: Destination, navigate: () => Promise<unknown>) {
-  await page.evaluate(({ path, selectors, text, query, basePath }) => {
+  await page.evaluate(({ path, selectors, text, value, query, basePath }) => {
     const sample: NavigationSample = { start: null, complete: null, pathname: path }
     window.__navigationSample = sample
     document.addEventListener('click', () => {
@@ -49,7 +49,8 @@ async function measureNavigation(page: Page, info: TestInfo, name: string, desti
         const currentPath = pathWithoutBase.replace(/^\/(?:en|zh-CN)(?=\/|$)/, '') || '/'
         const ready = currentPath === path && (!query || location.search.includes(query)) &&
           elements.every(element => element && element.getBoundingClientRect().height > 0 && !element.matches(':disabled')) &&
-          (!text || elements.some(element => element?.textContent?.includes(text) || (element instanceof HTMLInputElement && element.value === text))) &&
+          (!text || elements.some(element => element?.textContent?.includes(text))) &&
+          (!value || elements.some(element => element instanceof HTMLInputElement && element.value === value)) &&
           !document.querySelector('[data-settings-state="loading"], [data-settings-state="error"]')
         readyFrames = ready ? readyFrames + 1 : 0
         if (readyFrames >= 2) sample.complete = performance.now()
@@ -80,7 +81,7 @@ async function measureNavigation(page: Page, info: TestInfo, name: string, desti
 const members: Destination = { path: '/settings/members', selectors: ['[data-settings-state="ready"]', 'input[aria-label="搜索成员或邀请"]', 'main table tbody'], text: '回归测试成员' }
 const teams: Destination = { path: '/settings/teams', selectors: ['[data-settings-state="ready"]', 'input[aria-label="搜索团队"]'], text: '创建第一个团队' }
 const preferences: Destination = { path: '/settings', query: 'section=preferences', selectors: ['main [aria-label="界面主题"]', 'main button[aria-label="浅色"]'] }
-const account: Destination = { path: '/settings', query: 'section=account', selectors: ['main section[aria-labelledby="account-heading"]', 'main input[aria-label="名称"]'], text: '回归测试成员' }
+const account: Destination = { path: '/settings', query: 'section=account', selectors: ['main section[aria-labelledby="account-heading"]', 'main input[aria-label="名称"]'], value: '回归测试成员' }
 const workspace: Destination = { path: '/settings', query: 'section=general', selectors: ['main input[aria-label="名称"]'] }
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
@@ -95,7 +96,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
           await expect(dialog).toBeVisible()
           return dialog.getByRole('link', { name, exact: true })
         }
-        return page.locator('[data-slot="sidebar-container"]').getByRole('link', { name, exact: true })
+        return page.locator('[data-slot="settings-list"]').getByRole('link', { name, exact: true })
       }
       if (viewport.width < 768) await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()
       await page.getByRole('button', { name: '工作区菜单', exact: true }).click()

@@ -118,6 +118,7 @@
     "sidebarDescription": "显示移动端侧栏。",
     "toggleStatusFilter": "展开或收起状态筛选",
     "workspaceMenu": "工作区菜单",
+    "switchWorkspace": "切换工作区",
     "workspaceProjects": "工作区项目",
     "teamHome": "团队主页",
     "inbox": "收件箱",
@@ -950,6 +951,7 @@
     "botNotFound": "这个 Bot 不在当前工作区。",
     "executionPlaceInvalid": "请选择可用设备或云端。",
     "executionHarnessUnavailable": "所选设备上没有这个 Agent。",
+    "executionAutoNotAllowed": "请选择具体的执行选项。",
     "executionModelUnknown": "此模型不可用。",
     "executionRuleNotFound": "找不到这条执行规则。",
     "executionRuleOrderInvalid": "执行规则顺序已更改，请刷新后重试。",
@@ -1117,7 +1119,9 @@
     "e2bKeyUnverifiable": "暂时无法验证，请稍后重试。",
     "e2bKeyRateLimited": "E2B 当前对该密钥限流，请几分钟后再试。",
     "tokenNotFound": "令牌不存在或已被撤销。",
-    "tokenLimitReached": "你在当前工作区的有效令牌已达 50 个上限，请先撤销一个。"
+    "tokenLimitReached": "你在当前工作区的有效令牌已达 50 个上限，请先撤销一个。",
+    "accountDeletionPending": "账户删除等待清理完成。",
+    "SESSION_NOT_FRESH": "请重新登录后删除账户。"
   },
   "Overview": {
     "sections": {
@@ -1571,7 +1575,6 @@
   },
   "Settings": {
     "title": "设置",
-    "backToApp": "返回应用",
     "searchLabel": "搜索设置",
     "searchPlaceholder": "搜索设置…",
     "noResults": "没有匹配的设置",
@@ -1618,9 +1621,6 @@
       },
       "privacy": {
         "title": "数据与隐私"
-      },
-      "activity": {
-        "title": "活动"
       },
       "computers": {
         "title": "设备"
@@ -1786,7 +1786,6 @@
     },
     "subscriptions": {
       "heading": "模型订阅",
-      "description": "连接你自己的订阅，供此工作区中获授权的 Bot 任务使用。",
       "codex": "ChatGPT / Codex",
       "claude": "Claude",
       "unavailable": "此连接暂不可用。",
@@ -1802,9 +1801,8 @@
       "openProvider": "打开服务商页面",
       "finish": "完成连接",
       "close": "关闭",
-      "expired": "连接已过期，请重新开始。",
+      "expired": "{provider} 授权已过期",
       "loadFailed": "无法加载订阅设置。",
-      "connectionFailed": "无法完成连接，请重新开始。",
       "disconnectFailed": "无法断开订阅连接。",
       "connectedNotice": "订阅已连接。",
       "disconnectedNotice": "已从 Mikka 断开。你可能还需要在服务商网站撤销授权。",
@@ -1830,7 +1828,11 @@
       "extraUsageUnverified": "没确认额外用量已关闭，Bot 暂不会使用这个订阅",
       "removeFailed": "无法移除这个连接。",
       "loading": "正在读取模型订阅…",
-      "serviceOff": "这个部署还没有开启模型订阅，Bot 会使用工作区默认的模型额度。"
+      "serviceOff": "这个部署还没有开启模型订阅，Bot 会使用工作区默认的模型额度。",
+      "startFailed": "{provider} 授权启动失败",
+      "finishFailed": "{provider} 授权未完成",
+      "signedOut": "登录已过期，请重新登录后再连接。",
+      "restart": "重新开始"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
@@ -2016,33 +2018,6 @@
       "exportDownload": "下载导出文件",
       "manageNone": "目前没有共享中的链接"
     },
-    "activity": {
-      "filtersLabel": "筛选活动",
-      "filters": {
-        "all": "全部",
-        "accounts": "用了我的账户",
-        "reminders": "提醒"
-      },
-      "loading": "正在读取活动…",
-      "empty": "还没有活动记录。",
-      "loadError": "活动记录没有读出来。",
-      "loadMore": "加载更早的活动",
-      "loadingMore": "正在加载…",
-      "view": "查看",
-      "credentialUse": "{bot} 用了 {site} 的登录",
-      "someBot": "某个 Bot",
-      "approved": "你批准了：{action}",
-      "declined": "你拒绝了：{action}",
-      "reminder": "提醒：{title}",
-      "result": {
-        "input_inserted_guarded": "已填入，未提交",
-        "password_submitted": "已提交密码",
-        "otp_submitted": "已提交验证码",
-        "session_applied": "恢复了登录会话",
-        "denied_or_failed": "被拒绝或失败"
-      },
-      "emptyScope": "还没有活动记录。这里只记录 Bot 用你的登录、你批准或拒绝的操作，以及协调员发给你的提醒；普通对话和任务不会出现在这里。"
-    },
     "logins": {
       "heading": "网站登录",
       "description": "Bot 只在你批准的操作里使用这些登录。密码和验证码不会显示。",
@@ -2215,6 +2190,21 @@
           "credits_purchased": "购买了点数",
           "auto_recharge_changed": "修改了自动充值",
           "limits_changed": "修改了用量上限"
+        },
+        "audit": {
+          "exported": "导出审计日志",
+          "retention_changed": "更改审计留存",
+          "retention_applied": "执行审计留存清理"
+        },
+        "model": {
+          "policy_changed": "更改了模型权限",
+          "admitted": "允许了模型请求",
+          "denied": "拒绝了模型请求"
+        },
+        "skill": {
+          "registered": "登记了技能 {target}",
+          "reviewed": "批准了技能 {target}",
+          "withdrawn": "撤回了技能 {target}"
         }
       },
       "roles": {
@@ -3760,6 +3750,53 @@
       "unavailable": "Mikka 默认暂不可用，请稍后重试。",
       "verifyCard": "验证银行卡",
       "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅"
+    }
+  },
+  "BeUi": {
+    "dateRange": {
+      "startDate": "开始日期",
+      "endDate": "结束日期",
+      "selectDate": "选择日期",
+      "selectEnd": "选择结束日期",
+      "chooseMonth": "选择月份",
+      "chooseYear": "选择年份",
+      "previousMonth": "上个月",
+      "nextMonth": "下个月",
+      "previousYear": "上一年",
+      "nextYear": "下一年",
+      "previousYears": "更早的年份",
+      "nextYears": "更晚的年份",
+      "monthsIn": "选择 {year} 年的月份",
+      "yearsFrom": "选择 {start}–{end} 年中的年份",
+      "keyboardHelp": "方向键切换日期，Home 和 End 跳到本周首尾，Page Up 和 Page Down 切换月份，按住 Shift 再按 Page Up 或 Page Down 切换年份。Enter 或空格选中日期。用月份和年份按钮直接跳转；在月份或年份列表中，方向键移动，Esc 返回。",
+      "daysSelected": "已选 {count} 天",
+      "chooseStartDate": "选择开始日期",
+      "chooseEndDate": "选择结束日期",
+      "clear": "清除",
+      "clearRange": "清除日期范围",
+      "startChosen": "开始日期 {date}，请选择结束日期。",
+      "unavailableRange": "该范围包含不可选的日期，请另选结束日期。",
+      "rangeSelected": "已选 {from} 至 {to}。",
+      "cleared": "已清除日期范围。",
+      "presetSelected": "已选 {name}。"
+    },
+    "table": {
+      "selectAll": "全选",
+      "selectRow": "选择第 {row} 行",
+      "columnOptions": "{column} 列选项",
+      "rowOptions": "第 {row} 行选项",
+      "reorderColumn": "移动 {column} 列",
+      "renameColumn": "重命名 {column} 列",
+      "resizeColumn": "调整 {column} 列宽",
+      "editCell": "第 {row} 行的 {column}",
+      "emptyCell": "空",
+      "insertBefore": "在前面插入",
+      "insertAfter": "在后面插入",
+      "deleteColumn": "删除列",
+      "deleteRow": "删除行"
+    },
+    "timeline": {
+      "keyboardHint": "用左右方向键在事件之间切换。"
     }
   }
 }
