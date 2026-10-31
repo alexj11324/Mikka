@@ -109,6 +109,9 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
     setCategory(next.category ?? null)
   }
   const openApp = (next: string | null) => go({ app: next, category: next ? null : category })
+  // Kept here, not in the store, so back from an app's page finds the store as it was left.
+  const [tab, setTab] = useState<'apps' | 'skills'>('apps')
+  const [query, setQuery] = useState('')
 
   if (app) {
     const back = () => go({ category })
@@ -127,7 +130,7 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
     </div>
   }
   if (section === 'connections') return <ConnectedList apps={apps} ownStates={ownStates} href={id => href({ app: id })} onOpen={openApp} />
-  return <Store apps={apps} ownStates={ownStates} category={category} rootLabel={rootLabel} href={href} go={go} />
+  return <Store apps={apps} ownStates={ownStates} category={category} rootLabel={rootLabel} href={href} go={go} tab={tab} setTab={setTab} query={query} setQuery={setQuery} />
 }
 
 /** 设置 › 连接: only what the person has connected, one uniform row each. */
@@ -158,7 +161,11 @@ function ConnectedList({ apps, ownStates, href, onOpen }: { apps: ConnectedApps;
 }
 
 /** The rail's 插件: the 应用 store and the 技能 tab. */
-function Store({ apps, ownStates, category, rootLabel, href, go }: {
+function Store({ apps, ownStates, category, rootLabel, href, go, tab, setTab, query, setQuery }: {
+  tab: 'apps' | 'skills'
+  setTab: (tab: 'apps' | 'skills') => void
+  query: string
+  setQuery: (query: string) => void
   apps: ConnectedApps
   ownStates: Record<OwnAppId, OwnAppState> | undefined
   category: string | null
@@ -170,13 +177,11 @@ function Store({ apps, ownStates, category, rootLabel, href, go }: {
   const tApps = useTranslations('Settings.integrations')
   const common = useTranslations('Common')
   const info = useAppInfo()
-  const [tab, setTab] = useState<'apps' | 'skills'>('apps')
   const catalog = useStoreCatalog()
   const [confirming, setConfirming] = useState<{ id: string; accountId: string } | null>(null)
   const [disconnectError, setDisconnectError] = useState('')
 
-  const [query, setQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState(query.trim())
   const trimmedQuery = query.trim()
   const shortQuery = trimmedQuery.length === 1
   const queryReady = trimmedQuery === debouncedQuery && !shortQuery

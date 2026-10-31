@@ -16,7 +16,9 @@ test('GitHub, Linear and Telegram follow their own state', () => {
   assert.equal(storeItemState({ kind: 'own', state: 'connected' }), 'connected')
   assert.equal(storeItemState({ kind: 'own', state: 'notConnected' }), 'add')
   assert.equal(storeItemState({ kind: 'own', state: 'paused' }), 'unavailable')
-  assert.equal(storeItemState({ kind: 'own', state: null }), null)
+  // Not set up here: no control, and no placeholder left waiting.
+  assert.equal(storeItemState({ kind: 'own', state: null }), 'unavailable')
+  // Not read yet: a placeholder holds the place.
   assert.equal(storeItemState({ kind: 'own', state: undefined }), null)
 })
 
