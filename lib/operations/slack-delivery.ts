@@ -25,6 +25,22 @@ export type SlackDelivery = {
  * rechecks that binding and current connection before invoking either method. */
 export function composioSlackDelivery(client: ComposioActionClient | null): SlackDelivery | undefined {
   if (!client) return undefined
+  async function observedReceipt(input: Parameters<WriteProvider['lookup']>[0], ts: string): Promise<OperationReceipt> {
+    const effect = receipt(input, ts)
+    // A failed link lookup does not turn a confirmed post into a failed write.
+    // Only the provider's real permalink is returned; never invent a URL.
+    try {
+      const result = await client!.tools.proxyExecute({
+        endpoint: '/chat.getPermalink', method: 'GET', userId: input.ownerId, connectedAccountId: input.accountId,
+        parameters: [{ in: 'query', name: 'channel', value: String(input.payload.channel) }, { in: 'query', name: 'message_ts', value: ts }],
+      }, { signal: input.signal })
+      const data = record(result.data)
+      if (result.status !== 200 || data.ok !== true || data.channel !== input.payload.channel || typeof data.permalink !== 'string' || data.permalink.length > 2048) return effect
+      const url = new URL(data.permalink)
+      if (url.protocol !== 'https:' || url.username || url.password || !url.hostname.endsWith('.slack.com')) return effect
+      return { ...effect, providerObjectUrl: url.href, evidenceDigest: snapshotDigest([effect.evidenceDigest, url.href]) }
+    } catch { return effect }
+  }
   return {
     async send(input) {
       input.signal.throwIfAborted()
@@ -36,7 +52,7 @@ export function composioSlackDelivery(client: ComposioActionClient | null): Slac
       }, { signal: input.signal })
       const data = record(result.data)
       if (result.status !== 200 || data.ok !== true || data.channel !== input.payload.channel || !timestamp(data.ts)) throw new OperationError('operationUncertain')
-      return receipt(input, data.ts)
+      return observedReceipt(input, data.ts)
     },
     async lookup(input) {
       // Old native-tool writes have no correlation metadata. A text match alone
@@ -59,7 +75,7 @@ export function composioSlackDelivery(client: ComposioActionClient | null): Slac
         if (result.status !== 200 || data.ok !== true || !Array.isArray(data.messages)) throw new OperationError('operationUncertain')
         for (const raw of data.messages) {
           const message = record(raw), observed = record(message.metadata), payload = record(observed.event_payload)
-          if (observed.event_type === eventType && payload.operation_key === expected.event_payload.operation_key && payload.payload_digest === expected.event_payload.payload_digest && timestamp(message.ts)) return receipt(input, message.ts)
+          if (observed.event_type === eventType && payload.operation_key === expected.event_payload.operation_key && payload.payload_digest === expected.event_payload.payload_digest && timestamp(message.ts)) return observedReceipt(input, message.ts)
         }
         const next = record(data.response_metadata).next_cursor
         cursor = typeof next === 'string' && next.trim() ? next : undefined

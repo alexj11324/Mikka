@@ -13,24 +13,30 @@ const metadata = { event_type: 'mikka_operation', event_payload: { operation_key
 test('Slack sends one account-pinned request with correlation metadata after the final authority fence', async () => {
   const calls: unknown[] = []
   let checked = false
-  const client = { tools: { proxyExecute: async (request: unknown, options: { signal: AbortSignal }) => {
+  const client = { tools: { proxyExecute: async (request: { endpoint: string }, options: { signal: AbortSignal }) => {
     assert.equal(checked, true)
     assert.ok(options.signal)
     calls.push(request)
+    if (request.endpoint === '/chat.getPermalink') return { status: 200, data: { ok: true, channel: payload.channel, permalink: 'https://fixture.slack.com/archives/C12345678/p123456' } }
     return { status: 200, data: { ok: true, channel: payload.channel, ts: '123.456' } }
   } } } as unknown as ComposioActionClient
   const delivery = composioSlackDelivery(client)!
   const receipt = await delivery.send({ ...input, approvalContext: null, signal: new AbortController().signal, beforeSend: async () => { checked = true } })
   assert.equal(receipt.providerObjectId, '123.456')
-  assert.deepEqual(calls, [{ endpoint: '/chat.postMessage', method: 'POST', userId: 'owner', connectedAccountId: 'account', body: { ...payload, metadata } }])
+  assert.equal(receipt.providerObjectUrl, 'https://fixture.slack.com/archives/C12345678/p123456')
+  assert.deepEqual(calls, [
+    { endpoint: '/chat.postMessage', method: 'POST', userId: 'owner', connectedAccountId: 'account', body: { ...payload, metadata } },
+    { endpoint: '/chat.getPermalink', method: 'GET', userId: 'owner', connectedAccountId: 'account', parameters: [{ in: 'query', name: 'channel', value: payload.channel }, { in: 'query', name: 'message_ts', value: '123.456' }] },
+  ])
   checked = false
   await assert.rejects(delivery.send({ ...input, approvalContext: null, signal: new AbortController().signal, beforeSend: async () => { throw Error('revoked') } }), /revoked/)
-  assert.equal(calls.length, 1)
+  assert.equal(calls.length, 2)
 })
 
 test('readback requires exact operation and approved payload metadata, follows the provider cursor, and never posts', async () => {
   let reads = 0
   const client = { tools: { proxyExecute: async (request: { method: string; endpoint: string; parameters: { name: string; value: unknown }[] }) => {
+    if (request.endpoint === '/chat.getPermalink') return { status: 200, data: { ok: true, channel: payload.channel, permalink: 'https://fixture.slack.com/archives/C12345678/p123456' } }
     assert.equal(request.method, 'GET'); assert.equal(request.endpoint, '/conversations.history')
     assert.equal(request.parameters.find(p => p.name === 'channel')?.value, payload.channel)
     assert.equal(request.parameters.find(p => p.name === 'include_all_metadata')?.value, 'true')
@@ -67,6 +73,7 @@ test('the product provider pins its proxy contract and checks the current owner 
     } },
     tools: { proxyExecute: async ({ endpoint }: { endpoint: string }) => {
       if (endpoint === '/conversations.info') return { status: 200, data: { ok: true, channel: { id: payload.channel, is_member: true } } }
+      if (endpoint === '/chat.getPermalink') return { status: 200, data: { ok: false, error: 'message_not_found' } }
       assert.equal(endpoint, '/conversations.history'); historyReads++
       return { status: 200, data: { ok: true, messages: [{ ts: '123.456', metadata }] } }
     } },

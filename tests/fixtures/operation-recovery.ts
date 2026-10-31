@@ -70,6 +70,7 @@ async function main() {
       if (request.method === 'GET' && /^\/effects\/[a-f0-9]{64}$/.test(url.pathname)) return response.end(JSON.stringify(effects.get(url.pathname.slice(9)) ?? null))
       if (request.method === 'GET' && url.pathname === '/conversations.info') return response.end(JSON.stringify({ ok: true, channel: { id: url.searchParams.get('channel'), is_member: true, is_archived: false } }))
       if (request.method === 'GET' && url.pathname === '/conversations.history') return response.end(JSON.stringify({ ok: true, messages: slackMessages.filter(message => message.channel === url.searchParams.get('channel')) }))
+      if (request.method === 'GET' && url.pathname === '/chat.getPermalink') return response.end(JSON.stringify({ ok: true, channel: url.searchParams.get('channel'), permalink: `https://fixture.slack.com/archives/${url.searchParams.get('channel')}/p${url.searchParams.get('message_ts')!.replace('.', '')}` }))
       if (request.method !== 'POST' || !['/effects', '/chat.postMessage'].includes(url.pathname)) { response.statusCode = 404; return response.end('{}') }
       let body = ''
       for await (const part of request) { body += part; if (body.length > 4096) { response.statusCode = 413; return response.end('{}') } }

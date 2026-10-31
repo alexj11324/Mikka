@@ -29,7 +29,11 @@ export interface ApprovedWriteView {
   approvalExpiresAt: string
   status: 'pending' | 'running' | 'done' | 'declined'
   error: 'operationUncertain' | null
+  outcome?: ApprovedWriteOutcome
 }
+export interface ApprovedWriteOutcome { id: string; url?: string }
+export interface ApprovedWriteDecision { status: 'done' | 'running' | 'declined'; error: string | null; outcome?: ApprovedWriteOutcome }
+const writeOutcome = (receipt: NonNullable<OperationRecord['receipt']>): ApprovedWriteOutcome => ({ id: receipt.providerObjectId, ...(receipt.providerObjectUrl ? { url: receipt.providerObjectUrl } : {}) })
 // #204 acts in a person's own account, not a team workspace. Explicit personal
 // scope avoids inventing a workspace DB relationship or using a browser cookie.
 const scope = (owner: string) => `personal:${owner}`
@@ -51,6 +55,7 @@ export function projectApprovedWriteView(p: StoredWriteProposal, execution: (Ope
     account: { provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, version: p.operationBinding.version },
     createdAt: created.data.toISOString(), approvalExpiresAt: new Date(created.data.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     status, error: status === 'running' ? 'operationUncertain' : null,
+    ...(status === 'done' && execution?.receipt ? { outcome: writeOutcome(execution.receipt) } : {}),
   }
 }
 
@@ -61,7 +66,7 @@ async function bounded<T>(call: (signal: AbortSignal) => Promise<T>, requestSign
   finally { clearTimeout(timer) }
 }
 
-export function createApprovedWrites(pool: Pool, provider: WriteProvider, action: WriteActionName, context: WriteRequestContext = {}) {
+export function createApprovedWrites(pool: Pool, provider: WriteProvider, action: WriteActionName, context: WriteRequestContext = {}, notifyDecision?: (proposal: StoredWriteProposal, result: ApprovedWriteDecision) => Promise<void>) {
   function transaction<T>(work: (tx: PoolClient) => Promise<T>, actor: WriteActor | undefined = context.actor) {
     return writeTransaction(pool, work, { signal: context.signal, guard: context.guard, ...(actor ? { authorizeCommit: (tx: PoolClient) => requireOperationSession(tx, actor, actor.userId) } : {}) })
   }
@@ -89,7 +94,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
     // UI-compatible projection. Unknown results are never represented as failure
     // or success: existing running stays pending reconciliation; ledger is authoritative.
     if (row.status === 'succeeded') await pool.query(`UPDATE pending_actions SET status='done',result=$2,error=NULL WHERE id=$1 AND status IN ('running','done')`, [row.operationId, { id: row.receipt!.providerObjectId }])
-    return { status: row.status === 'succeeded' ? 'done' as const : 'running' as const, error: row.status === 'succeeded' ? null : 'operationUncertain' }
+    return { status: row.status === 'succeeded' ? 'done' as const : 'running' as const, error: row.status === 'succeeded' ? null : 'operationUncertain', ...(row.status === 'succeeded' ? { outcome: writeOutcome(row.receipt!) } : {}) }
   }
   async function execute(p: Proposal, actor?: WriteActor, readbackOnly = false) {
       const run = p.operationBinding.run
@@ -226,10 +231,10 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
           if (execution.rows[0]?.invokedAt) throw new OperationError('operationUncertain')
           // Closing an uninvoked owned proposal does not authorize an effect.
           // Allow old bindings without contextDigest to be safely declined.
-          const closed = await tx.query("UPDATE pending_actions SET status='declined',\"decidedAt\"=clock_timestamp() WHERE id=$1 AND \"userId\"=$2 AND action=$3 AND status IN ('pending','running') RETURNING id", [id, actor.userId, action])
+          const closed = await tx.query<Proposal>("UPDATE pending_actions SET status='declined',\"decidedAt\"=clock_timestamp() WHERE id=$1 AND \"userId\"=$2 AND action=$3 AND status IN ('pending','running') RETURNING *", [id, actor.userId, action])
           if (!closed.rows.length) throw new OperationError('pendingActionUnavailable')
           await requireOperationSession(tx, actor, actor.userId)
-          return null
+          return { proposal: closed.rows[0], readbackOnly: false, declined: true }
         }
         const row = await owned(tx, actor.userId, id)
         // An effect that was already sent may be read back after its worker
@@ -246,10 +251,11 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         if (!valid.rows.length) throw new OperationError('pendingActionUnavailable')
         if (!['pending', 'running', 'done'].includes(row.status)) throw new OperationError('pendingActionUnavailable')
         if (row.status === 'pending') await tx.query("UPDATE pending_actions SET status='running',\"decidedAt\"=clock_timestamp() WHERE id=$1", [id])
-        return { proposal: row, readbackOnly }
+        return { proposal: row, readbackOnly, declined: false }
       }, actor)
-      if (!decision) return { status: 'declined' as const, error: null }
-      return execute(decision.proposal, actor, decision.readbackOnly)
+      const result = decision.declined ? { status: 'declined' as const, error: null } : await execute(decision.proposal, actor, decision.readbackOnly)
+      await notifyDecision?.(decision.proposal, result)
+      return result
     },
   }
 }

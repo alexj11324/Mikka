@@ -119,7 +119,10 @@ for (const transport of ['generic', 'slack'] as const) test(`${transport}: an au
     const proposal = (await f.pool.query('SELECT id FROM pending_actions')).rows[0]
     let lookups = 0
     const provider = transport === 'slack' ? await recoverySlackProvider(f.origin) : recoveryHttpProvider(f.origin)
-    const service = createApprovedWrites(f.pool, { ...provider, lookup: async input => { lookups++; return provider.lookup(input) } }, action)
+    const notices: { proposal: string; status: string; outcome?: { id: string } }[] = []
+    const service = createApprovedWrites(f.pool, { ...provider, lookup: async input => { lookups++; return provider.lookup(input) } }, action, {}, async (p, result) => {
+      notices.push({ proposal: p.id, status: result.status, ...(result.outcome ? { outcome: result.outcome } : {}) })
+    })
     await assert.rejects(service.decide({ ...actor, userId: 'other' }, proposal.id, true))
     await f.pool.query('UPDATE "session" SET "expiresAt"=now()-interval \'1 second\' WHERE id=$1', [actor.sessionId])
     await assert.rejects(service.decide(actor, proposal.id, true), /operationSessionUnavailable/)
@@ -137,6 +140,11 @@ for (const transport of ['generic', 'slack'] as const) test(`${transport}: an au
     assert.equal(after.runId, run)
     assert.equal(after.binding.executionRunId, run)
     assert.equal(after.status, 'succeeded')
+    assert.equal(result.outcome?.id, after.receipt.providerObjectId)
+    const expectedOutcome = { id: after.receipt.providerObjectId, ...(transport === 'slack' ? { url: `https://fixture.slack.com/archives/C12345678/p${after.receipt.providerObjectId.replace('.', '')}` } : {}) }
+    assert.deepEqual(result.outcome, expectedOutcome)
+    assert.deepEqual(notices, [{ proposal: proposal.id, status: 'done', outcome: expectedOutcome }])
+    assert.deepEqual((await service.view(actor, proposal.id)).outcome, expectedOutcome)
     assert.equal((await service.decide(actor, proposal.id, true)).status, 'done')
     assert.equal(lookups, 1)
     const newRun = randomUUID()
