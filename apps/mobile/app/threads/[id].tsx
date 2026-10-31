@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
+import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check } from 'lucide-react-native'
@@ -8,7 +9,8 @@ import { MachineIcon, Spinner, StatusIcon } from '@/components/icons'
 import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { Text } from '@/components/Text'
-import { BackButton, Composer, Header } from '@/components/ui'
+import { NavBar, underBar } from '@/components/NavBar'
+import { Composer } from '@/components/ui'
 import { api } from '@/lib/api'
 import type { ThreadDetail } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
@@ -45,9 +47,9 @@ export default function ThreadScreen() {
 
   return (
     <View style={styles.screen}>
-      <Header
-        left={<BackButton onPress={() => (router.canGoBack() ? router.back() : router.replace('/threads'))} />}
-        title={thread ? (
+      <NavBar
+        back={() => (router.canGoBack() ? router.back() : router.replace('/threads'))}
+        titleView={thread ? (
           <View style={styles.titleRow}>
             <StatusIcon status={thread.status} size={18} />
             <View style={{ flexShrink: 1 }}>
@@ -58,11 +60,10 @@ export default function ThreadScreen() {
               </View>
             </View>
           </View>
-        ) : null}
-        right={<View />}
+        ) : undefined}
       />
       <OfflineBanner top={insets.top + 66} />
-      <ScrollView contentContainerStyle={styles.body}>
+      <KeyboardChatScrollView {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
         {error && !data ? <Text style={styles.error}>线程加载失败。</Text> : null}
         {data?.items.map((item, index) => {
@@ -83,7 +84,7 @@ export default function ThreadScreen() {
         })}
         {sendFailed ? <Text style={styles.error}>没发出去，再试一次。</Text> : null}
         {data && !data.active && data.error && !data.items.some(item => item.kind === 'error') ? <Text style={styles.error}>{data.error}</Text> : null}
-      </ScrollView>
+      </KeyboardChatScrollView>
       {data?.active ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} /> : null}
     </View>
   )
@@ -91,7 +92,7 @@ export default function ThreadScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'stretch', marginLeft: -8, marginRight: -60 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: 260 },
   title: { fontSize: 16, fontWeight: '600' },
   subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   subtitle: { fontSize: 11, color: colors.secondary, flexShrink: 1 },

@@ -390,6 +390,12 @@ export async function citationSources(userId: string, texts: readonly string[], 
   return sources
 }
 
+/** A waiting message as the chat shows it: its words, and a stand-in per photo so the chat can count them. */
+function withImages(text: string, images: unknown): ModelMessage['content'] {
+  if (!Array.isArray(images) || !images.length) return text
+  return [{ type: 'text', text }, ...images.map(() => ({ type: 'file' as const, data: '', mediaType: 'image/jpeg' }))]
+}
+
 /** The latest of the conversation for the chat, oldest first. */
 export async function chatView(userId: string, limit = 200, botId: string | null = null): Promise<ChatView> {
   const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
@@ -402,7 +408,7 @@ export async function chatView(userId: string, limit = 200, botId: string | null
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? 0
   const pending = waiting.filter(event => event.kind === 'user_message' && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
-    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage, pending: true as const,
+    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
   }))
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   return {

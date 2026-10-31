@@ -218,6 +218,18 @@ test('HTTP handler and action share personal submission identity and expose payl
   assert.equal(current.rows.size, 2)
 })
 
+test('the app\'s photos reach the stored message through the signed-in action', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+  assert.deepEqual(await sendCoordinatorMessage('', null, null, undefined, undefined, null, [{ dataUrl }]), { queued: true })
+  const [stored] = [...current.rows.values()] as { payload: { text: string; images: { dataUrl: string; mediaType: string }[] } }[]
+  assert.equal(stored.payload.text, '')
+  assert.equal(stored.payload.images[0].dataUrl, dataUrl)
+  assert.equal(stored.payload.images[0].mediaType, 'image/png')
+  assert.deepEqual(await sendCoordinatorMessage('', null, null, undefined, undefined, null, [{ dataUrl: 'data:image/png;base64,AAAA' }]), { error: 'messageRequired', params: undefined })
+  assert.equal(current.rows.size, 1)
+})
+
 test('HTTP handler rejects anonymous and unsupported question submissions without writing or waking', async () => {
   current = fixture(); callbacks.length = 0; userId = null
   assert.equal((await POST(request({ text: 'hello', submissionId }))).status, 401)

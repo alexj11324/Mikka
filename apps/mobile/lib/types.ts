@@ -33,6 +33,8 @@ export interface ChatItem {
   artifacts: string[]
   createdAt: string
   pending?: true
+  /** Photos the person sent with it, loaded from /api/mobile/chat/image. */
+  images?: number
 }
 
 export interface Chat {

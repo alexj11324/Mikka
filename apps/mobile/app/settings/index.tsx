@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Info, LogOut } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { Spinner } from '@/components/icons'
+import { NavBar, underBar } from '@/components/NavBar'
 import { PushRow } from '@/components/PushRow'
 import { Avatar, Row } from '@/components/settings'
 import { Text } from '@/components/Text'
@@ -30,17 +31,19 @@ export default function SettingsScreen() {
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
-      <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
-        <Text style={styles.title}>设置</Text>
-        <CloseButton onPress={close} />
-      </View>
+      {Platform.OS === 'ios' ? <NavBar title="设置" right={{ icon: 'xmark', label: '关闭', onPress: close, web: null }} /> : (
+        <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
+          <Text style={styles.title}>设置</Text>
+          <CloseButton onPress={close} />
+        </View>
+      )}
       {!data && error ? (
         <View style={{ paddingTop: 40, alignItems: 'center', gap: 10 }}>
           <Text style={{ color: colors.danger, fontSize: 13 }}>设置加载失败。</Text>
           <CardButton label="重试" onPress={() => void reload()} />
         </View>
       ) : !data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
+        <ScrollView {...underBar} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
           <PushRow proactive={data.preferences.proactive} />
           <Group>
             <Row icon={<Avatar name={data.user.name || data.user.email} image={data.user.image} size={40} />} label={data.user.name || data.user.email} detail={data.user.email} onPress={() => router.push('/settings/profile')} />

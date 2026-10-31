@@ -4,7 +4,7 @@ import { Circle, CircleCheck, CircleDashed, CircleDot, CircleX } from 'lucide-re
 import { useDrawer } from '@/components/Drawer'
 import { MenuIcon, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
-import { Header, RoundButton } from '@/components/ui'
+import { NavBar, underBar } from '@/components/NavBar'
 import type { Task } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
@@ -35,11 +35,12 @@ export default function TasksScreen() {
   const sections = SECTIONS.map(s => ({ title: s.title, data: (data?.tasks ?? []).filter(t => s.status.includes(t.status)) })).filter(s => s.data.length)
   return (
     <View style={styles.screen}>
-      <Header left={<RoundButton label="菜单" onPress={drawer.open}><MenuIcon /></RoundButton>} title="任务" />
+      <NavBar left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }} title="任务" />
       <SectionList
         sections={sections}
         keyExtractor={t => t.id}
         stickySectionHeadersEnabled={false}
+        {...underBar}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : <Text style={styles.empty}>{error ? '任务加载失败。' : '还没有任务。'}</Text>}
         renderSectionHeader={({ section }) => <Text style={styles.section}>{section.title}</Text>}

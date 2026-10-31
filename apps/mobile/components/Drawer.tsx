@@ -1,11 +1,15 @@
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native'
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { usePathname, useRouter, type Href } from 'expo-router'
 import { CircleArrowDown, CodeXml, Inbox, ListChecks, PenLine, Search, X } from 'lucide-react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { Dot, RoundButton } from '@/components/ui'
+import { tap } from '@/lib/haptics'
 import { useHome } from '@/lib/home'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
 import { colors, font } from '@/lib/theme'
@@ -14,35 +18,82 @@ type DrawerState = { open: () => void; close: () => void; isOpen: boolean }
 const DrawerContext = createContext<DrawerState>({ open: () => {}, close: () => {}, isOpen: false })
 export const useDrawer = () => useContext(DrawerContext)
 
+// Close to UIKit's default spring: settles fast, no visible bounce.
+const SPRING = { damping: 30, stiffness: 300, mass: 0.9, overshootClamping: true }
+
+/** Screens the drawer belongs to; a pushed page (a thread, Settings) keeps the system's swipe back instead. */
+const drawerRoot = (path: string) => path === '/' || path === '/suggestions' || path === '/threads' || path === '/tasks' || path.startsWith('/bots/')
+
 /**
  * The side drawer, like the ChatGPT iOS app (mobile.md "Where it lives"): it
- * slides in from the left and pushes the current screen right.
+ * slides in from the left and pushes the current screen right. It follows the
+ * finger: a swipe right anywhere on a drawer screen opens it, a swipe left or
+ * a tap on the pushed screen closes it, and letting go settles by position
+ * and speed, on the UI thread.
  */
 export function DrawerHost({ children }: { children: ReactNode }) {
   const { width } = useWindowDimensions()
   const panel = Math.min(width * 0.82, 340)
+  const path = usePathname()
   const [isOpen, setOpen] = useState(false)
-  const progress = useRef(new Animated.Value(0)).current
+  // 0 closed … 1 open.
+  const progress = useSharedValue(0)
+  const start = useSharedValue(0)
 
-  useEffect(() => {
-    Animated.timing(progress, { toValue: isOpen ? 1 : 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
-  }, [isOpen, progress])
+  const settle = useCallback((open: boolean, velocity = 0) => {
+    'worklet'
+    progress.value = withSpring(open ? 1 : 0, { ...SPRING, velocity: velocity / panel })
+  }, [panel, progress])
 
-  const value = useMemo(() => ({ open: () => setOpen(true), close: () => setOpen(false), isOpen }), [isOpen])
-  const shift = progress.interpolate({ inputRange: [0, 1], outputRange: [0, panel] })
-  const panelShift = progress.interpolate({ inputRange: [0, 1], outputRange: [-panel * 0.3, 0] })
+  const changed = useCallback((open: boolean) => {
+    setOpen(was => {
+      if (was !== open) tap()
+      return open
+    })
+  }, [])
+
+  const value = useMemo(() => ({
+    open: () => { settle(true); changed(true) },
+    close: () => { settle(false); changed(false) },
+    isOpen,
+  }), [changed, isOpen, settle])
+
+  const pan = Gesture.Pan()
+    .enabled(isOpen || drawerRoot(path))
+    // Closed: only a rightward swipe takes over, so the chat's leftward swipe (message times) and vertical scrolling stay theirs.
+    .activeOffsetX(isOpen ? [-12, 12] : [-10000, 14])
+    .failOffsetY([-14, 14])
+    .onBegin(() => { start.value = progress.value })
+    .onUpdate(event => {
+      progress.value = Math.min(1, Math.max(0, start.value + event.translationX / panel))
+    })
+    .onEnd(event => {
+      const open = event.velocityX > 500 ? true : event.velocityX < -500 ? false : progress.value > 0.5
+      settle(open, event.velocityX)
+      scheduleOnRN(changed, open)
+    })
+
+  const contentStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: progress.value * panel }],
+    borderTopLeftRadius: interpolate(progress.value, [0, 0.15], [0, 28], 'clamp'),
+    borderBottomLeftRadius: interpolate(progress.value, [0, 0.15], [0, 28], 'clamp'),
+    shadowOpacity: progress.value * 0.12,
+  }))
+  const panelStyle = useAnimatedStyle(() => ({ transform: [{ translateX: (progress.value - 1) * panel * 0.3 }] }))
 
   return (
     <DrawerContext.Provider value={value}>
-      <View style={styles.root}>
-        <Animated.View style={[styles.panel, { width: panel, transform: [{ translateX: panelShift }] }]} pointerEvents={isOpen ? 'auto' : 'none'}>
-          <DrawerPanel onNavigate={() => setOpen(false)} />
-        </Animated.View>
-        <Animated.View style={[styles.content, isOpen && styles.contentOpen, { transform: [{ translateX: shift }] }]}>
-          {children}
-          {isOpen ? <Pressable accessibilityLabel="关闭菜单" style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} /> : null}
-        </Animated.View>
-      </View>
+      <GestureDetector gesture={pan}>
+        <View style={styles.root}>
+          <Animated.View style={[styles.panel, { width: panel }, panelStyle]} pointerEvents={isOpen ? 'auto' : 'none'}>
+            <DrawerPanel onNavigate={value.close} />
+          </Animated.View>
+          <Animated.View style={[styles.content, contentStyle]}>
+            {children}
+            {isOpen ? <Pressable accessibilityLabel="关闭菜单" style={StyleSheet.absoluteFill} onPress={value.close} /> : null}
+          </Animated.View>
+        </View>
+      </GestureDetector>
     </DrawerContext.Provider>
   )
 }
@@ -115,8 +166,7 @@ function Row({ icon, label, trailing, active, onPress }: { icon: ReactNode; labe
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.grouped, overflow: 'hidden' },
   panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: colors.grouped },
-  content: { flex: 1, backgroundColor: colors.page, overflow: 'hidden' },
-  contentOpen: { borderTopLeftRadius: 28, borderBottomLeftRadius: 28, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: -2, height: 0 } },
+  content: { flex: 1, backgroundColor: colors.page, overflow: 'hidden', shadowColor: '#000', shadowRadius: 16, shadowOffset: { width: -2, height: 0 } },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
   brand: { fontSize: 28, fontWeight: '700' },
   search: { flex: 1, minWidth: 0, width: 0, marginRight: 12, height: 44, borderRadius: 22, backgroundColor: '#E4E4E6', paddingHorizontal: 16, fontSize: 16, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,

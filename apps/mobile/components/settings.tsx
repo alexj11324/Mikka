@@ -3,9 +3,10 @@ import { Image, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-na
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, ChevronRight } from 'lucide-react-native'
+import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import { Text } from '@/components/Text'
 import { API_URL } from '@/lib/config'
-import { BackButton, Header } from '@/components/ui'
+import { NavBar, underBar } from '@/components/NavBar'
 import { colors } from '@/lib/theme'
 
 /** The person's photo, or their initials on green when they have none. */
@@ -19,15 +20,15 @@ export function Avatar({ name, image, size }: { name: string; image: string | nu
   )
 }
 
-/** A settings sub-page: back button, centred title, grouped rows (R-70). */
-export function SettingsPage({ title, subtitle, right, children, footer }: { title: string; subtitle?: string; right?: ReactNode; children: ReactNode; footer?: ReactNode }) {
+/** A settings sub-page: the system bar with back and the title, grouped rows (R-70). */
+export function SettingsPage({ title, children, footer }: { title: string; children: ReactNode; footer?: ReactNode }) {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
-      <Header left={<BackButton onPress={() => router.back()} />} title={title} subtitle={subtitle} right={right} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: footer ? 16 : insets.bottom + 24 }}>{children}</ScrollView>
-      {footer}
+      <NavBar back={() => router.back()} title={title} />
+      <ScrollView {...underBar} contentContainerStyle={{ padding: 16, paddingBottom: footer ? 16 : insets.bottom + 24 }}>{children}</ScrollView>
+      {footer ? <KeyboardStickyView offset={{ opened: insets.bottom - 8 }}>{footer}</KeyboardStickyView> : null}
     </View>
   )
 }

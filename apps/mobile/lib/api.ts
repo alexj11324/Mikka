@@ -28,13 +28,16 @@ export async function saveWorkspace(id: string) {
  * comes from the keychain; on web the browser sends its own cookies. A 401
  * means the session is gone: the app signs out and shows the sign-in screen.
  */
+/** The headers that sign a request as the person (iOS: the session and workspace cookies; the web's browser sends its own). */
+export async function authHeaders(): Promise<Record<string, string>> {
+  if (Platform.OS === 'web') return {}
+  const workspace = await savedWorkspace()
+  return { cookie: [await authClient.getCookie(), workspace ? `mikka-workspace=${workspace}` : ''].filter(Boolean).join('; ') }
+}
+
 export async function api<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
-  const headers: Record<string, string> = { accept: 'application/json' }
+  const headers: Record<string, string> = { accept: 'application/json', ...await authHeaders() }
   if (init.body !== undefined) headers['content-type'] = 'application/json'
-  if (Platform.OS !== 'web') {
-    const workspace = await savedWorkspace()
-    headers.cookie = [await authClient.getCookie(), workspace ? `mikka-workspace=${workspace}` : ''].filter(Boolean).join('; ')
-  }
   const response = await fetch(`${API_URL}${path}`, {
     method: init.method ?? 'GET',
     headers,

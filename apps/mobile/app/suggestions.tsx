@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDrawer } from '@/components/Drawer'
 import { MenuIcon, SourceIcon, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
-import { Header, RoundButton } from '@/components/ui'
+import { NavBar, underBar } from '@/components/NavBar'
 import { shortWhen } from '@/lib/clock'
 import type { Suggestion, Suggestions } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
@@ -28,13 +28,16 @@ export default function SuggestionsScreen() {
 
   return (
     <View style={styles.screen}>
-      <Header left={<RoundButton label="菜单" onPress={drawer.open}><MenuIcon /></RoundButton>} title="建议" />
-      {loading ? <View style={styles.center}><Spinner /></View> : null}
-      {!loading && error ? <Text style={styles.note}>建议加载失败。</Text> : null}
-      {!loading && data && !items.length ? <Text style={styles.note}>今天还没有新的建议。</Text> : null}
+      <NavBar left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }} title="建议" />
       <FlatList
         data={items}
         keyExtractor={item => item.id}
+        {...underBar}
+        ListHeaderComponent={<>
+          {loading ? <View style={styles.center}><Spinner /></View> : null}
+          {!loading && error ? <Text style={styles.note}>建议加载失败。</Text> : null}
+          {!loading && data && !items.length ? <Text style={styles.note}>今天还没有新的建议。</Text> : null}
+        </>}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
         renderItem={({ item, index }) => (
           <Pressable accessibilityRole="button" onPress={() => arrange(item)}
