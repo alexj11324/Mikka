@@ -50,6 +50,7 @@ test('a failed hidden welcome does not enqueue another welcome on mount or poll'
   await register(page)
   await page.getByRole('button', { name: 'Coordinator', exact: true }).first().click()
   await expect(page.getByRole('alert').filter({ hasText: '回复重试已停止' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: '正在写欢迎语…' })).toHaveCount(0)
   const served = chat.served
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect.poll(() => chat.served, { timeout: 15000 }).toBeGreaterThan(served)
