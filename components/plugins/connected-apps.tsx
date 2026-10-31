@@ -118,13 +118,19 @@ export function useConnectedApps(enabled = true) {
   async function startLink(key: string, body: { toolkit: ComposioAppId } | { accountId: string }) {
     setPending(key); setError('')
     try {
-      const handoff = await openCurrentPageInBrowser()
-      if (handoff === 'desktop') return
-      if (handoff === 'unsupported') { setError(t('browserUpdateRequired')); return }
+      // A reconnect keeps the account it replaces in a cookie the callback must
+      // read, so on the desktop it still starts in the browser (#601).
+      if ('accountId' in body) {
+        const handoff = await openCurrentPageInBrowser()
+        if (handoff === 'desktop') return
+        if (handoff === 'unsupported') { setError(t('browserUpdateRequired')); return }
+      }
       const response = await fetch(integrationPath, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, returnTo: currentReturnPath() }) })
       const result = await response.json() as { redirectUrl?: unknown }
       const redirect = response.ok ? composioConnectRedirect(result.redirectUrl) : null
       if (!redirect) throw new Error()
+      // The desktop shell sends any off-origin navigation to the system browser
+      // and stays here; the list re-reads on focus once the callback is done.
       window.location.assign(redirect.href)
     } catch {
       setError(t('connectFailed'))
