@@ -19,12 +19,12 @@ let actor = '', sessionId = randomUUID()
 mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: {
   getSession: async () => ({ user: { id: actor }, session: { id: sessionId } }),
 } } } })
-const next = await import('next/server')
-// Node has no Next request-lifetime scheduler. Response handling, device auth,
-// Factory/policy services and all database operations remain real.
-mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
 
 test('Factory task denials preserve public errors before policy and execution side effects', { skip: !target }, async t => {
+  const next = await import('next/server')
+  // Node has no Next request-lifetime scheduler. Response handling, device auth,
+  // Factory/policy services and all database operations remain real.
+  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
   const pool = new Pool({ connectionString: target })
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
