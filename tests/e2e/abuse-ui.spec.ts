@@ -1,4 +1,4 @@
-import { test, expect, app, register, seedCoordinatorError, seedHostedVerification } from './fixtures'
+import { test, expect, register, seedCoordinatorError, seedHostedVerification } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
 // Card verification and Mikka 默认 states (#523, #525, #526) on the #531 backend.
@@ -19,18 +19,21 @@ test('计费：未验证时显示验证银行卡；Stripe 未配置时对话框�
 })
 
 test('计费：已验证的工作区只显示状态', async ({ page }, testInfo) => {
-  await register(page)
+  // The workspace exists once the page has read its hosted usage.
+  await register(page, '/settings?section=billing')
+  await expect(page.getByRole('button', { name: '验证银行卡', exact: true })).toBeVisible()
   await seedHostedVerification(page, 1_000_000)
-  await page.goto(app('/settings?section=billing'))
+  await page.reload()
   await expect(page.getByText('已验证', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '验证银行卡', exact: true })).toHaveCount(0)
   await attachLightDark(page, testInfo, 'billing-verified')
 })
 
 test('用量：显示 Mikka 默认剩余额度', async ({ page }, testInfo) => {
-  await register(page)
+  await register(page, '/settings?section=usage')
+  await expect(page.locator('[data-slot="hosted-remaining"]')).toBeVisible()
   await seedHostedVerification(page, 734_000)
-  await page.goto(app('/settings?section=usage'))
+  await page.reload()
   const remaining = page.locator('[data-slot="hosted-remaining"]')
   await expect(remaining).toContainText('US$0.73')
   await expect(remaining).toContainText('Mikka 默认剩余额度')
