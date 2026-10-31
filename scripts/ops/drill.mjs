@@ -42,6 +42,7 @@ let sinkRefuse = false; const receivedAlerts = []
 const server = createServer(async (request, response) => { let body = ''; for await (const chunk of request) body += chunk
   receivedAlerts.push({ receivedAt: new Date().toISOString(), event: JSON.parse(body) }); response.writeHead(sinkRefuse ? 503 : 204); response.end() }); server.listen(0, '127.0.0.1'); await once(server, 'listening')
 const sink = `http://127.0.0.1:${server.address().port}/internal-alerts`
+const onFailure = async notice => (await notifyAlerts([notice], { sink })).healthy
 try {
   for (const user of [survivor, deleted]) await main.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, `${user}@example.invalid`])
   for (const [id, owner] of [[ws, survivor], [deletedWs, deleted]]) {
@@ -63,7 +64,7 @@ try {
   const deliveredBeforeRepeat = receivedAlerts.length
   assert.equal((await notifyAlerts(actionableAlerts({ requests: {}, database: metrics }), { sink, state: fired.state })).healthy, true)
   assert.equal(receivedAlerts.length, deliveredBeforeRepeat)
-  const backup = await backupIsolated({ targets, objectsDirectory, outputDirectory: backupDirectory, key, sourceSha, migrationsDirectory: 'drizzle', vaultProbe: async () => true, quiesced: { writersStopped: true, workersStopped: true } })
+  const backup = await backupIsolated({ targets, objectsDirectory, outputDirectory: backupDirectory, key, sourceSha, migrationsDirectory: 'drizzle', vaultProbe: async () => true, quiesced: { writersStopped: true, workersStopped: true }, onFailure })
   await main.query('UPDATE issues SET title=\'Committed after backup\' WHERE id=$1', [issue])
   await main.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [token])
   const requested = await requestAccountDeletion(deleted, `${deleted}@example.invalid`, randomUUID(), options); assert.equal(requested.ok, true)
@@ -73,7 +74,7 @@ try {
   const deletionManifestSha256 = createHash('sha256').update(JSON.stringify(deletionManifest)).digest('hex')
   const failureAt = new Date(), input = { targets: restored, backupDirectory, objectsDirectory: restoredObjects, key,
     expectedManifestSha256: backup.manifestSha256, migrationsDirectory: 'drizzle', deletionManifest, deletionManifestSha256,
-    deletionObservedAt, applyDeletions: applyAccountDeletionManifest, vaultProbe: async () => true }
+    deletionObservedAt, applyDeletions: applyAccountDeletionManifest, vaultProbe: async () => true, onFailure }
   async function denied(name, changed, pattern) { await assert.rejects(restoreIsolated({ ...input, ...changed }), pattern); failures.push(name) }
   await denied('wrong-independent-manifest-anchor', { expectedManifestSha256: '0'.repeat(64) }, /recoveryManifestMismatch/)
   await denied('wrong-migration-inventory', { migrationsDirectory: objectsDirectory }, /recoverySchemaMismatch/)
@@ -106,12 +107,22 @@ try {
   const sinkFailure = await notifyAlerts(actionableAlerts({ requests: {}, database: dbFailure }), { sink }); assert.equal(sinkFailure.healthy, false)
   sinkRefuse = false
   const dbAlert = await notifyAlerts(actionableAlerts({ requests: {}, database: dbFailure }), { sink, state: sinkFailure.state }); assert.equal(dbAlert.healthy, true)
-  const recovery = await notifyAlerts([], { sink, state: { ...fired.state, ...dbAlert.state } }); assert.equal(recovery.healthy, true)
+  // Repair only this run's controlled fault fixtures. No provider was ever called for this injected operation,
+  // so failed is definitive no-effect evidence here; this is not a recipe for clearing a real uncertain action.
+  await main.query('UPDATE coordinator_events SET "deliveredAt"=now() WHERE "userId"=$1', [survivor])
+  await main.query('UPDATE agent_runs SET status=\'succeeded\',"startedAt"="createdAt"+interval \'1 second\',"finishedAt"=now(),"leaseExpiresAt"=NULL WHERE id=$1', [run])
+  await main.query('UPDATE operation_ledger SET status=\'failed\',"updatedAt"=now() WHERE "operationId"=$1', [effect])
+  const recoveredMetrics = await databaseSignals(main)
+  assert.equal(recoveredMetrics.databaseAvailable, 1)
+  assert.equal(recoveredMetrics.staleWake, 0); assert.equal(recoveredMetrics.expiredRunLease, 0); assert.equal(recoveredMetrics.staleEffect, 0)
+  const recoveredAlerts = actionableAlerts({ requests: {}, database: recoveredMetrics })
+  assert.equal(recoveredAlerts.length, 0, 'recovery must follow actual database re-observation')
+  const recovery = await notifyAlerts(recoveredAlerts, { sink, state: { ...fired.state, ...dbAlert.state } }); assert.equal(recovery.healthy, true)
   const report = { version: 1, sourceSha, sourcePatchSha256, toolSourcesSha256, environment: 'Linux, local PostgreSQL 17 existing Docker loopback; no application or worker connected',
     databaseNames: [...targets, ...restored].map(target => target.database), objectives, backupManifestSha256: backup.manifestSha256,
     deletionManifestSha256, failureAt: failureAt.toISOString(), rpoObservedMs: failureAt.getTime() - Date.parse(backup.manifest.capturedAt),
     ...restoredResult, deniedFailures: failures, monitorSignals: metrics, monitorFiringDelivered: fired.deliveries.length,
-    monitorRecoveryDelivered: recovery.deliveries.length, sinkFailureVisibleAndRetried: true, receivedAlerts, limitations: ['No cloud PITR/cross-region/storage-vendor or production KMS test', 'No full login-chat-provider end-to-end or hosted alert schedule evidence', 'Targets remain quarantined; no external effects replayed', 'Test encryption key exists in process memory only; retained encrypted bundle is not a reusable production backup'] }
+    monitorRecoveryDelivered: recovery.deliveries.length, recoveredMonitorSignals: recoveredMetrics, restoreFailureNotices: receivedAlerts.filter(row => row.event.id.startsWith('restore-blocked:')).length, sinkFailureVisibleAndRetried: true, receivedAlerts, limitations: ['No cloud PITR/cross-region/storage-vendor or production KMS test', 'No full login-chat-provider end-to-end or hosted alert schedule evidence', 'Targets remain quarantined; no external effects replayed', 'Test encryption key exists in process memory only; retained encrypted bundle is not a reusable production backup'] }
   assert.ok(report.rpoObservedMs <= objectives.localRpoMs); assert.ok(report.restoreDurationMs <= objectives.localRtoMs)
   await writeFile(join(root, 'report.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })
   console.log(JSON.stringify({ evidenceDirectory: root, ...report }))
