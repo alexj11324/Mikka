@@ -49,6 +49,15 @@ approvals declined. Active schedules pause and executing operations become
 uncertain. Existing successful receipts are preserved. Outboxes are not marked
 artificially delivered and no provider effects are resent.
 
+Blocked backup/restore attempts emit a fixed, privacy-safe failure event and
+rethrow the original failure. A trusted `onFailure(notice)` adapter can send it
+to the existing approved internal sink and must return true only after delivery.
+The drill wires that adapter. A missing adapter is explicitly `not_configured`;
+a failed delivery is `failed`, remains visible on stderr, and never authorizes
+exposure or hides the original restore failure. No database URL, object path,
+key or upstream exception text is copied into the event. This is an internal
+failure signal, not an external paging integration.
+
 PUBLIC CONNECT does not restrict the database owner or superusers: the local
 drill uses that owner explicitly. Database URLs must remain private and no
 application or worker may be pointed at these targets. Before any later
@@ -84,3 +93,12 @@ journal, actual vault probe and approved target/exposure checks. The drill
 uses real PostgreSQL and deletion code with controlled SQL business fixtures;
 it does not replace authenticated application end-to-end acceptance or prove
 cloud PITR, cross-region recovery, vendor access or production RPO/RTO.
+
+The drill's recovery notification now follows repair of its own injected DB
+fault records and a fresh `databaseSignals` query; it does not manufacture
+recovery by supplying an empty alert list. The injected operation never called
+a provider, so that fixture alone has definitive no-effect evidence. Do not
+copy its SQL cleanup into handling of a real uncertain external operation.
+The earlier timing report retains its original source SHA. The updated full
+restore drill still needs its next associated controlled run; source/HTTP
+failure-notice tests do not replace that positive end-to-end result.

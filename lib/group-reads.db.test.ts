@@ -1,3 +1,4 @@
+import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
@@ -36,6 +37,22 @@ test('group read routes advance actual group history without opening private DMs
   const route = await import('../app/api/conversations/[id]/read/route')
   const list = await import('../app/api/conversations/route')
   const links = await import('../app/api/conversation-links/[id]/messages/route')
+  const messages = await import('../app/api/conversations/[id]/messages/route')
+  const { AfterContext } = await import('next/dist/server/after/after-context')
+  const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
+  const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
+  const { createRequestStoreForAPI } = await import('next/dist/server/async-storage/request-store')
+  const { NextRequest } = await import('next/server')
+  const history = async (query = '') => {
+    const request = new NextRequest(`http://127.0.0.1/api/conversations/${group}/messages${query}`)
+    const waits: Promise<unknown>[] = [], errors: unknown[] = [], closes: Array<() => void> = []
+    const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: callback => { closes.push(callback) }, onTaskError: error => { errors.push(error) } })
+    const requestStore: ReturnType<typeof createRequestStoreForAPI> = Reflect.apply(createRequestStoreForAPI, undefined, [request, new URL(request.url), { tags: [], expirationsByCacheKind: new Map() }, undefined, undefined, undefined])
+    return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, () => workUnitAsyncStorage.run(requestStore, async () => {
+      try { return await messages.GET(request, { params: Promise.resolve({ id: group }) }) }
+      finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
+    }))
+  }
   const linked = (id = exchangeLink, query = '') => links.GET(new Request(`http://127.0.0.1/api/conversation-links/${id}/messages${query}`), { params: Promise.resolve({ id }) })
   const call = (method: 'GET' | 'POST', id = group, messageId?: string, origin?: string) => route[method](new Request(`http://127.0.0.1/api/conversations/${id}/read`, {
     method, headers: { host: '127.0.0.1', ...(origin ? { origin } : {}), 'content-type': 'text/plain' },
@@ -91,15 +108,30 @@ test('group read routes advance actual group history without opening private DMs
     assert.equal('linkedConversationId' in all, false)
     assert.equal('POST' in links, false)
     assert.deepEqual(await (await call('GET')).json(), priorRead, 'viewing an exchange neither marks nor adds unread source messages')
-    const messages = await import('../app/api/conversations/[id]/messages/route')
+    const firstPageResponse = await history('?limit=1')
+    assert.equal(firstPageResponse.status, 200)
+    const firstPage = await firstPageResponse.json()
+    assert.deepEqual(firstPage.messages.map((m: { position: string }) => m.position), ['4'])
+    assert.deepEqual(firstPage.timeline.map((item: { type: string }) => item.type), ['message', 'agent_exchange'])
+    assert.deepEqual(firstPage.timeline[1], { type: 'agent_exchange', linkId: exchangeLink, anchorPosition: '4', count: '2', participants: all.participants })
+    assert.equal(firstPage.nextBefore, '4')
+    const olderPage = await (await history(`?before=${firstPage.nextBefore}&limit=3`)).json()
+    assert.deepEqual(olderPage.messages.map((m: { position: string }) => m.position), ['3', '2', '1'])
+    assert.equal(olderPage.timeline.some((item: { type: string }) => item.type === 'agent_exchange'), false)
+    assert.equal(olderPage.nextBefore, null)
+    assert.equal(JSON.stringify(firstPage.timeline).includes('private-worker-instructions'), false)
+    assert.equal(JSON.stringify(firstPage.timeline).includes('private-outside-segment'), false)
+    assert.deepEqual(await (await call('GET')).json(), priorRead, 'timeline links neither change read state nor count as unread messages')
     assert.equal((await messages.GET(new Request(`http://127.0.0.1/api/conversations/${dm}/messages`), { params: Promise.resolve({ id: dm }) })).status, 404)
     for (const query of ['?limit=0', '?limit=101', '?before=0']) assert.equal((await linked(exchangeLink, query)).status, 422)
     const wrongKind = randomUUID(), foreignDM = randomUUID(), crossed = randomUUID(), unrelated = randomUUID()
     await pool.query('INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy") VALUES ($1,$2,\'agent_dm\',\'Foreign fixture\',$3)', [foreignDM, otherWorkspace, outsider])
     for (const [id, source, target] of [[wrongKind, group, otherGroup], [crossed, group, foreignDM], [unrelated, otherGroup, foreignDM]]) await pool.query('INSERT INTO conversation_links (id,"sourceConversationId","linkedConversationId","anchorPosition","firstPosition","lastPosition","messageCount") VALUES ($1,$2,$3,1,1,1,1)', [id, source, target])
     for (const id of [randomUUID(), wrongKind, crossed, unrelated]) assert.equal((await linked(id)).status, 404)
+    assert.deepEqual((await (await history()).json()).timeline.filter((item: { type: string }) => item.type === 'agent_exchange').map((item: { linkId: string }) => item.linkId), [exchangeLink], 'foreign and wrong-kind links cannot appear in the source timeline')
     tokenWorkspaceId = otherWorkspace
     assert.equal((await linked()).status, 404)
+    assert.equal((await history()).status, 404)
     tokenWorkspaceId = undefined
   })
   await t.test('unknown groups, unrelated workspaces, scoped callers and raw DMs stay private', async () => {
@@ -116,11 +148,13 @@ test('group read routes advance actual group history without opening private DMs
     await pool.query('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberId"=$2', [group, member])
     assert.equal((await call('GET')).status, 404)
     assert.equal((await linked()).status, 404)
+    assert.equal((await history()).status, 404)
     assert.equal((await call('POST', group, ids[1])).status, 404)
     caller = owner
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspace, owner])
     assert.equal((await call('GET')).status, 404)
     assert.equal((await linked()).status, 404)
+    assert.equal((await history()).status, 404)
     assert.equal((await call('POST', group, ids[1])).status, 404)
   })
 })

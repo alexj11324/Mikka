@@ -83,7 +83,7 @@ function decrypt(bytes, key) {
   } catch { throw Error('recoveryPayloadAuthenticationFailed') }
 }
 
-export async function backupIsolated({ targets, objectsDirectory, outputDirectory, key, sourceSha, migrationsDirectory, vaultProbe, quiesced }) {
+async function backupIsolatedVerified({ targets, objectsDirectory, outputDirectory, key, sourceSha, migrationsDirectory, vaultProbe, quiesced }) {
   if (quiesced?.writersStopped !== true || quiesced?.workersStopped !== true || !/^[a-f0-9]{40}$/.test(sourceSha)) throw Error('recoveryQuiescenceRequired')
   await validateTargets(targets)
   if (!await vaultProbe()) throw Error('recoveryVaultUnavailable')
@@ -124,7 +124,7 @@ export async function backupIsolated({ targets, objectsDirectory, outputDirector
   }
 }
 
-export async function restoreIsolated({ targets, backupDirectory, objectsDirectory, key, expectedManifestSha256, migrationsDirectory,
+async function restoreIsolatedVerified({ targets, backupDirectory, objectsDirectory, key, expectedManifestSha256, migrationsDirectory,
   deletionManifest, deletionManifestSha256, deletionObservedAt, applyDeletions, vaultProbe, now = new Date() }) {
   const started = performance.now(), manifestBytes = await readFile(join(backupDirectory, 'manifest.json'))
   if (!/^[a-f0-9]{64}$/.test(expectedManifestSha256 ?? '') || hash(manifestBytes) !== expectedManifestSha256) throw Error('recoveryManifestMismatch')
@@ -191,3 +191,32 @@ export async function restoreIsolated({ targets, backupDirectory, objectsDirecto
       state: 'quarantined', releaseConditions: ['application and workers remain stopped', 'reconcile durable outboxes and uncertain effects', 'freshly authenticate and reauthorize', 'check current deletion/revocation journal again before exposure'] }
   } finally { await Promise.all(pools.map(pool => pool.end())); await admin.end() }
 }
+
+const failureCodes = new Set([
+  'recoveryManifestMismatch', 'recoveryManifestInvalid', 'recoverySchemaMismatch', 'recoveryVaultUnavailable',
+  'recoveryCurrentDeletionJournalRequired', 'recoveryPayloadMismatch', 'recoveryPayloadAuthenticationFailed',
+  'recoveryObjectMismatch', 'recoveryObjectPathInvalid', 'recoveryObjectCleanupFailed', 'recoveryTargetExists',
+  'recoveryDatabaseMismatch', 'recoveryPostgresToolFailed', 'recoveryIsolatedTargetRequired',
+  'recoveryContainerBindingMismatch', 'recoveryQuiescenceRequired', 'recoveryDistinctDatabasesRequired',
+  'accountDeletionManifestInvalid', 'accountDeletionManifestHasPendingJobs', 'accountDeletionRestoreCleanupPending',
+])
+/** A blocked recovery always remains a failure. Notification cannot authorize exposure or hide that failure. */
+async function withFailureNotice(phase, options, work) {
+  try { return await work(options) }
+  catch (error) {
+    const code = failureCodes.has(error?.message) ? error.message : error?.code === 'ENOENT' ? 'recoveryPayloadMissing' : 'recoveryFailed'
+    const notice = { version: 1, id: `${phase}-blocked:${code}`, state: 'firing', observedAt: new Date().toISOString(),
+      code, value: 1, owner: 'repository-maintainers', runbook: 'docs/operations/safe-recovery.md',
+      action: 'Keep the recovery target isolated. Check the independent manifest, schema, object payloads, vault and current deletion journal before a new attempt.' }
+    let notificationStatus = 'not_configured'
+    if (options.onFailure) {
+      try { notificationStatus = await options.onFailure(notice) === true ? 'delivered' : 'failed' }
+      catch { notificationStatus = 'failed' }
+    }
+    // Only fixed reason codes, never database URLs, rows, object paths, keys or original exception text.
+    console.error(JSON.stringify({ ...notice, notificationStatus }))
+    throw error
+  }
+}
+export const backupIsolated = options => withFailureNotice('backup', options, backupIsolatedVerified)
+export const restoreIsolated = options => withFailureNotice('restore', options, restoreIsolatedVerified)

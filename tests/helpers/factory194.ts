@@ -48,7 +48,7 @@ export async function factory194Fixture(connectionString: string) {
     options: `-c search_path=${schema}`,
   });
   await pool.query(`
-    CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,title text,content jsonb,revision integer,scope text NOT NULL DEFAULT 'personal',"scopeVersion" integer NOT NULL DEFAULT 1);
+    CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,title text,content jsonb,revision integer,status text NOT NULL DEFAULT 'todo',scope text NOT NULL DEFAULT 'personal',"scopeVersion" integer NOT NULL DEFAULT 1);
     CREATE TABLE coordinator_events (id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,kind text,payload jsonb);
     CREATE TABLE "session" (id text PRIMARY KEY,"userId" text,"expiresAt" timestamptz);
     CREATE TABLE account (id text,"userId" text,"providerId" text);

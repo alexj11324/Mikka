@@ -5,6 +5,8 @@ import { factoryEventId } from "./event-id";
 import { factoryCheckIndependent, type FactoryCheckTaskIdentity } from "./check-independence";
 import { readFactoryPublicationReceiptV2 } from "./publication-receipt";
 import { validateMonitorV2Observation, type MonitorV2Observation } from "./monitor-v2-binding";
+import { factoryDispatchDatabase } from "./transaction";
+import { systemActor } from "../activity-actor";
 
 export interface MonitorIncidentInput {
   ownerId: string; workspaceKey: string; fingerprint: string; checkKey: string;
@@ -14,19 +16,37 @@ export interface MonitorIncidentInput {
 
 /** One incident ledger for the event consumer and receipt-bound host adapter.
  * The caller holds its authorized task/issue transaction. Recovery records
- * evidence on the existing issue; it never closes or creates an issue. */
+ * evidence on the existing issue. A distinct regression after a completed
+ * delivery gets one personal follow-up, without granting external publication. */
 export async function recordMonitorIncidentState(tx: PoolClient, input: {
   ownerId: string; workspaceKey: string; fingerprint: string; checkKey: string;
   issueId: string; taskId: string; candidateId: string;
   outcome: "unhealthy" | "healthy"; observationId?: string;
 }) {
+  // Follow the consumer's source-issue -> incident lock order.
+  const source = (await tx.query('SELECT status FROM issues WHERE id=$1 FOR SHARE',[input.issueId])).rows[0];
   await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [JSON.stringify(["monitor-incident",input.ownerId,input.workspaceKey,input.fingerprint])]);
   let row = (await tx.query('SELECT * FROM factory_monitor_incidents WHERE "userId"=$1 AND "workspaceKey"=$2 AND fingerprint=$3 FOR UPDATE',[input.ownerId,input.workspaceKey,input.fingerprint])).rows[0];
   if (row && (row.issueId !== input.issueId || row.checkKey !== input.checkKey)) throw Error("factoryMonitorIncidentConflict");
   if (!row) {
     if (input.outcome === "healthy") throw Error("factoryMonitorIncidentRequired");
+    let followupIssueId: string | null = null;
+    if (source?.status === "done") {
+      const { createIssueForUserInTransaction } = await import("../issue-create");
+      const followup = await factoryDispatchDatabase(tx).transaction(inner => createIssueForUserInTransaction(inner,input.ownerId,{
+        title: `Monitor regression ${input.fingerprint.slice(0,12)}`,
+        content: {type:"doc",content:[{type:"paragraph",content:[{type:"text",text:`Source issue: ${input.issueId}. Candidate: ${input.candidateId}. Fingerprint: ${input.fingerprint}.`}]}]},
+        status:"todo",priority:"normal",
+      },systemActor("factory-monitor"),{id:randomUUID(),linearSyncBlocked:true}));
+      if (!followup) throw Error("factoryMonitorFollowupUnavailable");
+      followupIssueId=followup.id;
+    }
     row = (await tx.query(`INSERT INTO factory_monitor_incidents(id,"userId","workspaceKey",fingerprint,"checkKey","issueId","taskId","candidateId",status)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,'open') RETURNING *`,[randomUUID(),input.ownerId,input.workspaceKey,input.fingerprint,input.checkKey,input.issueId,input.taskId,input.candidateId])).rows[0];
+    if (followupIssueId) {
+      await tx.query('UPDATE factory_monitor_incidents SET "followupIssueId"=$2 WHERE id=$1',[row.id,followupIssueId]);
+      row.followupIssueId=followupIssueId;
+    }
   }
   await tx.query(`UPDATE factory_monitor_incidents SET occurrences=occurrences+$2,status=$3,"recoveredObservationId"=$4,"updatedAt"=clock_timestamp() WHERE id=$1`,[row.id,input.outcome === "unhealthy" ? 1 : 0,input.outcome === "healthy" ? "recovered" : "open",input.outcome === "healthy" ? input.observationId ?? null : null]);
   return { ...row, occurrences: row.occurrences + (input.outcome === "unhealthy" ? 1 : 0) };

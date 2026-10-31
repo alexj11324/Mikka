@@ -11,12 +11,17 @@ The passed component evidence remains in
 [`old-backend-batch-20261030.md`](../integration/old-backend-batch-20261030.md).
 Neither that evidence nor the merged PR alone closes these issues.
 
-| Issue | Remaining runtime acceptance |
+The owner subsequently confirmed their OAuth acceptance was already complete,
+excluded Slack/Notion checks, and instructed us not to add a real-model gate to
+ordinary daemon acceptance. No new provider probe, reconnect request or proxy
+system was introduced for the following closeout.
+
+| Issue | Current child-agent conclusion |
 | --- | --- |
-| #176 | Activate the existing minute Worker after the matching application/schema is available; demonstrate failed wake delivery recovering without a new message and one original-chat result with the real consumer |
-| #178 | Normal enrollment and live daemon requests, owner/peer rejection, pending-request revocation, old-token rejection after restart, then an active real harness's stop timing |
-| #179 | A real model selects the existing schedule tools through chat, persists once/repeat definitions, completes two repeated occurrences and an authorized `agent_read`, and reports to the original chat |
-| #209 | Two independent daemon/harness nodes, partition of the old control path with the protected action endpoint still reachable, independent takeover, old-attempt refusal, checkpoint restoration and STOP timing |
+| #176 | Existing durable recovery/component evidence retained; local minute Worker source and real HTTP endpoints exercised. Production cron activation/read-back remains the release owner's step. |
+| #178 | Ordinary backend acceptance passed, including a reproduced and fixed in-flight repository-process cancellation bug. Integrate the daemon fix and run its matching CI before closing. |
+| #179 | Persistent scheduling implementation and earlier once/snapshot HTTP evidence retained; real elapsed-time repeat ran twice and published both original-chat reports. Model-selected tools and `agent_read` inference were not tested, per the owner's scope. |
+| #209 | Existing independent recovery/DB/real-Git evidence retained. STOP without retry additionally passed through actual minute HTTP. Joint two-daemon takeover/checkpoint restoration was not exercised in this closeout; no known implementation defect was found by this scoped check. Two remote hosts and model-context continuation are not claimed. |
 
 ## Device credential HTTP acceptance
 
@@ -162,9 +167,10 @@ exited 1 with the same refresh rejection and no inference result. It completed
 before the parent's pause instruction; no further model attempts were made.
 Its private output remains in `/tmp/mikka-direct-codex-probe`.
 
-All four issues remain open for the remaining runtime acceptance in the table
-above. In particular, #178's passed infrastructure matrix is not a claim that
-its active real-model stopping requirement passed.
+The provider failure is retained as a failed inference attempt. It is not an
+additional OAuth requirement: the owner later confirmed their own OAuth checks
+and waived our model/third-party probes. The non-model in-flight process test
+below supplies the missing ordinary #178 cancellation evidence.
 
 ## Existing minute Worker
 
@@ -196,6 +202,108 @@ uses the same validation. Adding those to its server and bypassing attestation
 would invalidate this evidence. Real-model acceptance instead needs an already
 supported authorized test-identity setup, as described in
 [`acceptance.md`](../acceptance.md), with its own precise environment record.
-The release owner is checking the existing model/Infisical/deployment path.
-No real model, provider action, production rollout or issue closure is claimed
-by the startup probe or by this acceptance runner's source.
+The owner excluded additional model/third-party testing from this closeout;
+no alternate provider, proxy or login setup was added. No real-model success,
+provider business action, production rollout or issue closure is claimed by
+this child-agent evidence.
+
+## In-flight repository cancellation: reproduced and fixed
+
+The first non-model run used the actual attested application, normal account
+pool, genuine MCP dispatch, a normal daemon, and a dedicated local HTTPS bare
+Git repository. Its Git object response deliberately remained pending while
+repository preparation was active. TLS verification stayed enabled and the
+production prohibition on file transport remained unchanged.
+
+Revoking the owner credential immediately rejected the old report endpoint
+with 401, revoked the attributed run token and persisted `stopRequestedAt`.
+The daemon logged its rejected session almost immediately. Nevertheless its
+journal remained `preparing` and the live Git preparation did not finish within
+the pre-recorded 30-second healthy-loopback bound. This is a reachable in-flight
+cancellation defect, not a hypothetical failure or a model authentication issue.
+Occurrence 3/10 × impact 6/10 = 18; cancellation and local execution authority
+also warrant fixing on their own severity.
+
+The cause was the direct Git child being killed while its transport descendants
+still held the process's stdio open. The existing Execa 10.1.1 dependency already
+provides `killDescendants`; enabling that option only for repository-cache Git
+commands gives each such command its own process group and applies the existing
+abort/timeout cleanup to its descendants. No global process sweep, protocol,
+kill-grace extension or fabricated terminal state was added.
+
+The regression uses real Git with a controlled non-network SSH transport child.
+It timed out before the fix and passed after it, together with the existing
+repository suite (10/10). Daemon typecheck, targeted lint and diff checks passed.
+Logs: `/tmp/mikka-repository-cancel-before.log` and
+`/tmp/mikka-repository-cancel-after.log`.
+
+The actual after-run kept the exact `375d6709` application artifact and used
+daemon `c630126277628b555e57d18e282dc17d2c7449a9`. It reused the previously
+owned, fully initialized `mikka_native_mcp_e2e` database and its existing
+`/tmp/mikka-native-mcp375/environment.json` descriptor, with all three database
+URLs identical. Actual signed application attestation passed again; no
+quarantined identity or hourly signup guard was reset. The retained previous
+TLS database and every earlier failed attempt remain intact.
+
+From 2026-10-31 05:17:06 to 05:17:40 UTC:
+
+- Genuine dispatch reached repository preparation with three captured, active
+  Git process IDs. No model was invoked.
+- After owner revocation, preparation reached its real terminal state and all
+  three captured processes exited in **10,294.3 ms**. Two PIDs disappeared; the
+  remaining zombie was explicitly counted as exited, not live execution.
+- The old device report route returned 401 and the attributed worker token was
+  revoked. The separately enrolled sibling daemon remained online and its real
+  authenticated runs endpoint still returned 200.
+- The existing minute Worker function called its real loopback HTTP endpoints;
+  the server reached `stopped`, created no retry and returned `stopped` through
+  the actual MCP `get_run` tool.
+- Process/daemon logs passed the existing credential evidence audit. Both
+  daemon processes stopped normally; fixture accounts remained quarantined.
+
+Before evidence: `/tmp/mikka-active-revoke-375d-WZWyLT/result.json`
+(`passed: false`). After evidence:
+`/tmp/mikka-active-revoke-375d-Tz8bwp/result.json` (`passed: true`) and
+`/tmp/mikka-active-revoke375-after.log`. The two daemon processes share one
+Linux host; this is not evidence of cross-host takeover, checkpoint restoration
+or live-model cancellation.
+
+## Real-clock repeated scheduling
+
+The exact same `375d6709` application accepted a real HTTP user message through
+its normal owner session. The existing host schedule-tool factory used that
+canonical source event to persist an interval definition in `Asia/Shanghai`,
+with SDK tool-call replay preserving the same schedule ID. A peer's history
+request was rejected. The minute Worker source called the actual HTTP routes
+at the two due times, without changing the database clock or rewriting due
+slots:
+
+| Due time (UTC) | Actual report time (UTC) | Operation ID |
+| --- | --- | --- |
+| 2026-10-31 05:12:47.450 | 05:12:47.786 | `6296d0ca-5cbb-46f8-b77f-e291563cafc3` |
+| 2026-10-31 05:13:47.450 | 05:13:47.782 | `6e125f55-b4d7-4b83-81b0-02a85de83b86` |
+
+Both occurrences succeeded and were reported once. An immediate duplicate
+minute call created no third occurrence. The actual owner chat GET returned
+200 with the reminder text. Its final assertion incorrectly expected two chat
+items: the existing `chatItems` function deliberately merges adjacent assistant
+reports into one item. That original runner exited nonzero and its
+`result.json` remains `passed: false`.
+
+Following the owner's instruction not to repeat a whole real-time run for a
+faulty assertion, an offline analysis of the retained rows verified each
+operation ID occurs exactly once in the original-chat projection and the
+reminder text occurs twice in its one merged item. The separate
+`analysis.json` records `analysisPassed: true` and `originalAttemptPassed:
+false`; it does not rewrite the original attempt or retroactively pass its
+unreached peer-chat/cancel assertions. The earlier once/snapshot HTTP
+acceptance remains the evidence for peer-chat isolation. The owned active
+fixture was subsequently cancelled using its existing trusted host source,
+recorded only as fixture cleanup.
+
+Evidence: `/tmp/mikka-repeat179-375d-0ZRtrv/result.json`,
+`/tmp/mikka-repeat179-375d-0ZRtrv/analysis.json` and
+`/tmp/mikka-repeat179375-attempt1.log`. This verifies host tools, genuine chat
+source, persistent scheduling, elapsed-time repetition, real minute HTTP and
+original-chat publication. It does not claim model-selected tools,
+`agent_read` inference or production cron activation.
