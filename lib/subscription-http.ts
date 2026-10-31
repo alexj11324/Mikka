@@ -30,6 +30,14 @@ export function refusalCode(error: unknown) {
   if (error instanceof WorkerRefusal && /^[a-z_]{1,64}$/.test(error.code)) return error.code
   return 'subscription_unavailable'
 }
+/** A sign-in that never started leaves no row: each failed 连接 would otherwise add one. Best effort, so the refusal itself still reaches the page. */
+async function discardUnstarted(service: SubscriptionService, userId: string, connectionId: string, worker: { call(method: string, params: unknown): Promise<unknown> }) {
+  try {
+    const row = await service.repository.connection(userId, connectionId)
+    await worker.call('disconnect', { revision: Number(row.epoch) })
+    await service.repository.remove(userId, connectionId)
+  } catch { /* still listed; 移除 clears it */ }
+}
 export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
   return async (request: Request): Promise<Response> => {
     const refused: { action?: string; provider?: string } = {}
@@ -56,7 +64,9 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         if (!service.capabilities.oauth?.[body.provider]) throw new SubscriptionRefusal('backend_unavailable')
         const connectionId = await service.repository.create(session.userId, body.workspaceId, body.provider)
         const row = await service.repository.connection(session.userId, connectionId)
-        const result = await service.worker(service.repository.scope(row)).call<{ authorizationUrl: string; revision: number }>('oauthStart', { revision: Number(row.epoch), sessionId: session.sessionId }, request.signal)
+        const worker = service.worker(service.repository.scope(row))
+        const result = await worker.call<{ authorizationUrl: string; revision: number }>('oauthStart', { revision: Number(row.epoch), sessionId: session.sessionId }, request.signal)
+          .catch(async (failure: unknown) => { await discardUnstarted(service, session.userId, connectionId, worker); throw failure })
         return Response.json({ connectionId, ...result }, { headers })
       }
       const row = await service.repository.connection(session.userId, body.connectionId)
@@ -96,7 +106,7 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
     if (session.tokenWorkspaceId && session.tokenWorkspaceId !== workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
     await deps.workspace(session.userId, workspaceId)
-    const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and "removedAt" is null order by "createdAt" desc limit 50', [session.userId, workspaceId])
+    const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and "removedAt" is null and "credentialVersion">0 and state<>\'disconnected\' order by "createdAt" desc limit 50', [session.userId, workspaceId])
     // Which Bots use each connection is a nicety: the list still loads without it.
     const bots = await service.repository.connectionBots(session.userId, workspaceId).catch(() => [])
     // Listing needs custody only; sign-in needs the full runtime (connect). Offer

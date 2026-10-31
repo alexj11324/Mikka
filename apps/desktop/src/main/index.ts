@@ -12,6 +12,7 @@ import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
 import { AppLoadState, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
+import { catchClaudeCallback } from './subscription-callback'
 import { NotificationCenter } from './notification-center'
 import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision } from './security'
 import { UPDATE_CHECK_INTERVAL_MS, Updates } from './updates'
@@ -361,6 +362,7 @@ function start(): void {
       return shell.openExternal(target)
     },
     prepareAuth,
+    claudeCallback: url => catchClaudeCallback(url, page => shell.openExternal(page)),
     localDevice: localDeviceStatus,
     quota: localQuota,
     notifications,

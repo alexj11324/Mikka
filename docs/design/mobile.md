@@ -184,7 +184,12 @@ mobile drawer.
   (`runId`) or the chat (`botId`), also when it launched the app.
 - **Cards and proposals:** OpenUI replies are drawn natively
   (`components/OpenUI.tsx`: text, choice and question cards, approval,
-  follow-ups, buttons); a card the app cannot draw shows its words and
+  follow-ups, buttons, and the image cards `BeCardGrid`, `BeImageCard` and
+  `BeImage`). Image cards find their picture as the web does, through
+  `GET /api/agent/images` (`lib/images.ts`): grey 16:9 while looking, the card
+  without a picture when there is none or the lookup fails, and the Wikimedia
+  Commons credit under 图片来源与许可. A grid is one column on a phone, as the
+  web's grid is below 26rem. A card the app cannot draw shows its words and
   「在网页上打开」, which opens the same chat on the web signed in
   (`app/api/mobile/open`, a one-minute single-use token). The browser first
   shows the target account and requires a same-origin, browser-bound confirmation;
