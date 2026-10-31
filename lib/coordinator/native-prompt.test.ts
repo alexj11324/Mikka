@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { personalCoordinatorInstructions, nativeCoordinatorContext } from './native-prompt'
+import { coordinatorPresentation, personalCoordinatorInstructions, nativeCoordinatorContext } from './native-prompt'
 import { coordinatorRuntimeSchema, nativeCoordinatorCommandSchema } from '@mikka/protocol/coordinator'
 
 test('personal instructions retain host approval and existing OpenUI vocabulary',()=>{
@@ -10,6 +10,11 @@ test('personal instructions retain host approval and existing OpenUI vocabulary'
   assert.match(instructions,/host's real approval/)
   assert.match(instructions,/TextContent\(/)
   assert.match(instructions,/BeQuestions\(/)
+  // A report renders as cards and a table, not ASCII art in a code block.
+  assert.match(instructions,/BeStat\(/)
+  assert.match(instructions,/ShadcnTable\(/)
+  assert.match(instructions,/Never draw an interface as ASCII art/)
+  assert.ok(instructions.endsWith(coordinatorPresentation()))
   assert.doesNotMatch(instructions,/Prime/)
 })
 test('canonical conversation/events are passed as context rather than system instructions',()=>{

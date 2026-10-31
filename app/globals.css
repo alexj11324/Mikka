@@ -321,6 +321,11 @@
 @layer base {
 * {
   @apply border-border outline-ring/50;
+  /* Thin scrollbars on a transparent track, like Codex. The platform default
+     is a wide bar between two straight track lines whenever macOS shows
+     scrollbars always or a mouse is connected. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent;
 }
 html {
   scrollbar-gutter: stable;
