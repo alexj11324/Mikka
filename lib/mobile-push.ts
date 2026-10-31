@@ -2,7 +2,8 @@ import 'server-only'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { bots, mobilePushTokens } from '@/lib/db/schema'
-import { readPreferences, type Preferences } from '@/lib/preferences'
+import { readPreferences } from '@/lib/preferences'
+import { pushAllowed } from '@/lib/push-allowed'
 import type { PushReason } from '@/lib/push-reasons'
 import { openUIText, parseOpenUI } from '@/lib/openui-lang'
 import type { ActionLocale } from '@/lib/suggestions/action-title'
@@ -15,8 +16,6 @@ const MESSAGES = {
   en: () => import('@/messages/en.json'),
 } as const
 
-const FLAG: Record<PushReason, keyof Preferences> = { decide: 'pushDecide', review: 'pushReview', finished: 'pushFinished', briefing: 'pushBriefing' }
-
 /**
  * The push for a verification code, in the person's language: it only says
  * one came; the code stays in the app chat. Read straight from the messages:
@@ -27,10 +26,7 @@ export async function codePushBody(locale: ActionLocale): Promise<string> {
   return (await MESSAGES[locale]()).default.MobilePush.verificationCode
 }
 
-/** Whether the person's 通知 settings let a reply with these reasons reach the phone. */
-export function pushAllowed(preferences: Preferences, reasons: readonly PushReason[]): boolean {
-  return preferences.proactive && reasons.some(reason => preferences[FLAG[reason]] === true)
-}
+export { pushAllowed }
 
 /**
  * The push text: the reply's first lines, without citation tokens or Markdown

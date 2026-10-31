@@ -28,13 +28,15 @@ const appHref = z
 
 /**
  * The kinds that become a desktop system notification (interaction spec 8.3):
- * the ones where an agent is waiting on the person. Everything else stays in
- * the inbox.
+ * the ones where an agent is waiting on the person, and a finished thread
+ * (线程完成, on by default; Alex, 2026-10-31). Everything else stays in the
+ * inbox.
  */
 export const DESKTOP_NOTIFICATION_KINDS = [
   "review",
   "awaiting",
   "failed",
+  "finished",
 ] as const
 export type DesktopNotificationKind =
   (typeof DESKTOP_NOTIFICATION_KINDS)[number]
