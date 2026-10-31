@@ -66,8 +66,8 @@ export const AGENT_DEMO_SECTIONS = [
     response: `root = Stack([BeCodeBlock(${JSON.stringify(AGENT_DEMO_CODE)}, "typescript", "示例函数.ts", [4]), ${content('```mermaid\nflowchart LR\nA(提出需求) --> B(整理计划):::focus\nB --> C{确认方案}:::warning\nC -->|同意| D(准备交付):::success\nC -->|修改| B\n```')}, ${content('```mermaid\nsequenceDiagram\n参与者->>助手: 选择演示内容\n助手-->>参与者: 本地渲染组件\nNote over 参与者,助手: 不请求模型\n```')}, ${content('```python\ndef completion_rate(done, total):\n    return done / total if total else 0\n```\n\n```\n不指定语言的单行代码也使用 beUI Code Block\n```')}])`,
   },
   {
-    id: 'cards', title: '卡片、指标与图片', description: 'beUI 卡片、动态数字、状态标签、图文网格与图片查看器。图片使用本地演示占位图。',
-    response: `root = Stack([BeCard("演示项目摘要", [BeBadge("演示数据", "info"), AgentIcon("assistant", "组件由本地样例自动组合"), BeStat("已完成示例任务", 3, "项", 0), BeButton("继续细化", "演示：细化项目摘要", "outline")], "这里展示的是样例，不是真实项目数据。"), BeCardGrid([BeImageCard("需求工作坊", "Demo workshop", "梳理问题、边界与交付物。", ["演示占位图", "需求"], "演示：了解需求工作坊"), BeImageCard("设计评审", "Demo design", "讨论原型并收集反馈。", ["演示占位图", "设计"], "演示：了解设计评审")]), BeImage("Demo illustration", "演示资料配图", "本地占位图，仅用于查看图片组件效果。")])`,
+    id: 'cards', title: '卡片、指标与图片', description: 'beUI 卡片、动态数字、OpenUI 状态标签、图文网格与图片查看器。图片使用本地演示占位图。',
+    response: `root = Stack([BeCard("演示项目摘要", [Tag("演示数据", null, "sm", "info"), AgentIcon("assistant", "组件由本地样例自动组合"), BeStat("已完成示例任务", 3, "项", 0), BeButton("继续细化", "演示：细化项目摘要", "outline")], "这里展示的是样例，不是真实项目数据。"), BeCardGrid([BeImageCard("需求工作坊", "Demo workshop", "梳理问题、边界与交付物。", ["演示占位图", "需求"], "演示：了解需求工作坊"), BeImageCard("设计评审", "Demo design", "讨论原型并收集反馈。", ["演示占位图", "设计"], "演示：了解设计评审")]), BeImage("Demo illustration", "演示资料配图", "本地占位图，仅用于查看图片组件效果。")])`,
   },
   {
     id: 'decisions', title: '计划、审批与多步骤提问', description: '可操作的建议确认、单选、多选和自定义回答。所有提交仅反馈到本演示。',
@@ -81,11 +81,16 @@ wrap = InlineText(["这一句故意写得比较长，用来看换行效果：引
 computer = ComputerCard("demo-done", "${DEMO_RUN}", "打开 #66 的预览部署，用测试账号登录，截一张首页。", "done", "Mikka Frontend", "#66 预览部署检查")`,
   },
   {
-    id: 'ui', title: 'shadcn、REUI 与数据图表', description: '折叠面板、标签页、表格、进度条和 OpenUI 数据图表，均使用固定演示数据。',
-    response: `root = Stack([ShadcnCard("交付检查（演示）", [ShadcnBadge("待评审", "secondary"), ShadcnAlert("仅供预览", "这些内容不代表真实任务状态。"), ShadcnProgress("示例进度", 60), ShadcnTable(["项目", "数量"], [["已完成", "3"], ["待完成", "2"]]), ShadcnButton("继续细化", "演示：继续完善交付检查", "outline")], "shadcn 本地组件"), ShadcnTabs([{title:"概览", children:[${content('标签页内同样支持 **Markdown**。')}]}, {title:"说明", children:[${content('这是第二个标签页，可自由切换。')}]}]), ShadcnAccordion([{title:"这些数据来自模型吗？", content:"不是，演示使用预设样例。"}, {title:"会保存演示操作吗？", content:"不会，退出或重播即可重置演示。"}], true), ReuiFrame("REUI 示例", [ReuiBadge("示例标签", "info-light"), ReuiAlert("本地反馈", "此面板仅展示组件样式。", "info")], "与工作区共享主题"))])`,
+    id: 'ui', title: 'OpenUI 组件与批量核对', description: '状态标签、步骤、额度、排行和可编辑表格，均使用固定演示数据。',
+    response: `root = Stack([tags, steps, quota, ranking, review])
+tags = Stack([Tag("进行中", null, "sm", "warning"), Tag("已完成", null, "sm", "success"), Tag("待评审", null, "sm", "info"), Tag("失败", null, "sm", "danger")], "row", "s")
+steps = Steps([StepsItem("11月2日 · 需求确认", "整理范围与验收标准。"), StepsItem("11月9日 · 设计评审", "建议日期"), StepsItem("11月16日 · 交付检查", "核对交付物。")])
+quota = RadialChart("本月额度", 60, 100, "万 token")
+ranking = BarChart(["Alex", "Sam", "Lee", "Kim"], [{name: "完成", values: [9, 7, 4, 2]}], true, "项")
+review = Form("tasks", Buttons([Button("创建这 3 个任务", Action([@ToAssistant("演示：按表格创建这些任务")]), "primary")]), [FormControl("任务", EditableTable("tasks", [{type: "text", key: "title", header: "标题"}, {type: "select", key: "priority", header: "优先级", options: [{value: "high", label: "高"}, {value: "low", label: "低"}]}, {type: "date-single", key: "due", header: "截止"}], [{id: "1", values: ["整理需求", "high", "2026-11-02"]}, {id: "2", values: ["评审设计", "low", "2026-11-09"]}, {id: "3", values: ["交付检查", "low", "2026-11-16"]}]))])`,
   },
   {
-    id: 'report', title: 'beUI 报告与图表', description: '提示、可排序表格、柱状图、折线图、时间线、折叠区、标签页、文件树、来源与建议修改，均使用固定演示数据。',
+    id: 'report', title: 'beUI 报告与图表', description: '提示、可排序表格、柱状图、折线图、步骤、折叠区、标签页、文件树、来源与建议修改，均使用固定演示数据。',
     response: `root = Stack([alert, stats, table, bars, trend, stack, share, divider, timeline, more, tabs, tree, sources, diff])
 alert = BeAlert("示例数据", "以下数字均为演示数据，不代表真实项目。", "info")
 stats = BeCardGrid([BeStat("本周完成", 12, "项"), BeStat("平均耗时", 3.4, "天", 1)])
@@ -95,7 +100,7 @@ trend = LineChart(["周一", "周二", "周三", "周四", "周五"], [{name: "�
 stack = AreaChart(["周一", "周二", "周三", "周四", "周五"], [{name: "完成", values: [1, 3, 2, 4, 2]}, {name: "新增", values: [2, 1, 3, 1, 2]}], "项")
 share = DonutChart([{name: "需求", value: 5}, {name: "设计", value: 3}, {name: "检查", value: 4}], "项", "合计")
 divider = Separator()
-timeline = BeTimeline([{date: "2026-11-02", title: "需求确认", description: "整理范围与验收标准。"}, {date: "2026-11-09", title: "设计评审", meta: "建议日期"}, {date: "2026-11-16", title: "交付检查"}])
+timeline = Steps([StepsItem("11月2日 · 需求确认", "整理范围与验收标准。"), StepsItem("11月9日 · 设计评审", "建议日期"), StepsItem("11月16日 · 交付检查", "核对交付物。")])
 more = BeCollapsible("补充说明", [TextContent("折叠区只放补充内容。")])
 tabs = BeTabs([{title: "概览", children: [TextContent("第一页")]}, {title: "细节", children: [TextContent("第二页")]}])
 tree = BeFileTree(["app/page.tsx", "app/layout.tsx", "lib/report.ts"])

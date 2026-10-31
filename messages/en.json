@@ -2833,7 +2833,6 @@
     "addAnotherAnswer": "Add another answer…",
     "files": "Files",
     "sources": "Sources",
-    "timeline": "Timeline",
     "noData": "No data",
     "answerYes": "Yes",
     "answerNo": "No",
@@ -3771,9 +3770,6 @@
       "insertAfter": "Insert after",
       "deleteColumn": "Delete column",
       "deleteRow": "Delete row"
-    },
-    "timeline": {
-      "keyboardHint": "Use the left and right arrow keys to move between events."
     }
   }
 }

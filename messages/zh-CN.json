@@ -2833,7 +2833,6 @@
     "addAnotherAnswer": "补充其他回答…",
     "files": "文件",
     "sources": "来源",
-    "timeline": "时间线",
     "noData": "暂无数据",
     "answerYes": "是",
     "answerNo": "否",
@@ -3771,9 +3770,6 @@
       "insertAfter": "在后面插入",
       "deleteColumn": "删除列",
       "deleteRow": "删除行"
-    },
-    "timeline": {
-      "keyboardHint": "用左右方向键在事件之间切换。"
     }
   }
 }

@@ -20,6 +20,13 @@ test('personal instructions retain host approval and existing OpenUI vocabulary'
   assert.match(instructions,/DonutChart\(/)
   assert.match(instructions,/BeAlert\(/)
   assert.match(instructions,/Separator\(/)
+  // Status, milestones, used-versus-limit and a reviewable batch before creating tasks.
+  assert.match(instructions,/Tag\(/)
+  assert.match(instructions,/Steps\(/)
+  assert.match(instructions,/RadialChart\(/)
+  assert.match(instructions,/EditableTable\(/)
+  assert.match(instructions,/rankings as BarChart with horizontal true/)
+  assert.doesNotMatch(instructions,/BeBadge\(|BeTimeline\(|ShadcnTable\(|ReuiFrame\(/)
   assert.match(instructions,/Never draw an interface as ASCII art/)
   assert.ok(instructions.endsWith(coordinatorPresentation()))
   assert.doesNotMatch(instructions,/Prime/)

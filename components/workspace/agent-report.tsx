@@ -2,12 +2,11 @@
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useMemo, type ReactNode } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { Citations } from '@/components/agents/citations'
 import { FileDiff, type FileDiffLine } from '@/components/agents/file-diff'
 import { FileTree, FileTreeFile, FileTreeFolder } from '@/components/motion/file-tree'
 import { Table, type TableColumn, type TableLabels } from '@/components/motion/table'
-import { Timeline } from '@/components/motion/timeline'
 
 type Cell = string | number
 const ROW_HEIGHT = 44
@@ -86,22 +85,6 @@ export function AgentFileDiff({ file, diff = '', language }: { file?: string; di
     })
   }, [diff])
   return <FileDiff file={file} lines={lines} language={language} defaultOpen collapseOnComplete={false} />
-}
-
-/** beUI Timeline with the description inside each card. */
-export function AgentTimeline({ events = [] }: { events?: { date: string; title: string; description?: string; meta?: string }[] }) {
-  const agentCopy = useAgentCopy()
-  const t = useTranslations('BeUi.timeline')
-  const locale = useLocale()
-  const dateFormat = useMemo(() => new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }), [locale])
-  const items = useMemo(() => events.map((event, index) => ({
-    id: String(index),
-    date: event.date,
-    title: event.title,
-    media: event.description ? <p className="line-clamp-5 p-3 text-sm leading-6 text-muted-foreground">{event.description}</p> : undefined,
-    meta: event.meta,
-  })), [events])
-  return <Timeline events={items} height={360} itemWidth={280} years={false} aria-label={agentCopy.timeline} keyboardHint={t('keyboardHint')} formatDate={date => dateFormat.format(date)} className="w-full min-w-0" />
 }
 
 /** Sources actually read, as beUI Citations. */
