@@ -2702,6 +2702,13 @@
     "working": "Coordinator 正在处理…",
     "loadError": "对话加载失败，正在重试。",
     "failedTitle": "回复失败",
+    "subscriptionRefusal": {
+      "unavailable": "所选订阅不可用",
+      "reconnect": "订阅需要重新连接",
+      "quotaUsed": "订阅额度已用完",
+      "retry": "订阅暂时不可用",
+      "open": "模型与额度"
+    },
     "wakeErrors": {
       "wake_failed": "回复等待重试",
       "wake_start_unconfirmed": "回复启动未确认",

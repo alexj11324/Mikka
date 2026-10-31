@@ -338,6 +338,15 @@ test(
       const coordinator = await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies);
       assert.equal(coordinator.modelSelection?.modelId,'dynamic-model','refreshed catalogue bindings support Coordinator execution');
       assert.equal(await actions.getBotModel(secondBot),catalogue.bindingId,'action returns the visible option for a saved copied binding');
+      const { COORDINATOR_MODEL } = await import('./coordinator/model');
+      const unbound = {ownerId:'bob',workspaceId:randomUUID(),botId:randomUUID()};
+      assert.deepEqual(await freezeBotModel(unbound,dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'a bot with no choice and no subscription runs on the hosted default');
+      const revokedBot = randomUUID();
+      await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3)',[revokedBot,alice.ownerId,alice.workspaceId]);
+      await settings.setBotModel(alice,revokedBot,catalogue.bindingId);
+      const { rows: [revoked] } = await pool.query('UPDATE byos_connections SET state=$2 WHERE id=(SELECT "connectionId" FROM byos_bindings WHERE id=$1) RETURNING id,state',[catalogue.bindingId,'disconnected']);
+      await assert.rejects(freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:revokedBot},dependencies),{code:'binding_required'},'a chosen subscription that was revoked refuses instead of taking the hosted default');
+      await pool.query('UPDATE byos_connections SET state=$2 WHERE id=$1',[revoked.id,'connected']);
       sessionOwner = null;
       await assert.rejects(actions.listExecutionRules());
       sessionOwner = "bob";

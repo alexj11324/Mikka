@@ -37,6 +37,8 @@ import { BrowserNoteChip, BrowserNoteLine, useBrowserNotesComposer } from '@/com
 import { SentSuggestion } from '@/components/suggestions/mobile-card'
 import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
+import { subscriptionRefusal } from '@/lib/subscription-refusal'
+import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
 import { FieldError } from '@/components/ui/field'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
@@ -134,6 +136,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const items = useMemo(() => data?.items ?? [], [data])
   // A turn the hosted model (Mikka 默认) refused: verification, allowance or pause (#523, #525, #526).
   const refusal = data?.working ? null : hostedRefusal(data?.error)
+  // The chosen subscription refused it: the mapped line, never the raw step error.
+  const declined = data?.working || refusal ? null : subscriptionRefusal(data?.error)
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
   const unanswered = data?.enabled === false && items.findLast(item => item.from !== 'event')?.from === 'person'
@@ -259,7 +263,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
       {refusal && <HostedRefusalNotice code={refusal} />}
-      {data?.error && !data.working && !refusal && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></>}</Alert>}
+      {declined && <SubscriptionRefusalNotice notice={declined} />}
+      {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></>}</Alert>}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {sendError && <FieldError className="text-xs">{sendError}</FieldError>}
       {botId && <SubagentLoginNeeds botId={botId} />}
