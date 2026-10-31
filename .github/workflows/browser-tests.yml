@@ -169,6 +169,9 @@ jobs:
           const secret = require('node:crypto').randomBytes(32).toString('hex')
           writeSync(1, `::add-mask::${secret}\n`)
           appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          const secretsKey = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secretsKey}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `WORKSPACE_SECRETS_KEY=${secretsKey}\n`)
           NODE
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
@@ -248,6 +251,9 @@ jobs:
           const secret = require('node:crypto').randomBytes(32).toString('hex')
           writeSync(1, `::add-mask::${secret}\n`)
           appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          const secretsKey = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secretsKey}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `WORKSPACE_SECRETS_KEY=${secretsKey}\n`)
           NODE
       - name: Install Chromium and official system dependencies
         timeout-minutes: 15
@@ -410,6 +416,9 @@ jobs:
           const secret = require('node:crypto').randomBytes(32).toString('hex')
           writeSync(1, `::add-mask::${secret}\n`)
           appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          const secretsKey = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secretsKey}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `WORKSPACE_SECRETS_KEY=${secretsKey}\n`)
           NODE
       - name: Install Chromium and official system dependencies
         timeout-minutes: 15
@@ -526,6 +535,9 @@ jobs:
           const secret = require('node:crypto').randomBytes(32).toString('hex')
           writeSync(1, `::add-mask::${secret}\n`)
           appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          const secretsKey = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secretsKey}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `WORKSPACE_SECRETS_KEY=${secretsKey}\n`)
           NODE
       - name: Install Chromium and official system dependencies
         timeout-minutes: 15

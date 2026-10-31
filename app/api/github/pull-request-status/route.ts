@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { issueForUser } from '@/lib/issue-access'
 import { pullRequestSchema, readIssueMetadata } from '@/lib/issue-metadata'
 import { GitHubAccessError, readAuthorizedPullRequest } from '@/lib/github/user-access'

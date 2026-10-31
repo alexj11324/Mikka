@@ -1,5 +1,5 @@
 import 'server-only'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { readArtifactContent } from '@/lib/artifacts/store'
 
 /** The signed-in person's artifact file for a route's `[artifactId]/versions/[version]`, or a response to send instead. */

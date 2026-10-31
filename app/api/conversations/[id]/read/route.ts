@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { handleRead, requestHost, type ReadRequest } from '@/lib/conversation-reads-store'
 

@@ -137,6 +137,7 @@ const TOOLS = [
         },
         spec: SPEC_SCHEMA,
         split: SPLIT_SCHEMA,
+        previewDatabaseBranch: { type: "string", description: "Name of the preview database branch you actually created or used; omit when none." },
         criteria: {
           type: "array",
           description:
@@ -149,6 +150,8 @@ const TOOLS = [
                 description: "The criterion's id, as given in your brief.",
               },
               passed: { type: "boolean" },
+              command: { type: "string", description: "Exact command used to check this criterion, when one was run." },
+              exitCode: { type: ["integer", "null"], description: "Observed exit code of that command." },
               evidence: {
                 type: "string",
                 description:
@@ -332,6 +335,7 @@ function record(kind, args, toolName) {
       : {}),
     ...(plan ? { plan } : {}),
     // Kept as sent; the daemon validates and trims each entry.
+    ...(typeof args.previewDatabaseBranch === "string" ? { previewDatabaseBranch: args.previewDatabaseBranch } : {}),
     ...(Array.isArray(args.criteria) ? { criteria: args.criteria } : {}),
     at: new Date().toISOString(),
   }

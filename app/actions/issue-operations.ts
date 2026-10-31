@@ -1,6 +1,6 @@
 'use server'
 
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
@@ -54,7 +54,10 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
     try {
       const result = await db.transaction(async tx => {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${issue.userId}, 0))`)
-        const rows = await tx.select().from(issues).where(eq(issues.userId, issue.userId)).orderBy(issues.id).for('update')
+        // The owner advisory lock serializes graph edits, including disjoint edges
+        // that would jointly close a cycle. Only the two rows we may update need
+        // row locks; the rest of the graph is an ordinary MVCC read.
+        const rows = await tx.select().from(issues).where(and(eq(issues.userId, issue.userId), inArray(issues.id, [issue.id, ...(target ? [target.id] : [])]))).orderBy(issues.id).for('update')
         const current = rows.find(row => row.id === issue.id)
         const other = rows.find(row => row.id === target?.id)
         requireLockedIssueScope(current, user.id, issue.scopeVersion)
@@ -65,6 +68,9 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
           const memberships = await tx.select({ id: issueMembers.issueId }).from(issueMembers).where(and(eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, user.id)))
           if (![current.id, ...(other ? [other.id] : [])].every(id => memberships.some(member => member.id === id))) return { error: 'issueAccessChanged' }
         }
+        const graphRows = value.kind !== 'related' && !value.remove && other
+          ? await tx.select({ id: issues.id, content: issues.content }).from(issues).where(eq(issues.userId, issue.userId))
+          : []
         const metadata = readIssueMetadata(current.content)
         const targetMetadata = other ? readIssueMetadata(other.content) : null
         const patches = new Map<string, { metadata: IssueMetadata; status?: string }>()
@@ -76,21 +82,21 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
         if (value.kind === 'parent' || value.kind === 'child') {
           const child = value.kind === 'child' ? other! : current
           const parentId = value.remove || !other ? null : value.kind === 'child' ? current.id : other.id
-          const graph = new Map(rows.map(row => [row.id, readIssueMetadata(row.content).parentId ? [readIssueMetadata(row.content).parentId!] : []]))
+          const graph = new Map(graphRows.map(row => [row.id, readIssueMetadata(row.content).parentId ? [readIssueMetadata(row.content).parentId!] : []]))
           if (parentId && createsIssueCycle(child.id, [parentId], graph)) return { error: 'issueParentCycle' }
           update(child.id, { parentId })
         } else if (value.kind === 'related') {
           update(current.id, { relatedIds: toggle(metadata.relatedIds, other!.id) })
           update(other!.id, { relatedIds: toggle(targetMetadata!.relatedIds, current.id) })
         } else if (value.kind === 'duplicate') {
-          if (!value.remove && createsIssueCycle(current.id, [other!.id], new Map(rows.map(row => [row.id, readIssueMetadata(row.content).duplicateOfId ? [readIssueMetadata(row.content).duplicateOfId!] : []])))) return { error: 'issueDuplicateCycle' }
+          if (!value.remove && createsIssueCycle(current.id, [other!.id], new Map(graphRows.map(row => [row.id, readIssueMetadata(row.content).duplicateOfId ? [readIssueMetadata(row.content).duplicateOfId!] : []])))) return { error: 'issueDuplicateCycle' }
           update(current.id, { duplicateOfId: value.remove ? null : other!.id }, value.remove ? 'todo' : 'duplicate')
         } else {
           const blocked = value.kind === 'blocks' ? other! : current
           const blocker = value.kind === 'blocks' ? current : other!
           const blockedMetadata = readIssueMetadata(blocked.content)
           const next = toggle(blockedMetadata.blockedByIds, blocker.id)
-          const graph = new Map(rows.map(row => [row.id, readIssueMetadata(row.content).blockedByIds]))
+          const graph = new Map(graphRows.map(row => [row.id, readIssueMetadata(row.content).blockedByIds]))
           if (!value.remove && createsIssueCycle(blocked.id, next, graph)) return { error: 'issueBlockCycle' }
           update(blocked.id, { blockedByIds: next })
         }

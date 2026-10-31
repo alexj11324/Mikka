@@ -36,16 +36,17 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
   { id: 'activity', group: 'personal', title: 'Activity' },
   { id: 'computers', group: 'personal', title: 'Devices' },
+  // Hidden until an API accepts the tokens (Alex); the UI and token store are built. Delete `unbuilt` to ship it.
   { id: 'developer', group: 'personal', title: 'Personal access tokens', unbuilt: true },
   { id: 'general', group: 'workspace', title: 'General' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
   { id: 'bots', group: 'workspace', title: 'Bots', unbuilt: true },
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },
-  { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true, unbuilt: true },
-  { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true, unbuilt: true },
-  { id: 'usage', group: 'workspace', title: 'Usage', unbuilt: true },
-  { id: 'billing', group: 'workspace', title: 'Billing', adminOnly: true, unbuilt: true },
+  { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true },
+  { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
+  { id: 'usage', group: 'workspace', title: 'Usage' },
+  { id: 'billing', group: 'workspace', title: 'Billing', adminOnly: true },
 ]
 
 /** Section ids from before v4. Old links open the page that now holds the content. */

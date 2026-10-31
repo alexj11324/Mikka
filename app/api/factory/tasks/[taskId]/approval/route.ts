@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/api-auth";
 import { factoryApprovals, factoryMerges } from "@/lib/factory/server";
 import { GitHubAccessError, githubUserToken } from "@/lib/github/user-access";
 import { handleFactoryApproval } from "@/lib/factory/approval-http";

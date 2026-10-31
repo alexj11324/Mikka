@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/api-auth";
 import { factoryRouteEnabled, handleFactoryRoute } from "@/lib/factory/route-http";
 import { issueMutationsEnabled } from "@/lib/coordinator/issue-tools-enabled";
 

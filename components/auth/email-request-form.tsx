@@ -12,17 +12,20 @@ import { Spinner } from '@/components/ui/spinner'
 import { Link } from '@/i18n/navigation'
 import { EMAIL_RESEND_COOLDOWN_SECONDS, recoveryMessageKey, type AuthRecoveryResult } from '@/lib/auth-recovery'
 import { useCooldown } from './use-cooldown'
+import { Turnstile, type TurnstileHandle } from './turnstile'
 
 // One email field that asks the backend to send a link: the reset link on
 // /forgot-password, the verification link on /verify-email. Only the person's
 // click sends; the response never says whether an email went out.
-export function EmailRequestForm({ title, description, submitLabel, send }: { title: string; description: string; submitLabel: string; send: (email: string) => Promise<AuthRecoveryResult> }) {
+export function EmailRequestForm({ title, description, submitLabel, send, turnstile = false }: { title: string; description: string; submitLabel: string; send: (email: string, turnstileToken: string | null) => Promise<AuthRecoveryResult>; turnstile?: boolean }) {
   const t = useTranslations('Auth')
   const pendingRef = useRef(false)
   const [pending, setPending] = useState(false)
   const [processed, setProcessed] = useState(false)
   const [error, setError] = useState('')
   const [cooldown, startCooldown] = useCooldown()
+  const widget = useRef<TurnstileHandle>(null)
+  const [token, setToken] = useState<string | null>(null)
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (pendingRef.current || cooldown > 0) return
@@ -31,7 +34,7 @@ export function EmailRequestForm({ title, description, submitLabel, send }: { ti
     setPending(true)
     setError('')
     try {
-      const result = await send(email)
+      const result = await send(email, token)
       if (result.ok) {
         setProcessed(true)
         startCooldown(EMAIL_RESEND_COOLDOWN_SECONDS)
@@ -43,6 +46,8 @@ export function EmailRequestForm({ title, description, submitLabel, send }: { ti
     } catch {
       setError(t('connectionFailed'))
     } finally {
+      // A Turnstile token is single-use, accepted or not.
+      widget.current?.reset()
       pendingRef.current = false
       setPending(false)
     }
@@ -60,6 +65,7 @@ export function EmailRequestForm({ title, description, submitLabel, send }: { ti
             </InputGroup>
           </Field>
         </FieldGroup>
+        {turnstile && <Turnstile ref={widget} onToken={setToken} />}
         <Button type="submit" variant={processed ? 'outline' : 'default'} className="w-full" disabled={pending || cooldown > 0}>
           {cooldown > 0 ? t('retryIn', { seconds: cooldown }) : processed ? t('resendLink') : submitLabel}
           {pending ? <Spinner data-icon="inline-end" /> : !processed && cooldown === 0 && <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />}
