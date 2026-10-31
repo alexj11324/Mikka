@@ -30,6 +30,9 @@ const DOCS_ONLY = [
   /^LICENSE$/,
   /^AGENTS\.md$/,
   /^\.github\/pull_request_template\.md$/,
+  // README diagrams and the scripts that draw them; nothing in the app imports either.
+  /^docs\/assets\/[^/]+\.svg$/,
+  /^scripts\/(?:generate-diagrams|diagram-svg)\.mjs$/,
 ]
 
 function isDocumentationFile(file) {
