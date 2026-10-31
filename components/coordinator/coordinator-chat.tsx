@@ -34,6 +34,8 @@ import { ArtifactQuoteChip, ArtifactQuoteLine } from '@/components/artifacts/art
 import type { ArtifactChatSlot } from '@/components/artifacts/artifact-viewer'
 import { BrowserNoteChip, BrowserNoteLine, useBrowserNotesComposer } from '@/components/browser/browser-notes'
 import { SentSuggestion } from '@/components/suggestions/mobile-card'
+import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
+import { hostedRefusal } from '@/lib/billing/verification-client'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
 
@@ -112,6 +114,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
   }, [prefill])
   const items = useMemo(() => data?.items ?? [], [data])
+  // A turn the hosted model (Mikka 默认) refused: verification, allowance or pause (#523, #525, #526).
+  const refusal = data?.working ? null : hostedRefusal(data?.error)
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
   const unanswered = data?.enabled === false && items.findLast(item => item.from !== 'event')?.from === 'person'
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
@@ -225,7 +229,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
-      {data?.error && !data.working && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
+      {refusal && <HostedRefusalNotice code={refusal} />}
+      {data?.error && !data.working && !refusal && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
       {botId && <SubagentLoginNeeds botId={botId} />}
