@@ -320,8 +320,8 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
 
 test('pnpm store cache is restored everywhere and saved only on main', () => {
   const action = readFileSync('.github/actions/pnpm-install/action.yml', 'utf8')
-  assert.match(action, /uses: actions\/cache\/restore@[a-f0-9]{40}\b/)
-  assert.match(action, /uses: actions\/cache\/save@[a-f0-9]{40}\b/)
+  assert.match(action, /uses:\s+actions\/cache\/restore@[a-f0-9]{40}\b/)
+  assert.match(action, /uses:\s+actions\/cache\/save@[a-f0-9]{40}\b/)
   assert(action.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'"))
   assert(!action.includes('cache: pnpm'))
   assert(!readFileSync('.github/workflows/ui-policy.yml', 'utf8').includes('cache: pnpm'))

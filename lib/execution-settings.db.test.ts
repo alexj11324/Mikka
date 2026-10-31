@@ -48,7 +48,7 @@ test(
       await pool.query(migration);
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
-      const explicitMigration = await readFile(new URL("../drizzle/20261031044137_explicit_execution.sql",import.meta.url),"utf8");
+      const explicitMigration = await readFile(new URL("../drizzle/20261031054017_explicit_execution.sql",import.meta.url),"utf8");
       const settings = new ExecutionSettings(pool),
         alice = { ownerId: "alice", workspaceId: randomUUID() },
         bob = { ...alice, ownerId: "bob" },

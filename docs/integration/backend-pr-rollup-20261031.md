@@ -1,51 +1,44 @@
 # Backend PR rollup — 2026-10-31
 
-The requested inventory was frozen at 2026-10-31 04:36:46 UTC. Only PRs created before 02:36:46 UTC were eligible. Frontend and mixed frontend implementation PRs remain with cc.
+The inventory was frozen at 2026-10-31 04:36:46 UTC; only PRs created before 02:36:46 UTC were eligible. All 27 open PRs were inspected. Frontend and mixed frontend implementation remain with cc.
 
-| Source PR | Reviewed head | Included backend behavior |
+## Final scope
+
+| Source PR | Reviewed head | Disposition |
 | --- | --- | --- |
-| #486 | `098bdfe658a13ca8633d1b13345870295800ba93` | Standalone actor constraint validation; PG17 concurrent writer and invalid-row regressions |
-| #565 | `fa78bb0658980f2890f7037db7dfafd3a1c93210` | Explicit saved execution settings, discovered model slots, offline wait and opt-in account quota fallback (#537) |
-| #576 | `176ccd11f9dccfad3da7d9cdff75d21c226bfb6b` | Actual-cost billing, model admission, approved writes, scoped reads, Team Skills, audit export/retention, deletion recovery, Linear archive and release/ops fixes |
+| #486 | `098bdfe658a13ca8633d1b13345870295800ba93` | Include standalone actor validation and PG17 concurrent-writer/invalid-row regressions; close after #605 merges |
+| #565 | `fa78bb0658980f2890f7037db7dfafd3a1c93210` | Include explicit execution defaults, discovered slots and opt-in account fallback (#537); close after #605 merges |
+| #576 | `59ae2c2fefc2ad1cedc2d65ab44f3ed460f5d189` | A parallel task merged this at 05:37:04 UTC as `326fd49b342ad50d8e16378188283a1974752ca9`; preserve its final implementation and applied migration names |
 
-Frontend/mixed candidates left untouched: #567, #557, #556, #552, #549, #547, #546, #534, #533, #532, #530, #529, #483, #482, #481, #480, #478. Newer PRs #603, #602, #599, #596, #591 and #585 are outside the frozen cutoff.
+The original rollup included #576. Its parallel merge changed the baseline while browser verification was running. The final PR merges current main, removes duplicate copies of its nine migrations, and delivers the remaining #565/#486 changes plus a claim-access denial regression. It does not reapply #576's DDL or revert its fixes.
 
 ## Integration decisions
 
-- Preserve main's Coordinator hosted-model fallback when no subscription exists. An unavailable explicit subscription still refuses; a named Bot still requires its executor. Replacing this with the old #565 file would break every subscription-free Coordinator dispatch (occurrence 10, impact 8, score 80). Existing `lib/bot-model-selection.test.ts` covers the retained behavior.
-- Preserve #598 personal plugins, MCP dependencies, migration and required DB test inventory; union the model-admission and ops suites into the CI list.
-- Preserve the latest workspace navigation selectors; retain #486's test-only account input-value readiness fix. No production frontend implementation is included.
-- #576's failed claim fixtures imported the real auth graph or rejected the newly added issue-access import. Stub that IO boundary in fixtures, preserve production task authorization, and exercise denial before claim/token/receipt creation. The quota fixture also isolates the new model-admission IO boundary while checking the exact model and owner/workspace scope.
-- Retain ordinary Linear bidirectional sync's existing explicit default-off decision. Features completed by the source PRs otherwise retain their enabled defaults.
+- Preserve main's subscription-free Coordinator hosted-model fallback. An unavailable explicit subscription still refuses; a named Bot still requires its executor. The old #565 file would break subscription-free Coordinator dispatch (occurrence 10 × impact 8 = 80); existing `lib/bot-model-selection.test.ts` covers the retained behavior.
+- Preserve #598 plugins and the complete current main DB-suite inventory. Current main also contains #576's immutable action pins and release regressions, so retain those versions.
+- Keep current workspace navigation selectors and #486's test-only account input-value readiness fix. No production frontend implementation is included.
+- The quota fixture isolates model-admission IO while asserting exact owner/workspace/model. The benchmark route fixture additionally verifies task-access denial before claim, token or Skill receipt creation; production authorization remains intact.
+- Preserve ordinary Linear bidirectional sync's explicitly chosen default-off setting and main's enabled feature defaults.
 
-- The first integrated CI run found floating action refs added to main after #576: two desktop-icon steps and the shared pnpm composite action. Pin them to the same vetted action revisions used elsewhere and extend the release regression to composite actions. The deterministic release-gate failure is occurrence 10 × impact 4 = 40; leaving composite actions floating also defeats the source PR’s intended dependency trust boundary.
+## Migrations and rollback
 
-## Migration ordering
+Only three migrations are new relative to `326fd49b`. They follow its latest `20261031050737_account_deletion_warnings.sql` and preserve the source SQL bodies:
 
-All incoming SQL files are new relative to main. Their names are advanced past main's `20261031040000_personal_plugins.sql`, preserving their relative order and SQL bodies. Existing migrations on main are unchanged. All exact filename references in tests/docs follow the rename.
-
-| Source filename | Integrated filename |
+| Source filename | Final filename |
 | --- | --- |
-| `20261030233501_validate_activity_actor_type.sql` | `20261031044135_validate_activity_actor_type.sql` |
-| `20261030233502_validate_activity_actor_id.sql` | `20261031044136_validate_activity_actor_id.sql` |
-| `20261031001500_explicit_execution.sql` | `20261031044137_explicit_execution.sql` |
-| `20261031012940_workspace_model_admission.sql` | `20261031044138_workspace_model_admission.sql` |
-| `20261031013401_audit_export_snapshots.sql` | `20261031044139_audit_export_snapshots.sql` |
-| `20261031015301_account_deletion_jobs.sql` | `20261031044140_account_deletion_jobs.sql` |
-| `20261031015302_workspace_deletion_guards.sql` | `20261031044141_workspace_deletion_guards.sql` |
-| `20261031020440_team_skill_metadata.sql` | `20261031044142_team_skill_metadata.sql` |
-| `20261031020703_audit_retention_policy.sql` | `20261031044143_audit_retention_policy.sql` |
-| `20261031021420_archive_linear_on_personal_scope.sql` | `20261031044144_archive_linear_on_personal_scope.sql` |
-| `20261031022001_ops_monitor_observations.sql` | `20261031044145_ops_monitor_observations.sql` |
-| `20261031022004_account_deletion_warnings.sql` | `20261031044146_account_deletion_warnings.sql` |
+| `20261030233501_validate_activity_actor_type.sql` | `20261031054015_validate_activity_actor_type.sql` |
+| `20261030233502_validate_activity_actor_id.sql` | `20261031054016_validate_activity_actor_id.sql` |
+| `20261031001500_explicit_execution.sql` | `20261031054017_explicit_execution.sql` |
 
-The actor validations retain `migrate: no-transaction`; they add no new constraint or column and allow concurrent writers with PostgreSQL's validation lock. Other changes are additive tables/columns, metadata guards, or explicit execution-rule data conversion; failures remain visible to the deployment migrator. A data rollback for new execution settings must preserve explicit selections rather than recreating automatic choices. Additive schema can remain when reverting application code; do not drop audit/deletion guard evidence or immutable artifacts during a rollback.
+All existing main migrations and ledger names remain unchanged. The earlier rollup's alternative copies of #576's migrations are removed before deployment. Constraint validation remains nontransactional and permits concurrent writes; invalid legacy rows fail closed. The explicit-rule conversion keeps saved selections and adds a unique default row per scope. Reverting application code may retain the additive schema; do not recreate automatic choices or drop audit/deletion evidence during rollback.
 
 ## Verification and boundaries
 
-Integration environment: cloud Linux, Node 24, pnpm 10.34.3, a task-owned ephemeral PostgreSQL 17 container on loopback, isolated `mikka_e2e`. Full migration bootstrap succeeded. Local check results and the final head's required CI/browser results are recorded in the PR.
+Use cloud Linux, pnpm 10.34.3 and task-owned ephemeral PostgreSQL 17 on loopback (`mikka_e2e`). Verify migration from the exact merged-main ledger to this branch, then replay/bootstrap, execution settings, source checks and required CI/browser jobs. The PR records final-head results.
 
-This rollup does not claim live SaaS OAuth/native-provider, Team Skills browser, production legacy-data validation, or production disaster-recovery acceptance. #576's remaining acceptance requirements stay documented in its integration records. Superseding source PRs is not a blanket closure of their referenced issues. The standalone validation PR's production scan duration remains dependent on real table size and legacy rows; its fail-closed behavior and concurrent-writer test are retained.
+A primary browser run on the earlier `44fab50a` head hit an intermittent return-to-board timeout; the independent targeted job passed the same case and all 115 cases. Evidence and low-risk triage (2 × 2 = 4) are tracked in #606 for cc; no speculative frontend fix is included. That earlier run's results do not substitute for verification of the reconciled head.
+
+This PR does not claim new live-provider, Team Skills browser, production legacy-data or production disaster-recovery acceptance. Preserve owner-provided OAuth acceptance and the scoped boundaries recorded on main. Production validation scan duration still depends on real table size and legacy rows.
 
 ## Complete open-PR inventory
 
@@ -60,7 +53,7 @@ The snapshot contains 27 PRs: 20 older than the cutoff (3 selected backend PRs a
 | [#596](https://github.com/alexj11324/Mikka/pull/596) | fix(ui): sweep explanatory copy, double frames, outlined search and partial row hover | 新于本次两小时截止时间；前端/桌面 UI，保持打开留给 cc。 |
 | [#591](https://github.com/alexj11324/Mikka/pull/591) | feat(settings): open Settings inside the app shell, like Codex; remove 活动; prefetch sections | 新于本次两小时截止时间；前端/桌面 UI，保持打开留给 cc。 |
 | [#585](https://github.com/alexj11324/Mikka/pull/585) | feat(plugins): one 插件 list for the rail page and 设置 › 连接 | 新于本次两小时截止时间；前端/桌面 UI，保持打开留给 cc。 |
-| [#576](https://github.com/alexj11324/Mikka/pull/576) | Charge actual model usage and integrate older backend fixes | 后端：纳入本整合 PR，通过验证后合并并关闭来源 PR。 |
+| [#576](https://github.com/alexj11324/Mikka/pull/576) | Charge actual model usage and integrate older backend fixes | 后端：并行任务已于 05:37:04 UTC 合并；本 PR 保留 main 已应用的版本和迁移账本。 |
 | [#567](https://github.com/alexj11324/Mikka/pull/567) | feat(captures): a recording's step timeline, in the agent's own words | 混合：录像步骤 API、daemon 工具 schema 与时间线 UI；还包含 #547 验收合并依赖，整项留给 cc。 |
 | [#565](https://github.com/alexj11324/Mikka/pull/565) | Execution settings: explicit defaults, model slots and opt-in fallbacks (#537) | 后端：纳入本整合 PR，通过验证后合并并关闭来源 PR。 |
 | [#557](https://github.com/alexj11324/Mikka/pull/557) | feat(settings): 重新播放引导, E2B key per workspace with BYO state, PAT flag (#538 UI) | 前端接入：设置页、E2B/BYO 展示和占位适配器；真实权限/工作区接口由已合并后端提供，需 cc 接线。 |

@@ -15,7 +15,7 @@ test('minute collector persists real SQL signals without a sink and keeps delive
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
   for (const table of ['coordinator_events', 'agent_runs', 'operation_ledger', 'byos_secret_artifacts', 'byos_connections', 'schedule_occurrences'])
     await pool.query(`CREATE TABLE "${schema}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`)
-  await pool.query(await readFile(new URL('../../drizzle/20261031044145_ops_monitor_observations.sql', import.meta.url), 'utf8'))
+  await pool.query(await readFile(new URL('../../drizzle/20261031050736_ops_monitor_observations.sql', import.meta.url), 'utf8'))
   let result = await collectOperationalSignals(pool)
   assert.equal(result.notificationStatus, 'not_configured'); assert.equal(result.persisted, true); assert.equal(result.signals.databaseAvailable, 1)
   await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,"createdAt") VALUES(gen_random_uuid(),'ops-fixture','user_message',gen_random_uuid()::text,'{}',now()-interval '10 minutes')`)
