@@ -32,13 +32,12 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
   async function workspaces() {
     await openSidebar()
     await switcher.click()
-    await page.getByRole('menuitem', { name: '切换工作区', exact: true }).click()
+    return page.getByRole('menu', { name: '工作区菜单', exact: true })
   }
   await settings()
   await openSidebar()
   await sidebar.getByRole('button', { name: '主页', exact: true }).click()
-  await workspaces()
-  await page.getByRole('menuitem', { name: '创建工作区', exact: true }).click()
+  await (await workspaces()).getByRole('menuitem', { name: '创建工作区', exact: true }).click()
   const name = `工作区回归 ${randomUUID()}`
   await page.getByLabel('工作区名称', { exact: true }).fill(name)
   await page.getByLabel('工作区网址', { exact: true }).fill(`mobile-${randomUUID().slice(0, 8)}`)
@@ -56,8 +55,7 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
   await expect(page.getByLabel('名称', { exact: true })).toHaveValue(name)
   await openSidebar()
   await sidebar.getByRole('button', { name: '主页', exact: true }).click()
-  await workspaces()
-  await page.getByRole('menuitem', { name: '回归测试成员的工作区', exact: true }).click()
+  await (await workspaces()).getByRole('menuitem', { name: '回归测试成员的工作区', exact: true }).click()
   await expect(page).toHaveURL(url => url.pathname === app('/'))
   await openSidebar()
   await expect(switcher).toContainText('回归测试成员的工作区')
@@ -71,13 +69,15 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', { 
   // Without Linear the toolbar button is a plain refresh, not a success state.
   await expect(page.getByRole('button', { name: '刷新', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '已与 Linear 同步', exact: true })).toHaveCount(0)
-  // The issue-tool gate is off in this suite; the request must not be queued.
+  // Task creation is on by default (R-76): with no issue-tool setting the dialog offers 创建任务.
   const dialog = await openCreateIssue(page)
   const request = `把群聊未读数接到侧栏 ${randomUUID()}`
   await dialog.getByLabel('任务描述', { exact: true }).fill(request)
-  // With the gate off the dialog explains why and keeps 创建任务 disabled.
-  await expect(dialog.getByText('这个工作区还没有开启任务创建，可以先在对话里交给 Coordinator。', { exact: true })).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '创建任务', exact: true })).toBeDisabled()
+  await expect(dialog.getByText('这个工作区还没有开启任务创建，可以先在对话里交给 Coordinator。', { exact: true })).toHaveCount(0)
+  await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
+  // The request passes the issue-tool gate; no Coordinator runs in this suite, so it is refused there and the draft stays.
+  await expect(dialog.getByRole('alert').filter({ hasText: 'Coordinator 暂时不可用' })).toBeVisible()
+  await expect(dialog.getByText('暂时无法创建任务。', { exact: true })).toHaveCount(0)
   await expect(dialog.getByLabel('任务描述', { exact: true })).toHaveValue(request)
   await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true }).getByText(request)).toHaveCount(0)
   await page.keyboard.press('Escape')
@@ -95,17 +95,14 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', { 
   await expect(page.getByRole('tab', { name: /^应用/ })).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByText('线程运行环境', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-  await page.getByRole('menuitem', { name: '切换工作区', exact: true }).hover()
-  const switcher = page.getByRole('menu', { name: '切换工作区', exact: true })
-  await expect(switcher).toContainText(account.email)
+  const switcher = page.getByRole('menu', { name: '工作区菜单', exact: true })
+  await expect(switcher.getByRole('group', { name: account.email, exact: true })).toBeVisible()
+  await expect(switcher.getByRole('menuitem', { name: '切换工作区', exact: true })).toHaveCount(0)
   await expect(switcher.getByRole('menuitem', { name: '创建工作区', exact: true })).toBeVisible()
   await expect(switcher.getByRole('menuitem', { name: '添加账户', exact: true })).toBeVisible()
   await expect(switcher.getByRole('menuitem', { name: '个人资料', exact: true })).toHaveCount(0)
   await expect(switcher.getByRole('menuitem', { name: '切换明暗主题', exact: true })).toHaveCount(0)
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
+  await switcher.getByRole('menuitem', { name: '退出登录', exact: true }).click()
   await expect(page).toHaveURL(/\/sign-in/)
   await page.getByLabel('邮箱', { exact: true }).fill(account.email)
   await fillSecretPassword(page, account.password)

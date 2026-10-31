@@ -2,7 +2,9 @@ import { readFile, writeFile, rename } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
 
-export const WINDOW_MS = 15 * 60_000, REQUEST_DEADLINE_MS = 120_000
+import { requestOutcomes, WINDOW_MS } from './request-outcomes.mjs'
+export { requestOutcomes, WINDOW_MS } from './request-outcomes.mjs'
+export const REQUEST_DEADLINE_MS = 120_000
 const groupFor = route => route === '/api/auth/[...all]' ? 'login' : route === '/api/coordinator/messages' ? 'chat' : 'api'
 
 /** Completed 4xx remain failures: this SLI measures the user's successful request, not server availability. */
@@ -117,11 +119,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const pool = new Pool({ connectionString: process.env.OPS_DATABASE_URL, max: 1, connectionTimeoutMillis: 5_000 })
   let database
   try { database = await databaseSignals(pool) } catch { database = { databaseAvailable: 0 } } finally { await pool.end() }
-  const requests = requestSlis((await readFile(logs, 'utf8')).split('\n'))
+  const lines = (await readFile(logs, 'utf8')).split('\n'), observedAt = Date.now()
+  const requests = requestSlis(lines, observedAt), outcomes = requestOutcomes(lines, observedAt)
   let state = {}
   try { state = JSON.parse(await readFile(stateFile, 'utf8')) } catch (error) { if (error.code !== 'ENOENT') throw Error('opsAlertStateInvalid') }
   const result = await notifyAlerts(actionableAlerts({ requests, database }), { state, sink: process.env.OPS_INTERNAL_ALERT_SINK })
   await writeFile(`${stateFile}.tmp`, JSON.stringify(result.state), { mode: 0o600 }); await rename(`${stateFile}.tmp`, stateFile)
-  console.log(JSON.stringify({ observedAt: new Date().toISOString(), requests, database, deliveries: result.deliveries, healthy: result.healthy }))
+  console.log(JSON.stringify({ observedAt: new Date(observedAt).toISOString(), requests, outcomes, database, deliveries: result.deliveries, healthy: result.healthy }))
   if (!result.healthy) process.exitCode = 1
 }

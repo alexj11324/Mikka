@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
+import { dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -129,11 +130,7 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
     await appPool?.end();
     // Loaded transitively by the run-stop path; it binds to the same database.
     await (globalThis as { workspacePool?: { end: () => Promise<void> } }).workspacePool?.end();
-    await pool.end();
-    // pool.end() resolves before the backends exit; wait before the FORCE drop.
-    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++)
-      await new Promise((r) => setTimeout(r, 50));
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await dropTestDatabase(admin, database, pool);
     await admin.end();
   }
 });

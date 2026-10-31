@@ -11,6 +11,7 @@ import { createFactoryDispatch, factoryBinding } from "../dispatch";
 import { factoryCheckIndependent } from "../check-independence";
 import { createFactoryQuestions } from "./store";
 import { handleFactoryQuestionList } from "./ask-user";
+import { dropTestDatabase } from "../../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -315,11 +316,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.equal((await get(null)).status, 401);
     });
   } finally {
-    await pool.end();
-    // pool.end() resolves before the backends exit; wait before the FORCE drop.
-    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++)
-      await new Promise((r) => setTimeout(r, 50));
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await dropTestDatabase(admin, database, pool);
     await admin.end();
   }
 });

@@ -5,6 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { gunzipSync, gzipSync } from 'node:zlib'
 import test from 'node:test'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dropTestDatabase } from './support/drop-test-database'
 
 test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, flag: process.env.MIKKA_BYO_E2B_KEY }
@@ -218,8 +219,7 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
       const { rows: events } = await mailboxPool.query(`select payload from coordinator_events where "runId"=$1`, [runId])
       noPlain('coordinator_events', JSON.stringify(events))
     } finally {
-      await mailboxPool.end()
-      await pool.query(`drop database if exists ${name} with (force)`)
+      await dropTestDatabase(pool, name, mailboxPool)
     }
   })
 

@@ -38,7 +38,7 @@ stub('./wake-recovery.ts',{
  }),
 })
 stub('../../workflows/coordinator/workflow.ts',{coordinatorTurn:()=>{}})
-mock.module('workflow/api',{namedExports:{start:async()=>{starts++}}})
+mock.module('workflow/api',{namedExports:{start:async()=>{starts++;return {runId:'synthetic-workflow'}}}})
 let wake:typeof import('./wake'),group:typeof import('./route-group'),transport:typeof import('./decide')
 before(async()=>{
  console.error=()=>{}

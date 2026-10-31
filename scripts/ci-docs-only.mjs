@@ -75,7 +75,7 @@ export const BROWSER_MAIN_SPECS = Object.freeze([
   'coordinator-choice-card.spec.ts', 'coordinator-scroll.spec.ts', 'global-search-scope.spec.ts', 'invalid-issue-content.spec.ts',
   'issue-threads.spec.ts', 'linear-sync-disabled.spec.ts', 'members.spec.ts', 'mobile-handoff.spec.ts',
   'plugins-page.spec.ts',
-  'settings.spec.ts', 'sign-out.spec.ts', 'suggestion-entry-contract.spec.ts', 'suggestions-rail.spec.ts',
+  'settings.spec.ts', 'settings-background-polling.spec.ts', 'sign-out.spec.ts', 'suggestion-entry-contract.spec.ts', 'suggestions-rail.spec.ts',
   'teams.spec.ts', 'thread-cards.spec.ts', 'thread-projection.spec.ts', 'thread-stop.spec.ts',
   'workspace-menu.spec.ts',
   'abuse-ui.spec.ts', 'settings-audit.spec.ts', 'settings-billing.spec.ts', 'settings-general.spec.ts',
@@ -115,6 +115,7 @@ const SCOPED_BROWSER = [
   { area: 'side panels', paths: [/^components\/nav\/(?:bot-list|context-panel)\.tsx$/, /^hooks\/use-resizable-width\.ts$/], specs: ['side-panel-resize.spec.ts'] },
   { area: 'relations', paths: [/^lib\/issue-relation/, /^components\/workspace\/issue-relations\.tsx$/], specs: ['relations.spec.ts'] },
   { area: 'active agents', paths: [/^lib\/active-agents\./], specs: ['active-agents.spec.ts'] },
+  { area: 'account menu', paths: [/^components\/workspace-menu\.tsx$/, /^components\/nav\/icon-rail\.tsx$/], specs: ['workspace-menu.spec.ts', 'workspace.spec.ts', 'sign-out.spec.ts', 'workspace-shortcuts.spec.ts'] },
   { area: 'agent ui', paths: [/^lib\/agent-ui[-.]/, /^lib\/legacy-chat-content\.ts$/, /^components\/workspace\/agent-(?:ui-library|generative-ui|theme|chart|report|editable-table|text-bubble|decision|citations)\.tsx$/], specs: ['agent.spec.ts', 'coordinator-choice-card.spec.ts', 'bot-image-read.spec.ts', 'e2b-machine-name.spec.ts'] },
 ]
 export const BROWSER_SCOPED_SPECS = Object.freeze([...new Set(SCOPED_BROWSER.flatMap(rule => rule.specs))].sort())
