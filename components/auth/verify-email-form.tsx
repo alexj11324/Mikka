@@ -17,5 +17,5 @@ export function VerifyEmailForm() {
     window.history.replaceState(window.history.state, '', cleaned)
     setLinkFailed(true)
   }, [])
-  return <EmailRequestForm title={t('verifyTitle')} description={linkFailed ? t('verifyLinkInvalid') : t('verifyDescription')} submitLabel={t('sendVerification')} send={sendVerificationEmail} />
+  return <EmailRequestForm title={t('verifyTitle')} description={linkFailed ? t('verifyLinkInvalid') : t('verifyDescription')} submitLabel={t('sendVerification')} send={sendVerificationEmail} turnstile />
 }

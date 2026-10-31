@@ -7,8 +7,9 @@
 // /mikka/sign-in and /mikka/reset-password.
 
 import { withBasePath } from '@/lib/base-path'
+import { turnstileHeaders } from '@/lib/signup-refusal'
 
-export type AuthRecoveryError = 'invalid_token' | 'password_length' | 'rate_limited' | 'unavailable' | 'invalid_request' | 'failed'
+export type AuthRecoveryError = 'invalid_token' | 'password_length' | 'rate_limited' | 'unavailable' | 'turnstile_failed' | 'turnstile_unavailable' | 'invalid_request' | 'failed'
 export type AuthRecoveryResult = { ok: true } | { ok: false; error: AuthRecoveryError; retryAfter?: number }
 
 // The page's own cooldown after a processed email request. The backend limits
@@ -21,18 +22,21 @@ export function classifyFailure(status: number, code: string | undefined, retryA
     return { ok: false, error: 'rate_limited', retryAfter: Number.isFinite(seconds) && seconds > 0 ? seconds : EMAIL_RESEND_COOLDOWN_SECONDS }
   }
   if (code === 'INVALID_TOKEN') return { ok: false, error: 'invalid_token' }
+  // Turnstile on 重新发送验证邮件 (#527).
+  if (code === 'TURNSTILE_INVALID' || code === 'TURNSTILE_REQUIRED') return { ok: false, error: 'turnstile_failed' }
+  if (code === 'SIGNUP_VERIFICATION_UNAVAILABLE') return { ok: false, error: 'turnstile_unavailable' }
   if (code === 'PASSWORD_TOO_SHORT' || code === 'PASSWORD_TOO_LONG') return { ok: false, error: 'password_length' }
   if (status === 503 || code === 'AUTH_EMAIL_DELIVERY_UNAVAILABLE') return { ok: false, error: 'unavailable' }
   if (status === 400 || status === 403) return { ok: false, error: 'invalid_request' }
   return { ok: false, error: 'failed' }
 }
 
-async function post(path: string, body: Record<string, string>): Promise<AuthRecoveryResult> {
+async function post(path: string, body: Record<string, string>, headers: Record<string, string> = {}): Promise<AuthRecoveryResult> {
   const response = await fetch(withBasePath(`/api/auth/${path}`), {
     method: 'POST',
     credentials: 'same-origin',
     cache: 'no-store',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
   })
   if (response.ok) return { ok: true }
@@ -41,8 +45,8 @@ async function post(path: string, body: Record<string, string>): Promise<AuthRec
   return classifyFailure(response.status, code, response.headers.get('X-Retry-After'))
 }
 
-export function sendVerificationEmail(email: string) {
-  return post('send-verification-email', { email })
+export function sendVerificationEmail(email: string, turnstileToken: string | null = null) {
+  return post('send-verification-email', { email }, turnstileHeaders(turnstileToken))
 }
 
 export function requestPasswordReset(email: string) {
@@ -53,13 +57,15 @@ export function resetPassword(token: string, newPassword: string) {
   return post('reset-password', { token, newPassword })
 }
 
-export type RecoveryMessageKey = 'resetLinkInvalid' | 'passwordLength' | 'recoveryUnavailable' | 'submitFailed' | 'connectionFailed'
+export type RecoveryMessageKey = 'resetLinkInvalid' | 'passwordLength' | 'recoveryUnavailable' | 'signupRefusal.turnstileFailed' | 'signupRefusal.turnstileUnavailable' | 'submitFailed' | 'connectionFailed'
 
 // Rate limits are shown as a countdown instead (see useCooldown).
 export function recoveryMessageKey(error: Exclude<AuthRecoveryError, 'rate_limited'>): RecoveryMessageKey {
   if (error === 'invalid_token') return 'resetLinkInvalid'
   if (error === 'password_length') return 'passwordLength'
   if (error === 'unavailable') return 'recoveryUnavailable'
+  if (error === 'turnstile_failed') return 'signupRefusal.turnstileFailed'
+  if (error === 'turnstile_unavailable') return 'signupRefusal.turnstileUnavailable'
   if (error === 'invalid_request') return 'submitFailed'
   return 'connectionFailed'
 }

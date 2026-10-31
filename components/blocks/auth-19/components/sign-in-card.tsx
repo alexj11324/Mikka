@@ -1,6 +1,6 @@
 'use client'
 
-import type { FormEventHandler } from 'react'
+import type { FormEventHandler, ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { ArrowRightIcon, Loader2Icon, LockKeyholeIcon, MailIcon, UserIcon } from 'lucide-react'
@@ -30,9 +30,11 @@ type SignInCardProps = {
   onSubmit: FormEventHandler<HTMLFormElement>
   onGoogleSignIn: () => Promise<void>
   onGitHubSignIn: () => Promise<void>
+  /** Sign-up's Turnstile widget; renders nothing without a site key. */
+  turnstile?: ReactNode
 }
 
-export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, notice, googleCallbackURL, githubCallbackURL, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, notice, googleCallbackURL, githubCallbackURL, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile }: SignInCardProps) {
   const t = useTranslations('Auth')
   function authHref(path: string) {
     const params = new URLSearchParams()
@@ -110,6 +112,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
               </InputGroup>
             </Field>
           </FieldGroup>
+          {turnstile}
           <Button type="submit" className="w-full" disabled={pending}>
             {registering ? t('submitCreate') : t('submitSignIn')}
             {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-end" /> : <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />}

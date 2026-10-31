@@ -38,24 +38,25 @@ export function SettingsSection({
   children,
 }: {
   id?: string
-  title: string
+  /** Left out when the page title already names the card (常规's first card). */
+  title?: string
   description?: string
   action?: ReactNode
   children: ReactNode
 }) {
   return (
-    <section className="flex flex-col gap-1" aria-labelledby={id}>
+    <section className="flex flex-col gap-1" aria-labelledby={title ? id : undefined}>
       {/* The title is inset like the row text; the action has no inset so its
           right edge lines up with the card's right edge below it. */}
-      <header className="flex items-end justify-between gap-3 pl-1">
+      {(title || action) && <header className="flex items-end justify-between gap-3 pl-1">
         <div className="flex min-w-0 flex-col gap-0.5">
-          <h2 id={id} className="text-sm font-medium">
+          {title && <h2 id={id} className="text-sm font-medium">
             {title}
-          </h2>
+          </h2>}
           {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
         {action && <div data-settings-section-action className="flex shrink-0 items-center gap-2">{action}</div>}
-      </header>
+      </header>}
       <div data-settings-card className="overflow-hidden rounded-2xl border bg-card">
         <div data-settings-rows className="divide-y divide-border">{children}</div>
       </div>
@@ -73,17 +74,23 @@ export function SettingsSection({
 export function SettingRow({
   title,
   description,
+  icon,
   children,
 }: {
   title: string
-  description?: string
+  description?: ReactNode
+  /** The named thing's icon (R-74), before the title. */
+  icon?: ReactNode
   children?: ReactNode
 }) {
   return (
     <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-sm leading-snug font-medium text-foreground">{title}</span>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      <div className="flex min-w-0 items-center gap-3">
+        {icon}
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-sm leading-snug font-medium text-foreground">{title}</span>
+          {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        </div>
       </div>
       <div className="shrink-0 text-sm">{children}</div>
     </div>
