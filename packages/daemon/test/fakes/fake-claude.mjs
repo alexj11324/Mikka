@@ -92,6 +92,7 @@ lines.on("line", async (line) => {
     return
   }
   const captureApprovals = {
+    REQUEST_HELP_APPROVAL_TEST: ['mcp__mikka__request_help', { question: 'Which existing API is specified?' }],
     CAPTURE_SCREENSHOT_APPROVAL_TEST: ['mcp__mikka_computer__capture_screenshot', { title: 'Synthetic evidence' }],
     START_RECORDING_APPROVAL_TEST: ['mcp__mikka_computer__start_screen_recording', { title: 'Synthetic flow', maxSeconds: 5 }],
     STOP_RECORDING_APPROVAL_TEST: ['mcp__mikka_computer__stop_screen_recording', {}],

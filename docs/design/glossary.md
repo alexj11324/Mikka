@@ -60,5 +60,9 @@ Decided by Alex, 2026-10-28.
 - "任务" for the right panel's thread tab. Say **线程**.
 - A Chinese word for Artifact. Keep **Artifact**.
 - "浏览器" for a bot's cloud computer, or "电脑" for the local browser.
-- "Agent" when you mean the thing on the left. Say **bot**. "Agent" is fine
-  for the coding agents that run threads (`agents` table, Claude Code, Codex).
+- "Agent" when you mean the thing on the left. Say **bot**. **Agent** is the
+  right-side worker that runs threads (`agents` table, Claude Code, Codex).
+- "harness" or 「执行器」 in the UI for that worker. Say **Agent** (R-43).
+- 「E2B」 as the cloud machine's name. It is **Mikka Cloud** in both languages,
+  never translated; E2B names only the provider and its API key.
+  Code identifiers may keep `harness`.

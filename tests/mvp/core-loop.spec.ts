@@ -143,7 +143,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     checkpoint('daemon-registered', 'Real daemon logged in, registered and exposed its mock harness')
     const dialog = await openCreateIssue(page)
     const machine = dialog.getByRole('combobox', { name: '运行的机器', exact: true })
-    await expect(machine).toContainText('E2B')
+    await expect(machine).toContainText('Mikka Cloud')
     await machine.click()
     await page.getByRole('option').filter({ hasText: device!.name }).click()
     await expect(machine).toContainText(device!.name)
