@@ -33,6 +33,7 @@ async function main() {
       'playwright-selection-smoke-report', 'selection-smoke-results',
       'playwright-selection-targeted-report', 'selection-targeted-results',
       '.cache/e2e/playwright-selection.log',
+      'playwright-turnstile-report', 'turnstile-results', '.cache/e2e/playwright-turnstile.log',
     ]) {
       try { await stat(path); paths.push(path) } catch (error) { if (error.code !== 'ENOENT') throw error }
     }

@@ -12,7 +12,7 @@ import { constrainedAssignmentPolicy } from '../run-assignment-policy'
 // Execute the actual route in memory, with its database/auth boundaries replaced.
 async function routeFixture(unavailable=false,stopped=false) {
   const calls:string[]=[]
-  const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1}
+  const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',deviceTokenId:null as string|null,status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1}
   const agent={id:'agent',userId:'owner',harness:'codex'},repo={id:'repo',userId:'owner',deviceId:'device',repoPath:'v2/github.com/mikka-ci/benchmark-claim',remoteUrl:'https://github.com/mikka-ci/benchmark-claim.git',verifyCommand:'mutable-repo-command'}
   const selections=[run,agent,repo]
   class ImprovementError extends Error {constructor(public code:string){super(code)}}
@@ -20,6 +20,9 @@ async function routeFixture(unavailable=false,stopped=false) {
   const db={select:()=>({from:()=>({where:()=>({limit:async()=>[selections.shift()]})})}),update:()=>({set:(values:object)=>({where:async()=>{calls.push('block');Object.assign(run,values)}})})}
   const benchmark={harness:'codex',model:'actual-observed-model',verifyCommand:'git diff --exit-code HEAD --',policy:{readOnly:true,networkAllow:[],permissions:{install_dependency:'deny',write_outside_repo:'deny',git_push:'deny',network:'ask'}},benchmark:{caseId:'case',benchmarkDigest:'digest',sourceCommit:'frozen-sha'}}
   const modules:Record<string,unknown>={
+    // This VM owns frozen benchmark composition, not credential admission;
+    // the actual route/fence and token revocation have real PostgreSQL tests.
+    '@/lib/device-route':{withDeviceRoute:<T>(handler:T)=>handler},
     'next/server':{NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
     '@mikka/protocol/device':deviceProtocol,
@@ -34,7 +37,7 @@ async function routeFixture(unavailable=false,stopped=false) {
     '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{throw Error('unexpected publication failure')}},
     '@/lib/run-publication-result':{PublicationError:class extends Error {}},
     '@/lib/db':{db,pool:{},withDatabaseClient:async(_tx:unknown,fn:()=>Promise<unknown>)=>fn()},'@/lib/db/schema':{agentRuns:{},agents:{},deviceRepos:{}},
-    '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner'}),ownedDevice:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]})},
+    '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token'}),ownedDevice:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]})},
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
     '@/lib/mcp/worker':{issueRunToken:async()=>{calls.push('token');return {token:'synthetic-test-token'}}},
     '@/lib/run-leases':{},'@/lib/run-retry':{},
@@ -43,7 +46,14 @@ async function routeFixture(unavailable=false,stopped=false) {
     '@/lib/factory/runtime':{guardFactoryClaim:async()=>{calls.push('guard');if(stopped)throw new FactoryError('stopped');return {preserveQuestionWorktree:true}}},
     '@mikka/protocol/agent-policy':{defaultRunPolicy},
     '@/lib/computer/local-authority':{localComputerAuthority:async()=>null},
-    '@/lib/computer/claim':{claimLocalRun:async(_pool:unknown,_runId:string,_deviceId:string,_lease:Date,_subscription:unknown,guard:(tx:object)=>Promise<boolean>,after:(tx:object)=>Promise<void>)=>{if(!await guard({}))return 'unavailable';calls.push('claim');run.status='preparing';await after({});return 'claimed'}},
+    '@/lib/computer/claim':{claimLocalRun:async(_pool:unknown,_runId:string,_deviceId:string,_lease:Date,_subscription:unknown,guard:(tx:object)=>Promise<boolean>,after:(tx:object)=>Promise<void>)=>{
+      const tx={query:async(statement:string,args:unknown[])=>{
+        assert.ok(statement.startsWith('UPDATE agent_runs SET "deviceTokenId"=$2'))
+        assert.deepEqual(Array.from(args),['run','synthetic-device-token','owner'])
+        run.deviceTokenId=String(args[1]);return {rows:[],rowCount:1}
+      }}
+      if(!await guard(tx))return 'unavailable';calls.push('claim');run.status='preparing';await after(tx);return 'claimed'
+    }},
     '@/lib/subscription-runtime':{},
     '@/lib/computer/native-run-binding':{},
     '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
@@ -66,7 +76,7 @@ async function routeFixture(unavailable=false,stopped=false) {
 const claimRequest=()=>new Request('https://fixture.invalid/v1/claim',{headers:{[deviceProtocol.REPO_ORIGIN_HEADER]:'1','x-mikka-skill-artifacts':'1'}})
 
 test('actual claim route resolves frozen benchmark exactly once after claim and receipt and overrides mutable config',async()=>{
-  const {post,calls,benchmark}=await routeFixture()
+  const {post,calls,benchmark,run}=await routeFixture()
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,200)
   const assignment=await response.json()
@@ -78,6 +88,7 @@ test('actual claim route resolves frozen benchmark exactly once after claim and 
   assert.equal(assignment.policyRevision,'synthetic-current-policy')
   assert.deepEqual(assignment.benchmark,benchmark.benchmark)
   assert.deepEqual(assignment.policy,benchmark.policy)
+  assert.equal(run.deviceTokenId,'synthetic-device-token')
 })
 
 test('actual claim route withholds all assignment bytes when frozen configuration becomes unavailable after claim',async()=>{

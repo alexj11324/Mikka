@@ -9,7 +9,7 @@ import { remoteKey } from '@mikka/protocol/repository'
 import { SKILL_ARTIFACT_HEADER, skillSlug } from '@mikka/protocol/skill'
 import { verifySkillAssignment } from '../../packages/daemon/src/agents/skill-artifact'
 import { RunContext } from '../../packages/daemon/src/agents/run-context'
-import { test,expect,register,app } from './fixtures'
+import { test,expect,register,app,leavePage } from './fixtures'
 
 // Actual built Next routes + cookie/device authentication + real PG/mount.
 // Terminal report/session are explicitly synthetic; no CLI/model is invoked.
@@ -18,6 +18,7 @@ test('Skill baseline selection, actual claim receipt and feedback provenance use
   const target=new URL(process.env.E2E_DATABASE_URL!)
   expect(target.hostname).toBe('127.0.0.1');expect(target.pathname).toBe('/mikka_e2e')
   const {email}=await register(page),pool=new Pool({connectionString:target.toString(),max:2})
+  await leavePage(page)
   const deviceId=randomUUID(),agentId=randomUUID(),repoId=randomUUID(),issueId=randomUUID(),runId=randomUUID()
   const deviceToken=`orv_${randomBytes(32).toString('base64url')}`
   const headers={authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}

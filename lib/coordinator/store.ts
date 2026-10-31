@@ -27,6 +27,8 @@ import { pushReasons, type PushReason } from '@/lib/push-reasons'
 import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
 import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
+import type { ScheduledRead } from '@/lib/schedules/contract'
+import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -92,6 +94,8 @@ export interface InboxTake {
   /** A handed-over verification code: the push says only that one came, the code stays in the app chat. */
   pushHidesText: boolean
   taskEventId?: string
+  sourceEventId?: string
+  scheduledRead?: ScheduledRead
   approvedRepositoryKey?: string
 }
 
@@ -108,7 +112,17 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     if (!taken) return { held: false, ...NO_TAKE }
     const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
-    const due = isolateTaskRequest(candidates)
+    // A schedule is a separate read-only turn. Hydrate its authority through
+    // the stored event link, never from notification/model payload fields.
+    const scheduledCandidate = candidates[0]?.payload.source === 'schedule_due' ? candidates[0] : undefined
+    const scheduledRow=scheduledCandidate?(await tx.execute(sql`SELECT o.* FROM schedule_occurrences o JOIN user_schedules s ON s.id=o.schedule_id WHERE o.event_id=${scheduledCandidate.id} AND s.owner_id=${userId} AND s.bot_id IS NOT DISTINCT FROM ${botId}::uuid LIMIT 1`)).rows[0] as Occurrence|undefined:undefined
+    const scheduled=scheduledInbox(scheduledRow,now)
+    if(scheduled && !scheduled.scope){
+      await tx.update(coordinatorEvents).set({deliveredAt:now,tier:'background'}).where(eq(coordinatorEvents.id,scheduled.eventId))
+      return {held:true,...NO_TAKE}
+    }
+    const scheduledRead=scheduled?.scope??undefined
+    const due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id))
     if (!due.length) return { held: true, ...NO_TAKE }
     let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
     let approvedRepositoryKey: string | undefined
@@ -126,7 +140,8 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
         }
       }
     }
-    const isolatedTask = Boolean(taskEventId) || Boolean(approval)
+    const sourceEventId = scheduled ? undefined : due.findLast(event => event.kind === 'user_message')?.id
+    const isolatedTask = Boolean(taskEventId) || Boolean(approval) || Boolean(scheduled)
     const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), eq(coordinatorEvents.tier, 'background')))
@@ -137,7 +152,7 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     const first = await nextPosition(tx, userId, botId)
     if (chatEvents.length) await tx.insert(coordinatorMessages).values(chatEvents.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
-      message: sourcedEventMessage({ ...event, deliveredAt: now }, eventPrompt(event)),
+      message: sourcedEventMessage({ ...event, deliveredAt: now }, scheduledRead ? `[Scheduled read-only task] The person requested this stored task for now: ${scheduledRead.prompt}\nUse only the available allowed read tools. Do not create or change anything, request approval, schedule more work, or claim an external write. Return the result for this original chat.` : eventPrompt(event)),
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
     for (const event of events) {
@@ -153,6 +168,8 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     return {
       held: true, added: events.length,
       ...(taskEventId ? { taskEventId } : {}),
+      ...(sourceEventId ? { sourceEventId } : {}),
+      ...(scheduledRead ? { scheduledRead } : {}),
       ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),

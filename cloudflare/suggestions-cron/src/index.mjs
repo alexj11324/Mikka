@@ -1,9 +1,12 @@
 // Scheduling only: each endpoint handles its own work in Mikka.
 export const SCHEDULES = {
+  '* * * * *': '/api/cron/coordinator-wakes',
   '*/15 * * * *': '/api/cron/briefings',
   '0 * * * *': '/api/cron/suggestions-reconcile',
   '30 * * * *': '/api/cron/user-facts',
 }
+
+export const MINUTE_ENDPOINTS = ['/api/cron/coordinator-wakes', '/api/cron/schedules', '/api/cron/run-recovery']
 
 /** @typedef {{ MIKKA_URL?: string, CRON_SECRET?: string }} Env */
 
@@ -16,6 +19,15 @@ export async function runSchedule(cron, env, fetcher = fetch) {
   const endpoint = SCHEDULES[cron]
   if (!endpoint) throw new Error('Unknown suggestions schedule')
   if (!env.MIKKA_URL || !env.CRON_SECRET) throw new Error('MIKKA_URL and CRON_SECRET must be set')
+  const endpoints = cron === '* * * * *' ? MINUTE_ENDPOINTS : [endpoint]
+  // Each durable queue must still get its tick when another endpoint fails.
+  const results = await Promise.allSettled(endpoints.map(path => runEndpoint(path, env, fetcher)))
+  const failed = results.find(result => result.status === 'rejected')
+  if (failed) throw failed.reason
+  return results[0].value
+}
+
+async function runEndpoint(endpoint, env, fetcher) {
   let response
   try {
     response = await fetcher(`${env.MIKKA_URL.replace(/\/+$/, '')}${endpoint}`, {
@@ -32,7 +44,7 @@ export async function runSchedule(cron, env, fetcher = fetch) {
   try { summary = await response.json() }
   catch { throw new Error(`${endpoint} returned invalid JSON`) }
   const counts = {}
-  for (const key of ['zones', 'due', 'written', 'empty', 'skipped', 'failed', 'deferred', 'pushed', 'people']) {
+  for (const key of ['zones', 'due', 'written', 'empty', 'skipped', 'failed', 'deferred', 'pushed', 'people', 'started', 'exhausted', 'materialized', 'executed', 'reported', 'owners']) {
     const value = summary?.[key]
     if (Number.isSafeInteger(value) && value >= 0) counts[key] = value
   }

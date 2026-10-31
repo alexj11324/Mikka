@@ -146,7 +146,8 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
   await invitation.getByRole('button', { name: '完成', exact: true }).click()
   const memberContext = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
   const workspaceId = (await (await page.request.get(app('/api/workspace'))).json()).workspace.id as string
-  const runtime = watchRuntime(memberContext, ['/api/workspace', '/api/teams/directory', '/api/workspace'].map(path => ({ path: app(`${path}?workspace=${workspaceId}`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' })))
+  // Expected denials once the member leaves; allowed per test, any number of refetches.
+  const runtime = watchRuntime(memberContext, [], ['/api/workspace', '/api/teams/directory'].map(path => ({ path: app(`${path}?workspace=${workspaceId}`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' })))
   try {
     const member = await memberContext.newPage()
     await register(member, invitePath, email)

@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { authenticateDevice } from '@/lib/device-link'
@@ -11,7 +12,7 @@ const payload = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('take'), deviceId: z.uuid(), id: z.uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
   z.object({ operation: z.literal('cancel'), deviceId: z.uuid(), id: z.uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
 ])
-export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return Response.json({ error: 'unauthorized' }, { status: 401 })
   const { runId } = await params
@@ -25,3 +26,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     return Response.json({ cancelled: await store.cancel(actor, runId, input.id, input.digest) })
   } catch { return Response.json({ error: 'approvalUnavailable' }, { status: 409 }) }
 }
+
+export const POST = withDeviceRoute(handlePOST)

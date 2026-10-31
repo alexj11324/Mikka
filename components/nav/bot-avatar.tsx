@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils'
 export { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape }
 
 /**
- * What the bot is doing, as bloub states (Figma 196:3571): 空闲 idle (its eyes
- * follow the cursor), 工作中 thinking, 等你处理 notify, 完成 wink, 出错
+ * What the bot is doing, as bloub states (Figma 196:3571): 空闲 idle (it plays
+ * its own animations), 工作中 thinking, 等你处理 notify, 完成 wink, 出错
  * exclaim, 离线 sleep.
  */
 export type BotMood = 'idle' | 'thinking' | 'notify' | 'wink' | 'exclaim' | 'sleep'
@@ -48,12 +48,21 @@ function loadRuntime(): Promise<Runtime> {
 if (typeof window !== 'undefined') void loadRuntime()
 
 /**
- * Idle plays a montage instead of one long idle block: rest (bloub blinks on
- * its own), a wink, rest, a wide-eyed glance. Other moods hold their state.
+ * Idle plays bloub's own animations on its own, with no cursor following
+ * (Alex: 「它自己动就行了」): short rests (bloub blinks by itself) between the
+ * shape changes, glances and effects. The status states (thinking, notify,
+ * exclaim, sleep) stay out, so they keep meaning 工作中 / 等你处理 / 出错 / 离线.
+ * Other moods hold their state.
  */
+const IDLE_MONTAGE = [
+  ['idle', 3], ['egg', 1.8], ['idle', 2.5], ['wink', 1.6], ['idle', 2.5], ['hexagon', 1.6],
+  ['idle', 2.5], ['wide', 1.8], ['idle', 2.5], ['play', 2], ['idle', 2.5], ['orbit', 3.4],
+  ['idle', 2.5], ['comet', 2.6], ['idle', 2.5], ['burst', 2.4],
+] as const
+
 function cycleFor(bloub: Runtime[0], mood: BotMood) {
   if (mood !== 'idle') return [{ state: mood, duration: 12 }]
-  return ([['idle', 6], ['wink', 1.6], ['idle', 5], ['wide', 2.2]] as const).map(([state, seconds]) => ({ state, duration: bloub.clampDuration(state, seconds) }))
+  return IDLE_MONTAGE.map(([state, seconds]) => ({ state, duration: bloub.clampDuration(state, seconds) }))
 }
 
 /** A steady start point per bot plus the page clock, so a remounted avatar continues where it was instead of restarting. */
@@ -116,7 +125,6 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
         get color() { return state().color },
         get shape() { return state().shape },
         get cycle() { return cycleFor(bloub, state().mood) },
-        get follow() { return !frozen && state().mood === 'idle' },
       }), node)
       live.current = { set: next => setState(() => next), dispose }
     }

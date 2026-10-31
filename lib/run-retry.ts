@@ -4,6 +4,16 @@
 // again as a new run, up to MAX_RUN_ATTEMPTS in all. A run the agent itself
 // ended (error, timeout, a failed verify) is never retried here: running it
 // again could repeat its side effects, so it goes to the person.
+import { RUN_CHECKPOINT_RECOVERY_MAX_AGE_MS, type RunCheckpoint } from '@mikka/protocol/device'
+
+/** The server upload clock is authoritative for recovery freshness. */
+export function checkpointRecoveryError(checkpoint: RunCheckpoint | null, now = new Date()): string | null {
+  if (!checkpoint) return null
+  if (checkpoint.unavailableReason) return 'Checkpoint exceeds the recovery size limit. Restore the original worktree before retrying.'
+  const time = Date.parse(checkpoint.takenAt)
+  if (!Number.isFinite(time) || now.getTime() - time > RUN_CHECKPOINT_RECOVERY_MAX_AGE_MS) return 'Checkpoint is older than the thirty-minute recovery window.'
+  return null
+}
 
 /** Runs a device has claimed and must keep renewing the lease of. */
 export const LEASED_RUN_STATUSES = ['preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
@@ -22,13 +32,14 @@ const RETRY_HEADING = '## This run is a retry'
 /**
  * What the retry is told. The daemon continues the lost attempt's worktree
  * (and its session, when the harness can resume), so its files are usually
- * still there; a new machine starts from the base branch instead.
+ * still there; a new machine restores only its uploaded repository checkpoint.
  */
 export function retryNote(attempt: number): string {
   return [
     RETRY_HEADING,
     `This is attempt ${attempt} of ${MAX_RUN_ATTEMPTS}. The previous attempt stopped because its machine went offline, not because of anything it did.`,
     'Its work is usually still here: check the files and `git status` first and continue from them. Do not repeat a push, a pull request or a message that already happened.',
+    'On another device, recovery contains only the uploaded repository snapshot. Ignored files, files outside the repository, secrets, process memory and the old harness session are not transferred. Check the restored files and missing context before taking another external action.',
   ].join('\n\n')
 }
 

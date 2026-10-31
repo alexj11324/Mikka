@@ -57,6 +57,8 @@ import {
 
 import {
   applyCheckpoint,
+  assertCheckpointFresh,
+  CheckpointRecoveryError,
   hasCommit,
   headCommit,
   takeCheckpoint,
@@ -996,7 +998,11 @@ export class RunSupervisor {
     }
     // Taking over a run from another machine: start where it started.
     const resume = assignment.resumeFrom?.baseCommit
-    if (resume && (await hasCommit(repo.path, resume))) return resume
+    if (resume) {
+      assertCheckpointFresh(assignment.resumeFrom!)
+      if (await hasCommit(repo.path, resume)) return resume
+      throw new CheckpointRecoveryError('Checkpoint base commit is unavailable. Restore the original worktree before retrying.')
+    }
     const branch = assignment.pushBranch
     const base = await this.deps.baseRef(assignment)
     if (!branch || !pushDecision(runPolicy(assignment.policy), repo.push?.approved === true).push) return base
@@ -1072,7 +1078,7 @@ export class RunSupervisor {
         this.deps.log.error({ run_id: runId, err: error }, "run failed")
         if (this.stopping) return
         try {
-          this.finish(runId, run.cancelRequested ? run.forcedStop ?? "cancelled" : "error", run.cancelRequested ? undefined : message)
+          this.finish(runId, run.cancelRequested ? run.forcedStop ?? "cancelled" : error instanceof CheckpointRecoveryError ? 'blocked' : "error", run.cancelRequested ? undefined : message)
         } catch (finishError) {
           this.deps.log.error(
             { run_id: runId, err: finishError },
@@ -1148,6 +1154,8 @@ export class RunSupervisor {
       throw new Error(
         "Original question worktree is unavailable; a fresh task cannot replace it",
       )
+    if (assignment.requireWorktreeContinuation && !entry.worktree && !continued)
+      throw new CheckpointRecoveryError('Original worktree is unavailable and there is no usable recovery snapshot.')
     const worktree =
       entry.worktree ??
       continued ??
@@ -1172,6 +1180,7 @@ export class RunSupervisor {
           worktree,
           checkpoint: assignment.resumeFrom,
         })
+        if (!applied) throw new CheckpointRecoveryError('Checkpoint patch could not be restored. Restore the original worktree before retrying.')
         log.info(
           { files: assignment.resumeFrom.files, applied },
           "checkpoint from the earlier attempt",
@@ -1218,6 +1227,8 @@ export class RunSupervisor {
       try { checkMailbox() } catch (error) { toolApproval.revoke(); throw error }
     }
     const options = {
+      github: assignment.github && assignment.mcp && (assignment.kind === 'implement' || assignment.kind === 'fix') && !runPolicy(assignment.policy).readOnly
+        ? { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId } : undefined,
       toolApproval,
       runId,
       requireSessionResume: assignment.requireSessionResume,
@@ -1396,6 +1407,7 @@ export class RunSupervisor {
                   error: "Session ended without an exit event",
                 }
               : next.value
+        if (event.type === 'progress') { run.lastProgressAt = Date.now(); continue }
         if (event.type === "chunk") {
           // Streamed text is not progress; tool calls, steps and files are.
           if (!event.chunk.type.endsWith("-delta"))

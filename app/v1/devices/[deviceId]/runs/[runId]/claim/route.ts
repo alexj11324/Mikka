@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
 import { and, eq, isNull } from 'drizzle-orm'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
@@ -5,7 +6,7 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
-import { RUN_LEASE_MS, REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
+import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER } from '@mikka/protocol/device'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
@@ -14,7 +15,7 @@ import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { latestCheckpoint } from '@/lib/run-leases'
-import { retryNote } from '@/lib/run-retry'
+import { checkpointRecoveryError, retryNote } from '@/lib/run-retry'
 import { constrainedAssignmentPolicy } from '@/lib/run-assignment-policy'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
@@ -38,7 +39,7 @@ export const dynamic = 'force-dynamic'
  * it needs to run. 409 means the run is not queued for this device — the
  * daemon's `RunNotPinnedHereError`, and it stops asking.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId, runId } = await params
@@ -72,6 +73,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
+  const resumeFrom = run.retryOf ? await latestCheckpoint(run.retryOf) : null
+  const [lost] = run.retryOf
+    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId }).from(agentRuns).where(eq(agentRuns.id, run.retryOf)).limit(1)
+    : []
+  const recoveryError = run.retryOf
+    ? checkpointRecoveryError(resumeFrom) ?? (!resumeFrom ? 'No uploaded recovery snapshot is available.' : null)
+    : null
+  const requireWorktreeContinuation = Boolean(recoveryError && lost?.deviceId === deviceId && request.headers.get(RECOVERY_WORKTREE_HEADER) === '1')
+  if (recoveryError && !requireWorktreeContinuation) {
+    const { persistRunCompletion } = await import('@/lib/run-publications')
+    await persistRunCompletion(caller.userId, runId, { stopReason: 'blocked', report: { summary: recoveryError, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } }, caller.scopeDeviceId)
+    after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
+    return NextResponse.json({ error: recoveryError, code: 'checkpointRecoveryUnavailable' }, { status: 409 })
+  }
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
   try { await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts) } catch (error) {
     if (!(error instanceof ImprovementError)) throw error
@@ -102,6 +117,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     catch (error) { if (error instanceof FactoryError) return false; throw error }
   }
   const afterClaim = async (tx: import('pg').PoolClient) => {
+    await tx.query('UPDATE agent_runs SET "deviceTokenId"=$2 WHERE id=$1 AND "userId"=$3', [runId, caller.tokenId, caller.userId])
     if (factoryClaim.preserveQuestionWorktree === true) {
       const { withDatabaseClient } = await import('@/lib/db')
       factoryToken = await withDatabaseClient(tx, () => issueRunToken(run))
@@ -161,15 +177,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   // when the harness can, its session; the daemon falls back to `prompt`.
   // Another machine has no such worktree and starts from the latest
   // checkpoint instead.
-  const [lost] = run.retryOf
-    ? await db.select({ sessionId: agentRuns.sessionId }).from(agentRuns).where(eq(agentRuns.id, run.retryOf)).limit(1)
-    : []
-  const resumeFrom = run.retryOf ? await latestCheckpoint(run.retryOf) : null
   const retry = run.retryOf
     ? {
       continuesRunId: run.retryOf, followUp: retryNote(run.attempt),
-      ...(lost?.sessionId ? { resumeSessionId: lost.sessionId } : {}),
-      ...(resumeFrom ? { resumeFrom } : {}),
+      ...(lost?.sessionId && lost.deviceId === deviceId ? { resumeSessionId: lost.sessionId } : {}),
+      ...(resumeFrom && !requireWorktreeContinuation ? { resumeFrom } : {}),
+      ...(requireWorktreeContinuation ? { requireWorktreeContinuation: true as const } : {}),
     }
     : {}
   const settings = device.kind === 'local' && repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
@@ -200,6 +213,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
     ...(runTestFixture(harness) ? { fixture: runTestFixture(harness) } : {}),
     ...((device.kind === 'cloud' ? repo.verifyCommand : settings?.verifyCommand) ? { verifyCommand: (device.kind === 'cloud' ? repo.verifyCommand : settings?.verifyCommand)! } : {}),
     ...(mcp ? { mcp } : {}),
+    ...(mcp && publication?.pushBranch && /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) &&
+      ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly && assignmentPolicy.permissions.git_push === 'allow' && harness !== 'mock'
+      ? { github: { endpoint: mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), repository: repo.repoPath.slice('v2/github.com/'.length), branch: publication.pushBranch } } : {}),
     ...(run.agentDefinition?.model ? {model:run.agentDefinition.model} : {}),
     ...(subscription ? { ...(run.agentDefinition?.cliModelSelection ? {} : {model:subscription.modelId}), subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
@@ -214,3 +230,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   }))
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }
+
+export const POST = withDeviceRoute(handlePOST)

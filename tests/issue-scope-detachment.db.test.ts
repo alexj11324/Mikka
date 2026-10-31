@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { readIssueMetadata } from '../lib/issue-metadata'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
-import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
+import { REPO_ORIGIN_HEADER, RUN_LEASE_MS } from '@mikka/protocol/device'
 import { remoteKey } from '@mikka/protocol/repository'
 
 // Only the dedicated cloud-Linux test DB or Actions' ephemeral service. Never
@@ -550,7 +550,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
       await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Completion fixture\',$3,\'todo\',\'normal\',$4)',[id,issueOwner,doc,scope])
       await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,issueOwner])
     }
-    await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId",status,kind) values ($1,$2,$3,$4,$5,\'running\',$6)',[run,actor,withIssue?id:null,actor===owner?ownerAgent:agent,actor===owner?ownerDevice:device,kind])
+    await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId",status,kind,"leaseExpiresAt") values ($1,$2,$3,$4,$5,\'running\',$6,$7)',[run,actor,withIssue?id:null,actor===owner?ownerAgent:agent,actor===owner?ownerDevice:device,kind,new Date(Date.now()+RUN_LEASE_MS)])
     return {id,run,issueId:withIssue?id:null}
   }
   await scopeSubtest(t, 'publication-aware completion preserves retirement and later-generation dispatch fences', async()=>{
