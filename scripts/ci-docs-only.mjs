@@ -90,7 +90,7 @@ export const BROWSER_MAIN_SPECS = Object.freeze([
  * slower edge cases, mocked-UI and harness specs waiting to be converted. */
 export const BROWSER_NIGHTLY_SPECS = Object.freeze([
   'agent-performance.spec.ts', 'navigation-performance.spec.ts',
-  'board-layout.spec.ts', 'browser-pane.spec.ts', 'issue-header-breadcrumb.spec.ts', 'side-panel-resize.spec.ts',
+  'board-layout.spec.ts', 'browser-pane.spec.ts', 'desktop-translucent.spec.ts', 'issue-header-breadcrumb.spec.ts', 'side-panel-resize.spec.ts',
   'issue-menu-collision.spec.ts', 'offline-layout.spec.ts', 'settings-surface.spec.ts',
   'workspace-shortcuts.spec.ts', 'controls.spec.ts',
   'artifact-share.spec.ts', 'avatar.spec.ts', 'detail-return.spec.ts', 'github-integration.spec.ts',
