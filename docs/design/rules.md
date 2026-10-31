@@ -262,6 +262,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   page names the product for each. Rail icons: 主页 House, 建议 Lightbulb,
   看板 Columns3, 插件 Blocks. Artifact is the one exception: it uses
   Mikka's own stacked-cards icon (R-56), never lucide Copy or Library.
+  No sparkle for AI (unslop): thinking is Brain, a bot is Bot (ui-policy
+  `icons/no-sparkle`).
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
@@ -309,7 +311,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-30** Greys are pure neutral: `rgba(0,0,0,a)` and `#737373 / #A3A3A3 /
   #171717` in light mode, the same idea in dark. Never slate, zinc or teal
   tinted. Main content is near-black (`text-foreground`); grey is for
-  metadata, borders and hover only.
+  metadata, borders and hover only. One accent, `accent/default`
+  (`--sidebar-primary`): no second brand hue on buttons or selections (the
+  violet workspace and project accents now map to it; unslop, 2026-10-31).
 - **R-31** No white hairlines. Inputs have a grey fill and no stroke. The
   sources to watch: shadcn `border-input` (dark `--input` is
   `oklch(1 0 0 / 15%)`), `ring-foreground/10` on dialogs and popovers,
@@ -337,7 +341,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
   (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium
   (group title), 11/14 Medium (badge), and 24/32 SemiBold for the 建议 page
-  title only (R-55).
+  title only (R-55). Nothing is smaller than 11px. Labels are sentence case:
+  no uppercase label with wide tracking (unslop; ui-policy
+  `typography/uppercase-label`). Weights stop at SemiBold, never Bold.
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
   14 approval and list card, 14 dialog (`rounded-xl`, the `DialogContent` /
   `AlertDialogContent` default; a call site does not change it), 999 pill. Spacing is a multiple of 4.
@@ -353,6 +359,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   shapes kept); people use letter avatars.
 - **R-37** Animate only when the user's action changes a size or position.
   Position and size move with springs; opacity and colour use a duration.
+  Springs settle without visible overshoot (no bouncy springs). No hover
+  scale or lift: hover is a colour or surface change, a press may scale to
+  0.97. Transitions name their properties, never `transition-all` (ui-policy
+  `motion/transition-all`); animate transform and opacity rather than
+  width, height, top or left (unslop, interface-design).
 - **R-38** Light-theme hover and column backgrounds use `rgba(0,0,0,a)`
   overlays, not a tinted overlay (an `rgba(16,24,40,…)` overlay read as mint
   green).
@@ -386,7 +397,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   Never 会话 for a left row or a run, and never 任务 for the panel's thread
   tab. 「Artifact」 is never translated. Built-in role names stay English
   (Coordinator).
-- **R-44** The home greeting stays 「早上好，Alex」 (time of day + name).
+- **R-44** No greeting headlines: a title names the place or the period,
+  never 「欢迎回来」 or 「早上好，Alex」 (unslop). The sign-in title is
+  「登录 Mikka」. The Coordinator's daily briefing may still open with
+  「早上好，Alex。」 inside its message (R-46); that is speech, not a title.
+  `check-copy` rejects greeting titles and exclamation marks.
 
 - **R-45** A 建议 item, briefing item or follow-up item makes clear what to
   do and who or what it is about; never a bare report such as 「CI 挂了」 or

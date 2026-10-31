@@ -26,8 +26,8 @@
 --color-card-foreground: var(--card-foreground);
 --color-popover: var(--popover);
 --color-popover-foreground: var(--popover-foreground);
-  --color-workspace-accent: oklch(0.56 0.18 279);
-  --color-workspace-accent-foreground: oklch(1 0 0);
+  --color-workspace-accent: var(--sidebar-primary);
+  --color-workspace-accent-foreground: var(--sidebar-primary-foreground);
   --color-project-action: var(--project-action);
   --color-project-action-foreground: var(--project-action-foreground);
   --color-primary: var(--primary);
@@ -172,8 +172,8 @@
   --ink-3: color-mix(in oklch, var(--muted-foreground) 65%, var(--background));
   --line: var(--border);
   --line-strong: color-mix(in oklch, var(--border) 80%, var(--foreground));
---project-action: oklch(0.56 0.17 277);
---project-action-foreground: oklch(0.985 0 0);
+--project-action: var(--sidebar-primary);
+--project-action-foreground: var(--sidebar-primary-foreground);
 --label-violet: var(--color-violet-600);
 --label-blue: var(--color-blue-600);
 --shell-chrome: oklch(0.97 0 0);

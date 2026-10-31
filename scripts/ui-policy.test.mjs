@@ -68,6 +68,9 @@ for (const [label, source, rule] of [
   ['button icon metadata', 'import { Check } from "lucide-react"; const ui = <Button><Check /></Button>', 'icons/data-icon'],
   ['icon dimensions', 'import { Check } from "lucide-react"; const ui = <Button><Check data-icon="inline-start" className="size-4" /></Button>', 'icons/no-size-override'],
   ['font family allowlist', 'import { Roboto } from "next/font/google";', 'typography/font-family'],
+  ['transition all', '<Button className="transition-all" />', 'motion/transition-all'],
+  ['uppercase tracked label', '<Button className="uppercase tracking-wider" />', 'typography/uppercase-label'],
+  ['sparkle icon', 'import { Sparkles } from "lucide-react";', 'icons/no-sparkle'],
 ]) test(label, () => has(`${prefix}\n${source}`, rule))
 
 test('local fonts must be registered with their CSS variable', () => {

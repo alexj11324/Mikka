@@ -4,7 +4,7 @@ import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch
 test('未登录访问受保护页面、注册和登录链接', async ({ page }) => {
   await page.goto(app('/settings/members'))
   await expect(page).toHaveURL(/\/sign-in/)
-  await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '登录 Mikka' })).toBeVisible()
   await page.getByRole('link', { name: '创建账号', exact: true }).last().click()
   await expect(page.getByRole('heading', { name: '创建你的工作账号' })).toBeVisible()
   await page.getByRole('link', { name: '去登录', exact: true }).last().click()
