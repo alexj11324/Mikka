@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
+import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
 import { PanelLeft, Plus } from 'lucide-react'
 import { botChatSummaries, getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
@@ -13,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { cn } from '@/lib/utils'
+import { SPRING_SIDEBAR } from '@/lib/ease'
 import { markdownLine, sessionPreview } from '@/lib/agent-history'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
@@ -154,9 +156,10 @@ export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail,
   </>
   if (isMobile) return <Sidebar collapsible="offcanvas" mobileTitle={i18nText('Nav.sidebarTitle')} mobileDescription={i18nText('Nav.sidebarDescription')} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>
   // On desktop the list is the first column inside the card; it folds to nothing and the rail stays.
-  return <div data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} className={cn('relative hidden shrink-0 overflow-hidden border-r transition-[width] duration-150 ease-out motion-reduce:transition-none md:block', open ? 'w-64' : 'w-0 border-r-0')}>
+  // R-37: the width moves on a spring; MotionConfig at the root turns it off for reduced motion.
+  return <motion.div data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} initial={false} animate={{ width: open ? 256 : 0 }} transition={SPRING_SIDEBAR} className={cn('relative hidden shrink-0 overflow-hidden md:block', open ? 'border-r' : 'border-r-0')}>
     <Sidebar collapsible="none" className="w-64 bg-transparent">{body}</Sidebar>
     {/* Comma's edge toggle: an invisible strip along the edge that shows a hairline on hover. */}
     <SidebarRail label={i18nText('Nav.sidebarRail')} title={i18nText('Nav.collapseList')} className="right-0 left-auto w-2 cursor-col-resize ltr:translate-x-0 rtl:translate-x-0 after:inset-y-3 after:start-auto after:right-0 after:w-px after:bg-border after:opacity-0 after:transition-opacity hover:after:opacity-100" />
-  </div>
+  </motion.div>
 }
