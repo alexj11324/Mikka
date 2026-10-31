@@ -30,6 +30,7 @@ import { SubagentLoginNeeds } from './subagent-login-needs'
 import { UnreadDivider } from '@/components/chat/unread-divider'
 import { UnreadPill } from '@/components/chat/unread-pill'
 import { MESSAGE_POSITION_ATTR, useUnreadIndicators } from '@/lib/hooks/use-unread-indicators'
+import { useArrivals } from '@/lib/hooks/use-arrivals'
 import dynamic from 'next/dynamic'
 import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'
 import { ArtifactQuoteChip, ArtifactQuoteLine } from '@/components/artifacts/artifact-quote'
@@ -39,6 +40,9 @@ import { SentSuggestion } from '@/components/suggestions/mobile-card'
 import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
 import { FieldError } from '@/components/ui/field'
+
+/** A new message's enter: a short fade (decisions.md 2026-10-31, motion audit). */
+const ENTER = 'animate-in fade-in-0 duration-200 motion-reduce:animate-none'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
 
@@ -133,6 +137,12 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
   }, [prefill])
   const items = useMemo(() => data?.items ?? [], [data])
+  // New messages fade in briefly, as in Claude Code; what was there when the chat opened does not (R-37).
+  // A stored reply that replaces a reply already streamed on screen is not new.
+  const streamedThrough = useRef(-1)
+  useEffect(() => { for (const reply of stream.replies) if (reply.committedThrough !== undefined) streamedThrough.current = Math.max(streamedThrough.current, reply.committedThrough) })
+  const arriving = useArrivals(data ? [...items.map(item => `item-${item.position}`), ...stream.replies.map(reply => `stream-${reply.id}`)] : null)
+  const entering = (item: (typeof items)[number]) => arriving(`item-${item.position}`) && !(item.from === 'coordinator' && item.position <= streamedThrough.current)
   // A turn the hosted model (Mikka 默认) refused: verification, allowance or pause (#523, #525, #526).
   const refusal = data?.working ? null : hostedRefusal(data?.error)
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
@@ -223,7 +233,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               : <div className="flex flex-1 flex-col items-center justify-center gap-3">{avatar('profile')}<p className="text-sm font-medium">{name}</p></div>)}
             {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
               {unread.divider === item.position && <UnreadDivider />}
-              <MessageScrollerItem messageId={String(item.position)} className="[content-visibility:visible]" {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
+              <MessageScrollerItem messageId={String(item.position)} className={cn('[content-visibility:visible]', entering(item) && ENTER)} {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
               {item.from === 'event'
                 ? <p className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
@@ -245,7 +255,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                   </MessageContent></Message>}
             </MessageScrollerItem>
             </Fragment>)}
-            {stream.replies.map(reply => <MessageScrollerItem key={reply.id} messageId={reply.id} data-coordinator-stream-id={reply.id} data-streaming={reply.committedThrough === undefined} className="[content-visibility:visible]">
+            {stream.replies.map(reply => <MessageScrollerItem key={reply.id} messageId={reply.id} data-coordinator-stream-id={reply.id} data-streaming={reply.committedThrough === undefined} className={cn('[content-visibility:visible]', arriving(`stream-${reply.id}`) && ENTER)}>
               <Message align="start"><MessageContent>
                 <CoordinatorReply text={reply.text} citations={citations} isStreaming={reply.committedThrough === undefined} />
               </MessageContent></Message>

@@ -18,6 +18,9 @@ function groupIssues(issues: Issue[]): Columns {
   return Object.fromEntries(BOARD_COLUMNS.map(column => [column.value, issues.filter(issue => boardColumnOf(issue.status) === column.value)]))
 }
 
+/** The card fade's length, matching `duration-150` on the card. */
+const CARD_MOTION_MS = 150
+
 export function IssueBoard({ issues, columns: visibleColumns, hidden, narrow, context, onOpen, onDiscuss, onHideColumn, onShowColumn, onUpdated, onBusyChange }: {
   issues: Issue[]
   columns: IssueStatus[]
@@ -45,6 +48,15 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, narrow, co
     setColumns(groupIssues(issues))
   }
   const [message, setMessage] = useState('')
+  // Only the person's own moves animate (decisions.md 2026-10-31): a card moved with the status menu fades in at its
+  // new place, a deleted card fades out before it leaves. Changes from others, and drags (dnd-kit animates those), snap.
+  const [cardMotion, setCardMotion] = useState<ReadonlyMap<string, 'enter' | 'leave'>>(() => new Map())
+  const setMotion = (id: string, kind: 'enter' | 'leave' | null) => setCardMotion(current => {
+    const next = new Map(current)
+    if (kind) next.set(id, kind)
+    else next.delete(id)
+    return next
+  })
   const saving = useRef(false)
   const viewportRef = useRef<HTMLDivElement>(null)
   const viewportId = useId()
@@ -109,6 +121,8 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, narrow, co
     const target = boardColumnOf(status)
     const next = Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, key === target ? [{ ...issue, status }, ...items.filter(item => item.id !== issue.id)] : items.filter(item => item.id !== issue.id)]))
     setColumns(next)
+    setMotion(issue.id, 'enter')
+    window.setTimeout(() => setMotion(issue.id, null), CARD_MOTION_MS * 2)
     void persist(issue, { status }, columns)
   }
 
@@ -121,7 +135,10 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, narrow, co
   async function remove(issue: Issue) {
     if (saving.current) return
     const previous = columns
+    setMotion(issue.id, 'leave')
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) await new Promise(resolve => window.setTimeout(resolve, CARD_MOTION_MS))
     setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.filter(item => item.id !== issue.id)])))
+    setMotion(issue.id, null)
     const result = await setIssueDeleted({ id: issue.id, revision: issue.revision }).catch(() => null)
     if (!result || !('issue' in result)) {
       setColumns(previous)
@@ -146,7 +163,7 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, narrow, co
   return <section aria-label={t('label')} className="flex min-h-0 min-w-0 flex-1 flex-col">
     <p role="status" aria-live="polite" className="sr-only">{message}</p>
     <p id={instructionsId} className="sr-only">{t('keyboardHint')}</p>
-    <KanbanBoard value={columns} columns={visibleColumns} hiddenColumns={hidden} narrowColumns={narrow} context={context} onDelete={issue => { void remove(issue) }} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
+    <KanbanBoard value={columns} columns={visibleColumns} hiddenColumns={hidden} narrowColumns={narrow} context={cardMotion.size ? { ...context, motion: cardMotion } : context} onDelete={issue => { void remove(issue) }} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
       setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
       setMessage(t('propertiesSaved'))
       void onUpdated().catch(() => {})
