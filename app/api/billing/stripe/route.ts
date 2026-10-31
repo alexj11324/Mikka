@@ -15,6 +15,8 @@ export async function POST(request: Request) {
     const event = JSON.parse(body)
     if (event.type === 'setup_intent.succeeded') {
       await (await import('@/lib/abuse/card')).applyCardSetup(z.object({data:z.object({object:z.record(z.string(),z.unknown())})}).parse(event).data.object)
+    } else if (event.type === 'checkout.session.completed' && event.data?.object?.mode === 'setup') {
+      await (await import('@/lib/abuse/card')).applyCardCheckout(z.object({data:z.object({object:z.record(z.string(),z.unknown())})}).parse(event).data.object)
     } else await applyStripeEvent(event)
   } catch (error) {
     // A malformed event is refused for good; anything else (the database) is a 500 so Stripe retries.

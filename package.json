@@ -163,8 +163,8 @@
     "test:secrets-db": "node --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/workspace-secrets.db.test.ts tests/secret-masking.db.test.ts tests/secret-masking-points.test.ts",
     "test:smoke": "playwright test -c playwright.smoke.config.ts",
     "test:onboarding-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/onboarding.db.test.ts",
-    "test:abuse": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/abuse/policy.test.ts lib/abuse/model.test.ts lib/abuse/card.test.ts",
-    "test:abuse-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/abuse/store.db.test.ts"
+    "test:abuse": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/abuse/policy.test.ts lib/abuse/model.test.ts lib/abuse/card.test.ts lib/abuse/card-checkout.test.ts",
+    "test:abuse-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/abuse/store.db.test.ts lib/abuse/card.db.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.99",

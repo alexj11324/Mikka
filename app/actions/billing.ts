@@ -4,6 +4,7 @@ import type { ActionResult } from '@/lib/action-result'
 import { billingPortalUrl, planCheckoutUrl, workspaceBillingView, type BillingView } from '@/lib/billing/service'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
+import { getLocale } from 'next-intl/server'
 
 /** 设置 › 计费. Admins only. */
 export async function getBilling(workspaceId?: string): Promise<ActionResult<BillingView>> {
@@ -29,11 +30,19 @@ export async function startPlanCheckout(returnUrl: string, workspaceId?: string)
   })
 }
 
-/** Backend contract for Claude's card-verification screen. */
+/** Stripe hosts card verification and returns to this workspace's billing settings. */
 export async function startCardVerification(workspaceId?: string) {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
-    return (await import('@/lib/abuse/card')).createCardSetup(actor.userId,actor.workspaceId,undefined,actor.email)
+    return (await import('@/lib/abuse/card')).createCardSetup(actor.userId,actor.workspaceId,undefined,await getLocale())
+  })
+}
+
+export async function cardVerificationStatus(workspaceId?: string) {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    const { cardVerificationStatus: readCardVerificationStatus } = await import('@/lib/abuse/card')
+    return readCardVerificationStatus(actor.userId, actor.workspaceId)
   })
 }
 export async function getHostedUsage(workspaceId?: string) {

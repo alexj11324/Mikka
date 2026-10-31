@@ -7,11 +7,23 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
 ## Backend contract for the frontend
 
 - `startCardVerification(workspaceId?)` is admin-only and returns a Stripe
-  SetupIntent `clientSecret` and `paymentElementOptions` with the authenticated
-  user’s email prefilled for Link. Use Stripe.js to confirm the setup. There is no
-  amount, charge, subscription, or automatic top-up. Bank authorization holds
-  can still appear. The existing signature-checked webhook handles
-  `setup_intent.succeeded`; the frontend must not grant credit itself.
+  Checkout `{ url }` in `mode: 'setup'`, with USD currency and the workspace's
+  shared Stripe customer. Redirect the browser to that URL. The server builds
+  the localized billing return URL with the application base path and workspace:
+  `?section=billing&workspace=…&verify=success&session_id={CHECKOUT_SESSION_ID}`
+  or `verify=cancelled`. Setup creates no charge, subscription, or automatic
+  top-up; bank authorization holds can still appear. The frontend never grants
+  credit from the return parameters.
+- `cardVerificationStatus(workspaceId?)` is admin-only. It returns `status`
+  (`unverified`, `pending`, `verified`, or `unavailable`), nullable `last4`,
+  nullable `allowance` (`granted` or `claimed_elsewhere`), and
+  `remainingAllowanceMicroUsd` / `remainingAllowancePoints`. USD 1 is 1,000,000
+  microdollars or 100 points. An allowance that has been spent still reports
+  `granted`; a card claimed by another workspace verifies without another gift.
+  An open/completed Checkout awaiting its webhook is `pending`; an expired or
+  canceled setup is `unverified`. Missing Stripe configuration is `unavailable`.
+  Status reads cannot verify cards or grant credit; card fingerprints stay on
+  the server.
 - `getHostedUsage(workspaceId?)` returns `state`, `balance`, and up to 50 recent
   calls (recent calls are admin-only; members receive balance/state). Amounts are integer microdollars (USD 1 = 1,000,000); purchased points
   convert at 100 points per dollar. The existing admin `workspaceUsage` read
@@ -40,6 +52,25 @@ in this PR. Those remain with Claude. Production email signup/resend needs
 Claude's token-sending frontend; enabling the backend intentionally refuses
 requests without that proof.
 
+### Frontend integration (#563)
+
+`lib/billing/verification-client.ts` in frontend PR #563 currently uses
+fallbacks for `cardVerificationStatus`, `getCreditBilling`, and
+`startPointsPurchase`. Replace those fallbacks with their real actions from
+`app/actions/billing.ts` after #558 and #559 are integrated. The existing
+`startCardVerification` wrapper already accepts `{ url }`; it must no longer
+expect `clientSecret` or `paymentElementOptions`. Action successes are flat
+objects, and failures are `{ error }`.
+
+The points action is `startPointsPurchase(workspaceId, amount)` for USD
+10 / 25 / 50. The #559 `CreditBillingView` and `CreditTransaction` field names
+match #563's types. Its real `balancePoints` can contain fractional points;
+#563's current fallback rounds down. The frontend session should decide its
+display precision and update its assertions when connecting the real action.
+Its existing no-Stripe-key test that seeds a verified row also needs to follow
+the real status contract: without Stripe configuration, the action returns
+`unavailable` even when that row exists.
+
 ## Scope and accounting
 
 All new Gateway text calls are admitted before provider I/O. Default Workflow
@@ -66,6 +97,16 @@ The workspace database migration snapshots existing workspace IDs once; lazy
 application-database initialization marks these verified and gives the same
 bounded USD 1 starting allowance without asking existing users to bind a card.
 Replaying the migration does not grandfather later workspaces.
+
+On the existing signature-checked Stripe endpoint, retain
+`setup_intent.succeeded` and existing billing subscriptions, and enable
+`checkout.session.completed`. Setup sessions use their locally recorded
+session/customer binding to retrieve the SetupIntent and payment method before
+the existing card claim and grant transaction runs. Payment-mode sessions
+continue to the billing handler for #559. Retain #559's additional
+`checkout.session.async_payment_succeeded`, `charge.refunded`, and
+`refund.updated` subscriptions when both changes are deployed. Receiving both
+setup-completion events or replaying a session cannot grant a second allowance.
 
 Free credit is spent before purchased points; `plan` grants are ignored.
 One pending/unknown call per workspace bounds concurrent overdraft to the one
@@ -128,39 +169,11 @@ Tests never use a production database, create a live Stripe charge or start an
 E2B sandbox. Required PR CI supplies the production build, full functionality
 and integration-branch performance acceptance.
 
-## Link
+## Hosted verification
 
-Mikka’s live account was checked read-only through the Stripe plugin: Link is
-available and enabled in both its direct default and app-associated default
-payment-method configurations. No merchant settings were changed and no live
-SetupIntent or charge was created for this check.
-
-This integration intentionally uses [Link within a card integration](https://docs.stripe.com/payments/link/link-payment-integrations?link-integrations=link-card-integrations):
-`allowed_payment_method_types: ['card']`. Do not add `'link'` to that list;
-Stripe then represents Link as a separate opaque payment method instead of
-returning the underlying card details. A Link-saved card comes back as
-`PaymentMethod.type=card`, `card.wallet.type=link`; its `card.fingerprint` uses
-the same database claim as manual card entry. It grants no second allowance.
-
-For Claude’s Payment Element screen:
-
-```ts
-const { clientSecret, paymentElementOptions } = result.data
-const elements = stripe.elements({ clientSecret })
-const payment = elements.create('payment', paymentElementOptions)
-payment.mount(container)
-// On submit: await elements.submit(); then stripe.confirmSetup({
-//   elements, confirmParams: { return_url: sameOriginReturnUrl },
-//   redirect: 'if_required',
-// })
-```
-
-Link uses the email prefill to offer authentication and saved payment details.
-Stripe handles SMS/email authentication and any bank-required authentication;
-Mikka never reads the code. Display depends on Stripe eligibility and the
-customer’s browser/session. A successful Link login alone never grants credit:
-the verified SetupIntent webhook remains the only grant path. These are backend
-contracts and integration examples; the React screen remains with Claude.
-
-References: [Link setup and reuse](https://docs.stripe.com/payments/link/save-and-reuse),
-[Link integration types](https://docs.stripe.com/payments/link/link-payment-integrations).
+Stripe Checkout owns the card form, Link eligibility, errors, and bank-required
+authentication. Mikka does not receive authentication codes. A successful Link
+login or Checkout return alone never grants credit: the verified completion
+webhook must resolve a card fingerprint and run the existing claim transaction.
+Regular cards and Link-saved cards use the same fingerprint claim, so saving or
+reusing a card cannot grant a second allowance.
