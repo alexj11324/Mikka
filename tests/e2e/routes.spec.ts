@@ -25,3 +25,16 @@ test('匿名访问旧设置入口会重定向到登录页并保留设置路径',
   await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
   await expect(page.getByLabel('邮箱', { exact: true })).toBeVisible()
 })
+
+test('桌面登录入口在服务端解析后保留回调和状态', async ({ page }) => {
+  const state = 'abcdefghijklmnop1234'
+  const callback = 'http://127.0.0.1:49152/auth/callback'
+  const query = new URLSearchParams({ desktop: '1', desktop_state: state, desktop_next: '/', desktop_callback: callback })
+  const response = await page.goto(app(`/en/sign-in?${query}`))
+  expect(response?.status()).toBe(200)
+  const html = await response!.text()
+  // AuthForm's server-rendered props must contain the canonical desktop flow.
+  const serializedFlow = JSON.stringify({ state, next: '/', callback }).replaceAll('"', '\\"')
+  expect(html).toContain(`\\"desktopFlow\\":${serializedFlow}`)
+  await expect(page.getByRole('status')).toHaveText('Click the provider button to finish OAuth authorization in this tab.')
+})
