@@ -9,7 +9,7 @@ import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
 import { useActionError } from '@/lib/use-action-error'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
@@ -39,6 +39,7 @@ import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
 import { subscriptionRefusal } from '@/lib/subscription-refusal'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
+import { RetryReplyButton } from './retry-reply-button'
 import { FieldError } from '@/components/ui/field'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
@@ -138,6 +139,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const refusal = data?.working ? null : hostedRefusal(data?.error)
   // The chosen subscription refused it: the mapped line, never the raw step error.
   const declined = data?.working || refusal ? null : subscriptionRefusal(data?.error)
+  // 重试 on any failed reply, never on a wake still being retried by the server.
+  const retry = <RetryReplyButton botId={botId} onQueued={mutate} />
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
   const unanswered = data?.enabled === false && items.findLast(item => item.from !== 'event')?.from === 'person'
@@ -262,9 +265,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
-      {refusal && <HostedRefusalNotice code={refusal} />}
-      {declined && <SubscriptionRefusalNotice notice={declined} />}
-      {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></>}</Alert>}
+      {refusal && <HostedRefusalNotice code={refusal} retry={retry} />}
+      {declined && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
+      {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription><AlertAction>{retry}</AlertAction></>}</Alert>}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {sendError && <FieldError className="text-xs">{sendError}</FieldError>}
       {botId && <SubagentLoginNeeds botId={botId} />}
