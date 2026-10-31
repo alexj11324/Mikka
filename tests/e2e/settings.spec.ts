@@ -81,6 +81,23 @@ test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', as
 })
 })
 
+test('默认工作区解析后改用带 workspace 的读取时，管理员分区不闪掉', async ({ page }) => {
+  // Settings first read the default workspace, then name it once the team directory resolves it.
+  // Slow both, so the unnamed read lands first and the named one stays pending for a while:
+  // the admin-only rows must not drop out meanwhile, or the sidebar jumps.
+  await page.route('**/api/teams/directory*', async route => { await new Promise(resolve => setTimeout(resolve, 1500)); await route.fallback() })
+  await page.route('**/api/workspace?workspace=*', async route => { await new Promise(resolve => setTimeout(resolve, 2000)); await route.fallback() })
+  await register(page, '/settings/members')
+  const admin = page.locator('[data-slot="settings-list"]').getByRole('link', { name: '团队权限', exact: true })
+  await expect(admin).toBeVisible()
+  const gaps: number[] = []
+  for (const started = Date.now(); Date.now() - started < 4000;) {
+    if (await admin.count() === 0) gaps.push(Date.now() - started)
+    await page.waitForTimeout(50)
+  }
+  expect(gaps, '管理员分区在读取期间消失').toEqual([])
+})
+
 test('设置页打开并空闲后，每个分区首次打开都不显示骨架屏', async ({ page }) => {
   test.setTimeout(120000)
   await register(page, '/settings?section=preferences')
