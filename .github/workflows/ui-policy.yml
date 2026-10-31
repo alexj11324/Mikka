@@ -219,6 +219,8 @@ jobs:
       - run: pnpm test:integrations
       - run: pnpm test:github
       - run: pnpm test:request-log
+      # Legacy read routes; previously only in legacy-read-compat.yml, which ran on merged branches.
+      - run: pnpm test:legacy-reads
       - run: pnpm test:slack
       - run: pnpm test:telegram
       - run: pnpm test:agent
