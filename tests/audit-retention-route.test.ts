@@ -6,7 +6,7 @@ const origin = 'https://mikka.example', workspaceId = randomUUID()
 let session: { user: { id: string }; session: { id: string } } | null = null, denied = false
 const calls: unknown[][] = []
 class WorkspaceError extends Error {}
-let route: typeof import('./route')
+let route: typeof import('../app/api/workspaces/[workspaceId]/audit-log/retention/route')
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => session } } } })
   mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError } })
@@ -15,7 +15,7 @@ before(async () => {
     readAuditRetention: async (...args: unknown[]) => { calls.push(args); if (denied) throw new WorkspaceError(); return { retentionDays: null, legalHold: false } },
     configureAuditRetention: async (...args: unknown[]) => { calls.push(args); if (denied) throw new WorkspaceError(); return args[2] },
   } })
-  route = await import('./route')
+  route = await import('../app/api/workspaces/[workspaceId]/audit-log/retention/route')
 })
 beforeEach(() => { session = { user: { id: 'admin' }, session: { id: 'session' } }; denied = false; calls.length = 0 })
 const context = { params: Promise.resolve({ workspaceId }) }

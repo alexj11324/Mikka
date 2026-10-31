@@ -16,6 +16,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/mcp/worker.ts', file: 'lib/mcp/worker-authorization.db.test.ts', script: 'test:worker-authorization-db' },
   { marker: 'lib/device-revocation.ts', file: 'lib/device-revocation.db.test.ts', script: 'test:device-revocation-db' },
   { marker:'lib/abuse/store.ts',file:'lib/abuse/store.db.test.ts',script:'test:abuse-db' },
+  { marker: 'lib/abuse/alerts.ts', file: 'lib/abuse/alerts.db.test.ts', script: 'test:abuse-db' },
   { marker: 'lib/onboarding.ts', file: 'lib/onboarding.db.test.ts', script: 'test:onboarding-db' },
   { marker: 'lib/device-enrollment.ts', file: 'lib/device-enrollment.db.test.ts', script: 'test:device-enrollment-db' },
   { marker:'lib/execution-settings.ts',file:'lib/execution-settings.db.test.ts',script:'test:execution-settings-db' },

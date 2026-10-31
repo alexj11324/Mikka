@@ -25,7 +25,7 @@ test('audit retention requires an explicit admin policy, honors hold/export leas
     await configureAuditRetention(owner, ws.id, { retentionDays: 30, legalHold: true }, database)
     assert.deepEqual(await applyAuditRetention(ws.id, new Date(), database), { deleted: 0, skipped: 'legal_hold' })
     const constraint = `retention_change_fail_${randomUUID().replaceAll('-', '')}`
-    await main.query(`ALTER TABLE workspace_audit_events ADD CONSTRAINT ${constraint} CHECK(action<>'audit.retention_changed') NOT VALID`)
+    await main.query(`ALTER TABLE workspace_audit_events ADD CONSTRAINT ${constraint} CHECK("workspaceId"<>'${ws.id}'::uuid OR action<>'audit.retention_changed') NOT VALID`)
     try { await assert.rejects(configureAuditRetention(owner, ws.id, { retentionDays: 1, legalHold: false }, database)) }
     finally { await main.query(`ALTER TABLE workspace_audit_events DROP CONSTRAINT ${constraint}`) }
     const policy = await readAuditRetention(owner, ws.id, database)
@@ -47,7 +47,7 @@ test('audit retention requires an explicit admin policy, honors hold/export leas
   })
   await t.test('cleanup audit failure rolls event deletion back; NULL restores retention without deleting anything', async () => {
     const id = await event(ws.id, 100), constraint = `retention_apply_fail_${randomUUID().replaceAll('-', '')}`
-    await main.query(`ALTER TABLE workspace_audit_events ADD CONSTRAINT ${constraint} CHECK(action<>'audit.retention_applied') NOT VALID`)
+    await main.query(`ALTER TABLE workspace_audit_events ADD CONSTRAINT ${constraint} CHECK("workspaceId"<>'${ws.id}'::uuid OR action<>'audit.retention_applied') NOT VALID`)
     try { await assert.rejects(applyAuditRetention(ws.id, new Date(), database)) }
     finally { await main.query(`ALTER TABLE workspace_audit_events DROP CONSTRAINT ${constraint}`) }
     assert.equal((await main.query('SELECT count(*)::int n FROM workspace_audit_events WHERE id=$1', [id])).rows[0].n, 1)

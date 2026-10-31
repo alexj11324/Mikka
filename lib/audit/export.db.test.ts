@@ -63,7 +63,7 @@ test('audit snapshots are complete, resumable, tenant-bound and detect changed/m
   await t.test('audit failure prevents an unrecorded export from becoming available', async () => {
     const receiptCount = Number((await workspace.query('SELECT count(*) FROM workspace_audit_exports WHERE "workspaceId"=$1', [ws.id])).rows[0].count)
     const constraint = `audit_export_fail_${randomUUID().replaceAll('-', '')}`
-    await main.query(`ALTER TABLE workspace_audit_events ADD CONSTRAINT ${constraint} CHECK (action<>'audit.exported') NOT VALID`)
+    await main.query(`ALTER TABLE workspace_audit_events ADD CONSTRAINT ${constraint} CHECK ("workspaceId"<>'${ws.id}'::uuid OR action<>'audit.exported') NOT VALID`)
     try { await assert.rejects(createAuditExport(admin, ws.id, 'all', new Date(), 200, targets)) }
     finally { await main.query(`ALTER TABLE workspace_audit_events DROP CONSTRAINT ${constraint}`) }
     assert.equal(Number((await workspace.query('SELECT count(*) FROM workspace_audit_exports WHERE "workspaceId"=$1', [ws.id])).rows[0].count), receiptCount)
