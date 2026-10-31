@@ -2,8 +2,8 @@
 const TOP_LEVEL_COMPONENTS = [
   'Stack', 'TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'BeButton',
   'BeFollowUps', 'BeStat', 'BeResponse', 'BeApproval', 'BeQuestions', 'BeTodoList', 'AgentIcon',
-  'InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'ComputerCard', 'ShadcnProgress',
-  'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'BeFileTree', 'BeCitations', 'BeFileDiff',
+  'InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'ComputerCard',
+  'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'RadialChart', 'BeFileTree', 'BeCitations', 'BeFileDiff',
   'Tag', 'Steps', 'Form',
 ]
 

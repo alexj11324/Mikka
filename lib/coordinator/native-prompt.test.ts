@@ -23,7 +23,7 @@ test('personal instructions retain host approval and existing OpenUI vocabulary'
   // Status, milestones, used-versus-limit and a reviewable batch before creating tasks.
   assert.match(instructions,/Tag\(/)
   assert.match(instructions,/Steps\(/)
-  assert.match(instructions,/ShadcnProgress\(/)
+  assert.match(instructions,/RadialChart\(/)
   assert.match(instructions,/EditableTable\(/)
   assert.match(instructions,/rankings as BarChart with horizontal true/)
   assert.doesNotMatch(instructions,/BeBadge\(|BeTimeline\(|ShadcnTable\(|ReuiFrame\(/)

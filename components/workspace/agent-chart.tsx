@@ -2,7 +2,7 @@
 
 import { useId } from 'react'
 import { useReducedMotion } from 'motion/react'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Label, Line, LineChart, Pie, PieChart, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Label, Line, LineChart, Pie, PieChart, PolarAngleAxis, PolarRadiusAxis, RadialBar, RadialBarChart, XAxis, YAxis } from 'recharts'
 import { cn } from '@/lib/utils'
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 
@@ -103,5 +103,27 @@ export function AgentDonutChart({ slices = [], unit, total }: Donut) {
       </Pie>
       <ChartLegend content={<ChartLegendContent nameKey="key" />} />
     </PieChart>
+  </ChartContainer>
+}
+
+type Usage = { label?: string; used?: number; limit?: number; unit?: string }
+
+/** shadcn radial chart: one arc for what is used of a limit, the amount in the centre and the limit under it. */
+export function AgentRadialChart({ label = '', used = 0, limit = 1, unit }: Usage) {
+  const reduce = useReducedMotion() ?? false
+  const config = { used: { label, color: token(0) } } satisfies ChartConfig
+  const amount = (value: number) => `${compact.format(value)}${unit ?? ''}`
+  return <ChartContainer config={config} role="img" aria-label={`${label} ${amount(used)} / ${amount(limit)}`} className="mx-auto aspect-square max-h-56 w-full min-w-0">
+    <RadialBarChart data={[{ key: 'used', value: Math.min(Math.max(used, 0), limit) }]} startAngle={90} endAngle={-270} innerRadius="72%" outerRadius="100%" barSize={14}>
+      <PolarAngleAxis type="number" domain={[0, limit]} tick={false} axisLine={false} />
+      <RadialBar dataKey="value" fill="var(--color-used)" background={{ fill: 'var(--muted)' }} cornerRadius={8} isAnimationActive={!reduce} />
+      <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+        <Label content={({ viewBox }) => viewBox && 'cx' in viewBox && 'cy' in viewBox ? <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+          <tspan x={viewBox.cx} y={(viewBox.cy || 0) - 10} className="fill-foreground text-2xl font-semibold tabular-nums">{amount(used)}</tspan>
+          <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 12} className="fill-muted-foreground text-xs tabular-nums">/ {amount(limit)}</tspan>
+          {label && <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 30} className="fill-muted-foreground text-xs">{label}</tspan>}
+        </text> : null} />
+      </PolarRadiusAxis>
+    </RadialBarChart>
   </ChartContainer>
 }

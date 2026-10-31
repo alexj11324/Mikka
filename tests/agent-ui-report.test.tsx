@@ -19,6 +19,7 @@ const samples = {
   LineChart: 'root = LineChart(["Mon", "Tue", "Wed"], [{name: "Visits", values: [120, 180, 150]}], "%")',
   AreaChart: 'root = AreaChart(["Mon", "Tue", "Wed"], [{name: "Organic", values: [12, 14, 18]}, {name: "Paid", values: [5, 6, 7]}])',
   DonutChart: 'root = DonutChart([{name: "Direct", value: 42}, {name: "Search", value: 36}], "", "Total")',
+  RadialChart: 'root = RadialChart("Quota", 60, 100, "k")',
   Separator: 'root = Stack([TextContent("Above"), Separator(), TextContent("Below")])',
   BeAlert: 'root = BeAlert("Sample data", "Figures below are illustrative.", "warning")',
   BeTable: 'root = BeTable(["Team", "Done"], [["Design", 3], ["Build", 5]])',
@@ -52,6 +53,9 @@ test('Report components parse, are detected as OpenUI and render through the rea
   // ReUI area and donut charts render through the shared chart container.
   assert.match(render(samples.AreaChart), /data-slot="chart"/)
   assert.match(render(samples.DonutChart), /data-slot="chart"/)
+  assert.match(render(samples.RadialChart), /data-slot="chart"/)
+  assert.match(render(samples.RadialChart), /var\(--chart-1\)/)
+  assert.equal(agentComponentCatalog.RadialChart.props.safeParse({ label: 'Quota', used: 1, limit: 0 }).success, false)
   assert.match(render(samples.Separator), /role="separator"/)
   assert.match(render(samples.BeAlert), /Figures below are illustrative/)
   assert.match(render(samples.BeTable), /Design|Team/)

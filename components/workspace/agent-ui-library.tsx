@@ -14,12 +14,11 @@ import { AnimatedNumber } from '@/components/motion/animated-number'
 import { Card as BeCard, CardContent as BeCardContent, CardDescription as BeCardDescription, CardHeader as BeCardHeader, CardTitle as BeCardTitle } from '@/components/motion/card'
 import { createAgentLibrary, type AgentComponentRenderers } from '@/lib/agent-ui-catalog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
 import { AgentTextBubble, InsideBlock } from './agent-text-bubble'
 import { Alert as BeAlert, AlertContent as BeAlertContent, AlertDescription as BeAlertDescription, AlertIcon as BeAlertIcon, AlertTitle as BeAlertTitle } from '@/components/motion/alert'
 import { Collapsible as BeCollapsible, CollapsibleContent as BeCollapsibleContent, CollapsibleIndicator as BeCollapsibleIndicator, CollapsibleTrigger as BeCollapsibleTrigger } from '@/components/motion/collapsible'
 import { Tabs as BeTabs, TabsContent as BeTabsContent, TabsList as BeTabsList, TabsTrigger as BeTabsTrigger } from '@/components/motion/tabs'
-import { AgentAreaChart, AgentBarChart, AgentDonutChart, AgentLineChart } from './agent-chart'
+import { AgentAreaChart, AgentBarChart, AgentDonutChart, AgentLineChart, AgentRadialChart } from './agent-chart'
 import { AgentCitations, AgentFileDiff, AgentFileTree, AgentTable } from './agent-report'
 import { AgentEditableTable } from './agent-editable-table'
 
@@ -78,12 +77,12 @@ const renderers = {
   LineChart: ({ props }) => <AgentLineChart labels={props.labels} series={props.series} unit={props.unit} />,
   AreaChart: ({ props }) => <AgentAreaChart labels={props.labels} series={props.series} unit={props.unit} />,
   DonutChart: ({ props }) => <AgentDonutChart slices={props.slices} unit={props.unit} total={props.total} />,
+  RadialChart: ({ props }) => <AgentRadialChart label={props.label} used={props.used} limit={props.limit} unit={props.unit} />,
   // UI policy draws no horizontal rules: a section break is space, still announced as a separator.
   Separator: () => <div role="separator" className="h-2" />,
   BeFileTree: ({ props }) => <AgentFileTree paths={props.paths} />,
   BeCitations: ({ props }) => <AgentCitations sources={props.sources} />,
   BeFileDiff: ({ props }) => <AgentFileDiff file={props.file} diff={props.diff} language={props.language} />,
-  ShadcnProgress: ({ props }) => <Progress value={props.value}><ProgressLabel>{props.label}</ProgressLabel><ProgressValue /></Progress>,
 } satisfies AgentComponentRenderers
 
 // Replies flow through these; every other component, ours or OpenUI's, is a block, and text inside it gets no bubble.

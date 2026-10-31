@@ -81,11 +81,11 @@ wrap = InlineText(["这一句故意写得比较长，用来看换行效果：引
 computer = ComputerCard("demo-done", "${DEMO_RUN}", "打开 #66 的预览部署，用测试账号登录，截一张首页。", "done", "Mikka Frontend", "#66 预览部署检查")`,
   },
   {
-    id: 'ui', title: 'OpenUI 组件与批量核对', description: '状态标签、步骤、额度进度、排行和可编辑表格，均使用固定演示数据。',
+    id: 'ui', title: 'OpenUI 组件与批量核对', description: '状态标签、步骤、额度、排行和可编辑表格，均使用固定演示数据。',
     response: `root = Stack([tags, steps, quota, ranking, review])
 tags = Stack([Tag("进行中", null, "sm", "warning"), Tag("已完成", null, "sm", "success"), Tag("待评审", null, "sm", "info"), Tag("失败", null, "sm", "danger")], "row", "s")
 steps = Steps([StepsItem("11月2日 · 需求确认", "整理范围与验收标准。"), StepsItem("11月9日 · 设计评审", "建议日期"), StepsItem("11月16日 · 交付检查", "核对交付物。")])
-quota = ShadcnProgress("本月额度（演示）", 60)
+quota = RadialChart("本月额度", 60, 100, "万 token")
 ranking = BarChart(["Alex", "Sam", "Lee", "Kim"], [{name: "完成", values: [9, 7, 4, 2]}], true, "项")
 review = Form("tasks", Buttons([Button("创建这 3 个任务", Action([@ToAssistant("演示：按表格创建这些任务")]), "primary")]), [FormControl("任务", EditableTable("tasks", [{type: "text", key: "title", header: "标题"}, {type: "select", key: "priority", header: "优先级", options: [{value: "high", label: "高"}, {value: "low", label: "低"}]}, {type: "date-single", key: "due", header: "截止"}], [{id: "1", values: ["整理需求", "high", "2026-11-02"]}, {id: "2", values: ["评审设计", "low", "2026-11-09"]}, {id: "3", values: ["交付检查", "low", "2026-11-16"]}]))])`,
   },

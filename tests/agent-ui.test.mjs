@@ -332,7 +332,7 @@ test('beUI 与 OpenUI 内置组件的输出可解析', () => {
     assert.ok(library.components[name])
   }
   // Duplicates of OpenUI or beUI components are gone; old saved replies stay readable in the archive (tests/legacy-chat-content.test.tsx).
-  for (const name of ['ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame', 'BeBadge', 'BeTimeline']) {
+  for (const name of ['ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ShadcnProgress', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame', 'BeBadge', 'BeTimeline']) {
     assert.equal(name in agentComponentCatalog, false, name)
   }
 })

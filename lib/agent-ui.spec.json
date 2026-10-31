@@ -66,10 +66,6 @@
         "signature": "PieChart(labels: string[], values: number[], variant?: \"pie\" | \"donut\", appearance?: \"circular\" | \"semiCircular\")",
         "description": "Circular slices; use plucked arrays: PieChart(data.categories, data.values)"
       },
-      "RadialChart": {
-        "signature": "RadialChart(labels: string[], values: number[])",
-        "description": "Radial bars; use plucked arrays: RadialChart(data.categories, data.values)"
-      },
       "SingleStackedBarChart": {
         "signature": "SingleStackedBarChart(labels: string[], values: number[])",
         "description": "Single horizontal stacked bar; use plucked arrays: SingleStackedBarChart(data.categories, data.values)"
@@ -414,6 +410,10 @@
         "signature": "DonutChart(slices: {name: string, value: number}[], unit?: string, total?: string)",
         "description": "环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。"
       },
+      "RadialChart": {
+        "signature": "RadialChart(label: string, used: number, limit: number, unit?: string)",
+        "description": "环形进度图（shadcn chart），一条弧表示已用占上限多少，中间显示已用量和上限：额度、预算、完成度。label 为名称，used 为已用量，limit 为上限（大于 0），unit 为单位。数字只能来自用户或工具数据。"
+      },
       "Separator": {
         "signature": "Separator()",
         "description": "段落分隔，用于分开报告中的部分。按界面规范显示为留白而不是横线。不带参数。"
@@ -433,10 +433,6 @@
       "EditableTable": {
         "signature": "EditableTable(name: string, columns: {type: \"text\" | \"number\" | \"date-single\" | \"select\" | \"url\", key: string, header: string, width?: number, options?: {value: string, label: string}[]}[], data: {id: string, values: (string | number)[]}[])",
         "description": "可编辑表格，让用户在你动手前核对或修改一批记录（例如建任务前）。放在 Form 的 FormControl 里，Form 的按钮用 @ToAssistant 说明要做什么；用户改过的行随回复发回。name 为字段名；columns 每项 {type, key, header, options?}，type 为 text、number、date-single、select、url；data 每行 {id, values}，values 与 columns 等长。最多 6 列、30 行。只读数据用 BeTable。"
-      },
-      "ShadcnProgress": {
-        "signature": "ShadcnProgress(label: string, value: number)",
-        "description": "进度条：已用与上限，例如额度、预算或完成度。label 为名称，value 为 0–100 的百分比，只用用户或工具提供的数字。"
       }
     },
     "componentGroups": [
@@ -463,8 +459,7 @@
         "name": "任务与进度",
         "components": [
           "BeTodoList",
-          "BeStat",
-          "ShadcnProgress"
+          "BeStat"
         ],
         "notes": [
           "Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。"
@@ -515,13 +510,14 @@
           "LineChart",
           "AreaChart",
           "DonutChart",
+          "RadialChart",
           "Separator",
           "BeFileTree",
           "BeFileDiff"
         ],
         "notes": [
           "beUI CodeBlock 用于代码回复；BeFileDiff 只展示建议修改；ToolResult、AgentActivity、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不开放给模型，不自动生成虚构工具记录。",
-          "报告：提示用 BeAlert，表格用 BeTable，标签页用 BeTabs，状态用 Tag，里程碑用 Steps；趋势用 LineChart，分类对比用 BarChart，排行用 BarChart 横向，已用与上限用 ShadcnProgress，图表颜色来自主题图表色，只用用户或工具提供的数字。批量确认多条记录（例如建任务前）用 Form 包 EditableTable，提交按钮的 @ToAssistant 写清要做什么。"
+          "报告：提示用 BeAlert，表格用 BeTable，标签页用 BeTabs，状态用 Tag，里程碑用 Steps；趋势用 LineChart，分类对比用 BarChart，排行用 BarChart 横向，已用与上限用 RadialChart，图表颜色来自主题图表色，只用用户或工具提供的数字。批量确认多条记录（例如建任务前）用 Form 包 EditableTable，提交按钮的 @ToAssistant 写清要做什么。"
         ]
       }
     ],
@@ -576,9 +572,6 @@
         },
         "PieChart": {
           "$ref": "#/$defs/PieChart"
-        },
-        "RadialChart": {
-          "$ref": "#/$defs/RadialChart"
         },
         "SingleStackedBarChart": {
           "$ref": "#/$defs/SingleStackedBarChart"
@@ -838,6 +831,9 @@
         "DonutChart": {
           "$ref": "#/$defs/DonutChart"
         },
+        "RadialChart": {
+          "$ref": "#/$defs/RadialChart"
+        },
         "Separator": {
           "$ref": "#/$defs/Separator"
         },
@@ -852,9 +848,6 @@
         },
         "EditableTable": {
           "$ref": "#/$defs/EditableTable"
-        },
-        "ShadcnProgress": {
-          "$ref": "#/$defs/ShadcnProgress"
         }
       },
       "required": [
@@ -874,7 +867,6 @@
         "HorizontalBarChart",
         "Series",
         "PieChart",
-        "RadialChart",
         "SingleStackedBarChart",
         "Slice",
         "ScatterChart",
@@ -961,12 +953,12 @@
         "LineChart",
         "AreaChart",
         "DonutChart",
+        "RadialChart",
         "Separator",
         "BeFileTree",
         "BeCitations",
         "BeFileDiff",
-        "EditableTable",
-        "ShadcnProgress"
+        "EditableTable"
       ],
       "additionalProperties": false,
       "$defs": {
@@ -1049,7 +1041,26 @@
                     "$ref": "#/$defs/PieChart"
                   },
                   {
-                    "$ref": "#/$defs/RadialChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "values": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "values"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/SingleStackedBarChart"
@@ -1661,29 +1672,6 @@
           ],
           "additionalProperties": false,
           "description": "Circular slices; use plucked arrays: PieChart(data.categories, data.values)"
-        },
-        "RadialChart": {
-          "type": "object",
-          "properties": {
-            "labels": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "values": {
-              "type": "array",
-              "items": {
-                "type": "number"
-              }
-            }
-          },
-          "required": [
-            "labels",
-            "values"
-          ],
-          "additionalProperties": false,
-          "description": "Radial bars; use plucked arrays: RadialChart(data.categories, data.values)"
         },
         "SingleStackedBarChart": {
           "type": "object",
@@ -3958,7 +3946,26 @@
                     "$ref": "#/$defs/PieChart"
                   },
                   {
-                    "$ref": "#/$defs/RadialChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "values": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "values"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/SingleStackedBarChart"
@@ -4310,7 +4317,26 @@
                       "$ref": "#/$defs/PieChart"
                     },
                     {
-                      "$ref": "#/$defs/RadialChart"
+                      "type": "object",
+                      "properties": {
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "values": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          }
+                        }
+                      },
+                      "required": [
+                        "labels",
+                        "values"
+                      ],
+                      "additionalProperties": false
                     },
                     {
                       "$ref": "#/$defs/SingleStackedBarChart"
@@ -4834,7 +4860,26 @@
                     "$ref": "#/$defs/PieChart"
                   },
                   {
-                    "$ref": "#/$defs/RadialChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "values": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "values"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/SingleStackedBarChart"
@@ -5190,7 +5235,26 @@
                     "$ref": "#/$defs/PieChart"
                   },
                   {
-                    "$ref": "#/$defs/RadialChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "values": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "values"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/SingleStackedBarChart"
@@ -6435,6 +6499,37 @@
           "additionalProperties": false,
           "description": "环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。"
         },
+        "RadialChart": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "used": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1000000000000
+            },
+            "limit": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1000000000000
+            },
+            "unit": {
+              "type": "string",
+              "maxLength": 12
+            }
+          },
+          "required": [
+            "label",
+            "used",
+            "limit"
+          ],
+          "additionalProperties": false,
+          "description": "环形进度图（shadcn chart），一条弧表示已用占上限多少，中间显示已用量和上限：额度、预算、完成度。label 为名称，used 为已用量，limit 为上限（大于 0），unit 为单位。数字只能来自用户或工具数据。"
+        },
         "Separator": {
           "type": "object",
           "properties": {},
@@ -6644,26 +6739,6 @@
           ],
           "additionalProperties": false,
           "description": "可编辑表格，让用户在你动手前核对或修改一批记录（例如建任务前）。放在 Form 的 FormControl 里，Form 的按钮用 @ToAssistant 说明要做什么；用户改过的行随回复发回。name 为字段名；columns 每项 {type, key, header, options?}，type 为 text、number、date-single、select、url；data 每行 {id, values}，values 与 columns 等长。最多 6 列、30 行。只读数据用 BeTable。"
-        },
-        "ShadcnProgress": {
-          "type": "object",
-          "properties": {
-            "label": {
-              "type": "string",
-              "maxLength": 8000
-            },
-            "value": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 100
-            }
-          },
-          "required": [
-            "label",
-            "value"
-          ],
-          "additionalProperties": false,
-          "description": "进度条：已用与上限，例如额度、预算或完成度。label 为名称，value 为 0–100 的百分比，只用用户或工具提供的数字。"
         }
       }
     }
@@ -6690,7 +6765,7 @@
       "TextContent 的 text 字符串支持 Markdown（标题、粗体、列表、引用、表格、代码块）、KaTeX LaTeX 数学公式及 Mermaid 图表。数学公式使用 $$ 包裹，独立公式的 $$ 分别另起一行。流程图、时序图等使用 text 内标注 mermaid 的三反引号代码围栏。只在字符串内部使用 Markdown 围栏，整体回复仍严格遵循 OpenUI Lang；字符串中的换行、引号和 LaTeX 反斜杠按 OpenUI 字符串语法转义。Mermaid 不含初始化配置、HTML、外部图片或点击动作。",
       "TextContent 使用 JSON 双引号字符串：换行写成 \\n，LaTeX 命令的每个反斜杠写成 \\\\，不要再重复转义整段正文，也不要在双引号内混入真实换行。例如：root = TextContent(\"### 自注意力机制\\n\\n每个 token 投影为查询、键和值。\\n\\n$$\\n\\\\mathrm{Attention}(Q,K,V)=\\\\mathrm{softmax}\\\\left(\\\\frac{QK^\\\\top}{\\\\sqrt{d_k}}\\\\right)V\\n$$\\n\\n- 缩放点积防止 softmax 饱和。\")",
       "Mermaid 图表由宿主统一主题，优先使用 flowchart、sequenceDiagram、stateDiagram-v2、classDiagram、erDiagram。流程图使用简短中文节点、清晰分组和少量连线；短流程可 LR，宽或复杂流程用 TD，避免堆成一张超宽大图。核心节点用 A(核心处理):::focus，完成态用 :::success，需人工确认的节点用 :::warning，样式由宿主定义，不再输出 classDef、style、linkStyle 或硬编码颜色。每图只强调 1–2 个关键节点，其余保持克制。不要在标签内使用 HTML；节点内容尽量简短，需要换行时使用 Mermaid 支持的文字换行。不要生成 click 动作或初始化配置。",
-      "按功能组优先使用已注册组件：消息回复 BeResponse；方案确认 BeApproval；单选、多选、自定义提问 BeQuestions；建议计划或用户任务状态 BeTodoList；动态按钮 BeButton；状态标签 Tag；用户数字指标 BeStat。图标用现有 Lucide 的 AgentIcon 白名单。内容卡片使用 BeCard（beUI Card compact），图文推荐使用 BeCardGrid + BeImageCard。提示用 BeAlert，已用与上限用 ShadcnProgress，折叠用 BeCollapsible，标签页用 BeTabs，表格用 BeTable，里程碑用 Steps。不得使用目录外组件或声称会自动安装组件。",
+      "按功能组优先使用已注册组件：消息回复 BeResponse；方案确认 BeApproval；单选、多选、自定义提问 BeQuestions；建议计划或用户任务状态 BeTodoList；动态按钮 BeButton；状态标签 Tag；用户数字指标 BeStat。图标用现有 Lucide 的 AgentIcon 白名单。内容卡片使用 BeCard（beUI Card compact），图文推荐使用 BeCardGrid + BeImageCard。提示用 BeAlert，已用与上限用 RadialChart，折叠用 BeCollapsible，标签页用 BeTabs，表格用 BeTable，里程碑用 Steps。不得使用目录外组件或声称会自动安装组件。",
       "根据问题选择合适的组件：项目计划使用 BeTodoList 并设 source=suggestion；只有用户提供真实状态才用 source=user；对比使用 BeTabs 或 BeTable；用户提供数字时可使用图表；简单问答使用 TextContent。BeApproval 只能确认建议，不是工具授权；BeApproval 和 BeQuestions 在回答区内直接提交并继续对话，不经输入框。加载状态 AgentProgress、ReasoningText、ThinkingShimmer 和真实工具授权 ToolApproval 由宿主控制，不由模型虚构。不要为了展示组件而堆砌界面。",
       "用户的问题、语言、受众和所需深度决定回答。先给结论，再自然继续对话；事实来源、技术细节和不确定性在影响判断时说明，不以固定模板强迫长答或短答。用户要求详细时完整展开，不能用一张摘要表或追问按钮代替当前答案。一般知识可直接作答，不因用户没有提供材料而拒答；纠错时给出完整修正后的答案。重要正文默认纵向展开，折叠区仅放补充内容。",
       "用户的工作区记录、业务统计和任务状态只能来自用户提供的数据。没有实时工作区数据和工具，不得声称查询、创建、保存或更新了项目、任务、文档。建议计划标明为建议；不得编造业务统计或实时信息。只有用户明确要求时才提供标明为示例的业务数据。",
@@ -6730,11 +6805,11 @@
     "LineChart",
     "AreaChart",
     "DonutChart",
+    "RadialChart",
     "Separator",
     "BeFileTree",
     "BeCitations",
     "BeFileDiff",
-    "EditableTable",
-    "ShadcnProgress"
+    "EditableTable"
   ]
 }

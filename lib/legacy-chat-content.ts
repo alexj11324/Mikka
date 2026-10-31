@@ -5,7 +5,7 @@ import { normalizeAgentUISource } from './agent-ui-source'
 /** Components older replies used before they were replaced by OpenUI's own or beUI ones; their props, in order, are read as text only. */
 const RETIRED: Record<string, string[]> = {
   ShadcnCard: ['title', 'children', 'description'], ShadcnBadge: ['text', 'variant'], ShadcnAlert: ['title', 'description', 'variant'],
-  ShadcnAccordion: ['items', 'multiple'], ShadcnTabs: ['items'], ShadcnTable: ['columns', 'rows'], ShadcnButton: ['label', 'prompt', 'variant'],
+  ShadcnAccordion: ['items', 'multiple'], ShadcnTabs: ['items'], ShadcnTable: ['columns', 'rows'], ShadcnButton: ['label', 'prompt', 'variant'], ShadcnProgress: ['label', 'value'],
   ReuiBadge: ['text', 'variant'], ReuiAlert: ['title', 'description', 'variant'], ReuiFrame: ['title', 'children', 'description'],
   BeBadge: ['text', 'status'], BeTimeline: ['events'],
 }
