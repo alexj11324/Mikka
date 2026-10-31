@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { FactoryError, type FactoryBinding } from "./approval-contract";
+import { revisionBindingSchema } from './contract';
 import { maskFactoryNote } from "./note-mask";
 import { checkFactoryRepairBudget } from "./check-recovery-evidence";
 import {
@@ -36,6 +37,11 @@ import {
 
 const principalId = (actor: FactoryActor) =>
   actor.sessionId ? `session:${actor.sessionId}` : `owner:${actor.userId}`;
+const requestDigest = (request: any) => digest({
+  ...request,
+  expiresAt: undefined,
+  binding: revisionBindingSchema.parse(request.binding),
+});
 
 function providerInput(
   task: FactoryTask,
@@ -50,8 +56,9 @@ function providerInput(
       approvalId: a.id,
       ownerId: task.userId,
       humanSessionId: a.humanSessionId,
+      // Historical receipt metadata stays immutable; it is not a grant lease.
       expiresAt: a.request.expiresAt,
-      binding: req.binding,
+      binding: bindingOf(task),
       eventId: req.eventId,
       action: req.action,
       target: req.target,
@@ -153,11 +160,9 @@ async function humanApproval(
   );
   if (!rows.length) fail("factoryHumanRequired");
 }
-/** The approval as bound to this task's current candidate and attempt. Revocation and a
- * superseded candidate always void it. Expiry and the approver's session do not: they gate
- * only a new reservation (validApproval). Once a publication is reserved, checking or
- * replaying its outcome needs only the caller's normal acceptance auth (owned), as on
- * GitHub/Vercel where a started deployment is still reported after the approver signs out. */
+/** Historical revoked approvals cannot revive. A started publication retains
+ * its exact candidate and the caller's normal ownership/STOP checks; neither
+ * a legacy grant expiry nor the original approver signing out cancels it. */
 async function boundApproval(
   tx: PoolClient,
   task: FactoryTask,
@@ -167,7 +172,7 @@ async function boundApproval(
   const {
     rows: [a],
   } = await tx.query(
-    'SELECT *,"expiresAt">clock_timestamp() AS unexpired FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL FOR UPDATE',
+    'SELECT * FROM factory_approvals WHERE id=$1 AND "taskId"=$2 AND "userId"=$3 AND "candidateId"=$4 AND "revokedAt" IS NULL FOR UPDATE',
     [id, task.id, task.userId, task.candidateId],
   );
   if (
@@ -191,7 +196,8 @@ async function approvedEvidence(tx: PoolClient, task: FactoryTask, a: any) {
   return current;
 }
 
-/** Authorization for a new reservation: bound, unexpired, with a live human session. */
+/** A new approval still requires the person. Expiry is no longer a separate
+ * permission lease: approving reserves the publication in that transaction. */
 async function validApproval(
   tx: PoolClient,
   task: FactoryTask,
@@ -199,22 +205,9 @@ async function validApproval(
   publish: boolean,
 ) {
   const a = await boundApproval(tx, task, id, publish);
-  if (!a.unexpired) fail("factoryApprovalInvalid");
   const current = await approvedEvidence(tx, task, a);
   await humanApproval(tx, { userId: a.userId, sessionId: a.humanSessionId });
   return { a, current };
-}
-
-/** What the transaction's row locks cannot freeze: the clock, the granting session and its expiry. Re-asked right before the provider call, without rereading
- * or rehashing the evidence validApproval already checked in this transaction. */
-async function grantStillLive(tx: PoolClient, a: any) {
-  const {
-    rows: [live],
-  } = await tx.query("SELECT $1::timestamptz>clock_timestamp() AS ok", [
-    a.expiresAt,
-  ]);
-  if (!live.ok) fail("factoryApprovalInvalid");
-  return humanApproval(tx, { userId: a.userId, sessionId: a.humanSessionId });
 }
 
 function gatesFor() {
@@ -362,11 +355,24 @@ export function createFactoryApprovals(
     await browserSession(tx, actor);
     return task;
   }
-  function fence(task: FactoryTask, binding: FactoryBinding) {
-    if (digest(bindingOf(task)) !== digest(binding)) fail("factoryStale");
+  function fence(task: FactoryTask, binding: Pick<FactoryBinding, 'taskId' | 'revision'>) {
+    if (task.id !== binding.taskId || task.revision !== binding.revision)
+      fail("factoryStale");
   }
   async function defer(error: unknown, publicationId: string): Promise<never> {
-    return deferPublication(pool, publicationId, error);
+    try { return await deferPublication(pool, publicationId, error); }
+    catch (failure) {
+      if (failure instanceof PublicationDeferred && failure.state === 'failed') {
+        await transaction(async tx => {
+          const { rows: [publication] } = await tx.query(`SELECT p.*,a."userId" FROM factory_publications p JOIN factory_approvals a ON a.id=p."approvalId" WHERE p.id=$1`, [publicationId]);
+          if (!publication) return;
+          const task = await store.lockTask(tx, publication.userId, publication.taskId);
+          if (task.stage !== 'publish' || task.status !== 'pending' || task.candidateId !== publication.candidateId || task.revision !== publication.request?.binding?.revision) return;
+          await store.apply(task.userId, bindingOf(task), randomUUID(), { action: 'retry_publication', publicationId, reason: 'Publication failed; approve this candidate again to retry' }, tx);
+        });
+      }
+      throw failure;
+    }
   }
   async function complete(
     tx: PoolClient,
@@ -412,7 +418,7 @@ export function createFactoryApprovals(
     ]);
     return response;
   }
-  return {
+  const service = {
     async ledger(actor: FactoryActor, taskId: string) {
       if (!z.uuid().safeParse(taskId).success) fail("factoryInvalid");
       return transaction(async (tx) => {
@@ -495,7 +501,6 @@ export function createFactoryApprovals(
       const req = parsed.data;
       return transaction(async (tx) => {
         const task = await owned(tx, actor, req.binding.taskId);
-        if (task.issueId !== req.binding.issueId) fail("factoryNotFound");
         const {
           rows: [prior],
         } = await tx.query(
@@ -504,12 +509,15 @@ export function createFactoryApprovals(
         );
         if (prior) {
           if (
-            digest(prior.request) !== digest(req) ||
+            requestDigest(prior.request) !== requestDigest(req) ||
             prior.principalId !== principalId(actor)
           )
             fail("factoryReplayMismatch");
-          // No historical success response can revive an expired/revoked/stale approval.
-          await validApproval(tx, task, prior.id, true);
+          const { rows: [publication] } = await tx.query('SELECT id,status,result FROM factory_publications WHERE "approvalId"=$1 ORDER BY "createdAt" DESC LIMIT 1', [prior.id]);
+          if (publication?.status === 'succeeded') {
+            if (task.status !== 'passed' || task.stage !== 'publish' || task.candidateId !== prior.candidateId || task.revision !== publication.result?.binding?.revision) fail('factoryStale');
+            await boundApproval(tx, { ...task, revision: prior.publishRevision }, prior.id, true);
+          } else await boundApproval(tx, task, prior.id, true);
           return { approvalId: prior.id, binding: bindingOf(task) };
         }
         fence(task, req.binding);
@@ -521,15 +529,11 @@ export function createFactoryApprovals(
         const current = await approvalEvidence(tx, task);
         if (digest(req.candidate) !== digest(current.manifest.candidate))
           fail("factoryEvidenceMismatch");
-        const {
-          rows: [expiry],
-        } = await tx.query(
-          "SELECT $1::timestamptz>clock_timestamp() AND $1::timestamptz<=clock_timestamp()+interval '24 hours' AS valid",
-          [req.expiresAt],
-        );
-        if (!expiry.valid) fail("factoryApprovalExpiry");
         await humanApproval(tx, actor);
         const approvalId = randomUUID();
+        // Retain the existing column and receipt shape during rollout. This
+        // timestamp is immutable metadata, not an expiring permission grant.
+        const receiptTimestamp = new Date(Date.now() + 24 * 60 * 60_000).toISOString();
         const inserted = await tx.query(
           `INSERT INTO factory_approvals (id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,$16,$7,$8,$9,$10,$11,$12,$13,$14,$4,$14,$15) ON CONFLICT DO NOTHING RETURNING id`,
           [
@@ -540,14 +544,14 @@ export function createFactoryApprovals(
             actor.userId,
             principalId(actor),
             req.eventId,
-            JSON.stringify(req),
+            JSON.stringify({ ...req, expiresAt: receiptTimestamp }),
             JSON.stringify(req.candidate),
             req.action,
             req.target,
             null,
             JSON.stringify(current.manifest),
             task.revision,
-            req.expiresAt,
+            receiptTimestamp,
             actor.sessionId,
           ],
         );
@@ -572,7 +576,7 @@ export function createFactoryApprovals(
           {
             action: "advance",
             stage: "publish",
-            reason: "Await exact approved publication action",
+            reason: "Approved publication reserved",
           },
           tx,
         );
@@ -580,8 +584,22 @@ export function createFactoryApprovals(
           'UPDATE factory_approvals SET "publishAttemptId"=$2,"publishRevision"=$3 WHERE id=$1',
           [approvalId, result.task.attemptId, result.task.revision],
         );
+        const publication = { binding: bindingOf(result.task), eventId: randomUUID(), approvalId, action: req.action, target: req.target, targetEnvironment: req.targetEnvironment };
+        await reservePublication(tx, { approvalId, taskId: task.id, candidateId: task.candidateId!, action: req.action, target: req.target, eventId: publication.eventId, request: publication });
         return { approvalId, binding: bindingOf(result.task) };
       });
+    },
+    /** The browser approves and starts the exact durable reservation in one
+     * operation. The legacy publish call below can only consume/read it. */
+    async approveAndPublish(actor: FactoryActor, input: unknown): Promise<unknown> {
+      const parsed = approvalRequest.safeParse(input);
+      if (!parsed.success) fail('factoryInvalid');
+      const request = parsed.data;
+      if (!adapters.some(adapter => adapter.action === request.action && adapter.target === request.target && adapter.environment === request.targetEnvironment))
+        fail('factoryPublicationUnavailable');
+      const approved = await service.approve(actor, input);
+      const result = await service.publish(actor, { binding: approved.binding, eventId: randomUUID(), approvalId: approved.approvalId, action: request.action, target: request.target, targetEnvironment: request.targetEnvironment });
+      return { ...result, approvalId: approved.approvalId };
     },
     /** Human "request changes" on the candidate awaiting approval. Revokes any
      * open grant for that candidate and sends the task back to execute. */
@@ -604,7 +622,7 @@ export function createFactoryApprovals(
         );
         if (prior) {
           if (
-            digest(prior.request) !== digest(req) ||
+            requestDigest(prior.request) !== requestDigest(req) ||
             prior.principalId !== principalId(actor)
           )
             fail("factoryReplayMismatch");
@@ -708,12 +726,16 @@ export function createFactoryApprovals(
         );
         if (prior) {
           if (
-            digest(prior.request) !== digest(req) ||
+            requestDigest(prior.request) !== requestDigest(req) ||
             prior.principalId !== principalId(actor)
           )
             fail("factoryReplayMismatch");
           return prior.result as { approvalId: string; revoked: boolean };
         }
+        // Approval already starts publication. Cancellation belongs to the
+        // task's STOP control, not a second approval-grant lifecycle.
+        if ((await tx.query('SELECT 1 FROM factory_publications WHERE "approvalId"=$1 AND status<>\'failed\' LIMIT 1', [req.approvalId])).rowCount)
+          fail('factoryPublicationAlreadyClaimed');
         const { rowCount } = await tx.query(
           'UPDATE factory_approvals SET "revokedAt"=coalesce("revokedAt",clock_timestamp()) WHERE id=$1 AND "taskId"=$2 AND "userId"=$3',
           [req.approvalId, task.id, actor.userId],
@@ -737,7 +759,7 @@ export function createFactoryApprovals(
     async publish(actor: FactoryActor, input: unknown) {
       const parsed = publicationRequest.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
-      const req = parsed.data;
+      let req = parsed.data;
       const adapter = adapters.find(
         (a) =>
           a.action === req.action &&
@@ -747,6 +769,31 @@ export function createFactoryApprovals(
       if (!adapter) fail("factoryPublicationUnavailable");
       const reservation = await transaction(async (tx) => {
         const task = await owned(tx, actor, req.binding.taskId);
+        if ((await tx.query('SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, req.eventId])).rowCount)
+          fail('factoryReplayMismatch');
+        const { rows: [approvedPublication] } = await tx.query('SELECT * FROM factory_publications WHERE "taskId"=$1 AND "approvalId"=$2 ORDER BY "createdAt" DESC LIMIT 1 FOR UPDATE', [task.id, req.approvalId]);
+        if (approvedPublication) {
+          const reserved = publicationRequest.parse(approvedPublication.request);
+          if (reserved.action !== req.action || reserved.target !== req.target || reserved.targetEnvironment !== req.targetEnvironment) fail('factoryApprovalInvalid');
+          if (req.binding.revision !== reserved.binding.revision &&
+            (approvedPublication.status !== 'succeeded' || req.binding.revision !== approvedPublication.result?.binding?.revision)) fail('factoryStale');
+          req = reserved;
+          if (approvedPublication.status === 'failed') throw new PublicationDeferred(approvedPublication.id, 'failed', approvedPublication.receipt);
+          if (approvedPublication.status === 'succeeded') {
+            if (task.stage !== 'publish' || task.status !== 'passed' || task.candidateId !== approvedPublication.candidateId || task.revision !== approvedPublication.result?.binding?.revision) fail('factoryStale');
+            await boundApproval(tx, { ...task, revision: req.binding.revision }, req.approvalId, true);
+            return { result: approvedPublication.result as { publicationId: string; receipt: PublicationAdapterReceipt; binding: FactoryBinding } };
+          }
+          fence(task, req.binding);
+          if (approvedPublication.status === 'uncertain' || approvedPublication.receipt !== null)
+            throw new PublicationDeferred(approvedPublication.id, approvedPublication.status === 'uncertain' ? 'uncertain' : 'pending', approvedPublication.receipt);
+          const a = await boundApproval(tx, task, req.approvalId, true);
+          await approvedEvidence(tx, task, a);
+          // Commit the effect claim BEFORE provider IO. A crash from here on
+          // is reconciled, never interpreted as permission to POST again.
+          await tx.query("UPDATE factory_publications SET status='uncertain' WHERE id=$1", [approvedPublication.id]);
+          return { id: approvedPublication.id as string };
+        }
         const {
           rows: [replay],
         } = await tx.query(
@@ -754,7 +801,7 @@ export function createFactoryApprovals(
           [task.id, req.eventId],
         );
         if (replay) {
-          if (digest(replay.request) !== digest(req))
+          if (requestDigest(replay.request) !== requestDigest(req))
             fail("factoryReplayMismatch");
           if (replay.status !== "succeeded" || !replay.result)
             fail("factoryPublicationAlreadyClaimed");
@@ -807,8 +854,9 @@ export function createFactoryApprovals(
           eventId: req.eventId,
           request: req,
         });
+        await tx.query("UPDATE factory_publications SET status='uncertain' WHERE id=$1", [id]);
         return { id };
-      });
+      }).catch(error => error instanceof PublicationDeferred && error.state === 'failed' ? defer(error, error.publicationId) : Promise.reject(error));
       if ("result" in reservation) return reservation.result;
       const publicationId = reservation.id;
       // Durable reservation precedes the effect: on crash/unknown outcome it
@@ -817,26 +865,29 @@ export function createFactoryApprovals(
       try {
         return await transaction(async (tx) => {
           const task = await owned(tx, actor, req.binding.taskId);
-          fence(task, req.binding);
           const {
             rows: [claim],
           } = await tx.query(
-            "SELECT status,receipt FROM factory_publications WHERE id=$1 FOR UPDATE",
+            'SELECT status,receipt,result,"candidateId" FROM factory_publications WHERE id=$1 FOR UPDATE',
             [publicationId],
           );
-          if (claim?.status !== "reserved" || claim.receipt != null)
+          if (claim?.status === 'succeeded') {
+            if (task.stage !== 'publish' || task.status !== 'passed' || task.candidateId !== claim.candidateId || task.revision !== claim.result?.binding?.revision) fail('factoryStale');
+            await boundApproval(tx, { ...task, revision: req.binding.revision }, req.approvalId, true);
+            return claim.result as { publicationId: string; receipt: PublicationAdapterReceipt; binding: FactoryBinding };
+          }
+          if (!claim) fail('factoryPublicationAlreadyClaimed');
+          if (claim.receipt !== null)
+            throw new PublicationDeferred(publicationId, claim.status === 'uncertain' ? 'uncertain' : 'pending', claim.receipt);
+          fence(task, req.binding);
+          if (claim.status !== "uncertain")
             fail("factoryPublicationAlreadyClaimed");
-          const { a, current } = await validApproval(
-            tx,
-            task,
-            req.approvalId,
-            true,
-          );
+          const a = await boundApproval(tx, task, req.approvalId, true);
+          const current = await approvedEvidence(tx, task, a);
           const trustedInput = providerInput(task, a, req, publicationId);
           // Authorized once above; the task and approval rows stay locked until COMMIT.
           trustedInput.beforeCreate = async () => {
             fence(await owned(tx, actor, task.id), req.binding);
-            await grantStillLive(tx, a);
           };
           const receipt = publicationAdapterReceipt.parse(
             await adapter.execute(trustedInput, tx),
@@ -853,7 +904,8 @@ export function createFactoryApprovals(
         .strict()
         .safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
-      const { publicationId, ...req } = parsed.data;
+      const { publicationId, ...requested } = parsed.data;
+      let req = requested;
       try {
         return await transaction(async (tx) => {
           const task = await owned(tx, actor, req.binding.taskId);
@@ -864,7 +916,9 @@ export function createFactoryApprovals(
             [publicationId, task.id, req.approvalId],
           );
           if (!p) fail("factoryPublicationReceiptRequired");
-          if (digest(p.request) !== digest(req)) fail("factoryReplayMismatch");
+          const reserved = publicationRequest.parse(p.request);
+          if (requestDigest({ ...reserved, eventId: req.eventId }) !== requestDigest(req)) fail("factoryReplayMismatch");
+          req = reserved;
           // Terminal: a confirmed provider failure is not asked again (B2).
           if (p.status === "failed")
             throw new PublicationDeferred(p.id, "failed", p.receipt);
@@ -925,4 +979,5 @@ export function createFactoryApprovals(
       }
     },
   };
+  return service;
 }

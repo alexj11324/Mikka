@@ -181,6 +181,10 @@ export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
 
 /** Largest gzipped checkpoint patch the server keeps. */
 export const RUN_CHECKPOINT_MAX_BYTES = 8 * 1024 * 1024
+/** This daemon enforces requireWorktreeContinuation before starting an agent. */
+export const RECOVERY_WORKTREE_HEADER = 'x-mikka-recovery-worktree'
+/** Longest an automatic cross-machine recovery uses an uploaded snapshot. */
+export const RUN_CHECKPOINT_RECOVERY_MAX_AGE_MS = 30 * 60_000
 
 /**
  * A run's work in progress, saved by the daemon (never the agent) after
@@ -199,6 +203,8 @@ export const runCheckpointSchema = z.object({
   /** Files the patch touches. */
   files: z.number().int().nonnegative(),
   takenAt: isoTime,
+  /** The latest tree could not be checkpointed; it supersedes older patches. */
+  unavailableReason: z.literal('too_large').optional(),
 })
 export type RunCheckpoint = z.infer<typeof runCheckpointSchema>
 
@@ -323,6 +329,11 @@ export const runAssignmentSchema = z.object({
    * one, and the run goes ahead without it.
    */
   mcp: z.object({ url: z.url(), token: z.string().min(1).max(200), mailbox: z.literal(true).optional() }).optional(),
+  /** Agent-owned GitHub delivery; the same run token exchanges short-lived credentials. */
+  github: z.object({
+    endpoint: z.url(), repository: z.string().regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
+    branch: z.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/),
+  }).strict().optional(),
   /** Question continuation must not silently open a different session. */
   /**
    * What the orchestrator dispatched this run for (ADR 0023). `plan` writes a
@@ -335,11 +346,14 @@ export const runAssignmentSchema = z.object({
    * branch, so nothing the earlier run left uncommitted is lost.
    */
   continuesRunId: id.optional(),
+  /** A same-device retry with no usable snapshot must reuse its real worktree. */
+  requireWorktreeContinuation: z.literal(true).optional(),
   /**
    * The latest checkpoint of the attempt this run takes over after its
    * machine went offline. Used only for a new worktree (another machine, or
    * the earlier worktree is gone): it starts at `baseCommit` (the base
-   * branch when that commit is not here) with the patch applied.
+   * commit with the patch applied. Missing or unusable recovery data blocks
+   * the attempt rather than silently starting again from the base branch.
    */
   resumeFrom: runCheckpointSchema.optional(),
   /**

@@ -24,6 +24,7 @@ import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCap
 import {
   CLIENT_VERSION_HEADER,
   REPO_ORIGIN_HEADER,
+  RECOVERY_WORKTREE_HEADER,
   DAEMON_RPC_ERRORS,
   devicePaths,
   fsPaths,
@@ -226,6 +227,7 @@ export class HttpServerLink implements ServerLink {
           [CLIENT_VERSION_HEADER]: this.clientVersion,
           [SKILL_ARTIFACT_HEADER]: '1',
           [REPO_ORIGIN_HEADER]: '1',
+          [RECOVERY_WORKTREE_HEADER]: '1',
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
         },

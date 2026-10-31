@@ -1,17 +1,18 @@
 // `mikka daemon | daemon login | daemon status` (ADR 0004). The desktop app
 // runs the same entry with `daemon --data-dir <userData>`.
 import { parseArgs } from "node:util"
+import { watch } from 'node:fs'
 
 import type { Flavor } from "@mikka/protocol"
 
 import { readJson, writeJsonAtomic } from "./fs-util"
-import { DaemonAlreadyRunningError } from "./lock"
+import { DaemonAlreadyRunningError, daemonProcessAlive, LOCK_TAKEOVER_MS } from "./lock"
 import { createLogger } from "./log"
 import { installService } from "./service"
 import { deviceLogin, registrationLogin } from "./login"
 import { startDaemon } from "./main"
 import { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
-import { connectDaemonInDataDir, isNoDaemon } from "./rpc/client"
+import { connectDaemonInDataDir, isNoDaemon, type DaemonClient } from "./rpc/client"
 import { MemoryServer, type DeviceRepo, type ServerLink } from "./server-link"
 import { HttpServerLink } from "./server-link-http"
 
@@ -26,6 +27,33 @@ const SERVER_URLS: Record<Flavor, string> = {
 }
 
 const CLIENT = { name: "mikka-cli", version: DAEMON_VERSION }
+
+/** A service may hold its lock/read device.json before opening its RPC socket.
+ * A login persisted in that window must reach the live process as well. Watch
+ * readiness rather than sleeping, and retain the daemon's existing startup bound. */
+async function connectStartingDaemon(dataDir: string): Promise<DaemonClient | undefined> {
+  if (!daemonProcessAlive(dataDir)) return undefined
+  let revision = 0, timedOut = false, failure: Error | undefined
+  let wake: (() => void) | undefined
+  const changed = () => { revision++; wake?.() }
+  const watcher = watch(dataDir, changed)
+  watcher.on('error', error => { failure = error; changed() })
+  const timer = setTimeout(() => { timedOut = true; changed() }, LOCK_TAKEOVER_MS)
+  try {
+    for (;;) {
+      if (failure) throw failure
+      if (timedOut) throw new Error(`The daemon is starting but its control socket did not become ready within ${LOCK_TAKEOVER_MS / 1000} seconds. Retry sign-in when the service is ready.`)
+      const before = revision
+      try { return await connectDaemonInDataDir(dataDir, CLIENT) }
+      catch (error) { if (!isNoDaemon(error)) throw error }
+      // If the holder exited, the saved credential belongs to its next start.
+      if (!daemonProcessAlive(dataDir)) return undefined
+      if (revision !== before) continue
+      await new Promise<void>(resolve => { wake = resolve })
+      wake = undefined
+    }
+  } finally { clearTimeout(timer); watcher.close() }
+}
 
 export interface CliIO {
   out: (line: string) => void
@@ -142,6 +170,15 @@ export async function runCli(
         credential,
         ...(workspaceId ? { workspaceId } : {}),
       })
+      // Persist before checking the PID. If a process already read the old
+      // file, its PID necessarily exists and it must receive the credential
+      // over RPC. A process starting later reads the newly persisted file.
+      const starting = await connectStartingDaemon(dataDir)
+      if (starting) {
+        try {
+          await starting.request('device.setCredential', { credential, ...(workspaceId ? { workspaceId } : {}) })
+        } finally { starting.close() }
+      }
     }
     io.out("Signed in. This device registers on the daemon's next sync.")
     return 0

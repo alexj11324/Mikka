@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { gzipSync } from 'node:zlib'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
-import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
+import { REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, type RunCheckpoint } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
 import { POST } from '../app/v1/devices/[deviceId]/runs/[runId]/claim/route'
@@ -17,6 +18,9 @@ function fixture() {
     repo: {id:'repo',userId:'member',deviceId:'device',baseBranch:'main',repoPath:repository.key,remoteUrl:repository.remoteUrl},
     cliPolicy: {revision:'a'.repeat(64),policy:defaultRunPolicy()},
     publication: {pushBranch:'synthetic-claim-branch',policy:defaultRunPolicy()},
+    checkpoint: null as RunCheckpoint | null,
+    strictRecovery: false,
+    lost: undefined as {deviceId:string;sessionId:string}|undefined,
     preparation:[] as string[],
     memberAllowed:true,questionRetryBlocked:false,tokenError:false,locks:[] as string[],transactions:0,transactionErrors:[] as Error[],beforeToken:undefined as (()=>Promise<void>)|undefined,
   }
@@ -24,12 +28,15 @@ function fixture() {
   return probe
 }
 async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings']) {
-  try { return await POST(new Request('http://127.0.0.1/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1'}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
+  try { return await POST(new Request('http://127.0.0.1/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
   finally {
     // Trace the intended gate: an unrelated failed prerequisite must not
     // masquerade as a successful lineage, scope or lease rejection.
     assert.deepEqual(probe.preparation,preparation)
   }
+}
+function validCheckpoint(): RunCheckpoint {
+  return {baseCommit:'a'.repeat(40),patch:gzipSync(Buffer.alloc(0)).toString('base64'),files:0,takenAt:new Date().toISOString()}
 }
 
 test('historical question retries stop before publication, leases or worker credentials',async()=>{
@@ -44,10 +51,69 @@ test('historical question retries stop before publication, leases or worker cred
 
 test('ordinary retries retain the normal claim path after question lineage validation',async()=>{
   const probe=fixture();probe.run.retryOf='ordinary-parent'
-  const response=await claim(probe,['question-retry','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','checkpoint','settings'])
+  probe.checkpoint=validCheckpoint()
+  const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
   assert.equal(response.status,200)
   assert.equal(probe.run.status,'preparing')
   assert.equal((await response.json()).continuesRunId,'ordinary-parent')
+})
+
+test('known unavailable or stale recovery blocks before leases, worker credentials or an old-client assignment', async () => {
+  for (const unavailable of [true, false]) {
+    const probe=fixture();probe.run.retryOf='lost-parent'
+    probe.lost={deviceId:'device',sessionId:'old-machine-session'}
+    probe.checkpoint={baseCommit:'a'.repeat(40),patch:'synthetic-empty-snapshot',files:1,
+      takenAt:new Date(Date.now()-(unavailable ? 0 : 31*60_000)).toISOString(),
+      ...(unavailable ? {unavailableReason:'too_large' as const} : {})}
+    const response=await claim(probe,['question-retry','checkpoint','blocked-recovery'])
+    assert.equal(response.status,409)
+    assert.equal(probe.run.status,'stopped')
+    assert.equal(probe.run.leaseExpiresAt,null)
+    const body=await response.json()
+    assert.equal(body.code,'checkpointRecoveryUnavailable')
+    for(const field of ['resumeFrom','prompt','mcp','github'])assert.equal(Object.hasOwn(body,field),false)
+  }
+})
+
+test('same-device retries retain their session while a different device starts a new session', async () => {
+  for(const sameDevice of [true,false]) {
+    const probe=fixture();probe.run.retryOf='lost-parent'
+    probe.checkpoint=validCheckpoint()
+    probe.lost={deviceId:sameDevice ? 'device' : 'old-device',sessionId:'old-machine-session'}
+    const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
+    assert.equal(response.status,200)
+    const body=await response.json()
+    assert.equal(body.continuesRunId,'lost-parent')
+    assert.equal(body.resumeSessionId,sameDevice ? 'old-machine-session' : undefined)
+    assert.deepEqual(body.resumeFrom,probe.checkpoint)
+    assert.equal(body.requireWorktreeContinuation,undefined)
+  }
+})
+
+test('strict same-device continuation can use its original worktree without a usable snapshot',async()=>{
+  for(const snapshot of ['missing','stale','unavailable'] as const) {
+    const probe=fixture();probe.run.retryOf='lost-parent';probe.strictRecovery=true
+    probe.lost={deviceId:'device',sessionId:'original-session'}
+    if(snapshot!=='missing')probe.checkpoint={...validCheckpoint(),...(snapshot==='stale' ? {takenAt:new Date(Date.now()-31*60_000).toISOString()} : {unavailableReason:'too_large' as const})}
+    const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
+    assert.equal(response.status,200)
+    const body=await response.json()
+    assert.equal(body.requireWorktreeContinuation,true)
+    assert.equal(body.continuesRunId,'lost-parent')
+    assert.equal(body.resumeSessionId,'original-session')
+    assert.equal(body.resumeFrom,undefined)
+  }
+})
+
+test('a missing snapshot blocks cross-device recovery and legacy clients before issuing a lease or token',async()=>{
+  for(const [sameDevice,strictRecovery] of [[false,true],[false,false],[true,false]]) {
+    const probe=fixture();probe.run.retryOf='lost-parent';probe.strictRecovery=strictRecovery
+    probe.lost={deviceId:sameDevice ? 'device' : 'old-device',sessionId:'original-session'}
+    const response=await claim(probe,['question-retry','checkpoint','blocked-recovery'])
+    assert.equal(response.status,409)
+    assert.equal(probe.run.leaseExpiresAt,null)
+    assert.equal((await response.json()).code,'checkpointRecoveryUnavailable')
+  }
 })
 
 test('claim committed before retirement cannot return its old prompt when token issuance fails',async()=>{

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { CLIENT_VERSION_HEADER, emptyRunReport } from "@mikka/protocol"
 import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
+import { RECOVERY_WORKTREE_HEADER } from "@mikka/protocol/device"
 
 import {
   DaemonError,
@@ -84,6 +85,14 @@ const assignment = (runId: string) => ({
 })
 
 describe("HttpServerLink", () => {
+  it('advertises strict local-worktree continuation and preserves the required assignment', async () => {
+    const fetcher = (async (_url, init) => {
+      expect(new Headers(init?.headers).get(RECOVERY_WORKTREE_HEADER)).toBe('1')
+      return json({...assignment('run-1'),continuesRunId:'lost-run',requireWorktreeContinuation:true})
+    }) as typeof fetch
+    const result=await new HttpServerLink('http://server.test',fetcher).claimRun('dev-1','run-1')
+    expect(result.requireWorktreeContinuation).toBe(true)
+  })
   it('holds every pending tool callback during human control and continues the same gate on release', async () => {
     vi.useFakeTimers()
     let paused = true, live = true, executed = 0

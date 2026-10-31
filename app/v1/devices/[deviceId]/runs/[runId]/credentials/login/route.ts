@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { z } from 'zod'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 import { pool } from '@/lib/db'
@@ -5,7 +6,7 @@ import { login } from '@/lib/credentials/runtime'
 import { CredentialError } from '@/lib/credentials/contracts'
 import { credentialBody, credentialFailure, privateHeaders } from '@/lib/credentials/http'
 export const maxDuration = 60
-export async function POST(request: Request, context: { params: Promise<{ deviceId: string; runId: string }> }) {
+async function handlePOST(request: Request, context: { params: Promise<{ deviceId: string; runId: string }> }) {
   try {
     const { deviceId, runId } = await context.params
     if (!z.uuid().safeParse(deviceId).success || !z.uuid().safeParse(runId).success) throw new CredentialError('credential_denied', 404)
@@ -20,3 +21,5 @@ export async function POST(request: Request, context: { params: Promise<{ device
     return Response.json(await login({ userId: principal.userId, workspaceId: run.workspaceId, botId: run.botId, runId }, parsed.data.site, undefined, { forcePassword: parsed.data.forcePassword }), { headers: privateHeaders })
   } catch (error) { return credentialFailure(error) }
 }
+
+export const POST = withDeviceRoute(handlePOST)

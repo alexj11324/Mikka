@@ -45,6 +45,7 @@ before(async () => {
 after(async () => {
   if (!databaseUrl) return
   await pool.query('DELETE FROM credential_fill_leases WHERE user_id = ANY($1)', [[A, B]])
+  await pool.query('DELETE FROM device_credential_revocations WHERE "ownerId" = ANY($1)', [[A, B]])
   await pool.query('DELETE FROM device_tokens WHERE "userId" = ANY($1)', [[A, B]])
   await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [[A, B]])
   await pool.query('DELETE FROM device_repos WHERE "userId" = ANY($1)', [[A, B]])
