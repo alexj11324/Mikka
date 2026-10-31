@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { COMMANDS_MAX_SKIP, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_PARAM } from '@mikka/protocol/device'
 import { authenticateDevice, ownedDevice, pendingCommands, sleep, waitSeconds } from '@/lib/device-link'
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic'
  * this device's running agents, and stops they asked for. Long-polls when
  * nothing is pending.
  */
-export async function GET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
+async function handleGET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
@@ -24,3 +25,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
     await sleep(Math.min(1_000, Math.max(50, deadline - Date.now())))
   }
 }
+
+export const GET = withDeviceRoute(handleGET)

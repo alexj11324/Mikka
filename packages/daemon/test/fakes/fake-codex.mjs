@@ -70,6 +70,14 @@ async function runTurn(text) {
     threadId,
     turn: { id: open, status: "inProgress", error: null },
   })
+  if (text === 'TOOL_PROGRESS_TEST') {
+    notify('item/commandExecution/outputDelta', { threadId: 'foreign-thread', turnId: open, delta: 'ignored' })
+    notify('item/commandExecution/outputDelta', { threadId, turnId: 'stale-turn', delta: 'ignored' })
+    notify('item/commandExecution/outputDelta', { threadId, turnId: open, delta: '' })
+    notify('item/commandExecution/outputDelta', { threadId, turnId: open, delta: 'CI still pending' })
+    complete()
+    return
+  }
   if (text === 'MCP_ELICITATION_TEST' || text === 'MIKKA_ELICITATION_TEST') {
     // Synthetic native protocol coverage only. The official-CLI acceptance
     // test separately proves actual MCP execution and the broker transport.

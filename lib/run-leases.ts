@@ -6,8 +6,8 @@ import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
 import { after } from 'next/server'
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
-import { db } from '@/lib/db'
-import { agentRuns, agents, deviceRepos, devices, runCheckpoints } from '@/lib/db/schema'
+import { db, pool } from '@/lib/db'
+import { agentRuns, agents, deviceRepos, devices } from '@/lib/db/schema'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent, runRetriedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
@@ -20,9 +20,26 @@ const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
 
 // Run leases on the server (ADR 0012). The heartbeat renews the lease of each
 // run the device reports; a run left out is not renewed, and the daemon stops
-// it once its lease runs out. `reclaimLostRuns` handles runs whose device
-// stopped renewing: it is called where the owner's devices or app check in,
-// since there is no frequent cron on this plan.
+// it once its lease runs out. Owner requests and the independent minute sweep
+// share `reclaimLostRuns`, so recovery does not depend on an open app/device.
+
+/** A bounded cron pass over persisted work, without relying on owner polling. */
+export async function sweepExpiredRunLeases(now = new Date()): Promise<{ owners: number; failed: number }> {
+  const owners = await db.selectDistinct({ userId: agentRuns.userId }).from(agentRuns)
+    .leftJoin(devices, eq(devices.id, agentRuns.deviceId))
+    .where(or(
+      and(inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now)),
+      and(eq(agentRuns.status, 'queued'), isNotNull(agentRuns.retryOf),
+        or(isNull(devices.lastSeenAt), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS)))),
+    ))
+    .orderBy(agentRuns.userId).limit(100)
+  let failed = 0
+  for (const owner of owners) {
+    try { await reclaimLostRuns(owner.userId, now) }
+    catch { failed++ }
+  }
+  return { owners: owners.length, failed }
+}
 
 /**
  * Renews the leases of the device's claimed runs it still reports. Reported
@@ -67,11 +84,15 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
     ))
     .limit(20)
   for (const { run } of stranded) {
-    if (run.agentDefinition?.pinnedDeviceId) continue
-    const target = await takeoverTarget(run, now)
+    if (run.stopRequestedAt) {
+      const ended = await endRun(run.id, ['queued'], { status: 'stopped', error: null }, now)
+      if (ended) await announceEnd({ ...run, status: 'stopped' })
+      continue
+    }
+    const target = run.agentDefinition?.pinnedDeviceId ? null : await takeoverTarget(run, now)
     if (target) {
       await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, updatedAt: now })
-        .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued')))
+        .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
       continue
     }
     if (run.createdAt.getTime() > now.getTime() - RETRY_QUEUE_WAIT_MS) continue
@@ -113,9 +134,11 @@ export async function latestCheckpoint(retryOf: string): Promise<RunCheckpoint |
     if (!row?.retryOf) break
     chain.push(row.retryOf)
   }
-  const [checkpoint] = await db.select().from(runCheckpoints).where(inArray(runCheckpoints.runId, chain)).orderBy(desc(runCheckpoints.takenAt)).limit(1)
+  const { rows: [checkpoint] } = await pool.query<{ baseCommit: string; patch: Buffer; files: number; takenAt: Date; unavailableReason: string | null }>(
+    'SELECT "baseCommit",patch,files,"updatedAt" AS "takenAt","unavailableReason" FROM run_checkpoints WHERE "runId"=ANY($1::uuid[]) ORDER BY array_position($1::uuid[],"runId") LIMIT 1', [chain])
   if (!checkpoint) return null
-  return { baseCommit: checkpoint.baseCommit, patch: checkpoint.patch.toString('base64'), files: checkpoint.files, takenAt: checkpoint.takenAt.toISOString() }
+  return { baseCommit: checkpoint.baseCommit, patch: checkpoint.patch.toString('base64'), files: checkpoint.files, takenAt: checkpoint.takenAt.toISOString(),
+    ...(checkpoint.unavailableReason ? { unavailableReason: 'too_large' as const } : {}) }
 }
 
 type Run = typeof agentRuns.$inferSelect
@@ -124,7 +147,7 @@ async function reclaimLostRun(run: Run, now: Date) {
   const outcome = lostRunOutcome(run)
   if (outcome.kind !== 'retry') {
     const status = outcome.kind === 'stopped' ? 'stopped' : 'failed'
-    const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status, error: outcome.kind === 'failed' ? outcome.error : null }, now)
+    const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status, error: outcome.kind === 'failed' ? outcome.error : null }, now, true)
     if (ended) await announceEnd({ ...run, status })
     return
   }
@@ -134,7 +157,7 @@ async function reclaimLostRun(run: Run, now: Date) {
   const retried = await db.transaction(async tx => {
     const [ended] = await tx.update(agentRuns)
       .set({ status: 'failed', stopReason: 'device_lost', error: `The device went offline; ${target ? 'handed to another device' : 'queued again'} as attempt ${outcome.attempt} of ${MAX_RUN_ATTEMPTS}.`, finishedAt: now, updatedAt: now })
-      .where(and(eq(agentRuns.id, run.id), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now)))
+      .where(and(eq(agentRuns.id, run.id), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now), isNull(agentRuns.stopRequestedAt)))
       .returning({ id: agentRuns.id })
     if (!ended) return false
     await tx.insert(agentRuns).values({
@@ -155,19 +178,25 @@ async function reclaimLostRun(run: Run, now: Date) {
 }
 
 /** Ends a run that is still in one of `from`; false when something else ended it first. */
-async function endRun(runId: string, from: readonly Run['status'][], end: { status: 'failed' | 'stopped'; error: string | null }, now: Date): Promise<boolean> {
-  const ended = await db.update(agentRuns)
-    .set({ status: end.status, pauseReason: null, resumeStatus: null, stopReason: 'device_lost', error: end.error, finishedAt: now, updatedAt: now })
-    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...from])))
-    .returning({ id: agentRuns.id })
-  return ended.length > 0
+async function endRun(runId: string, from: readonly Run['status'][], end: { status: 'failed' | 'stopped'; error: string | null }, now: Date, expiredLease = false): Promise<boolean> {
+  return db.transaction(async tx => {
+    const [ended] = await tx.update(agentRuns)
+      .set({ status: end.status, pauseReason: null, resumeStatus: null, stopReason: 'device_lost', error: end.error, finishedAt: now, updatedAt: now })
+      .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...from]),
+        end.status === 'failed' ? isNull(agentRuns.stopRequestedAt) : undefined,
+        expiredLease ? lt(agentRuns.leaseExpiresAt, now) : undefined))
+      .returning()
+    if (!ended) return false
+    // A worker ending after this commit cannot lose the failure notification.
+    await recordCoordinatorEvent(tx, runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null }))
+    return true
+  })
 }
 
 /** Same as a completion from the daemon: tokens off, and the Coordinator hears it. A failure lands in 等你. */
 async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {
   await revokeRunTokens(run.id)
   stopRecordingsAfter([run.id])
-  await recordCoordinatorEvent(db, runFinishedEvent({ ...run, stopReason: 'device_lost', report: null }))
   await afterRunEnded(run.userId, run.id)
   after(() => wakeCoordinator(run.userId))
 }

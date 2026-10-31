@@ -53,6 +53,12 @@ function processAlive(pid: number): boolean {
   }
 }
 
+/** The PID is published before a daemon reads its persisted device state. */
+export function daemonProcessAlive(dataDir: string): boolean {
+  const pid = holderPid(dataDir)
+  return pid !== null && processAlive(pid)
+}
+
 function socketAnswers(socketPath: string): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = createConnection(socketPath)

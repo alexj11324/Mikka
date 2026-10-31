@@ -19,7 +19,8 @@ export function acceptanceState(input: {
   // Precedence (R-56):
   // 1. Only approvals on the current candidate count; the latest of them decides
   //    (a newer revoke beats an older valid approval, a newer approval beats an older revoke).
-  // 2. An approval is active only while now < expiresAt (expiresAt == now is expired).
+  // 2. An approved publication survives the legacy grant timestamp. Only old
+  //    approvals without a reservation still use their old expiry display.
   //    "Latest" is by createdAt, not by array order; ties keep the ledger's order.
   // 3. With no current candidate (candidateId null) no approval counts.
   // 4. Approvals on an older candidate never count. As on GitHub, a new commit voids the old
@@ -37,10 +38,11 @@ export function acceptanceState(input: {
     .filter(approval => approval.candidateId !== input.candidateId)
     .reduce<AcceptanceApproval | undefined>((last, approval) => !last || time(approval) >= time(last) ? approval : last, undefined)
   const latest = approvals[approvals.length - 1]
-  const active = latest && !latest.revokedAt && Date.parse(latest.expiresAt) > now ? latest : undefined
-  const publication = active ? [...input.publications].reverse().find(item => item.approvalId === active.id) : undefined
+  const latestPublication = latest ? [...input.publications].reverse().find(item => item.approvalId === latest.id) : undefined
+  const active = latest && !latest.revokedAt && (latestPublication || Date.parse(latest.expiresAt) > now) ? latest : undefined
+  const publication = active ? latestPublication : undefined
   const state: AcceptanceState = publication?.status === 'succeeded' ? 'live'
-    : publication?.status === 'failed' ? 'failed'
+    : publication?.status === 'failed' ? input.stage === 'approval' ? 'pending' : 'failed'
       : publication?.status === 'uncertain' ? 'checking'
         : publication ? 'publishing'
           : active ? 'approved'

@@ -5,8 +5,9 @@ import { lockWritePolicy } from './write-policy-store'
 /** Composes the existing domain binding and approval checks with live policy.
  * Callbacks are host implementations executed with the same locked transaction;
  * they must verify owner, account, target, payload and the exact approval. */
-export function withWritePolicy(checkBinding: OperationAuthorize, checkApproval: OperationAuthorize, options: { allowCompleted?: boolean } = {}): OperationAuthorize {
+export function withWritePolicy(checkBinding: OperationAuthorize, checkApproval: OperationAuthorize, options: { allowCompleted?: boolean; readbackOnly?: boolean } = {}): OperationAuthorize {
   return async (tx, binding, runId, phase) => {
+    if (options.readbackOnly && phase !== 'read' && phase !== 'reconcile') throw new OperationError('operationReadbackOnly')
     const scope = binding.policyScope
     const executionRunId = binding.executionRunId
     if (!scope || !executionRunId || (runId !== null && runId !== executionRunId)) throw new OperationError('writePolicyUnavailable')

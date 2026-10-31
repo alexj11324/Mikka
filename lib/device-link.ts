@@ -6,6 +6,7 @@ import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
 import { z } from 'zod'
 import { agentRuns, deviceTokens, devices, runMessages } from '@/lib/db/schema'
 import type { RunCommand } from '@mikka/protocol/device'
+import { deviceRequestCaller } from '@/lib/device-request-context'
 
 /**
  * The single workspace this MVP serves. The protocol's register answer
@@ -51,6 +52,8 @@ export interface DeviceCaller {
  * `null` means the token is missing, unknown or revoked.
  */
 export async function authenticateDevice(request: Request): Promise<DeviceCaller | null> {
+  const admitted = deviceRequestCaller.getStore()
+  if (admitted) return admitted
   const header = request.headers.get('authorization') ?? ''
   if (!header.startsWith('Bearer ')) return null
   const token = header.slice('Bearer '.length).trim()
@@ -87,7 +90,7 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
   // A daemon polls every few seconds; one write a minute is enough to show
   // that a token is still in use.
   if (!row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > 60_000) {
-    await db.update(deviceTokens).set({ lastUsedAt: new Date() }).where(eq(deviceTokens.id, row.id))
+    await db.update(deviceTokens).set({ lastUsedAt: new Date() }).where(and(eq(deviceTokens.id, row.id), isNull(deviceTokens.revokedAt)))
   }
   return { userId: row.userId, tokenId: row.id, ...(row.boundDeviceId && row.boundWorkspaceId ? { scopeDeviceId: row.boundDeviceId, scopeWorkspaceId: row.boundWorkspaceId } : {}), ...(removingDeviceId ? { removingDeviceId } : {}) }
 }

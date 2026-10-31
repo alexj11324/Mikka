@@ -28,6 +28,9 @@ const publicationAssignment={pushBranch:'mikka/mik-42',policy:publicationPolicy}
 const prepared=mock.fn(async(..._args:Parameters<typeof import('../run-publications').prepareRunPublication>)=>structuredClone(publicationAssignment))
 const completed=mock.fn(async()=>{throw Error('Claim unexpectedly completed a run')})
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
+// This suite substitutes device authentication and DB IO to test only claim
+// snapshot composition. Real credential admission is covered by revocation DB tests.
+stub('../device-route.ts',{withDeviceRoute:<T>(handler:T)=>handler})
 let selectIndex=0
 let mismatch: string|undefined
 let currentRun: {id:string;userId:string;agentId:string;deviceId:string;deviceRepoId:string;issueId:string;baseBranch:null;kind:string;prompt:string;agentDefinition:ReturnType<typeof frozen>|null;status:string;stopRequestedAt:Date|null;leaseExpiresAt:Date|null}

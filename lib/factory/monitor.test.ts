@@ -1321,14 +1321,17 @@ test(
                 userId: "owner",
                 sessionId: (await ensureOwner("owner")).sessionId,
               };
-              await createFactoryApprovals(pool, authorize, store).revoke(
+              await assert.rejects(() => createFactoryApprovals(pool, authorize, store).revoke(
                 actor,
                 {
                   binding: binding(sample.task),
                   eventId: randomUUID(),
                   approvalId: actual.approvalId,
                 },
-              );
+              ), (error: unknown) => error instanceof FactoryError && error.code === 'factoryPublicationAlreadyClaimed');
+              // Preserve coverage for historical revoked rows. New grants do
+              // not have a separate revocation lifecycle after publication.
+              await pool.query('UPDATE factory_approvals SET "revokedAt"=clock_timestamp() WHERE id=$1', [actual.approvalId]);
             }
             assert.equal(
               (await monitor.consume("owner", sample.input)).outcome,

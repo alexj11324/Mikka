@@ -60,6 +60,14 @@ export const bindingSchema = z
   })
   .strict();
 export type FactoryBinding = z.infer<typeof bindingSchema>;
+/** Request fence. taskId identifies the owned task; every lifecycle change
+ * increments revision. Legacy display fields are accepted but not authority. */
+export const revisionBindingSchema = z.object({
+  taskId: canonicalUuid,
+  revision: z.number().int().positive(),
+});
+export type FactoryRevisionBinding = z.infer<typeof revisionBindingSchema>;
+export type FactoryBindingInput = FactoryRevisionBinding & Partial<Omit<FactoryBinding, keyof FactoryRevisionBinding>>;
 export const candidateSchema = z
   .object({
     sha: z.string().regex(/^[a-f0-9]{40}$/),
@@ -124,6 +132,7 @@ export const changeSchema = z.discriminatedUnion("action", [
     })
     .strict(),
   z.object({ action: z.literal("retry"), reason }).strict(),
+  z.object({ action: z.literal("retry_publication"), publicationId: canonicalUuid, reason }).strict(),
   z.object({ action: z.literal("repair"), reason }).strict(),
   z.object({ action: z.literal("cancel"), reason }).strict(),
   z.object({ action: z.literal("revoke"), reason }).strict(),
