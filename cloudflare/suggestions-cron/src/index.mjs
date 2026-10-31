@@ -6,7 +6,7 @@ export const SCHEDULES = {
   '30 * * * *': '/api/cron/user-facts',
 }
 
-export const MINUTE_ENDPOINTS = ['/api/cron/coordinator-wakes', '/api/cron/schedules', '/api/cron/run-recovery', '/api/cron/account-deletions', '/api/cron/audit-retention']
+export const MINUTE_ENDPOINTS = ['/api/cron/coordinator-wakes', '/api/cron/schedules', '/api/cron/run-recovery', '/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor']
 
 /** @typedef {{ MIKKA_URL?: string, CRON_SECRET?: string }} Env */
 

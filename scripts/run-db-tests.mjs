@@ -76,6 +76,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/audit/retention.ts', file: 'lib/audit/retention.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-jobs.db.test.ts', script: 'test:account-db' },
   { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-restore.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/ops/monitor.ts', file: 'lib/ops/monitor.db.test.ts', script: 'test:ops-db' },
 ]
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.
