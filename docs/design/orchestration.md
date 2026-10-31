@@ -1,194 +1,224 @@
 # Orchestration: models, Agents, machines, scheduling, billing
 
-- **Status:** source of truth for these topics from 2026-10-31
+- **Status:** this is the source of truth for these topics from 2026-10-31
   ([decision](decisions/2026-10-31-2300-orchestration-spec.md)). When another
   document, decision or code comment disagrees, this file wins and the other
   one gets fixed. `decisions.md` rows stay as frozen history.
-- **Built on:** Alex's rules of 2026-10-31 (relayed by the coordinator),
-  [personal vs workspace](decisions/2026-10-31-2130-personal-vs-workspace.md),
-  [bots reply on Mikka 默认](decisions/2026-10-31-2110-bots-reply-on-mikka-cloud.md).
-- **Scope:** the simplest system consistent with those rules. It adds no new
-  machinery; where today's code differs, the
-  [conflict table](#conflicts-with-todays-docs-and-code) names the fix.
+- **Built on:** Alex's rules of 2026-10-31 and his answers to the open
+  questions, both relayed by the coordinator. Also
+  [personal vs workspace](decisions/2026-10-31-2130-personal-vs-workspace.md)
+  and [bots reply on Mikka 默认](decisions/2026-10-31-2110-bots-reply-on-mikka-cloud.md).
+- **Scope:** the simplest system consistent with those rules. Where today's
+  code differs,
+  [the conflict table](research/2026-10-31-orchestration-conflicts.md) names
+  the fix and its owner.
 
 ## 1. Concepts and names
 
 | Word | What it is |
 | --- | --- |
-| **Account** | A person. Owns their sign-in, devices, app connections, cards and model subscriptions. |
-| **Personal workspace** | One per account, exactly one member. Every account has one. |
-| **Team workspace** | Several members, with the team's policies, secrets, E2B key, credits and payment method. |
-| **Bot** | Lives in one workspace, has one owner, chats on Mikka's own harness (R-05) and dispatches threads. |
+| **Account** | A person. Owns their sign-in, devices, app connections, cards, credits they verified, model credentials and E2B key. |
+| **Personal workspace** | One per account, with exactly one member. Every account has one. |
+| **Team workspace** | Several members, with the team's policies, secrets, credits and payment method. It has no E2B key of its own. |
+| **Bot** | Lives in one workspace and has one owner. Chats on Mikka's own harness (R-05) and dispatches threads. |
 | **Thread** | The work a bot dispatched (`agent_runs`). Each turn of it is a **run**. |
-| **Agent** | The coding worker that runs a thread: Claude Code, Codex (Cursor where installed). Code may say `harness`; the UI says Agent (R-43). |
-| **Subscription** | A Claude or ChatGPT/Codex login, bound to the account. |
-| **Share** | A member's opt-in to use their subscription in one team workspace. Off by default; serves only the owner's own bots and runs unless the owner ticks 「团队成员也可以用」 (`allowOthers`). |
-| **Mikka 默认** | The hosted model, paid from the workspace's credits. A **model**, never a machine. |
-| **Machine (电脑)** | Where an Agent runs: **Mikka Cloud** (a sandbox on the workspace's own E2B key) or a **device** (the Mac desktop app, or a server running the daemon). Both are **runners** with one contract (§3). |
-| **Mikka Cloud** | The cloud machine. A **machine**, never a model. Mikka hosts no sandbox of its own. |
-| **Environment** | What a run executes in: an E2B sandbox, a disposable container on a device with Docker, or a worktree plus a temporary Agent config dir on a device without it. One per thread at a time. |
+| **Agent** | The coding worker that runs a thread: Claude Code or Codex. Code may say `harness`; the UI says Agent (R-43). |
+| **Model credential** | A Claude or ChatGPT/Codex subscription login, an API key, or a custom provider. Bound to the account and managed on the page 「API 与订阅」. |
+| **Share** | A member's opt-in to make one of their credentials usable in one team workspace. Off by default. A share serves only the owner's own bots and runs unless the owner ticks 「分享给团队成员」. |
+| **Mikka 默认** | The hosted model, paid from the workspace's credits. It is a **model**, never a machine. |
+| **Machine (电脑)** | Where an Agent runs: **Mikka Cloud** (a sandbox on the run owner's own E2B key) or a **device** (a personal computer running the desktop app, or a server running the daemon). Both are **runners** with one contract (§3). |
+| **Mikka Cloud** | The cloud machine. It is a **machine**, never a model. Mikka hosts no sandbox of its own. |
+| **Environment** | What a thread executes in. One per thread, reused across that thread's runs (§5). |
 | **Lease** | A machine's time-limited claim on a run, renewed by heartbeat (ADR 0012). |
 
-Never write 「Mikka Cloud」 for the hosted model or 「Mikka 默认」 for the
-machine.
+Never write 「Mikka Cloud」 for the hosted model, and never write
+「Mikka 默认」 for the machine.
 
 ## 2. Model resolution
 
-A run's model is decided once, when the run is created, and frozen in the run.
-Three things are decided independently: the model (this section), the machine
-(§4) and concurrency (§5).
+A run's model and credential are decided when the run is created and frozen
+for that run. Three things are decided independently: the model (this
+section), the machine (§4) and concurrency (§5).
 
 ```mermaid
 flowchart TD
-  start([New run for bot B, owner O, workspace W]) --> own{O's own subscription<br/>valid, and allowed in W?}
-  own -- yes --> sub[Use O's subscription]
-  own -- no --> share{Another member's share in W<br/>with 团队成员也可以用?<br/>Claude first}
+  start([New run: bot B, owner O, workspace W]) --> own{One of O's credentials<br/>valid, and allowed in W?}
+  own -- yes --> mine[Use O's credential]
+  own -- no --> share{Another member's credential<br/>shared in W with 分享给团队成员?<br/>Claude first}
   share -- yes --> other[Use that share]
   share -- no --> hosted[Mikka 默认<br/>W's credits]
-  sub --> freeze[[Frozen for the whole run]]
+  mine --> freeze[[Frozen for the whole run]]
   other --> freeze
   hosted --> freeze
 ```
 
-1. **The bot owner's subscription**, when it is valid (connected, not revoked,
-   not paused, quota left) and allowed in this workspace: always in the
-   personal workspace; in a team, when the owner shared it there and the
-   admin has not turned off 「允许成员使用个人订阅」. When the owner has
-   several, the bot's saved choice wins, then Claude, then ChatGPT/Codex.
-2. **Otherwise another member's share** in this workspace with
-   「团队成员也可以用」 ticked, Claude first.
+1. **The bot owner's own credential**, when it is valid (connected, not
+   revoked or paused, quota left) and allowed in this workspace. In the
+   personal workspace it is always allowed. In a team it is allowed when the
+   owner shared it there and the admin has not turned off
+   「允许成员使用个人订阅」. If several qualify, the bot's saved choice wins;
+   after that a subscription comes before an API key, and Claude comes before
+   ChatGPT/Codex.
+2. **Otherwise another member's credential** shared in this workspace with
+   「分享给团队成员」 ticked, Claude first.
 3. **Otherwise Mikka 默认**, through the usual hosted admission (§7).
 
 Rules that hold everywhere:
 
-- Never refuse with 「未连接账号」 or `binding_required`. No subscription
-  means Mikka 默认.
-- **No switch mid-run.** A run frozen on a subscription that disappears
-  (disconnected, revoked, share withdrawn, owner left, admin switch off) or
-  runs out of quota **stops** with the subscription line (所选订阅不可用 /
-  订阅需要重新连接 / 订阅额度已用完) and 重试. 重试 starts a new run, which
-  resolves again from step 1.
-- Conversation compaction uses the same frozen model as the turn.
+- Never refuse with 「未连接账号」 or `binding_required`. A person with no
+  credential gets Mikka 默认.
+- **No switch mid-run.** A run frozen on a credential that disappears stops,
+  with the subscription line and 重试. A credential disappears when it is
+  disconnected, revoked, paused, its share is withdrawn, its owner leaves, or
+  the admin switch is turned off.
+- **Quota exhausted.** The run that hit the limit stops; it never switches.
+  - When 「订阅额度用完时改用 API Key」 is on (the default) and the owner has
+    an API key for that provider, the next run uses that API key.
+  - When nothing is left, the stopped run opens a popup. The person picks the
+    model or credential themselves, and 重试 runs the turn on that choice.
+    重试 never re-resolves on its own.
+- Conversation compaction uses the same frozen model and credential as the
+  turn.
 - The same order serves bot chats and threads. A bot chat runs on Mikka's
-  harness; a thread runs on the Agent that matches the model (§3).
+  harness; a thread runs on the Agent mapped to the model (§3).
 
-## 3. Agent (harness) and runners
+## 3. Agents (harnesses) and runners
 
-| Model | Agent for a thread |
-| --- | --- |
-| Claude subscription | Claude Code |
-| ChatGPT/Codex subscription | Codex |
-| Mikka 默认 | see open question 1 |
+**Model → Agent.** GPT/OpenAI models run on **Codex**. Every other model runs
+on **Claude Code**, including Mikka 默认 and models reached through an API
+key or a custom provider. In 「API 与订阅」 a person can override which Agent
+runs each model; the override is a per-model setting. Bots never run on
+Claude Code or Codex (R-05); those Agents run threads only.
 
-Bots never run on Claude Code or Codex (R-05); those Agents only run threads.
-
-**A user's Mac or server is a runner just like E2B.** Every runner gives the
-same contract: a clean environment for the run, Agents that Mikka installed,
-credentials injected at start and wiped at the end.
+**A user's computer or server is a runner, just like E2B.** Every runner meets
+the same contract: a clean environment for the thread, Agents that Mikka
+installed, and credentials injected at the start of each run and wiped at its
+end.
 
 | | Mikka Cloud (E2B) | Device with Docker | Device without Docker (most Macs) |
 | --- | --- | --- | --- |
-| Environment | Sandbox from the Mikka template | Disposable container from the same image, deleted after the run | A worktree plus a temporary Agent config dir (`CLAUDE_CONFIG_DIR` / `CODEX_HOME` style), deleted after the run |
+| Environment | A sandbox from the Mikka template | A container from the same image | A worktree plus a temporary Agent config dir (`CLAUDE_CONFIG_DIR` / `CODEX_HOME` style) |
 | Agents | Preinstalled in the image | Preinstalled in the image | The daemon's own copies in a private dir (e.g. `~/.mikka/harness`) |
 | Isolation | The sandbox | The container | The Agent's own sandbox plus Mikka's approval policy |
 
-- **One image.** One Dockerfile builds the E2B template and the device
-  image, multi-arch.
-- **Daemon-managed Agents.** The daemon installs and updates its own Claude
-  Code and Codex on first use. It never uses or touches the person's own
-  Claude Code or Codex installs, logins or config, and no longer detects
-  them.
-- **Device capability check** replaces Agent detection: OS, architecture,
-  free disk, and Docker yes/no. A sandbox runs only a boot self-check; a
-  failed check marks the runner unhealthy and the run goes back to the queue.
-- **Model slots** come from the daemon's own Agent copies, not from the
+- **One image.** One multi-arch Dockerfile builds both the E2B template and
+  the device image.
+- **Daemon-managed Agents.** The daemon installs and updates its own copies
+  of Claude Code and Codex on first use. It never uses, touches or detects
+  the person's own Claude Code or Codex installs, logins or config.
+- **Device capability check.** This replaces Agent detection. A device
+  reports its OS, architecture, free disk, whether Docker is available, and
+  its 「允许自动调度」 switch (§4). A sandbox runs only a boot self-check; a
+  failed check marks the runner unhealthy, and its runs are placed again.
+- **Model slots** come from the daemon's own Agent copies, never from the
   person's CLI settings.
-- Tool permissions are the run's allow / ask / deny policy
+- **Tools.** Tool permissions follow the run's allow / ask / deny policy
   (`packages/daemon/src/agents/tool-approval-policy.ts`). Connected apps reach
-  the run as one MCP entry per toolkit, through Mikka, with the run token
+  the run as one MCP entry per toolkit, through Mikka, using the run token
   ([apps in device runs](decisions/2026-10-31-1937-apps-in-device-runs.md)).
 
 ## 4. Machine selection and fallback
 
-Mikka hosts no sandboxes and offers no free cloud trial. A machine is either
-Mikka Cloud on the workspace's own E2B key, or one of the owner's devices.
+Mikka hosts no sandboxes and offers no free cloud trial. A run's machine is
+always the run owner's own: Mikka Cloud on **their** E2B key, or one of
+**their** devices. An E2B key is personal and is never shared, because a
+sandbox carries its owner's credentials and app access. A member never runs
+on another member's E2B. In a team, each member brings their own key.
 
-1. **A machine the run asks for** (a label rule, a thread continuing on its
-   machine, a device-only source event) is used as asked. If that device is
-   offline, the person's 设备离线时 setting applies: 等它上线 (stay queued)
-   or 改到云端运行 (only when an E2B key is available).
-2. **Otherwise Mikka Cloud** when the workspace has an E2B key (cloud by
-   default, R-23).
-3. **Otherwise the owner's online device** that passes the capability check,
-   servers before other devices.
-4. **Otherwise queue** the run and show one action card in the chat:
-   在这台 Mac 上启用 / 连接我的服务器 / 填入 E2B Key. The run starts on its
-   own when any of them becomes available. It never fails for lack of a
-   machine.
+**Automatic scheduling.** Each device has a 「允许自动调度」 switch. It is on
+by default for servers and off by default for personal computers (Mac,
+Windows). Automatic placement uses only devices that have it on. A person can
+still pick any of their own devices by hand.
 
-A device only runs its owner's work. A team admin's 「个人设备」 switch can
-leave members' devices out in that workspace.
+**Placing a new run:**
+
+1. A machine the run asks for is used as asked. That means a label rule, a
+   thread continuing in its environment, a device-only source event, or a
+   device the person picked.
+2. Otherwise Mikka Cloud, when the owner has an E2B key. Cloud is the default
+   (R-23).
+3. Otherwise the owner's online device that has 「允许自动调度」 on and
+   passes the capability check, servers first.
+4. Otherwise the run is queued and the chat shows one action card:
+   在这台电脑上启用 / 连接我的服务器 / 填入 E2B Key. The run starts on its own
+   as soon as one of these becomes available.
+
+**When a machine goes away during a thread:**
+
+- **The E2B sandbox is gone:** start a new one from the template and continue
+  the thread from its branch.
+- **A server goes offline:**
+  1. Move the run to E2B, when the owner has a key.
+  2. Otherwise move it to the owner's personal computer that has
+     「允许自动调度」 on.
+  3. Otherwise show an error with actions to fix it: 在这台电脑上允许自动调度
+     / 填入 E2B Key / 让服务器重新上线.
+- **A personal computer goes offline:** apply the same three steps.
+
+This replaces the old 「设备离线时」 setting.
+
+A device runs only its owner's work. A team admin's 「个人设备」 switch can
+leave members' devices out of that workspace.
 
 ## 5. Scheduling and concurrency
 
 ```mermaid
 sequenceDiagram
   participant S as Mikka server
-  participant M as Machine (sandbox or device daemon)
-  S->>S: create run (model + machine frozen), status queued
+  participant M as Runner (sandbox or device daemon)
+  S->>S: create run (model + credential + machine frozen), queued
   M->>S: claim (lease)
-  S-->>M: assignment + run token + resolved owner's credentials
+  S-->>M: assignment + run token + the resolved owner's credential
   loop while running
-    M->>S: heartbeat renews lease
+    M->>S: heartbeat renews the lease
   end
   M->>S: finish
-  S->>S: revoke run token
-  M->>M: wipe credentials (sandbox paused or killed, never snapshotted with them)
+  S->>S: revoke the run token
+  M->>M: wipe the credential; the environment pauses without it
 ```
 
-- **One environment per thread.** A thread gets its own environment (§3);
-  threads run in parallel up to the machine caps. Runs of one thread are
-  serial. On a device the environment is disposable per run, and the next run
-  of the thread starts clean from the thread's branch; Mikka Cloud may pause
-  the thread's sandbox between runs (open question 6).
-- **Leases.** A claimed run holds a lease renewed by the heartbeat. A lease
-  that runs out (machine gone) returns the run: a run pinned to a device waits
-  per 设备离线时; any other run is placed again by §4, keeping its frozen model.
-- **Queueing.** A run with no machine stays `queued` with the action card
-  (§4). Hitting a machine cap also queues; it does not fail.
-- **Device offline.** Pinned runs follow 设备离线时. Unpinned runs follow §4.
-- **Quota exhausted.**
-  - A subscription: the frozen run stops (§2). New runs skip that
-    subscription until it has quota again.
-  - Mikka 默认: the hosted refusal line with 验证银行卡 / 充值 and 重试.
-    Admission checks only that the balance is positive and charges actual use
-    afterwards.
-- **Caps** on running sandboxes (per owner, per workspace) protect the
-  person's own E2B account; see open question 3.
+- **One environment per thread**, reused across the thread's runs. A sandbox
+  pauses between runs, and a container or worktree stays. Credentials are
+  injected at the start of every run and are absent while the environment is
+  paused or idle. The environment ends when the thread ends.
+- **Concurrency.** Threads run in parallel. The runs of one thread run one at
+  a time. There are no Mikka machine caps: the owner's own E2B account sets
+  the limit.
+- **Leases.** A claimed run holds a lease that the heartbeat renews. When a
+  lease runs out because the machine is gone, the run is placed again by §4,
+  keeping its frozen model and credential.
+- **Queueing.** A run with no machine stays `queued` and shows the action
+  card (§4).
+- **Quota exhausted.** For a credential, see §2. For Mikka 默认, the hosted
+  refusal line appears with 验证银行卡 / 充值 and 重试. Admission checks only
+  that the balance is positive, then charges actual use afterwards.
 
 ## 6. Credentials lifecycle
 
-Environments hold software only: repository, dependencies and preinstalled
-Agents. Snapshots never contain a login, token or key.
+Environments hold software only: the repository, dependencies and
+preinstalled Agents. No snapshot or paused environment contains a login,
+token or key.
 
-1. **At rest:** subscriptions in the subscription service's secret bundle,
-   bound to the account; app connections in Composio, reached only through
-   Mikka; saved logins in the credential vault; the E2B key as a workspace
-   secret, used by the server only and never handed to a sandbox or a model.
-2. **At run start:** the server resolves the run's owner (the bot owner, or
-   the share owner when §2 step 2 applied) and injects only that person's
-   credential for the frozen model, plus a run token for Mikka's MCP and
-   apps. It lands only inside the run's environment: the sandbox or
-   container, or the temporary Agent config dir on a device. It never goes
-   to, or comes from, the person's own CLI config.
-3. **At run end:** the run token is revoked, the injected credential is
-   deleted, the container or temporary config dir is removed, and a sandbox
-   is paused (without the credential) or killed. Work survives only on the
-   thread's branch.
+1. **At rest:**
+   - Subscriptions, API keys and custom providers live in the subscription
+     service's secret bundle, bound to the account.
+   - App connections live in Composio and are reached only through Mikka.
+   - Saved logins live in the credential vault.
+   - The E2B key belongs to the account. Only the server uses it; it is never
+     handed to a sandbox or a model.
+2. **At run start:** the server resolves the run's credential owner: the bot
+   owner, or the share's owner when §2 step 2 applied. It injects only that
+   credential, plus a run token for Mikka's MCP and apps. The credential lands
+   only inside the run's environment: the sandbox, the container, or the
+   temporary Agent config dir. It never comes from, or goes to, the person's
+   own CLI config.
+3. **At run end:** the run token is revoked and the injected credential is
+   deleted. The environment pauses or idles without it.
 
-When a member leaves a team, their shares and card designation leave that
-workspace at once and their bots there are archived. An admin may take a bot
-over; it then runs on the admin's or the workspace's resources.
+When a member leaves a team, their shares, card designation and credit
+shares leave that workspace at once, and their bots there are paused (暂停).
+An admin may take a bot over. It then runs on the admin's resources or the
+workspace's.
 
 ## 7. Billing
 
@@ -196,43 +226,36 @@ The workspace where the work happens pays.
 
 | Work | Who pays |
 | --- | --- |
-| A run on a subscription | The subscription owner's own plan quota. 0 credits. |
+| A run on a subscription | The credential owner's own plan quota. 0 credits. |
+| A run on an API key or a custom provider | The key owner, billed by their provider. 0 credits. |
 | A run on Mikka 默认 | That workspace's credits. |
-| Mikka Cloud time | The workspace's E2B account, billed by E2B. Mikka charges nothing. |
+| Mikka Cloud time | The run owner's own E2B account, billed by E2B. Mikka charges nothing. |
 | A device | Nobody. |
-| Coordinator, memory extraction, other work with no workspace of its own | The personal workspace, never 「the oldest workspace」. |
+| Coordinator, memory extraction and other work with no workspace of its own | The personal workspace, never 「the oldest workspace」. |
 
-- **Verification is per person:** a person verifies a card once, on Stripe's
-  page.
-- **The payment method is per workspace:** each workspace designates the card
-  its credits are bought with. The designation goes when that member leaves.
-- Hosted admission: the person is verified and the workspace's balance is
-  positive. Card verification grants the one-off USD 1 allowance once per
-  card (open question 4).
+- **Verification is per person.** A person verifies a card once, on Stripe's
+  page. The one-off USD 1 credit goes to the verifier's personal workspace,
+  once per card.
+- **The payment method is per workspace.** Each workspace designates the card
+  its credits are bought with.
+- **Credits can be shared.** As with a card designation, a person may opt in
+  to share their credits with a team workspace. Both go away when that member
+  leaves.
+- **Hosted admission** requires a verified person and a positive balance in
+  the workspace.
 
 ## 8. MVP vs later
 
 | MVP | Later |
 | --- | --- |
-| Personal workspace for everyone; team workspaces beside it | — |
-| Account subscriptions, per-workspace shares, 团队成员也可以用, the admin switch | Per-member spend caps |
-| Model order of §2; Mikka 默认 when nothing else; no mid-run switch | — |
-| Mikka Cloud on the workspace's E2B key; Mac desktop and daemon servers as runners with the same contract | — |
-| Daemon-managed Agents; disposable containers where Docker exists, worktree plus temporary config dir elsewhere; one multi-arch image | — |
-| Device capability check (OS, arch, disk, Docker) instead of Agent detection | — |
-| Queue and action card when no machine | — |
-| One environment per thread; lease and heartbeat | — |
-| Credentials injected per run, wiped at the end | — |
-| No Mikka-hosted sandboxes, no free cloud trial | (not planned) |
-
-## Conflicts with today's docs and code
-
-Listed, with file:line and owner, in
-[2026-10-31-orchestration-conflicts](research/2026-10-31-orchestration-conflicts.md).
-Code rows are fixed by the pull request or session named there.
-
-## Open questions
-
-Listed with recommended answers in
-[the decision](decisions/2026-10-31-2300-orchestration-spec.md#open-questions-for-alex).
-This file follows the recommendations until Alex answers.
+| A personal workspace for everyone; team workspaces beside it | — |
+| Account-level subscriptions, API keys and custom providers on 「API 与订阅」; per-workspace shares; 「分享给团队成员」; the admin switch | Per-member spend caps |
+| Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完时改用 API Key」; a popup when nothing is left | — |
+| Model → Agent mapping with a per-model override | — |
+| Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
+| Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a container where Docker exists, otherwise a worktree plus a temporary config dir, one multi-arch image | — |
+| A device capability check and 「允许自动调度」 instead of Agent detection and 「设备离线时」 | — |
+| Queue with an action card when there is no machine; the offline flow of §4 | — |
+| One environment per thread; leases and heartbeats; credentials injected each run and absent while paused | — |
+| Card verification per person; credit and card shares per workspace | — |
+| No Mikka-hosted sandboxes and no free cloud trial | (not planned) |

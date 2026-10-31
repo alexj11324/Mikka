@@ -13,9 +13,10 @@
 - Rule: —
 - Replaces, in part:
   - [2026-10-31-1834-every-bot-replies](2026-10-31-1834-every-bot-replies.md): the order (saved choice → account subscription → Mikka 默认) gains other members' shares.
-  - [2026-10-31-2130-personal-vs-workspace](2026-10-31-2130-personal-vs-workspace.md): 「a credential never runs another member's bot」 now has the opt-in exception 「团队成员也可以用」; cards and verification move to the person.
-  - `decisions.md` 2026-10-30 「No 自动」: the initial place is Mikka Cloud when the workspace has an E2B key, then a device; 「Bot 额度用完时 · 换用另一个账号」 no longer switches inside a run.
-  - `decisions.md` 2026-10-29 「hard spend guards」: hitting a cap queues the run instead of refusing it.
+  - [2026-10-31-2130-personal-vs-workspace](2026-10-31-2130-personal-vs-workspace.md): 「a credential never runs another member's bot」 now has the opt-in exception 「分享给团队成员」; cards and verification move to the person; bots of a leaving member are paused (暂停).
+  - `decisions.md` 2026-10-30 「No 自动」: the initial place is Mikka Cloud on the person's E2B key, then a device with 「允许自动调度」; 「设备离线时」 and 「Bot 额度用完时」 are replaced (answers 5 and 7 below).
+  - `decisions.md` 2026-10-29 「hard spend guards」: removed (answer 3).
+  - `decisions.md` 2026-10-30 「E2B runs only on the workspace's own API key」 and the 2130 decision's 「Team workspace: … the E2B key」: the E2B key is personal (answer 2).
   - The daemon's detection of the person's own Claude Code / Codex installs and logins ([local runtime](../../local-runtime.md), [execution settings](../../execution-rules.md)).
 
 [`../orchestration.md`](../orchestration.md) is the source of truth for model
@@ -25,40 +26,37 @@ comment that disagrees with it gets fixed; the conflicts known on this date
 are in
 [2026-10-31-orchestration-conflicts](../research/2026-10-31-orchestration-conflicts.md).
 
-## Open questions for Alex
+## Alex's answers to the open questions
 
-Each has a recommended answer; the spec follows the recommendation until Alex
-says otherwise.
+Source: Alex, 2026-10-31, relayed by the coordinator session. The Chinese
+names are his; the rest is the relayed summary, not a verbatim quote.
 
-1. **Which Agent runs a thread on Mikka 默认?** Today only bot chats use the
-   hosted model; threads need a Claude or Codex login.
-   Recommended: Codex for now, pointed at Mikka's model endpoint with a
-   run-scoped token billed to the workspace, so no provider key enters the
-   environment. Until that exists, a thread with no subscription stays queued
-   with 连接订阅 rather than failing.
-2. **Whose E2B key?** Rule 5 says 「the user's own E2B key」; today the key
-   belongs to the workspace (decision 2026-10-30, 2130).
-   Recommended: keep it per workspace. In a personal workspace it is the
-   person's own key; a team sets a team key. No member key inside a team for
-   MVP.
-3. **Machine caps now that the person's E2B pays.** Today: 3 running per owner,
-   20 per workspace, 60 compute hours per owner per 30 days, refused with 429.
-   Recommended: keep 3 per owner and 20 per workspace as queue limits (they
-   guard E2B's own concurrency ceiling), drop the 60-hour budget (Mikka no
-   longer pays), never refuse.
-4. **The USD 1 allowance under per-person verification.** Today it goes once
-   per card to the first workspace that verifies it.
-   Recommended: once per card, to the verifying person's personal workspace.
-5. **Bot 额度用完时.** With no mid-run switch, 停下等我 / 换用另一个账号 only
-   differ at the next run.
-   Recommended: retire the setting. A run whose subscription runs out stops
-   with 订阅额度已用完 and 重试; the next run resolves again by the normal
-   order.
-6. **Environment per run or per thread on Mikka Cloud?** Devices start every
-   run clean; today an E2B thread sandbox pauses between runs of a thread.
-   Recommended: keep pausing on E2B (faster follow-ups, no credential inside
-   while paused) and treat the thread's branch as the only state that must
-   survive, so either runner can pick up the next run.
-7. **设备离线时 default.** Today `wait`.
-   Recommended: keep `wait` for runs pinned to a device; unpinned runs already
-   follow the fallback order.
+1. **Agent per model.** API keys and custom providers are model credentials
+   alongside subscriptions. GPT/OpenAI models run on Codex and every other
+   model, Mikka 默认 included, on Claude Code; a person can override the Agent
+   per model. Threads never queue to ask for a subscription.
+2. **E2B key is personal and never shared.** A sandbox carries its owner's
+   credentials and app access (for example email), so member A never runs on
+   member B's E2B. In a team each member brings their own key; workspace-level
+   E2B keys go away.
+3. **No machine caps** when the person's own E2B key pays: the 3 / 20 running
+   limits and the 60-hour budget go away.
+4. **Credits.** The card-verification credit goes to the verifier's personal
+   workspace. A person can share credits with a team workspace by opting in,
+   as with a card designation.
+5. **Quota exhausted.** With 「订阅额度用完时改用 API Key」 on (default on), the
+   next run uses the owner's API key; never mid-run. When nothing is left the
+   run stops and a popup lets the person choose the model or credential, then
+   retry; retry does not re-resolve on its own. 「额度用完时：停下等我」 is
+   removed as unclear.
+6. **Environment per thread,** reused across its runs; credentials are
+   injected each run and absent while paused.
+7. **Device scheduling.** Each device has 「允许自动调度」, on by default for
+   servers and off for personal computers (Mac / Windows). A lost E2B sandbox
+   is replaced by a new one. A server that goes offline moves its run to E2B
+   when the person has a key, else to a personal computer with 允许自动调度
+   on, else shows an error with ways to fix it (enable scheduling on this
+   computer, add an E2B key, bring the server back). This replaces
+   「设备离线时」.
+8. **Copy.** The page is 「API 与订阅」; the share box reads 「分享给团队成员」;
+   a leaving member's bots are paused (暂停).

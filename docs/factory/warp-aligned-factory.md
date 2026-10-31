@@ -125,7 +125,7 @@ output redaction is a backstop, not a substitute for least privilege.
 ## Execution and budget
 
 Where runs execute is set by [`../design/orchestration.md`](../design/orchestration.md)
-(Mikka Cloud on the workspace's E2B key, or the person's own devices as runners
+(Mikka Cloud on the person's own E2B key, or the person's own devices as runners
 with the same contract). A runner declares the resource shape; `workerHost` (added when self-hosted
 workers are deployed) selects where it runs. Warp-hosted shapes are bounded by
 the plan; self-hosted capacity is bounded by the worker. Mikka additionally

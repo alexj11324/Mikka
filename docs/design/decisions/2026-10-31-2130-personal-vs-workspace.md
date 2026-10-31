@@ -6,7 +6,7 @@
   「可以按你的建议来」. Research and audit:
   [personal vs workspace](../research/2026-10-31-personal-vs-workspace.md)
 - Rule: —
-- Superseded in part by: [2026-10-31-2300-orchestration-spec](2026-10-31-2300-orchestration-spec.md) (a member may share a subscription with 「团队成员也可以用」; cards and verification belong to the person; Mikka Cloud time is billed by E2B to the workspace's own key, not by Mikka)
+- Superseded in part by: [2026-10-31-2300-orchestration-spec](2026-10-31-2300-orchestration-spec.md) (a member may share a credential with 「分享给团队成员」; cards and verification belong to the person; the E2B key is personal, never a team's, and E2B bills it, not Mikka; a leaving member's bots are paused; 「设备离线时」 and 「Bot 额度用完时」 are replaced)
 - Replaces: subscriptions stored and resolved per (owner, workspace); the
   Coordinator and memory extraction billed to the oldest workspace
 

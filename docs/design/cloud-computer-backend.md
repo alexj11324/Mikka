@@ -5,7 +5,7 @@ frontend is built separately** against the API contract in section 5. When the
 design changes, this document is updated, not forked. Revised 2026-10-27:
 separate thread machines and bot web sub-agents (section 2, R-72).
 
-> Orchestration (models, Agents, runners, scheduling, credentials, billing) follows [`orchestration.md`](orchestration.md); where this document disagrees, that file wins. Mikka hosts no sandboxes: every E2B sandbox here runs on the workspace's own E2B key.
+> Orchestration (models, Agents, runners, scheduling, credentials, billing) follows [`orchestration.md`](orchestration.md); where this document disagrees, that file wins. Mikka hosts no sandboxes: every E2B sandbox here runs on its owner's own E2B key, which is personal and never shared; a team workspace has no E2B key. Where this document says 「workspace」 for a machine, read 「owner in that workspace」 (machines are keyed by workspace and owner, `unattended-sandbox.md`).
 
 - Design review page: https://claude.ai/artifact/G8aEuFM4rwvGFeZbPYyVwU
 - Figma: file `zPe5LKycb2XuT1ivCLRw07`, section "云端电脑" (node `102:65`)
@@ -32,7 +32,7 @@ computer. The computer is keyed by `bots.id`, never `agents.id`:
   automatically when an agent needs it, or when the user presses 唤醒.
 - **设置 › 设备** lists only machines the user connected (this Mac, SSH hosts,
   Tailnet machines). Mikka Cloud is never listed there: it runs on the
-  workspace's E2B key, set in 密钥与环境.
+  person's own E2B key.
 - **添加设备**: a host field plus the hosts found in the user's `~/.ssh/config`
   and on their Tailnet; 设置 then shows progress through 登录 → 检查主机 →
   安装 Mikka → 启动服务 → 连接.
@@ -158,7 +158,8 @@ registers with `kind: "cloud"`, so the devices UI can exclude it.
 
 ### Secrets
 
-The E2B API key is the workspace's own key from 密钥与环境; there is no
+The E2B API key is the run owner's own key (today stored per workspace,
+moving to per person: [conflicts](research/2026-10-31-orchestration-conflicts.md) C21); there is no
 platform key in production ([hosted abuse controls](../backend/hosted-abuse-controls.md)).
 The server reads it; it is never handed to the model or to the sandbox. A
 platform `E2B_API_KEY` exists only for isolated acceptance.
@@ -367,7 +368,7 @@ provisions a machine without both.
 
 Prerequisites:
 
-1. The workspace has its own E2B key.
+1. The owner has their own E2B key.
 2. `20261029011635_subagents_thread_machines.sql` and
    `20261029080001_owner_cloud_machines.sql` are applied to the matching
    database.
@@ -400,8 +401,9 @@ runs cannot both take the last slot:
 
 Today a blocked request returns `429` (`Thread machine limit reached`, `Workspace
 machine limit reached`, or `Thread machine budget exhausted`); it never
-provisions or bills. Under [orchestration](orchestration.md) § 5 a cap queues
-the run instead; that change is pending in code. Invalid, zero or negative settings fall back to the
+provisions or bills. Under [orchestration](orchestration.md) § 5 there are no
+Mikka caps when the person's own E2B key pays; removing them is pending in code
+(conflict C15). Invalid, zero or negative settings fall back to the
 defaults, so there is no "unlimited" configuration.
 
 Compute hours are tracked, not assumed: the migration adds `runningSince` and

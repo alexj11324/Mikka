@@ -6,7 +6,8 @@ Backend only. The settings UI is maintained separately in #529 and its dependent
 > Agent discovery follow [`design/orchestration.md`](design/orchestration.md),
 > which wins where they differ; the pending code changes are listed in
 > [orchestration conflicts](design/research/2026-10-31-orchestration-conflicts.md)
-> (C7, C11–C13, C16).
+> (C7, C11–C16, C23, C24). 「设备离线时」 and 「Bot 额度用完时」 are replaced by
+> 「允许自动调度」 and 「订阅额度用完时改用 API Key」.
 
 ## Frontend contract
 
@@ -54,8 +55,8 @@ Without a matching local install, a connected cloud binding supplies an explicit
 cloud choice. No server model-name constants or guessed model names are used.
 When no usable report/binding exists, return `executionModelUnknown` rather than
 inventing an automatic choice; redetect/connect an account first. Target: the
-place is Mikka Cloud when the workspace has an E2B key, otherwise an online
-device, and the model resolves separately, falling back to Mikka 默认
+place is Mikka Cloud when the owner has an E2B key, otherwise an online
+device with 「允许自动调度」 on, and the model resolves separately, falling back to Mikka 默认
 ([orchestration](design/orchestration.md) § 2, § 4).
 
 `20261031054017_explicit_execution.sql` is idempotent: it makes the label nullable,
