@@ -99,7 +99,11 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and "removedAt" is null order by "createdAt" desc limit 50', [session.userId, workspaceId])
     // Which Bots use each connection is a nicety: the list still loads without it.
     const bots = await service.repository.connectionBots(session.userId, workspaceId).catch(() => [])
-    return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(service.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: accountLabel(row.accountLabel), bots: bots.filter(bot => bot.connectionId === row.id).map(({ id, name, color, shape }) => ({ id, name, color, shape })) })) }, { headers })
+    // Listing needs custody only; sign-in needs the full runtime (connect). Offer
+    // 连接 only when that runtime exists, or every click fails the same way.
+    let signIn: SubscriptionService | null = null
+    try { signIn = deps.service(false) } catch { /* custody-only deployment: list and remove still work */ }
+    return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(signIn?.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: accountLabel(row.accountLabel), bots: bots.filter(bot => bot.connectionId === row.id).map(({ id, name, color, shape }) => ({ id, name, color, shape })) })) }, { headers })
   } catch (error) {
     if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable') return Response.json({ enabled: false, providers: [], connections: [] }, { headers })
     return Response.json({ error: 'subscription_unavailable' }, { status: 409, headers })

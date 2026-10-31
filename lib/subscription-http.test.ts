@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { SubscriptionRefusal } from '@mikka/protocol/subscription'
 import { WorkerRefusal } from '../packages/daemon/src/subscription-worker-client'
-import { subscriptionHTTP, type SubscriptionHTTPDependencies } from './subscription-http'
+import { subscriptionHTTP, subscriptionList, type SubscriptionHTTPDependencies } from './subscription-http'
 import type { SubscriptionService } from './subscription-service'
 
 const workspaceId = randomUUID(), connectionId = randomUUID()
@@ -49,4 +49,18 @@ test('route refusals keep their code; unknown errors stay generic but are logged
   assert.deepEqual(JSON.parse(unknown.lines[0]), { level: 'warn', msg: 'subscription_refused', action: 'connect', provider: 'codex', code: 'subscription_unavailable', error: 'TypeError' })
   const odd = connect(new WorkerRefusal('Not A Code'))
   assert.deepEqual(await (await odd.response).json(), { error: 'subscription_unavailable' })
+})
+
+test('Connect is offered only when the sign-in runtime exists, not just custody', async () => {
+  const custody = {
+    capabilities: { oauth: { codex: true, claude: true } },
+    repository: { pool: { query: async () => ({ rows: [] }) }, connectionBots: async () => [] },
+  } as unknown as SubscriptionService
+  const list = (full: boolean) => subscriptionList(new Request(`https://mikka.test/api/subscriptions?workspace=${workspaceId}`), {
+    session: async () => ({ userId: 'user-1', sessionId: 's' }),
+    workspace: async () => undefined,
+    service: custodyOnly => { if (!custodyOnly && !full) throw new SubscriptionRefusal('backend_unavailable'); return custody },
+  })
+  assert.deepEqual((await (await list(false)).json()).providers, [{ provider: 'codex', available: false }, { provider: 'claude', available: false }])
+  assert.deepEqual((await (await list(true)).json()).providers, [{ provider: 'codex', available: true }, { provider: 'claude', available: true }])
 })
