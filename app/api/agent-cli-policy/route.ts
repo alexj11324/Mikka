@@ -9,7 +9,7 @@ const schema = z.discriminatedUnion('operation', [
   z.object({ operation:z.literal('read'), runId:z.uuid() }).strict(),
   z.object({ operation:z.literal('readAgent'), agentId:z.uuid(), botId:z.uuid().nullable() }).strict(),
   z.object({ operation:z.literal('setAgent'), agentId:z.uuid(), botId:z.uuid().nullable(), target:z.enum(['agent','worker','workspace']), expectedRevision:z.string().regex(/^[a-f0-9]{64}$/), policy:z.unknown() }).strict(),
-  z.object({ operation:z.literal('set'), runId:z.uuid(), target:z.enum(['agent','worker','workspace']), expectedRevision:z.string().regex(/^[a-f0-9]{64}$/), policy:z.unknown() }).strict(),
+  z.object({ operation:z.literal('set'), runId:z.uuid(), target:z.enum(['agent','worker','workspace','team','project']), expectedRevision:z.string().regex(/^[a-f0-9]{64}$/), policy:z.unknown() }).strict(),
 ])
 export async function POST(request: Request) {
   if (!request.headers.get('cookie') || request.headers.has('authorization') || request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error:'unauthorized' }, { status:401 })
