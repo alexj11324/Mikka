@@ -233,8 +233,11 @@ export const agentComponentGroups: { name: string; components: AgentComponentNam
   { name: '本地内容与兼容组件', components: ['TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BeTimeline', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'Separator', 'BeFileTree', 'BeFileDiff', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；BeFileDiff 只展示建议修改；ToolResult、AgentActivity、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不开放给模型，不自动生成虚构工具记录。', '报告优先使用 beUI：提示用 BeAlert，表格用 BeTable，标签页用 BeTabs；趋势用 LineChart，分类对比用 BarChart，图表颜色来自主题图表色，只用用户或工具提供的数字。'] },
 ]
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenUI types each built-in renderer by its own props.
+type AnyRenderer = ComponentRenderer<any>
+
 /** `block` wraps OpenUI's own renderers, so the host can treat its cards, tables and charts like its own. */
-export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> = {}, block?: (name: string, render: ComponentRenderer<never>) => ComponentRenderer<never>) {
+export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> = {}, block?: (name: string, render: AnyRenderer) => AnyRenderer) {
   const names = Object.keys(agentComponentCatalog) as AgentComponentName[]
   const components = names.map(name => {
     const definition = agentComponentCatalog[name]
@@ -247,7 +250,7 @@ export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> =
   return createLibrary({
     root: 'Stack',
     components: [...Object.values(openuiLibrary.components).filter(component => !names.includes(component.name as AgentComponentName))
-      .map(component => block ? { ...component, component: block(component.name, component.component as ComponentRenderer<never>) } : component), ...components],
+      .map(component => block ? { ...component, component: block(component.name, component.component) } : component), ...components],
     functions: Object.values(openuiLibrary.functions),
     actions: Object.values(openuiLibrary.actions) as DefinedAction[],
     componentGroups: agentComponentGroups,
