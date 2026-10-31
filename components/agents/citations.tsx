@@ -1,5 +1,7 @@
 "use client";
 
+// beui.dev/components/agents/citations
+
 import { Button } from "@/components/ui/button";
 import { BookOpenText, ChevronDown, ExternalLink, Globe2 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";

@@ -1,0 +1,48 @@
+/* github.com/starc007/beui-native/blob/main/src/styles/theme.css
+   Light values are Mikka's colours from lib/theme.ts; dark keeps beUI's. */
+@layer theme {
+  :root {
+    @variant light {
+      --color-background: #ffffff;
+      --color-surface: #f2f2f7;
+      --color-foreground: #1c1c1e;
+      --color-muted: #8a8a8e;
+      --color-border: #e5e5ea;
+      --color-border-strong: #b0b0b5;
+      --color-primary: #3478f6;
+      --color-on-primary: #ffffff;
+      --color-destructive: #e5484d;
+      --color-success: #34c759;
+      --color-warning: #e8840c;
+    }
+  }
+
+  :root {
+    @variant dark {
+      --color-background: #151515;
+      --color-surface: #1c1c1c;
+      --color-foreground: oklch(96% 0 0);
+      --color-muted: oklch(62% 0 0);
+      --color-border: rgb(255 255 255 / 0.05);
+      --color-border-strong: rgb(255 255 255 / 0.14);
+      --color-primary: #0285f7;
+      --color-on-primary: #ffffff;
+      --color-destructive: #f87171;
+      --color-success: #34d399;
+      --color-warning: #fbbf24;
+    }
+  }
+
+  /* Tailwind's default monospace stack isn't a font React Native can load. */
+  :root {
+    @variant ios {
+      --font-mono: Menlo;
+    }
+  }
+
+  :root {
+    @variant android {
+      --font-mono: monospace;
+    }
+  }
+}
