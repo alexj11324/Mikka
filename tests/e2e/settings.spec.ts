@@ -466,11 +466,13 @@ test('设置侧栏的搜索框在浅色、深色和半透明窗口里都与侧�
   ]
   for (const { name, scheme, translucent } of cases) {
     await page.emulateMedia({ colorScheme: scheme })
-    await page.evaluate(on => {
+    // A solid colour stands in for the window material: light behind a light window, dark behind a dark one.
+    const material = scheme === 'dark' ? 'rgb(40 40 40)' : 'rgb(200 200 200)'
+    await page.evaluate(({ on, material }) => {
       const root = document.documentElement
-      if (on) { root.dataset.desktopPlatform = 'darwin'; root.dataset.desktopTranslucent = ''; document.body.style.background = 'rgb(200 200 200)' }
+      if (on) { root.dataset.desktopPlatform = 'darwin'; root.dataset.desktopTranslucent = ''; document.body.style.background = material }
       else { delete root.dataset.desktopTranslucent; document.body.style.background = '' }
-    }, translucent)
+    }, { on: translucent, material })
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     const box = (await field.boundingBox())!
     // Inside the field at its right end (no icon or text there) against the sidebar just below it.
