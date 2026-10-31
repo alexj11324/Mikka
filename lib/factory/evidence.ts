@@ -14,6 +14,8 @@ export interface FactoryCaptureEvidence {
   title: string;
   size: number;
   durationMs: number | null;
+  /** A recording's timeline (Figma 13): each step's offset and the agent's own description. */
+  steps?: { atMs: number; label: string }[];
 }
 
 export function digest(value: unknown): string {
@@ -135,7 +137,14 @@ export async function readFactoryArtifact(
       size: (row.size as number | null) ?? 0,
       durationMs: (row.durationMs as number | null) ?? null,
     };
-    raw = capture;
+    raw = { ...capture };
+    if (row.kind === "video") {
+      const { rows: steps } = await tx.query(
+        `SELECT "atMs",label FROM run_capture_steps WHERE "captureId"=$1 AND "userId"=$2 ORDER BY "atMs","createdAt" LIMIT 200`,
+        [row.id, task.userId],
+      );
+      capture.steps = steps.map((step) => ({ atMs: step.atMs as number, label: step.label as string }));
+    }
     sourceTime = row.updatedAt;
   } else {
     // Only existing, access controlled artifacts. Arbitrary URLs never count.
