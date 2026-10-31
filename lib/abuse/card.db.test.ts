@@ -78,6 +78,16 @@ test('hosted Checkout verification on isolated PostgreSQL', { skip: !dbUrl }, as
     assert.equal((await pool.query('SELECT * FROM hosted_card_claims WHERE "workspaceId"=$1', [ws.id])).rowCount, 1)
   })
 
+  await t.test('old verification with the same card fills missing last4 without resetting its allowance', async () => {
+    const ws = await workspace(), card = `card_${randomUUID()}`
+    await hostedUsage.verify(ws.id, 'cus_old', card)
+    const setup = await create(ws.id, card, '5678')
+    await pool.query('UPDATE hosted_allowances SET remaining=100000 WHERE "workspaceId"=$1', [ws.id])
+    await applyCardCheckout(setup.session, setup.fake)
+    assert.deepEqual(await cardVerificationStatus(owner, ws.id), { status: 'verified', last4: '5678', allowance: 'granted', remainingAllowanceMicroUsd: 100_000, remainingAllowancePoints: 10 })
+    assert.equal(await auditCount(ws.id), 1)
+  })
+
   await t.test('status is authorized, pending before webhook, unverified after expiration, unavailable without Stripe', async () => {
     const ws = await workspace()
     assert.equal((await cardVerificationStatus(owner, ws.id)).status, 'unverified')
