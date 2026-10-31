@@ -10,6 +10,7 @@ type FileKind = 'artifact' | 'capture' | 'checkpoint'
 interface File {
   kind: FileKind; id: string; name: string; size: number | null; sha256: string | null
   contentType: string; unavailable?: string; artifactId?: string; version?: number; runId?: string
+  baseCommit?: string; files?: number; takenAt?: string; updatedAt?: string
 }
 const CHUNK_BYTES = 64 * 1024
 const RECHECK_BYTES = 1024 * 1024
@@ -21,7 +22,7 @@ export async function accountExportFiles(userId: string, database: Pool = pool):
       FROM artifact_versions v JOIN artifacts a ON a.id=v."artifactId" WHERE a."userId"=$1 ORDER BY v."artifactId",v.version`, [userId]),
     database.query<{ id: string; runId: string; status: string; contentType: string; size: number | null; sha256: string | null }>(`SELECT c.id,c."runId",c.status,c."contentType",c.size,c.sha256 FROM run_captures c
       JOIN agent_runs r ON r.id=c."runId" WHERE c."userId"=$1 AND r."userId"=$1 ORDER BY c."createdAt",c.id`, [userId]),
-    database.query<{ id: string; size: number; sha256: string; unavailableReason: string | null }>(`SELECT c."runId" AS id,octet_length(c.patch)::int AS size,encode(sha256(c.patch),'hex') AS sha256,c."unavailableReason" FROM run_checkpoints c
+    database.query<{ id: string; size: number; sha256: string; baseCommit: string; files: number; takenAt: Date; updatedAt: Date; unavailableReason: string | null }>(`SELECT c."runId" AS id,octet_length(c.patch)::int AS size,encode(sha256(c.patch),'hex') AS sha256,c."baseCommit",c.files,c."takenAt",c."updatedAt",c."unavailableReason" FROM run_checkpoints c
       JOIN agent_runs r ON r.id=c."runId" WHERE c."userId"=$1 AND r."userId"=$1 ORDER BY c."runId"`, [userId]),
   ])
   return [
@@ -30,6 +31,7 @@ export async function accountExportFiles(userId: string, database: Pool = pool):
     ...captures.rows.map(row => ({ kind: 'capture' as const, id: row.id, runId: row.runId, name: `capture-${row.id}`, contentType: row.contentType,
       size: row.size, sha256: row.sha256, ...(row.status === 'ready' ? {} : { unavailable: `capture_${row.status}` }) })),
     ...checkpoints.rows.map(row => ({ kind: 'checkpoint' as const, id: row.id, runId: row.id, name: `run-${row.id}.patch.gz`, contentType: 'application/gzip',
+      baseCommit: row.baseCommit, files: row.files, takenAt: row.takenAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
       size: row.size, sha256: row.sha256, ...(row.unavailableReason ? { unavailable: `checkpoint_${row.unavailableReason}` } : {}) })),
   ]
 }

@@ -15,7 +15,10 @@ export async function credentialActor(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) throw new CredentialError('credential_auth_required', 401)
   const context = await loadWorkspaceContext(undefined, session.user)
-  return { userId: session.user.id, workspaceId: context.workspace.id }
+  const auditActor = session.tokenWorkspaceId
+    ? { type: 'token' as const, id: session.session.id.replace(/^pat:/, ''), name: 'Personal access token' }
+    : { type: 'user' as const, id: session.user.id, name: session.user.name || session.user.id }
+  return { userId: session.user.id, workspaceId: context.workspace.id, auditActor }
 }
 
 export async function login(caller: BrowserCaller, site: string, submittedUsername?: string, options?: { forcePassword?: boolean }) {
