@@ -26,8 +26,10 @@
   in the Claude app: the quote, the words, then 「+」 and send.
 - A bot's reply has 复制 under it. A long press on a message opens a system
   sheet (Alex, with a screenshot: 「长按应该是可以弹出这个东西才对」): 回复,
-  复制, 选择文本. Reactions wait for the server to keep them.
+  复制, 选择文本. Reactions (the emoji row above them) come after 新建 Bot and
+  新建群聊 (Alex: 「表情回应那里，你可以做，你排到后面去」); they need the
+  server to keep them.
 
 Defaults Alex left standing when asked: two tabs (对话, 线程); the
-Coordinator pinned first. 新建 Bot and 新建群聊 from 「+」 come next, with
-their mobile endpoints.
+Coordinator pinned first. Order of the rest: the bot's page (电脑, PR, 定时任务,
+资料库), then 新建 Bot and 新建群聊 from 「+」, then reactions.
