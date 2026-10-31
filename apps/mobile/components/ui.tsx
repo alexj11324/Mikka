@@ -157,8 +157,8 @@ export function Capsule({ children }: { children: ReactNode }) {
     : <View style={[styles.capsule, { backgroundColor: '#fff' }, lift]}>{children}</View>
 }
 
-/** The field's surface: Liquid Glass on iOS 26, white with a lift elsewhere. */
-function Field({ style, children }: { style: StyleProp<ViewStyle>; children: ReactNode }) {
+/** A field's surface (the composer, the drawer's search): Liquid Glass on iOS 26, white with a lift elsewhere. */
+export function Field({ style, children }: { style: StyleProp<ViewStyle>; children: ReactNode }) {
   return glass ? <GlassView style={[style, { backgroundColor: undefined }]}>{children}</GlassView> : <View style={[style, lift]}>{children}</View>
 }
 

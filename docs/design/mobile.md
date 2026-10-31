@@ -50,7 +50,8 @@ Drawer, top to bottom:
 | 置顶 | 置顶 | Pinned bots and group chats |
 | 最近 | 最近 | The other bots and group chats, newest first (the web bot list, R-01) |
 | 重启以更新 | 重启以更新 | Only once an update has downloaded; tapping restarts into it ([decision](decisions/2026-10-31-2010-ota-updates.md)) |
-| Bottom | 新建 · avatar | New bot or chat; the avatar opens Settings |
+| Top | 搜索 · 新建 | A Liquid Glass search field that filters the drawer, and a compose button (new chat) |
+| Bottom | Avatar · name | The person; opens Settings (as in ChatGPT and Claude on iOS) |
 
 The Coordinator is the first ordinary row in the drawer and the default
 screen; it gets no other special UI (R-06).

@@ -29,3 +29,11 @@ and other files are refused until the server can read them.
 
 The `ios-design` skill is vendored in `.claude/skills/ios-design/` and is the
 checklist for iOS work. These native modules need a new TestFlight build.
+
+Later the same evening, on 「你这个抽屉不像原生呀」: the drawer's icons are SF
+Symbols; its top is a Liquid Glass search field and a compose button (新建),
+which replace the 「Mikka」 title and the blue 「新建」 pill; its last row is
+the person's avatar and name, opening 设置; the pushed screen dims as the
+drawer opens. Under the bars, content blurs (top, the system's scroll-edge
+effect) and fades (behind the composer), and the bot's name sits in a glass
+capsule.
