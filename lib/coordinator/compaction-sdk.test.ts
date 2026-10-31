@@ -9,9 +9,10 @@ const scope={ownerId:'synthetic-owner',botId:id(1),workspaceId:id(2)}
 const selection={type:'subscription' as const,bindingId:id(3),ownerId:scope.ownerId,consumerId:scope.botId,workspaceId:scope.workspaceId,connectionId:id(4),connectionRevision:1,modelId:'synthetic-stream-model',route:'claude_cpa' as const}
 
 mock.module(new URL('../model-admission/runtime.ts', import.meta.url).href, { namedExports: {
- assertUnmanagedModelTransport: async (actualScope: {workspaceId:string;ownerId:string}, modelId: string) => {
+ assertSubscriptionModelTransport: async (actualScope: {workspaceId:string;ownerId:string}, modelId: string, route: string) => {
   assert.deepEqual(actualScope, {workspaceId:scope.workspaceId,ownerId:scope.ownerId})
   assert.equal(modelId, selection.modelId)
+  assert.equal(route, selection.route)
  },
 } })
 before(async () => { compactWithFrozenModel = (await import('./compaction-model')).compactWithFrozenModel })

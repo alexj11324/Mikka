@@ -55,7 +55,11 @@ export const realCliMembershipGuard: CliMembershipGuard = async (workspaceId, us
 
 // Computer authority has its existing persisted broker policy. Adding a
 // shared protocol action must not silently create a second writable source.
-export const cliPolicyLayerSchema = z.strictObject({ permissions: storedPermissionsSchema.omit({ computer_use: true }).optional(), networkAllow: networkAllowSchema.optional(), approvalMode: approvalModeSchema.optional() })
+export const cliPolicyValuesSchema = z.strictObject({ permissions: storedPermissionsSchema.omit({ computer_use: true }).optional(), networkAllow: networkAllowSchema.optional(), approvalMode: approvalModeSchema.optional() })
+export const cliPolicyLayerSchema = cliPolicyValuesSchema.extend({ defaults: cliPolicyValuesSchema.optional() })
+type CliPolicyValues = z.infer<typeof cliPolicyValuesSchema>
+// Defaults replace scalar/list fields; permission choices inherit per action.
+const mergeCliPolicyValues = (base: CliPolicyValues, next: CliPolicyValues): CliPolicyValues => ({ ...base, ...next, ...(next.permissions ? { permissions: { ...base.permissions, ...next.permissions } } : {}) })
 const rank = { deny: 0, ask: 1, allow: 2 } as const
 /** Caller identity is authenticated by the host. Workspace membership is
  * separately pinned by cliAgentPolicyGuard through transaction commit. */
@@ -79,7 +83,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
   for (const id of workspaceIds) await tx.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission) VALUES ($1,'allow') ON CONFLICT ("workspaceId") DO NOTHING`, [id])
   const agentRow = await tx.query<{ policy: unknown; version: string; generation: string; workspace: string | null }>(`SELECT cli_run_policy AS policy,cli_run_policy_version AS version,cli_run_policy_generation AS generation,workspace_id AS workspace FROM agent_kit_heads WHERE owner_id=$1 AND bot_key=$2 FOR SHARE`, [userId,key])
   if (!agentRow.rows[0] || agentRow.rows[0].workspace !== scope.workspaceId) throw new Error('agentPolicyUnavailable')
-  const agent = cliPolicyLayerSchema.parse(agentRow.rows[0]?.policy ?? {})
+  const agent = cliPolicyValuesSchema.parse(agentRow.rows[0]?.policy ?? {})
   const workerRow = await tx.query<{ policy: unknown; version: string; generation: string; deviceId: string | null }>(`SELECT cli_run_policy AS policy,cli_run_policy_version AS version,cli_run_policy_generation AS generation,"deviceId" FROM agents WHERE id=$1 AND "userId"=$2 FOR SHARE`, [scope.agentId,userId])
   if (!workerRow.rows[0]) throw new Error('agentPolicyUnavailable')
   // A new owned worker can be configured before its first device assignment.
@@ -91,17 +95,18 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     if (!device.rows[0]) throw new Error('agentPolicyUnavailable')
     deviceKind = device.rows[0].kind
   }
-  const worker = cliPolicyLayerSchema.parse(workerRow.rows[0].policy)
+  const worker = cliPolicyValuesSchema.parse(workerRow.rows[0].policy)
   const workerVersion = String(workerRow.rows[0].version)
   const agentVersion = String(agentRow.rows[0]?.version ?? '0')
   let workspace: z.infer<typeof cliPolicyLayerSchema> = {}
   const workspaceLayers: z.infer<typeof cliPolicyLayerSchema>[] = []
+  const workspaceById = new Map<string, z.infer<typeof cliPolicyLayerSchema>>()
   const workspaceVersions: string[][] = []
   for (const id of workspaceIds) {
     const row = await tx.query<{ policy: unknown; version: string; generation: string }>(`SELECT cli_run_policy AS policy,cli_run_policy_version AS version,cli_run_policy_generation AS generation FROM workspace_computer_policies WHERE "workspaceId"=$1 FOR SHARE`, [id])
     if (!row.rows[0]) throw new Error('agentPolicyUnavailable')
     const layer = cliPolicyLayerSchema.parse(row.rows[0].policy)
-    workspaceLayers.push(layer)
+    workspaceLayers.push(layer); workspaceById.set(id, layer)
     if (id === primaryWorkspaceId) workspace = layer
     const version = String(row.rows[0].version)
     if (!/^\d+$/.test(version)) throw new Error('agentPolicyUnavailable')
@@ -122,7 +127,22 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     scopedLayers.push(layer); scopeLayers[kind] = layer
     scopeVersions.push([kind,id,row.generation,String(row.version)])
   }
-  const policy = resolveTrustedRunPolicy({ workspace: { permissions: agent.permissions, networkAllow: agent.networkAllow }, personalApprovalMode: agent.approvalMode, environment: deviceKind === 'cloud' ? 'cloud' : 'local' })
+  let defaults: CliPolicyValues = {}
+  const defaultSources: { scope: 'workspace' | 'team' | 'project'; scopeId: string; defaults: CliPolicyValues }[] = []
+  const inherit = (scope: 'workspace' | 'team' | 'project', scopeId: string, layer?: z.infer<typeof cliPolicyLayerSchema>) => {
+    if (!layer?.defaults) return
+    defaults = mergeCliPolicyValues(defaults, layer.defaults)
+    defaultSources.push({ scope, scopeId, defaults: layer.defaults })
+  }
+  // Locks/revisions keep UUID order. Inheritance instead follows specificity:
+  // the task workspace overrides its Bot's workspace, then its team/project.
+  for (const id of new Set([workspaceId, task?.workspaceId].filter((id): id is string => !!id))) inherit('workspace', id, workspaceById.get(id))
+  if (hierarchy) {
+    inherit('team', hierarchy.teamId, scopeLayers.team)
+    if (hierarchy.projectId) inherit('project', hierarchy.projectId, scopeLayers.project)
+  }
+  const configured = mergeCliPolicyValues(defaults, agent)
+  const policy = resolveTrustedRunPolicy({ workspace: { permissions: configured.permissions, networkAllow: configured.networkAllow }, personalApprovalMode: configured.approvalMode, environment: deviceKind === 'cloud' ? 'cloud' : 'local' })
   for (const layer of [worker, ...workspaceLayers, ...scopedLayers]) {
     for (const action of CONFIGURABLE_ACTIONS) {
       if (action === 'computer_use') continue
@@ -141,7 +161,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     policy.permissions.git_push = 'deny'
   }
   const revision = createHash('sha256').update(JSON.stringify(['sandbox-task-policy-v2',deviceKind,userId,scope.botId,scope.workspaceId,scope.agentId,agentRow.rows[0].generation,agentVersion,workerRow.rows[0].generation,workerVersion,workspaceVersions,scopeVersions,task ?? null])).digest('hex')
-  return { policy, revision, workspaceId: primaryWorkspaceId, workspaceIds, hierarchy, layers: { agent, worker, workspace, ...scopeLayers } }
+  return { policy, revision, workspaceId: primaryWorkspaceId, workspaceIds, hierarchy, defaults, defaultSources, policySnapshotRequired: [...workspaceLayers, ...scopedLayers].some(layer => Object.keys(layer).length > 0), layers: { agent, worker, workspace, ...scopeLayers } }
 }
 
 /** Resolve a run's exact owner, Bot and worker; then use the same policy layer. */

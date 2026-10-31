@@ -20,7 +20,7 @@ const CORRECTION_LIMIT = 10
 const TEXT_LIMIT = 2000
 
 /** An agent in the group, with its role description from the Agent settings page. */
-export interface RoutingMember { id: string; name: string; description: string }
+export interface RoutingMember { id: string; name: string; description: string; memberType?: 'agent' | 'bot' }
 /** A message the router routed to the wrong member; `rightId` is who the person meant, when they said. */
 export interface RoutingCorrection { message: string; wrongId: string; rightId?: string }
 export interface GroupMessage { text: string; mentions: readonly string[]; recent?: readonly { author: string; text: string }[] }

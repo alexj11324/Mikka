@@ -32,6 +32,8 @@
     "./profile": "./src/profile.ts",
     "./quota": "./src/quota.ts",
     "./agent-policy": "./src/agent-policy.ts",
+    "./policy-snapshot": "./src/policy-snapshot.ts",
+    "./node-policy-snapshot": "./src/node-policy-snapshot.ts",
     "./api": "./src/api.ts",
     "./analytics": "./src/analytics.ts",
     "./analytics-client": "./src/analytics-client.ts",

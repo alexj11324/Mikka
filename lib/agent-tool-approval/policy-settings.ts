@@ -1,11 +1,20 @@
-import type { Pool } from 'pg'
+import type { Pool, PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { writeTransaction } from '@/lib/operations/write-transaction'
-import { cliPolicyGuard, cliAgentPolicyGuard, cliPolicyLayerSchema, lockCliRunPolicy, lockCliAgentPolicy, realCliMembershipGuard, type CliMembershipGuard } from './policy-store'
+import { cliPolicyGuard, cliAgentPolicyGuard, cliPolicyLayerSchema, cliPolicyValuesSchema, lockCliRunPolicy, lockCliAgentPolicy, realCliMembershipGuard, type CliMembershipGuard } from './policy-store'
+
+async function auditSharedPolicy(tx: PoolClient, ownerId: string, scope: 'workspace' | 'team' | 'project', current: Awaited<ReturnType<typeof lockCliAgentPolicy>>) {
+  const workspaceId = scope === 'workspace' ? current.workspaceId : current.hierarchy?.workspaceId
+  const scopeId = scope === 'workspace' ? workspaceId : current.hierarchy?.[scope === 'team' ? 'teamId' : 'projectId']
+  if (!workspaceId || !scopeId) throw new Error('agentPolicyUnavailable')
+  const { recordAudit } = await import('@/lib/audit/record')
+  await recordAudit(drizzle(tx), { workspaceId, actor: { type: 'user', id: ownerId, name: ownerId }, action: 'agent.policy_changed',
+    target: { type: scope, id: scopeId, label: scope }, metadata: { scope, revision: current.revision } })
+}
 
 /** Own CLI fields only; external-write/computer choices are never changed. */
 export async function setCliPolicy(pool: Pick<Pool, 'connect'>, ownerId: string, runId: string, target: 'agent' | 'worker' | 'workspace' | 'team' | 'project', expectedRevision: string, input: unknown, membership: CliMembershipGuard = realCliMembershipGuard) {
-  const policy = cliPolicyLayerSchema.parse(input)
+  const policy = (target === 'agent' || target === 'worker' ? cliPolicyValuesSchema : cliPolicyLayerSchema).parse(input)
   const guard = cliPolicyGuard(runId,ownerId,membership)
   return writeTransaction(pool, async tx => {
     // Tool liveness and approval decisions lock run -> policy. Take the run
@@ -26,11 +35,7 @@ export async function setCliPolicy(pool: Pick<Pool, 'connect'>, ownerId: string,
       await tx.query('UPDATE workspace_computer_policies SET cli_run_policy=$2 WHERE "workspaceId"=$1', [current.workspaceId,policy])
     }
     const next = await lockCliRunPolicy(tx,runId,ownerId)
-    if ((target === 'team' || target === 'project') && next.hierarchy) {
-      const { recordAudit } = await import('@/lib/audit/record')
-      await recordAudit(drizzle(tx),{ workspaceId: next.hierarchy.workspaceId,actor:{type:'user',id:ownerId,name:ownerId},action:'agent.policy_changed',
-        target:{type:target,id:next.hierarchy[target === 'team' ? 'teamId' : 'projectId']!,label:target},metadata:{scope:target,revision:next.revision} })
-    }
+    if (target === 'workspace' || target === 'team' || target === 'project') await auditSharedPolicy(tx, ownerId, target, next)
     return next
   }, { guard: async (tx,signal) => {
     const lease = await guard(tx,signal)
@@ -49,7 +54,7 @@ export async function setCliPolicy(pool: Pick<Pool, 'connect'>, ownerId: string,
 
 /** A person may configure a worker before its first run. */
 export async function setCliAgentPolicy(pool: Pick<Pool, 'connect'>, ownerId: string, agentId: string, botId: string | null, target: 'agent' | 'worker' | 'workspace', expectedRevision: string, input: unknown, membership: CliMembershipGuard = realCliMembershipGuard) {
-  const policy = cliPolicyLayerSchema.parse(input)
+  const policy = (target === 'agent' || target === 'worker' ? cliPolicyValuesSchema : cliPolicyLayerSchema).parse(input)
   const guard = cliAgentPolicyGuard(ownerId,agentId,botId,membership)
   return writeTransaction(pool, async tx => {
     const current = await lockCliAgentPolicy(tx,ownerId,agentId,botId)
@@ -60,7 +65,9 @@ export async function setCliAgentPolicy(pool: Pick<Pool, 'connect'>, ownerId: st
       if (!current.workspaceId) throw new Error('agentPolicyUnavailable')
       await tx.query('UPDATE workspace_computer_policies SET cli_run_policy=$2 WHERE "workspaceId"=$1', [current.workspaceId,policy])
     }
-    return lockCliAgentPolicy(tx,ownerId,agentId,botId)
+    const next = await lockCliAgentPolicy(tx,ownerId,agentId,botId)
+    if (target === 'workspace') await auditSharedPolicy(tx, ownerId, target, next)
+    return next
   }, { guard: async (tx,signal) => {
     const lease = await guard(tx,signal)
     try {

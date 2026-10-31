@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { admitGatewayRoute, GATEWAY_MODEL_ENDPOINT, managedGatewayOptions, ModelAdmissionError, parseModelAdmissionPolicy } from './contract'
+import { admitGatewayRoute, admitModelRoute, GATEWAY_MODEL_ENDPOINT, managedGatewayOptions, ModelAdmissionError, parseModelAdmissionPolicy, subscriptionModelRoute } from './contract'
 
 const request = { ownerId: 'alice', model: 'deepseek/deepseek-v4.1-flash', endpoint: GATEWAY_MODEL_ENDPOINT }
 const rule = { provider: 'vercel-gateway', endpoint: GATEWAY_MODEL_ENDPOINT, model: request.model,
@@ -28,4 +28,18 @@ test('policy input cannot declare another transport, proxy URL or undocumented f
     { servingProviders: [] }, { servingProviders: ['deepseek','another-provider'] }, { credentials: 'never accepted' }])
     assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...rule, ...changed }] }), denied('modelPolicyInvalid'))
   assert.throws(() => parseModelAdmissionPolicy({schemaVersion:1,routes:[rule,rule]}),denied('modelPolicyInvalid'))
+})
+test('existing subscription routes pin the worker endpoint, physical provider and exact model without claiming a region', () => {
+  for (const kind of ['codex_cpa', 'claude_cpa', 'codex_cli', 'claude_code_cli']) {
+    const transport = subscriptionModelRoute(kind)
+    const route = { ...transport, model: 'provider-model', servingProviders: [kind.startsWith('codex') ? 'openai' : 'anthropic'], principalIds: ['alice'], dataRegions: ['unknown'] }
+    const rule = parseModelAdmissionPolicy({ schemaVersion: 1, routes: [route] })
+    const request = { ...transport, ownerId: 'alice', model: route.model }
+    assert.equal(admitModelRoute(rule, request).dataRegion, 'unknown')
+    for (const changed of [{ model: 'other-model' }, { ownerId: 'bob' }, { provider: 'vercel-gateway' }, { endpoint: 'https://proxy.invalid' }])
+      assert.throws(() => admitModelRoute(rule, { ...request, ...changed }), denied('modelRouteDenied'))
+    assert.throws(() => admitModelRoute(parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...route, dataRegions: ['us'] }] }), request), denied('modelRegionUnverified'))
+    assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...route, endpoint: `${transport.endpoint}?proxy=true` }] }), denied('modelPolicyInvalid'))
+  }
+  assert.throws(() => subscriptionModelRoute('openai_siwc'), denied('modelRouteDenied'))
 })
