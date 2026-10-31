@@ -1982,7 +1982,7 @@
         "session_applied": "恢复了登录会话",
         "denied_or_failed": "被拒绝或失败"
       },
-      "emptyScope": "还没有活动记录。"
+      "emptyScope": "还没有活动记录。这里只记录 Bot 用你的登录、你批准或拒绝的操作，以及协调员发给你的提醒；普通对话和任务不会出现在这里。"
     },
     "logins": {
       "heading": "网站登录",

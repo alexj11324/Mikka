@@ -1982,7 +1982,7 @@
         "session_applied": "Session restored",
         "denied_or_failed": "Refused or failed"
       },
-      "emptyScope": "No activity yet."
+      "emptyScope": "No activity yet. This lists bots using your logins, actions you approved or declined, and reminders from the Coordinator. Ordinary chats and tasks don’t show up here."
     },
     "logins": {
       "heading": "Site sign-ins",

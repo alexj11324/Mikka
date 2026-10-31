@@ -96,8 +96,10 @@ export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx
 // Files another open change owns; each fixes its own lines and then drops its entry here.
 // plugins-skills-view: the Plugins/Skills session moves its skill search to SearchInput.
 // secrets-settings: PR #557 rewrites the E2B section, whose loading rows need `bare`.
+// settings-sidebar: PR #591 rebuilds the sidebar; its 搜索设置 field moves to SearchInput there.
 export const UI_SWEEP_PENDING = new Map([
   ['components/plugins/plugins-skills-view.tsx', 'style/search-input'],
+  ['components/settings/settings-sidebar.tsx', 'style/search-input'],
   ['components/settings/secrets-settings.tsx', 'style/nested-frame'],
 ])
 const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx']
