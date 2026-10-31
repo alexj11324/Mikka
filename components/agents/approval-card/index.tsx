@@ -15,6 +15,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentDisclosure } from "@/components/agents/agent-disclosure";
+import { statusTones } from "@/lib/status-appearance";
 import { ActionSwapRollText } from "@/components/motion/action-swap-roll";
 import { Button } from "@/components/motion/button";
 import { Checkbox } from "@/components/motion/checkbox";
@@ -57,26 +58,26 @@ function useStatusLabel(status: ApprovalCardStatus) {
 
 function getStatusClass(status: ApprovalCardStatus) {
   if (status === "approved" || status === "answered") {
-    return "text-emerald-600 dark:text-emerald-400";
+    return "text-success-foreground";
   }
-  if (status === "rejected") return "text-rose-600 dark:text-rose-400";
+  if (status === "rejected") return "text-destructive";
   if (status === "changes-requested") {
-    return "text-amber-600 dark:text-amber-400";
+    return "text-warning-foreground";
   }
   return "text-muted-foreground";
 }
 
 function getStatusBadgeClass(status: ApprovalCardStatus) {
   if (status === "pending" || status === "changes-requested") {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400";
+    return statusTones.warning;
   }
   if (status === "submitting") {
-    return "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400";
+    return statusTones.info;
   }
   if (status === "approved" || status === "answered") {
-    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    return statusTones.success;
   }
-  return "border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400";
+  return statusTones.destructive;
 }
 
 function isAnswered(answer: ApprovalCardAnswer) {
@@ -440,7 +441,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
             ) : (
               <span
                 className={cn(
-                  "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+                  "shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors",
                   getStatusBadgeClass(status),
                 )}
               >
@@ -564,7 +565,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                     size="sm"
                     disabled={busy}
                     onClick={onReject}
-                    className="rounded-full text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400"
+                    className="rounded-full text-muted-foreground hover:text-destructive"
                   >
                     {agentCopy.reject}</Button>
                 ) : null}
