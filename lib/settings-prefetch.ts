@@ -14,7 +14,7 @@ import { currentMonth } from '@/lib/usage/month'
 import { computerPolicyKey, readComputerPolicy } from '@/components/settings/computer-policy-settings'
 import { cardVerificationKey } from '@/components/billing/free-allowance-section'
 import { cardVerificationStatus } from '@/lib/billing/verification-client'
-import { visibleSettingsSections, type SettingsSectionId } from '@/lib/settings-sections'
+import type { SettingsSectionId } from '@/lib/settings-sections'
 
 /**
  * The first read of each section, with the same SWR keys and calls the section
@@ -36,52 +36,16 @@ const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: un
 
 const started = new Set<string>()
 
-export function prefetchSettingsSection(section: SettingsSectionId, workspaceId: string | undefined, cache: Cache): Promise<unknown> {
+export function prefetchSettingsSection(section: SettingsSectionId, workspaceId: string | undefined, cache: Cache) {
   const reads = READS[section]
   // Workspace sections need the workspace; a section is fetched once per page, then SWR revalidates as usual.
   const once = `${section}:${workspaceId ?? ''}`
-  if (!reads || started.has(once) || (!workspaceId && !['security', 'notifications', 'logins'].includes(section))) return Promise.resolve()
+  if (!reads || started.has(once) || (!workspaceId && !['security', 'notifications', 'logins'].includes(section))) return
   started.add(once)
-  const pending: Promise<unknown>[] = []
   for (const [key, read] of reads(workspaceId ?? '')) {
     // A key SWR already holds belongs to a section that has been open: a preload
     // nobody takes would be handed to that section's next revalidation, stale.
     if (cache.get(unstable_serialize(key as never)) !== undefined) continue
-    pending.push(Promise.resolve(preload(key as never, read)).catch(() => {}))
+    void preload(key as never, read).catch(() => {})
   }
-  return Promise.all(pending)
-}
-
-const idle = () => new Promise<void>(resolve => {
-  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => resolve(), { timeout: 2000 })
-  else window.setTimeout(resolve, 200)
-})
-
-/**
- * Every section the viewer can open, fetched while the page is idle, so no
- * section shows a skeleton after Settings has opened. Hover still fetches a
- * section sooner when the person gets there first.
- *
- * One section at a time: Next runs a page's server actions one after another,
- * so a burst of reads would hold back a save made meanwhile. It stops for good
- * once the person types or clicks in a section (choosing one in the section
- * list does not count), so reads never queue ahead of their edits; at most the
- * section already in flight finishes.
- */
-export function prefetchAllSettings(workspaceId: string, admin: boolean, cache: Cache) {
-  let cancelled = false
-  const stop = (event?: Event) => {
-    if (event?.target instanceof Element && event.target.closest('[data-slot="settings-list"]')) return
-    cancelled = true
-  }
-  const events = ['keydown', 'pointerdown'] as const
-  for (const type of events) window.addEventListener(type, stop, { capture: true })
-  void (async () => {
-    for (const { id } of visibleSettingsSections({ admin })) {
-      await idle()
-      if (cancelled) return
-      await prefetchSettingsSection(id, workspaceId, cache)
-    }
-  })()
-  return () => { stop(); for (const type of events) window.removeEventListener(type, stop, { capture: true }) }
 }

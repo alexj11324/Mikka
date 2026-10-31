@@ -59,12 +59,8 @@ test('通知保存失败时开关恢复原值，重试后保存成功', async ({
   await register(page, '/settings?section=notifications')
   const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
   await expect(proactive).toBeChecked()
-  // Fail only the save of this switch: a server action (Next-Action header) whose
-  // arguments carry the proactive patch. Settings' other reads keep loading.
-  await page.route('**/*', route => {
-    const request = route.request()
-    return request.headers()['next-action'] && request.postData()?.includes('"proactive"') ? route.abort() : route.continue()
-  })
+  // Server actions POST with a Next-Action header; drop exactly those.
+  await page.route('**/*', route => route.request().headers()['next-action'] ? route.abort() : route.continue())
   await proactive.click()
   await expect(page.locator('[data-slot="alert"]')).toContainText('这项设置没有保存，已恢复为原来的值。')
   await expect(proactive).toBeChecked()

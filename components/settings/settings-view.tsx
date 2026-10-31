@@ -33,7 +33,7 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
 import type { RailDestination } from '@/components/nav/icon-rail'
-import { prefetchAllSettings, prefetchSettingsSection } from '@/lib/settings-prefetch'
+import { prefetchSettingsSection } from '@/lib/settings-prefetch'
 import { FieldError } from '@/components/ui/field'
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
@@ -66,12 +66,6 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const { cache } = useSWRConfig()
   // Settings opened without ?workspace= still has one: the default the API resolved.
   const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
-  const roleKnown = workspace !== undefined
-  // Once the role is known, load every section the viewer can open, so none shows a skeleton later.
-  useEffect(() => {
-    if (preview || !roleKnown || !resolvedWorkspaceId) return
-    return prefetchAllSettings(resolvedWorkspaceId, admin, cache)
-  }, [preview, roleKnown, resolvedWorkspaceId, admin, cache])
   const title = t(`sections.${section}.title`)
   const routedBody = section === 'members' || section === 'teams'
 

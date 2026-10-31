@@ -79,29 +79,6 @@ test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', as
 })
 })
 
-test('设置页打开并空闲后，每个分区首次打开都不显示骨架屏', async ({ page }) => {
-  test.setTimeout(120000)
-  await register(page, '/settings?section=preferences')
-  const sidebar = page.locator('[data-slot="settings-list"]')
-  await expect(sidebar.getByRole('link', { name: '计费', exact: true })).toBeVisible()
-  // Settings loads every section's data once it is idle; after that nothing is left to wait for.
-  await page.waitForLoadState('networkidle')
-  const skeleton = page.locator('main [data-slot="skeleton"]')
-  const flashed: string[] = []
-  const names = (await sidebar.locator('[data-slot="sidebar-group"]').filter({ hasText: /个人|工作区/ }).getByRole('link').allInnerTexts()).map(name => name.trim())
-  expect(names.length).toBeGreaterThan(10)
-  for (const name of names) {
-    const link = sidebar.getByRole('link', { name, exact: true })
-    await link.click()
-    await expect(link).toHaveAttribute('aria-current', 'page')
-    for (const deadline = Date.now() + 400; Date.now() < deadline;) {
-      if (await skeleton.count()) { flashed.push(name); break }
-      await page.waitForTimeout(20)
-    }
-  }
-  expect(flashed, '这些分区仍显示了骨架屏').toEqual([])
-})
-
 test('悬停预取后首次打开与再次打开设置分区都不显示骨架屏', async ({ page }) => {
   await register(page, '/settings?section=preferences')
   const sidebar = page.locator('[data-slot="settings-list"]')
