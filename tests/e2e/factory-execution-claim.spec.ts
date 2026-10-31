@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { test, expect, register, app } from "./fixtures";
+import { test, expect, register, app, leavePage } from "./fixtures";
 import { createFactoryStore, type FactoryTask } from "../../lib/factory/store";
 import { createFactoryDispatch } from "../../lib/factory/dispatch";
 import { factoryCheckGates } from "../../lib/factory/checks";
@@ -31,6 +31,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
   // Claim policy materialization requires the real account's owner FK before
   // the request can reach the Factory task lock exercised below.
   const { email } = await register(page);
+  await leavePage(page);
   const pool = new Pool({ connectionString: target.toString(), max: 3 });
   const issueId = randomUUID(),
     agentId = randomUUID(),

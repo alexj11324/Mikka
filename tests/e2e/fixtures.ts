@@ -92,18 +92,49 @@ export async function hydrated(field: Locator) {
   await expect.poll(() => field.evaluate(element => Object.keys(element).some(key => key.startsWith('__reactProps$')))).toBe(true)
 }
 
+/**
+ * Each text appears exactly once among the items, in any order and next to any
+ * other items. Use it instead of an ordered toHaveText([...]) list, which fails
+ * whenever an unrelated item is added or the order changes.
+ */
+export async function expectItems(items: Locator, texts: string[]) {
+  for (const text of texts) {
+    const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const exact = new RegExp('^\\s*' + escaped + '\\s*$')
+    await expect(items.filter({ hasText: exact }), text).toHaveCount(1)
+  }
+}
+
+/**
+ * API-only specs sign up through the browser, then work over HTTP and SQL. Leave
+ * the signed-in page before seeding: an open workspace page can reload and take
+ * row locks on the same issues while a fixture transaction holds them (a
+ * deadlock that surfaced as HTTP 500 on /mikka). page.request keeps the session.
+ */
+export async function leavePage(page: Page) {
+  await page.goto('about:blank')
+}
+
 type ExpectedConsoleError = { path: string; message: string }
 
-export function watchRuntime(context: BrowserContext, expectedConsoleErrors: ExpectedConsoleError[] = []) {
+/**
+ * expectedConsoleErrors: each entry absorbs exactly one matching console error.
+ * allowedConsoleErrors: a per-test allowlist for denials the test provokes on
+ * purpose (for example a 403 on a workspace it may not read). Each entry absorbs
+ * any number of matching errors, so a refetch does not fail the guard; anything
+ * else, every page error and every same-origin 5xx still fails the test.
+ */
+export function watchRuntime(context: BrowserContext, expectedConsoleErrors: ExpectedConsoleError[] = [], allowedConsoleErrors: ExpectedConsoleError[] = []) {
   const failures: string[] = []
   const expected = [...expectedConsoleErrors]
   context.on('page', page => {
     page.on('pageerror', error => failures.push(error.stack ?? error.message))
     page.on('console', message => {
       if (message.type() !== 'error') return
-      const index = expected.findIndex(error => message.text() === error.message && message.location().url === `${new URL(page.url()).origin}${error.path}`)
+      const matches = (error: ExpectedConsoleError) => message.text() === error.message && message.location().url === `${new URL(page.url()).origin}${error.path}`
+      const index = expected.findIndex(matches)
       if (index >= 0) expected.splice(index, 1)
-      else failures.push(`console.error: ${message.text()}`)
+      else if (!allowedConsoleErrors.some(matches)) failures.push(`console.error: ${message.text()}`)
     })
     page.on('response', response => {
       if (response.status() >= 500 && new URL(response.url()).origin === new URL(page.url()).origin) {
@@ -119,13 +150,14 @@ export function browserClientHeaders() {
   return { 'x-forwarded-for': `198.18.${randomInt(256)}.${randomInt(1, 255)}` }
 }
 
-export const test = base.extend<{ runtimeGuard: void; expectedConsoleErrors: ExpectedConsoleError[] }>({
+export const test = base.extend<{ runtimeGuard: void; expectedConsoleErrors: ExpectedConsoleError[]; allowedConsoleErrors: ExpectedConsoleError[] }>({
   expectedConsoleErrors: [[], { option: true }],
+  allowedConsoleErrors: [[], { option: true }],
   extraHTTPHeaders: async ({ extraHTTPHeaders }, use) => {
     await use({ ...extraHTTPHeaders, ...browserClientHeaders() })
   },
-  runtimeGuard: [async ({ context, expectedConsoleErrors }, use, testInfo) => {
-    const failures = watchRuntime(context, expectedConsoleErrors)
+  runtimeGuard: [async ({ context, expectedConsoleErrors, allowedConsoleErrors }, use, testInfo) => {
+    const failures = watchRuntime(context, expectedConsoleErrors, allowedConsoleErrors)
     await use()
     if (failures.length) await testInfo.attach('runtime-errors', { body: failures.join('\n\n'), contentType: 'text/plain' })
     expect(failures, '页面异常、console.error 或服务端 5xx 不得被忽略').toEqual([])
