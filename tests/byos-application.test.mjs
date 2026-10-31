@@ -169,6 +169,9 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
   let browserServer
   let browser
   try {
+    // Native admission initializes the real owner FK/Coordinator head through
+    // readCliRunPolicy; this fixture has no task or Bot workspace membership.
+    await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('alice','BYOS fixture','alice@byos-fixture.invalid',true,now(),now()) ON CONFLICT (id) DO NOTHING`)
     assert.equal((await http(new Request('http://localhost/api/subscriptions', { method: 'POST' }))).status, 401)
     assert.equal((await http(new Request('http://localhost/api/subscriptions', { method: 'POST', headers: { 'sec-fetch-site': 'cross-site' } }))).status, 403)
     assert.equal((await post({ action: 'connect', workspaceId, provider: 'codex', accessToken: 'never-import' })).status, 409)
@@ -420,7 +423,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     if (browser) await browser.close()
     if (browserServer) await new Promise(resolve => browserServer.close(resolve))
     await new Promise(resolve => infisical.close(resolve))
-    await pool.end()
+    await Promise.all([pool.end(), (await import('../lib/db/index.ts')).pool.end(), (await import('../lib/workspace-db.ts')).workspacePool.end()])
     await rm(directory, { recursive: true, force: true })
   }
 })
