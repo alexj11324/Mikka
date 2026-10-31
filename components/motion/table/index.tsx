@@ -15,12 +15,19 @@ import { useColumnReorder } from "./use-column-reorder";
 import { useColumnResize } from "./use-column-resize";
 import { useColumnSort } from "./use-column-sort";
 import { useRowSelection } from "./use-row-selection";
-import { alignText, CHECKBOX_PX, CHECKBOX_WIDTH, readCell } from "./utils";
+import {
+  alignText,
+  CHECKBOX_PX,
+  CHECKBOX_WIDTH,
+  DEFAULT_TABLE_LABELS,
+  readCell,
+} from "./utils";
 
 export type {
   SortDirection,
   SortState,
   TableColumn,
+  TableLabels,
   TableProps,
 } from "./types";
 
@@ -98,8 +105,10 @@ export function Table<T>({
   loading = false,
   skeletonRows = 3,
   emptyState = "No data",
+  labels: labelOverrides,
   className,
 }: TableProps<T>) {
+  const labels = { ...DEFAULT_TABLE_LABELS, ...labelOverrides };
   const reduce = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
   const thRefs: HeaderCellRefs = useRef<
@@ -288,6 +297,7 @@ export function Table<T>({
             columns={orderedColumns}
             rowHeight={rowHeight}
             reduce={!!reduce}
+            labels={labels}
             thRefs={thRefs}
             selectable={selectable}
             allSelected={allSelected}
@@ -368,7 +378,7 @@ export function Table<T>({
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => toggleRow(entry.id)}
-                              aria-label={`Select row ${vItem.index + 1}`}
+                              aria-label={labels.selectRow(vItem.index + 1)}
                             />
                           </div>
                         </td>
@@ -384,7 +394,8 @@ export function Table<T>({
                           {!column.cell && column.editable ? (
                             <EditableCell
                               value={String(readCell(entry.row, column) ?? "")}
-                              label={`${column.key} for row ${vItem.index + 1}`}
+                              label={labels.editCell(column.key, vItem.index + 1)}
+                              placeholder={labels.emptyCell}
                               onChange={(next) =>
                                 onCellEdit?.(entry.id, column.key, next)
                               }
@@ -425,6 +436,7 @@ export function Table<T>({
           onDeleteRow={onDeleteRow}
           onEnter={() => activateRow(activeRow.id, activeRow.index)}
           onLeave={deactivateRow}
+          labels={labels}
         />
       ) : null}
     </div>

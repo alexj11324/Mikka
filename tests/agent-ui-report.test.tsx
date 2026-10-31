@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { NextIntlClientProvider } from 'next-intl'
 import { createParser } from '@openuidev/lang-core'
 import messages from '../messages/en.json'
+import chineseMessages from '../messages/zh-CN.json'
 import { agentComponentCatalog, createAgentLibrary } from '../lib/agent-ui-catalog'
 import { detectAgentUISource } from '../lib/agent-ui-source'
 import { AgentGenerativeUI } from '../components/workspace/agent-generative-ui'
@@ -28,8 +29,8 @@ const samples = {
   BeFileDiff: 'root = BeFileDiff("lib/report.ts", "-const a = 1\\n+const a = 2\\n context", "tsx")',
 } as const
 
-function render(response: string) {
-  return renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages}>
+function render(response: string, locale: 'en' | 'zh-CN' = 'en') {
+  return renderToStaticMarkup(<NextIntlClientProvider locale={locale} messages={locale === 'en' ? messages : chineseMessages}>
     <AgentGenerativeUI response={response} isStreaming={false} onAction={() => {}} />
   </NextIntlClientProvider>)
 }
@@ -110,4 +111,15 @@ test('BeQuestions accepts beUI Select, Switch, slider and date range inputs on t
   assert.equal(BeQuestions.props.safeParse({ ...base, questions: [{ id: 'a', title: 'Budget', input: 'slider', range: { min: 5, max: 1 } }] }).success, false)
   assert.equal(BeQuestions.props.safeParse({ ...base, questions: [{ id: 'a', title: 'Remote?', input: 'switch' }] }).success, true)
   assert.equal(BeQuestions.props.safeParse({ ...base, questions: [{ id: 'a', title: 'Upload', input: 'file' }] }).success, false)
+})
+
+test('beUI table, timeline and date range text follows the locale', () => {
+  const timeline = render(samples.BeTimeline, 'zh-CN')
+  assert.match(timeline, /用左右方向键在事件之间切换/)
+  assert.match(timeline, /2026年11月2日/)
+  assert.doesNotMatch(timeline, /arrow keys|Nov/)
+  assert.match(render(samples.BeTimeline), /Nov 2, 2026/)
+  const dates = render('root = BeQuestions("Offsite", [{id: "dates", title: "日期", input: "dateRange"}])', 'zh-CN')
+  assert.match(dates, /选择日期/)
+  assert.doesNotMatch(dates, /Select dates|Choose a date range/)
 })
