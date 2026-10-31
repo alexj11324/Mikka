@@ -32,12 +32,13 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
     {ISSUE_STATUSES.map(status => {
       const group = issues.filter(issue => issue.status === status.value)
       if (!group.length) return null
-      const indicatorClassName = status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-success-foreground' : status.value === 'done' ? 'text-info-foreground' : 'text-muted-foreground'
+      // R-34: the same colours as ISSUE_STATUSES (board, ⌘K): review is info, done is success.
+      const indicatorClassName = status.value === 'doing' ? 'text-warning-foreground' : status.value === 'review' ? 'text-info-foreground' : status.value === 'done' ? 'text-success-foreground' : 'text-muted-foreground'
       return <section key={status.value} aria-label={statusLabel(status.value)}>
         <header className="flex h-10 items-center gap-2 bg-muted/40 px-4 text-xs sm:px-6">
           <status.icon className={cn('size-3.5', indicatorClassName)} />
           <h2 className="font-medium">{statusLabel(status.value)}</h2>
-          <span className="text-muted-foreground">{group.length}</span>
+          <span className="text-muted-foreground tabular-nums">{group.length}</span>
         </header>
         <ul>
           {group.map(issue => <li key={issue.id}>

@@ -52,13 +52,13 @@ function useScreenBox(rect: ScreenRect | null, pad = 0) {
 /** The ring around what the agent is about to touch: blue while it works, orange while it waits for you. */
 function TargetRing({ rect, tone }: { rect: ScreenRect; tone: 'agent' | 'approval' }) {
   const ref = useScreenBox(rect, 3)
-  return <span ref={ref} aria-hidden="true" className={cn('pointer-events-none absolute top-(--box-y) left-(--box-x) h-(--box-h) w-(--box-w) rounded-md ring-2 transition-all duration-150 ease-out motion-reduce:transition-none',
+  return <span ref={ref} aria-hidden="true" className={cn('pointer-events-none absolute top-(--box-y) left-(--box-x) h-(--box-h) w-(--box-w) rounded-md ring-2 transition-[top,left,width,height] duration-150 ease-out motion-reduce:transition-none',
     tone === 'agent' ? 'ring-sidebar-primary' : 'ring-attention')} />
 }
 
 function Cursor({ x, y }: { x: number; y: number }) {
   const ref = useScreenBox({ x, y, w: 0, h: 0 })
-  return <span ref={ref} aria-hidden="true" className="pointer-events-none absolute top-(--box-y) left-(--box-x) text-foreground transition-all duration-150 ease-out motion-reduce:transition-none">
+  return <span ref={ref} aria-hidden="true" className="pointer-events-none absolute top-(--box-y) left-(--box-x) text-foreground transition-[top,left,width,height] duration-150 ease-out motion-reduce:transition-none">
     <MousePointer2 className="size-[max(0.75rem,2cqw)] fill-screen stroke-screen-foreground" />
   </span>
 }

@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
-import { getBilling, openBillingPortal, startPlanCheckout } from '@/app/actions/billing'
+import { openBillingPortal, startPlanCheckout, type getBilling } from '@/app/actions/billing'
+import { settingsRead } from '@/lib/settings-read'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { BalanceSection, creditBillingKey } from '@/components/billing/balance-section'
@@ -22,7 +23,7 @@ export function BillingSettings({ workspaceId }: { workspaceId: string }) {
   const computerBilling = useGatedFeature('computerBilling')
   const locale = useLocale()
   const actionError = useActionError()
-  const billing = useSWR(['settings:billing', workspaceId], () => getBilling(workspaceId))
+  const billing = useSWR(['settings:billing', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getBilling>>>('billing', { workspace: workspaceId }))
   const { mutate } = useSWRConfig()
   // 免费额度 and 余额 (#558, #559) come first, whether or not a plan is set up.
   const credits = <>

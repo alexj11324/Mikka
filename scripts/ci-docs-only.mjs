@@ -56,7 +56,7 @@ export function isSchemaOnly(files) {
 // - targeted: smoke plus the complete specs of each area whose paths changed,
 //   and any existing spec the pull request edits;
 // - main: every code-bearing push to main runs the functional spec files below
-//   (whole files, including the smoke files) on two shards;
+//   (whole files, including the smoke files) on four shards;
 // - full: nightly, manual runs and integrate/* pull requests run every spec plus
 //   performance on four shards. Unsafe modes and unknown ranges also take full.
 // Every spec file belongs to main or to the nightly-only list, so a new spec has
