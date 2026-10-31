@@ -82,3 +82,15 @@ export async function refreshBotModels(connectionId: string, workspaceId?: strin
 export async function getRedetectDeviceStatus(commandId: string, workspaceId?: string) {
   return new ExecutionSettings(pool).redetectStatus(await context(workspaceId), commandId);
 }
+
+export async function getExecutionFallbacks() {
+  return new ExecutionSettings(pool).fallbacks((await context()).ownerId);
+}
+export async function updateExecutionFallbacks(
+  value: import("@/lib/execution-rules").ExecutionFallbacks,
+) {
+  return new ExecutionSettings(pool).setFallbacks(
+    (await context()).ownerId,
+    value,
+  );
+}

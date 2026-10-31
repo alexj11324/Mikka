@@ -11,7 +11,7 @@ import { constrainedAssignmentPolicy } from '../run-assignment-policy'
 import { ModelAdmissionError } from '../model-admission/contract'
 
 // Execute the actual route in memory, with its database/auth boundaries replaced.
-async function routeFixture(unavailable=false,stopped=false,modelDenied=false) {
+async function routeFixture(unavailable=false,stopped=false,modelDenied=false,issueDenied=false) {
   const calls:string[]=[]
   const admissionScopes:string[]=[]
   const workspaceIds=['bot-workspace','task-workspace']
@@ -25,10 +25,9 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false) {
   const modules:Record<string,unknown>={
     // This VM owns frozen benchmark composition, not credential admission;
     // the actual route/fence and token revocation have real PostgreSQL tests.
+    '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,scope:'personal',content:{type:'doc'}}}},
     '@/lib/device-route':{withDeviceRoute:<T>(handler:T)=>handler},
-    // Visibility is a boundary here; real access denials have source/PG coverage.
-    '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>userId===run.userId&&id===run.issueId?{id:run.issueId,userId:run.userId,scope:'personal',content:{type:'doc'}}:null},
-    'next/server':{NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
+    'next/server':{after:()=>{calls.push('wakeScheduled')},NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
     '@mikka/protocol/device':deviceProtocol,
     '@mikka/protocol/daemon':daemonProtocol,
@@ -48,7 +47,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false) {
     }},
     '@/lib/run-assignment-policy':{constrainedAssignmentPolicy},
     '@/lib/run-claim-response':{authorizedClaimResponse:async(_user:string,_run:unknown,_lease:string,respond:(current:typeof run)=>Response)=>respond(run)},
-    '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{throw Error('unexpected publication failure')}},
+    '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{assert.equal(issueDenied,true);calls.push('rejectPublication')}},
     '@/lib/run-publication-result':{PublicationError:class extends Error {}},
     '@/lib/db':{db,pool:{},withDatabaseClient:async(_tx:unknown,fn:()=>Promise<unknown>)=>fn()},'@/lib/db/schema':{agentRuns:{},agents:{},deviceRepos:{}},
     '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token'}),ownedDevice:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]})},
@@ -132,5 +131,14 @@ test('benchmark claim cannot bypass its task workspace model rule through the Bo
   assert.deepEqual(await response.json(),{error:'modelRouteDenied'})
   assert.deepEqual(admissionScopes,['bot-workspace','task-workspace'])
   assert.deepEqual(calls,['preflight'])
+  assert.equal(run.status,'queued')
+})
+
+
+test('task access denial withholds assignment and credentials before claim preparation',async()=>{
+  const {post,calls,run}=await routeFixture(false,false,false,true)
+  const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
+  assert.equal(response.status,409)
+  assert.deepEqual(calls,['rejectPublication','wakeScheduled'])
   assert.equal(run.status,'queued')
 })
