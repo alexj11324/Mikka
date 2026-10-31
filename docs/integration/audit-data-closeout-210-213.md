@@ -60,3 +60,82 @@ cleanup is only logged. The next component will preserve deletion intent,
 cross-database progress and pending objects so retries and restore replay do
 not claim unfinished work succeeded. Real provider/backup exceptions must be
 listed rather than reported as deleted.
+
+## Account deletion journal (#213)
+
+The previous path committed the main store before the workspace store, then
+logged and swallowed object-delete errors. A workspace failure could leave no
+account available to retry; an R2 failure lost the only object references.
+Occurrence 6/10, impact 8/10 (48): an ordinary provider/storage outage or process
+restart after an acknowledged database commit takes this path. The owner-column
+INSERT race is a privacy defect even on tables such as `user_facts` without a
+user FK; its fix does not depend on a low likelihood score.
+
+`account_deletion_jobs` now retains a content-free receipt outside the deleted
+user's foreign-key cascade. Its phases are `preparing`, `requested`,
+`external_pending`, `main_deleted`, `workspace_deleted`, `storage_pending`,
+`completed` or `cancelled`. Main data deletion and its object list/phase commit
+in one main-store transaction. Workspace deletion has a separate commit and is
+idempotently replayable. No distributed atomic transaction is claimed.
+
+The owner write barrier waits for in-flight managed file writes and INSERTs.
+After request confirmation it rejects new owned INSERTs, including tables
+without FKs; solo workspaces reject new memberships/content while pending.
+A fresh workspace plan is checked while its row locks span main deletion and
+workspace deletion, preserving shared issues/projects/group messages. An owner
+can cancel only before external cleanup begins. Owner IDs, plans and object
+keys are excluded from the public lifecycle receipt. The receipt UUID is a
+private capability passed in a request header, never a URL; store it privately.
+The backend POST takes the current human session and typed email, so device/API
+principals cannot impersonate an account owner. The existing settings action
+keeps its typed-email confirmation and reports pending cleanup rather than
+reporting deletion success. New backend POST supports a client-kept request UUID
+for lost-response recovery; its settings UI integration is still a dependency.
+
+`GET /api/cron/account-deletions` resumes at most five jobs using the existing
+cron workload secret. The existing minute worker must include this endpoint.
+Database-only receipts remain queryable after the user/sessions disappear.
+Capture upload grants must expire before final object cleanup; both staging
+and verified keys are retained. Failed old-avatar cleanup retains its key.
+Composio deletion enumerates all states with the trusted owner filter and
+requests upstream revocation through the existing SDK adapter; provider data
+contents are not deleted. BYOS custody artifacts and cloud runtimes without an
+acknowledged teardown adapter explicitly block, preserving their mappings.
+
+The restore adapter requires an independently retained **current** deletion
+manifest, its protected digest anchor and an isolated explicit target pair.
+`applyAccountDeletionManifest` rejects altered manifests and any unfinished
+live job. Completed deletions replay the same local deletion path and saved
+shared-data preservation decision; they do not redo remote provider effects.
+A failed restore/object cleanup leaves recovery quarantined. Manifest SHA256
+is corruption detection, not an authenticity or freshness proof. Backup-local
+journals cannot prove that no deletion occurred after the backup.
+
+### Data ownership and remaining policy/acceptance
+
+| Assets | Purpose / current deletion treatment | Retention / outstanding boundary |
+| --- | --- | --- |
+| Main owner rows, sign-in/session/device/OAuth tokens, local vault envelopes | Owned service data; deleted in the main transaction, existing FK/dependency order retained | No invented legal retention period |
+| Solo workspaces, membership, invitation, owned projects | Workspace commit; invitations matched using normalized email hash | Shared team issues/projects/group messages stay for remaining members |
+| Artifact versions, captures, avatar and known retired avatar objects | Persist keys before removing DB pointers; retry acknowledged object DELETEs after upload grant expiry | Historical unreferenced bucket objects from failed PUT/database transactions need an independently verified bucket inventory/lifecycle policy |
+| Composio connections | Owner-filtered list and managed authorization removal before local mapping deletion | Upstream revocation may be asynchronous; real provider acceptance still required |
+| BYOS Infisical artifacts, native model state | Preserve mapping and report `subscription_custody_cleanup_required` | An owner-bound, acknowledged cleanup adapter is still required |
+| Cloud sandbox files / run runtime | Report `cloud_runtime_cleanup_required` while managed resources remain | Owner-bound runtime teardown acknowledgment is required; user-device files are outside service custody |
+| Audit rows, shared message authorship, immutable evaluation ledgers | Existing accountability/team records are retained, not silently rewritten/deleted | Explicit data minimization, legal hold and retention policy remains required; account deletion is not claimed to erase every actor reference |
+| Deletion receipt and restore-suppression guards | Restore must not resurrect an erased account | Default `retentionUntil = NULL`; no destructive expiry without an explicit policy |
+| Backups / provider-held logs and user-owned upstream contents | Recovery replays current tombstones before exposure; it never uses an old dump as proof of current deletion state | Backup expiry, independent storage custody, upstream retention and policy approval remain concrete deployment acceptance requirements |
+
+Real PG17 component checks cover sole-admin refusal, owner-only cancellation,
+external cleanup blocking, file retry, upload-grant delay, main/workspace commit
+failure, a new pool resuming the committed phase, and concurrent no-FK INSERT
+rejection. A second real PostgreSQL schema tests explicit restore targets,
+altered/pending manifests, preserved peer data and post-replay suppression.
+That schema fixture is not a complete backup/restore drill. Route adapters use
+explicit module fixtures; they are not deployed Mikka HTTP/provider acceptance.
+No customer data, real external authorization or production history was deleted.
+
+Still required before closing #213: full fixed-revision app HTTP acceptance,
+settings request/receipt status integration and fresh reauthentication policy,
+complete portable export coverage (files/harness checkpoints), real BYOS/cloud
+cleanup evidence, verified historical object inventory/lifecycle, current
+manifest backup drill, and the explicit retention/hold/backup policy above.

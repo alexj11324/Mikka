@@ -207,6 +207,7 @@ export async function deleteAccount(input: { email: string }): Promise<ActionRes
     const typed = z.object({ email: z.string().max(320) }).safeParse(input)
     if (!typed.success || typed.data.email.trim().toLowerCase() !== user.email.toLowerCase()) throw new ActionFailureError('accountEmailMismatch')
     const outcome = await deleteAccountData(user.id, user.email)
+    if (!outcome.ok && 'pending' in outcome) throw new ActionFailureError('accountDeletionPending')
     if (!outcome.ok) throw new ActionFailureError('accountSoleAdmin', { workspaces: outcome.soleAdminOf.join(', '), count: outcome.soleAdminOf.length })
     // The sessions went with the user row; this clears the cookie too.
     await auth.api.signOut({ headers: requestHeaders }).catch(() => undefined)

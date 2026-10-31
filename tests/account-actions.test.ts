@@ -10,7 +10,7 @@ let authFailure: { body: { code: string } } | null = null
 let mailConfigured = true
 let mailOutcome: 'sent' | 'unavailable' | 'failed' = 'sent'
 let reservation: { ok: true; id: string; token: string; expiresAt: Date } | { ok: false; retryAfterMinutes: number } = { ok: true, id: 'r1', token: 'mkx_token', expiresAt: new Date('2026-10-30T00:00:00Z') }
-let deletion: { ok: true } | { ok: false; soleAdminOf: string[] } = { ok: true }
+let deletion: { ok: true } | { ok: false; soleAdminOf: string[] } | { ok: false; pending: true; id: string; stage: string } = { ok: true }
 let tokens: Record<string, string> = {}
 
 const calls = {
@@ -180,6 +180,10 @@ test('deleting the account needs the account\'s own email typed again, and a sol
 
   deletion = { ok: false, soleAdminOf: ['Acme', 'Beta'] }
   assert.deepEqual(await account.deleteAccount({ email: 'alice@example.com' }), { error: 'accountSoleAdmin', params: { workspaces: 'Acme, Beta', count: 2 } })
+  assert.equal(calls.signOut.mock.callCount(), 0)
+
+  deletion = { ok: false, pending: true, id: 'job', stage: 'storage_pending' }
+  assert.equal((await account.deleteAccount({ email: 'alice@example.com' })).error, 'accountDeletionPending')
   assert.equal(calls.signOut.mock.callCount(), 0)
 
   deletion = { ok: true }

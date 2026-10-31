@@ -139,6 +139,7 @@ export const ACTION_ERROR_CODES = [
   'dataExportRateLimited',
   'accountEmailMismatch',
   'accountSoleAdmin',
+  'accountDeletionPending',
   'workspaceSlugTaken',
   'workspaceIconInvalid',
   'workspaceDeleteNameMismatch',

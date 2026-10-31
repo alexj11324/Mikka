@@ -2,12 +2,10 @@ import 'server-only'
 import type { PoolClient } from 'pg'
 import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 import { getTableName, type Table } from 'drizzle-orm'
-import { pool } from '@/lib/db'
 import { workspaceDb } from '@/lib/workspace-db'
 import * as workspaceSchema from '@/lib/db/workspace-schema'
 import * as teamSchema from '@/lib/db/team-schema'
 import * as projectSchema from '@/lib/db/project-schema'
-import { artifactStorage, deleteArtifactObject } from '@/lib/artifacts/storage'
 
 const { workspaces, workspaceMembers, workspaceInvitations } = workspaceSchema
 const { teams, teamMembers, teamIssues, teamProjects, teamIssueCreateReceipts, teamIssuePromotionReceipts } = teamSchema
@@ -43,6 +41,8 @@ const SKIPPED = new Map<string, string>([
   ['conversations', 'special'],
   // Taken by the user row's foreign key.
   ['user', 'user row'],
+  ['account_deletion_jobs', 'durable deletion receipt'],
+  ['account_deletion_guards', 'restore suppression tombstone'],
 ])
 /**
  * Append-only skill-evaluation ledgers: triggers reject every DELETE
@@ -54,8 +54,9 @@ const IMMUTABLE_PREFIX = 'improvement_'
 export type AccountDeletion =
   | { ok: true }
   | { ok: false; soleAdminOf: string[] }
+  | { ok: false; pending: true; id: string; stage: string }
 
-interface Plan {
+export interface Plan {
   /** Workspaces only this person belongs to: they go entirely. */
   solo: string[]
   /** Workspaces shared with others: only the membership goes. */
@@ -65,25 +66,18 @@ interface Plan {
   keptProjectIds: string[]
 }
 
-type WorkspaceTx = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
+type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'delete'>
 
 /** Checks, then deletes the account and everything it owns. The caller has verified the session and the typed email. */
-export async function deleteAccount(userId: string, email: string): Promise<AccountDeletion> {
-  let storageKeys: string[] = []
-  const outcome = await workspaceDb.transaction(async wtx => {
-    const plan = await planWorkspaces(wtx, userId)
-    if ('soleAdminOf' in plan) return { ok: false as const, soleAdminOf: plan.soleAdminOf }
-    // The main database commits first while the workspace rows stay locked;
-    // if it fails, the workspace changes roll back with this transaction.
-    storageKeys = await deleteMainData(userId, plan)
-    await deleteWorkspaceData(wtx, userId, email, plan)
-    return { ok: true as const }
-  })
-  if (outcome.ok) await removeObjects(storageKeys)
-  return outcome
+export async function deleteAccount(userId: string, email: string, options: import('./deletion-jobs').AccountDeletionOptions = {}): Promise<AccountDeletion> {
+  const { requestAccountDeletion, resumeAccountDeletion } = await import('./deletion-jobs')
+  const requested = await requestAccountDeletion(userId, email, undefined, options)
+  if (!requested.ok) return requested
+  const job = await resumeAccountDeletion(requested.id, options)
+  return job.stage === 'completed' ? { ok: true } : { ok: false, pending: true, id: job.id, stage: job.stage }
 }
 
-async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<Plan | { soleAdminOf: string[] }> {
+export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<Plan | { soleAdminOf: string[] }> {
   const memberships = await wtx.select({ workspaceId: workspaceMembers.workspaceId, role: workspaceMembers.role, status: workspaceMembers.status })
     .from(workspaceMembers).where(eq(workspaceMembers.userId, userId))
   const owned = await wtx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.userId, userId))
@@ -110,7 +104,7 @@ async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<Plan | 
   return { solo, shared, keptIssueIds, keptProjectIds }
 }
 
-async function deleteWorkspaceData(wtx: WorkspaceTx, userId: string, email: string, plan: Plan) {
+export async function deleteWorkspaceData(wtx: WorkspaceTx, userId: string, emailHash: string, plan: Plan) {
   if (plan.solo.length) {
     const soloTeams = wtx.select({ id: teams.id }).from(teams).where(inArray(teams.workspaceId, plan.solo))
     await wtx.delete(teamMembers).where(inArray(teamMembers.teamId, soloTeams))
@@ -125,7 +119,7 @@ async function deleteWorkspaceData(wtx: WorkspaceTx, userId: string, email: stri
   }
   await wtx.delete(teamMembers).where(eq(teamMembers.userId, userId))
   await wtx.delete(workspaceMembers).where(eq(workspaceMembers.userId, userId))
-  await wtx.delete(workspaceInvitations).where(and(sql`lower(${workspaceInvitations.email}) = ${email.toLowerCase()}`, eq(workspaceInvitations.status, 'pending')))
+  await wtx.delete(workspaceInvitations).where(and(sql`encode(sha256(convert_to(lower(${workspaceInvitations.email}), 'UTF8')), 'hex') = ${emailHash}`, eq(workspaceInvitations.status, 'pending')))
   const kept = plan.keptProjectIds
   await wtx.delete(projectEvents).where(kept.length ? and(eq(projectEvents.userId, userId), sql`not (${projectEvents.projectId} = any(${kept}::uuid[]))`) : eq(projectEvents.userId, userId))
   await wtx.delete(projects).where(kept.length ? and(eq(projects.userId, userId), sql`not (${projects.id} = any(${kept}::uuid[]))`) : eq(projects.userId, userId))
@@ -135,25 +129,22 @@ const ident = (name: string) => `"${name.replaceAll('"', '""')}"`
 
 interface Statement { table: string; text: string; values: unknown[] }
 
-/** The main database's part, in one transaction. Returns the R2 objects to remove once it commits. */
-async function deleteMainData(userId: string, plan: Plan): Promise<string[]> {
-  const client = await pool.connect()
-  try {
-    await client.query('begin')
-    const { rows: keys } = await client.query<{ key: string }>(
-      `select v."storageKey" as key from artifact_versions v join artifacts a on a.id = v."artifactId" where a."userId" = $1 and v."storageKey" is not null
-       union all select "storageKey" from run_captures where "userId" = $1 and "storageKey" is not null
-       union all select "storageKey" from user_avatars where "userId" = $1 and "storageKey" is not null`, [userId])
-    await runToFixpoint(client, await deletionStatements(client, userId, plan))
-    await client.query('delete from "user" where id = $1', [userId])
-    await client.query('commit')
-    return keys.map(row => row.key)
-  } catch (error) {
-    await client.query('rollback').catch(() => undefined)
-    throw error
-  } finally {
-    client.release()
-  }
+/** Object references are captured in the same transaction that removes their rows. */
+export async function accountStorageKeys(client: Pick<PoolClient, 'query'>, userId: string): Promise<{ keys: string[]; notBefore: Date }> {
+  const { rows } = await client.query<{ key: string; expiresAt: Date | null }>(
+    `select v."storageKey" as key,NULL::timestamptz as "expiresAt" from artifact_versions v join artifacts a on a.id=v."artifactId" where a."userId"=$1 and v."storageKey" is not null
+     union all select "storageKey","expiresAt" from run_captures where "userId"=$1 and "storageKey" is not null
+     union all select 'capture-uploads/' || "userId" || '/runs/' || "runId" || '/captures/' || id || '.' ||
+       CASE "contentType" WHEN 'image/png' THEN 'png' WHEN 'image/jpeg' THEN 'jpg' WHEN 'image/webp' THEN 'webp' WHEN 'video/mp4' THEN 'mp4' WHEN 'video/webm' THEN 'webm' END,"expiresAt"
+       from run_captures where "userId"=$1 AND source='local' AND "expiresAt" IS NOT NULL
+     union all select "storageKey",NULL from user_avatars where "userId"=$1 and "storageKey" is not null
+     union all select "storageKey",NULL from account_storage_retirements where "userId"=$1`, [userId])
+  return { keys: [...new Set(rows.map(row => row.key).filter((key): key is string => Boolean(key)))], notBefore: new Date(Math.max(Date.now(), ...rows.map(row => row.expiresAt?.getTime() ?? 0))) }
+}
+
+export async function deleteMainAccountData(client: PoolClient, userId: string, plan: Plan): Promise<void> {
+  await runToFixpoint(client, await deletionStatements(client, userId, plan))
+  await client.query('delete from "user" where id=$1', [userId])
 }
 
 /** Every delete the account needs in the main database, in no particular order. */
@@ -228,15 +219,4 @@ export async function runToFixpoint(client: Pick<PoolClient, 'query'>, statement
     if (blocked.length === pending.length) throw new Error(`account deletion blocked by references into: ${[...new Set(blocked.map(item => item.table))].join(', ')}`)
     pending = blocked
   }
-}
-
-async function removeObjects(keys: string[]) {
-  if (!keys.length || artifactStorage() !== 'r2') return
-  let failed = 0
-  for (let start = 0; start < keys.length; start += 10) {
-    const results = await Promise.allSettled(keys.slice(start, start + 10).map(key => deleteArtifactObject(key)))
-    failed += results.filter(result => result.status === 'rejected').length
-  }
-  // Counts only: keys contain user ids.
-  if (failed) console.error('account_delete_object_cleanup_failed', { failed, total: keys.length })
 }

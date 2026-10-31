@@ -1117,7 +1117,8 @@
     "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
     "e2bKeyRateLimited": "E2B is rate limiting this key right now. Wait a few minutes and try again.",
     "tokenNotFound": "This token does not exist or was already revoked.",
-    "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first."
+    "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first.",
+    "accountDeletionPending": "Account deletion is pending cleanup."
   },
   "Overview": {
     "sections": {
