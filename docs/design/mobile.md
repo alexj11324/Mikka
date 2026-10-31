@@ -139,7 +139,7 @@ precedent. Figma frames 07, 07a–07e.
 | 已连接的 App | top → 07e | Claude Connectors; ChatGPT 插件; Poke Integrations |
 | 外观 | top | Claude, ChatGPT, Comma Android |
 | 语言 (opens iOS Settings) | top | Comma iOS |
-| 版本 | top | Comma iOS Version; ChatGPT 关于 |
+| 版本 | top | Comma iOS Version; ChatGPT 关于. Shows the version, the build and, when an update is running, when it was published (「1.0.0 (6) · 10-31 22:51」) |
 | 退出登录 | top, last | ChatGPT, Claude, Comma |
 | Push not deliverable (only when it fails) | top, first | Comma iOS |
 
