@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
-import { deleteSavedLogin, listSavedLoginUsage, listSavedLogins } from '@/app/actions/settings-activity'
+import { deleteSavedLogin, listSavedLoginUsage, type listSavedLogins } from '@/app/actions/settings-activity'
+import { settingsRead } from '@/lib/settings-read'
 import type { SavedLogin, SavedLoginUse } from '@/lib/settings/saved-logins'
 import { Link } from '@/i18n/navigation'
 import { Plus } from 'lucide-react'
@@ -19,7 +20,7 @@ export function SavedLoginsSettings() {
   const t = useTranslations('Settings.logins')
   const actionError = useActionError()
   const locale = useLocale()
-  const { data, error, isLoading, mutate } = useSWR('account:saved-logins', listSavedLogins)
+  const { data, error, isLoading, mutate } = useSWR('account:saved-logins', () => settingsRead<Awaited<ReturnType<typeof listSavedLogins>>>('saved-logins'))
   const [removing, setRemoving] = useState<SavedLogin | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)

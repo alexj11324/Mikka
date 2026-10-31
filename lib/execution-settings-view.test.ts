@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { botModelChoice, defaultModel, groupBotModels, harnessOptions, initialExecution, modelName, modelOptions, modelProvider, placeKind, redetectTargets, retarget, selectedBotModel, type ExecutionPlace } from './execution-settings-view'
+import { botModelChoice, defaultModel, groupBotModels, harnessOptions, initialExecution, modelName, modelOptions, modelProvider, placeKind, redetectTargets, retarget, selectedBotModel, withCloudModels, type ExecutionPlace } from './execution-settings-view'
 
 const laptop: ExecutionPlace = {
   id: '00000000-0000-4000-8000-000000000001', name: 'Alex MacBook Pro', deviceType: 'laptop', enabled: true, online: true,
@@ -22,10 +22,14 @@ test('device type comes from the daemon; cloud wins over its server type; old da
   assert.deepEqual(places.map(placeKind), ['laptop', 'server', 'unknown', 'cloud'])
 })
 
-test('harnesses are the installed ones at a device; cloud offers every rule harness', () => {
+const accounts = [{ provider: 'claude', modelId: 'claude-e2e' }, { provider: 'codex', modelId: 'codex-a' }, { provider: 'codex', modelId: 'codex-b' }]
+
+test('harnesses are the installed ones at a device; Mikka Cloud offers the connected accounts\' Agents', () => {
   assert.deepEqual(harnessOptions(places, laptop.id), ['claude_code', 'codex'])
   assert.deepEqual(harnessOptions(places, server.id), ['codex'])
-  assert.deepEqual(harnessOptions(places, 'cloud'), ['claude_code', 'codex', 'cursor'])
+  assert.deepEqual(harnessOptions(withCloudModels(places, accounts), 'cloud'), ['claude_code', 'codex'])
+  assert.deepEqual(harnessOptions(withCloudModels(places, accounts.slice(1)), 'cloud'), ['codex'])
+  assert.deepEqual(harnessOptions(withCloudModels(places, []), 'cloud'), [])
 })
 
 const names = (options: { name: string }[]) => options.map(option => option.name)
@@ -33,7 +37,9 @@ const names = (options: { name: string }[]) => options.map(option => option.name
 test('models are only what the harness reported there, never a built-in list', () => {
   assert.deepEqual(names(modelOptions(places, laptop.id, 'codex')), ['reported-a', 'reported-b'])
   assert.deepEqual(names(modelOptions(places, laptop.id, 'cursor')), [])
-  assert.deepEqual(names(modelOptions(places, 'cloud', 'codex')), ['reported-a', 'reported-b', 'reported-c'])
+  // Mikka Cloud runs on the account: its models, never a device's slots, as the server checks.
+  assert.deepEqual(names(modelOptions(withCloudModels(places, accounts), 'cloud', 'codex')), ['codex-a', 'codex-b'])
+  assert.deepEqual(names(modelOptions(withCloudModels(places, accounts), 'cloud', 'claude_code')), ['claude-e2e'])
   // #537 shim: Claude Code reports nothing yet, so only its `opus` slot is offered.
   assert.deepEqual(modelOptions(places, laptop.id, 'claude_code'), [{ value: 'opus', name: 'opus' }])
 })
@@ -70,7 +76,9 @@ test('initial value: an offline server is skipped for any online device, then th
   const mac = slotted('mac', 'laptop', true, 'Opus Resolved')
   const box = slotted('box', 'server', false, 'Opus On Box')
   assert.deepEqual(initialExecution([box, mac, cloud], [claude]), { place: 'mac', harness: 'claude_code', model: 'opus' })
-  assert.deepEqual(initialExecution([box, cloud], [claude]), { place: 'cloud', harness: 'claude_code', model: 'opus' })
+  // On Mikka Cloud the Agent runs on the account, so the model is the account's, not a device slot.
+  assert.deepEqual(initialExecution([box, cloud], [claude]), { place: 'cloud', harness: 'claude_code', model: 'claude-account-model' })
+  assert.deepEqual(initialExecution(withCloudModels([box, cloud], [claude]), [claude]), { place: 'cloud', harness: 'claude_code', model: 'claude-account-model' })
   assert.deepEqual(initialExecution([{ ...mac, enabled: false }, cloud], [claude]).place, 'cloud')
 })
 
@@ -98,7 +106,8 @@ test('moving a rule keeps the harness and model only where the new place has the
   const rule = { label: 'backend', place: server.id, harness: 'codex', model: 'reported-c' }
   assert.deepEqual(retarget(places, { ...rule, place: laptop.id }), { ...rule, place: laptop.id, model: 'reported-a' })
   assert.deepEqual(retarget(places, { ...rule, harness: 'claude_code', model: 'opus' }), { ...rule, harness: 'codex', model: 'reported-b' })
-  assert.deepEqual(retarget(places, { ...rule, place: 'cloud' }), { ...rule, place: 'cloud' })
+  assert.deepEqual(retarget(withCloudModels(places, accounts), { ...rule, place: 'cloud' }), { ...rule, place: 'cloud', model: 'codex-a' })
+  assert.deepEqual(retarget(withCloudModels(places, accounts), { ...rule, place: 'cloud', harness: 'claude_code', model: 'opus' }), { ...rule, place: 'cloud', harness: 'claude_code', model: 'claude-e2e' })
   assert.deepEqual(retarget(places, { ...rule, place: laptop.id, harness: 'claude_code' }), { ...rule, place: laptop.id, harness: 'claude_code', model: 'opus' })
 })
 

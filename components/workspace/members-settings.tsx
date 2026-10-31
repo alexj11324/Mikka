@@ -67,27 +67,12 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 import { SearchInput } from "@/components/ui/search-input";
-import { withBasePath } from "@/lib/base-path";
+import { fetchSettingsData, memberSettingsKey } from "@/lib/settings-data";
 import { useActionError } from "@/lib/use-action-error";
 import { SettingsDataState } from "@/components/settings/settings-data-state";
 import { cn } from "@/lib/utils";
 import { FieldError } from '@/components/ui/field'
 
-async function fetchSettings(url: string): Promise<WorkspaceSettings> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    const payload: unknown = await response.json().catch(() => null);
-    const message =
-      typeof payload === "object" &&
-      payload !== null &&
-      "error" in payload &&
-      typeof payload.error === "string"
-        ? payload.error
-        : "Failed to load members.";
-    throw new Error(message);
-  }
-  return response.json();
-}
 type Change = {
   userId: string;
   name: string;
@@ -113,14 +98,12 @@ export function MembersSettings({
   const locale = useLocale();
   const router = useRouter();
   const requestedWorkspaceId = initial?.workspace.id ?? workspaceId;
-  const settingsUrl = requestedWorkspaceId
-    ? `/api/workspace?workspace=${encodeURIComponent(requestedWorkspaceId)}`
-    : "/api/workspace";
+  // The same key the settings preloader fills, so members open from its cache.
   const {
     data: fetchedData,
     error: fetchError,
     mutate,
-  } = useSWR<WorkspaceSettings>(withBasePath(settingsUrl), fetchSettings, {
+  } = useSWR<WorkspaceSettings>(memberSettingsKey(requestedWorkspaceId), fetchSettingsData<WorkspaceSettings>, {
     fallbackData: initial,
     revalidateOnMount: true,
   });

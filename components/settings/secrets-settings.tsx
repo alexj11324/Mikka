@@ -4,7 +4,8 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { Cloud } from 'lucide-react'
-import { createSecret, deleteE2BKey, deleteSecret, getE2BKeyCapability, listSecrets, replaceSecret, saveE2BKey } from '@/app/actions/workspace-secrets'
+import { createSecret, deleteE2BKey, deleteSecret, replaceSecret, saveE2BKey, type getE2BKeyCapability, type listSecrets } from '@/app/actions/workspace-secrets'
+import { settingsRead } from '@/lib/settings-read'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -32,7 +33,7 @@ function groupByScope(secrets: WorkspaceSecretView[]) {
 export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.secrets')
   const actionError = useActionError()
-  const list = useSWR(['settings:secrets', workspaceId], () => listSecrets(workspaceId))
+  const list = useSWR(['settings:secrets', workspaceId], () => settingsRead<Awaited<ReturnType<typeof listSecrets>>>('secrets', { workspace: workspaceId }))
   const [editing, setEditing] = useState<WorkspaceSecretView | 'new' | null>(null)
   const secretDialog = usePresence(editing)
   const [warning, setWarning] = useState<string | null>(null)
@@ -64,7 +65,7 @@ export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
 function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.secrets.e2b')
   const actionError = useActionError()
-  const status = useSWR(['settings:e2b-key', workspaceId], () => getE2BKeyCapability(workspaceId))
+  const status = useSWR(['settings:e2b-key', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getE2BKeyCapability>>>('e2b-key', { workspace: workspaceId }))
   const [open, setOpen] = useState(false)
   const keyDialog = usePresence(open)
   const data = status.data && !status.data.error ? status.data : null

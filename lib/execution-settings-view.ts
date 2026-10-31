@@ -34,13 +34,29 @@ const localDevices = (places: readonly ExecutionPlace[]) => places.filter(place 
 const installed = (place: ExecutionPlace, harness: string) => place.harnesses.some(info => info.harness === harness && info.installed)
 
 /**
- * Harnesses offered at a place: what the device detected, installed ones only.
- * Cloud reports none of its own, so it offers every harness a rule can name.
+ * Harnesses offered at a place: what the device detected, installed ones only. Mikka Cloud
+ * offers what `withCloudModels` gave it: the Agents of the connected accounts.
  */
 export function harnessOptions(places: readonly ExecutionPlace[], place: string): RuleHarness[] {
-  const device = place === 'cloud' ? null : places.find(item => item.id === place)
-  if (!device) return [...RULE_HARNESSES]
-  return RULE_HARNESSES.filter(harness => installed(device, harness))
+  const target = places.find(item => item.id === place)
+  if (!target) return [...RULE_HARNESSES]
+  return RULE_HARNESSES.filter(harness => installed(target, harness))
+}
+
+/** Which account runs which Agent on Mikka Cloud, as the server checks a cloud rule. */
+const CLOUD_PROVIDERS = { claude_code: 'claude', codex: 'codex' } as const
+
+/**
+ * Mikka Cloud runs an Agent on the person's own subscription, so its Agents and models are
+ * the connected accounts' (Claude → Claude Code, ChatGPT → Codex), never what a device reports.
+ */
+export function withCloudModels(places: readonly ExecutionPlace[], accounts: readonly Pick<BotModelRow, 'provider' | 'modelId'>[]): ExecutionPlace[] {
+  return places.map(place => placeKind(place) !== 'cloud' ? place : {
+    ...place,
+    harnesses: (Object.entries(CLOUD_PROVIDERS) as [RuleHarness, string][])
+      .map(([harness, provider]) => ({ harness, installed: true, version: null, models: [...new Set(accounts.filter(row => row.provider === provider).map(row => row.modelId))] }))
+      .filter(info => info.models.length > 0) as HarnessReport[],
+  })
 }
 
 /** A model a rule can pick: `value` is stored (a slot or a reported id), `name` is shown. */
@@ -50,12 +66,11 @@ export interface ModelOption { value: string; name: string; isDefault?: boolean 
 export const CLAUDE_CODE_DEFAULT_SLOT = 'opus'
 
 /**
- * Models a harness reported at a place, by slot when it reports slots. Cloud
- * reports none of its own, so it offers what that harness reports on the
- * person's devices. Nothing is hard-coded.
+ * Models a harness reported at a place, by slot when it reports slots; on Mikka Cloud, the
+ * connected account's models (`withCloudModels`). Nothing is hard-coded.
  */
 export function modelOptions(places: readonly ExecutionPlace[], place: string, harness: string): ModelOption[] {
-  const devices = place === 'cloud' ? localDevices(places) : places.filter(item => item.id === place)
+  const devices = places.filter(item => item.id === place)
   const options = new Map<string, ModelOption>()
   for (const info of devices.flatMap(device => device.harnesses.filter(item => item.harness === harness && item.installed))) {
     const reported = info.modelSlots?.length
@@ -64,7 +79,7 @@ export function modelOptions(places: readonly ExecutionPlace[], place: string, h
     for (const option of reported) if (!options.has(option.value)) options.set(option.value, option)
   }
   // #537: Claude Code reports no models yet; offer its `opus` slot by name until the daemon reports what it resolves to.
-  if (harness === 'claude_code' && options.size === 0) options.set(CLAUDE_CODE_DEFAULT_SLOT, { value: CLAUDE_CODE_DEFAULT_SLOT, name: CLAUDE_CODE_DEFAULT_SLOT })
+  if (harness === 'claude_code' && options.size === 0 && place !== 'cloud') options.set(CLAUDE_CODE_DEFAULT_SLOT, { value: CLAUDE_CODE_DEFAULT_SLOT, name: CLAUDE_CODE_DEFAULT_SLOT })
   return [...options.values()]
 }
 
@@ -115,7 +130,7 @@ export function initialExecution(places: readonly ExecutionPlace[], accounts: re
     : RULE_HARNESSES.find(item => ordered.some(device => installed(device, item))) ?? 'claude_code'
   const place = ordered.find(device => installed(device, harness))?.id ?? 'cloud'
   const model = defaultModel(modelOptions(places, place, harness), harness)?.value
-    // #537: cloud Codex with no device reporting models falls back to the account's own model.
+    // Mikka Cloud with no account model offered here: the account's own model.
     ?? accounts.find(row => row.provider === subscription)?.modelId ?? ''
   return { place, harness, model }
 }

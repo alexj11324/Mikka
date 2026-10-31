@@ -4,8 +4,11 @@
  * whenDeviceOffline), label rules, and each Bot's model plus whenQuotaExhausted.
  */
 import {
-  createExecutionRule, deleteExecutionRule, getBotModel, getExecutionFallbacks, listBotModels, listExecutionPlaces, listExecutionRules, redetectDevice, setBotModel, updateExecutionFallbacks, updateExecutionRule,
+  createExecutionRule, deleteExecutionRule, getBotModel, redetectDevice, setBotModel, updateExecutionFallbacks, updateExecutionRule,
+  type getExecutionFallbacks, type listExecutionRules,
 } from '@/app/actions/execution-settings'
+import type { BotView } from '@/app/actions/bots'
+import { settingsRead } from '@/lib/settings-read'
 import type { ExecutionRule } from '@/lib/execution-rules'
 import { initialExecution, retarget, type BotModelRow, type ExecutionChoice, type ExecutionPlace, type RuleHarness } from '@/lib/execution-settings-view'
 
@@ -27,7 +30,11 @@ const DEFAULT_ID = 'default'
 const concrete = (value: string) => value === 'auto' ? undefined : value
 
 export async function readExecutionSettings(): Promise<StoredExecutionSettings> {
-  const [rows, fallbacks] = await Promise.all([listExecutionRules(), getExecutionFallbacks()])
+  // First reads go over GET (`/api/settings/[read]`), so they never queue in front of a save.
+  const [rows, fallbacks] = await Promise.all([
+    settingsRead<Awaited<ReturnType<typeof listExecutionRules>>>('execution-rules'),
+    settingsRead<Awaited<ReturnType<typeof getExecutionFallbacks>>>('execution-fallbacks'),
+  ])
   const fallback = rows.find(rule => rule.label === null)
   return {
     defaults: { place: concrete(fallback?.place ?? 'auto'), harness: concrete(fallback?.harness ?? 'auto') as RuleHarness | undefined, model: concrete(fallback?.model ?? 'auto'), whenDeviceOffline: fallbacks.whenDeviceOffline },
@@ -57,14 +64,14 @@ export function executionSettingsView(stored: StoredExecutionSettings, places: r
 
 const ruleValue = (label: string, value: ExecutionChoice) => ({ label, place: value.place, harness: value.harness, model: value.model })
 
-export async function saveDefaults(value: TaskDefaults): Promise<void> {
+/** The label-less default rule: where, with which Agent and model, a task without a matching label runs. */
+export async function saveDefaultRule(value: ExecutionChoice): Promise<void> {
   await updateExecutionRule(DEFAULT_ID, { label: null, place: value.place, harness: value.harness as RuleHarness, model: value.model })
-  const fallbacks = await getExecutionFallbacks()
-  if (fallbacks.whenDeviceOffline !== value.whenDeviceOffline) await updateExecutionFallbacks({ ...fallbacks, whenDeviceOffline: value.whenDeviceOffline })
 }
 
-export async function saveWhenQuotaExhausted(value: WhenQuotaExhausted): Promise<void> {
-  await updateExecutionFallbacks({ ...await getExecutionFallbacks(), whenQuotaExhausted: value })
+/** Both fallbacks in one write, from what the screen shows, so one change is one request. */
+export async function saveFallbacks(value: { whenDeviceOffline: WhenDeviceOffline; whenQuotaExhausted: WhenQuotaExhausted }): Promise<void> {
+  await updateExecutionFallbacks(value)
 }
 
 export async function addRule(label: string, value: ExecutionChoice) {
@@ -79,8 +86,20 @@ export async function removeRule(id: string) {
   await deleteExecutionRule(id)
 }
 
-export const listPlaces = async () => (await listExecutionPlaces()) as ExecutionPlace[]
-export const listAccountModels = async () => (await listBotModels()) as BotModelRow[]
+export const listPlaces = () => settingsRead<ExecutionPlace[]>('execution-places')
+export const listAccountModels = () => settingsRead<BotModelRow[]>('bot-models')
+export const listWorkspaceBots = () => settingsRead<BotView[]>('bots')
+
+/** Bot 与 Agents' SWR keys; settings-prefetch fills the same ones. */
+export const BOT_AGENTS_KEYS = { settings: 'execution-settings', places: 'execution-places', bots: 'bot-agents-bots', accounts: 'bot-models' } as const
+
+/** The section's first reads, by key, for settings-prefetch. */
+export const botAgentsReads = (): [key: string, read: () => Promise<unknown>][] => [
+  [BOT_AGENTS_KEYS.settings, readExecutionSettings],
+  [BOT_AGENTS_KEYS.places, listPlaces],
+  [BOT_AGENTS_KEYS.bots, listWorkspaceBots],
+  [BOT_AGENTS_KEYS.accounts, listAccountModels],
+]
 export const readBotModel = async (botId: string | null) => (await getBotModel(botId)) ?? null
 export const saveBotModel = (botId: string | null, bindingId: string) => setBotModel(botId, bindingId)
 export const redetect = (deviceIds: string[]) => Promise.all(deviceIds.map(id => redetectDevice(id)))

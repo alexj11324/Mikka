@@ -18,8 +18,11 @@ test('管理员可以改名、改地址并删除工作区', async ({ page }, tes
   await expect(name).toHaveValue(renamed)
   const slug = `e2e-${randomUUID().slice(0, 8)}`
   await address.fill(slug)
+  // Reload only once the address save has returned; a reload before that cancels it in flight.
+  const addressSaved = page.waitForResponse(response => response.request().method() === 'POST' && Boolean(response.request().postData()?.includes(slug)))
   await address.press('Enter')
   await expect(address).toHaveValue(slug)
+  await addressSaved
   await page.reload()
   await expect(name).toHaveValue(renamed)
   await expect(address).toHaveValue(slug)

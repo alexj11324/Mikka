@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
-import { changePassword, getPasswordStatus, listSessions, revokeOtherSessions, revokeSession, setPassword } from '@/app/actions/account'
+import { changePassword, revokeOtherSessions, revokeSession, setPassword, type getPasswordStatus, type listSessions } from '@/app/actions/account'
+import { settingsRead } from '@/lib/settings-read'
 import type { SignedInDevice } from '@/lib/account/sessions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,8 +22,8 @@ export function SecuritySettings() {
   const t = useTranslations('Settings.security')
   const actionError = useActionError()
   const locale = useLocale()
-  const password = useSWR('account:password', getPasswordStatus)
-  const sessions = useSWR('account:sessions', listSessions)
+  const password = useSWR('account:password', () => settingsRead<Awaited<ReturnType<typeof getPasswordStatus>>>('password'))
+  const sessions = useSWR('account:sessions', () => settingsRead<Awaited<ReturnType<typeof listSessions>>>('sessions'))
   const [editing, setEditing] = useState(false)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')

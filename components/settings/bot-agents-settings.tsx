@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { Check, ChevronDown, MoreHorizontal, Plus, RotateCw } from 'lucide-react'
-import { listBots, type BotView } from '@/app/actions/bots'
+import type { BotView } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -16,18 +16,18 @@ import { DeviceLabel, HarnessLabel, ModelLabel, ProviderMark, harnessName } from
 import { SettingsLoading, SettingsSaveError } from '@/components/settings/primitives'
 import { LabelDot } from '@/components/workspace/issue-metadata-controls'
 import {
-  addRule, executionSettingsView, listAccountModels, listPlaces, readBotModel, readExecutionSettings, redetect, removeRule, saveBotModel, saveDefaults, saveWhenQuotaExhausted, updateRule,
+  BOT_AGENTS_KEYS, addRule, executionSettingsView, listWorkspaceBots, listAccountModels, listPlaces, readBotModel, readExecutionSettings, redetect, removeRule, saveBotModel, saveDefaultRule, saveFallbacks, updateRule,
   type LabelRule, type StoredExecutionSettings, type TaskDefaults, type WhenDeviceOffline, type WhenQuotaExhausted,
 } from '@/lib/execution-settings-client'
 import type { ExecutionRule } from '@/lib/execution-rules'
-import { botModelChoice, groupBotModels, harnessOptions, modelName, modelOptions, modelProvider, placeKind, redetectTargets, retarget, type BotModelRow, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
+import { botModelChoice, groupBotModels, harnessOptions, modelName, modelOptions, modelProvider, placeKind, redetectTargets, retarget, withCloudModels, type BotModelRow, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
 import { cn } from '@/lib/utils'
 import { findLabel, listWorkspaceLabels, matchLabels } from '@/lib/workspace-labels'
 import { FieldError } from '@/components/ui/field'
 
 type T = ReturnType<typeof useTranslations<'Settings.botAgents'>>
 
-const KEYS = { settings: 'execution-settings', places: 'execution-places', bots: 'bot-agents-bots', accounts: 'bot-models' } as const
+const KEYS = BOT_AGENTS_KEYS
 
 /*
  * 设置 › Bot 与 Agents, laid out like Comma's 模型与 API: one card per
@@ -38,7 +38,7 @@ export function BotAgentsSettings() {
   const t = useTranslations('Settings.botAgents')
   const stored = useSWR(KEYS.settings, readExecutionSettings)
   const places = useSWR(KEYS.places, listPlaces, { refreshInterval: 15_000 })
-  const bots = useSWR(KEYS.bots, listBots)
+  const bots = useSWR(KEYS.bots, listWorkspaceBots)
   const accounts = useSWR(KEYS.accounts, listAccountModels)
   const [failed, setFailed] = useState<(() => Promise<void>) | null>(null)
   /** A choice the server refused stays on screen, marked 未保存, until a retry saves it. */
@@ -52,17 +52,20 @@ export function BotAgentsSettings() {
   if (stored.error || places.error || bots.error || accounts.error) return <FieldError>{t('loadFailed')}</FieldError>
   if (!stored.data || !places.data || !bots.data || !accounts.data) return <SettingsLoading label={t('loading')} rows={4} />
 
-  const placeList = places.data
   const accountRows = accounts.data
+  const placeList = withCloudModels(places.data, accountRows)
   const view = executionSettingsView(stored.data, placeList, accountRows)
   const defaults = unsaved.defaults ?? view.defaults
   const quota = unsaved.whenQuotaExhausted ?? view.whenQuotaExhausted
   const current = stored.data
 
   const changeDefaults = (next: TaskDefaults) => {
+    const rule = next.place !== defaults.place || next.harness !== defaults.harness || next.model !== defaults.model
+    const offline = next.whenDeviceOffline !== defaults.whenDeviceOffline
     setUnsaved(state => ({ ...state, defaults: next }))
     void save(async () => {
-      await saveDefaults(next)
+      if (rule) await saveDefaultRule(next)
+      if (offline) await saveFallbacks({ whenDeviceOffline: next.whenDeviceOffline, whenQuotaExhausted: quota })
       setUnsaved(({ defaults: _saved, ...rest }) => rest)
       await stored.mutate()
     })
@@ -70,7 +73,7 @@ export function BotAgentsSettings() {
   const changeQuota = (next: WhenQuotaExhausted) => {
     setUnsaved(state => ({ ...state, whenQuotaExhausted: next }))
     void save(async () => {
-      await saveWhenQuotaExhausted(next)
+      await saveFallbacks({ whenDeviceOffline: defaults.whenDeviceOffline, whenQuotaExhausted: next })
       setUnsaved(({ whenQuotaExhausted: _saved, ...rest }) => rest)
       await stored.mutate()
     })

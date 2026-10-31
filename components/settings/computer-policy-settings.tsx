@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { z } from 'zod'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
@@ -15,25 +16,30 @@ const stateSchema = z.discriminatedUnion('enabled', [
 ])
 type State = z.infer<typeof stateSchema>
 
+const policyPath = (workspaceId: string) => withBasePath(`/api/workspaces/${encodeURIComponent(workspaceId)}/computer-policy`)
+export const computerPolicyKey = (workspaceId: string) => ['settings:computer-policy', workspaceId] as const
+export async function readComputerPolicy(workspaceId: string): Promise<State> {
+  const response = await fetch(policyPath(workspaceId), { cache: 'no-store', credentials: 'same-origin' })
+  if (!response.ok) throw new Error('Computer policy unavailable')
+  return stateSchema.parse(await response.json())
+}
+
 export function ComputerPolicySettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.computerPolicy')
-  const [state, setState] = useState<State | null>(null)
+  const policy = useSWR(computerPolicyKey(workspaceId), () => readComputerPolicy(workspaceId))
+  const state = policy.data ?? null
   const [pending, setPending] = useState(false)
-  const [error, setError] = useState(false)
-  const path = withBasePath(`/api/workspaces/${encodeURIComponent(workspaceId)}/computer-policy`)
-  const refresh = useCallback(async () => {
-    const response = await fetch(path, { cache: 'no-store', credentials: 'same-origin' })
-    if (!response.ok) throw new Error('Computer policy unavailable')
-    setState(stateSchema.parse(await response.json()))
-  }, [path])
-  useEffect(() => { void refresh().catch(() => setError(true)) }, [refresh])
+  const [changeError, setChangeError] = useState(false)
+  const error = changeError || Boolean(policy.error)
+  const path = policyPath(workspaceId)
+  const refresh = async () => { await policy.mutate() }
   async function change(permission: ComputerPermission) {
-    setPending(true); setError(false)
+    setPending(true); setChangeError(false)
     try {
       const response = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ permission }) })
       if (!response.ok) throw new Error('Computer policy unavailable')
       await refresh()
-    } catch { setError(true); await refresh().catch(() => undefined) } finally { setPending(false) }
+    } catch { setChangeError(true); await refresh().catch(() => undefined) } finally { setPending(false) }
   }
   const labels = { allow: t('allow'), deny: t('deny') }
   if (!state) return error ? <FieldError>{t('error')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>

@@ -98,7 +98,10 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
 
   // The fallbacks save too: a reload keeps the choice.
   await fallback.getByRole('button', { name: '默认 设备离线时：等它上线', exact: true }).click()
+  // The choice is one save (a server action); wait for it before reloading.
+  const saved = page.waitForResponse(response => response.request().method() === 'POST' && Boolean(response.request().headers()['next-action']))
   await page.getByRole('option', { name: '改到云端运行' }).click()
+  expect((await saved).ok()).toBe(true)
   await expect(fallback.getByRole('button', { name: '默认 设备离线时：改到云端运行', exact: true })).toBeVisible()
   await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
   await page.reload()

@@ -1,4 +1,6 @@
-import { test, expect, register, rail, app, expectItems } from './fixtures'
+import { randomUUID } from 'node:crypto'
+import type { BrowserContext } from '@playwright/test'
+import { test, expect, register, rail, app, expectItems, browserClientHeaders, BASE_PATH } from './fixtures'
 
 test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立即切走', async ({ page }) => {
   const navigations: string[] = []
@@ -77,6 +79,83 @@ test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', as
   await page.goBack()
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
 })
+})
+
+test('设置页打开并空闲后，每个分区首次打开都不显示骨架屏', async ({ page }) => {
+  test.setTimeout(120000)
+  await register(page, '/settings?section=preferences')
+  const sidebar = page.locator('[data-slot="settings-list"]')
+  await expect(sidebar.getByRole('link', { name: '计费', exact: true })).toBeVisible()
+  // Settings loads every section's data once it is idle; after that nothing is left to wait for.
+  await page.waitForLoadState('networkidle')
+  const skeleton = page.locator('main [data-slot="skeleton"]')
+  const flashed: string[] = []
+  const names = (await sidebar.locator('[data-slot="sidebar-group"]').filter({ hasText: /个人|工作区/ }).getByRole('link').allInnerTexts()).map(name => name.trim())
+  expect(names.length).toBeGreaterThan(10)
+  for (const name of names) {
+    const link = sidebar.getByRole('link', { name, exact: true })
+    await link.click()
+    await expect(link).toHaveAttribute('aria-current', 'page')
+    for (const deadline = Date.now() + 400; Date.now() < deadline;) {
+      if (await skeleton.count()) { flashed.push(name); break }
+      await page.waitForTimeout(20)
+    }
+  }
+  expect(flashed, '这些分区仍显示了骨架屏').toEqual([])
+})
+
+test('设置读取接口沿用原来的权限：仅管理员可读的只给管理员，外人只得到错误', async ({ page, browser, baseURL }) => {
+  test.setTimeout(120000)
+  await register(page, '/settings/members')
+  await page.getByRole('button', { name: '邀请成员', exact: true }).click()
+  const invite = page.getByRole('dialog', { name: '邀请成员', exact: true })
+  const email = `member-${randomUUID()}@example.com`
+  await invite.getByLabel('邮箱地址', { exact: true }).fill(email)
+  await invite.getByRole('button', { name: '创建邀请链接', exact: true }).click()
+  const inviteURL = new URL(await invite.getByLabel(`${email} 的邀请链接`, { exact: true }).inputValue())
+  await invite.getByRole('button', { name: '完成', exact: true }).click()
+  const workspace = (await (await page.request.get(app('/api/workspace'))).json()).workspace.id as string
+
+  const memberContext = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
+  const outsiderContext = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
+  const anonymous = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
+  try {
+    const member = await memberContext.newPage()
+    await register(member, inviteURL.pathname.slice(BASE_PATH.length), email)
+    await member.getByRole('button', { name: '接受邀请并加入', exact: true }).click()
+    await expect(member).toHaveURL(/\/settings\/members\?workspace=/)
+    const outsider = await outsiderContext.newPage()
+    await register(outsider)
+
+    const read = async (context: BrowserContext, name: string) => {
+      const response = await context.request.get(app(`/api/settings/${name}?workspace=${workspace}`))
+      expect(response.headers()['cache-control']).toBe('private, no-store')
+      return { status: response.status(), body: await response.json() as { error?: string; canEdit?: boolean; secrets?: Record<string, unknown>[] } | null }
+    }
+    // Admin-only, as the actions were: 审计日志 and 计费.
+    for (const name of ['audit', 'billing']) {
+      const owner = await read(page.context(), name)
+      expect(owner.status, name).toBe(200)
+      expect(owner.body?.error, `管理员读取 ${name}`).toBeUndefined()
+      expect((await read(memberContext, name)).body?.error, `成员读取 ${name}`).toBeTruthy()
+    }
+    // Members read these, as before: secret names without values, and app policy without edit rights.
+    const memberSecrets = await read(memberContext, 'secrets')
+    expect(memberSecrets.body?.error).toBeUndefined()
+    expect(memberSecrets.body?.secrets?.every(secret => !('value' in secret))).toBe(true)
+    expect((await read(memberContext, 'app-policy')).body?.canEdit).toBe(false)
+    expect((await read(page.context(), 'app-policy')).body?.canEdit).toBe(true)
+    for (const name of ['audit', 'billing', 'secrets', 'app-policy', 'workspace-general', 'usage']) {
+      expect((await read(outsiderContext, name)).body?.error, `外人读取 ${name}`).toBeTruthy()
+      const signedOut = await read(anonymous, name)
+      expect(signedOut.status === 401 || Boolean(signedOut.body?.error), `未登录读取 ${name}`).toBe(true)
+    }
+    expect((await page.request.get(app('/api/settings/unknown'))).status()).toBe(404)
+  } finally {
+    await memberContext.close()
+    await outsiderContext.close()
+    await anonymous.close()
+  }
 })
 
 test('悬停预取后首次打开与再次打开设置分区都不显示骨架屏', async ({ page }) => {
