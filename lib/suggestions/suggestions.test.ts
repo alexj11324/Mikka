@@ -69,6 +69,18 @@ test('GitHub signatures are checked against the raw body', () => {
   assert.equal(verifyGitHubSignature(body, null, 's3cret'), false)
 })
 
+test('GitHub candidate lookup only admits actions that produce notifications', () => {
+  const payload = { requested_reviewer: { id: 42 }, assignee: { id: 43 }, issue: { user: { id: 44 } }, pull_request: { user: { id: 45 } } }
+  for (const [event, action, ids] of [
+    ['pull_request', 'review_requested', ['42']], ['pull_request', 'assigned', ['43']],
+    ['issues', 'assigned', ['43']], ['issue_comment', 'created', ['44']],
+    ['pull_request_review', 'submitted', ['45']], ['pull_request_review_comment', 'created', ['45']],
+    ['pull_request', 'synchronize', []], ['issues', 'opened', []], ['issues', 'closed', []], ['issues', 'edited', []],
+    ['issue_comment', 'edited', []], ['issue_comment', 'deleted', []],
+    ['pull_request_review', 'dismissed', []], ['pull_request_review_comment', 'edited', []], ['check_run', 'created', []],
+  ] as const) assert.deepEqual(githubCandidateIds(event, { ...payload, action }), ids, `${event}.${action}`)
+})
+
 test('notices about one thread share a matter', () => {
   const first = gmailNotification(me, { messageId: 'm1', threadId: 't1', subject: 'Invoice' })!
   const second = gmailNotification(me, { messageId: 'm2', threadId: 't1', subject: 'Re: Invoice' })!

@@ -2,12 +2,36 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import test from 'node:test'
-import { actionableAlerts, internalSink, notifyAlerts, requestSlis } from './monitor.mjs'
+import { actionableAlerts, internalSink, notifyAlerts, requestOutcomes, requestSlis, WINDOW_MS } from './monitor.mjs'
 import { withRequestLog } from '../../lib/request-log.ts'
 
 const now = Date.parse('2026-10-31T12:00:00Z')
 const start = (id, route = '/api/auth/[...all]') => ({ msg: 'api_request_started', invocationId: id, route, timestamp: new Date(now - 180_000).toISOString() })
 const end = (id, status, durationMs = 500) => ({ ...start(id), msg: 'api_request', status, durationMs })
+
+test('outcome coverage distinguishes legitimate empty work from errors, missing completion and legacy logs', () => {
+  const result = requestOutcomes([
+    start('empty'), { ...end('empty', 200), outcome: 'empty', body: 'SECRET' },
+    start('work'), { ...end('work', 202), outcome: 'work' },
+    start('ignored'), { ...end('ignored', 204), outcome: 'ignored' },
+    start('failed'), { ...end('failed', 500), outcome: 'empty' },
+    start('killed'), start('legacy'), end('legacy', 200),
+    { ...end('orphan', 200), outcome: 'empty' },
+    { ...end('old', 200), outcome: 'empty', timestamp: new Date(now - WINDOW_MS - 1).toISOString() },
+    { ...end('undated', 200), outcome: 'empty', timestamp: undefined },
+    'malformed',
+  ], now)
+  assert.deepEqual(result['/api/auth/[...all]'], { count: 7, completed: 5, empty: 1, work: 1, ignored: 1, unknown: 4, emptyRatio: 1 / 3, coverage: 3 / 7, unwindowed: 1 })
+  assert.ok(!JSON.stringify(result).includes('SECRET'))
+  const unknown = requestOutcomes([start('no-end', '/v1/devices/[deviceId]/commands')], now)['/v1/devices/[deviceId]/commands']
+  assert.equal(unknown.emptyRatio, null)
+  assert.equal(unknown.coverage, 0)
+  const undated = requestOutcomes([{ msg: 'api_request', route: '/legacy', outcome: 'empty' }], now)['/legacy']
+  assert.equal(undated.count, 0)
+  assert.equal(undated.emptyRatio, null)
+  assert.equal(undated.coverage, null)
+  assert.deepEqual(requestOutcomes([], now), {})
+})
 
 test('started, failed, 429 and overdue unfinished requests share the denominator; raw payloads never enter metrics', () => {
   const result = requestSlis([start('ok'), end('ok', 200), start('failed'), end('failed', 500), start('limited'), end('limited', 429), start('killed'),

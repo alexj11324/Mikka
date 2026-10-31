@@ -133,7 +133,7 @@ jobs:
       - run: pnpm test:linear-sync
       - run: pnpm check:agent-definitions
       - name: Release identity, vulnerability policy and artifact tamper regressions
-        run: node --test scripts/release/security.test.mjs scripts/ops/monitor.test.mjs scripts/ops/recovery-failures.test.mjs
+        run: pnpm test:release-security
       - run: pnpm test:mailbox-verification
       - run: pnpm test:factory-approval
       - run: pnpm test:personal-mailbox-core
