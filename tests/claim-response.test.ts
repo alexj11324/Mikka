@@ -16,7 +16,7 @@ function fixture() {
     device: {id:'device',ownerId:'member',enabled:true,kind:'local',protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]},
     agent: {id:'agent',userId:'member',deviceId:'device',harness:'codex'},
     repo: {id:'repo',userId:'member',deviceId:'device',baseBranch:'main',repoPath:repository.key,remoteUrl:repository.remoteUrl},
-    cliPolicy: {revision:'a'.repeat(64),policy:defaultRunPolicy()},
+    cliPolicy: {revision:'a'.repeat(64),policy:defaultRunPolicy(),workspaceIds:[] as string[]},
     publication: {pushBranch:'synthetic-claim-branch',policy:defaultRunPolicy()},
     checkpoint: null as RunCheckpoint | null,
     strictRecovery: false,
@@ -47,6 +47,20 @@ test('historical question retries stop before publication, leases or worker cred
   assert.equal(probe.run.leaseExpiresAt,null)
   const body=await response.json()
   for(const field of ['prompt','mcp','skills','skillReceipt'])assert.equal(Object.hasOwn(body,field),false)
+})
+
+test('native claims check both stored Bot and task workspace model limits before leases or credentials',async()=>{
+  const probe=fixture()
+  probe.cliPolicy.workspaceIds=['bot-workspace','task-workspace']
+  Object.assign(probe,{modelAdmissionDeniedWorkspace:'task-workspace'})
+  const response=await claim(probe,['skill-preflight','policy','model-admission','model-admission'])
+  assert.equal(response.status,409)
+  assert.equal((await response.json()).error,'modelRouteDenied')
+  assert.equal(probe.run.status,'queued')
+  assert.equal(probe.run.leaseExpiresAt,null)
+  assert.deepEqual((probe as typeof probe & {modelAdmissionScopes:unknown[]}).modelAdmissionScopes,[
+    {workspaceId:'bot-workspace',ownerId:'member'},{workspaceId:'task-workspace',ownerId:'member'},
+  ])
 })
 
 test('ordinary retries retain the normal claim path after question lineage validation',async()=>{

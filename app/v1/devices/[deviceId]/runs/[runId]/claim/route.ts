@@ -8,6 +8,8 @@ import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER } from '@mikka/protocol/device'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
+import { assertUnmanagedModelTransport } from '@/lib/model-admission/runtime'
+import { ModelAdmissionError } from '@/lib/model-admission/contract'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDevice } from '@/lib/device-link'
@@ -105,8 +107,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id || subscription.ownerId !== caller.userId)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   let cliPolicy: Awaited<ReturnType<typeof readCliRunPolicy>>
-  try { cliPolicy = await readCliRunPolicy(pool, runId, caller.userId) }
-  catch { return NextResponse.json({ error: 'Agent policy unavailable.' }, { status: 409 }) }
+  try {
+    cliPolicy = await readCliRunPolicy(pool, runId, caller.userId)
+    for (const workspaceId of cliPolicy.workspaceIds) await assertUnmanagedModelTransport({ workspaceId, ownerId: caller.userId }, run.agentDefinition?.model ?? 'native-default', request.signal)
+  }
+  catch (error) { return NextResponse.json({ error: error instanceof ModelAdmissionError ? error.code : 'Agent policy unavailable.' }, { status: 409 }) }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let factoryClaim: Record<string, unknown> = {}
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined

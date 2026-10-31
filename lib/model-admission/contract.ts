@@ -20,7 +20,7 @@ export const modelAdmissionPolicySchema = z.strictObject({
   })).max(100),
 })
 export type ModelAdmissionPolicy = z.infer<typeof modelAdmissionPolicySchema>
-export type ModelAdmissionCode = 'modelRouteDenied' | 'modelPolicyRevoked' | 'modelRegionUnverified' | 'modelPrincipalUnavailable' | 'modelPolicyChanged' | 'modelPolicyInvalid'
+export type ModelAdmissionCode = 'modelRouteDenied' | 'modelPolicyRevoked' | 'modelRegionUnverified' | 'modelPrincipalUnavailable' | 'modelPolicyChanged' | 'modelPolicyInvalid' | 'modelTransportActive'
 export class ModelAdmissionError extends Error {
   constructor(readonly code: ModelAdmissionCode) { super(code); this.name = 'ModelAdmissionError' }
 }
