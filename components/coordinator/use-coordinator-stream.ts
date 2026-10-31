@@ -20,6 +20,7 @@ export function useCoordinatorStream({ botId, runId, cursor, persistedStreamIds,
   useEffect(() => {
     setState(previous => ({ botId, replies: previous.botId === botId ? previous.replies.filter(reply => reply.committedThrough !== undefined) : [], error: false }))
     if (!runId) { connect.current = () => {}; return }
+    const streamRunId = runId
     let disposed = false
     let active = false
     let controller: AbortController | undefined
@@ -32,7 +33,7 @@ export function useCoordinatorStream({ botId, runId, cursor, persistedStreamIds,
       let replies: CoordinatorLiveReply[] = []
       setState(previous => ({ ...previous, error: false }))
       try {
-        const query = new URLSearchParams({ runId })
+        const query = new URLSearchParams({ runId: streamRunId })
         if (botId) query.set('botId', botId)
         const response = await fetch(withBasePath(`/api/coordinator/stream?${query}`), { credentials: 'same-origin', signal })
         if (response.status === 204) return

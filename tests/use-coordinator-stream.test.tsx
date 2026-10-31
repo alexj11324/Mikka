@@ -26,7 +26,8 @@ test('hook keeps one reader, rebuilds reconnects, reconciles history, and cancel
   const container = browser.document.createElement('div') as unknown as HTMLElement
   document.body.append(container)
   const root = createRoot(container)
-  let output: ReturnType<typeof useCoordinatorStream>
+  let output!: ReturnType<typeof useCoordinatorStream>
+  const getOutput = (): ReturnType<typeof useCoordinatorStream> => output
   let props: Parameters<typeof useCoordinatorStream>[0] = { botId: null, runId: 'run', cursor: 0, revalidate: async () => { output.reconnect() } }
   function Probe() {
     output = useCoordinatorStream(props)
@@ -47,7 +48,7 @@ test('hook keeps one reader, rebuilds reconnects, reconciles history, and cancel
     assert.equal(output.replies.map(reply => reply.text).join(''), 'first')
     props = { ...props, persistedStreamIds: ['run:0'] }
     await render()
-    assert.deepEqual(output.replies, [], 'saved history suppresses the partial before its committed marker')
+    assert.deepEqual(getOutput().replies, [], 'saved history suppresses the partial before its committed marker')
     assert.equal(streams.length, 1, 'history deduplication keeps the reader active')
     props = { ...props, persistedStreamIds: [] }
     await render()
