@@ -52,7 +52,7 @@ export default async function RootLayout({
         {/* OpenUI 1.0.1 has no public opt-out; claim its bootstrap guard before imports run. */}
         {process.env.NODE_ENV === 'development' && <Script id="disable-openui-devtools" strategy="beforeInteractive">{'globalThis[Symbol.for("openui.devtools.autoMount")] = true;'}</Script>}
       </head>
-      <body className="antialiased">
+      <body className="antialiased in-data-desktop-translucent:bg-transparent">
         <NextIntlClientProvider messages={messages}>
           <ThemeProvider>{posthogConfig.token && <PostHogAnalytics />}{children}<Toaster /></ThemeProvider>
         </NextIntlClientProvider>
