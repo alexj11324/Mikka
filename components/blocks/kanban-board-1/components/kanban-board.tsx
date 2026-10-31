@@ -170,14 +170,14 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, narrowColumns = []
         {shown.map(column => {
           const tasks = props.value[column.value] ?? []
           if (narrow(column.value)) return <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-10 min-w-10 shrink-0">
-            <Button variant="ghost" className="h-full w-10 flex-col items-center justify-start gap-2 overflow-hidden rounded-xl bg-muted/60 px-0 py-2.5 font-medium hover:bg-muted" aria-label={tBoard('expandColumn', { status: statusLabel(column.value) })} onClick={() => setOpened(current => [...current, column.value])}>
+            <Button variant="ghost" className="h-full w-10 flex-col items-center justify-start gap-2 overflow-hidden rounded-xl bg-muted/60 dark:bg-muted/30 px-0 py-2.5 font-medium hover:bg-muted" aria-label={tBoard('expandColumn', { status: statusLabel(column.value) })} onClick={() => setOpened(current => [...current, column.value])}>
               <column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />
               <span className="shrink-0 text-sm leading-tight [writing-mode:vertical-rl]">{statusLabel(column.value)}</span>
               <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{tasks.length}</span>
             </Button>
           </KanbanColumn>
           return <KanbanColumn key={column.value} value={column.value} className={cn('min-h-0', fit ? 'max-w-72 min-w-44 flex-1 basis-0' : 'w-60 min-w-60 shrink-0')}>
-            <section className="group/column flex min-h-0 flex-1 flex-col gap-1 rounded-xl bg-muted/60 p-1.5" aria-label={t('columnLabel', { status: statusLabel(column.value) })}>
+            <section className="group/column flex min-h-0 flex-1 flex-col gap-1 rounded-xl bg-muted/60 dark:bg-muted/30 p-1.5" aria-label={t('columnLabel', { status: statusLabel(column.value) })}>
               <div className="flex h-8 shrink-0 items-center gap-2 pr-0.5 pl-1.5">
                 <column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />
                 <h2 className="truncate text-sm font-medium">{statusLabel(column.value)}</h2>
@@ -196,7 +196,7 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, narrowColumns = []
             </section>
           </KanbanColumn>
         })}
-        {hidden.length > 0 && !fit && <section aria-label={tBoard('hiddenLane')} className="flex w-52 shrink-0 flex-col gap-1 rounded-xl bg-muted/60 p-1.5">
+        {hidden.length > 0 && !fit && <section aria-label={tBoard('hiddenLane')} className="flex w-52 shrink-0 flex-col gap-1 rounded-xl bg-muted/60 dark:bg-muted/30 p-1.5">
           <h2 className="flex h-8 items-center px-1.5 text-sm font-medium text-muted-foreground">{tBoard('hiddenLane')}</h2>
           {hidden.map(({ status, count }) => {
             const column = BOARD_COLUMNS.find(item => item.value === status)!

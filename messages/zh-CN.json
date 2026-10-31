@@ -465,7 +465,6 @@
     "placeholderCompact": "添加描述…",
     "placeholderFull": "描述背景与验收标准，输入 / 插入内容…",
     "selectionRequired": "请先选中一段尚未评论的正文。",
-    "hint": "输入 / 插入内容，选中文字设置格式",
     "selectionComment": "选区评论",
     "selectionHint": "选中描述中的一段文字，再添加评论。",
     "selectionCommentLabel": "选区评论内容",

@@ -70,7 +70,7 @@ export function ThreadList({ threads, issues, bots, all = false, onOpenIssue }: 
   const t = useTranslations('Shell.threads')
   // One clock for every row's time.
   const now = useNow({ updateInterval: 60_000 })
-  if (!threads.length) return <p className="px-2 text-xs text-muted-foreground">{t('empty')}</p>
+  if (!threads.length) return <p className="px-2 py-6 text-center text-xs text-muted-foreground">{t('empty')}</p>
   const groups = groupThreads(threads, id => issues.find(issue => issue.id === id))
   const rows = (list: Thread[]) => <ul className="flex flex-col">{list.map(thread => <ThreadRow key={thread.id} thread={thread} issues={issues} bots={bots} all={all} now={now} onOpenIssue={onOpenIssue} />)}</ul>
   return <div role="group" aria-label={t('title')} className="flex flex-col gap-3">

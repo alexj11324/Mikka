@@ -465,7 +465,6 @@
     "placeholderCompact": "Add a description…",
     "placeholderFull": "Describe the background and acceptance criteria. Type / to insert content…",
     "selectionRequired": "Select a passage of body text that has no comment yet.",
-    "hint": "Type / to insert content, or select text to format it",
     "selectionComment": "Selection comment",
     "selectionHint": "Select a passage in the description, then add a comment.",
     "selectionCommentLabel": "Selection comment",
