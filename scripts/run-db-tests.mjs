@@ -70,6 +70,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/audit/query.ts', file: 'tests/audit-query.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
   { marker: 'lib/audit/record.ts', file: 'tests/audit-record.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/audit/delivery.ts', file: 'tests/audit-delivery.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/account/delete.ts', file: 'lib/account/store.db.test.ts', script: 'test:account-db' },
   { marker: 'lib/agent-tool-approval/task-policy.db.test.ts', file: 'lib/agent-tool-approval/task-policy.db.test.ts', script: 'test:worker-authorization-db' },
   { marker: 'lib/abuse/store.ts', file: 'lib/abuse/model-postpay.db.test.ts', script: 'test:abuse-db' },

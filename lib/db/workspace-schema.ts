@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, uuid, varchar, primaryKey, unique, index } from 'drizzle-orm/pg-core'
+import type { AuditRow } from '@/lib/audit/events'
+import { pgTable, text, timestamp, uuid, varchar, primaryKey, unique, index, jsonb } from 'drizzle-orm/pg-core'
 
 export const workspaces = pgTable('mikka_workspaces', {
   id: uuid('id').primaryKey(),
@@ -38,3 +39,13 @@ export const workspaceSlugRedirects = pgTable('mikka_workspace_slug_redirects', 
   workspaceId: uuid('workspaceId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('mikka_workspace_slug_redirects_workspace_idx').on(table.workspaceId)])
+
+/** Durable delivery receipt for the main audit sink, committed with workspace mutations. */
+export const workspaceAuditOutbox = pgTable('workspace_audit_outbox', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspaceId').notNull(),
+  payload: jsonb('payload').$type<AuditRow>(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull(),
+  lastAttemptAt: timestamp('lastAttemptAt', { withTimezone: true }),
+  deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
+})

@@ -4,8 +4,8 @@
 // - Writes that live in the MIKKA database (secret, token)
 //   MUST call recordAudit(tx, …) inside the business transaction, so the audit
 //   row commits or rolls back with the change. Never use recordAuditSafe for them.
-// - Only cross-database member/permission writes (DATABASE_URL, which cannot share
-//   a transaction with MIKKA_DATABASE_URL) use recordAuditSafe, after they commit.
+// - Cross-database workspace changes MUST enqueueWorkspaceAudit in their workspace
+//   transaction; delivery.ts relays that committed intent to this same main sink.
 // - Retention defaults to retain; only an explicit admin policy enables expiry (./retention.ts).
 import 'server-only'
 import { db as defaultDb } from '@/lib/db'
@@ -47,9 +47,10 @@ export function auditFailureSummary(error: unknown): { name: string; code: strin
  * A swallowed insert error inside a caller's transaction would abort it and turn
  * its COMMIT into a silent ROLLBACK, so this always writes on its own connection.
  * Logs only action, workspaceId and auditFailureSummary.
+ * @deprecated Workspace mutations must enqueueWorkspaceAudit inside their transaction.
  */
-// TODO(audit): replace log-only failure with an outbox or retry; member/permission
-// writes live in DATABASE_URL, so they cannot share the audit transaction.
+// Legacy best-effort API only. Production workspace mutations use the durable
+// transaction-bound enqueueWorkspaceAudit instead; this is not a cross-DB guarantee.
 export async function recordAuditSafe(event: AuditEvent): Promise<RecordedAudit | null> {
   try {
     return await recordAudit(defaultDb, event)

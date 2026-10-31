@@ -8,6 +8,7 @@ import { teamIssueCreateReceipts, teamIssuePromotionReceipts, teamIssues, teamMe
 import { workspaceInvitations, workspaceMembers, workspaceSlugRedirects, workspaces } from '@/lib/db/workspace-schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
+import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/delivery'
 import { parseWorkspaceIcon } from './icon'
 
 export type MainTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -40,12 +41,12 @@ export async function slugIsReserved(tx: WorkspaceTransaction, slug: string) {
 }
 
 /** 常规: rename, change the URL slug (old slug redirects) and set or clear the icon. Admins only. */
-export async function updateWorkspaceGeneral(actorId: string, workspaceId: string, input: UpdateWorkspaceInput): Promise<WorkspaceGeneral> {
+export async function updateWorkspaceGeneral(actorId: string, workspaceId: string, input: UpdateWorkspaceInput, audit?: AuditRequestContext): Promise<WorkspaceGeneral> {
   const values = updateWorkspaceInput.parse(input)
   const icon = values.icon === undefined ? undefined : parseWorkspaceIcon(values.icon)
   if (icon === false) throw new WorkspaceError('workspaceIconInvalid')
   return workspaceDb.transaction(async tx => {
-    const { workspace } = await requireWorkspace(tx, workspaceId, actorId, true)
+    const { workspace, membership } = await requireWorkspace(tx, workspaceId, actorId, true)
     // One lock for every slug change, so two renames cannot claim the same slug.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('mikka-workspace-slugs', 0))`)
     const changes: Partial<typeof workspaces.$inferInsert> = {}
@@ -61,6 +62,10 @@ export async function updateWorkspaceGeneral(actorId: string, workspaceId: strin
     if (!Object.keys(changes).length) return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon }
     const [updated] = await tx.update(workspaces).set(changes).where(eq(workspaces.id, workspaceId))
       .returning({ id: workspaces.id, name: workspaces.name, slug: workspaces.slug, icon: workspaces.icon })
+    if (changes.slug && changes.slug !== workspace.slug && workspace.slug) await enqueueWorkspaceAudit(tx, {
+      workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'workspace.slug_changed',
+      target: { type: 'workspace', id: workspaceId, label: updated.name }, metadata: { from: workspace.slug, to: changes.slug }, ...audit,
+    })
     return updated
   })
 }
@@ -106,7 +111,7 @@ export interface WorkspaceTransfer { owner: WorkspaceTransferTarget; previousRol
  * 转让工作区: makes another active member the owner; a member is promoted to admin.
  * The previous owner stays an admin (they can step down in 成员).
  */
-export async function transferWorkspaceOwnership(actorId: string, workspaceId: string, toUserId: string): Promise<WorkspaceTransfer> {
+export async function transferWorkspaceOwnership(actorId: string, workspaceId: string, toUserId: string, audit?: AuditRequestContext): Promise<WorkspaceTransfer> {
   z.uuid().parse(workspaceId)
   const to = z.string().min(1).max(200).parse(toUserId)
   return workspaceDb.transaction(async tx => {
@@ -119,6 +124,9 @@ export async function transferWorkspaceOwnership(actorId: string, workspaceId: s
     if (!target) throw new WorkspaceError('workspaceTransferTargetInvalid')
     if (target.role !== 'admin') await tx.update(workspaceMembers).set({ role: 'admin' }).where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, to)))
     await tx.update(workspaces).set({ userId: to }).where(eq(workspaces.id, workspaceId))
+    const base = { workspaceId, actor: { type: 'user' as const, id: actorId, name: membership.name }, target: { type: 'member', id: target.userId, label: target.name || target.email }, ...audit }
+    if (target.role !== 'admin') await enqueueWorkspaceAudit(tx, { ...base, action: 'member.role_changed', metadata: { oldRole: target.role, newRole: 'admin' } })
+    await enqueueWorkspaceAudit(tx, { ...base, action: 'workspace.ownership_transferred' })
     return { owner: { userId: target.userId, name: target.name, email: target.email }, previousRole: target.role }
   })
 }
