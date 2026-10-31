@@ -8,7 +8,7 @@ import {
   browserPlan, BROWSER_MAIN_SPECS, BROWSER_NIGHTLY_SPECS, BROWSER_SCOPED_SPECS, BROWSER_SMOKE_FILES,
   BROWSER_INFRA_FILES, needsSelectionValidation,
 } from './ci-docs-only.mjs'
-import { browserArguments, selectionPlan, selectionValidationPlans, specGrep } from './ci-browser-tests.mjs'
+import { browserArguments, selectionPlan, selectionValidationPlans, specGrep, turnstileArguments, TURNSTILE_TEST_SECRET } from './ci-browser-tests.mjs'
 
 const smoke = { tier: 'smoke', specs: [], performance: false }
 const full = { tier: 'full', specs: [], performance: false }
@@ -94,6 +94,8 @@ test('the smoke tag marks exactly the approved tests, and only in the declared f
   const count = specFiles.reduce((sum, file) => sum + (readFileSync(`tests/e2e/${file}`, 'utf8').match(/'@smoke'/g) ?? []).length, 0)
   assert.equal(count, 10)
   assert.equal((readFileSync('tests/mvp/core-loop.spec.ts', 'utf8').match(/'@smoke'/g) ?? []).length, 1)
+  // The keyed Turnstile run selects the sign-up smoke test.
+  assert.match(readFileSync('tests/e2e/workspace.spec.ts', 'utf8'), /test\('注册、创建任务、菜单、搜索、视图切换和退出登录', \{ tag: \['@smoke', '@turnstile'\] \}/)
 })
 
 test('runner turns each tier into fixed argv and refuses anything else', () => {
@@ -129,18 +131,29 @@ test('targeted grep selects whole files by name and the smoke tag, nothing else'
   assert(!grep.test(' chromium profile.spec.ts 切换界面语言'))
 })
 
-test('runner invokes pnpm without a shell and preserves actual command failure', () => {
+test('runner invokes pnpm without a shell, preserves failure, and gives the Turnstile secret only to the keyed run', () => {
   const dir = mkdtempSync(join(tmpdir(), 'browser-runner-retained-'))
   console.log(`Retained browser runner evidence: ${dir}`)
-  const trace = join(dir, 'argv.json')
-  writeFileSync(join(dir, 'pnpm'), `#!${process.execPath}\nimport {writeFileSync} from 'node:fs'; writeFileSync(process.env.TEST_TRACE, JSON.stringify(process.argv.slice(2))); process.exit(Number(process.env.TEST_EXIT));\n`, { mode: 0o700 })
+  const trace = join(dir, 'argv.json'), envTrace = join(dir, 'env.json')
+  writeFileSync(join(dir, 'pnpm'), `#!${process.execPath}\nimport {writeFileSync} from 'node:fs'; writeFileSync(process.env.TEST_TRACE, JSON.stringify(process.argv.slice(2))); writeFileSync(process.env.TEST_ENV_TRACE, JSON.stringify({ secret: process.env.TURNSTILE_SECRET_KEY ?? null, report: process.env.PLAYWRIGHT_HTML_OUTPUT_DIR ?? null })); process.exit(Number(process.env.TEST_EXIT));\n`, { mode: 0o700 })
+  const env = { PATH: dir, TEST_TRACE: trace, TEST_ENV_TRACE: envTrace }
   for (const status of [0, 7]) {
     const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs')], {
-      encoding: 'utf8', env: { PATH: dir, BROWSER_TIER: 'smoke', BROWSER_SPECS: '[]', TEST_TRACE: trace, TEST_EXIT: String(status) },
+      encoding: 'utf8', env: { ...env, BROWSER_TIER: 'smoke', BROWSER_SPECS: '[]', TEST_EXIT: String(status) },
     })
     assert.equal(result.status, status, result.stderr)
     assert.deepEqual(JSON.parse(readFileSync(trace, 'utf8')), browserArguments('smoke', '[]'))
+    // The ordinary run never holds the secret, so token-less API sign-ups keep working.
+    assert.deepEqual(JSON.parse(readFileSync(envTrace, 'utf8')), { secret: null, report: null })
   }
+  for (const status of [0, 5]) {
+    const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), '--turnstile'], { encoding: 'utf8', env: { ...env, TEST_EXIT: String(status) } })
+    assert.equal(result.status, status, result.stderr)
+    assert.deepEqual(JSON.parse(readFileSync(trace, 'utf8')), turnstileArguments())
+    assert.deepEqual(JSON.parse(readFileSync(envTrace, 'utf8')), { secret: TURNSTILE_TEST_SECRET, report: 'playwright-turnstile-report' })
+  }
+  assert.equal(TURNSTILE_TEST_SECRET, '1x0000000000000000000000000000000AA')
+  assert.notEqual(spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), '--turnstile', '--shard=1/2'], { encoding: 'utf8', env }).status, 0)
 })
 
 test('each selection plan can run as an independent unsharded job', () => {
@@ -274,13 +287,14 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   const source = workflow()
   assert(source.includes('    name: Browser tests (before merge)\n'))
   assert(source.includes('needs: [changes, browser-pr, browser-selection, browser-build, browser-runtime, browser-e2e-full]'))
-  // One pull request runner: build, runtime gates, MVP smoke, smoke/targeted, performance.
+  // One pull request runner: build, runtime gates, MVP smoke, smoke/targeted, Turnstile, performance.
   const pr = source.split('\n  browser-pr:\n')[1].split('\n  browser-selection:\n')[0]
   for (const step of ['pnpm exec next build', 'pnpm test:test-accounts-db', 'pnpm test:factory-http', 'node scripts/test-accounts/run-http.mjs',
-    'pnpm test:e2e:mvp --grep @smoke', 'node scripts/ci-browser-tests.mjs >', 'pnpm test:performance',
-    'node scripts/test-accounts/evidence.mjs']) assert(pr.includes(step), step)
+    'pnpm test:e2e:mvp --grep @smoke', 'node scripts/ci-browser-tests.mjs >', 'node scripts/ci-browser-tests.mjs --turnstile', 'pnpm test:performance',
+    'node scripts/test-accounts/evidence.mjs', 'NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA']) assert(pr.includes(step), step)
   assert(!pr.includes('name: browser-build-'), 'no build artifact round trip on pull requests')
   assert(!pr.includes('pnpm lint') && !pr.includes('pnpm build'), 'lint runs once, in ui-policy.yml')
+  assert(!pr.includes('TURNSTILE_SECRET_KEY'), 'the secret reaches only the keyed run')
   assert(source.includes("shard: ${{ fromJSON(needs.changes.outputs.browser_tier == 'main' && '[1, 2]' || '[1, 2, 3, 4]') }}"))
   assert(source.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/$BROWSER_SHARDS'))
   assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted'))
@@ -290,7 +304,7 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
     'browser-test-report-selection-targeted-${{ github.sha }}', 'browser-test-report-shard-${{ matrix.shard }}-${{ github.sha }}']) assert(source.includes(`name: ${name}`), name)
   // Every uploaded path is one the evidence scanner audits first.
   const scanned = readFileSync('scripts/test-accounts/evidence.mjs', 'utf8')
-  for (const path of ['playwright-selection-targeted-report', 'selection-targeted-results', '.cache/e2e/playwright-selection.log']) {
+  for (const path of ['playwright-turnstile-report', 'turnstile-results', '.cache/e2e/playwright-turnstile.log', 'playwright-selection-targeted-report', 'selection-targeted-results', '.cache/e2e/playwright-selection.log']) {
     assert(source.includes(path), path)
     assert(scanned.includes(path), path)
   }

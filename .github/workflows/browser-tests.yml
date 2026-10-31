@@ -158,6 +158,10 @@ jobs:
       SLACK_BOT_USER_ID: U123
       SLACK_USER_BINDINGS: '{"U456":"ci-only-mikka-user"}'
       NEXT_TELEMETRY_DISABLED: '1'
+      # Cloudflare's documented public test site key (always passes). Baked into
+      # the build so the sign-up form renders the widget and sends a token; the
+      # matching test secret is given only to the keyed sign-up run below.
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/pnpm-install
@@ -258,6 +262,29 @@ jobs:
           fi
           cat "$log_file"
           exit "$test_status"
+      - name: Sign-up through Cloudflare Turnstile with the public test keys
+        if: ${{ !cancelled() }}
+        run: |
+          # The keyed run needs a sign-up form that sends the token (#554). Until
+          # that is on the branch, the build has no widget and the run would
+          # only prove that a token-less sign-up is refused.
+          if ! grep -rqs --include='*.ts' --include='*.tsx' NEXT_PUBLIC_TURNSTILE_SITE_KEY components app lib; then
+            echo "::notice::The sign-up form does not read NEXT_PUBLIC_TURNSTILE_SITE_KEY yet; the keyed sign-up run starts once it does."
+            exit 0
+          fi
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-turnstile.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          node scripts/ci-browser-tests.mjs --turnstile > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
       - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
         if: ${{ !cancelled() && needs.changes.outputs.browser_performance == 'true' }}
         run: |
@@ -288,11 +315,14 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            playwright-turnstile-report/
+            turnstile-results/
             playwright-performance-report/
             performance-results/
             .cache/e2e/http-acceptance-summary.json
             .cache/e2e/account-http-evidence.json
             .cache/e2e/playwright-browser.log
+            .cache/e2e/playwright-turnstile.log
             .cache/e2e/playwright-performance.log
           # Only the explicit scanned paths above; never the private account directory.
           include-hidden-files: true

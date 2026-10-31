@@ -4,6 +4,10 @@ import { constants, copyFileSync, existsSync, lstatSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { browserPlan, BROWSER_MAIN_SPECS, BROWSER_SCOPED_SPECS, BROWSER_SMOKE_TAG, BROWSER_SPEC_NAME } from './ci-docs-only.mjs'
 
+/** Cloudflare's documented always-pass test secret; public, never a credential. */
+export const TURNSTILE_TEST_SECRET = '1x0000000000000000000000000000000AA'
+export const TURNSTILE_TAG = '@turnstile'
+
 const SHARDED_TIERS = new Set(['main', 'full'])
 
 /** Playwright matches --grep against "project file describe title tags"; a whole
@@ -40,6 +44,12 @@ export function browserArguments(tier, encodedSpecs, shard, { specExists = spec 
   return args
 }
 
+/** The keyed sign-up run: only tests tagged @turnstile, against a server that
+ * holds Cloudflare's test secret, so the token path is verified end to end. */
+export function turnstileArguments() {
+  return ['exec', 'playwright', 'test', '--grep', TURNSTILE_TAG, '--grep-invert', '@performance', '--output=turnstile-results']
+}
+
 // Policy changes must exercise actual subset execution. The smoke plan covers
 // the tag filter; the targeted plan covers the tag filter plus every scoped spec.
 export function selectionValidationPlans() {
@@ -67,6 +77,14 @@ export function main() {
   const shard = process.argv.find(argument => argument.startsWith('--shard='))?.slice('--shard='.length)
   if (validating && shard) throw new Error('Selection validation must run unsharded')
   if (legacyValidation && planName !== undefined) throw new Error('Choose one selection validation mode')
+  if (process.argv.includes('--turnstile')) {
+    if (validating || shard) throw new Error('The Turnstile run is a single unsharded subset')
+    const args = turnstileArguments()
+    console.log(`Browser acceptance layer: turnstile; ${args.join(' ')}`)
+    const result = run(args, { ...process.env, TURNSTILE_SECRET_KEY: TURNSTILE_TEST_SECRET, PLAYWRIGHT_HTML_OUTPUT_DIR: 'playwright-turnstile-report' })
+    if (result.status !== 0) process.exitCode = result.status ?? 1
+    return
+  }
   const plans = planName !== undefined
     ? [selectionPlan(planName)]
     : validating

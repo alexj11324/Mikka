@@ -57,7 +57,8 @@ cannot.
    | Selection-policy changes (classifier, runner, this workflow) | Also "Browser selection validation": every scoped spec as one real subset |
    | Unsafe file modes, unavailable comparisons, `integrate/` branches | The full tier (below) before merge |
 
-   The smoke set covers anonymous redirects, sign-up, task creation, account
+   The smoke set covers anonymous redirects, sign-up (with Cloudflare's public
+   Turnstile test keys once the form sends a token), task creation, account
    isolation, a settings save, Factory acceptance and approval, device
    authorization, share revocation, an approval card and the real daemon loop.
    The tags live in the specs; the area map, the main list and the nightly-only
