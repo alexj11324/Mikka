@@ -270,3 +270,11 @@ only (「按 issue，仅后端」). Personal MCP connections and installed skill
 owner-scoped; the app catalog exposes supported Composio toolkits. Plugin-page
 tabs, counts, switches and browse controls follow separately. See
 [the backend contract](personal-plugins-backend.md).
+
+## 2026-10-31 — Progressive bot replies
+
+Alex requested following OpenUI and Vercel's streaming guides for the Coordinator
+and bot chats. Show the reply as it is generated using the existing OpenUI
+components; save the final messages through the current history and authorization
+path. Refreshing or reconnecting resumes the active reply without duplicating
+it. No new layout or copy. See [the streaming contract](../architecture/coordinator-streaming.md).
