@@ -1786,7 +1786,6 @@
     },
     "subscriptions": {
       "heading": "Model subscriptions",
-      "description": "Connect your own subscription for authorized Bot tasks in this workspace.",
       "codex": "ChatGPT / Codex",
       "claude": "Claude",
       "unavailable": "This connection is not available yet.",
@@ -1802,9 +1801,8 @@
       "openProvider": "Open the provider page",
       "finish": "Complete connection",
       "close": "Close",
-      "expired": "The connection attempt expired. Start again.",
+      "expired": "{provider} sign-in expired",
       "loadFailed": "Could not load subscription settings.",
-      "connectionFailed": "The connection could not be completed. Start a new attempt.",
       "disconnectFailed": "The subscription could not be disconnected.",
       "connectedNotice": "Subscription connected.",
       "disconnectedNotice": "Disconnected from Mikka. The provider's authorization may still need to be revoked on its website.",
@@ -1830,7 +1828,11 @@
       "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
       "removeFailed": "The connection could not be removed.",
       "loading": "Loading model subscriptions…",
-      "serviceOff": "Model subscriptions aren't turned on for this deployment. Bots use the workspace's default model quota."
+      "serviceOff": "Model subscriptions aren't turned on for this deployment. Bots use the workspace's default model quota.",
+      "startFailed": "{provider} sign-in could not start",
+      "finishFailed": "{provider} sign-in did not finish",
+      "signedOut": "Your session expired. Sign in again, then connect.",
+      "restart": "Start over"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",

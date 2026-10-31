@@ -1786,7 +1786,6 @@
     },
     "subscriptions": {
       "heading": "模型订阅",
-      "description": "连接你自己的订阅，供此工作区中获授权的 Bot 任务使用。",
       "codex": "ChatGPT / Codex",
       "claude": "Claude",
       "unavailable": "此连接暂不可用。",
@@ -1802,9 +1801,8 @@
       "openProvider": "打开服务商页面",
       "finish": "完成连接",
       "close": "关闭",
-      "expired": "连接已过期，请重新开始。",
+      "expired": "{provider} 授权已过期",
       "loadFailed": "无法加载订阅设置。",
-      "connectionFailed": "无法完成连接，请重新开始。",
       "disconnectFailed": "无法断开订阅连接。",
       "connectedNotice": "订阅已连接。",
       "disconnectedNotice": "已从 Mikka 断开。你可能还需要在服务商网站撤销授权。",
@@ -1830,7 +1828,11 @@
       "extraUsageUnverified": "没确认额外用量已关闭，Bot 暂不会使用这个订阅",
       "removeFailed": "无法移除这个连接。",
       "loading": "正在读取模型订阅…",
-      "serviceOff": "这个部署还没有开启模型订阅，Bot 会使用工作区默认的模型额度。"
+      "serviceOff": "这个部署还没有开启模型订阅，Bot 会使用工作区默认的模型额度。",
+      "startFailed": "{provider} 授权启动失败",
+      "finishFailed": "{provider} 授权未完成",
+      "signedOut": "登录已过期，请重新登录后再连接。",
+      "restart": "重新开始"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
