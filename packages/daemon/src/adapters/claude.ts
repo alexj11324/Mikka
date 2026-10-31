@@ -15,12 +15,14 @@
 // server drops every host MCP server. The only writable path outside the
 // worktree is this worktree's session store under `~/.claude/projects`, so
 // `resume` works after a daemon restart and for a follow-up run in the same
-// worktree (the store is keyed by the cwd).
+// worktree (the store is keyed by the cwd). A custom API gateway is the one
+// exception to ignoring host settings; see claude-gateway.ts.
 import { spawn } from "node:child_process"
 import { computerDomain, computerSandboxPolicy, sandboxComputerSpec } from '../computer/transport'
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { homedir } from "node:os"
+import { readClaudeGateway } from "./claude-gateway"
 import { join } from "node:path"
 import type { Writable } from "node:stream"
 
@@ -462,7 +464,10 @@ export class ClaudeAdapter implements AgentAdapter {
       ? join(nativeHome, ".claude")
       : (this.options.configDir ?? join(homedir(), ".claude"))
     if (nativeHome) ownDir(configDir)
+    // A hosted or brokered run has its own credential, never the host's gateway.
+    const gateway = nativeHome || externalAuth ? null : readClaudeGateway(configDir)
     const ctx = new RunContext({
+      harnessDomains: gateway ? [gateway.domain] : undefined,
       github: options.github,
       githubRuntime: options.githubRuntime,
       childPath: options.env.PATH,
@@ -544,6 +549,7 @@ export class ClaudeAdapter implements AgentAdapter {
           ...options.env,
           ...ctx.tempEnv(),
           ...CLAUDE_RUN_ENV,
+          ...gateway?.env,
           CLAUDE_CODE_TMPDIR: ctx.tmpDir,
           ...(nativeHome
             ? {

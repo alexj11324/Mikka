@@ -96,6 +96,8 @@ export interface RunContextOptions {
   worktree: string
   /** Extra domains for this run (the repo's allow-list). */
   networkAllow?: readonly string[]
+  /** Where this machine's harness reaches its API, beyond the vendor's own hosts. */
+  harnessDomains?: readonly string[]
   /** The workspace's agent policy (ADR 0028); defaults when absent. */
   policy?: RunPolicy
   /** Host-verified final policy binding, checked before any run files exist. */
@@ -313,6 +315,7 @@ export class RunContext {
       ],
       allowDomains: [
         ...HARNESS_DOMAINS[this.options.harness],
+        ...(this.options.harnessDomains ?? []),
         ...runDomains(
           runPolicy(this.options.policy),
           [...(this.options.networkAllow ?? []), ...(this.options.github ? ['github.com', 'api.github.com', new URL(this.options.github.endpoint).host] : [])],
