@@ -69,20 +69,20 @@ test('Coordinator streams before completion, resumes once and isolates bot and o
     expect((await testAccounts.scope.peer.request(streamPath)).status).toBe(204)
     expect((await testAccounts.scope.owner.request(app('/api/coordinator/stream?runId=wrun_wrong'))).status).toBe(204)
     // Cancel a real replay reader, then prove the producer and its durable lease survive.
-    const replay = await page.evaluate(async path => {
+    const replay = await page.evaluate(async ({ path, expected }) => {
       const response = await fetch(path)
       if (!response.ok || !response.body) throw new Error('Replay unavailable')
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
       let text = ''
       try {
-        while (!text.includes('"type":"text"')) {
+        while (!text.includes(expected)) {
           const next = await reader.read()
           if (next.done) throw new Error('Replay ended before text')
           text += next.value
         }
       } finally { await reader.cancel() }
       return text
-    }, streamPath)
+    }, { path: streamPath, expected: primary.first })
     expect(replay).toContain(primary.first)
     expect(await holder(null)).toBe(primaryRun)
     expect(await control('state', primary)).toEqual({ started: 1, released: false })
