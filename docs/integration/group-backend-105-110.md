@@ -133,13 +133,68 @@ application signup/browser acceptance, new database or schema were used.
 passes its seven source tests; its separate Actions-only migration test stays
 skipped locally, with its isolation guard preserved.
 
-This is **not an exchange producer**. Runtime still has no `agent_dm` creation
-or `conversation_links` writer. `groupRuntime.generate` only creates public
+That projection-only revision was **not an exchange producer**. Runtime had no `agent_dm` creation
+or `conversation_links` writer. `groupRuntime.generate` only created public
 group replies and mentions; the private mailbox's trusted records identify
 owner/workspace and run/Coordinator/Bot sessions, without a source group,
 anchor message or authorized DM binding. Automatically sharing those messages
 would invent provenance and expose private correspondence. Producer and
-contiguous aggregation therefore remain skipped pending an actual trusted
+contiguous aggregation therefore remained skipped at that revision pending a trusted
 group-originated exchange event. The Bot-versus-legacy-Agent identity binding,
 stored avatars and frontend marker/panel also remain outside this patch;
 neither #110 nor parent #105 is complete.
+
+## #110 trusted group-turn producer
+
+The next slice, based on main `e5261087`, connects exchange creation to the
+existing real `processGroupTurn` host. Missing producer wiring was an ordinary
+required path (occurrence 10 × impact 3 = 30), not an untestable provider edge.
+The structured group response now chooses either a public reply (`privateTo:
+null`) or one currently eligible peer. The model cannot supply a source group,
+anchor, sender, link or private conversation binding. Those come from the
+authorized queued root and the executing host agent.
+
+The host rechecks workspace/actor and both current source-group peers under
+the existing group row lock before committing each private message. It creates
+an `agent_dm` containing exactly the two legacy agent members, appends one
+`conversation_links` range for the source user message and extends that range
+for consecutive messages. A later root reuses the same pair's group-bound DM
+but allocates a new bounded segment. Each message and its position/link updates commit
+together. This uses the existing tables and turn lock; no migration, extra
+scheduler, provider, credentials or default-off gate was introduced.
+
+Peer replies run serially, at most three messages per exchange, within the
+existing turn deadline and hosted-model billing scope. Their transcript is
+not added to public round context, routing corrections, source message
+positions, last-message previews or unread counts. Private continuation is
+restricted to the two peers, even if a response asks to address another
+current group member. Failure retains an honest partial segment and the
+existing failed/not-automatically-replayed turn state. No unrelated personal
+mailbox/session history is read or retroactively shared.
+
+Verification used the retained isolated PG17 database
+`scope184_ca4f5c0154df48d6ba451ba6882b1103_e2e` at loopback port 55599 and
+matching application/workspace database URLs. The actual group store and
+`processGroupTurn` write the exchanges; exported history/link/read routes and
+real ownership/workspace checks read them back. Only session identity and
+model choice/text are fixtures. The route suite passes 8/8 with zero skips,
+including continuous aggregation, a later separately bounded range, ordinary
+source-member access, raw-DM denial, forged model/request bindings, unchanged
+source unread positions, peer removal during generation and owner suspension
+before persistence. Logs: `/tmp/mikka-group110-producer-db-final.log`.
+
+`test:group-turns` passes 11 source tests plus two model-consumer tests; its
+existing Actions-only database case stays locally skipped without changing
+that guard. The actual AI SDK structured-output consumer also verifies required nullable
+`privateTo`, its peer descriptor and UUID validation using a synthetic model.
+New serial tests verify private-context separation, the three
+message cap and foreign/self/third-peer refusal. Typecheck and focused lint
+pass. No local Next build, new database/container, real model inference,
+OAuth flow or external SaaS write was performed or claimed.
+
+The modern Bot-to-legacy-Agent identity bridge, stored avatars and frontend
+marker/read-only panel remain outside this backend slice. The existing
+group APIs still identify creator-owned legacy agents, not arbitrary Bot IDs;
+no identity alias or private Bot-session sharing was invented. This closes
+the trusted producer/contiguous-range gap while leaving #110/#105's remaining
+product/frontend scope explicit.

@@ -49,6 +49,46 @@ test('failure clears generating status and does not synthesize a response', asyn
   assert.deepEqual(statuses, [a,null]); assert.deepEqual(outcomes,[undefined,'failed'])
 })
 
+test('private peer rounds stay bounded and never become another public responder context', async () => {
+  const publicReplies: string[] = [], privateReplies: string[] = [], calls: string[] = []
+  const peers = [...members, { id: outsider, name: 'Third member', description: '' }]
+  await runGroupRounds({ by: 'mention', responders: [a, outsider] }, message, {
+    async eligible() { return peers }, async status() {},
+    async generate(agent, input) {
+      calls.push(agent.id)
+      if (agent.id === outsider) {
+        assert.deepEqual(input.earlier, [], 'a public responder cannot see peer-private replies')
+        assert.equal(input.privatePeer, undefined)
+        return { text: 'public only', mentions: [] }
+      }
+      if (!input.privatePeer) return { text: 'private question', mentions: [], privateTo: b }
+      assert.equal(input.privatePeer.id, agent.id === a ? b : a)
+      assert.equal(input.earlier.length, agent.id === b ? 1 : 2)
+      return { text: 'private reply', mentions: [] }
+    },
+    async publish(_, reply) { publicReplies.push(reply.text); return true },
+    async publishPrivate(_, __, reply) { privateReplies.push(reply.text); return true },
+  })
+  assert.deepEqual(calls, [a,b,a,outsider])
+  assert.deepEqual(privateReplies, ['private question','private reply','private reply'])
+  assert.deepEqual(publicReplies, ['public only'])
+})
+
+test('private routing rejects foreign/self/third peers and an unavailable writer before exposing text', async () => {
+  const io = { async eligible() { return [...members, { id: outsider, name: 'Third member', description: '' }] }, async status() {},
+    async publish() { assert.fail('private text must not become a public message') } }
+  for (const peer of [a, randomUUID()]) await assert.rejects(runGroupRounds({ by: 'mention', responders: [a] }, message,
+    { ...io, async generate() { return { text: 'private', mentions: [], privateTo: peer } } }), UnknownMentionError)
+  await assert.rejects(runGroupRounds({ by: 'mention', responders: [a] }, message,
+    { ...io, async generate() { return { text: 'private', mentions: [], privateTo: b } } }), /writer_unavailable/)
+  let writes = 0
+  await assert.rejects(runGroupRounds({ by: 'mention', responders: [a] }, message, { ...io,
+    async generate(_, input) { return { text: 'private', mentions: [], privateTo: input.privatePeer ? outsider : b } },
+    async publishPrivate() { writes++; return true },
+  }), /peer_mismatch/)
+  assert.equal(writes, 1, 'the first authorized exchange remains, the third-peer response is never stored')
+})
+
 // Enforce the authorized ephemeral DB boundary, even if REQUIRE_DB is accidentally set locally.
 const dbURL = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' ? process.env.E2E_DATABASE_URL : undefined
 if (process.env.REQUIRE_DB === '1' && !dbURL) throw new Error('REQUIRE_DB=1 requires GitHub Actions ephemeral PG17')
