@@ -38,7 +38,7 @@ export interface WorkerMetadata { id: string; provider: string; state: string; r
 export interface NativeLease { accessToken: string; accountId?: string; chatgptAccountId?: string; chatgptPlanType?: string; expiresAt?: string }
 
 export class WorkerRefusal extends Error {
-  constructor(readonly code: string = "subscription_worker_unavailable") { super(code) }
+  constructor(readonly code: string = "subscription_worker_unavailable") { super(code); this.name = "WorkerRefusal" }
 }
 const safeCode = (value: unknown) => typeof value === "string" && /^[a-z_]{1,64}$/.test(value) ? value : "subscription_worker_unavailable"
 
