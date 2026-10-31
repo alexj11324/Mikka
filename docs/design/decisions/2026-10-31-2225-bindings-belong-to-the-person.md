@@ -30,13 +30,13 @@
    bot there replies on Mikka 默认; a run frozen on a subscription stops
    instead of falling back. App connections and devices already run only
    their owner's bots and get no further switch for now.
-4. **The owner may also let other members' bots use it** (团队成员也可以用,
+4. **The owner may also let other members' bots use it** (分享给团队成员,
    off by default; Alex, 「B」). Comma pools subscriptions per workspace the
    same way. Personal Claude and ChatGPT plans may not allow sharing with
    other people (see Precedent), so the risk sits with the subscription's
    owner: turning it on shows that warning and asks them to confirm.
    - A bot uses its owner's own subscription first; otherwise one another
-     member shared here with 团队成员也可以用, Claude first, then the oldest
+     member shared here with 分享给团队成员, Claude first, then the oldest
      share; otherwise Mikka 默认. A Coordinator only ever uses its own
      person's subscription.
    - Other members see only 「X 的 Claude 订阅」 as available, never the

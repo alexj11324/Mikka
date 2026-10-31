@@ -31,7 +31,7 @@ export async function freezeBotModel(
     available.find((row) => row.provider === "claude") ??
     available[0];
   if (!binding && scope.botId) {
-    // The owner has none here: another member's subscription shared with 团队成员也可以用 (Alex, 「B」).
+    // The owner has none here: another member's subscription shared with 分享给团队成员 (Alex, 「B」).
     const pooled = (await settings.pooledBindings(settingsScope))[0];
     if (pooled)
       return freezeHostedModelSelection(

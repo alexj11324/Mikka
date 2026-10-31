@@ -21,7 +21,7 @@ export async function authorizeSubscriptionWorkspace(userId: string, workspaceId
 export async function authorizeSubscriptionUse(userId: string, workspaceId: string, consumerId?: string) {
   await authorizeSubscriptionWorkspace(userId, workspaceId)
   if (!(await subscriptionsUsable(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
-  // Another member's bot needs 团队成员也可以用 on, checked on every call: un-sharing or leaving stops it at once.
+  // Another member's bot needs 分享给团队成员 on, checked on every call: un-sharing or leaving stops it at once.
   if (consumerId && z.uuid().safeParse(consumerId).success) {
     const { rows: [bot] } = await pool.query<{ ownerId: string }>('SELECT "ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2', [consumerId, workspaceId])
     if (bot && bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')

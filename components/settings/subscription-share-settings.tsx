@@ -15,7 +15,7 @@ type Change = { shared: boolean; allowOthers?: boolean }
 
 /**
  * 在这里使用我的订阅: a member shares their own subscriptions into this team
- * workspace for their own bots; 团队成员也可以用 lets other members' bots use
+ * workspace for their own bots; 分享给团队成员 lets other members' bots use
  * them too, after a warning the owner confirms (Alex, 「B」). A personal
  * workspace always uses its owner's subscriptions, so it shows nothing here
  * (decision 2026-10-31-2225).

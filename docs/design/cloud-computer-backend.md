@@ -121,7 +121,7 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
 - **No credentials in a snapshot** (decision 2026-10-31-2225): no subscription
   login or token is ever in a workspace or thread snapshot. At run start the
   credential the resolver picked for that bot (its owner's shared
-  subscription, another member's shared with 团队成员也可以用, or none for
+  subscription, another member's shared with 分享给团队成员, or none for
   Mikka 默认) reaches the run through the run-scoped native broker; the
   sandbox only ever sees a placeholder, and the broker is closed when the run
   ends or pauses. Un-sharing or leaving takes effect on the next run with no

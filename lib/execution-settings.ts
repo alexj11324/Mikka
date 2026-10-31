@@ -464,7 +464,7 @@ export class ExecutionSettings {
   }
   /**
    * For a bot whose owner has no subscription here: other members' subscriptions
-   * shared with 团队成员也可以用 (Alex, 「B」), Claude first, then by the oldest
+   * shared with 分享给团队成员 (Alex, 「B」), Claude first, then by the oldest
    * share. Only ever offered to the resolver, never listed to the bot's owner.
    */
   async pooledBindings(scope: ExecutionSettingsScope) {

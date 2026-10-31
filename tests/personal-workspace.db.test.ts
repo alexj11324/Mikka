@@ -134,7 +134,7 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.deepEqual(await policy.getSubscriptionShare(member, team.id), { personal: false, shared: true, allowOthers: false, allowed: false, available: [] })
     await rejects(policy.setOwnSubscriptionShare(admin, team.id, { shared: true }), 'workspaceAccessDenied')
     await policy.setMemberSubscriptionPolicy({ id: admin, name: 'Alex' }, team.id, true)
-    // 团队成员也可以用: the admin sees the member's subscription is available, never the credential.
+    // 分享给团队成员: the admin sees the member's subscription is available, never the credential.
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,"secretName","secretDigest","providerSubject") VALUES ($1,$2,$3,'claude','connected',$5,$4,'synthetic-subject')`, [randomUUID(), member, team.id, 'a'.repeat(64), `synthetic-${randomUUID()}`])
     assert.deepEqual((await policy.setOwnSubscriptionShare(member, team.id, { shared: true, allowOthers: true })).allowOthers, true)
     assert.deepEqual((await policy.getSubscriptionShare(admin, team.id)).available, [{ name: member, provider: 'claude' }])

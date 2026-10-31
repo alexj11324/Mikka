@@ -34,7 +34,7 @@ export async function setMemberSubscriptionPolicy(actor: { id: string; name: str
   return getMemberSubscriptionPolicy(actor.id, workspaceId)
 }
 
-/** 模型与额度 › 在这里使用我的订阅 and 团队成员也可以用, plus who else lets this member's bots use theirs. */
+/** 模型与额度 › 在这里使用我的订阅 and 分享给团队成员, plus who else lets this member's bots use theirs. */
 export interface SubscriptionShareView {
   personal: boolean; shared: boolean; allowOthers: boolean; allowed: boolean
   /** Members whose subscriptions this member's bots may use here; names only, never the credential. */

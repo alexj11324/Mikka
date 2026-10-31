@@ -4,7 +4,7 @@ import type { Pool, PoolClient } from 'pg'
  * Decision 2026-10-31-2225: a subscription belongs to its owner. Their personal
  * workspace uses it automatically; a team workspace uses it only after the owner
  * shares it there (在这里使用我的订阅), for the owner's own bots and, if they also
- * turn on 团队成员也可以用, other members' bots; and only while that workspace's
+ * turn on 分享给团队成员, other members' bots; and only while that workspace's
  * admin leaves 允许成员使用个人订阅 on (the default).
  */
 type Query = Pick<Pool | PoolClient, 'query'>
@@ -20,7 +20,7 @@ export async function subscriptionShared(query: Query, ownerId: string, workspac
   return Boolean((await query.query('SELECT 1 FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, workspaceId])).rowCount)
 }
 
-/** 团队成员也可以用: the owner also lets other members' bots here use it (Alex, 「B」). */
+/** 分享给团队成员: the owner also lets other members' bots here use it (Alex, 「B」). */
 export async function othersMayUse(query: Query, ownerId: string, workspaceId: string): Promise<boolean> {
   const { rows: [row] } = await query.query<{ allowOthers: boolean }>('SELECT "allowOthers" FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, workspaceId])
   return Boolean(row?.allowOthers) && (await memberSubscriptionsAllowed(query, workspaceId))

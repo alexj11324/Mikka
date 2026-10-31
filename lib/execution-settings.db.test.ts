@@ -387,7 +387,7 @@ test(
       // Un-sharing takes it out of team B at once.
       await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, false);
       assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'un-shared: Mikka 默认');
-      // Alex 「B」: with 团队成员也可以用, other members' bots may use her shared subscription too.
+      // Alex 「B」: with 分享给团队成员, other members' bots may use her shared subscription too.
       await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, true);
       assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'shared for her own bots only: bob\'s bot replies on Mikka 默认');
       await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, true, true);
