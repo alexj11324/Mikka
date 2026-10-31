@@ -26,8 +26,8 @@
 --color-card-foreground: var(--card-foreground);
 --color-popover: var(--popover);
 --color-popover-foreground: var(--popover-foreground);
-  --color-workspace-accent: oklch(0.56 0.18 279);
-  --color-workspace-accent-foreground: oklch(1 0 0);
+  --color-workspace-accent: var(--sidebar-primary);
+  --color-workspace-accent-foreground: var(--sidebar-primary-foreground);
   --color-project-action: var(--project-action);
   --color-project-action-foreground: var(--project-action-foreground);
   --color-primary: var(--primary);
@@ -146,12 +146,12 @@
 --bot-gris: #a3a3a3;
 --bot-creme: #f1efe9;
 /* The Coordinator's star (Figma 202:4518). */
---settings-background: oklch(0.98 0.002 286);
+--settings-background: oklch(0.98 0 0);
 --settings-foreground: oklch(0.145 0 0);
 --settings-card: var(--card);
---settings-sidebar: oklch(0.95 0.002 286);
+--settings-sidebar: oklch(0.95 0 0);
 --settings-sidebar-foreground: oklch(0.205 0 0);
---settings-sidebar-accent: oklch(0.905 0.002 286);
+--settings-sidebar-accent: oklch(0.905 0 0);
 --settings-border: oklch(0.905 0 0);
 --settings-input: oklch(0.89 0 0);
 --settings-muted-foreground: oklch(0.49 0 0);
@@ -172,8 +172,8 @@
   --ink-3: color-mix(in oklch, var(--muted-foreground) 65%, var(--background));
   --line: var(--border);
   --line-strong: color-mix(in oklch, var(--border) 80%, var(--foreground));
---project-action: oklch(0.56 0.17 277);
---project-action-foreground: oklch(0.985 0 0);
+--project-action: var(--sidebar-primary);
+--project-action-foreground: var(--sidebar-primary-foreground);
 --label-violet: var(--color-violet-600);
 --label-blue: var(--color-blue-600);
 --shell-chrome: oklch(0.97 0 0);

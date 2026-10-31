@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
@@ -38,6 +38,64 @@ type ListProps = {
   onSignOut: () => void
   signingOut: boolean
   onBeforeChange?: (action: () => Promise<void>) => void
+}
+
+const WIDTH_KEY = 'mikka:bot-list-width'
+const LIST_WIDTH = { min: 208, max: 400, initial: 256 }
+const clampWidth = (value: number) => Math.round(Math.min(LIST_WIDTH.max, Math.max(LIST_WIDTH.min, value)))
+
+/**
+ * Dragging the list's edge sets its width, as in Linear's sidebar; the width is
+ * remembered on this device. A click without a drag still folds the list.
+ */
+function useListWidth() {
+  const [width, setWidth] = useState(LIST_WIDTH.initial)
+  const [dragging, setDragging] = useState(false)
+  // The remembered width is applied on load without a spring.
+  const [restored, setRestored] = useState(false)
+  const moved = useRef(false)
+  useEffect(() => {
+    try {
+      const stored = Number(window.localStorage.getItem(WIDTH_KEY))
+      if (stored) setWidth(clampWidth(stored))
+    } catch { /* storage unavailable */ }
+    const frame = requestAnimationFrame(() => setRestored(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
+  function onPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (event.button !== 0) return
+    const strip = event.currentTarget, startX = event.clientX, startWidth = width
+    const direction = getComputedStyle(strip).direction === 'rtl' ? -1 : 1
+    let latest = startWidth
+    moved.current = false
+    strip.setPointerCapture(event.pointerId)
+    const move = (next: PointerEvent) => {
+      const delta = (next.clientX - startX) * direction
+      // A few pixels of jitter is still a click.
+      if (!moved.current && Math.abs(delta) < 3) return
+      if (!moved.current) { moved.current = true; setDragging(true) }
+      latest = clampWidth(startWidth + delta)
+      setWidth(latest)
+    }
+    const end = () => {
+      strip.removeEventListener('pointermove', move)
+      strip.removeEventListener('pointerup', end)
+      strip.removeEventListener('pointercancel', end)
+      if (!moved.current) return
+      setDragging(false)
+      try { window.localStorage.setItem(WIDTH_KEY, String(latest)) } catch { /* storage unavailable */ }
+    }
+    strip.addEventListener('pointermove', move)
+    strip.addEventListener('pointerup', end)
+    strip.addEventListener('pointercancel', end)
+  }
+  /** True once for the click that ends a drag, so that click does not fold the list. */
+  function endedDrag() {
+    const was = moved.current
+    moved.current = false
+    return was
+  }
+  return { width, dragging, instant: dragging || !restored, onPointerDown, endedDrag }
 }
 
 const SEEN_KEY = 'mikka:conversations-seen'
@@ -120,6 +178,10 @@ export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail,
   if (lastReply?.from === 'coordinator') latest.coordinator = lastReply.createdAt
   const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : null
   const unread = useUnread(activeId, latest)
+  const { width, dragging, instant, onPointerDown, endedDrag } = useListWidth()
+  const listRef = useRef<HTMLDivElement>(null)
+  // The inner list keeps its full width while the column folds, so rows never squeeze.
+  useLayoutEffect(() => { listRef.current?.style.setProperty('--bot-list-width', `${width}px`) }, [width])
   function choose(target: ChatTarget) { onOpen(target); setOpenMobile(false) }
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-1">
@@ -157,9 +219,10 @@ export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail,
   if (isMobile) return <Sidebar collapsible="offcanvas" mobileTitle={i18nText('Nav.sidebarTitle')} mobileDescription={i18nText('Nav.sidebarDescription')} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>
   // On desktop the list is the first column inside the card; it folds to nothing and the rail stays.
   // R-37: the width moves on a spring; MotionConfig at the root turns it off for reduced motion.
-  return <motion.div data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} initial={false} animate={{ width: open ? 256 : 0 }} transition={SPRING_SIDEBAR} className={cn('relative hidden shrink-0 overflow-hidden md:block', open ? 'border-r' : 'border-r-0')}>
-    <Sidebar collapsible="none" className="w-64 bg-transparent">{body}</Sidebar>
-    {/* Comma's edge toggle: an invisible strip along the edge that shows a hairline on hover. */}
-    <SidebarRail label={i18nText('Nav.sidebarRail')} title={i18nText('Nav.collapseList')} className="right-0 left-auto w-2 cursor-col-resize ltr:translate-x-0 rtl:translate-x-0 after:inset-y-3 after:start-auto after:right-0 after:w-px after:bg-border after:opacity-0 after:transition-opacity hover:after:opacity-100" />
+  // While dragging the edge the width follows the pointer with no spring.
+  return <motion.div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} initial={false} animate={{ width: open ? width : 0 }} transition={instant ? { duration: 0 } : SPRING_SIDEBAR} className={cn('relative hidden shrink-0 overflow-hidden md:block', open ? 'border-r' : 'border-r-0', dragging && 'select-none')}>
+    <Sidebar collapsible="none" className="w-[var(--bot-list-width,16rem)] bg-transparent">{body}</Sidebar>
+    {/* Comma's edge strip with a hairline on hover: drag it to resize the list, click it to fold the list. */}
+    <SidebarRail label={i18nText('Nav.sidebarRail')} title={i18nText('Nav.collapseList')} onPointerDown={onPointerDown} onClick={() => { if (!endedDrag()) toggleSidebar() }} className="right-0 left-auto w-2 cursor-col-resize ltr:translate-x-0 rtl:translate-x-0 after:inset-y-3 after:start-auto after:right-0 after:w-px after:bg-border after:opacity-0 after:transition-opacity hover:after:opacity-100" />
   </motion.div>
 }

@@ -41,6 +41,11 @@ Notes:
   the 「归档」 page, or marked 已废弃, never count.
 - Figma decides layout, not look. Comma decides look. Old Figma frames use
   zinc greys; the tokens in `rules.md` win.
+- The vendored design skills `unslop` and `interface-design`
+  (`.claude/skills/`) win over `rules.md` for product and visual rules by
+  default (decision 2026-10-31); a skill rule that does not fit a dense SaaS
+  product is skipped with a reason. Change the rule, its check and the code
+  in the same PR.
 - Library defaults are the lowest source. A shadcn default that breaks a rule
   (for example the `border-input` hairline, R-31) is a bug, not a choice.
 - A measured value (a width, a gap) that differs between Figma and code is a

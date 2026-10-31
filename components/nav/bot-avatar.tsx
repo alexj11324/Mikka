@@ -42,6 +42,7 @@ export function CoordinatorAvatar({ size = 'list', mood }: { size?: keyof typeof
   return <BotAvatar {...COORDINATOR_AVATAR} size={size} mood={mood} />
 }
 
+type BloubBotRef = import('@norbert_bodziony/bloub').BloubBotRef
 type Runtime = [typeof import('@norbert_bodziony/bloub'), typeof import('@solidjs/web'), typeof import('solid-js')]
 let runtime: Runtime | null = null
 let loading: Promise<Runtime> | null = null
@@ -75,12 +76,25 @@ function cycleFor(bloub: Runtime[0], mood: BotMood, brisk: boolean) {
   return IDLE_MONTAGE.map(([state, seconds]) => ({ state, duration: bloub.clampDuration(state, seconds) }))
 }
 
-/** A steady start point per bot plus the page clock, so a remounted avatar continues where it was instead of restarting. */
+/**
+ * Where a cycle of this length stands for this bot right now: a steady start
+ * point per bot plus the page clock. Every avatar of the same bot reads the same
+ * value, so the chat header, the list row and the panel show the same pose.
+ */
 function phaseFor(seed: string, length: number): number {
   let hash = 0
   for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) | 0
   const offset = (Math.abs(hash) % 1000) / 1000 * length
   return (offset + performance.now() / 1000) % length
+}
+
+const RESYNC_EVENT = 'mikka:bot-avatar-resync'
+
+/** The block and the offset inside it for a phase, as bloub's `seek` takes them. */
+function blockAt(cycle: { duration: number }[], phase: number) {
+  let index = 0, rest = phase
+  while (index < cycle.length - 1 && rest >= cycle[index].duration) rest -= cycle[index++].duration
+  return { index, offset: rest }
 }
 
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -91,7 +105,7 @@ const SVG_SCALE = 1.58
 
 const pick = <T extends string>(value: string | null | undefined, options: readonly T[], fallback: T) => (options as readonly string[]).includes(value ?? '') ? value as T : fallback
 
-type Live = { set: (next: { color: string; shape: string; mood: BotMood }) => void; dispose: () => void }
+type Live = { set: (next: { color: string; shape: string; mood: BotMood }) => void; resync: () => void; dispose: () => void }
 
 /**
  * A bot's avatar: the bloub blob (@norbert_bodziony/bloub) in the bot's shape
@@ -129,21 +143,44 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
       const [state, setState] = createSignal(first)
       const cycle = cycleFor(bloub, first.mood, brisk)
       const length = cycle.reduce((sum, block) => sum + block.duration, 0)
+      let player: BloubBotRef | null = null
       const dispose = render(() => createComponent(bloub.BloubBot, {
         size: Math.round(px * SVG_SCALE), paper: 'transparent', ariaLabel: label ?? '', fps: 30,
-        ...(frozen ? { frozenAt: 0 } : { initialPhase: phaseFor(latestSeed.current, length) }),
+        // bloub only moves through the montage while `playing`; without it an avatar stays on the block it mounted in.
+        ...(frozen ? { frozenAt: 0 } : { initialPhase: phaseFor(latestSeed.current, length), playing: true }),
+        ref: (value: BloubBotRef) => { player = value },
+        // The current pose (idle, egg, play…), so tests and reviews can see that a bot's avatars agree.
+        onStateChange: (pose: string) => { node.dataset.pose = pose },
         get color() { return state().color },
         get shape() { return state().shape },
         get cycle() { return cycleFor(bloub, state().mood, brisk) },
       }), node)
-      live.current = { set: next => setState(() => next), dispose }
+      // bloub stops its clock while an avatar is hidden (folded list, closed panel,
+      // background tab), so on its return it would lag the others; seek it back to
+      // the shared clock so every avatar of a bot keeps one pose.
+      const resync = () => {
+        if (frozen || !player) return
+        const blocks = cycleFor(bloub, state().mood, brisk)
+        const total = blocks.reduce((sum, block) => sum + block.duration, 0)
+        const { index, offset } = blockAt(blocks, phaseFor(latestSeed.current, total))
+        player.seek(index, offset)
+      }
+      live.current = { set: next => setState(() => next), resync, dispose }
     }
     if (runtime) mount(runtime)
     else void loadRuntime().then(mount)
     // Ink flips to cream when the theme changes.
     const watch = new MutationObserver(() => live.current?.set(latest.current()))
     watch.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => { alive = false; watch.disconnect(); live.current?.dispose(); live.current = null; node.replaceChildren() }
+    // When any avatar comes back into view, every avatar on the page seeks to the
+    // shared clock at the same moment, so small drift between them is cleared too.
+    const align = () => live.current?.resync()
+    window.addEventListener(RESYNC_EVENT, align)
+    const shown = new IntersectionObserver(entries => { if (entries.at(-1)?.isIntersecting) window.dispatchEvent(new Event(RESYNC_EVENT)) })
+    shown.observe(node)
+    const returned = () => { if (document.visibilityState === 'visible') window.dispatchEvent(new Event(RESYNC_EVENT)) }
+    document.addEventListener('visibilitychange', returned)
+    return () => { alive = false; watch.disconnect(); shown.disconnect(); window.removeEventListener(RESYNC_EVENT, align); document.removeEventListener('visibilitychange', returned); live.current?.dispose(); live.current = null; node.replaceChildren() }
   }, [px, still, label, brisk])
 
   useEffect(() => { live.current?.set(latest.current()) }, [tone, form, mood])
