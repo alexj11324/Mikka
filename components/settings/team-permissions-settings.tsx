@@ -5,7 +5,6 @@ import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { updateAppPolicy, type getAppPolicy } from '@/app/actions/app-policy'
 import { updatePersonalPolicy, type getPersonalPolicy } from '@/app/actions/personal-policy'
-import { PERSONAL_RESOURCES, type PersonalResource } from '@/lib/personal-policy'
 import { Switch } from '@/components/ui/switch'
 import { settingsRead } from '@/lib/settings-read'
 import { AppTile } from '@/components/plugins/connected-apps'
@@ -16,7 +15,7 @@ import { APP_ACCESS, type AppAccess, type PolicyApp } from '@/lib/app-policy/app
 import { useActionError } from '@/lib/use-action-error'
 import { FieldError } from '@/components/ui/field'
 
-/** N4 团队权限: the existing 电脑操作 row, members' personal accounts, then which connected apps the workspace's bots may use. */
+/** N4 团队权限: the existing 电脑操作 row, members' personal subscriptions, then which connected apps the workspace's bots may use. */
 export function TeamPermissionsSettings({ workspaceId }: { workspaceId: string }) {
   return <>
     <ComputerPolicySettings workspaceId={workspaceId} />
@@ -25,7 +24,7 @@ export function TeamPermissionsSettings({ workspaceId }: { workspaceId: string }
   </>
 }
 
-/** Members' own subscriptions, app connections and devices in this workspace; on by default (decision 2026-10-31-2130). */
+/** 允许成员使用个人订阅: one switch, on by default; members share their own subscriptions themselves (decision 2026-10-31-2330). */
 function PersonalPolicySettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.personalPolicy')
   const appT = useTranslations('Settings.appPolicy')
@@ -33,34 +32,34 @@ function PersonalPolicySettings({ workspaceId }: { workspaceId: string }) {
   const actionError = useActionError()
   const policy = useSWR(['settings:personal-policy', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getPersonalPolicy>>>('personal-policy', { workspace: workspaceId }))
   const [pending, setPending] = useState(false)
-  const [failed, setFailed] = useState<{ resource: PersonalResource; allowed: boolean; message: string } | null>(null)
+  const [failed, setFailed] = useState<{ allowed: boolean; message: string } | null>(null)
   const data = policy.data && !policy.data.error ? policy.data : null
 
-  async function change(resource: PersonalResource, allowed: boolean) {
+  async function change(allowed: boolean) {
     setPending(true)
     setFailed(null)
     try {
-      const result = await updatePersonalPolicy({ resource, allowed }, workspaceId)
-      if (result.error) { setFailed({ resource, allowed, message: actionError(result.error) }); return }
+      const result = await updatePersonalPolicy(allowed, workspaceId)
+      if (result.error) { setFailed({ allowed, message: actionError(result.error) }); return }
       await policy.mutate(result, { revalidate: false })
     } catch {
-      setFailed({ resource, allowed, message: actionError() })
+      setFailed({ allowed, message: actionError() })
     } finally {
       setPending(false)
     }
   }
 
-  if (!policy.data && !policy.error) return <SettingsLoading label={t('loading')} rows={3} />
+  if (!policy.data && !policy.error) return <SettingsLoading label={t('loading')} rows={1} />
   if (!data) return <FieldError>{actionError(policy.data?.error)}</FieldError>
   return <>
     <SettingsSection id="personal-policy-heading" title={t('heading')}>
-      {PERSONAL_RESOURCES.map(resource => <SettingRow key={resource} title={t(resource)}>
+      <SettingRow title={t('subscriptions')}>
         {data.canEdit
-          ? <Switch aria-label={t(resource)} checked={data[resource]} disabled={pending} onCheckedChange={allowed => void change(resource, allowed)} />
-          : <span>{appT(`access.${data[resource] ? 'allow' : 'deny'}`)}</span>}
-      </SettingRow>)}
+          ? <Switch aria-label={t('subscriptions')} checked={data.allowed} disabled={pending} onCheckedChange={allowed => void change(allowed)} />
+          : <span>{appT(`access.${data.allowed ? 'allow' : 'deny'}`)}</span>}
+      </SettingRow>
     </SettingsSection>
-    {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => void change(failed.resource, failed.allowed)} />}
+    {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => void change(failed.allowed)} />}
   </>
 }
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { pool } from "./db";
+import { ActionFailureError } from "./action-error";
 import { ExecutionSettings, executionWorkspace } from "./execution-settings";
 import { COORDINATOR_MODEL } from "./coordinator/model";
 import {
@@ -17,6 +18,9 @@ export async function freezeBotModel(
   const workspaceId =
     scope.workspaceId ?? (await executionWorkspace(scope.ownerId, scope.botId));
   const settings = new ExecutionSettings(pool);
+  // An archived bot (its owner left or was suspended) runs nothing until an admin takes it over (§8.3).
+  if (scope.botId && !(await settings.botActive(scope.ownerId, scope.botId)))
+    throw new ActionFailureError("botNotFound");
   const settingsScope = { ownerId: scope.ownerId, workspaceId };
   const selected = await settings.botModel(settingsScope, scope.botId);
   const available = await settings.botModels(settingsScope);

@@ -1,5 +1,5 @@
 import 'server-only'
-import { personalResourceAllowed } from './personal-policy'
+import { subscriptionsUsable } from './personal-policy'
 import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
 import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/subscription'
 import { workspaceDb } from './workspace-db'
@@ -15,11 +15,11 @@ import { join } from 'node:path'
 export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
 }
-/** A subscription runs in a workspace only for a member, and only while that workspace's admin has
- * not switched personal subscriptions off; a frozen run then stops, never falls back (decision 2026-10-31-2130). */
+/** A subscription runs in a workspace only for a member who shared it there, and only while that
+ * workspace's admin allows it; otherwise a frozen run stops, never falls back (decision 2026-10-31-2330). */
 export async function authorizeSubscriptionUse(userId: string, workspaceId: string) {
   await authorizeSubscriptionWorkspace(userId, workspaceId)
-  if (!(await personalResourceAllowed(pool, workspaceId, 'subscriptions'))) throw new SubscriptionRefusal('account_unavailable')
+  if (!(await subscriptionsUsable(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
 }
 export function subscriptionRuntime(nativeBroker = false, custodyOnly = false): SubscriptionService {
   if (process.env.MIKKA_BYOS_ENABLED !== '1' && !(custodyOnly && process.env.MIKKA_BYOS_ENROLLMENT_ENABLED === '1')) throw new SubscriptionRefusal('backend_unavailable')

@@ -2246,12 +2246,19 @@
         "notion": "Notion"
       }
     },
+    "subscriptionShare": {
+      "heading": "这个工作区",
+      "share": "在这里使用我的订阅",
+      "blocked": "管理员已关闭"
+    },
+    "archivedBots": {
+      "heading": "已暂停的 Bot",
+      "takeOver": "接管"
+    },
     "personalPolicy": {
-      "loading": "正在加载成员的个人账号",
-      "heading": "成员的个人账号",
-      "subscriptions": "个人订阅",
-      "apps": "个人应用连接",
-      "devices": "个人设备"
+      "loading": "正在加载个人订阅设置",
+      "heading": "个人订阅",
+      "subscriptions": "允许成员使用个人订阅"
     },
     "appPolicy": {
       "loading": "正在加载应用权限",

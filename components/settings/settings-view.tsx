@@ -16,6 +16,7 @@ import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings
 import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
+import { SubscriptionShareSettings } from '@/components/settings/subscription-share-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
 import { SecuritySettings } from '@/components/settings/security-settings'
@@ -31,6 +32,7 @@ import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
 import { BotAgentsSettings } from '@/components/settings/bot-agents-settings'
+import { ArchivedBotsSettings } from '@/components/settings/archived-bots-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
@@ -108,7 +110,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
-    case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'models': return workspaceId && !preview ? <><SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /><SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} /></> : waiting
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
@@ -116,7 +118,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'billing': return workspaceId && !preview ? <BillingSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
     case 'computers': return null
-    case 'bots': return workspaceId && !preview ? <BotAgentsSettings key={workspaceId} /> : waiting
+    case 'bots': return workspaceId && !preview ? <><BotAgentsSettings key={workspaceId} /><ArchivedBotsSettings key={`archived-${workspaceId}`} workspaceId={workspaceId} /></> : waiting
     case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return null
   }

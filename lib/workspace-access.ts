@@ -11,7 +11,7 @@ import { requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaces, workspaceMembers, workspaceInvitations } from '@/lib/db/workspace-schema'
 import { renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-name'
-import { ensurePersonalWorkspace } from '@/lib/personal-workspace'
+import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-workspace'
 
 function workspaceLocale(value: string): WorkspaceLocale {
   return value === 'en' ? 'en' : 'zh-CN'
@@ -61,6 +61,8 @@ const readWorkspaceContext = cache(async (userId: string, email: string, name: s
     await ensurePersonalWorkspace(user, locale)
     choices = await readChoices()
   }
+  const personal = choices.find(choice => choice.kind === 'personal')
+  if (personal) await ensurePersonalShare(user.id, personal.id)
 
   const savedId = cookieStore.get('mikka-workspace')?.value
   const workspaceId = requestedId || (choices.find(item => item.id === savedId)?.id ?? choices[0]?.id)

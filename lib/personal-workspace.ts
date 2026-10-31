@@ -2,6 +2,8 @@ import 'server-only'
 import { createHash } from 'node:crypto'
 import { and, eq, sql } from 'drizzle-orm'
 import { workspaceDb } from '@/lib/workspace-db'
+import { pool } from '@/lib/db'
+import { setSubscriptionShare } from '@/lib/personal-policy'
 import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
 import { defaultWorkspaceName, type WorkspaceLocale } from '@/lib/workspace-name'
 
@@ -12,7 +14,7 @@ const workspaceUUID = (seed: string) => {
 
 /** The person's one personal workspace (decision 2026-10-31-2130), created on first need. Idempotent. */
 export async function ensurePersonalWorkspace(user: { id: string; email: string; name: string }, locale: WorkspaceLocale): Promise<string> {
-  return workspaceDb.transaction(async tx => {
+  const id = await workspaceDb.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-owner:${user.id}`}, 0))`)
     const [own] = await tx.select({ id: workspaces.id }).from(workspaces).where(and(eq(workspaces.userId, user.id), eq(workspaces.kind, 'personal'))).limit(1)
     if (own) return own.id
@@ -24,4 +26,15 @@ export async function ensurePersonalWorkspace(user: { id: string; email: string;
     await tx.insert(workspaceMembers).values({ workspaceId: id, userId: user.id, email: user.email.toLowerCase(), name: user.name, role: 'admin' }).onConflictDoNothing()
     return id
   })
+  await ensurePersonalShare(user.id, id)
+  return id
+}
+
+const shared = new Set<string>()
+/** A personal workspace uses its owner's subscriptions without a share step (decision 2026-10-31-2330). */
+export async function ensurePersonalShare(userId: string, workspaceId: string) {
+  const key = `${userId}:${workspaceId}`
+  if (shared.has(key)) return
+  await setSubscriptionShare(pool, userId, workspaceId, true)
+  shared.add(key)
 }

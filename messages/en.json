@@ -2246,12 +2246,19 @@
         "notion": "Notion"
       }
     },
+    "subscriptionShare": {
+      "heading": "This workspace",
+      "share": "Use my subscriptions here",
+      "blocked": "Turned off by an admin"
+    },
+    "archivedBots": {
+      "heading": "Paused bots",
+      "takeOver": "Take over"
+    },
     "personalPolicy": {
-      "loading": "Loading members' personal accounts",
-      "heading": "Members' personal accounts",
-      "subscriptions": "Personal subscriptions",
-      "apps": "Personal app connections",
-      "devices": "Personal devices"
+      "loading": "Loading personal subscription settings",
+      "heading": "Personal subscriptions",
+      "subscriptions": "Let members use their own subscriptions"
     },
     "appPolicy": {
       "loading": "Loading app permissions",

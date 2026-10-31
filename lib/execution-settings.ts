@@ -6,7 +6,7 @@ import { enqueueDeviceCommand } from "./device-management";
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
-import { personalResourceAllowed } from "./personal-policy";
+import { subscriptionsUsable } from "./personal-policy";
 import {
   DEFAULT_EXECUTION_FALLBACKS,
   type ExecutionFallbacks,
@@ -62,7 +62,7 @@ export class ExecutionSettings {
   ): Promise<ExecutionRule> {
     const places = await this.places(scope, query);
     const models = await this.botModels(scope, query);
-    const providers = (await personalResourceAllowed(query, scope.workspaceId, "subscriptions"))
+    const providers = (await subscriptionsUsable(query, scope.ownerId, scope.workspaceId))
       ? (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND state='connected'`,[scope.ownerId])).rows
       : [];
     const preferred = providers.some((m) => m.provider === "claude")
@@ -434,14 +434,14 @@ export class ExecutionSettings {
     }
     return [...labels.values()].sort((a,b) => a.name.localeCompare(b.name));
   }
-  /** The owner's connected subscriptions, from any workspace: a subscription belongs to the account
-   * (decision 2026-10-31-2130). None when this workspace's admin switched personal subscriptions off. */
+  /** The owner's connected subscriptions, from any workspace: a subscription belongs to the account.
+   * None unless the owner shared them into this workspace and its admin allows it (decision 2026-10-31-2330). */
   private async connectedBindings(
     scope: ExecutionSettingsScope,
     bindingId?: string,
     query: Pick<PoolClient, "query"> = this.pool,
   ) {
-    if (!(await personalResourceAllowed(query, scope.workspaceId, "subscriptions"))) return [];
+    if (!(await subscriptionsUsable(query, scope.ownerId, scope.workspaceId))) return [];
     return (
       await query.query(
         `SELECT b.id AS "bindingId",b."consumerId",b."workspaceId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan
@@ -453,6 +453,10 @@ export class ExecutionSettings {
         [scope.ownerId, scope.workspaceId, bindingId ?? null],
       )
     ).rows;
+  }
+  /** False once the owner left or was suspended and the bot was archived (§8.3), or when it is not theirs. */
+  async botActive(ownerId: string, botId: string) {
+    return Boolean((await this.pool.query('SELECT 1 FROM bots WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL', [botId, ownerId])).rowCount);
   }
   /** Execution resolves its saved binding independently of the deduplicated catalogue. */
   async botBinding(scope: ExecutionSettingsScope, bindingId: string) {
@@ -598,9 +602,10 @@ export class ExecutionSettings {
   }
 }
 
-/** Bot scope is exact. Work with no workspace of its own (the Coordinator default,
- * memory extraction) runs and bills in the owner's personal workspace, never the
- * oldest membership (decision 2026-10-31-2130). */
+/** Bot scope is exact. Work with no bot of its own (the Coordinator's triage,
+ * memory extraction) runs and bills in the owner's first active workspace, as
+ * before: it is charged where it happens, never moved to a new personal
+ * workspace (decision 2026-10-31-2330). */
 export async function executionWorkspace(
   ownerId: string,
   botId: string | null,
@@ -609,7 +614,8 @@ export async function executionWorkspace(
   if (botId) {
     const bot = (
       await pool.query(
-        'SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2',
+        // An archived bot (its owner left or was suspended) runs nothing until an admin takes it over (§8.3).
+        'SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL',
         [botId, ownerId],
       )
     ).rows[0];
@@ -622,31 +628,22 @@ export async function executionWorkspace(
   const { workspaceDb } = await import("./workspace-db");
   const { workspaceMembers, workspaces } =
     await import("./db/workspace-schema");
-  const { and, eq } = await import("drizzle-orm");
-  const personal = () =>
-    workspaceDb
-      .select({ id: workspaces.id })
-      .from(workspaces)
-      .innerJoin(
-        workspaceMembers,
-        and(
-          eq(workspaceMembers.workspaceId, workspaces.id),
-          eq(workspaceMembers.userId, ownerId),
-          eq(workspaceMembers.status, "active"),
-        ),
-      )
-      .where(and(eq(workspaces.userId, ownerId), eq(workspaces.kind, "personal")))
-      .limit(1);
-  const [workspace] = await personal();
-  if (workspace) return workspace.id;
-  // Someone who has not opened Mikka since personal workspaces arrived: create it now.
-  const user = (
-    await pool.query('SELECT id,email,name FROM "user" WHERE id=$1', [ownerId])
-  ).rows[0];
-  if (!user) throw new ActionFailureError("workspaceAccessDenied");
-  const { ensurePersonalWorkspace } = await import("./personal-workspace");
-  await ensurePersonalWorkspace(user, "zh-CN");
-  const [created] = await personal();
-  if (!created) throw new ActionFailureError("workspaceAccessDenied");
-  return created.id;
+  const { and, eq, asc } = await import("drizzle-orm");
+  const [workspace] = await workspaceDb
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .innerJoin(
+      workspaceMembers,
+      eq(workspaceMembers.workspaceId, workspaces.id),
+    )
+    .where(
+      and(
+        eq(workspaceMembers.userId, ownerId),
+        eq(workspaceMembers.status, "active"),
+      ),
+    )
+    .orderBy(asc(workspaces.createdAt))
+    .limit(1);
+  if (!workspace) throw new ActionFailureError("workspaceAccessDenied");
+  return workspace.id;
 }

@@ -19,17 +19,24 @@ test('管理员可以禁止某个应用，刷新后保持', async ({ page }, tes
   await attachLightDark(page, testInfo, 'team-permissions-slack-blocked')
 })
 
-// Decision 2026-10-31-2130: a team admin can switch members' personal subscriptions, app connections and devices off; on by default.
-test('团队管理员可以关闭成员的个人订阅，刷新后保持', async ({ page }) => {
+// Decision 2026-10-31-2330: members share their own subscriptions into a team; an admin has one switch, on by default.
+test('团队管理员可以不允许成员使用个人订阅，成员自己的共享开关随之关闭', async ({ page }) => {
   await register(page, '/')
   const workspace = await seedTeamWorkspace(page)
+  await page.goto(app(`/settings?section=models&workspace=${workspace}`))
+  const share = page.getByRole('switch', { name: '在这里使用我的订阅', exact: true })
+  await expect(share).not.toBeChecked()
+  await share.click()
+  await expect(share).toBeChecked()
   await page.goto(app(`/settings?section=permissions&workspace=${workspace}`))
-  await expect(page.getByRole('heading', { level: 2, name: '成员的个人账号' })).toBeVisible()
-  const subscriptions = page.getByRole('switch', { name: '个人订阅', exact: true })
-  for (const name of ['个人订阅', '个人应用连接', '个人设备']) await expect(page.getByRole('switch', { name, exact: true })).toBeChecked()
-  await subscriptions.click()
-  await expect(subscriptions).not.toBeChecked()
+  await expect(page.getByRole('heading', { level: 2, name: '个人订阅' })).toBeVisible()
+  const allowed = page.getByRole('switch', { name: '允许成员使用个人订阅', exact: true })
+  await expect(allowed).toBeChecked()
+  await allowed.click()
+  await expect(allowed).not.toBeChecked()
   await page.reload()
-  await expect(page.getByRole('switch', { name: '个人订阅', exact: true })).not.toBeChecked()
-  await expect(page.getByRole('switch', { name: '个人设备', exact: true })).toBeChecked()
+  await expect(page.getByRole('switch', { name: '允许成员使用个人订阅', exact: true })).not.toBeChecked()
+  await page.goto(app(`/settings?section=models&workspace=${workspace}`))
+  await expect(page.getByText('管理员已关闭', { exact: true })).toBeVisible()
+  await expect(page.getByRole('switch', { name: '在这里使用我的订阅', exact: true })).toHaveCount(0)
 })

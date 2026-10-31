@@ -11,6 +11,7 @@ let available: { bindingId: string; provider?: string }[] = []
 let savedBinding: { bindingId: string } | undefined
 let settingsError: Error | undefined
 let workspaceCalls = 0
+let botActive = true
 const workspaceBots: (string | null)[] = []
 const hostedCalls: unknown[][] = []
 const hostedModel = { modelId: 'hosted-fixture' }
@@ -23,6 +24,7 @@ mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExp
     return scope.workspaceId
   },
   ExecutionSettings: class {
+    async botActive() { return botActive }
     async botModel() { if (settingsError) throw settingsError; return selected }
     async botModels() { return available }
     async botBinding() { return savedBinding }
@@ -128,4 +130,12 @@ test('settings errors propagate instead of selecting the hosted fallback', async
   settingsError = new Error('database unavailable')
   await assert.rejects(freezeBotModel(scope, noSubscription), settingsError)
   assert.equal(hostedCalls.length, 0)
+})
+
+test('an archived bot (its owner left the team) is refused before any model is chosen', async () => {
+  botActive = false
+  try {
+    await assert.rejects(freezeBotModel({ ...scope, botId: id(1) }, noSubscription), { code: 'botNotFound' })
+    assert.equal(hostedCalls.length, 0)
+  } finally { botActive = true }
 })

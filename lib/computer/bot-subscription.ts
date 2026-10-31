@@ -2,6 +2,7 @@ import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { z } from 'zod'
+import { subscriptionsUsableSql } from '@/lib/personal-policy'
 
 const inputSchema = z.object({ botId: z.uuid(), connectionId: z.uuid(), revision: z.number().int().positive(), harness: z.enum(['codex', 'claude_code']), modelId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/), idempotencyKey: z.string().min(1).max(256).optional() }).strict()
 
@@ -22,7 +23,7 @@ export async function bindBotSubscription(pool: Pool, actor: { userId: string; w
     await client.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
       SELECT $1,$2,$3,$4,id,epoch,$7,$8 FROM byos_connections WHERE id=$5 AND "ownerId"=$2
         AND epoch=$6 AND state='connected' AND provider=$9
-        AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"::text=$3 AND NOT p.subscriptions) ON CONFLICT (id) DO NOTHING`,
+        AND ${subscriptionsUsableSql('$2', '$3')} ON CONFLICT (id) DO NOTHING`,
     [id, actor.userId, actor.workspaceId, runtime.agentId, input.connectionId, input.revision, route, input.modelId, provider])
     const result = await client.query(`SELECT b.id FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId"
       WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3 AND b."consumerId"=$4 AND b."connectionId"=$5

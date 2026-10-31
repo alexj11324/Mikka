@@ -11,7 +11,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaceInvitations, workspaces } from '@/lib/db/workspace-schema'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { slugIsReserved } from '@/lib/workspace-admin/general'
-import { transferOnSuspend } from '@/lib/workspace-admin/members'
+import { releaseDepartingMember, restoreReturningMember, transferOnSuspend } from '@/lib/workspace-admin/members'
 import { auditRequestContext } from '@/lib/audit/record'
 import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 
@@ -125,7 +125,7 @@ export async function updateWorkspaceMember(input: { workspaceId: string; userId
     z.string().min(1).max(200).parse(input.userId)
     if (input.transferTo !== undefined && status !== 'suspended') throw new WorkspaceError('validationGeneric')
     const request = auditRequestContext(await headers())
-    await workspaceDb.transaction(async tx => {
+    const previous = await workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, input.workspaceId, user.id, true)
       const [target] = await tx.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId))).limit(1)
       if (!target) throw new WorkspaceError('workspaceMemberNotFound')
@@ -138,8 +138,11 @@ export async function updateWorkspaceMember(input: { workspaceId: string; userId
       if (target.status !== status) await enqueueWorkspaceAudit(tx, { ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
       if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
       await tx.update(workspaceMembers).set({ role, status }).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId)))
-
+      return target.status
     })
+    // §8.3: a suspended member's share and bots leave with them; reactivation brings their bots back.
+    if (previous !== 'suspended' && status === 'suspended') await releaseDepartingMember(input.workspaceId, input.userId)
+    if (previous === 'suspended' && status === 'active') await restoreReturningMember(input.workspaceId, input.userId)
   })
 }
 
