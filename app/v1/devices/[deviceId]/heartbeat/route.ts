@@ -7,7 +7,7 @@ import { ensureDeviceAgents } from '@/lib/device-agents'
 import { devices } from '@/lib/db/schema'
 import { authenticateDevice, linkDeviceToken } from '@/lib/device-link'
 import { reclaimLostRuns, renewRunLeases } from '@/lib/run-leases'
-import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
+import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { skillAssignments } from '@/lib/self-improvement/server'
 import { pendingDeviceCommands } from '@/lib/device-management'
 import { renewCloudDeviceToken } from '@/lib/computer/cloud-device'
@@ -43,7 +43,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const [prior] = factoryOn ? await db.select({ enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses }).from(devices).where(eq(devices.id, deviceId)).limit(1) : []
   await db.update(devices).set({ ...(parsed.data.deviceType ? { deviceType: parsed.data.deviceType } : {}), harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
   await ensureDeviceAgents(pool, caller.userId, deviceId, parsed.data.harnesses)
-  const selected=await skillAssignments.renewHeartbeat(caller.userId,deviceId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1')
+  const selected=await skillAssignments.renewHeartbeat(caller.userId,deviceId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1',request.headers.get(TEAM_SKILL_HEADER)==='1')
   const result=await renewRunLeases(deviceId,selected.legacy)
   result.leases={...result.leases,...selected.leases}
   result.revoked=[...new Set([...(result.revoked??[]),...selected.revoked])]

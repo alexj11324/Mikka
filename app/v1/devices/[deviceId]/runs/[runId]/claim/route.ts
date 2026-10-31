@@ -20,7 +20,7 @@ import { latestCheckpoint } from '@/lib/run-leases'
 import { checkpointRecoveryError, retryNote } from '@/lib/run-retry'
 import { constrainedAssignmentPolicy } from '@/lib/run-assignment-policy'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
-import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
+import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { claimBenchmarkAssignment, skillAssignments } from '@/lib/self-improvement/server'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
@@ -90,7 +90,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     return NextResponse.json({ error: recoveryError, code: 'checkpointRecoveryUnavailable' }, { status: 409 })
   }
   const supportsSkillArtifacts = request.headers.get(SKILL_ARTIFACT_HEADER) === '1'
-  try { await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts) } catch (error) {
+  const supportsTeamSkills = request.headers.get(TEAM_SKILL_HEADER) === '1'
+  try { await skillAssignments.preflight(caller.userId, runId, supportsSkillArtifacts, supportsTeamSkills) } catch (error) {
     if (!(error instanceof ImprovementError)) throw error
     return NextResponse.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 409 })
   }
@@ -161,7 +162,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   let skillAssignment
   let benchmarkAssignment
   try {
-    skillAssignment = await skillAssignments.recordClaim(caller.userId, deviceId, runId, leaseExpiresAt, supportsSkillArtifacts)
+    skillAssignment = await skillAssignments.recordClaim(caller.userId, deviceId, runId, leaseExpiresAt, supportsSkillArtifacts, supportsTeamSkills)
     benchmarkAssignment = await claimBenchmarkAssignment(caller.userId, deviceId, runId, leaseExpiresAt)
   } catch (error) {
     await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })

@@ -19,6 +19,7 @@ import { createImprovementFactoryBridge } from './factory-bridge'
 import { createSkillEvaluations } from './evaluations'
 import { digest, ImprovementError } from './contract'
 import { REPORT_BENCHMARK } from './report-benchmark'
+import { TeamSkillStore } from './team-skills'
 
 const authorize: Parameters<typeof createSkillAssignments>[1] = async (userId, issueId, tx) =>
   Boolean(await issueForUser(userId, issueId, false, drizzle(tx)))
@@ -41,6 +42,7 @@ export const skillEffectEvaluator: typeof evaluateSkillEffect = async (userId, p
   return hostedBillingScope.run({ workspaceId, ownerId: userId }, () => evaluateSkillEffect(userId, proposal))
 }
 export const skillRegistry = createSkillRegistry(pool, authorize)
+export const teamSkillStore = new TeamSkillStore(pool)
 export const skillAssignments:ReturnType<typeof createSkillAssignments> = createSkillAssignments(pool, authorize,
   (...args)=>skillEvaluations.authorizeEvaluation(...args))
 export const skillEvaluations:ReturnType<typeof createSkillEvaluations> = createSkillEvaluations(pool, {
