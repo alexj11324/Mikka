@@ -11,11 +11,20 @@ const committed = (id = 'run:0', through = 2, quiet = false): CoordinatorWorkflo
 const boundary = (type: 'start-step' | 'finish-step') => ({ type }) as unknown as CoordinatorWorkflowStreamPart
 const body = (events: CoordinatorStreamEvent[]) => events.map(event => event.type === 'text' ? event.delta : '').join('')
 
+async function drain(stream: ReadableStream<CoordinatorStreamEvent>, events: CoordinatorStreamEvent[] = []) {
+  const reader = stream.getReader()
+  try {
+    for (;;) {
+      const next = await reader.read()
+      if (next.done) return events
+      events.push(next.value)
+    }
+  } finally { reader.releaseLock() }
+}
+
 async function project(parts: CoordinatorWorkflowStreamPart[]) {
   const output = new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) { parts.forEach(part => controller.enqueue(part)); controller.close() } })
-  const events: CoordinatorStreamEvent[] = []
-  for await (const event of output.pipeThrough(coordinatorTextStream('owner', []))) events.push(event)
-  return events
+  return drain(output.pipeThrough(coordinatorTextStream('owner', [])))
 }
 
 test('text arrives before the turn commits; model internals never leave the stream', async () => {
@@ -72,17 +81,14 @@ test('split saved secrets are blocked before any secret character reaches the br
       controller.close()
     } })
     const seen: CoordinatorStreamEvent[] = []
-    await assert.rejects(async () => {
-      for await (const event of raw.pipeThrough(coordinatorTextStream('owner', fingerprints))) seen.push(event)
-    }, { code: 'credential_secret_detected' })
+    await assert.rejects(drain(raw.pipeThrough(coordinatorTextStream('owner', fingerprints)), seen), { code: 'credential_secret_detected' })
     assert.ok(body(seen).length > 0)
     assert.equal(body(seen), ('safe '.repeat(10)).slice(0, body(seen).length))
 
     const safe = new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) {
       controller.enqueue(start()); controller.enqueue(delta('short safe reply')); controller.enqueue(committed()); controller.close()
     } })
-    const safeEvents: CoordinatorStreamEvent[] = []
-    for await (const event of safe.pipeThrough(coordinatorTextStream('owner', fingerprints))) safeEvents.push(event)
+    const safeEvents = await drain(safe.pipeThrough(coordinatorTextStream('owner', fingerprints)))
     assert.equal(body(safeEvents), 'short safe reply')
   } finally {
     if (old === undefined) delete process.env.BETTER_AUTH_SECRET
