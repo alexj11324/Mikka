@@ -5,11 +5,23 @@ import { DECISION_MODEL } from './decision'
 import { invokeDecision } from './decide'
 import { createGroupJudgment } from './group-judgment'
 import { GroupJudgmentPendingError } from './group-correction'
+import { MockLanguageModelV3 } from 'ai/test'
 // Explicit server/billing fixtures; the REST payload remains synthetic.
 mock.module(new URL('../abuse/context.ts',import.meta.url).href,{namedExports:{hostedBillingScope:{getStore:()=>({workspaceId:'fixture-workspace',ownerId:'fixture-owner'})}}})
 mock.module(new URL('../abuse/runtime.ts',import.meta.url).href,{namedExports:{canUseMikkaPaid:async()=>{},hostedUsage:{reserve:async()=>{},settle:async()=>{}}}})
 mock.module(new URL('../abuse/alerts.ts',import.meta.url).href,{namedExports:{checkAbuseAlerts:async()=>{}}})
 mock.module(new URL('../model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertUnmanagedModelTransport:async()=>{}}})
+let groupReply: unknown
+const generationInputs: unknown[] = []
+const groupModel = new MockLanguageModelV3({ doGenerate: async options => {
+  generationInputs.push(options)
+  return { content: [{ type: 'text', text: JSON.stringify(groupReply) }], finishReason: { unified: 'stop', raw: 'stop' },
+    usage: { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } }, warnings: [] }
+} })
+mock.module(new URL('../abuse/model.ts', import.meta.url).href, { namedExports: { hostedModel: async (workspace: string, _model: string, _options: unknown, owner: string) => {
+  assert.equal(workspace, 'fixture-workspace'); assert.equal(owner, 'fixture-owner'); return groupModel
+} } })
+mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspaceDb: { select: () => { throw Error('No workspace I/O in model-consumer fixture') } } } })
 
 const a = '00000000-0000-4000-8000-000000000001', b = '00000000-0000-4000-8000-000000000002'
 const members = [{id:a,name:'A',description:'role A'},{id:b,name:'B',description:'role B'}]
@@ -72,4 +84,19 @@ test('group consumer uses actual host receipt from synthetic REST response, not 
     if (oldKey === undefined) delete process.env.DECISION_GATEWAY_API_KEY
     else process.env.DECISION_GATEWAY_API_KEY = oldKey
   }
+})
+
+test('actual structured generation distinguishes public/private output and validates the peer UUID', async () => {
+  const { groupRuntime } = await import('./group-runtime')
+  for (const privateTo of [null, b]) {
+    groupReply = { text: 'synthetic group reply', mentions: [], privateTo }
+    const result = await groupRuntime.generate(members[0], { message: { text: 'source group', mentions: [] }, earlier: [], followUp: '', members, privatePeer: members[1] })
+    assert.deepEqual(result, groupReply)
+    const request = generationInputs.at(-1) as { responseFormat: { schema: { required: string[] } }; prompt: Array<{ role: string; content: Array<{ text: string }> }> }
+    assert.ok(request.responseFormat.schema.required.includes('privateTo'))
+    const input = JSON.parse(request.prompt.find(entry => entry.role === 'user')!.content[0].text)
+    assert.equal(input.privatePeer.id, b)
+  }
+  groupReply = { text: 'invalid private peer', mentions: [], privateTo: 'not-an-agent-id' }
+  await assert.rejects(groupRuntime.generate(members[0], { message: { text: 'source group', mentions: [] }, earlier: [], followUp: '', members }))
 })

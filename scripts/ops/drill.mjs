@@ -11,6 +11,7 @@ import { once } from 'node:events'
 import { Pool } from 'pg'
 import { backupIsolated, isolatedTarget, restoreIsolated } from './isolated-recovery.mjs'
 import { actionableAlerts, databaseSignals, notifyAlerts } from './monitor.mjs'
+import { repairDrillFaults } from './drill-state.mjs'
 
 const container = process.env.OPS_POSTGRES_CONTAINER ?? 'mikka-aggregate-number-postgres'
 if (!process.env.OPS_POSTGRES_URL) throw Error('opsExplicitPostgresRequired')
@@ -26,7 +27,7 @@ process.env.MIGRATE = '1'; process.env.VERCEL_ENV = 'development'
 const migrationLog = execFileSync(process.execPath, ['scripts/migrate.mjs'], { env: process.env, maxBuffer: 2_000_000 })
 await writeFile(join(root, 'migrations.log'), migrationLog, { mode: 0o600 })
 const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
-const toolSourcesSha256 = createHash('sha256').update(Buffer.concat(await Promise.all(['scripts/ops/drill.mjs', 'scripts/ops/isolated-recovery.mjs', 'scripts/ops/monitor.mjs', 'lib/request-log.ts'].map(file => readFile(file))))).digest('hex')
+const toolSourcesSha256 = createHash('sha256').update(Buffer.concat(await Promise.all(['scripts/ops/drill.mjs', 'scripts/ops/drill-state.mjs', 'scripts/ops/isolated-recovery.mjs', 'scripts/ops/monitor.mjs', 'lib/request-log.ts'].map(file => readFile(file))))).digest('hex')
 const sourcePatchSha256 = createHash('sha256').update(execFileSync('git', ['diff', 'HEAD'])).digest('hex')
 const { applyAccountDeletionManifest, exportAccountDeletionManifest, requestAccountDeletion, resumeAccountDeletion } = await import('../../lib/account/deletion-jobs.ts')
 const main = new Pool({ connectionString: targets[0].url, max: 5 }), workspace = new Pool({ connectionString: targets[1].url, max: 5 })
@@ -109,20 +110,18 @@ try {
   const dbAlert = await notifyAlerts(actionableAlerts({ requests: {}, database: dbFailure }), { sink, state: sinkFailure.state }); assert.equal(dbAlert.healthy, true)
   // Repair only this run's controlled fault fixtures. No provider was ever called for this injected operation,
   // so failed is definitive no-effect evidence here; this is not a recipe for clearing a real uncertain action.
-  await main.query('UPDATE coordinator_events SET "deliveredAt"=now() WHERE "userId"=$1', [survivor])
-  await main.query('UPDATE agent_runs SET status=\'succeeded\',"startedAt"="createdAt"+interval \'1 second\',"finishedAt"=now(),"leaseExpiresAt"=NULL WHERE id=$1', [run])
-  await main.query('UPDATE operation_ledger SET status=\'failed\',"updatedAt"=now() WHERE "operationId"=$1', [effect])
+  await repairDrillFaults(main, { ownerId: survivor, runId: run, effectIds: [effect] })
   const recoveredMetrics = await databaseSignals(main)
   assert.equal(recoveredMetrics.databaseAvailable, 1)
   assert.equal(recoveredMetrics.staleWake, 0); assert.equal(recoveredMetrics.expiredRunLease, 0); assert.equal(recoveredMetrics.staleEffect, 0)
   const recoveredAlerts = actionableAlerts({ requests: {}, database: recoveredMetrics })
-  assert.equal(recoveredAlerts.length, 0, 'recovery must follow actual database re-observation')
+  assert.deepEqual(recoveredAlerts.map(alert => alert.id), ['dispatch-start'], 'the live faults recover, but the failed dispatch remains in its SLO window')
   const recovery = await notifyAlerts(recoveredAlerts, { sink, state: { ...fired.state, ...dbAlert.state } }); assert.equal(recovery.healthy, true)
   const report = { version: 1, sourceSha, sourcePatchSha256, toolSourcesSha256, environment: 'Linux, local PostgreSQL 17 existing Docker loopback; no application or worker connected',
     databaseNames: [...targets, ...restored].map(target => target.database), objectives, backupManifestSha256: backup.manifestSha256,
     deletionManifestSha256, failureAt: failureAt.toISOString(), rpoObservedMs: failureAt.getTime() - Date.parse(backup.manifest.capturedAt),
     ...restoredResult, deniedFailures: failures, monitorSignals: metrics, monitorFiringDelivered: fired.deliveries.length,
-    monitorRecoveryDelivered: recovery.deliveries.length, recoveredMonitorSignals: recoveredMetrics, restoreFailureNotices: receivedAlerts.filter(row => row.event.id.startsWith('restore-blocked:')).length, sinkFailureVisibleAndRetried: true, receivedAlerts, limitations: ['No cloud PITR/cross-region/storage-vendor or production KMS test', 'No full login-chat-provider end-to-end or hosted alert schedule evidence', 'Targets remain quarantined; no external effects replayed', 'Test encryption key exists in process memory only; retained encrypted bundle is not a reusable production backup'] }
+    monitorRecoveryDelivered: recovery.deliveries.length, recoveredMonitorSignals: recoveredMetrics, retainedWindowedAlerts: recoveredAlerts.map(alert => alert.id), restoreFailureNotices: receivedAlerts.filter(row => row.event.id.startsWith('restore-blocked:')).length, sinkFailureVisibleAndRetried: true, receivedAlerts, limitations: ['No cloud PITR/cross-region/storage-vendor or production KMS test', 'No full login-chat-provider end-to-end or hosted alert schedule evidence', 'Targets remain quarantined; no external effects replayed', 'Test encryption key exists in process memory only; retained encrypted bundle is not a reusable production backup'] }
   assert.ok(report.rpoObservedMs <= objectives.localRpoMs); assert.ok(report.restoreDurationMs <= objectives.localRtoMs)
   await writeFile(join(root, 'report.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })
   console.log(JSON.stringify({ evidenceDirectory: root, ...report }))

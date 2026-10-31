@@ -147,9 +147,11 @@ export async function revokeWorkspaceInvitation(workspaceId: string, invitationI
   return result(async () => {
     const user = await requireUser()
     z.uuid().parse(invitationId)
+    const request = auditRequestContext(await headers())
     await workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, workspaceId, user.id, true)
-      await tx.update(workspaceInvitations).set({ status: 'revoked' }).where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.id, invitationId), eq(workspaceInvitations.status, 'pending')))
+      const [revoked] = await tx.update(workspaceInvitations).set({ status: 'revoked' }).where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.id, invitationId), eq(workspaceInvitations.status, 'pending'))).returning({ id: workspaceInvitations.id })
+      if (revoked) await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.invitation_revoked', target: { type: 'invitation', id: revoked.id }, ...request })
     })
   })
 }
@@ -158,6 +160,7 @@ export async function acceptWorkspaceInvitation(token: string) {
   return result(async () => {
     const user = await requireUser()
     tokenSchema.parse(token)
+    const request = auditRequestContext(await headers())
     const workspaceId = await workspaceDb.transaction(async tx => {
       const [candidate] = await tx.select({ workspaceId: workspaceInvitations.workspaceId }).from(workspaceInvitations).where(and(eq(workspaceInvitations.tokenHash, hashToken(token)), eq(workspaceInvitations.email, user.email.toLowerCase()), eq(workspaceInvitations.status, 'pending'), gt(workspaceInvitations.expiresAt, new Date()))).limit(1)
       if (!candidate) throw new WorkspaceError('inviteInvalid')
@@ -166,7 +169,10 @@ export async function acceptWorkspaceInvitation(token: string) {
       if (!invitation) throw new WorkspaceError('inviteExpired')
       const [existing] = await tx.select({ status: workspaceMembers.status }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, candidate.workspaceId), eq(workspaceMembers.userId, user.id))).limit(1)
       if (existing?.status === 'suspended') throw new WorkspaceError('workspaceMembershipSuspended')
-      if (!existing) await tx.insert(workspaceMembers).values({ workspaceId: candidate.workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: invitation.role })
+      if (!existing) {
+        await tx.insert(workspaceMembers).values({ workspaceId: candidate.workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: invitation.role })
+        await enqueueWorkspaceAudit(tx, { workspaceId: candidate.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.joined', target: { type: 'member', id: user.id }, metadata: { role: invitation.role }, ...request })
+      }
       await tx.update(workspaceInvitations).set({ status: 'accepted' }).where(and(eq(workspaceInvitations.id, invitation.id), eq(workspaceInvitations.workspaceId, candidate.workspaceId), eq(workspaceInvitations.email, user.email.toLowerCase())))
       return candidate.workspaceId
     })
