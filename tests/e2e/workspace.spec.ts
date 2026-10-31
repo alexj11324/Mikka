@@ -71,13 +71,15 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', { 
   // Without Linear the toolbar button is a plain refresh, not a success state.
   await expect(page.getByRole('button', { name: '刷新', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '已与 Linear 同步', exact: true })).toHaveCount(0)
-  // The issue-tool gate is off in this suite; the request must not be queued.
+  // Task creation is on by default (R-76): with no issue-tool setting the dialog offers 创建任务.
   const dialog = await openCreateIssue(page)
   const request = `把群聊未读数接到侧栏 ${randomUUID()}`
   await dialog.getByLabel('任务描述', { exact: true }).fill(request)
-  // With the gate off the dialog explains why and keeps 创建任务 disabled.
-  await expect(dialog.getByText('这个工作区还没有开启任务创建，可以先在对话里交给 Coordinator。', { exact: true })).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '创建任务', exact: true })).toBeDisabled()
+  await expect(dialog.getByText('这个工作区还没有开启任务创建，可以先在对话里交给 Coordinator。', { exact: true })).toHaveCount(0)
+  await dialog.getByRole('button', { name: '创建任务', exact: true }).click()
+  // The request passes the issue-tool gate; no Coordinator runs in this suite, so it is refused there and the draft stays.
+  await expect(dialog.getByRole('alert').filter({ hasText: 'Coordinator 暂时不可用' })).toBeVisible()
+  await expect(dialog.getByText('暂时无法创建任务。', { exact: true })).toHaveCount(0)
   await expect(dialog.getByLabel('任务描述', { exact: true })).toHaveValue(request)
   await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true }).getByText(request)).toHaveCount(0)
   await page.keyboard.press('Escape')
