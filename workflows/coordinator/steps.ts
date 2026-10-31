@@ -244,6 +244,17 @@ export async function personalMcp(userId: string, botId: string | null, executio
 // preserve the first uncertain outcome rather than replaying this step.
 personalMcp.maxRetries = 0
 
+/** Apps connected from the 插件 store, through the tools Composio lists for them (lib/app-tools.ts). */
+export async function appTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (scope?.scheduledRead && operation === 'call') return { error: 'integrationActionNotAllowed' }
+  const { runAppTools } = await import('@/lib/app-tools-server')
+  return runAppTools(userId, botId, operation, input)
+}
+// A write may have happened even when its step fails; never replay it.
+appTools.maxRetries = 0
+
 export async function accountWrite(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
   'use step'
   await assertNativeToolScope(userId,scope)

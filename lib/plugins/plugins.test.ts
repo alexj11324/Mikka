@@ -3,12 +3,11 @@ import { test } from 'node:test'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import type { Composio } from '@composio/core'
 import { createMcpSchema, updateMcpSchema } from './contracts'
 import { fetchSkillSource } from './skill-source'
 import { publicMcpFetch } from './public-fetch'
 import { createPersonalMcpRuntime } from './mcp'
-import { listAppCatalog } from './catalog'
+import { assertCatalogToolkit, listStoreCatalog, resetStoreCatalogCache } from './catalog'
 import { executeComposioAction } from '@/lib/composio-actions'
 
 test('MCP input rejects credential URLs, private targets, forwarded headers and credential moves', () => {
@@ -111,11 +110,32 @@ for (const type of ['http', 'sse'] as const) test(`real MCP ${type} handshake, d
   } finally { stream?.end(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())) }
 })
 
-test('catalog comes from provider metadata and contains only toolkits with explicitly registered actions', async () => {
-  const toolkit = (slug: string) => ({ slug, name: slug, meta: { description: 'One\nline', logo: 'https://cdn.acme.dev/icon.svg' }, isLocalToolkit: false, authSchemes: ['OAUTH2'] })
-  const catalog = await listAppCatalog({ toolkits: { getMany: async (slugs: string[]) => { assert.ok(slugs.includes('googledrive')); return [toolkit('googledrive'), toolkit('gmail'), toolkit('unsupported')] } } } as unknown as Pick<Composio, 'toolkits'>)
-  assert.deepEqual(catalog.map(app => app.id), ['gmail', 'googledrive'])
-  assert.equal(catalog[1].description, 'One line'); assert.deepEqual(catalog[1].actions, ['list_drive_files'])
+test('store lists every toolkit with Composio-managed auth, in Composio order, with Composio sections', async () => {
+  const toolkit = (slug: string, extra: Record<string, unknown> = {}, created = '2026-01-01T00:00:00Z', categories = [{ id: 'email', name: 'email' }]) => ({ slug, name: slug.toUpperCase(), is_local_toolkit: false, no_auth: false, composio_managed_auth_schemes: ['OAUTH2'], meta: { description: 'One\nline', logo: 'https://cdn.acme.dev/icon.svg', created_at: created, categories }, ...extra })
+  const pages = [
+    { items: [toolkit('gmail'), toolkit('github'), toolkit('own_keys', { composio_managed_auth_schemes: [] }), toolkit('free', { no_auth: true })], next_cursor: 'p2' },
+    { items: [toolkit('slack', {}, '2026-10-30T00:00:00Z', [{ id: 'chat', name: 'team chat' }, { id: 'email', name: 'email' }]), toolkit('BAD SLUG'), toolkit('gmail'), toolkit('box', { meta: { logo: 'http://insecure.acme.dev/x.svg' } })], next_cursor: null },
+  ]
+  const queries: unknown[] = []
+  resetStoreCatalogCache()
+  const catalog = await listStoreCatalog(async query => { queries.push(query); return pages[queries.length - 1] })
+  assert.deepEqual(queries, [{ sort_by: 'usage', limit: 1000 }, { sort_by: 'usage', limit: 1000, cursor: 'p2' }])
+  // Usage order kept; own integrations (GitHub), own-credential and no-auth toolkits, bad slugs and duplicates left out.
+  assert.deepEqual(catalog.apps.map(app => app.id), ['gmail', 'slack', 'box'])
+  assert.equal(catalog.apps[0].description, 'One line'); assert.equal(catalog.apps[0].name, 'GMAIL')
+  assert.equal(catalog.apps[2].iconUrl, null); assert.equal(catalog.apps[2].description, '')
+  assert.deepEqual(catalog.popular, ['gmail', 'slack', 'box'])
+  assert.deepEqual(catalog.latest, ['slack', 'gmail'])
+  assert.deepEqual(catalog.categories, [{ id: 'email', name: 'email', apps: ['gmail', 'slack'] }, { id: 'chat', name: 'team chat', apps: ['slack'] }])
+  // Cached: a second read in the hour does not call Composio again.
+  await listStoreCatalog(async () => { throw new Error('not cached') })
+  await assert.rejects(assertCatalogToolkit(async () => pages[0], 'own_keys'), /integrationToolkitNotSupported/)
+  await assertCatalogToolkit(async () => pages[0], 'slack')
+  // A failed read is not kept.
+  resetStoreCatalogCache()
+  await assert.rejects(listStoreCatalog(async () => { throw new Error('down') }))
+  assert.deepEqual((await listStoreCatalog(async () => pages[1])).apps.map(app => app.id), ['slack', 'gmail', 'box'])
+  resetStoreCatalogCache()
   let execution: unknown
   const client = { connectedAccounts: { list: async () => ({ items: [{ id: 'own', toolkit: { slug: 'googledrive' }, status: 'ACTIVE', isDisabled: false, createdAt: '' }] }) }, tools: {
     getRawComposioToolBySlug: async () => ({ version: '20261022_00' }), execute: async (_slug: string, input: unknown) => { execution = input; return { successful: true, data: {} } },

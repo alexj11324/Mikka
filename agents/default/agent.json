@@ -10,6 +10,8 @@
     "read_notion_page_blocks",
     "search_slack_messages",
     "read_slack_thread",
+    "list_app_tools",
+    "call_app_tool",
     "search_gmail",
     "read_gmail_message",
     "list_calendar_events",

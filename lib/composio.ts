@@ -44,8 +44,10 @@ export async function renameComposioAccount(composio: ComposioClient, id: string
  * callers try again later. Only the sanitised
  * address is returned.
  */
-export async function readComposioAccountEmail(composio: ComposioClient, userId: string, toolkit: ComposioToolkitId, accountId: string, timeoutMs = 8_000): Promise<string | null> {
-  const identity = PROVIDER_IDENTITY[toolkit]
+export async function readComposioAccountEmail(composio: ComposioClient, userId: string, toolkit: string, accountId: string, timeoutMs = 8_000): Promise<string | null> {
+  // Only the apps below say who the account is; any other toolkit has no email to read.
+  if (!Object.hasOwn(PROVIDER_IDENTITY, toolkit)) return null
+  const identity = PROVIDER_IDENTITY[toolkit as ComposioToolkitId]
   const signal = AbortSignal.timeout(timeoutMs)
   const call = async (endpoint: string, parameters: { in: 'query' | 'header'; name: string; value: string }[] = []) => {
     const response = await composio.tools.proxyExecute({ endpoint, method: 'GET', connectedAccountId: accountId, userId, parameters }, { signal })

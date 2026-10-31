@@ -1,6 +1,7 @@
 import 'server-only'
 import { and, eq, gt, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
+import { appToolCallSchema, APP_TOOL_ACTION } from '@/lib/app-tools'
 import { isApprovalAction } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
@@ -64,7 +65,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     .set({ status: approve ? 'running' : 'declined', decidedAt: new Date() })
     .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
     .returning()
-  if (!row || (!isApprovalAction(row.action) && row.action !== 'browser_operation' && row.action !== 'credential_operation')) throw new ActionFailureError('pendingActionUnavailable')
+  if (!row || (!isApprovalAction(row.action) && row.action !== 'browser_operation' && row.action !== 'credential_operation' && row.action !== APP_TOOL_ACTION)) throw new ActionFailureError('pendingActionUnavailable')
 
   if ((row.action === 'browser_operation' || row.action === 'credential_operation') && Date.now() - row.createdAt.getTime() > 5 * 60_000) {
     await db.update(pendingActions).set({ status: 'failed', error: 'browserActionExpired' }).where(eq(pendingActions.id, row.id))
@@ -79,11 +80,13 @@ export async function decidePendingAction(userId: string, id: string, approve: b
       ? row.action === 'credential_operation'
         ? await (await import('@/lib/cloud-computer/credential-reviews')).executeCredentialOperation(pool, userId, row.input, approve)
         : await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve)
-      : row.connectedAccountId
-        ? await runComposioAction(userId, row.action, row.input, row.connectedAccountId)
-        : { error: 'integrationAccountNotBound' }
+      : !row.connectedAccountId
+        ? { error: 'integrationAccountNotBound' }
+        : row.action === APP_TOOL_ACTION
+          ? await runApprovedAppToolCall(userId, row.input, row.connectedAccountId)
+          : await runComposioAction(userId, row.action, row.input, row.connectedAccountId)
     if ('error' in result) {
-      status = isApprovalAction(row.action) && result.error === 'operationUncertain' ? 'running' : 'failed'
+      status = (isApprovalAction(row.action) || row.action === APP_TOOL_ACTION) && result.error === 'operationUncertain' ? 'running' : 'failed'
       error = result.error
     } else {
       status = approve ? 'done' : 'declined'
@@ -94,4 +97,23 @@ export async function decidePendingAction(userId: string, id: string, approve: b
   await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }))
   await wakeCoordinator(userId)
   return { status, error }
+}
+
+/**
+ * Runs exactly the store-app call the person approved, pinned to the tool
+ * version it was proposed with. Anything after dispatch that is not a clear
+ * success is uncertain: it may have happened, so it is never resent.
+ */
+async function runApprovedAppToolCall(userId: string, input: unknown, accountId: string): Promise<{ data: Record<string, unknown> } | { error: string }> {
+  const call = appToolCallSchema.safeParse(input)
+  if (!call.success) return { error: 'invalidIntegrationInput' }
+  const [{ getComposio }, { executeAppToolCall }] = await Promise.all([import('@/lib/composio'), import('@/lib/app-tools-server')])
+  const client = getComposio()
+  if (!client) return { error: 'composioNotConfigured' }
+  try {
+    const result = await executeAppToolCall(client, userId, call.data, accountId)
+    return result.successful ? { data: result.data ?? {} } : { error: 'operationUncertain' }
+  } catch {
+    return { error: 'operationUncertain' }
+  }
 }

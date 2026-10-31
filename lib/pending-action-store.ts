@@ -1,5 +1,6 @@
 import 'server-only'
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import { appToolCallSchema, APP_TOOL_ACTION, type AppToolCall } from '@/lib/app-tools'
 import { isApprovalAction, parseActionInput } from '@/lib/composio-actions'
 import { toolApprovalDefault } from '@/lib/composio-tool-hints'
 import { resolveActionAccount, runComposioAction } from '@/lib/composio'
@@ -104,6 +105,20 @@ export async function proposeAction(userId: string, action: string, input: unkno
   return { status: 'awaiting_approval', actionId: id }
 }
 
+/**
+ * A store app's tool call that needs the person's approval (a destructive
+ * write, or one an explicit setting asks for). Nothing runs here.
+ */
+export async function proposeAppToolCall(userId: string, call: AppToolCall, accountId: string) {
+  const parsed = appToolCallSchema.safeParse(call)
+  if (!parsed.success) return { error: 'invalidIntegrationInput' }
+  const waiting = await db.$count(pendingActions, and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
+  if (waiting >= MAX_PENDING) return { error: 'tooManyPendingActions: ask the person to approve or decline the waiting ones first' }
+  const id = crypto.randomUUID()
+  await db.insert(pendingActions).values({ id, userId, action: APP_TOOL_ACTION, input: parsed.data, connectedAccountId: accountId })
+  return { status: 'awaiting_approval', actionId: id }
+}
+
 /** The person's proposals still waiting for them, newest first. */
 export async function listPendingActions(userId: string): Promise<PendingActionView[]> {
   // Rendering existing cards must remain compatible before the account-binding
@@ -119,6 +134,7 @@ export async function listPendingActions(userId: string): Promise<PendingActionV
       if (Date.now() - row.createdAt.getTime() > 5 * 60_000) return []
       return [{ id: row.id, action: row.action, input: { summary: row.input.summary, origin: row.input.origin, operation: row.input.operation, description: row.action === 'credential_operation' ? 'The page stays hidden until entered login fields are absent. This does not confirm authentication.' : undefined }, context: null, status: row.status, createdAt: row.createdAt.toISOString() }]
     }
+    if (row.action === APP_TOOL_ACTION) return appToolCallSchema.safeParse(row.input).success ? [{ id: row.id, action: APP_TOOL_ACTION, input: row.input, context: null, status: row.status, createdAt: row.createdAt.toISOString() }] : []
     if (!isApprovalAction(row.action) && !(row.action === 'approve_repository_push' && validateRepositoryApproval(row.input))) return []
     return [{ id: row.id, action: row.action as PendingActionView['action'], input: row.input, context: row.context as PendingActionView['context'], status: row.status, createdAt: row.createdAt.toISOString() }]
   })

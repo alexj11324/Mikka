@@ -2661,7 +2661,10 @@
       "site": "网站",
       "approveClear": "清空登录字段",
       "approveSubmit": "提交登录",
-      "approveBrowser": "批准操作"
+      "approveBrowser": "批准操作",
+      "app": "应用",
+      "arguments": "内容",
+      "approveRun": "执行"
     },
     "working": "Coordinator 正在处理…",
     "loadError": "对话加载失败，正在重试。",
