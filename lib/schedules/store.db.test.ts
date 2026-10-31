@@ -118,7 +118,11 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     assert.equal(inbox.scheduledRead?.prompt,'Read current status only')
     const prompt=(await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2 ORDER BY position DESC LIMIT 1',[owner,botId])).rows[0].message
     assert.ok(!JSON.stringify(prompt).includes(inbox.scheduledRead!.leaseToken),'private occurrence fence must not enter model/chat data')
-    await store().completeRead(owner,botId,inbox.scheduledRead!,'Read-only result')
+    const streamId='wrun_schedule-fixture:0'
+    await store().completeRead(owner,botId,inbox.scheduledRead!,'Read-only result',streamId)
+    assert.equal((await pool.query('SELECT message FROM coordinator_messages WHERE id=$1',[read.operation_id])).rows[0].message.mikkaStreamId,streamId,'scheduled reply and stream identity persist atomically')
+    assert.ok((await request.run(()=>coordinator.chatView(owner,200,botId))).persistedStreamIds?.includes(streamId))
+    assert.ok((await request.run(()=>coordinator.loadConversation(owner,botId))).messages.every(({message})=>!('mikkaStreamId' in message)))
     const holder=(await pool.query('SELECT "leaseHolder" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2',[owner,botId])).rows[0].leaseHolder
     await request.run(()=>coordinator.releaseLease(owner,holder,botId))
     const human=randomUUID();await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier) VALUES($1,$2,$3,'user_message',$4,'{"text":"Create a reminder"}','attention')`,[human,owner,botId,human])

@@ -30,11 +30,18 @@ const samples = {
   BeFileDiff: 'root = BeFileDiff("lib/report.ts", "-const a = 1\\n+const a = 2\\n context", "tsx")',
 } as const
 
-function render(response: string, locale: 'en' | 'zh-CN' = 'en') {
+function render(response: string, locale: 'en' | 'zh-CN' = 'en', isStreaming = false) {
   return renderToStaticMarkup(<NextIntlClientProvider locale={locale} messages={locale === 'en' ? messages : chineseMessages}>
-    <AgentGenerativeUI response={response} isStreaming={false} onAction={() => {}} />
+    <AgentGenerativeUI response={response} isStreaming={isStreaming} onAction={() => {}} />
   </NextIntlClientProvider>)
 }
+
+test('streaming Markdown is visible while incomplete OpenUI prefixes stay buffered', () => {
+  assert.match(render('A growing **reply**', 'en', true), /A growing <strong>reply<\/strong>/)
+  assert.equal(render('root = Sta', 'en', true), '')
+  assert.equal(render('BeQuestions(', 'en', true), '')
+  assert.doesNotMatch(render('root = Stack([TextContent("Growing")', 'en', true), /root =|TextContent\(/)
+})
 
 test('Report components parse, are detected as OpenUI and render through the real renderer', () => {
   for (const [name, source] of Object.entries(samples)) {
