@@ -3,7 +3,7 @@ import { before, beforeEach, mock, test } from 'node:test'
 
 // Settings › 账户 actions: each one reads the person from the session (never
 // from its input), validates on the server and returns a coded failure.
-type Session = { user: { id: string; email: string; name: string }; session: { id: string } }
+type Session = { user: { id: string; email: string; name: string }; session: { id: string; createdAt: Date; updatedAt?: Date } }
 let current: Session | null = null
 let accounts: { providerId: string }[] = []
 let authFailure: { body: { code: string } } | null = null
@@ -35,7 +35,7 @@ const calls = {
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 mock.module('next/headers', { namedExports: { headers: async () => new Headers({ cookie: 'session=x' }) } })
 mock.module('next-intl/server', { namedExports: { getTranslations: async () => (key: string, values?: Record<string, unknown>) => `${key}:${JSON.stringify(values ?? {})}` } })
-stub('../lib/auth.ts', { auth: { api: {
+stub('../lib/auth.ts', { auth: { $context: Promise.resolve({ sessionConfig: { freshAge: 24 * 60 * 60 } }), api: {
   getSession: async () => current,
   updateUser: calls.updateUser,
   listUserAccounts: async () => accounts,
@@ -56,7 +56,7 @@ stub('../lib/account/delete.ts', { deleteAccount: calls.deleteAccount })
 let account: typeof import('../app/actions/account')
 before(async () => { account = await import('../app/actions/account') })
 
-const ALICE: Session = { user: { id: 'alice', email: 'Alice@Example.com', name: 'Alice' }, session: { id: 'session-alice' } }
+const ALICE: Session = { user: { id: 'alice', email: 'Alice@Example.com', name: 'Alice' }, session: { id: 'session-alice', createdAt: new Date() } }
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])
 
 beforeEach(() => {
@@ -196,4 +196,11 @@ test('completed deletion forwards non-blocking provider warnings in its private 
   deletion = { ok: true, receipt: { id: 'private-job', warnings: ['subscription_upstream_revocation_not_supported_revoke_at_provider'] } }
   assert.deepEqual(await account.deleteAccount({ email: 'alice@example.com' }), { deleted: true, receipt: deletion.receipt })
   assert.equal(calls.signOut.mock.callCount(), 1)
+})
+
+test('deletion requires a fresh authoritative sign-in; recent session activity does not reauthenticate it', async () => {
+  current = { ...ALICE, session: { ...ALICE.session, createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), updatedAt: new Date() } }
+  assert.equal((await account.deleteAccount({ email: 'alice@example.com' })).error, 'SESSION_NOT_FRESH')
+  assert.equal(calls.deleteAccount.mock.callCount(), 0)
+  assert.equal(calls.signOut.mock.callCount(), 0)
 })

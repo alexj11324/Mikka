@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
+import { AccountAuthenticationError, requireFreshAccountSession } from '@/lib/account/fresh-session'
 import { cancelAccountDeletion, readAccountDeletionReceipt, requestAccountDeletion } from '@/lib/account/deletion-jobs'
 
 export const runtime = 'nodejs'
@@ -11,8 +12,12 @@ const requestBody = z.object({ email: z.string().trim().max(320), requestId: rec
 /** A caller keeps its private request UUID before POST so a lost response can be resumed. No ID appears in a URL. */
 export async function POST(request: Request) {
   if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'originNotAllowed' }, { status: 403, headers })
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user || !session.session) return Response.json({ error: 'authRequired' }, { status: 401, headers })
+  let session
+  try { session = await requireFreshAccountSession(request.headers) }
+  catch (error) {
+    if (error instanceof AccountAuthenticationError) return Response.json({ error: error.code }, { status: error.status, headers })
+    return Response.json({ error: 'accountDeletionUnavailable' }, { status: 503, headers })
+  }
   const input = requestBody.safeParse(await request.json().catch(() => null))
   if (!input.success || input.data.email.toLowerCase() !== session.user.email.toLowerCase()) return Response.json({ error: 'accountEmailMismatch' }, { status: 400, headers })
   try {

@@ -9,6 +9,7 @@ export const ACTION_ERROR_CODES = [
   'executionCommandNotFound',
   'executionAccountUnavailable',
   'authRequired',
+  'SESSION_NOT_FRESH',
   'validationGeneric',
   'issueToolsDisabled',
   'validationTitleRequired',

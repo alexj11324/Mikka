@@ -14,6 +14,7 @@ import { listSignedInDevices, sessionTokenFor, type SignedInDevice } from '@/lib
 import { EXPORT_LINK_TTL_MS, releaseExport, reserveExport } from '@/lib/account/export'
 import { accountMailConfigured, sendAccountMail } from '@/lib/account/mail'
 import { listSharedArtifacts, type SharedArtifactLink } from '@/lib/account/shared-links'
+import { AccountAuthenticationError, requireFreshAccountSession } from '@/lib/account/fresh-session'
 import { deleteAccount as deleteAccountData } from '@/lib/account/delete'
 
 const displayName = z.string().trim().min(1).max(80)
@@ -21,9 +22,12 @@ const displayName = z.string().trim().min(1).max(80)
 const password = z.string().min(8).max(128)
 
 /** The signed-in person and the session this request came with. Every action starts here; nothing trusts a user id from the client. */
-async function requireSession() {
+async function requireSession(fresh = false) {
   const requestHeaders = await headers()
-  const session = await auth.api.getSession({ headers: requestHeaders })
+  const session = fresh ? await requireFreshAccountSession(requestHeaders).catch(error => {
+    if (error instanceof AccountAuthenticationError) throw new ActionFailureError(error.code)
+    throw error
+  }) : await auth.api.getSession({ headers: requestHeaders })
   if (!session?.user || !session.session) throw new ActionFailureError('authRequired')
   return { user: session.user, session: session.session, headers: requestHeaders }
 }
@@ -203,7 +207,7 @@ export async function listSharedLinks(): Promise<ActionResult<{ links: SharedArt
  */
 export async function deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true; receipt?: { id: string; warnings: string[] } }>> {
   return runAction(async () => {
-    const { user, headers: requestHeaders } = await requireSession()
+    const { user, headers: requestHeaders } = await requireSession(true)
     const typed = z.object({ email: z.string().max(320) }).safeParse(input)
     if (!typed.success || typed.data.email.trim().toLowerCase() !== user.email.toLowerCase()) throw new ActionFailureError('accountEmailMismatch')
     const outcome = await deleteAccountData(user.id, user.email)

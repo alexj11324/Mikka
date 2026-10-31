@@ -136,7 +136,7 @@ explicit module fixtures; they are not deployed Mikka HTTP/provider acceptance.
 No customer data, real external authorization or production history was deleted.
 
 Still required before closing #213: full fixed-revision app HTTP acceptance,
-settings request/receipt status integration and fresh reauthentication policy,
+settings request/receipt status integration and reauthentication navigation,
 complete portable export coverage (files/harness checkpoints), real BYOS/cloud
 cleanup evidence, verified historical object inventory/lifecycle, current
 manifest backup drill, and the explicit retention/hold/backup policy above.
@@ -218,3 +218,39 @@ live, no duplicate disconnect revision, owner-only run/token fencing, pending
 creation retention, retry of failed kill and deletion of discovered snapshots.
 Worker/provider responses are explicit fixtures, not real external acceptance.
 No real external account, sandbox or snapshot was changed by these tests.
+
+
+## Existing fresh-session boundary for deletion (#213)
+
+The settings deletion action and `POST /api/account/deletion` now require the
+existing Better Auth fresh-session contract before calling any deletion code.
+`lib/auth.ts` configures session lifetime/update cadence but does not override
+`freshAge`; the installed Better Auth 1.7.12 resolves it to 86400 seconds.
+The helper reads `auth.$context.sessionConfig.freshAge` at runtime rather than
+introducing another product time limit. It also honors Better Auth's explicit
+server-side zero opt-out if that configuration is ever selected.
+
+The identity read disables cookie-cache reuse and session refresh. Freshness
+is measured from the server-issued `session.createdAt`; a current `updatedAt`
+cannot reauthenticate an old sign-in. Missing/invalid session times cannot
+approve deletion. Stale identity returns Better Auth's existing
+`SESSION_NOT_FRESH` code with HTTP 403, or the same recognized action error;
+there is no new password, token or authentication state machine.
+
+The private receipt only reads lifecycle. A known receipt/request UUID cannot
+use stale identity to start or renew deletion authority. Already approved
+background jobs continue under their durable request and existing workload
+credential; freshness is not reapplied as a new approval on every retry.
+Owner cancellation retains its existing session check because it does not
+create deletion authority or undo an irreversible stage.
+
+Occurrence 3/10, impact 10/10 (30): an older still-valid seven-day browser
+session previously sufficed for irreversible deletion using its visible account
+email. This is also an explicit #213 authorization requirement. Component tests
+use the real installed Better Auth context to verify its default and configured
+freshAge, plus explicit identity fixtures for stale/updated/fresh/missing
+sessions, authoritative query flags, both public start entry points, known
+receipt reuse and continued status/background access. These are 18 passing
+component tests, not fixed-revision application sign-in acceptance. The
+existing settings/design owner still needs to route `SESSION_NOT_FRESH` back
+through ordinary sign-in and restore the pending deletion intent visibly.

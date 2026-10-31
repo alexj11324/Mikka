@@ -1118,7 +1118,8 @@
     "e2bKeyRateLimited": "E2B 当前对该密钥限流，请几分钟后再试。",
     "tokenNotFound": "令牌不存在或已被撤销。",
     "tokenLimitReached": "你在当前工作区的有效令牌已达 50 个上限，请先撤销一个。",
-    "accountDeletionPending": "账户删除等待清理完成。"
+    "accountDeletionPending": "账户删除等待清理完成。",
+    "SESSION_NOT_FRESH": "请重新登录后删除账户。"
   },
   "Overview": {
     "sections": {
