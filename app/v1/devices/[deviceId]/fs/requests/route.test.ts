@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mock, test } from 'node:test'
+import { before, mock, test } from 'node:test'
 
 let signedIn = true, owned = true
 mock.module('next/server', { namedExports: { NextResponse: { json: Response.json } } })
@@ -11,7 +11,8 @@ mock.module(new URL('../../../../../../lib/device-route.ts', import.meta.url).hr
   withDeviceRoute: (handler: unknown) => handler,
 } })
 
-const { GET } = await import('./route')
+let GET: typeof import('./route')['GET']
+before(async () => { ({ GET } = await import('./route')) })
 
 test('only an authenticated owned FS poll is empty, and its logs contain no device or caller data', async () => {
   const lines: string[] = []

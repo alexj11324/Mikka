@@ -37,6 +37,10 @@ deployment alone does not update them.
 [runtime-monitors.json](runtime-monitors.json) records the configured definitions
 for project `mikka`. All four enable team-owner notifications. These initial
 thresholds are project policy and should be calibrated against observed traffic.
+The built-in Test Notification reached the owner's Vercel Web inbox on
+2026-10-31; Email was enabled, but mailbox receipt was not checked. This
+verifies notification routing, not a real threshold firing/recovery cycle.
+The temporary test monitor was deleted after the check.
 
 | Monitor | Evaluation | Native ID |
 | --- | --- | --- |

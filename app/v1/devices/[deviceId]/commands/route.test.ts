@@ -6,11 +6,11 @@ import type { RequestLogEntry } from '../../../../../lib/request-log'
 mock.module(new URL('../../../../../lib/db/index.ts', import.meta.url).href, {
   namedExports: { db: {}, pool: {} },
 })
-const actual = await import('../../../../../lib/device-link')
+let actual: typeof import('../../../../../lib/device-link')
 const authenticateDevice = mock.fn(async () => ({ userId: 'owner', tokenId: 'token' }) as object | null)
 const ownedDevice = mock.fn(async () => ({ id: 'device-1' }) as object | null)
 const pendingCommands = mock.fn(async () => [] as unknown[])
-const sleep = mock.fn(actual.sleep)
+const sleep = mock.fn(async (ms: number, signal?: AbortSignal) => actual.sleep(ms, signal))
 const logs: RequestLogEntry[] = []
 for (const method of ['log', 'warn', 'error'] as const) {
   mock.method(console, method, (line: string) => {
@@ -19,16 +19,19 @@ for (const method of ['log', 'warn', 'error'] as const) {
     if (entry.msg === 'api_request') logs.push(entry)
   })
 }
-mock.module(new URL('../../../../../lib/device-link.ts', import.meta.url).href, {
-  namedExports: { authenticateDevice, ownedDevice, pendingCommands, sleep, waitSeconds: actual.waitSeconds },
-})
 mock.module(new URL('../../../../../lib/device-route.ts', import.meta.url).href, {
   namedExports: { withDeviceRoute: (handler: unknown) => handler },
 })
 mock.module('next/server', { namedExports: { NextResponse: Response } })
 
 let GET: typeof import('./route')['GET']
-before(async () => { ({ GET } = await import('./route')) })
+before(async () => {
+  actual = await import('../../../../../lib/device-link')
+  mock.module(new URL('../../../../../lib/device-link.ts', import.meta.url).href, {
+    namedExports: { authenticateDevice, ownedDevice, pendingCommands, sleep, waitSeconds: actual.waitSeconds },
+  })
+  GET = (await import('./route')).GET
+})
 after(() => mock.restoreAll())
 beforeEach(() => {
   authenticateDevice.mock.resetCalls()

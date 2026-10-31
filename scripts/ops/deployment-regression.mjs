@@ -55,7 +55,7 @@ export function metricRows(response, metric) {
   for (const point of response.summary) {
     const row = point.dimensions
     // Only route templates and status codes leave the API boundary; never request paths or payloads.
-    if (typeof row?.route !== 'string' || !/^\/[A-Za-z0-9_./\[\]()-]{0,250}$/.test(row.route) ||
+    if (typeof row?.route !== 'string' || !/^\/[A-Za-z0-9_./[\]()-]{0,250}$/.test(row.route) ||
         !/^[1-5]\d\d$/.test(String(row.httpStatus))) fail('metric_dimensions_invalid')
     const value = point.values?.value
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || (metric === COUNT && !Number.isSafeInteger(value))) fail('metric_value_invalid')
