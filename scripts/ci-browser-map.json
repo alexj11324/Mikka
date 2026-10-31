@@ -309,6 +309,15 @@
         "bot-image-read.spec.ts",
         "e2b-machine-name.spec.ts"
       ]
+    },
+    {
+      "area": "ci-targeted-acceptance-probe",
+      "paths": [
+        "^lib/ci-targeted-acceptance-probe\\.ts$"
+      ],
+      "specs": [
+        "routes.spec.ts"
+      ]
     }
   ]
 }

@@ -1,0 +1,358 @@
+name: Temporary targeted PR serial baseline
+
+# Mechanical extraction of browser-pr from 0f3993ba5160e439f4f035ae69cbd8bcee25e0bc.
+# Disposable comparison workflow; NEVER MERGE. Keep on the temporary proof PR only.
+# Shared classification is copied from 9840b8254863c60220d8d9f8b81382c7c3bb76bf.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+env:
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+  # Ephemeral CI registration fixtures share one loopback IP. Keep finite
+  # limits while leaving the production defaults at 5 signups/IP/hour.
+  MIKKA_SIGNUP_IP_HOURLY: '1000'
+  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+  MIKKA_VERIFICATION_IP_HOURLY: '1000'
+  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+
+jobs:
+  changes:
+    name: Changed files
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      docs_only: ${{ steps.docs.outputs.docs_only }}
+      browser_tier: ${{ steps.docs.outputs.browser_tier }}
+      browser_specs: ${{ steps.docs.outputs.browser_specs }}
+      browser_performance: ${{ steps.docs.outputs.browser_performance }}
+      verify_selection: ${{ steps.docs.outputs.verify_selection }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - id: docs
+        env:
+          INTEGRATION_ACCEPTANCE: ${{ startsWith(github.head_ref, 'integrate/') }}
+        # Run the classifier from main, never from this checkout: a pull
+        # request must not be able to rewrite the script that skips its own
+        # required checks.
+        run: |
+          git fetch origin main --no-tags
+          trusted_dir="$(mktemp -d)"
+          trusted="$trusted_dir/ci-docs-only.mjs"
+          # Older trusted classifiers predate the data file; updated ones require it.
+          if git cat-file -e origin/main:scripts/ci-browser-map.json 2>/dev/null; then
+            git show origin/main:scripts/ci-browser-map.json > "$trusted_dir/ci-browser-map.json"
+          fi
+          echo "Retained trusted classifier: $trusted"
+          if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
+            echo "docs_only=false (classifier is not on main yet)"
+            {
+              echo "docs_only=false"
+              echo "browser_tier=full"
+              echo 'browser_specs=[]'
+              echo "browser_performance=true"
+              echo "verify_selection=true"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git diff --quiet origin/main -- scripts/ci-docs-only.mjs; then
+            # Fixed CI-only allowlist + mode checks from trusted main. A changed
+            # classifier never narrows its own run: CI-only edits take the smoke
+            # tier, anything else takes full, and a pull request validates the
+            # subsets as well.
+            node --input-type=module - "$trusted" <<'BROWSER_BOOTSTRAP'
+          import { execFileSync } from 'node:child_process'
+          import { appendFileSync, readFileSync } from 'node:fs'
+          import { pathToFileURL } from 'node:url'
+          const { isDocsOnly, hasUnsafeModes } = await import(pathToFileURL(process.argv[2]).href)
+          const infra = new Set([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/workflows/analytics-ssr.yml", ".github/actions/pnpm-install/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-browser-map.json", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
+          const pullRequest = process.env.GITHUB_EVENT_NAME === 'pull_request'
+          const integration = !pullRequest || process.env.INTEGRATION_ACCEPTANCE === 'true'
+          let ciOnly = false, performance = integration
+          try {
+            const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
+            const base = event.pull_request?.base?.sha, head = event.pull_request?.head?.sha
+            if (!base || !head || /^0+$/.test(base) || /^0+$/.test(head)) throw new Error('missing range')
+            const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+            const files = execFileSync('git', ['diff', '--no-renames', '-z', '--name-only', `${base}...${head}`], options).split('\0').filter(Boolean)
+            const raw = execFileSync('git', ['diff', '--no-renames', '-z', '--raw', '--no-abbrev', `${base}...${head}`], options)
+            ciOnly = !integration && files.length > 0 && !hasUnsafeModes(raw) && files.every(file => infra.has(file) || isDocsOnly([file]))
+            performance ||= files.some(file => ['tests/e2e/navigation-performance.spec.ts', 'tests/e2e/agent-performance.spec.ts'].includes(file))
+          } catch { /* Unknown ranges always run full functionality. */ }
+          const tier = ciOnly ? 'smoke' : 'full'
+          const outputs = `docs_only=false\nbrowser_tier=${tier}\nbrowser_specs=[]\nbrowser_performance=${performance}\nverify_selection=${pullRequest}\n`
+          appendFileSync(process.env.GITHUB_OUTPUT, outputs)
+          console.log(`Trusted policy bootstrap: ${tier}; performance=${performance}; verify subsets=${pullRequest}`)
+          BROWSER_BOOTSTRAP
+            exit 0
+          fi
+          node "$trusted"
+          if [ "$INTEGRATION_ACCEPTANCE" = "true" ]; then
+            # A consolidation must validate all functionality and performance
+            # before merge, even when the normal PR classifier is narrower.
+            {
+              echo "docs_only=false"
+              echo "browser_tier=full"
+              echo 'browser_specs=[]'
+              echo "browser_performance=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+  browser-pr:
+    # Pull request tier: one runner installs, builds, starts and runs the smoke
+    # set, the targeted specs and the runtime gates. No artifact round trip.
+    name: Baseline serial PR acceptance
+    needs: changes
+    if: ${{ !github.event.pull_request.draft && needs.changes.result == 'success' && needs.changes.outputs.docs_only == 'false' && needs.changes.outputs.browser_tier == 'targeted' && needs.changes.outputs.browser_specs == '["routes.spec.ts"]' && needs.changes.outputs.browser_performance == 'false' && needs.changes.outputs.verify_selection == 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      # Isolated Slack callback fixtures; these tests make no Slack API calls.
+      SLACK_BOT_TOKEN: ci-only-slack-bot-token
+      SLACK_SIGNING_SECRET: ci-only-slack-signing-secret
+      SLACK_APP_ID: A123
+      SLACK_TEAM_ID: T123
+      SLACK_BOT_USER_ID: U123
+      SLACK_USER_BINDINGS: '{"U456":"ci-only-mikka-user"}'
+      NEXT_TELEMETRY_DISABLED: '1'
+      # Cloudflare's documented public test site key (always passes). Baked into
+      # the build so the sign-up form renders the widget and sends a token; the
+      # matching test secret is given only to the keyed sign-up run below.
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          const secretsKey = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secretsKey}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `WORKSPACE_SECRETS_KEY=${secretsKey}\n`)
+          const cronSecret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${cronSecret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `CRON_SECRET=${cronSecret}\n`)
+          NODE
+      - name: Install Chromium and official system dependencies
+        timeout-minutes: 15
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Bootstrap empty database using tracked migrations only
+        run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
+        env:
+          MIGRATION_BOOTSTRAP_CI: '1'
+      - name: Apply tracked migrations to the disposable browser database
+        # The actual Coordinator needs the migration-owned indexes/constraints,
+        # including NULLS NOT DISTINCT chat keys; schema-only seeding is not enough.
+        run: pnpm migrate
+        env:
+          MIGRATE: '1'
+      - run: pnpm test:e2e:setup
+      - name: Bind the disposable test environment to the exact checkout
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Restore the Next.js build cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .next/cache
+          key: next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - name: Build the application (lint runs once, in the CI workflow's UI policy job)
+        run: |
+          node scripts/build-subscription-worker.mjs
+          pnpm generate:agent-ui
+          pnpm exec next build
+      - name: Test account allocation across independent PostgreSQL clients
+        run: pnpm test:test-accounts-db
+      - name: Factory HTTP regressions against the built application (no skips)
+        run: pnpm test:factory-http
+      - name: Real HTTP authentication, account reuse and isolation
+        run: node scripts/test-accounts/run-http.mjs
+      - name: MVP real-daemon core loop (smoke)
+        if: ${{ !cancelled() }}
+        run: |
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-mvp.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          pnpm test:e2e:mvp --grep @smoke > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
+        env:
+          MIKKA_TEST_MODE: '1'
+          MIKKA_MVP_E2E: '1'
+          MIKKA_ISSUE_TOOLS_ENABLED: '1'
+      - name: Audit MVP evidence before the remaining browser suite
+        id: mvp-evidence-audit
+        if: ${{ !cancelled() }}
+        run: |
+          node scripts/test-accounts/cli.mjs audit-evidence --evidence playwright-mvp-report
+          node scripts/test-accounts/cli.mjs audit-evidence --evidence mvp-test-results
+          node scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/e2e/playwright-mvp.log
+      - name: Preserve audited MVP evidence
+        if: ${{ !cancelled() && steps.mvp-evidence-audit.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mvp-test-report-${{ github.sha }}-pull-request
+          path: |
+            playwright-mvp-report/
+            mvp-test-results/
+            .cache/e2e/playwright-mvp.log
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+      - name: Browser smoke and targeted specs
+        if: ${{ !cancelled() }}
+        env:
+          BROWSER_TIER: targeted
+          BROWSER_SPECS: '["routes.spec.ts"]'
+          # The real Factory claim/race specs must exercise the installed
+          # lifecycle gates in this isolated process, not the default-off path.
+          MIKKA_FACTORY_ROUTING_ENABLED: '1'
+          MIKKA_FACTORY_LIFECYCLE_ENABLED: '1'
+        run: |
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-browser.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          node scripts/ci-browser-tests.mjs > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
+      - name: Sign-up through Cloudflare Turnstile with the public test keys
+        if: ${{ !cancelled() }}
+        run: |
+          # The keyed run needs a sign-up form that sends the token (#554). Until
+          # that is on the branch, the build has no widget and the run would
+          # only prove that a token-less sign-up is refused.
+          if ! grep -rqs --include='*.ts' --include='*.tsx' NEXT_PUBLIC_TURNSTILE_SITE_KEY components app lib; then
+            echo "::notice::The sign-up form does not read NEXT_PUBLIC_TURNSTILE_SITE_KEY yet; the keyed sign-up run starts once it does."
+            exit 0
+          fi
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-turnstile.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          node scripts/ci-browser-tests.mjs --turnstile > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
+      - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
+        if: ${{ !cancelled() && false }}
+        run: |
+          umask 077
+          mkdir -p .cache/e2e
+          log_file=.cache/e2e/playwright-performance.log
+          : > "$log_file"
+          chmod 600 "$log_file"
+          test_status=0
+          pnpm test:performance --output=performance-results > "$log_file" 2>&1 || test_status=$?
+          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
+            if [ "$test_status" -eq 0 ]; then test_status=1; fi
+            exit "$test_status"
+          fi
+          cat "$log_file"
+          exit "$test_status"
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
+      - name: Scan account evidence before artifact upload
+        id: account-evidence-audit
+        if: ${{ !cancelled() }}
+        run: node scripts/test-accounts/evidence.mjs
+      - name: Upload browser evidence
+        if: ${{ !cancelled() && steps.account-evidence-audit.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-test-report-pull-request-${{ github.sha }}
+          path: |
+            playwright-report/
+            test-results/
+            playwright-turnstile-report/
+            turnstile-results/
+            playwright-performance-report/
+            performance-results/
+            .cache/e2e/http-acceptance-summary.json
+            .cache/e2e/account-http-evidence.json
+            .cache/e2e/playwright-browser.log
+            .cache/e2e/playwright-turnstile.log
+            .cache/e2e/playwright-performance.log
+          # Only the explicit scanned paths above; never the private account directory.
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+
+  baseline-completed:
+    name: Baseline serial completed
+    needs: [changes, browser-pr]
+    if: ${{ !cancelled() && !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the exact baseline scope and serial result
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SERIAL_RESULT: ${{ needs.browser-pr.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          BROWSER_TIER: ${{ needs.changes.outputs.browser_tier }}
+          BROWSER_SPECS: ${{ needs.changes.outputs.browser_specs }}
+          BROWSER_PERFORMANCE: ${{ needs.changes.outputs.browser_performance }}
+          VERIFY_SELECTION: ${{ needs.changes.outputs.verify_selection }}
+        run: |
+          fail() { echo "$1"; exit 1; }
+          [ "$CHANGES_RESULT" = "success" ] || fail "Baseline classification did not succeed: $CHANGES_RESULT"
+          [ "$SERIAL_RESULT" = "success" ] || fail "Baseline serial acceptance did not succeed: $SERIAL_RESULT"
+          [ "$DOCS_ONLY" = "false" ] || fail "Baseline docs_only must be false: $DOCS_ONLY"
+          [ "$BROWSER_TIER" = "targeted" ] || fail "Baseline browser tier must be targeted: $BROWSER_TIER"
+          [ "$BROWSER_SPECS" = '["routes.spec.ts"]' ] || fail "Baseline browser specs differ: $BROWSER_SPECS"
+          [ "$BROWSER_PERFORMANCE" = "false" ] || fail "Baseline performance must be false: $BROWSER_PERFORMANCE"
+          [ "$VERIFY_SELECTION" = "false" ] || fail "Baseline selection validation must be false: $VERIFY_SELECTION"
