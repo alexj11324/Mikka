@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { inlineMarkdown, isComponent, openUIText, parseOpenUI, type Component } from './openui-lang'
+import { agentImageQuery } from './agent-images'
+import { inlineMarkdown, isComponent, isImageQuery, openUIText, parseOpenUI, type Component } from './openui-lang'
 
 const WELCOME = 'root = Stack([TextContent("你好，Alex！我是你的 Coordinator。"), BeQuestions("刚开始使用", [{id:"start", title:"想先从哪里开始？", options:[{value:"a", label:"整理收件箱"}, {value:"b", label:"看看今天的日程"}], allowCustom:true}])])'
 
@@ -42,4 +43,18 @@ test('chips become the chat\'s citation tokens and links', () => {
 test('text of a card: words, question, options; no ids or style words', () => {
   assert.equal(openUIText(parseOpenUI(WELCOME) ?? undefined), '你好，Alex！我是你的 Coordinator。\n想先从哪里开始？\n- 整理收件箱\n- 看看今天的日程')
   assert.equal(openUIText(parseOpenUI('root = Stack([ShadcnBadge("待评审", "secondary"), BeTodoList("计划", [{id:"one", title:"整理需求"}], "suggestion")])') ?? undefined), '待评审\n计划\n整理需求')
+})
+
+test('image cards get their named props; their text leaves out the search words', () => {
+  const root = parseOpenUI('root = BeCardGrid([a, b])\na = BeImageCard("故宫", "Forbidden City Beijing", "明清皇宫", ["历史"], "怎么逛故宫？")\nb = BeImage("Beijing hutong", "北京胡同", "南锣鼓巷")') as Component
+  const [card, figure] = root.props.children as Component[]
+  assert.deepEqual(card.props, { title: '故宫', query: 'Forbidden City Beijing', description: '明清皇宫', tags: ['历史'], prompt: '怎么逛故宫？' })
+  assert.deepEqual(figure.props, { query: 'Beijing hutong', alt: '北京胡同', caption: '南锣鼓巷' })
+  assert.equal(openUIText(root), '故宫\n明清皇宫\n南锣鼓巷')
+})
+
+test('image search words: the same rule as the server\'s agentImageQuery', () => {
+  for (const query of ['Forbidden City', '  故宫  ', 'a', ' a ', 'x'.repeat(160), 'x'.repeat(161), 'line\nbreak', '<b>', 'see https://a.b', 'HTTP://A.B', 'http:/ok']) {
+    assert.equal(isImageQuery(query), agentImageQuery.safeParse(query).success, JSON.stringify(query))
+  }
 })

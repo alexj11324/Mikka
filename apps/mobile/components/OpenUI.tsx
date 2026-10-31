@@ -1,10 +1,11 @@
 import { createContext, Fragment, useContext, useState } from 'react'
-import { Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { Image, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { ArrowUpRight, Check } from 'lucide-react-native'
 import { BotBubble } from '@/components/chat'
 import { CardButton, ChatCard, cardText } from '@/components/cards'
 import { Markdown } from '@/components/Markdown'
 import { Text } from '@/components/Text'
+import { useImage, type FoundImage } from '@/lib/images'
 import { arr, inlineMarkdown, isComponent, obj, openUIText, parseOpenUI, str, type Component, type Value } from '@/lib/openui'
 import type { CitationSource } from '@/lib/types'
 import { openOnWeb } from '@/lib/web'
@@ -63,6 +64,10 @@ function Node({ value }: { value: Value | undefined }) {
     case 'BeApproval': return <Approval value={value} />
     case 'BeFollowUps': return <FollowUps value={value} />
     case 'BeButton': return <PromptButton value={value} />
+    // One column: the web's grid only goes to two from 26rem, wider than a phone's reply.
+    case 'BeCardGrid': return <View style={styles.stack}><Node value={value.props.children} /></View>
+    case 'BeImageCard': return <ImageCard value={value} />
+    case 'BeImage': return <Figure value={value} />
     default: return <WebOnly text={openUIText(value)} />
   }
 }
@@ -257,6 +262,80 @@ function PromptButton({ value }: { value: Component }) {
   )
 }
 
+/**
+ * A picture found by its search words, 16:9 as on the web: grey while
+ * looking, nothing when there is none or it fails to load.
+ */
+function Picture({ image, alt }: { image: FoundImage | null | undefined; alt: string }) {
+  const [failed, setFailed] = useState<string | null>(null)
+  if (image === undefined) return <View accessibilityLabel={alt} accessibilityState={{ busy: true }} style={styles.picture} />
+  if (!image || failed === image.src) return null
+  return <Image source={{ uri: image.src }} accessibilityLabel={alt} resizeMode="cover" onError={() => setFailed(image.src)} style={styles.picture} />
+}
+
+/** Where a picture is from, as the web credits it; tapping opens its Wikimedia Commons page. */
+function Credit({ image }: { image: FoundImage }) {
+  return (
+    <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(image.source)} hitSlop={4}>
+      <Text style={[cardText.meta, { textDecorationLine: 'underline' }]}>Wikimedia Commons · {image.title}{image.author ? ` · ${image.author}` : ''} · {image.license}</Text>
+    </Pressable>
+  )
+}
+
+/**
+ * BeImageCard (web: agent-image-card.tsx): picture, title, description, tags,
+ * and 继续了解 sending the card's prompt. The credit folds under 图片来源与许可.
+ */
+function ImageCard({ value }: { value: Component }) {
+  const title = str(value.props.title)
+  const description = str(value.props.description)
+  const tags = arr(value.props.tags).map(str).filter(Boolean).slice(0, 3)
+  const prompt = str(value.props.prompt)
+  const image = useImage(str(value.props.query))
+  const { send, state, open } = useAnswer()
+  const [credit, setCredit] = useState(false)
+  return (
+    <ChatCard>
+      {image === null ? null : (
+        <View style={{ gap: 6 }}>
+          <Picture image={image} alt={title} />
+          {image ? (
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: credit }} onPress={() => setCredit(!credit)} hitSlop={4} style={{ alignSelf: 'flex-start' }}>
+              <Text style={cardText.meta}>图片来源与许可</Text>
+            </Pressable>
+          ) : null}
+          {image && credit ? <Credit image={image} /> : null}
+        </View>
+      )}
+      <View style={{ gap: 4 }}>
+        <Text style={cardText.title}>{title}</Text>
+        {description ? <Text style={[cardText.body, { color: colors.secondary }]}>{description}</Text> : null}
+      </View>
+      {tags.length ? <View style={styles.tags}>{tags.map((tag, index) => <Text key={index} style={styles.tag}>{tag}</Text>)}</View> : null}
+      {prompt ? (
+        <View style={{ alignItems: 'flex-start', gap: 6 }}>
+          <CardButton label={state === 'sent' ? '已提问' : '继续了解'} disabled={!open} busy={state === 'sending'} onPress={() => void send(prompt)} />
+          <Failed state={state} />
+        </View>
+      ) : null}
+    </ChatCard>
+  )
+}
+
+/** BeImage (web: agent-image.tsx), a single illustration: picture, caption, credit. */
+function Figure({ value }: { value: Component }) {
+  const caption = str(value.props.caption)
+  const image = useImage(str(value.props.query))
+  if (image === null && !caption) return null
+  return (
+    <View style={{ gap: 6 }}>
+      <Picture image={image} alt={str(value.props.alt)} />
+      {caption ? <Text style={cardText.meta}>{caption}</Text> : null}
+      {image ? <Credit image={image} /> : null}
+    </View>
+  )
+}
+
 /** A card the app cannot draw: its words, and the same chat on the web, signed in. */
 function WebOnly({ text }: { text: string }) {
   const { webPath, sources, onOpen } = useCard()
@@ -281,5 +360,8 @@ const styles = StyleSheet.create({
   input: { minHeight: 44, borderRadius: 10, backgroundColor: colors.bubble, paddingHorizontal: 12, fontSize: 15, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 },
   followUp: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bubble, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12 },
+  picture: { width: '100%', aspectRatio: 16 / 9, borderRadius: 10, backgroundColor: colors.bubble },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  tag: { fontSize: 12, lineHeight: 16, color: colors.secondary, backgroundColor: colors.bubble, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, overflow: 'hidden' },
   webLink: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
 })
