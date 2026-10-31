@@ -1,7 +1,18 @@
 name: Cloud computer backend
 on:
   push:
-    branches: ['codex/e2b-cloud-computer-172']
+    branches: [main]
+    paths: &computer_paths
+      - 'packages/daemon/**'
+      - 'packages/protocol/**'
+      - 'lib/computer/**'
+      - 'lib/cua/**'
+      - 'lib/cloud-computer/**'
+      - 'app/api/bots/**'
+      - 'scripts/e2b/**'
+      - '.github/workflows/cloud-computer.yml'
+  pull_request:
+    paths: *computer_paths
   workflow_dispatch:
 permissions:
   contents: read
@@ -55,32 +66,58 @@ jobs:
           COMPUTER_TEST_DATABASE_URL: postgresql://postgres:isolated-ci@localhost:5432/computer_test
       - run: node --test packages/daemon/src/computer/local-grant.test.mjs
       - run: cd packages/daemon && node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts
+        env:
+          NODE_ENV: test
+          MIKKA_TEST_MODE: '1'
   local-driver-linux:
     name: Local driver (Linux Xvfb)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
       - name: Install isolated X11 and pinned MIT driver
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y xvfb x11-utils x11-apps xdotool libxdo3
+          sudo apt-get install -y xvfb x11-utils x11-apps xdotool libxdo3 xterm
           mkdir -p "$RUNNER_TEMP/cua"
           curl -fL --retry 2 https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-linux-x86_64-binary.tar.gz -o "$RUNNER_TEMP/cua/driver.tar.gz"
           echo "31ab9709dd91ce73677e49b9f3e75c6f0d3e4d9625c286c9e58262bfbea698dd  $RUNNER_TEMP/cua/driver.tar.gz" | sha256sum --check --strict
           tar -xzf "$RUNNER_TEMP/cua/driver.tar.gz" -C "$RUNNER_TEMP/cua"
-      - name: Real driver through exact-operation broker
-        run: MIKKA_CUA_TEST_BINARY="$RUNNER_TEMP/cua/cua-driver" MIKKA_CUA_TEST_SCREENSHOT="$RUNNER_TEMP/cua/desktop.png" node --import tsx --test packages/daemon/src/computer/xvfb.test.mjs
+      - name: Real default-allow driver through the run broker
+        run: MIKKA_CUA_TEST_BINARY="$RUNNER_TEMP/cua/cua-driver" MIKKA_CUA_TEST_SCREENSHOT="$RUNNER_TEMP/cua/desktop.png" node --test packages/daemon/src/computer/xvfb.test.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: local-computer-linux-evidence
+          path: ${{ runner.temp }}/cua/desktop*.png
+          if-no-files-found: ignore
+
+  local-driver-macos:
+    name: Local driver (macOS permissions, nonblocking)
+    # The old issue explicitly makes hosted-runner Accessibility/Screen Recording nonblocking.
+    runs-on: macos-15
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install the pinned MIT standalone driver
+        run: |
+          mkdir -p "$RUNNER_TEMP/cua"
+          curl -fL --retry 2 https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-darwin-universal-binary.tar.gz -o "$RUNNER_TEMP/cua/driver.tar.gz"
+          echo "2bb8dc4a7e69185ffd04c4a9c0eab590bd2c54b72c2c1be13ab675be4f487732  $RUNNER_TEMP/cua/driver.tar.gz" | shasum -a 256 --check
+          tar -xzf "$RUNNER_TEMP/cua/driver.tar.gz" -C "$RUNNER_TEMP/cua"
+      - name: Observe native screenshot, input and click through the run broker
+        run: MIKKA_CUA_TEST_BINARY="$RUNNER_TEMP/cua/cua-driver" MIKKA_CUA_TEST_SCREENSHOT="$RUNNER_TEMP/cua/desktop.png" node --test packages/daemon/src/computer/xvfb.test.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: local-computer-macos-evidence
           path: ${{ runner.temp }}/cua/desktop*.png
           if-no-files-found: ignore
 
