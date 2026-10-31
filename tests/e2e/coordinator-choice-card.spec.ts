@@ -87,12 +87,13 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await page.goto(app('/?section=coordinator'))
     const card = page.getByRole('region', { name: 'Coordinator', exact: true }).getByRole('group', { name: /派不出去/ })
     const setup = card.getByRole('link', { name: /去设置 E2B 密钥/ })
-    await expect(setup).toHaveAttribute('href', /\/settings\?section=integrations$/)
+    await expect(setup).toHaveAttribute('href', /\/settings\?section=secrets$/)
     await expect(card.getByText(/Run on Mikka Cloud|在 Mikka Cloud 上运行/)).toHaveCount(0)
     await expect(card.getByRole('button', { name: /等它上线/ })).toBeEnabled()
     await shoot(page, testInfo, `choice-${viewport.name}-nokey`)
     await setup.click()
-    await expect(page).toHaveURL(/\/settings\?section=integrations/)
+    await expect(page).toHaveURL(/\/settings\?section=secrets/)
+    await expect(page.getByRole('heading', { level: 1, name: '密钥与环境', exact: true })).toBeVisible()
   })
 
   test(`after answering, the no-key option is a record, not a settings link (${viewport.name})`, async ({ page }) => {
