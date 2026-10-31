@@ -33,8 +33,10 @@ const buttonVariants = cva(
         "icon-xs":
           "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
         "icon-compact": "size-6",
+        // interface-design: a 28px target is too small for a finger, so on a coarse pointer an
+        // invisible 6px ring makes the hit area 40px without changing how the button looks.
         "icon-sm":
-          "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
+          "relative size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5",
         "icon-lg": "size-9",
       },
     },
