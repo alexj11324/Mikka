@@ -22,6 +22,17 @@ function StepIcon({ state }: { state: StepState }) {
   return <Circle aria-hidden="true" className="size-4 text-muted-foreground/60" />
 }
 
+/** #540 adds host details, the key type and cancel to the preload contract; older desktops send aliases only. */
+type SshHost = { alias: string; address: string | null }
+type SshInstallSnapshot = SshInstallState & { keyType?: string }
+type SshBridgeNext = NonNullable<NonNullable<ReturnType<typeof bridgeFromWindow>>['ssh']> & { cancel?: (id: string) => Promise<SshInstallState | null> }
+
+function sshHost(host: string | { alias: string; user?: string | null; hostName?: string | null; port?: number | null }): SshHost {
+  if (typeof host === 'string') return { alias: host, address: null }
+  const address = host.hostName ? `${host.user ? `${host.user}@` : ''}${host.hostName}${host.port && host.port !== 22 ? `:${host.port}` : ''}` : null
+  return { alias: host.alias, address }
+}
+
 /**
  * 添加设备 in the desktop app (Figma V09c 685:24728 → V09c-5 686:25550): pick a
  * host from `~/.ssh/config` or type one, trust its host key, and Mikka installs
@@ -36,7 +47,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
 }) {
   const t = useTranslations('Devices.ssh')
   const commonT = useTranslations('Common')
-  const [hosts, setHosts] = useState<string[] | null>(null)
+  const [hosts, setHosts] = useState<SshHost[] | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [other, setOther] = useState('')
   const [install, setInstall] = useState<SshInstallState | null>(null)
@@ -50,7 +61,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
     if (!open || !ssh) return
     let live = true
     setStartError(false)
-    void ssh.hosts().then(list => { if (live) setHosts(list) }, () => { if (live) setHosts([]) })
+    void ssh.hosts().then(list => { if (live) setHosts((list as (string | SshHost)[]).map(sshHost)) }, () => { if (live) setHosts([]) })
     void ssh.state().then(state => { if (live && state && state.status !== 'online') setInstall(state) }, () => {})
     const unsubscribe = ssh.onChange(state => {
       if (!live) return
@@ -73,6 +84,13 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
     if (!ssh || !install) return
     try { setInstall(await ssh.accept(install.id)) } catch { setStartError(true) }
   }
+  // #540: the bridge stops a running install; until it ships, 关闭 hides the dialog and the install goes on.
+  const canCancel = Boolean((bridgeFromWindow(typeof window === 'undefined' ? null : window as MikkaWindow)?.ssh as SshBridgeNext | undefined)?.cancel)
+  async function cancel() {
+    const ssh = bridgeFromWindow(window as MikkaWindow)?.ssh as SshBridgeNext | undefined
+    if (!ssh?.cancel || !install) return
+    try { setInstall(await ssh.cancel(install.id)) } catch { setStartError(true) }
+  }
   function close(next: boolean) {
     if (!next) {
       // A finished, failed or unconfirmed install starts over next time; a running one is restored.
@@ -91,7 +109,10 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
     <DialogContent closeLabel={commonT('close')} className="sm:max-w-md" aria-describedby={undefined}>
       {fingerprint ? <>
         <DialogHeader><DialogTitle>{t('trust', { host: install.target })}</DialogTitle></DialogHeader>
-        <p className="font-mono text-xs break-all text-muted-foreground">{install.fingerprint}</p>
+        <p className="flex flex-col gap-0.5 font-mono text-xs break-all text-muted-foreground">
+          {(install as SshInstallSnapshot).keyType && <span>{(install as SshInstallSnapshot).keyType} · {install.target}</span>}
+          <span>{install.fingerprint}</span>
+        </p>
         <DialogFooter>
           <Button variant="secondary" size="sm" onClick={() => setInstall(null)}>{t('cancel')}</Button>
           <Button size="sm" onClick={() => { void accept() }}>{t('trustContinue')}</Button>
@@ -105,7 +126,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
               <StepIcon state={state} />
               <span className={cn('shrink-0', state === 'pending' && 'text-muted-foreground')}>{t(`steps.${step}`)}</span>
               <span className="sr-only">{t(`stepState.${state}`)}</span>
-              {state === 'failed' && install.reason && <span className="ml-auto min-w-0 truncate text-xs text-destructive" title={install.reason}>{install.reason}</span>}
+              {state === 'failed' && install.reason && <span className="ml-auto min-w-0 truncate text-xs text-destructive" title={install.reason}>{install.reason === 'cancelled' ? t('cancelled') : install.reason}</span>}
               {step === 'online' && added && <span className="ml-auto"><AgentMarks harnesses={installedAgents(added.harnesses)} /></span>}
             </li>
           })}
@@ -114,7 +135,9 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
           {install.status === 'online'
             ? <Button size="sm" onClick={() => close(false)}>{t('done')}</Button>
             : <>
-              <Button variant="secondary" size="sm" onClick={() => close(false)}>{install.status === 'running' ? t('hide') : t('cancel')}</Button>
+              {install.status === 'running' && canCancel
+                ? <Button variant="secondary" size="sm" onClick={() => { void cancel() }}>{t('cancel')}</Button>
+                : <Button variant="secondary" size="sm" onClick={() => close(false)}>{install.status === 'running' ? t('hide') : t('cancel')}</Button>}
               {install.status === 'failed' && install.retryable !== false && <Button size="sm" disabled={starting} onClick={() => { void begin(install.target) }}>{t('retry')}</Button>}
             </>}
         </DialogFooter>
@@ -124,7 +147,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
           {hosts && hosts.length > 0 && <section className="flex flex-col gap-2">
             <h3 className="text-sm text-muted-foreground">{t('sshConfig')}</h3>
             <ItemGroup role="listbox" aria-label={t('sshConfig')} className="max-h-64 gap-0! overflow-y-auto rounded-lg border">
-              {hosts.map((host, index) => {
+              {hosts.map(({ alias: host, address }, index) => {
                 const exists = addedHost(host, devices)
                 const active = selected === host && !other.trim()
                 return <Fragment key={host}>
@@ -133,7 +156,10 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
                     render={<Button variant="ghost" disabled={exists} onClick={() => { setSelected(host); setOther('') }} />}
                     className={cn('h-auto w-full justify-start gap-2.5 rounded-none px-3 py-2.5 font-normal', active && 'bg-muted')}>
                     <TerminalSquare aria-hidden="true" className="text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate text-left font-mono text-xs">{host}</span>
+                    <span className="flex min-w-0 flex-1 flex-col text-left">
+                      <span className="truncate text-sm">{host}</span>
+                      {address && <span className="truncate font-mono text-xs text-muted-foreground">{address}</span>}
+                    </span>
                     {exists ? <span className="text-xs text-muted-foreground">{t('added')}</span> : active && <Check aria-hidden="true" />}
                   </Item>
                 </Fragment>

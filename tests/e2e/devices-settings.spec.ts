@@ -72,7 +72,7 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
 
   await row(page, 'dev-vps').getByRole('button', { name: 'dev-vps 的更多操作' }).click()
   await page.getByRole('menuitem', { name: '移除设备' }).click()
-  await expect(page.getByRole('alertdialog', { name: '移除「dev-vps」？' })).toBeVisible()
+  await expect(page.getByRole('alertdialog', { name: '移除「dev-vps」？' })).toContainText('也会卸载 dev-vps 上的 daemon')
   await page.getByRole('button', { name: '移除', exact: true }).click()
   await expect(page.getByText('dev-vps', { exact: true })).toHaveCount(0)
   await expect.poll(async () => (await db().query('SELECT "removedAt" IS NOT NULL AS removed FROM devices WHERE id = $1', [ids.bare])).rows[0]?.removed).toBe(true)
@@ -93,7 +93,8 @@ test('设备（桌面版）：从 SSH 配置选主机，确认指纹，看安装
       app: { runtime: 'electron', version: 'e2e', flavor: 'dev', serverUrl: location.origin, zeroUrl: location.origin, openExternal: noop, prepareAuth: noop },
       notifications: { setBadge: noop, show: noop, onClick: () => () => {}, consumePendingClick: async () => null },
       ssh: {
-        hosts: async () => ['build-01', 'build-02', 'staging'],
+        // #540 shape: host details; the dialog also accepts bare aliases from older desktops.
+        hosts: async () => [{ alias: 'build-01', user: 'alex', hostName: 'build-01', port: 22 }, { alias: 'build-02', user: 'alex', hostName: '10.0.4.12', port: 22 }, 'staging'],
         state: async () => null,
         onChange: (listener: (state: unknown) => void) => { listeners.add(listener); return () => listeners.delete(listener) },
         begin: async (target: string) => {
@@ -115,6 +116,7 @@ test('设备（桌面版）：从 SSH 配置选主机，确认指纹，看安装
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('option', { name: /build-01/ })).toBeDisabled()
   await expect(dialog.getByRole('option', { name: /build-01/ })).toContainText('已添加')
+  await expect(dialog.getByRole('option', { name: /build-02/ })).toContainText('alex@10.0.4.12')
   await dialog.getByRole('option', { name: /build-02/ }).click()
   await dialog.getByRole('button', { name: '添加', exact: true }).click()
 

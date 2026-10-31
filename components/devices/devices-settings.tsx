@@ -129,11 +129,15 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t('remove.title', { name: device.name })}</AlertDialogTitle>
-          <AlertDialogDescription>{t('remove.description')}</AlertDialogDescription>
+          <AlertDialogDescription>{device.online ? t('remove.uninstall', { name: device.name }) : t('remove.offline', { name: device.name })}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{t('remove.cancel')}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => { void run(() => removeDevice(device.id), () => setRemoving(false)) }}>{t('remove.confirm')}</AlertDialogAction>
+          <AlertDialogAction variant="destructive" onClick={() => { void run(() => removeDevice(device.id), () => {
+            setRemoving(false)
+            // #536 adds the outcome; an older backend answers without it.
+            if (device.online) toast.success(t('remove.uninstalling', { name: device.name }))
+          }) }}>{t('remove.confirm')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
