@@ -310,7 +310,7 @@ export const agents = pgTable('agents', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('agents_user_name_key').on(table.userId, sql`lower(${table.name})`), index('agents_device_idx').on(table.deviceId)])
 
-export const RUN_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing', 'succeeded', 'stopped', 'failed', 'cancelled'] as const
+export const RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing', 'succeeded', 'stopped', 'failed', 'cancelled'] as const
 export type RunStatus = (typeof RUN_STATUSES)[number]
 
 /** One execution of one agent. The daemon claims it, runs it and reports back. */
@@ -325,6 +325,8 @@ export const agentRuns = pgTable('agent_runs', {
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
+  pauseReason: text('pauseReason').$type<'human_control' | null>(),
+  resumeStatus: text('resumeStatus').$type<RunStatus | null>(),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),
   /** Caller-supplied retry identity, scoped to userId. Null for older dispatchers. */

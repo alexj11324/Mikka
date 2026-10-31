@@ -1,9 +1,15 @@
-name: Publish daemon (manual)
+name: Publish daemon
 
-# Manual main-only release. The npm trusted publisher must be configured
-# separately before this workflow can publish.
+# Keep this filename: npm trusted publishing authorizes this workflow identity.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: publish-daemon
+  queue: max
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -18,7 +24,7 @@ jobs:
   publish:
     if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
       id-token: write
@@ -34,7 +40,12 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           cache: pnpm
+      - run: npm install --global npm@11.19.0
+      - name: Prepare release version and check registry
+        id: release
+        run: node packages/daemon/scripts/release.mjs
       - run: pnpm install --frozen-lockfile
+      - run: node --test packages/daemon/test/release.node-test.mjs
       - run: pnpm --filter @mikka/daemon typecheck
       - name: Prepare pinned hosted-runner test image
         run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
@@ -44,6 +55,12 @@ jobs:
       - run: pnpm --filter @mikka/daemon test:package
         env:
           MIKKA_DAEMON_DIST_DIR: ${{ steps.daemon-package.outputs.package-directory }}
+          RELEASE_EXPECTED_SHA: ${{ github.sha }}
       - name: Publish with npm trusted publishing and provenance
+        if: steps.release.outputs.published != 'true'
         working-directory: ${{ steps.daemon-package.outputs.package-directory }}
-        run: npm publish --access public --provenance
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          npm publish --access public --provenance --tag "$RELEASE_TAG"
+          node "$GITHUB_WORKSPACE/packages/daemon/scripts/release.mjs" --verify

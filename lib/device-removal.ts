@@ -9,7 +9,7 @@ import { DEVICE_UNINSTALL_GRACE_MS, enqueueDeviceCommand } from '@/lib/device-ma
 export const DEVICE_NAME_MAX = 60
 
 /** Run states where the daemon may still be working on the device. */
-const LIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
+const LIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
 
 export function parseDeviceName(name: unknown): string {
   if (typeof name !== 'string') throw new ActionFailureError('validationNameRequired')

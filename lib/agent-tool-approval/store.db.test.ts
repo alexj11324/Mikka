@@ -2,7 +2,7 @@ import { after, before, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 import { AgentToolApprovalStore } from './store'
 import { readCliRunPolicy, readCliAgentPolicy } from './policy-store'
 import { acquireWorkspaceMembership } from '../workspace-membership-guard'
@@ -151,4 +151,60 @@ test('unbound workers configure safely and only owned cloud devices receive open
  assert.equal((await readCliAgentPolicy(pool,user,worker,null,guard)).policy.permissions.network,'deny')
  await pool.query('UPDATE devices SET "ownerId"=$2 WHERE id=$1',[device,'someone-else'])
  await assert.rejects(readCliAgentPolicy(pool,user,worker,null,guard),/agentPolicyUnavailable/)
+})
+
+
+test('policy changes and live tool checks share run-before-policy lock order', { timeout: 10000 }, async () => {
+  const current = await readCliRunPolicy(pool,runId,actor.userId)
+  let checkLocked!: () => void, settingsLockingRun!: () => void
+  const held = new Promise<void>(resolve => { checkLocked=resolve })
+  const setting = new Promise<void>(resolve => { settingsLockingRun=resolve })
+  const instrument = (query: (client:PoolClient,args:unknown[]) => Promise<unknown>) => ({ connect: async () => {
+    const client = await pool.connect()
+    return new Proxy(client, { get(target,key) {
+      if (key === 'query') return (...args:unknown[]) => query(target,args)
+      const value = Reflect.get(target,key,target)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
+  } })
+  const checks = instrument(async (client,args) => {
+    const result = await Reflect.apply(client.query,client,args)
+    if (String(args[0]).startsWith('SELECT id FROM agent_runs') && String(args[0]).includes('FOR UPDATE')) {
+      checkLocked()
+      await setting
+    }
+    return result
+  })
+  const settings = instrument(async (client,args) => {
+    if (/FROM agent_runs WHERE id=\$1 AND "userId"=\$2 FOR (SHARE|UPDATE)/.test(String(args[0]))) settingsLockingRun()
+    return Reflect.apply(client.query,client,args)
+  })
+  const checking = new AgentToolApprovalStore({...checks,query:pool.query.bind(pool)}).checkState(actor,runId,current.revision)
+  await held
+  const changing = setCliPolicy(settings,actor.userId,runId,'worker',current.revision,current.layers.worker)
+  const results = await Promise.allSettled([checking,changing])
+  assert.deepEqual(results.map(result => result.status === 'fulfilled' ? 'ok' : (result.reason as {code?:string}).code),['ok','ok'])
+})
+
+test('human control preserves pending approval and existing lease, then expires through the existing liveness poll', async () => {
+  await pool.query(`ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "resumeStatus" text, ADD COLUMN "updatedAt" timestamptz`)
+  await pool.query(`CREATE TABLE computer_run_bindings ("runId" uuid, "botId" uuid, "ownerId" text, "workspaceId" uuid);
+    CREATE TABLE bot_desktops ("botId" uuid, "ownerId" text, "workspaceId" uuid, control text, "controlUntil" timestamptz)`)
+  const bot = randomUUID(), workspace = randomUUID()
+  await pool.query(`INSERT INTO computer_run_bindings VALUES ($1,$2,$3,$4)`, [runId,bot,actor.userId,workspace])
+  await pool.query(`INSERT INTO bot_desktops VALUES ($1,$2,$3,'user',now()+interval '5 minutes')`, [bot,actor.userId,workspace])
+  await pool.query(`UPDATE agent_runs SET status='running',"stopRequestedAt"=NULL,"leaseExpiresAt"=now()+interval '1 hour' WHERE id=$1`, [runId])
+  const revision = (await readCliRunPolicy(pool,runId,actor.userId)).revision
+  const approval = await store.propose(actor,{ ...payload('pause-boundary'),policyRevision:revision })
+  await pool.query(`UPDATE agent_runs SET status='paused',"pauseReason"='human_control',"resumeStatus"='running' WHERE id=$1`, [runId])
+  const lease = (await pool.query('SELECT "leaseExpiresAt" FROM agent_runs WHERE id=$1',[runId])).rows[0].leaseExpiresAt
+  assert.deepEqual(await store.checkState(actor,runId,revision),{live:true,paused:true})
+  assert.equal(await store.take(actor,runId,approval.id,approval.digest),'pending')
+  assert.equal((await pool.query('SELECT status FROM agent_tool_approvals WHERE id=$1',[approval.id])).rows[0].status,'pending')
+  await pool.query(`UPDATE bot_desktops SET "controlUntil"=now()-interval '1 second' WHERE "botId"=$1`, [bot])
+  assert.deepEqual(await store.checkState(actor,runId,revision),{live:true,paused:false})
+  const resumed = (await pool.query('SELECT status,"pauseReason","resumeStatus","leaseExpiresAt" FROM agent_runs WHERE id=$1',[runId])).rows[0]
+  assert.deepEqual(resumed,{status:'running',pauseReason:null,resumeStatus:null,leaseExpiresAt:lease})
+  await store.decide(actor.userId,runId,approval.id,approval.digest,'approve')
+  assert.equal(await store.take(actor,runId,approval.id,approval.digest),'allow')
 })

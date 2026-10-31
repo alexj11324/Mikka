@@ -113,7 +113,24 @@ export class HttpServerLink implements ServerLink {
     const liveness = new AbortController()
     const gate = new ToolApprovalGate(assignment.runId, {
       permission: request => toolApprovalDecision(request, assignment.policy, worktree),
-      isLive: async () => { try { check(); const current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean() }), signal:liveness.signal, timeoutMs:5000 }); check(); return current.live } catch { return false } },
+      // Keep the callback pending at the tool boundary. The adapter's current
+      // session and checkpoint remain intact; handback resolves this same call.
+      isLive: async () => {
+        try {
+          for (;;) {
+            check()
+            const current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean(), paused: z.boolean().optional() }), signal:liveness.signal, timeoutMs:5000 })
+            check()
+            if (!current.live || !current.paused) return current.live
+            await new Promise<void>((resolve, reject) => {
+              const stop = () => { clearTimeout(timer); reject(new Error('cancelled')) }
+              const timer = setTimeout(() => { liveness.signal.removeEventListener('abort',stop); resolve() },1000)
+              liveness.signal.addEventListener('abort',stop,{once:true})
+              if (liveness.signal.aborted) stop()
+            })
+          }
+        } catch { return false }
+      },
       ask: async (request, signal) => {
         const delay = () => new Promise<void>((resolve, reject) => {
           const done = () => { signal.removeEventListener('abort', stop); resolve() }
@@ -128,9 +145,11 @@ export class HttpServerLink implements ServerLink {
             catch (error) { if (signal.aborted || !(error instanceof ServerUnreachableError)) throw error; await delay() }
           }
         }
+        if (!await gate.checkLive()) return 'deny'
         const created = await retry(() => this.call('POST', path, { body: { operation: 'propose', deviceId: assignment.deviceId, policyRevision, requestId: request.requestId, harness: request.harness, method: request.method, input: request.input }, schema: proposal, signal }))
         try {
           for (;;) {
+            if (!await gate.checkLive()) return 'deny'
             const result = await retry(() => this.call('POST', path, { body: { operation: 'take', deviceId: assignment.deviceId, id: created.id, digest: created.digest }, schema: response, signal }))
             if (result.decision !== 'pending') return result.decision
             await delay()

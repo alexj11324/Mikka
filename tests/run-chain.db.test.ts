@@ -39,9 +39,12 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Chain CI worker\')', [agentId, userId, deviceId])
     return { userId, agentId, issue: () => issue(userId) }
   }
+  const issueNumbers = new Map<string, number>()
   async function issue(userId: string, scope = 'personal') {
     const id = randomUUID()
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope,"scopeSetBy") VALUES ($1,$2,\'Chain task\',$4,\'todo\',\'normal\',$3,\'user\')', [id, userId, scope, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1 } }, content: [] })])
+    const number = (issueNumbers.get(userId) ?? 0) + 1
+    issueNumbers.set(userId, number)
+    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope,"scopeSetBy") VALUES ($1,$2,\'Chain task\',$4,\'todo\',\'normal\',$3,\'user\')', [id, userId, scope, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [] })])
     return id
   }
   let clock = Date.parse('2026-10-01T00:00:00Z')
