@@ -16,6 +16,6 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: 'invalidRequest' }, { status: 400 })
   const value = parsed.data; const store = new AgentToolApprovalStore(pool)
   try {
-    return Response.json(value.operation === 'list' ? { requests: await store.list(session.user.id, value.runId) } : await store.decide(session.user.id, value.runId, value.id, value.digest, value.decision), { headers: { 'cache-control': 'no-store' } })
+    return Response.json(value.operation === 'list' ? { requests: await store.list(session.user.id, value.runId) } : await store.decide(session.user.id, value.runId, value.id, value.digest, value.decision, { name: session.user.name || session.user.id }), { headers: { 'cache-control': 'no-store' } })
   } catch { return Response.json({ error: 'approvalUnavailable' }, { status: 409 }) }
 }

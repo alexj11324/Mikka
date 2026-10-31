@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { test, expect, register } from './fixtures'
 
-// R-37 and decisions.md 2026-10-31 (segmented control motion): the selected mark of a segmented
+// R-37 and docs/design/decisions/2026-10-31-1814-segmented-control-motion.md: the selected mark of a segmented
 // control is one rounded pill per group that glides to the clicked item on a spring, and lands
 // at once when the OS asks for reduced motion. Checked on 偏好设置 › 界面主题.
 

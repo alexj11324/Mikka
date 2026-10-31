@@ -134,7 +134,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   const shown = tabs.includes(tab) ? tab : 'threads'
 
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
-  // The panel keeps its transparent pills while Alex compares them with the shared segmented control (decisions.md 2026-10-31);
+  // The panel keeps its transparent pills while Alex compares them with the shared segmented control (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md);
   // `indicator: false` opts out of the gliding pill. To switch, drop `pillTab` and the list overrides.
   const pillTab = { className: pill, indicator: false }
   // R-37: opening, closing and widening move the width on a spring; while the edge is dragged
