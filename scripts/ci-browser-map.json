@@ -34,6 +34,7 @@
     "members.spec.ts",
     "mobile-handoff.spec.ts",
     "plugins-page.spec.ts",
+    "question-card.spec.ts",
     "settings.spec.ts",
     "settings-background-polling.spec.ts",
     "sign-out.spec.ts",
@@ -207,7 +208,8 @@
         "issue-threads.spec.ts",
         "thread-question.spec.ts",
         "coordinator-choice-card.spec.ts",
-        "coordinator-scroll.spec.ts"
+        "coordinator-scroll.spec.ts",
+        "question-card.spec.ts"
       ]
     },
     {
@@ -297,11 +299,13 @@
       "paths": [
         "^lib\\/agent-ui[-.]",
         "^lib\\/legacy-chat-content\\.ts$",
-        "^components\\/workspace\\/agent-(?:ui-library|generative-ui|theme|chart|report|editable-table|text-bubble|decision|citations)\\.tsx$"
+        "^components\\/workspace\\/agent-(?:ui-library|generative-ui|theme|chart|report|editable-table|text-bubble|decision|citations)\\.tsx$",
+        "^components\\/agents\\/approval-card\\/"
       ],
       "specs": [
         "agent.spec.ts",
         "coordinator-choice-card.spec.ts",
+        "question-card.spec.ts",
         "bot-image-read.spec.ts",
         "e2b-machine-name.spec.ts"
       ]
