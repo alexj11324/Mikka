@@ -1869,7 +1869,11 @@
       "copy": "复制",
       "copied": "已复制",
       "rowMenu": "{label} 的更多操作",
-      "callbackPlaceholder": "http://localhost:54545/callback?code=…"
+      "callbackPlaceholder": "http://localhost:54545/callback?code=…",
+      "paused": "已暂停",
+      "useSubscription": "使用 {label}",
+      "pauseFailed": "无法更改这个订阅。",
+      "claudePlan": "Claude {plan}"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",

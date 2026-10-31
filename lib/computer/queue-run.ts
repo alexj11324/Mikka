@@ -29,7 +29,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3
         AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
         AND EXISTS (SELECT 1 FROM byos_bindings s JOIN byos_connections c ON c.id=s."connectionId" AND c."ownerId"=s."ownerId"
-          AND c."workspaceId"=s."workspaceId" AND c.state='connected' AND c.epoch=s."connectionRevision"
+          AND c."workspaceId"=s."workspaceId" AND c.state='connected' AND c.paused=false AND c.epoch=s."connectionRevision"
           WHERE s.id=(SELECT latest.id FROM byos_bindings latest WHERE latest."ownerId"=b."ownerId" AND latest."consumerId"=a.id::text
             AND latest.route=CASE a.harness WHEN 'codex' THEN 'codex_cli' WHEN 'claude_code' THEN 'claude_code_cli' ELSE '' END
             ORDER BY latest."createdAt" DESC,latest.id DESC LIMIT 1) AND s."workspaceId"=b."workspaceId"::text)`,

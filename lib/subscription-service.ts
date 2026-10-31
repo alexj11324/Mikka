@@ -30,6 +30,7 @@ export class SubscriptionService {
     if (binding.workspaceId !== use.workspaceId || binding.consumerId !== use.consumerId) throw new SubscriptionRefusal('binding_mismatch')
     await this.workspace(use.ownerId, binding.workspaceId)
     const row = await this.repository.connection(use.ownerId, binding.connectionId)
+    if (row.paused) throw new SubscriptionRefusal('account_unavailable')
     const revision = Number(row.epoch)
     const readiness = this.capabilities.ready(binding.route) ? 'ready' : 'unavailable'
     const baseQuota = { vendor: row.provider === 'codex' ? 'codex' : 'claude_code', status: 'unknown', source: 'local_credentials', plan: null, observedAt: new Date().toISOString(), windows: [] }
@@ -44,6 +45,7 @@ export class SubscriptionService {
     }
     // Re-read after async quota probing: disconnect/reconnect must win.
     const current = await this.repository.connection(use.ownerId, row.id)
+    if (current.paused) throw new SubscriptionRefusal('account_unavailable')
     return {
       binding,
       credentialTransition: current.state === 'refreshing' ? 'refreshing' : current.state === 'publication_pending' ? 'publication_pending' : undefined,

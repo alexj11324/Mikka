@@ -30,8 +30,13 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 	var route, boundModel, state string
 	var current int64
 	var quota []byte
-	err := w.Repo.DB.QueryRowContext(ctx, `select b.route,b."modelId",c.state,c.epoch,c.quota from byos_bindings b join byos_connections c on c.id=b."connectionId" where b.id=$1 and b."consumerId"=$2 and b."ownerId"=$3 and b."workspaceId"=$4 and c.id=$5 and c."ownerId"=$3 and c."workspaceId"=$4 and c.provider=$6 and b."connectionRevision"=$7 and c.epoch=$7`, w.Use.BindingID, w.Use.ConsumerID, w.Scope.OwnerID, w.Scope.WorkspaceID, w.Scope.ConnectionID, w.Scope.Provider, epoch).Scan(&route, &boundModel, &state, &current, &quota)
+	var paused bool
+	err := w.Repo.DB.QueryRowContext(ctx, `select b.route,b."modelId",c.state,c.epoch,c.quota,c.paused from byos_bindings b join byos_connections c on c.id=b."connectionId" where b.id=$1 and b."consumerId"=$2 and b."ownerId"=$3 and b."workspaceId"=$4 and c.id=$5 and c."ownerId"=$3 and c."workspaceId"=$4 and c.provider=$6 and b."connectionRevision"=$7 and c.epoch=$7`, w.Use.BindingID, w.Use.ConsumerID, w.Scope.OwnerID, w.Scope.WorkspaceID, w.Scope.ConnectionID, w.Scope.Provider, epoch).Scan(&route, &boundModel, &state, &current, &quota, &paused)
 	if err != nil || current != epoch || (state != "connected" && state != "refreshing" && state != "publication_pending") {
+		return ErrUnavailable
+	}
+	// 暂停 also ends a stream in progress: native_active rechecks here.
+	if paused && execution != "quota" {
 		return ErrUnavailable
 	}
 	expected := w.Scope.Provider + "_cpa"

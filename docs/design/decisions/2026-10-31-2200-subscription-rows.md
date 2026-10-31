@@ -19,3 +19,9 @@ never in the menu of a healthy connection: starting it clears the stored
 credential at once, so one stray click would lose a working subscription.
 
 Accepted frames: Figma page 733:28177 (states 1 to 7).
+
+A connected row has a switch, as Comma's Profile row (Alex: 「你确实应该加个
+switch，可以选择暂停或者不用」). Off keeps the connection and its quota on screen,
+shows 已暂停, and Bots stop using it from their next model call. It is a column,
+not a state, because refresh, usage reads and disconnect still need 已连接.
+The row names the Claude plan when the account profile gives one.

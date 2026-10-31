@@ -1869,7 +1869,11 @@
       "copy": "Copy",
       "copied": "Copied",
       "rowMenu": "More for {label}",
-      "callbackPlaceholder": "http://localhost:54545/callback?code=…"
+      "callbackPlaceholder": "http://localhost:54545/callback?code=…",
+      "paused": "Paused",
+      "useSubscription": "Use {label}",
+      "pauseFailed": "The subscription could not be changed.",
+      "claudePlan": "Claude {plan}"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",

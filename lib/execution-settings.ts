@@ -61,7 +61,7 @@ export class ExecutionSettings {
   ): Promise<ExecutionRule> {
     const places = await this.places(scope, query);
     const models = await this.botModels(scope, query);
-    const providers = (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected'`,[scope.ownerId,scope.workspaceId])).rows;
+    const providers = (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected' AND paused=false`,[scope.ownerId,scope.workspaceId])).rows;
     const preferred = providers.some((m) => m.provider === "claude")
       ? "claude_code"
       : providers.some((m) => m.provider === "codex")
@@ -313,7 +313,7 @@ export class ExecutionSettings {
         if (value.place === "cloud") {
           const models = await client.query(
             `SELECT b.id FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId"
-            AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected'
+            AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
             WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b."modelId"=$3 AND c.provider=CASE WHEN $4='claude_code' THEN 'claude' WHEN $4='codex' THEN 'codex' END`,
             [scope.ownerId, scope.workspaceId, value.model, value.harness],
           );
@@ -440,7 +440,7 @@ export class ExecutionSettings {
       await query.query(
         `SELECT b.id AS "bindingId",b."consumerId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan
        FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
-       AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected'
+       AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
        WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
        AND ($3::uuid IS NULL OR b.id=$3)
        AND ($3::uuid IS NOT NULL OR c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId") ORDER BY b."createdAt" DESC,b.id`,
@@ -470,7 +470,7 @@ export class ExecutionSettings {
   async refreshBotModels(scope: ExecutionSettingsScope, connectionId: string, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
     if (!z.uuid().safeParse(connectionId).success) throw new ActionFailureError("executionAccountUnavailable");
     const connection = (await this.pool.query(
-      `SELECT id,epoch,provider FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND state='connected'`,
+      `SELECT id,epoch,provider FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND state='connected' AND paused=false`,
       [connectionId, scope.ownerId, scope.workspaceId])).rows[0];
     if (!connection) throw new ActionFailureError("executionAccountUnavailable");
     let models: {id: string; name?: string}[];
@@ -482,7 +482,7 @@ export class ExecutionSettings {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      const current = await client.query(`SELECT id FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND state='connected' FOR UPDATE`, [connectionId,scope.ownerId,scope.workspaceId,connection.epoch]);
+      const current = await client.query(`SELECT id FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND state='connected' AND paused=false FOR UPDATE`, [connectionId,scope.ownerId,scope.workspaceId,connection.epoch]);
       if (!current.rowCount) throw new ActionFailureError("executionAccountUnavailable");
       for (const model of unique) {
         if (!z.string().trim().min(1).max(128).safeParse(model.id).success) throw new ActionFailureError("executionModelUnknown");
@@ -551,7 +551,7 @@ export class ExecutionSettings {
       `INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
       SELECT $1,b."ownerId",b."workspaceId",$2::text,b."connectionId",b."connectionRevision",b.route,b."modelId" FROM byos_bindings b
       JOIN bots bot ON bot.id=$2::uuid AND bot."ownerId"=$3 AND bot."workspaceId"=$4::uuid
-      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected'
+      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
       WHERE b.id=$5 AND b."ownerId"=$3 AND b."workspaceId"=$4::text ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id RETURNING id`,
       [id, botId, scope.ownerId, scope.workspaceId, bindingId],
     );

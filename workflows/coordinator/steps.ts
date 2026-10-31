@@ -439,7 +439,7 @@ export async function listBotSubscriptions(userId: string, input: { botId: strin
   const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
   if (!bot) return { error: 'cloudComputerUnavailable' }
   try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId) } catch { return { error: 'cloudComputerUnavailable' } }
-  const rows = (await pool.query(`SELECT id,provider,epoch FROM byos_connections WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected' ORDER BY "createdAt",id LIMIT 50`, [userId, bot.workspaceId])).rows
+  const rows = (await pool.query(`SELECT id,provider,epoch FROM byos_connections WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected' AND paused=false ORDER BY "createdAt",id LIMIT 50`, [userId, bot.workspaceId])).rows
   return rows.map(row => ({ connectionId: row.id, provider: row.provider, revision: Number(row.epoch) }))
 }
 

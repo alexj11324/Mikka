@@ -587,3 +587,28 @@ func TestPersistentUsage401NeverRefreshesOrStopsTheConnection(t *testing.T) {
 		})
 	}
 }
+
+func TestUsageNamesClaudePlanOnlyFromKnownProfileLabels(t *testing.T) {
+	for organization, want := range map[string]string{"claude_max": "Max", "claude_pro": "Pro", "unexpected<b>": "", "": ""} {
+		t.Run("type "+organization, func(t *testing.T) {
+			w, _, _ := fixtureWorker(t, "claude")
+			initial := mustAcquire(t, w)
+			w.Use = nil
+			usage := usageAnswer("claude", func(string) bool { return false })
+			w.QuotaClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				if request.URL.Path != "/api/oauth/profile" {
+					return usage.Transport.RoundTrip(request)
+				}
+				raw, _ := json.Marshal(map[string]any{"organization": map[string]any{"organization_type": organization}})
+				return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(raw)), Header: http.Header{}}, nil
+			})}
+			result, err := w.Usage(context.Background(), initial.Revision)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Plan != want || result.Status != 200 {
+				t.Fatalf("plan %q status %d, want %q", result.Plan, result.Status, want)
+			}
+		})
+	}
+}

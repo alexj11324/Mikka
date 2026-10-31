@@ -72,3 +72,24 @@ test('Connect is offered only when the sign-in runtime exists, not just custody'
   assert.deepEqual((await (await list(false)).json()).providers, [{ provider: 'codex', available: false }, { provider: 'claude', available: false }])
   assert.deepEqual((await (await list(true)).json()).providers, [{ provider: 'codex', available: true }, { provider: 'claude', available: true }])
 })
+
+test('pause reaches the repository with the owner and needs no provider call', async () => {
+  const calls: unknown[][] = [], worker: string[] = []
+  const service = {
+    capabilities: {},
+    repository: {
+      connection: async () => ({ id: connectionId, workspaceId, provider: 'claude', epoch: '1' }),
+      scope: () => ({}),
+      setPaused: async (...args: unknown[]) => { calls.push(args) },
+    },
+    worker: () => ({ call: async (method: string) => { worker.push(method); return {} } }),
+  } as unknown as SubscriptionService
+  const http = subscriptionHTTP({ session: async () => ({ userId: 'user-1', sessionId: 's' }), workspace: async () => undefined, service: () => service, log: () => undefined })
+  const send = (body: unknown) => http(new Request('https://mikka.test/api/subscriptions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }))
+  const response = await send({ action: 'pause', connectionId, paused: true })
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { id: connectionId, paused: true })
+  assert.deepEqual(calls, [['user-1', connectionId, true]])
+  assert.deepEqual(worker, [])
+  assert.notEqual((await send({ action: 'pause', connectionId, paused: 'yes' })).status, 200)
+})

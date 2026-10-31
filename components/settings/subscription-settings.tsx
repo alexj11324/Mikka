@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
+import { Switch } from '@/components/ui/switch'
 import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { BotAvatar } from '@/components/nav/bot-avatar'
@@ -169,6 +170,11 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     try { await post({ action: 'disconnect', connectionId: connection.id, revision: connection.revision }); await refresh(); setNotice(t('disconnectedNotice')) }
     catch { setError({ provider: connection.provider, message: t('disconnectFailed') }) } finally { setPending(false) }
   }
+  async function setPaused(connection: { id: string; provider: Provider }, paused: boolean) {
+    setPending(true); setError(null); setNotice('')
+    try { await post({ action: 'pause', connectionId: connection.id, paused }); await refresh() }
+    catch { setError({ provider: connection.provider, message: t('pauseFailed') }) } finally { setPending(false) }
+  }
   async function remove(connection: { id: string; provider: Provider; revision: number }) {
     setPending(true); setError(null); setNotice('')
     try { await post({ action: 'remove', connectionId: connection.id, revision: connection.revision }); await refresh() }
@@ -214,10 +220,11 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
                 // reauth: the runtime's own reconnect_required, or the provider refused this read.
                 const reauth = connection.state === 'reconnect_required' || read?.status === 'reauth'
                 const refused = read?.status === 'extra_usage' || read?.status === 'unverified'
-                const healthy = live && !reauth && !refused
+                const paused = connection.paused === true
+                const healthy = live && !reauth && !refused && !paused
                 const account = read?.account ?? connection.account ?? null
                 const plan = read?.plan ? t('codexPlan', { plan: read.plan }) : null
-                const product = provider === 'codex' ? plan ?? t('codexProduct') : t('claudeProduct')
+                const product = provider === 'codex' ? plan ?? t('codexProduct') : read?.plan ? t('claudePlan', { plan: read.plan }) : t('claudeProduct')
                 const bots = connection.bots ?? []
                 const signingIn = starting?.id === connection.id || attempt?.connectionId === connection.id
                 const canReconnect = available && !pending && !attempt
@@ -232,11 +239,12 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
                     </div>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:justify-end">
                       <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
-                        <span aria-hidden="true" className={cn('size-1.5 rounded-full', healthy ? 'bg-success' : reauth || refused ? 'bg-warning' : 'bg-muted-foreground')} />
-                        {reauth ? t('reauth') : refused ? t('notInUse') : live ? t('connected') : t('notConnected')}
+                        <span aria-hidden="true" className={cn('size-1.5 rounded-full', healthy ? 'bg-success' : reauth || (refused && !paused) ? 'bg-warning' : 'bg-muted-foreground')} />
+                        {reauth ? t('reauth') : paused ? t('paused') : refused ? t('notInUse') : live ? t('connected') : t('notConnected')}
                       </span>
                       {mine?.connectionId === connection.id && catching && <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>{t('cancel')}</Button>}
                       {(reauth || !live || signingIn) && <SignInButton busy={signingIn} disabled={!canReconnect} label={t('reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection) }} />}
+                      {live && !reauth && !signingIn && <Switch checked={!paused} disabled={pending || !!attempt} aria-label={t('useSubscription', { label: account ?? product })} onCheckedChange={checked => { void setPaused(connection, !checked) }} />}
                       <DropdownMenu>
                         <DropdownMenuTrigger disabled={pending || !!attempt} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { label: account ?? product })} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
