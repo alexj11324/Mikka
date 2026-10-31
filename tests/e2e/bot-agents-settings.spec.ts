@@ -148,7 +148,7 @@ test('Bot 与 Agents：规则标签从工作区已有标签中选，标签带颜
   await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
 })
 
-test('Bot 与 Agents：没有绑定订阅时，Coordinator 和每个 Bot 都显示 Mikka Cloud', async ({ page }) => {
+test('Bot 与 Agents：没有绑定订阅时，Coordinator 和每个 Bot 都显示 Mikka 默认', async ({ page }) => {
   await register(page, '/settings?section=bots')
   await expect(page.getByRole('heading', { level: 1, name: 'Bot 与 Agents' })).toBeVisible()
   await expect(page.getByRole('button', { name: '添加规则', exact: true })).toBeVisible()
@@ -167,7 +167,7 @@ test('Bot 与 Agents：没有绑定订阅时，Coordinator 和每个 Bot 都显�
   await page.reload()
 
   for (const name of ['Coordinator', 'E2E 新 Bot', 'E2E 断开 Bot']) {
-    await expect(page.locator(`[data-bot="${name}"]`).getByRole('button', { name: `${name} 模型：Mikka Cloud`, exact: true })).toBeVisible()
+    await expect(page.locator(`[data-bot="${name}"]`).getByRole('button', { name: `${name} 模型：Mikka 默认`, exact: true })).toBeVisible()
   }
   await expect(page.getByRole('main').getByText('未连接账号')).toHaveCount(0)
 })

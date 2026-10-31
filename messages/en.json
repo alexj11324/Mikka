@@ -2338,6 +2338,7 @@
         "model": "Model",
         "actions": "Actions"
       },
+      "hostedDefault": "Mikka Default",
       "defaults": "Task defaults",
       "whenQuotaExhausted": "When quota runs out",
       "quotaStop": "Stop and wait for me",

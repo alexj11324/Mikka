@@ -60,7 +60,7 @@ test('Coordinator without a subscription freezes and resolves the configured hos
   assert.deepEqual(hostedCalls, [[scope, COORDINATOR_MODEL]])
 })
 
-test('a saved choice whose account is gone, with no subscription bound, replies on Mikka Cloud', async () => {
+test('a saved choice whose account is gone, with no subscription bound, replies on Mikka 默认', async () => {
   // The Settings page showed 未连接账号 and these bots refused (binding_required) instead of replying.
   selected = id(9)
   available = []
@@ -80,7 +80,7 @@ test('Bot without a subscription replies on the same hosted default as the Coord
   assert.deepEqual(hostedCalls, [[bot, COORDINATOR_MODEL]])
 })
 
-test('a saved choice whose account is gone switches to a bound subscription, Claude first, not Mikka Cloud', async () => {
+test('a saved choice whose account is gone switches to a bound subscription, Claude first, not Mikka 默认', async () => {
   const dependencies = {
     service: () => ({ repository: {
       binding: async () => ({ ...binding }),

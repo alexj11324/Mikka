@@ -346,8 +346,8 @@ test(
       await settings.setBotModel(alice,revokedBot,catalogue.bindingId);
       const { rows: [revoked] } = await pool.query('UPDATE byos_connections SET state=$2 WHERE id=(SELECT "connectionId" FROM byos_bindings WHERE id=$1) RETURNING id,state',[catalogue.bindingId,'disconnected']);
       const others = await pool.query(`UPDATE byos_connections SET state='disconnected' WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected' RETURNING id`,[alice.ownerId,alice.workspaceId]);
-      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:revokedBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'a saved choice whose account was disconnected, with nothing else bound, replies on Mikka Cloud');
-      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'the Coordinator with no bound subscription replies on Mikka Cloud');
+      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:revokedBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'a saved choice whose account was disconnected, with nothing else bound, replies on Mikka 默认');
+      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'the Coordinator with no bound subscription replies on Mikka 默认');
       await pool.query(`UPDATE byos_connections SET state='connected' WHERE id=ANY($1::uuid[])`,[[revoked.id,...others.rows.map(row=>row.id)]]);
       sessionOwner = null;
       await assert.rejects(actions.listExecutionRules());

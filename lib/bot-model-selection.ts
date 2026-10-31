@@ -21,7 +21,7 @@ export async function freezeBotModel(
   const selected = await settings.botModel(settingsScope, scope.botId);
   const available = await settings.botModels(settingsScope);
   // A saved choice whose account was disconnected or signed in again is no longer bound:
-  // take a bound subscription (Claude first), otherwise Mikka Cloud (decision 2026-10-31-2110).
+  // take a bound subscription (Claude first), otherwise Mikka 默认, the hosted model (decision 2026-10-31-2110).
   const binding =
     (selected ? await settings.botBinding(settingsScope, selected) : undefined) ??
     available.find((row) => row.provider === "claude") ??

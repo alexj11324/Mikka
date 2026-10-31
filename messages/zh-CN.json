@@ -2338,6 +2338,7 @@
         "model": "模型",
         "actions": "操作"
       },
+      "hostedDefault": "Mikka 默认",
       "defaults": "任务默认",
       "whenQuotaExhausted": "额度用完时",
       "quotaStop": "停下等我",
