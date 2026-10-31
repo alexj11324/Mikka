@@ -3,7 +3,7 @@
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { AgentTextBubble } from './agent-text-bubble'
 import { useIsStreaming } from '@openuidev/react-lang'
-import { CircleCheck, CircleHelp, Code, ListTodo, LoaderCircle, MessageSquareText, Quote, Sparkles } from 'lucide-react'
+import { Bot, CircleCheck, CircleHelp, Code, ListTodo, LoaderCircle, MessageSquareText, Quote } from 'lucide-react'
 import { StreamingResponse } from '@/components/agents/streaming-response'
 import { AgentMarkdown } from './agent-markdown'
 import { AgentCodeBlock } from './agent-code-block'
@@ -15,7 +15,7 @@ export const AgentCodeContent: AgentComponentRenderers['BeCodeBlock'] = ({ props
   return <AgentCodeBlock {...props} isStreaming={isStreaming} />
 }
 
-const icons = { assistant: Sparkles, reply: MessageSquareText, approve: CircleCheck, question: CircleHelp, progress: LoaderCircle, task: ListTodo, code: Code, source: Quote }
+const icons = { assistant: Bot, reply: MessageSquareText, approve: CircleCheck, question: CircleHelp, progress: LoaderCircle, task: ListTodo, code: Code, source: Quote }
 
 export const AgentTextContent: AgentComponentRenderers['TextContent'] = ({ props }) => {
   const isStreaming = useIsStreaming()
