@@ -167,3 +167,37 @@ owner's policy/hold controls remain required. Cross-database member/permission
 writes still use log-only `recordAuditSafe`; its durable event delivery and the
 full event catalogue/failure paths remain concrete #210 gaps, so this component
 work alone does not justify closing #210.
+
+### Owner-bound external cleanup follow-up
+
+The account adapter now drives each BYOS connection through its existing
+owner-checked repository, worker `disconnect`, connection-scoped `cleanup` and
+`status`; it never invokes the global cleanup batch. It verifies all that
+connection's custody/enrollment artifacts are acknowledged, keeps unresolved
+mappings, and explicitly reports `subscription_provider_revocation_unavailable`
+because the actual worker contract is `providerRevocation: not_implemented`.
+Vault cleanup is not upstream OAuth revocation. Empty never-authorized local
+connection rows do not require a nonexistent remote resource cleanup.
+
+Dedicated thread machines use the existing owner/workspace-bound `end` path,
+including its run/token fence, recording finalization and acknowledged kill.
+Owner filters exclude peer machines. Pending creation leases remain pending
+including an `ended` row with an unresolved worker lease. An acknowledged
+provider NotFound for the already-owned sandbox is an idempotent delete result.
+No new recording/object is accepted after the account write barrier; account
+deletion intentionally discards that person's remaining capture contents.
+The shared Bot-machine lifecycle and provider snapshots have no existing
+owner teardown entry point, so their references stay and report
+`cloud_runtime_cleanup_required` / `cloud_snapshot_cleanup_required`; the
+adapter does not kill an entire shared workspace on one member's behalf.
+Remote adapters also reject a caller-supplied database target that differs from
+the server's credential scope; isolated restoration uses explicit local replay.
+
+Real PostgreSQL component tests verify owner-only BYOS fencing/custody
+acknowledgment while peers stay connected, preservation of the unresolved
+revocation mapping/user/job, retries without a duplicate disconnect revision,
+owner-only thread selection, pending-creation retention and shared machine/
+snapshot blockers. Worker/kill responses in these component tests are explicit
+fixtures, not real provider acceptance. The unimplemented upstream revocation,
+shared-machine/snapshot teardown and real external acceptance remain blockers;
+no account deletion is reported completed while any of them is unresolved.
