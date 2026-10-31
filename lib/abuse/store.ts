@@ -3,7 +3,6 @@ import type { Pool, PoolClient } from 'pg'
 import {
   abuseLimits,
   FREE_ALLOWANCE_MICRO_USD,
-  HOSTED_CALL_RESERVATION,
   MICRO_USD_PER_POINT,
   PaidResourceError,
 } from './policy'
@@ -76,13 +75,16 @@ export class HostedUsageStore {
     })
   }
   async balance(workspaceId: string, tx: Query = this.pool) {
+    // Already-incurred debt offsets unused free credit as well. Clamping each
+    // bucket independently must not turn an overdraft into new spending power.
     const {
       rows: [row],
     } = await tx.query(
-      `SELECT
+      `WITH balances AS (SELECT
       (EXISTS(SELECT 1 FROM hosted_verifications WHERE "workspaceId"=$1) OR EXISTS(SELECT 1 FROM workspace_credit_grants WHERE "workspaceId"=$1 AND bucket='purchased' AND points>0)) AS verified,
-      COALESCE((SELECT remaining FROM hosted_allowances WHERE "workspaceId"=$1),0)::float8 AS free,
-      GREATEST(0,COALESCE((SELECT sum(points)*$2 FROM workspace_credit_grants WHERE "workspaceId"=$1 AND bucket='purchased'),0)-COALESCE((SELECT sum("purchasedMicroUsd"+CASE WHEN state IN ('pending','unknown') THEN "reservedPurchased" ELSE 0 END) FROM hosted_usage WHERE "workspaceId"=$1),0))::float8 AS purchased`,
+      COALESCE((SELECT remaining FROM hosted_allowances WHERE "workspaceId"=$1),0) AS free,
+      COALESCE((SELECT sum(points)*$2 FROM workspace_credit_grants WHERE "workspaceId"=$1 AND bucket='purchased'),0)-COALESCE((SELECT sum("purchasedMicroUsd"+CASE WHEN state IN ('pending','unknown') THEN "reservedPurchased" ELSE 0 END) FROM hosted_usage WHERE "workspaceId"=$1),0) AS purchased)
+      SELECT verified,GREATEST(0,free+LEAST(0,purchased))::float8 AS free,GREATEST(0,purchased)::float8 AS purchased FROM balances`,
       [workspaceId, MICRO_USD_PER_POINT],
     )
     return row as { verified: boolean; free: number; purchased: number }
@@ -102,7 +104,8 @@ export class HostedUsageStore {
     model: string,
     id: string,
     env: Record<string, string | undefined> = process.env,
-    maximumCost = HOSTED_CALL_RESERVATION,
+    // Compatibility for older callers; estimates never reserve or gate money.
+    _maximumCost?: number,
   ) {
     return this.transaction(async (tx) => {
       // One short platform admission lock; no SQL lock spans provider I/O.
@@ -128,8 +131,6 @@ export class HostedUsageStore {
         ).rowCount
       )
         throw new PaidResourceError('usage_in_progress')
-      if (!Number.isSafeInteger(maximumCost) || maximumCost < 1)
-        throw new Error('invalid_usage_reservation')
       const limit = abuseLimits(env)
       const spent = Number(
         (
@@ -138,21 +139,13 @@ export class HostedUsageStore {
           )
         ).rows[0].n,
       )
-      let free = Math.min(balance.free, maximumCost)
-      // While paused, purchased points still work without consuming free credit.
-      if (spent + (free > 0 ? maximumCost : 0) > limit.dailyMicroUsd) {
-        if (balance.purchased <= 0)
-          throw new PaidResourceError('platform_paused')
-        free = 0
-      }
-      const purchased = Math.min(balance.purchased, maximumCost - free)
+      if (spent >= limit.dailyMicroUsd && balance.purchased <= 0)
+        throw new PaidResourceError('platform_paused')
+      // This existing row claims only the concurrency slot and receipt identity.
+      // No money is frozen, prepaid or estimated before provider execution.
       await tx.query(
-        'UPDATE hosted_allowances SET remaining=remaining-$2 WHERE "workspaceId"=$1',
-        [workspaceId, free],
-      )
-      await tx.query(
-        `INSERT INTO hosted_usage (id,"workspaceId",model,state,"reservedFree","reservedPurchased","reservedUnpaid") VALUES ($1,$2,$3,'pending',$4,$5,$6)`,
-        [id, workspaceId, model, free, purchased, free > 0 ? maximumCost : 0],
+        `INSERT INTO hosted_usage (id,"workspaceId",model,state) VALUES ($1,$2,$3,'pending')`,
+        [id, workspaceId, model],
       )
       return { id, workspaceId }
     })
@@ -175,7 +168,7 @@ export class HostedUsageStore {
       ).rows[0]
       if (!row || row.state === 'settled' || row.state === 'failed') return
       await this.lock(tx, row.workspaceId)
-      // Unknown cost never means free. Retain the reservation and block further
+      // Unknown cost never means free. Retain the receipt record and block further
       // workspace calls until the receipt is reconciled using this same method.
       if (cost === null) {
         await tx.query(
@@ -187,13 +180,18 @@ export class HostedUsageStore {
       if (!Number.isSafeInteger(cost) || cost < 0)
         throw new Error('invalid_usage_cost')
       const available = await this.balance(row.workspaceId, tx)
+      // Old rows may already have debited free credit or frozen purchased points.
+      // Settle those exact rows without charging their prepaid money twice.
+      const legacy = Number(row.reservedFree) > 0 || Number(row.reservedPurchased) > 0 || Number(row.reservedUnpaid) > 0
+      const spent = Number((await tx.query(`SELECT COALESCE(sum("unpaidMicroUsd"+CASE WHEN state IN ('pending','unknown') THEN "reservedUnpaid" ELSE 0 END),0) AS n FROM hosted_usage WHERE "createdAt">now()-interval '24 hours'`)).rows[0].n)
+      const useFree = legacy ? Number(row.reservedFree) > 0 : spent < abuseLimits().dailyMicroUsd
       const free =
-        Number(row.reservedFree) > 0
+        useFree
           ? Math.min(cost, Number(row.reservedFree) + available.free)
           : 0
       const purchased = cost - free
       const unpaid =
-        Number(row.reservedFree) > 0
+        useFree
           ? free +
             Math.max(
               0,

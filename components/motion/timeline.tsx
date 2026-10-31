@@ -97,6 +97,8 @@ export interface TimelineProps {
   formatDate?: (date: Date) => string;
   formatYear?: (date: Date) => string;
   "aria-label"?: string;
+  /** Mikka: screen-reader keyboard hint, so the host can translate it. */
+  keyboardHint?: string;
   className?: string;
 }
 
@@ -388,6 +390,7 @@ export function Timeline({
   formatDate = defaultFormatDate,
   formatYear = defaultFormatYear,
   "aria-label": ariaLabel = "Timeline",
+  keyboardHint = "Use the left and right arrow keys to move between events.",
   className,
 }: TimelineProps) {
   const reduce = useReducedMotion() ?? false;
@@ -674,7 +677,7 @@ export function Timeline({
       style={{ height }}
     >
       <p id={hintId} className="sr-only">
-        Use the left and right arrow keys to move between events.
+        {keyboardHint}
       </p>
       {years
         ? yearMarks.map((mark) => (

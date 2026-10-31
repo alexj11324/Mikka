@@ -14,7 +14,7 @@ import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session
 import { assertMvpEnvironment, MVP_SERVICES, REPOSITORY, REPOSITORY_KEY } from './isolated-env.mjs'
 import { RepositoryCache } from '../../packages/daemon/src/repositories'
 import { finishMvpResources, indexMvpResource } from './retention.mjs'
-import { seedMvpSubscription } from './subscription.mjs'
+import { seedMvpSubscription, seedMvpExecutionRule } from './subscription.mjs'
 import { HostedUsageStore } from '../../lib/abuse/store'
 
 const execute = promisify(execFile)
@@ -138,6 +138,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     expect(device!.protocolVersion).toBeGreaterThanOrEqual(3)
     await indexMvpResource('device-id', device!.id)
     await expect.poll(async () => (await pool.query('SELECT id FROM agents WHERE "userId" = $1 AND "deviceId" = $2 AND harness = $3', [user.id, device!.id, 'mock'])).rowCount).toBe(1)
+    await seedMvpExecutionRule(pool,user.id,subscription.workspaceId,device!.id)
     await service('/scenario/device', { deviceId: device!.id })
     checkpoint('daemon-registered', 'Real daemon logged in, registered and exposed its mock harness')
     const dialog = await openCreateIssue(page)

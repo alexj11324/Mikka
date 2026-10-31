@@ -105,12 +105,12 @@ export async function retryLinearIssue(issueId: string) {
     // Never relabel a retired claim as current work. Supersede any stale open
     // row before inserting into the issue-wide partial unique index.
     await tx.update(linearSyncOutbox).set({ status: 'done', claimToken: null, updatedAt: new Date() })
-      .where(and(eq(linearSyncOutbox.issueId, issue.id), sql`${linearSyncOutbox.scopeVersion} <> ${latest.scopeVersion}`, sql`${linearSyncOutbox.status} in ('queued', 'processing')`))
+      .where(and(eq(linearSyncOutbox.issueId, issue.id), sql`${linearSyncOutbox}.operation = 'sync'`, sql`${linearSyncOutbox.scopeVersion} <> ${latest.scopeVersion}`, sql`${linearSyncOutbox.status} in ('queued', 'processing')`))
     const [open] = await tx.select({ id: linearSyncOutbox.id }).from(linearSyncOutbox)
-      .where(and(eq(linearSyncOutbox.issueId, issue.id), eq(linearSyncOutbox.scopeVersion, latest.scopeVersion), sql`${linearSyncOutbox.status} in ('queued', 'processing')`)).limit(1)
+      .where(and(eq(linearSyncOutbox.issueId, issue.id), sql`${linearSyncOutbox}.operation = 'sync'`, eq(linearSyncOutbox.scopeVersion, latest.scopeVersion), sql`${linearSyncOutbox.status} in ('queued', 'processing')`)).limit(1)
     if (!open) {
       const [failed] = await tx.select({ id: linearSyncOutbox.id }).from(linearSyncOutbox)
-        .where(and(eq(linearSyncOutbox.issueId, issue.id), eq(linearSyncOutbox.status, 'failed'), eq(linearSyncOutbox.scopeVersion, latest.scopeVersion))).orderBy(desc(linearSyncOutbox.updatedAt)).limit(1)
+        .where(and(eq(linearSyncOutbox.issueId, issue.id), sql`${linearSyncOutbox}.operation = 'sync'`, eq(linearSyncOutbox.status, 'failed'), eq(linearSyncOutbox.scopeVersion, latest.scopeVersion))).orderBy(desc(linearSyncOutbox.updatedAt)).limit(1)
       if (failed) await tx.update(linearSyncOutbox).set({ status: 'queued', claimToken: null, attempts: 0, availableAt: new Date(), lastError: null, updatedAt: new Date() }).where(eq(linearSyncOutbox.id, failed.id))
       else await tx.insert(linearSyncOutbox).values({ id: crypto.randomUUID(), issueId: issue.id, scopeVersion: latest.scopeVersion }).onConflictDoNothing()
     }

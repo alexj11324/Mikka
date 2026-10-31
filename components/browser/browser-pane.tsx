@@ -254,7 +254,7 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
   const tool = (label: string, icon: ReactNode, props: { onClick?: () => void; disabled?: boolean; pressed?: boolean }) =>
     <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', props.pressed && pressed)} aria-label={label} aria-pressed={props.pressed} disabled={props.disabled} onClick={props.onClick} />}>{icon}</TooltipTrigger><TooltipContent side="bottom">{label}</TooltipContent></Tooltip>
 
-  return <aside aria-label={t('label')} data-slot="browser-pane" className="flex min-h-0 w-140 max-w-[50%] shrink-0 flex-col border-l">
+  return <aside aria-label={t('label')} data-slot="browser-pane" className="flex min-h-0 w-140 max-w-[50%] shrink-0 flex-col border-l bg-background">
     <div className="flex h-11 shrink-0 items-center gap-0.5 px-2">
       {tool(t('back'), <ArrowLeft data-icon="inline-start" />, { onClick: () => go(-1), disabled: history.index <= 0 })}
       {tool(t('forward'), <ArrowRight data-icon="inline-start" />, { onClick: () => go(1), disabled: history.index >= history.entries.length - 1 })}

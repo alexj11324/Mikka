@@ -6,6 +6,7 @@ let enabled = false
 let unavailable = false
 let reads = 0
 let claims = 0
+let archivePolls = 0
 let syncs = 0
 let finishClaimed = false
 let finished = 0
@@ -37,8 +38,13 @@ before(async () => {
       } }) }
     }, transaction: unexpected },
     pool: { connect: async () => {
-      claims++
-      return { query: async (query: string) => {
+      return { query: async (query: string, params?: unknown[]) => {
+        if (query.startsWith('select') && query.includes('linear_sync_outbox') && params?.[0] === false) {
+          archivePolls++
+          assert.match(query, /operation='archive' or \(\$1::boolean and operation='sync'\)/)
+          return { rows: [] }
+        }
+        if (query.startsWith('select')) claims++
         if (query.startsWith('select') && finishClaimed) {
           enabled = false
           return { rows: [{ deliveryId: 'already-claimed', attempts: 1, payload: { type: 'unsupported-historical-event' } }] }
@@ -74,12 +80,13 @@ before(async () => {
   callback = await import('../../app/api/integrations/linear/callback/route')
 })
 
-test('disabled direct worker calls preserve jobs without claims, reads or API calls; re-enable resumes claims', async () => {
-  enabled = false; claims = 0; reads = 0
+test('disabled direct worker calls poll only explicit archive cleanup; re-enable resumes ordinary claims', async () => {
+  enabled = false; claims = 0; reads = 0; archivePolls = 0
   assert.deepEqual(await worker.processLinearSyncBatch(), { inbox: 0, outbox: 0, disabled: true })
   await worker.processLinearIssueOutbox('issue')
   await worker.processLinearInboxDelivery('delivery')
   assert.equal(claims, 0); assert.equal(reads, 0); assert.equal(syncs, 0)
+  assert.equal(archivePolls, 2)
   enabled = true
   assert.deepEqual(await worker.processLinearSyncBatch(), { inbox: 0, outbox: 0 })
   assert.equal(claims, 2)
@@ -88,13 +95,14 @@ test('disabled direct worker calls preserve jobs without claims, reads or API ca
   assert.equal(claims, 2)
 })
 
-test('dispatch rechecks at execution time and does not start a disabled batch or single delivery', async () => {
-  enabled = true; scheduled = []; claims = 0
+test('disabled dispatch polls archive cleanup without starting ordinary sync or inbox delivery', async () => {
+  enabled = true; scheduled = []; claims = 0; archivePolls = 0
   dispatch.dispatchLinearWork(); dispatch.dispatchLinearIssueSync('issue'); dispatch.dispatchLinearWebhook('delivery')
   assert.equal(scheduled.length, 3)
   enabled = false
   await Promise.all(scheduled.map(fn => fn()))
   assert.equal(claims, 0)
+  assert.equal(archivePolls, 1)
 })
 
 test('disabling after a claim finishes that job and prevents subsequent inbox and outbox claims', async () => {

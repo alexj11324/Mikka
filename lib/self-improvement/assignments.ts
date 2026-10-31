@@ -6,12 +6,15 @@ import { skillAssignmentReceiptSchema } from '@mikka/protocol/skill'
 import { BASELINE_ARTIFACT, BASELINE_MARKDOWN } from './builtin-skill'
 import { digest, ImprovementError } from './contract'
 import { currentSkillEligibility, lockSkillScope, resolveSkillVersion, type SkillEvaluationAuthorization } from './registry'
+import { writeTransaction } from '@/lib/operations/write-transaction'
+import type { MailboxTransactionGuard } from '@/lib/mailbox-transaction-guard'
 
 type Authorize = (userId: string, issueId: string, tx: PoolClient) => Promise<boolean>
 type EvaluationPurpose = { purpose: 'evaluation'; evaluationId: string }
 type ActivePurpose = { purpose: 'active'; evaluationId: null }
 export function createSkillAssignments(pool: Pool, authorize: Authorize, authorizeEvaluation?: SkillEvaluationAuthorization) {
-  async function transaction<T>(work: (tx: PoolClient) => Promise<T>) {
+  async function transaction<T>(work: (tx: PoolClient) => Promise<T>, guard?: MailboxTransactionGuard) {
+    if(guard)return writeTransaction(pool,work,{guard})
     const tx = await pool.connect()
     try { await tx.query('BEGIN'); const result = await work(tx); await tx.query('COMMIT'); return result }
     catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
@@ -75,6 +78,16 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
   async function selectBaseline(userId: string, runId: string, existingTransaction?: PoolClient) {
     const work = async (tx: PoolClient) => select(tx, userId, await owned(tx, userId, runId), BASELINE_ARTIFACT.versionId)
     return existingTransaction ? work(existingTransaction) : transaction(work)
+  }
+  async function selectTeam(userId: string, runId: string, versionId: string) {
+    if(!z.uuid().safeParse(versionId).success)throw new ImprovementError('invalid')
+    const {teamSkillRunScope,teamSkillMembershipGuard}=await import('./team-skills')
+    return transaction(async tx => {
+      const run=await owned(tx,userId,runId),scope=await teamSkillRunScope(tx,userId,run)
+      const visible=await tx.query(`SELECT 1 FROM improvement_team_skill_metadata WHERE "versionId"=$1 AND "workspaceId"=$2`,[versionId,scope.workspaceId])
+      if(!visible.rowCount)throw new ImprovementError('notFound')
+      return select(tx,userId,run,versionId)
+    },teamSkillMembershipGuard(userId,versionId))
   }
   // Internal only: the benchmark service owns the transaction and frozen run binding.
   async function selectVersion(userId: string, runId: string, versionId: string, purpose: EvaluationPurpose, tx: PoolClient) {
@@ -145,7 +158,7 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
     }
     throw new ImprovementError('sourceRequired')
   }
-  async function preflight(userId: string, runId: string, supportsArtifacts: boolean) {
+  async function preflight(userId: string, runId: string, supportsArtifacts: boolean, supportsTeam = false) {
     const { rows: [selection] } = await pool.query('SELECT * FROM improvement_skill_selections WHERE "runId"=$1', [runId])
     if (!selection) {
       const { rows:[ancestor] }=await pool.query(`WITH RECURSIVE lineage AS (
@@ -159,12 +172,18 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
     }
     if (selection.userId !== userId) throw new ImprovementError('notFound')
     if (!supportsArtifacts) throw new ImprovementError('workerCapabilityRequired')
-    await transaction(async tx => { await selected(tx, userId, await owned(tx, userId, runId), selection) })
+    return transaction(async tx => {
+      const version=await selected(tx,userId,await owned(tx,userId,runId),selection)
+      if(version.artifact.registryId==='mikka-team'&&!supportsTeam)throw new ImprovementError('workerCapabilityRequired')
+      return version
+    })
   }
   // Called after the actual claim CAS, before returning that assignment. A
   // receipt proves the server prepared assignment bytes, never delivery/use.
-  async function recordClaim(userId: string, deviceId: string, runId: string, leaseExpiresAt: string, supportsArtifacts: boolean) {
-    await preflight(userId,runId,supportsArtifacts)
+  async function recordClaim(userId: string, deviceId: string, runId: string, leaseExpiresAt: string, supportsArtifacts: boolean, supportsTeam = false) {
+    const prepared=await preflight(userId,runId,supportsArtifacts,supportsTeam)
+    const teamGuard=prepared?.artifact.registryId==='mikka-team'
+      ? (await import('./team-skills')).teamSkillMembershipGuard(userId,prepared.artifact.versionId):undefined
     return transaction(async tx => {
       const { rows: [selection] } = await tx.query('SELECT * FROM improvement_skill_selections WHERE "runId"=$1', [runId])
       if (!selection) return {}
@@ -185,21 +204,22 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
         parsed.repoId !== run.deviceRepoId || parsed.deviceId !== deviceId || parsed.leaseExpiresAt !== leaseExpiresAt ||
         digest(parsed.artifact) !== digest(version.artifact)) throw new ImprovementError('conflict')
       return { skills: [version.skill], skillReceipt: parsed }
-    })
+    },teamGuard)
   }
-  async function revalidate(userId:string,runId:string,receiptId:string,supportsArtifacts:boolean) {
+  async function revalidate(userId:string,runId:string,receiptId:string,supportsArtifacts:boolean,supportsTeam=false) {
     if (!supportsArtifacts) throw new ImprovementError('workerCapabilityRequired')
     return transaction(async tx=>{
       const run=await owned(tx,userId,runId)
       if (!['preparing','running','waiting_input','finishing'].includes(run.status)||!run.leaseExpiresAt||run.leaseExpiresAt.getTime()<=Date.now())
         throw new ImprovementError('runUnavailable')
       const source=await assignedSkillForRun(tx,userId,run)
+      if(source.skillUsage==='assigned'&&source.skillArtifact.registryId==='mikka-team'&&!supportsTeam)throw new ImprovementError('workerCapabilityRequired')
       if (source.skillUsage!=='assigned'||source.skillReceipt.id!==receiptId) throw new ImprovementError('sourceMismatch')
       await currentSkillEligibility(tx,userId,run,source.skillArtifact,authorizeEvaluation)
       return {skillReceipt:source.skillReceipt,leaseExpiresAt:run.leaseExpiresAt.toISOString()}
     })
   }
-  async function renewHeartbeat(userId:string,deviceId:string,runIds:string[],supportsArtifacts:boolean) {
+  async function renewHeartbeat(userId:string,deviceId:string,runIds:string[],supportsArtifacts:boolean,supportsTeam=false) {
     // Protocol IDs may be non-UUIDs; the legacy lease boundary revokes those after partitioning.
     const validRunIds=runIds.filter(id=>z.uuid().safeParse(id).success)
     const {rows}=await pool.query(`SELECT s."runId",r.id FROM improvement_skill_selections s
@@ -214,6 +234,7 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
           if(run.deviceId!==deviceId||!['preparing','running','waiting_input','finishing'].includes(run.status)||!run.leaseExpiresAt||run.leaseExpiresAt.getTime()<=Date.now())
             throw new ImprovementError('runUnavailable')
           const source=await assignedSkillForRun(tx,userId,run)
+          if(source.skillUsage==='assigned'&&source.skillArtifact.registryId==='mikka-team'&&!supportsTeam)throw new ImprovementError('workerCapabilityRequired')
           if(source.skillUsage!=='assigned'||source.skillReceipt.id!==row.id)throw new ImprovementError('sourceMismatch')
           await currentSkillEligibility(tx,userId,run,source.skillArtifact,authorizeEvaluation)
           const expiry=new Date(Date.now()+RUN_LEASE_MS).toISOString()
@@ -228,7 +249,7 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
     const protectedIds=new Set(rows.map(row=>row.runId))
     return {legacy:runIds.filter(id=>!protectedIds.has(id)),leases,revoked}
   }
-  return { selectBaseline, selectVersion, selectActive, lockQuestion, continueQuestion, preflight, recordClaim, revalidate, renewHeartbeat }
+  return { selectBaseline, selectTeam, selectVersion, selectActive, lockQuestion, continueQuestion, preflight, recordClaim, revalidate, renewHeartbeat }
 }
 
 /** Historical provenance stays readable after source withdrawal or task revocation. */

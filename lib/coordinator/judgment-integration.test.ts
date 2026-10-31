@@ -14,6 +14,11 @@ const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new UR
 stub('../execution-settings.ts',{executionWorkspace:async()=> 'fixture-workspace'})
 stub('../abuse/runtime.ts',{canUseMikkaPaid:async()=>({verified:true,free:1000000,purchased:0}),hostedUsage:{reserve:async()=>{},settle:async()=>{}}})
 stub('../abuse/alerts.ts',{checkAbuseAlerts:async()=>{}})
+stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:async()=>{}})
+stub('../abuse/context.ts',{hostedBillingScope:{
+ getStore:()=>({workspaceId:'fixture-workspace',ownerId:'synthetic'}),
+ run:(scope:unknown,work:()=>unknown)=>{assert.deepEqual(scope,{workspaceId:'fixture-workspace',ownerId:'synthetic'});return work()},
+}})
 stub('./store.ts',{
  untriagedEvents:async()=>events.filter(e=>e.tier===null),
  claimTriageAttempt:async(event:typeof events[number],scope:unknown)=>{assert.deepEqual(scope,{userId:'synthetic',botId:null});event.lastTriageAttemptAt=new Date();return event.lastTriageAttemptAt},

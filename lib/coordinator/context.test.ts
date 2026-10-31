@@ -17,6 +17,16 @@ function exchange(text: string): ModelMessage[] {
   ]
 }
 
+test('unknown approved external writes require readback and prohibit another send', () => {
+  const prompt = eventPrompt({ kind: 'action_decided', issueId: null, runId: null, payload: {
+    action: 'send_email', actionId: 'proposal', status: 'running', error: 'operationUncertain', input: {},
+  } })
+  assert.match(prompt, /external outcome is unknown/)
+  assert.match(prompt, /Read back the connected account/)
+  assert.match(prompt, /Do not resend or create another proposal/)
+  assert.doesNotMatch(prompt, /it is done|but it failed/)
+})
+
 test('token estimate counts Chinese closer to a token a character', () => {
   assert.ok(estimateTokens([{ role: 'user', content: '你好世界你好世界' }]) > estimateTokens([{ role: 'user', content: 'hello wo' }]))
 })

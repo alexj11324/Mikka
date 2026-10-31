@@ -8,7 +8,7 @@ import { linearSyncEnabled } from './flags'
 
 export function dispatchLinearWork() {
   after(async () => {
-    try { if (await linearSyncEnabled()) await processLinearSyncBatch() }
+    try { await processLinearSyncBatch() }
     catch { console.error('Linear background sync could not start') }
   })
 }

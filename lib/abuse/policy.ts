@@ -1,7 +1,6 @@
 /** USD accounting uses integer microdollars; the one-off allowance is fixed. */
 export const FREE_ALLOWANCE_MICRO_USD = 1_000_000
 export const MICRO_USD_PER_POINT = 10_000 // Billing conversion: 100 points = USD 1.
-export const HOSTED_CALL_RESERVATION = 100_000
 export const HOSTED_CALL_TIMEOUT_MS = 60_000
 export type PaidResourceCode =
   | 'verification_required'

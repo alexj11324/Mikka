@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
-import { writeFile, mkdtemp, rm } from "node:fs/promises";
+import { writeFile, readFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { detectComputerDriver } from "./driver.mjs";
@@ -10,18 +10,31 @@ import { ComputerBroker } from "./broker.mjs";
 import { createInterface } from "node:readline";
 const binary = process.env.MIKKA_CUA_TEST_BINARY;
 test(
-  "pinned real driver: approval -> screenshot -> click -> observed desktop change",
+  "pinned real driver: default allow -> screenshot -> input/click -> observed desktop change",
   { skip: !binary, timeout: 90000 },
   async (t) => {
+    const dir = await mkdtemp(join(tmpdir(), "cua-real-"));
+    const previousHome = process.env.HOME, previousDisplay = process.env.DISPLAY;
+    process.env.HOME = join(dir, 'home');
+    await mkdir(join(process.env.HOME, '.cua'), { recursive: true });
+    await writeFile(join(process.env.HOME, '.cua', 'config.toml'), '[telemetry]\nenabled = false\n');
+    t.after(() => {
+      if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome;
+      if (previousDisplay === undefined) delete process.env.DISPLAY; else process.env.DISPLAY = previousDisplay;
+    });
     const driver = await detectComputerDriver(binary);
     assert.ok(driver, "pinned driver must exist");
-    const dir = await mkdtemp(join(tmpdir(), "cua-real-"));
+    const typedFile = join(dir, 'typed.txt'), marker = 'Mikka isolated CUA input';
     let dialog, clickAt;
     if (process.platform === "darwin") {
       const source = join(dir, "dialog.swift");
       await writeFile(source, `import AppKit
 class ReviewTarget: NSObject {
-  @objc func clicked(_ sender: Any?) { exit(0) }
+  var input: NSTextField?
+  @objc func clicked(_ sender: Any?) {
+    try? input?.stringValue.write(toFile: ${JSON.stringify(typedFile)}, atomically: true, encoding: .utf8)
+    exit(0)
+  }
 }
 let app = NSApplication.shared
 app.setActivationPolicy(.regular)
@@ -30,12 +43,16 @@ window.title = "Mikka isolated approved click"
 let label = NSTextField(labelWithString: "Mikka isolated computer-use test")
 label.frame = NSRect(x: 10, y: 80, width: 370, height: 30)
 window.contentView!.addSubview(label)
+let input = NSTextField(frame: NSRect(x: 10, y: 45, width: 370, height: 24))
+window.contentView!.addSubview(input)
 let owner = ReviewTarget()
+owner.input = input
 let button = NSButton(title: "OK", target: owner, action: #selector(ReviewTarget.clicked(_:)))
 button.frame = NSRect(x: 10, y: 10, width: 80, height: 30)
 window.contentView!.addSubview(button)
 window.makeKeyAndOrderFront(nil)
 app.activate(ignoringOtherApps: true)
+window.makeFirstResponder(input)
 let point = window.convertPoint(toScreen: NSPoint(x: 50, y: 25))
 let desktopTop = NSScreen.screens[0].frame.maxY
 print("\\(Int(point.x)) \\(Int(desktopTop - point.y))")
@@ -92,7 +109,8 @@ app.run()
     });
     t.after(() => broker.close());
     await broker.listen();
-    const grant = broker.spec("isolated-test", "ask");
+    assert.equal(broker.spec('denied-test', 'deny'), undefined);
+    const grant = broker.spec("isolated-test", "allow");
     const proxy = spawn(process.execPath, [
       new URL("./proxy.mjs", import.meta.url).pathname,
       grant.socketPath,
@@ -107,7 +125,7 @@ app.run()
     });
     t.after(() => lines.close());
     let next = 0;
-    async function approved(call) {
+    async function allowed(call) {
       const id = ++next;
       proxy.stdin.write(
         JSON.stringify({
@@ -117,14 +135,7 @@ app.run()
           params: call,
         }) + "\n",
       );
-      let row;
-      for (let i = 0; i < 100 && !row; i++) {
-        [row] = broker.list();
-        if (!row) await new Promise((r) => setTimeout(r, 20));
-      }
-      assert.ok(row, "exact call must reach the broker review fixture");
-      assert.equal(replies.has(id), false, "model call must still be blocked");
-      await broker.decide(row.id, row.digest, true);
+      assert.equal(broker.list().length, 0, 'default allow must not create a human approval');
       for (let i = 0; i < 1600 && !replies.has(id); i++)
         await new Promise((r) => setTimeout(r, 20));
       assert.ok(
@@ -133,7 +144,7 @@ app.run()
       );
       return replies.get(id);
     }
-    const before = await approved({ name: "get_desktop_state" });
+    const before = await allowed({ name: "get_desktop_state" });
     assert.notEqual(before.isError, true, JSON.stringify(before));
     const image = before.content.find((c) => c.type === "image");
     assert.ok(image, "real desktop screenshot returned");
@@ -142,17 +153,40 @@ app.run()
         process.env.MIKKA_CUA_TEST_SCREENSHOT,
         Buffer.from(image.data, "base64"),
       );
+    if (process.platform === 'darwin') {
+      const typed = await allowed({ name: 'type_text', arguments: { text: marker } });
+      assert.notEqual(typed.isError, true, JSON.stringify(typed));
+    }
     // Require an actual desktop state transition, not just a command receipt.
-    const click = await approved({ name: "click", arguments: clickAt });
+    const click = await allowed({ name: "click", arguments: clickAt });
     assert.notEqual(click.isError, true, JSON.stringify(click));
     for (let i = 0; i < 30 && dialog.exitCode === null; i++)
       await new Promise((r) => setTimeout(r, 100));
     assert.equal(
       dialog.exitCode,
       0,
-      "real approved click dismissed the dialog",
+      "real allowed click dismissed the dialog",
     );
-    const after = await approved({ name: "get_desktop_state" });
+    if (process.platform !== 'darwin') {
+      const terminal = spawn('xterm', ['-title', 'Mikka isolated input', '-geometry', '60x5+200+200', '-e', process.execPath, '-e',
+        "process.stdin.setEncoding('utf8');let value='';process.stdin.on('data',chunk=>{value+=chunk;if(value.includes('\\n')){require('node:fs').writeFileSync(process.argv[1],value.trim());process.exit(0)}})", typedFile]);
+      t.after(() => terminal.kill());
+      let window = '';
+      for (let i = 0; i < 100 && !window; i++) {
+        try { window = execFileSync('xdotool', ['search', '--name', '^Mikka isolated input$'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n')[0]; }
+        catch { await new Promise(resolve => setTimeout(resolve, 100)); }
+      }
+      assert.ok(window, 'isolated terminal input did not become ready');
+      execFileSync('xdotool', ['windowfocus', '--sync', window]);
+      const typed = await allowed({ name: 'type_text', arguments: { text: marker } });
+      assert.notEqual(typed.isError, true, JSON.stringify(typed));
+      const enter = await allowed({ name: 'press_key', arguments: { key: 'enter' } });
+      assert.notEqual(enter.isError, true, JSON.stringify(enter));
+      for (let i = 0; i < 50 && terminal.exitCode === null; i++) await new Promise(resolve => setTimeout(resolve, 100));
+      assert.equal(terminal.exitCode, 0, 'real driver input did not reach the isolated application');
+    }
+    assert.equal(await readFile(typedFile, 'utf8'), marker, 'observed application text must match the typed marker');
+    const after = await allowed({ name: "get_desktop_state" });
     assert.notEqual(after.isError, true);
     assert.ok(after.content.some((c) => c.type === "image"));
     const afterImage = after.content.find((c) => c.type === "image");
@@ -162,7 +196,7 @@ app.run()
         Buffer.from(afterImage.data, "base64"),
       );
     console.log(
-      "real screenshot and click successful through MCP and broker review fixture",
+      "real screenshot, typed application text and click successful through default-allow MCP broker; no human review",
     );
   },
 );

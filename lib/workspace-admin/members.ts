@@ -8,6 +8,7 @@ import { workspaceInvitations, workspaceMembers } from '@/lib/db/workspace-schem
 import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
+import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/delivery'
 import type { MainTransaction } from './general'
 
 const memberId = z.string().min(1).max(200)
@@ -72,16 +73,17 @@ export interface RemovedMember extends MemberRemoval { label: string }
  * membership check for this workspace at once. Team memberships in this
  * workspace and pending invitations to the same email go with it.
  */
-export async function removeMember(actorId: string, workspaceId: string, targetId: string, transferTo?: string): Promise<RemovedMember> {
+export async function removeMember(actorId: string, workspaceId: string, targetId: string, transferTo?: string, audit?: AuditRequestContext): Promise<RemovedMember> {
   memberId.parse(targetId)
   if (targetId === actorId) throw new WorkspaceError('workspaceCannotRemoveSelf')
   return workspaceDb.transaction(async tx => {
-    await requireWorkspace(tx, workspaceId, actorId, true)
+    const { membership } = await requireWorkspace(tx, workspaceId, actorId, true)
     const [target] = await tx.select().from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, targetId))).for('update').limit(1)
     if (!target) throw new WorkspaceError('workspaceMemberNotFound')
     if (target.role === 'admin' && target.status === 'active') await assertAnotherAdmin(tx, workspaceId, targetId)
     if (transferTo !== undefined) await requireTransferTarget(tx, workspaceId, targetId, transferTo)
+    await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'member.removed', target: { type: 'member', id: targetId, label: target.name || target.email }, ...audit })
     const transferred = transferTo === undefined ? { bots: 0 } : await db.transaction(main => transferBots(main, workspaceId, targetId, transferTo))
     const teamIds = (await tx.select({ id: teams.id }).from(teams).where(eq(teams.workspaceId, workspaceId))).map(row => row.id)
     if (teamIds.length) await tx.delete(teamMembers).where(and(inArray(teamMembers.teamId, teamIds), eq(teamMembers.userId, targetId)))

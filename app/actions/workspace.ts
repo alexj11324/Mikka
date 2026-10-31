@@ -12,7 +12,8 @@ import { workspaceMembers, workspaceInvitations, workspaces } from '@/lib/db/wor
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { slugIsReserved } from '@/lib/workspace-admin/general'
 import { transferOnSuspend } from '@/lib/workspace-admin/members'
-import { auditRequestContext, recordAuditSafe } from '@/lib/audit/record'
+import { auditRequestContext } from '@/lib/audit/record'
+import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 
 const roleSchema = z.enum(['admin', 'member'])
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/)
@@ -92,6 +93,7 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; em
     const user = await requireUser()
     const role = roleSchema.parse(input.role)
     const emails = [...new Set(z.array(z.email().max(254)).min(1).max(20).parse(input.emails.map(email => email.trim().toLowerCase())))]
+    const request = auditRequestContext(await headers())
     return workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, input.workspaceId, user.id, true)
       const members = await tx.select({ email: workspaceMembers.email }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, input.workspaceId))
@@ -103,13 +105,9 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; em
         const expiresAt = new Date(Date.now() + 7 * 86400000)
         await tx.insert(workspaceInvitations).values({ id: crypto.randomUUID(), workspaceId: input.workspaceId, userId: user.id, email, role, tokenHash, expiresAt })
           .onConflictDoUpdate({ target: [workspaceInvitations.workspaceId, workspaceInvitations.email], set: { userId: user.id, role, tokenHash, status: 'pending', expiresAt, createdAt: new Date() } })
+        await enqueueWorkspaceAudit(tx, { workspaceId: input.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.invited', target: { type: 'invitation', label: email }, metadata: { role }, ...request })
         links.push({ email, path: `/invite/${token}` })
       }
-      return links
-    }).then(async links => {
-      // Workspace rows live in DATABASE_URL: the audit rows follow the commit (lib/audit/record.ts).
-      const request = auditRequestContext(await headers())
-      for (const link of links) await recordAuditSafe({ workspaceId: input.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.invited', target: { type: 'invitation', label: link.email }, metadata: { role }, ...request })
       return links
     })
   })
@@ -126,6 +124,7 @@ export async function updateWorkspaceMember(input: { workspaceId: string; userId
     const status = z.enum(['active', 'suspended']).parse(input.status)
     z.string().min(1).max(200).parse(input.userId)
     if (input.transferTo !== undefined && status !== 'suspended') throw new WorkspaceError('validationGeneric')
+    const request = auditRequestContext(await headers())
     await workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, input.workspaceId, user.id, true)
       const [target] = await tx.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId))).limit(1)
@@ -134,14 +133,12 @@ export async function updateWorkspaceMember(input: { workspaceId: string; userId
         const others = await tx.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), ne(workspaceMembers.userId, input.userId), eq(workspaceMembers.role, 'admin'), eq(workspaceMembers.status, 'active'))).limit(1)
         if (!others.length) throw new WorkspaceError('workspaceLastAdmin')
       }
+      const base = { workspaceId: input.workspaceId, actor: { type: 'user' as const, id: user.id, name: user.name }, target: { type: 'member', id: target.userId, label: target.name || target.email }, ...request }
+      if (target.role !== role) await enqueueWorkspaceAudit(tx, { ...base, action: 'member.role_changed', metadata: { oldRole: target.role, newRole: role } })
+      if (target.status !== status) await enqueueWorkspaceAudit(tx, { ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
       if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
       await tx.update(workspaceMembers).set({ role, status }).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId)))
-      return target
-    }).then(async target => {
-      const request = auditRequestContext(await headers())
-      const base = { workspaceId: input.workspaceId, actor: { type: 'user' as const, id: user.id, name: user.name }, target: { type: 'member', id: target.userId, label: target.name || target.email }, ...request }
-      if (target.role !== role) await recordAuditSafe({ ...base, action: 'member.role_changed', metadata: { oldRole: target.role, newRole: role } })
-      if (target.status !== status) await recordAuditSafe({ ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
+
     })
   })
 }

@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'
 
-// One JSON line per API request, written to stdout so Vercel Runtime Logs
+// Start and completion JSON lines per API request, written to stdout so Vercel Runtime Logs
 // (free on every plan) can search it. Only safe fields: never headers,
 // cookies, tokens, bodies, query strings or emails. The user is a sha256 hash.
 
@@ -28,6 +28,8 @@ export function requestIdFor(request: Request): string {
 export type RequestLogEntry = {
   level: 'info' | 'warn' | 'error'
   msg: 'api_request'
+  timestamp: string
+  invocationId: string
   requestId: string
   route: string
   method: string
@@ -62,11 +64,16 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
   return async (request, ...rest) => {
     const started = performance.now()
     const store: Store = {}
+    const requestId = requestIdFor(request), invocationId = randomUUID()
+    // A missing completion remains observable when a handler/process is killed.
+    try { sink(JSON.stringify({ level: 'info', msg: 'api_request_started', timestamp: new Date().toISOString(),
+      requestId, invocationId, route, method: request.method }), 'info') } catch { /* best effort */ }
     const write = (status: number, error?: unknown) => {
       const entry: RequestLogEntry = {
         level: levelFor(status),
         msg: 'api_request',
-        requestId: requestIdFor(request),
+        timestamp: new Date().toISOString(),
+        requestId, invocationId,
         route,
         method: request.method,
         status,

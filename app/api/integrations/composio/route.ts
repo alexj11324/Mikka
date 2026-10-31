@@ -11,6 +11,8 @@ import { accountUpdateSchema, isDuplicateAliasError, safeReturnPath, toConnected
 import { isComposioCallbackVerifierConfigured } from '@/lib/composio-config'
 import { COMPOSIO_FLOW_COOKIE, composioFlowCookieOptions, encodeComposioFlow } from '@/lib/composio-flow'
 import { listComposioPages } from '@/lib/composio-pagination'
+import { assertCatalogToolkit } from '@/lib/plugins/catalog'
+import { PluginError } from '@/lib/plugins/contracts'
 
 const accountIdSchema = z.string().trim().min(1).max(255)
 const returnToSchema = z.string().max(512).optional()
@@ -82,6 +84,9 @@ async function handlePOST(request: Request) {
     const replacing = 'accountId' in parsed.data ? await findOwnAccount(composio, session.user.id, parsed.data.accountId) : undefined
     if ('accountId' in parsed.data && !replacing) return NextResponse.json({ error: 'integrationNotFound' }, { status: 404 })
     const toolkit = 'toolkit' in parsed.data ? parsed.data.toolkit : replacing!.toolkit.slug
+    // Only a newly offered catalog app needs provider availability validation.
+    // Reconnecting an existing account remains possible during catalog outages.
+    if ('toolkit' in parsed.data) await assertCatalogToolkit(composio, toolkit)
     const composioSession = await composio.create(session.user.id)
     const connection = await composioSession.authorize(toolkit)
     if (!connection.redirectUrl) return NextResponse.json({ error: 'integrationStartFailed' }, { status: 502 })
@@ -90,7 +95,8 @@ async function handlePOST(request: Request) {
     const returnTo = safeReturnPath(parsed.data.returnTo) ?? undefined
     response.cookies.set(COMPOSIO_FLOW_COOKIE, encodeComposioFlow({ link: connection.id, replace: replacing?.id, returnTo }), composioFlowCookieOptions(request.url, 600))
     return response
-  } catch {
+  } catch (error) {
+    if (error instanceof PluginError) return NextResponse.json({ error: error.code }, { status: error.status })
     return NextResponse.json({ error: 'integrationStartFailed' }, { status: 502 })
   }
 }

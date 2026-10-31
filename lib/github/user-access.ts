@@ -1,7 +1,7 @@
 import 'server-only'
 import { auth } from '@/lib/auth'
 
-export type GitHubAccessCode = 'authRequired' | 'githubNotConfigured' | 'githubNotConnected' | 'githubReconnectRequired' | 'githubRepositoryForbidden' | 'githubPullRequestInvalid' | 'githubUnavailable'
+export type GitHubAccessCode = 'authRequired' | 'githubNotConfigured' | 'githubNotConnected' | 'githubReconnectRequired' | 'githubRepositoryForbidden' | 'githubPullRequestInvalid' | 'githubIssueInvalid' | 'githubUnavailable'
 
 export class GitHubAccessError extends Error {
   constructor(readonly code: GitHubAccessCode, readonly status: number) {
@@ -109,4 +109,20 @@ export async function readAuthorizedPullRequest(headers: Headers, url: string) {
   if (pr.number !== number || githubId(baseRepo.id) !== repo.id || (pr.state !== 'open' && pr.state !== 'closed') || typeof pr.updated_at !== 'string' || !Number.isFinite(Date.parse(pr.updated_at))) throw new GitHubAccessError('githubUnavailable', 502)
   const state: 'open' | 'closed' | 'merged' = pr.state === 'closed' && (pr.merged === true || typeof pr.merged_at === 'string') ? 'merged' : pr.state
   return { userId: access.userId, githubAccountId: access.githubAccountId, repoId: repo.id, installationId: repo.installationId, number, url: `https://github.com/${repo.fullName}/pull/${number}`, state, updatedAt: pr.updated_at }
+}
+
+/** Existing issue readback only. A repository selection or PR URL never proves
+ * a GitHub issue mapping, and provider bodies/tokens are not returned. */
+export async function readAuthorizedIssue(headers: Headers, url: string) {
+  const match = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/issues\/([1-9]\d*)\/?$/.exec(url)
+  if (!match || !Number.isSafeInteger(Number(match[2]))) throw new GitHubAccessError('githubIssueInvalid', 400)
+  const number = Number(match[2])
+  const access = await authorizedRepositories(headers)
+  const repo = access.repositories.find(item => item.fullName.toLowerCase() === match[1].toLowerCase())
+  if (!repo) throw new GitHubAccessError('githubRepositoryForbidden', 403)
+  const issue = (await githubGet(access.token, `/repos/${repo.fullName}/issues/${number}`)).data
+  const canonical = `https://github.com/${repo.fullName}/issues/${number}`
+  if (issue.pull_request != null || issue.number !== number || typeof issue.html_url !== 'string' || issue.html_url.toLowerCase() !== canonical.toLowerCase() ||
+      (issue.state !== 'open' && issue.state !== 'closed') || typeof issue.updated_at !== 'string' || !Number.isFinite(Date.parse(issue.updated_at))) throw new GitHubAccessError('githubUnavailable', 502)
+  return { userId: access.userId, githubAccountId: access.githubAccountId, repoId: repo.id, installationId: repo.installationId, issueId: githubId(issue.id), number, url: canonical, state: issue.state, updatedAt: issue.updated_at }
 }

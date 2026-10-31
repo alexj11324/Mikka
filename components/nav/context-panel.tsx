@@ -116,7 +116,7 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
   // R-37: opening, closing and widening move the width on a spring; the content keeps its
   // narrow width so it is clipped, not squeezed, while the panel opens or closes.
-  return <motion.aside aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width: wide ? 520 : 360 }} exit={sheet ? undefined : { width: 0 }} transition={SPRING_SIDEBAR} className={cn('min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l xl:flex')}>
+  return <motion.aside aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width: wide ? 520 : 360 }} exit={sheet ? undefined : { width: 0 }} transition={SPRING_SIDEBAR} className={cn('min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l bg-background xl:flex')}>
     <Tabs value={view} onValueChange={value => setView(value as PanelView)} className={cn('min-h-0 flex-1 gap-0', !sheet && 'min-w-90')}>
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
         <TabsList aria-label={t('views')} className="gap-1 bg-transparent p-0">

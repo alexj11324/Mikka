@@ -33,7 +33,7 @@ export async function triageInbox(userId: string, botId: string | null = null): 
     claim: event => claimTriageAttempt(event, scope),
     deliverUser: event => setEventTier(event.id, 'attention', scope),
     classify: async (event, signal) => {
-      const result = await hostedBillingScope.run({workspaceId:await executionWorkspace(userId,botId)},()=>invokeDecision('triage', triageInput(event), triageQuestions(event), signal))
+      const result = await hostedBillingScope.run({workspaceId:await executionWorkspace(userId,botId),ownerId:userId},()=>invokeDecision('triage', triageInput(event), triageQuestions(event), signal))
       return { tier: tierFromDecision(result?.answers.get('tier')), execution: result?.execution ?? null }
     },
     complete: (event, attemptedAt, judgment) => completeTriageAttempt(event, scope, attemptedAt, judgment),
