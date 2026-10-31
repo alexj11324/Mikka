@@ -261,7 +261,7 @@ test('authenticated claim → sandboxed fake Codex → pending network → owner
         runId, cwd, prompt: JSON.stringify({ target, ...(includeOutside ? { outside: outsideTarget } : {}) }),
         // A trusted repo capability admits just the fixture to the immutable
         // ceiling. Policy still comes unchanged from the authenticated claim.
-        policy: savedAssignment.policy, networkAllow: [`127.0.0.1:${port}`], toolApproval: gate,
+        policy: savedAssignment.policy, policyHash:savedAssignment.policySnapshot?.payload.policyHash, networkAllow: [`127.0.0.1:${port}`], toolApproval: gate,
         env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: home }, log: createLogger(),
       }), `${name} adapter start`)
       const output = deferred<string>(), observed: AgentEvent[] = []; events.push(observed)
@@ -340,10 +340,8 @@ test('authenticated claim → sandboxed fake Codex → pending network → owner
     assert.equal(revoked.observed.at(-1)?.type, 'exit')
     assert.deepEqual(hits, ['/approved'])
     assert.deepEqual(outsideHits, [])
-    // Retain the original unsupported-native-callback stale-assignment check.
-    const stale = await link.prepareRunToolApproval(savedAssignment, new AbortController().signal, () => {})
-    active.push({ gate: stale })
-    assert.equal(await stale.request({ runId, requestId: 'stale', harness: 'codex', method: 'item/commandExecution/requestApproval', input: { command: 'npm install synthetic' } }), 'deny')
+    // A stale signed assignment is refused before another gate/CLI can start.
+    await assert.rejects(link.prepareRunToolApproval(savedAssignment, new AbortController().signal, () => {}), /Run policy context changed/)
     const remaining = await pool.query(`SELECT count(*)::int AS count FROM agent_tool_approvals WHERE "runId"=$1 AND status='pending'`, [runId])
     assert.equal(remaining.rows[0].count, 0)
     evidence.cancelled = cancelPending
