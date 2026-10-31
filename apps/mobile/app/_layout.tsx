@@ -1,7 +1,10 @@
+import '../global.css'
+
 import { useEffect } from 'react'
 import { Platform, View } from 'react-native'
 import { Stack, useRouter, type Href } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { DrawerHost } from '@/components/Drawer'
 import { Spinner } from '@/components/icons'
@@ -12,10 +15,12 @@ import { colors } from '@/lib/theme'
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <SessionGate />
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <SessionGate />
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   )
 }
 
