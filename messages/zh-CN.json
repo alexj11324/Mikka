@@ -1859,7 +1859,6 @@
       "connect": "连接",
       "disconnect": "断开连接",
       "working": "处理中…",
-      "loading": "正在读取集成…",
       "loadFailed": "无法读取集成状态。",
       "connectFailed": "无法开始连接，请重试。",
       "connectUnavailable": "应用连接未配置",

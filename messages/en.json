@@ -1859,7 +1859,6 @@
       "connect": "Connect",
       "disconnect": "Disconnect",
       "working": "Working…",
-      "loading": "Loading integrations…",
       "loadFailed": "Could not load integration status.",
       "connectFailed": "Could not start the connection. Please try again.",
       "connectUnavailable": "App connections are not set up",

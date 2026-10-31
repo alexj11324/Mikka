@@ -1,4 +1,4 @@
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, app, rail } from './fixtures'
 
 // 插件 (rail) and 设置 › 连接 render the same list (decisions 2026-10-31).
 const APPS = ['Gmail', 'Google 日历', 'Notion', 'Slack', 'GitHub', 'Linear', 'Telegram']
@@ -44,4 +44,35 @@ test('插件 is one list of apps, shared with 设置 › 连接', async ({ page 
   await expect(page.getByRole('heading', { name: 'Telegram', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '刷新状态', exact: true })).toHaveCount(0)
   await testInfo.attach('settings-connections-telegram', { body: await page.screenshot(), contentType: 'image/png' })
+})
+
+test('插件 opens on the last state it read: no loading line, no 连接 flip', async ({ page }) => {
+  // A controlled Composio answer: Gmail connected and on. No provider is called.
+  let hold = false
+  let release = () => {}
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/integrations/composio', async route => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    if (hold) await held
+    await route.fulfill({ json: { configured: true, callbackVerifierConfigured: true, webhookConfigured: true, accounts: [
+      { id: 'fixture-gmail', toolkit: 'gmail', status: 'ACTIVE', enabled: true, alias: null, createdAt: '2026-10-01T00:00:00.000Z', email: 'fixture@example.test', isDefault: true },
+    ] } })
+  })
+  try {
+    await register(page, '/?section=plugins')
+    const gmail = page.getByRole('switch', { name: '启用 Gmail', exact: true })
+    await expect(gmail).toBeChecked()
+
+    await rail(page, '主页').click()
+    await expect(page.getByRole('link', { name: '打开 Gmail', exact: true })).toHaveCount(0)
+    // Every later read waits: whatever the revisit shows comes from the cache.
+    hold = true
+    await rail(page, '插件').click()
+    await expect(gmail).toBeChecked()
+    // 连接 only on the three apps without an account; no line above the list.
+    await expect(page.getByRole('button', { name: '连接', exact: true })).toHaveCount(3)
+    await expect(page.getByText('正在读取集成…', { exact: true })).toHaveCount(0)
+  } finally {
+    release()
+  }
 })
