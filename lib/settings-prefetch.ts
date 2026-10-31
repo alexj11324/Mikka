@@ -36,31 +36,44 @@ const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: un
 
 const started = new Set<string>()
 
-export function prefetchSettingsSection(section: SettingsSectionId, workspaceId: string | undefined, cache: Cache) {
+export function prefetchSettingsSection(section: SettingsSectionId, workspaceId: string | undefined, cache: Cache): Promise<unknown> {
   const reads = READS[section]
   // Workspace sections need the workspace; a section is fetched once per page, then SWR revalidates as usual.
   const once = `${section}:${workspaceId ?? ''}`
-  if (!reads || started.has(once) || (!workspaceId && !['security', 'notifications', 'logins'].includes(section))) return
+  if (!reads || started.has(once) || (!workspaceId && !['security', 'notifications', 'logins'].includes(section))) return Promise.resolve()
   started.add(once)
+  const pending: Promise<unknown>[] = []
   for (const [key, read] of reads(workspaceId ?? '')) {
     // A key SWR already holds belongs to a section that has been open: a preload
     // nobody takes would be handed to that section's next revalidation, stale.
     if (cache.get(unstable_serialize(key as never)) !== undefined) continue
-    void preload(key as never, read).catch(() => {})
+    pending.push(Promise.resolve(preload(key as never, read)).catch(() => {}))
   }
+  return Promise.all(pending)
 }
 
+const idle = () => new Promise<void>(resolve => {
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => resolve(), { timeout: 2000 })
+  else window.setTimeout(resolve, 200)
+})
+
 /**
- * Every section the viewer can open, fetched once while the page is idle, so
- * no section shows a skeleton after Settings has opened. Hover still fetches
- * a section sooner when the person gets there first.
+ * Every section the viewer can open, fetched while the page is idle, so no
+ * section shows a skeleton after Settings has opened. Hover still fetches a
+ * section sooner when the person gets there first.
+ *
+ * One section at a time: Next runs a page's server actions one after another,
+ * so a burst of reads would hold back a save made meanwhile. A save waits for
+ * at most one section's reads.
  */
 export function prefetchAllSettings(workspaceId: string, admin: boolean, cache: Cache) {
-  const run = () => { for (const { id } of visibleSettingsSections({ admin })) prefetchSettingsSection(id, workspaceId, cache) }
-  if (typeof window.requestIdleCallback === 'function') {
-    const handle = window.requestIdleCallback(run, { timeout: 2000 })
-    return () => window.cancelIdleCallback(handle)
-  }
-  const timer = window.setTimeout(run, 200)
-  return () => window.clearTimeout(timer)
+  let cancelled = false
+  void (async () => {
+    for (const { id } of visibleSettingsSections({ admin })) {
+      await idle()
+      if (cancelled) return
+      await prefetchSettingsSection(id, workspaceId, cache)
+    }
+  })()
+  return () => { cancelled = true }
 }
