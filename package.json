@@ -174,7 +174,7 @@
     "test:signup-turnstile": "node --import tsx --test lib/signup-refusal.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/auth/turnstile.test.tsx",
     "test:hosted-usage": "node --experimental-test-module-mocks --import tsx --test lib/billing/hosted-usage.test.ts lib/billing/verification-client.test.ts",
     "test:model-admission": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/contract.test.ts lib/model-admission/http.test.ts lib/model-admission/gateway-transport.test.ts lib/model-admission/decision.test.ts",
-    "test:model-admission-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/store.db.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/revocation-postpay.db.test.ts",
+    "test:model-admission-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/store.db.test.ts lib/model-admission/subscription.db.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/revocation-postpay.db.test.ts",
     "test:release-security": "node --test scripts/release/security.test.mjs scripts/ops/monitor.test.mjs scripts/ops/recovery-failures.test.mjs",
     "test:ops-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/ops/monitor.db.test.ts",
     "test:plugins": "node --import tsx --test lib/plugins/plugins.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/plugins/routes.test.ts",

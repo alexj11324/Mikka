@@ -2,7 +2,7 @@
 
 The workspace policy row owns `model_admission`; there is no second policy
 registry or execution epoch. Policy contents are exact model/serving-provider
-allowlists, fixed Gateway transport, optional principal IDs and explicit data
+allowlists, fixed Gateway/subscription transports, optional principal IDs and explicit data
 region requirements. Unknown data region is not evidence of regional routing.
 
 The initial store uses the existing central workspace membership lease and
@@ -21,13 +21,30 @@ cannot assert that it uses the trusted endpoint. The current balance admission
 and actual-cost settlement remain the existing billing store's responsibility;
 this consumer does not estimate or prepay a maximum inference cost.
 
-Native CLI and subscription transports currently cannot attest this routing
-contract. A configured policy refuses those paths before claim/credentials or
-model construction; unconfigured ordinary execution retains its behavior. A
-policy cannot be published over unfinished native work in its Bot or task
-workspace. Publishing a rule cannot retroactively recall an already-issued
-provider credential or an in-flight request. This is an explicit unsupported
-managed transport, not completed positive native-CLI acceptance.
+The existing private subscription worker fixes Codex requests to
+`https://chatgpt.com/backend-api/codex/responses` and Claude requests to
+`https://api.anthropic.com/v1/messages` (native protocol also permits its fixed
+`?beta=true` variant). Policies can now authorize these exact existing
+`openai-subscription` / `anthropic-subscription` transports, physical provider
+and model. They still report `unknown` data region; US/EU-only rules refuse.
+No new endpoint, proxy, credential or subscription eligibility is introduced.
+
+Frozen BYOS models and the actual service transport recheck current principal,
+workspace and policy before each SDK call. Account fallback keeps the same
+model/route and re-enters this boundary. Native claim permits an existing bound
+broker only; each native HTTP request rechecks its live owner/device/run/binding,
+actual model/path and all current Bot/task workspace policies. The production
+hosted CLI receives a placeholder and its task-bound broker socket, never a
+provider bearer. The Go worker retains fixed destinations, credential filtering,
+redirect refusal and its per-chunk runtime/quota checks.
+
+Direct native CLI and the legacy in-process raw-credential launcher still
+refuse configured model policies. Initial policy installation cannot claim to
+recall earlier unmanaged native credentials, so it requires those runs to end.
+Existing policy updates/revocation remain available while controlled work is
+live; its following calls consult the new policy. This proves the supported
+broker route, not arbitrary native model aliases: the existing runner/worker
+still require the frozen binding model for fully working native execution.
 
 `/api/workspaces/:workspaceId/model-admission` reads a current member's policy;
 same-origin cookie-authenticated writes pass through the same guarded admin
@@ -64,11 +81,27 @@ and Factory source checks: 11 passed with one pre-existing Actions-only PG
 case skipped locally; no Actions identity was fabricated. Postpayment plus
 zero-provider-call revocation tests: 2 passed against real PG and loopback HTTP.
 
-Outstanding acceptance includes live model requests, child/fallback transport,
-native CLI model enforcement, actual provider-region evidence, and the main
-site user path. A mock provider, database test or model name is not that proof.
+Additional validation on `3e2135e3` plus this patch: real existing PG17 on
+loopback 55599 (`mikka_admission_closeout_e2e`), actual OpenAI-compatible SDK
+parser and loopback HTTP exercise permitted Codex/Claude BYOS models, a denied
+second workspace, cached-model revocation/region/abort, native HTTP permit and
+deny across Bot/task workspaces, live revocation, membership removal, STOP,
+model/path substitution and legacy raw-launch rejection. The private worker
+boundary is an explicit fixture; Go was source-reviewed, not compiled or
+executed in this environment. Existing daemon broker/IPC tests are separate
+evidence and do not represent real provider inference. Logs:
+`/tmp/mikka231-subscription-pg.log`, `daemon-broker.log`, `modelsuite.log`,
+`claim-fallback.log`, `admission.log`, `mvp.log`, `typecheck.log` and `lint.log`
+(all suffixes use the same `/tmp/mikka231-` prefix).
+
+Outstanding acceptance still includes live provider inference, a live
+child/fallback model request and the main-site user path. A fixture provider,
+database test or model name cannot close those requirements. There is no
+verified regional provider capability in the current transports, so requests
+requiring a known region remain refused rather than being labelled compliant.
 
 Risk estimate: policy bypass across principal/workspace or provider routes is
-occurrence 6 × impact 8 = 48. This is an engineering estimate. The concrete
-gap is that current model selection/billing lacks an organization model route
-allowlist; the store and its tests address only persisted rule authorization.
+occurrence 6 × impact 8 = 48. The concrete availability gap repaired here was
+that every configured policy rejected the existing fixed subscription routes.
+The positive-path tests retain the denial, live-revocation and unknown-region
+boundaries while proving the actual service/SDK/native HTTP integration.
