@@ -28,7 +28,7 @@ function providerName(provider: string | undefined) {
 function heading(t: T, group: BotModelMenuGroup) {
   switch (group.kind) {
     case 'hosted': return 'Mikka'
-    // The plan names it (Claude Max, ChatGPT Pro): everything but a share is the person's own (Figma 756:5189).
+    // The plan names it (Claude Max, ChatGPT Pro): everything but a share is the person's own (decision 2026-10-31-2330).
     case 'subscription': return group.plan ? `${providerName(group.provider)} ${group.plan}` : providerName(group.provider)
     case 'apiKey': return t('apiKey')
     case 'shared': return t('shared')
@@ -51,7 +51,7 @@ function OptionLabel({ t, option }: { t: T; option: Pick<BotModelMenuOption, 'id
 
 /**
  * The model chip in a bot's composer, the Coordinator's included (decision
- * 2026-10-31-2330, Figma 756:5189): the model the bot's next runs use, and a
+ * 2026-10-31-2330): the model the bot's next runs use, and a
  * menu of what this person can use here. The choice is saved per bot; a run
  * already going keeps its model.
  */
@@ -88,10 +88,10 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
       {failed && <span className="shrink-0 text-xs text-destructive">{t('notSaved')}</span>}
       <ChevronDown className="text-muted-foreground" />
     </DropdownMenuTrigger>
-    <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-80">
+    <DropdownMenuContent side="top" align="start" className="w-80">
       <DropdownMenuRadioGroup value={value} onValueChange={id => { void choose(String(id)) }}>
         {groups.map((group, index) => <DropdownMenuGroup key={`${group.kind}-${index}`} data-group={group.kind}>
-          {/* Figma 756:5189: a rule under Mikka 默认 only; the person's own groups follow one another under their headings. */}
+          {/* A rule under Mikka 默认 only; the person's own groups follow one another under their headings. */}
           {index === 1 && <DropdownMenuSeparator />}
           <DropdownMenuLabel className="font-normal">{heading(t, group)}</DropdownMenuLabel>
           {group.options.map(option => <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick>

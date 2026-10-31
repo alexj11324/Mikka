@@ -4,7 +4,7 @@ import { groupTag, groupTitle, optionName, useModelMenu } from '@/lib/model-menu
 import { colors } from '@/lib/theme'
 
 /**
- * The model chip beside the composer's 「+」: a SwiftUI menu like 「+」's
+ * The model chip beside the composer's 「+」: a borderless SwiftUI menu like 「+」's
  * (AttachMenu.ios.tsx). Each group is a section; the current model is ticked;
  * who pays shows under the name. Saved per bot for its next runs.
  */
@@ -16,7 +16,7 @@ export function ModelMenu({ botId }: { botId: string | null }) {
   const label = !current.available ? `${name} · 不可用` : failed ? `${name} · 未保存` : name
   return (
     <Host matchContents>
-      <Menu label={label} systemImage="chevron.down" modifiers={[buttonStyle('glass'), controlSize('small'), tint(current.available ? colors.ink : colors.secondary)]}>
+      <Menu label={label} systemImage="chevron.down" modifiers={[buttonStyle('borderless'), controlSize('small'), tint(current.available ? colors.ink : colors.secondary)]}>
         {groups.map((group, index) => (
           <Section key={`${group.kind}-${index}`} title={groupTitle(group)}>
             {group.options.map(option => {

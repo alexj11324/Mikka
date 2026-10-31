@@ -7,8 +7,8 @@
 - Replaces: the Coordinator and per-bot model rows in 设置 › 工作区 › Bot 与 Agents
 
 Model choice moves out of settings and into each bot's chat, the
-Coordinator's included. Accepted frame: Figma `zPe5LKycb2XuT1ivCLRw07`, node
-`756:5189`, which replaces `754:5189` 「v2 · 04 · Bot 对话框里的模型选择器」 (page `746:5189`).
+Coordinator's included. The look is main's own composer and menu (Alex: the
+running app on main is the only design source); this file fixes the content.
 
 - **Where.** A chip in the composer's bottom bar, beside 「+」: the model's mark,
   its name and ⌄. It opens a menu.
@@ -16,8 +16,8 @@ Coordinator's included. Accepted frame: Figma `zPe5LKycb2XuT1ivCLRw07`, node
   person can use here, named by its plan (「Claude Max」, 「ChatGPT Pro」, no
   「我的…」: everything but a share is the person's own); 「API Key」 (按量);
   「团队成员分享的」, each item named with whose key it is (「林同学的 Key」);
-  then 「管理 API 与订阅 ›」 to the account's 模型 page. It opens 8px above
-  the chip, left-aligned with it. A
+  then 「管理 API 与订阅 ›」 to the account's 模型 page. It opens right above
+  the chip, left-aligned with it, with main's `DropdownMenu` styling. A
   group with nothing in it is left out. Only credentials the resolver can use
   in this workspace are listed. The Coordinator only uses its own person's
   credentials, so its menu has no 团队成员分享的 group.

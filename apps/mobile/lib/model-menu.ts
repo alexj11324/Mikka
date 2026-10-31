@@ -11,7 +11,7 @@ export interface ModelMenu { groups: ModelGroup[]; current: ModelOption & { kind
 
 const providerName = (provider?: string) => provider === 'claude' ? 'Claude' : 'ChatGPT'
 
-/** A group's heading, as on the web (Figma 756:5189): the plan names a subscription. */
+/** A group's heading, as on the web (decision 2026-10-31-2330): the plan names a subscription. */
 export function groupTitle(group: ModelGroup) {
   switch (group.kind) {
     case 'hosted': return 'Mikka'
