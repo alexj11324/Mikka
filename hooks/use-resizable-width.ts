@@ -137,4 +137,4 @@ export function useResizableWidth({ storageKey, min, max, initial, edge }: Optio
 }
 
 /** The edge strip: invisible, with a hairline on hover that turns to the focus colour while dragged or focused. */
-export const RESIZE_EDGE = 'z-20 w-2 cursor-col-resize outline-none ltr:translate-x-0 rtl:translate-x-0 after:absolute after:inset-y-3 after:w-px after:bg-border after:opacity-0 after:transition-opacity hover:after:opacity-100 focus-visible:after:inset-y-0 focus-visible:after:bg-ring focus-visible:after:opacity-100 active:after:inset-y-0 active:after:bg-ring active:after:opacity-100'
+export const RESIZE_EDGE = 'z-20 w-2 cursor-col-resize outline-none ltr:translate-x-0 rtl:translate-x-0 after:absolute after:inset-y-0 after:w-px after:bg-border after:opacity-0 after:transition-opacity hover:after:opacity-100 focus-visible:after:bg-ring focus-visible:after:opacity-100 active:after:bg-ring active:after:opacity-100'

@@ -29,6 +29,8 @@ test('Both side columns resize from their inner edge and keep the width after re
   await expect(panel).toBeVisible()
   await expect(listEdge).toHaveAttribute('aria-valuenow', '256')
   await expect(panelEdge).toHaveAttribute('aria-valuenow', '360')
+  // The panel's limit is half the window, measured once the page is interactive.
+  await expect(panelEdge).toHaveAttribute('aria-valuemax', '720')
 
   // Dragging the list's right edge to the right widens it; the panel's left edge to the left widens it.
   await drag(page, listEdge, 80)
@@ -50,6 +52,7 @@ test('Both side columns resize from their inner edge and keep the width after re
   await expect(panelEdge).toHaveAttribute('aria-valuenow', '480')
 
   await page.reload()
+  await expect(panelEdge).toHaveAttribute('aria-valuemax', '720')
   await expect(list).toHaveAttribute('data-state', 'expanded')
   await expect(listEdge).toHaveAttribute('aria-valuenow', '336')
   await expect(panelEdge).toHaveAttribute('aria-valuenow', '480')
@@ -64,6 +67,7 @@ test('Both side columns resize from their inner edge and keep the width after re
   await page.keyboard.press('ArrowLeft')
   await expect(listEdge).toHaveAttribute('aria-valuenow', '320')
   await page.reload()
+  await expect(panelEdge).toHaveAttribute('aria-valuemax', '720')
   await expect(panelEdge).toHaveAttribute('aria-valuenow', '496')
   await expect(listEdge).toHaveAttribute('aria-valuenow', '320')
 
@@ -76,7 +80,14 @@ test('Both side columns resize from their inner edge and keep the width after re
   await expect(list).toHaveAttribute('data-state', 'expanded')
   await expect.poll(() => widthOf(panel)).toBe(360)
   await page.reload()
+  await expect(panelEdge).toHaveAttribute('aria-valuemax', '720')
   await expect(listEdge).toHaveAttribute('aria-valuenow', '256')
+  await expect(panelEdge).toHaveAttribute('aria-valuenow', '360')
+
+  // 加宽 still widens the panel and puts the old width back.
+  await page.getByRole('button', { name: '加宽右栏', exact: true }).click()
+  await expect(panelEdge).toHaveAttribute('aria-valuenow', '520')
+  await page.getByRole('button', { name: '恢复右栏宽度', exact: true }).click()
   await expect(panelEdge).toHaveAttribute('aria-valuenow', '360')
 
   // A single click still folds the list.
