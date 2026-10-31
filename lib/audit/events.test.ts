@@ -100,6 +100,7 @@ test('metadata is a per-action allowlist', () => {
     ['member.role_changed', { oldRole: 'member', newRole: 'admin' }],
     ['integration.permission_changed', { integration: 'Slack', capability: 'write', from: 'allow', to: 'deny' }],
     ['auth.signed_in', { newDevice: true, method: 'password' }],
+    ['auth.signed_in', { method: 'oauth' }],
     ['token.created', { tokenName: 'CI deploy' }],
   ]
   for (const [action, metadata] of ok) assert.deepEqual(toAuditRow({ ...base, action, metadata }).metadata, metadata, action)

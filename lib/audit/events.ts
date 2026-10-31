@@ -99,7 +99,7 @@ export const AUDIT_METADATA = {
   'env.deleted': z.object({ scope }).partial().strict(),
   'token.created': z.object({ tokenName: label, expiresAt: z.string().datetime({ offset: true }).nullable() }).partial().strict(),
   'token.revoked': none,
-  'auth.signed_in': z.object({ newDevice: z.boolean(), method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']) }).strict(),
+  'auth.signed_in': z.object({ newDevice: z.boolean().optional(), method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']) }).strict(),
   'auth.sign_in_failed': z.object({ method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']), reason: z.enum(['invalid', 'locked', 'expired', 'denied']) }).partial().strict(),
   'audit.exported': z.object({ count: z.number().int().min(0).max(50_000), digest: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
   'audit.retention_changed': z.object({ retentionDays: z.number().int().min(1).max(36500).nullable(), legalHold: z.boolean() }).strict(),
