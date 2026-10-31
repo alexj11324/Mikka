@@ -102,7 +102,7 @@ export async function notifyAlerts(alerts, { state = {}, sink, now = Date.now(),
     try {
       const response = await fetchImpl(target, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(event), signal: AbortSignal.timeout(3_000), redirect: 'error' })
       if (!response.ok) throw Error('opsAlertDeliveryFailed')
-      next[id] = { active, lastSent: now }; deliveries.push({ id, state: event.state, delivered: true })
+      next[id] = { ...previous, active, lastSent: now }; deliveries.push({ id, state: event.state, delivered: true })
     } catch {
       // No endpoint or upstream error body in logs.
       next[id] = { ...previous, lastFailed: now }; deliveries.push({ id, state: event.state, delivered: false })
