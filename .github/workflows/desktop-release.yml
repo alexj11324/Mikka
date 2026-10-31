@@ -62,7 +62,7 @@ jobs:
 
   macos:
     needs: preflight
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
     env:
       RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
