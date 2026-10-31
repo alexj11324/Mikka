@@ -81,6 +81,7 @@ test('known high vulnerabilities, malformed audit results and expired exceptions
   assert.equal(assessAudit(report, lock, { ...policy, exceptions: [{ ...exception, version: '0.9.0' }] }, now).allowed, false)
   assert.throws(() => assessAudit({ error: { code: 'network' } }, lock, policy, now), /ReportUnavailable/)
   assert.throws(() => assessAudit(report, { lockfileVersion: 3, packages: {} }, policy, now), /LockMismatch/)
+  assert.throws(() => assessAudit({ ...report, vulnerabilities: {} }, lock, policy, now), /FindingMissing/)
   const pnpm = { metadata: report.metadata, advisories: { '42': { module_name: 'controlled-vulnerable-fixture', severity: 'high', findings: [{ version: '1.0.0' }] } } }
   assert.equal(assessAudit(pnpm, null, policy, now).allowed, false)
   assert.equal(assessAudit(pnpm, null, { ...policy, exceptions: [exception] }, now).allowed, true)

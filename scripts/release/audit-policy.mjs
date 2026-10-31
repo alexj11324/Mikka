@@ -49,6 +49,8 @@ export function assessAudit(report, lock, policy, now = Date.now()) {
       policy.exceptions.some(exception => exception.package === name && exception.version === version && exception.advisory === advisory)))
     if (!exempt) findings.push({ package: name, severity: value.severity, advisories, versions: [...new Set(versions)] })
   }
+  for (const severity of policy.blockSeverities) if (counts[severity] > 0 &&
+    !Object.values(report.vulnerabilities).some(value => value.severity === severity)) throw Error('releaseAuditFindingMissing')
   return { allowed: findings.length === 0, findings }
 }
 
