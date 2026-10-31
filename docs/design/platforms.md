@@ -45,9 +45,13 @@ ship a smaller surface without the UI claiming a feature it cannot perform.
 - On macOS the desktop window is translucent, as in Codex: the window uses the
   `sidebar` vibrancy material (`apps/desktop/src/main/window-appearance.ts`), and
   the preload sets `data-desktop-translucent` on `<html>`. Under that attribute
-  the frame chrome (window bar, rail) and the card's first column show an 80%
-  `shell-chrome` tint over the blurred desktop; the content column and right
-  panels stay opaque. Reduce transparency, Windows and Linux keep the opaque
-  window. The setting is read at launch.
+  the frame chrome (window bar, rail) and the card's first column (bot list,
+  settings list) paint no background of their own, so the material shows
+  untinted; the content column and right panels stay opaque. Hover and current
+  fills there (`--sidebar-accent`, `--sidebar-item`) become a black (light) or
+  white (dark) overlay, and the settings search field takes `--control`.
+  `tests/e2e/desktop-translucent.spec.ts` checks this over a solid page color.
+  Reduce transparency, Windows and Linux keep the opaque window. The setting is
+  read at launch.
 - Feature flags (PostHog) gate rollout; capabilities gate possibility. Compose
   them with `&&`, never substitute one for the other.
