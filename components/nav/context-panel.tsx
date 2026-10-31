@@ -124,9 +124,9 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
           <TabsTrigger value="all" className={pill}>{t('allThreads')}</TabsTrigger>
         </TabsList>
         <div className="ml-auto flex items-center">
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('search')} onClick={onSearch} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('search')}</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={wide ? t('narrow') : t('widen')} aria-pressed={wide} className={cn(sheet && 'hidden')} onClick={() => setWide(value => !value)} />}>{wide ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</TooltipTrigger><TooltipContent>{wide ? t('narrow') : t('widen')}</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('search')} onClick={onSearch} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('search')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={wide ? t('narrow') : t('widen')} aria-pressed={wide} className={cn(sheet && 'hidden')} onClick={() => setWide(value => !value)} />}>{wide ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</TooltipTrigger><TooltipContent>{wide ? t('narrow') : t('widen')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
         </div>
       </div>
       <TabsContent value="overview" className="flex min-h-0 flex-col">
