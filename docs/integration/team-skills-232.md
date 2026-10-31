@@ -65,8 +65,51 @@ withdrawal path otherwise leaves a normal queued task permanently unfinished
 
 ## Remaining issue acceptance
 
-This backend slice has no new main-site Skill management UI, ordinary browser
-workflow/video, remote team source integration, or real Codex/Claude/OpenCode
-Team Skill model run. Those issue acceptance requirements remain open. The source
-tests and authenticated handler invocation must not be presented as GitHub-hosted
-CI, a full Next HTTP/browser session, or a real-model/native acceptance run.
+The original issue explicitly allows choosing the first registry source and
+supported plugin format. `workspace-upload`, workspace-admin approval and
+`single-skill-md-v1` are the implemented choices. An empty dependency/permission
+manifest describes this guidance-only format; it is not a promise to implement
+executable packages. Remote registries, archives and other plugin formats are
+outside this first scope, rather than unfinished requirements. Rejecting those
+inputs before fetching or extraction is the applicable refusal contract.
+
+The backend lifecycle within that chosen format is implemented. Selection on
+each new run supplies controlled distribution and rollback to an older approved
+version. New versions require new approval; existing selections stay pinned.
+An unselected retry or question descendant cannot drop an ancestor's protected
+Skill. Question continuations that retain the selection recheck its current
+eligibility. Native harness children share the existing run and tool gate; they
+do not acquire a new approval or receipt. Withdrawal revokes the run token and
+lease, and the daemon's stop path revokes the tool gate and cancels the CLI
+process tree at the documented running-task boundary.
+
+The applicable acceptance still missing is a main-site management workflow with
+the requested screenshots/video, and real native-model runs across supported
+harnesses. The UI dependency belongs to Claude. There is no new backend package
+format or remote-source implementation prerequisite for those checks. Keep the
+issue open until the applicable user-path acceptance is complete. Source tests,
+authenticated handler invocation and synthetic adapters do not establish a full
+Next/browser session or real-model execution.
+
+## Scope recheck, 2026-10-31
+
+At main `3e2135e3685268aecffd25a994914e7781409c47`, the unchanged suites passed:
+
+- Real PostgreSQL17 lifecycle: 8/8, zero skipped, using the existing isolated
+  `mikka_admission_closeout_e2e` on loopback55599. It checks review, tenant/member
+  boundaries, assignment and disk digests, authenticated receipt revalidation,
+  protected retry refusal, withdrawal, STOP/token/lease fencing and immutable
+  audit evidence. New append-only fixture records were retained; prior records
+  and immutability guards were not modified.
+- Contract, HTTP handler and actual filesystem/RunContext checks: 8/8.
+- Daemon mount/resume and HTTP transport suites: 46/46. The approved Team Skill
+  reaches the existing synthetic adapter; withdrawn fresh assignments and saved
+  resumes start no adapter. This is daemon wiring evidence, not a native-model
+  demonstration.
+
+The first attempted PostgreSQL run used `mikka_audit_closeout_e2e`, which lacks
+the Team Skill tables and failed before registration. No schema was changed;
+the successful rerun used the already migrated Team Skill acceptance target.
+Local logs are `/tmp/mikka-team-skill-232-closeout-{pg,contract,daemon}.log`.
+The recheck found no additional missing core hook in this first supported format;
+it does not change production behavior or widen plugin permissions.
