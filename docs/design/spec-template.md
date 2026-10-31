@@ -7,7 +7,7 @@ empty.
 - **Status:** draft / in review / accepted (date)
 - **Linear / GitHub:** MIK-xx, #nn
 - **Figma:** section and frame ids (accepted frames only count once listed in
-  `decisions.md`)
+  `decisions/` or `decisions.md`)
 - **Owner thread:**
 
 ## What the user does
@@ -27,7 +27,7 @@ dark mode, narrow window. For each one, the Figma frame or a sentence.
 ## Rules that apply
 
 The `rules.md` ids this feature touches (for example R-10, R-23), and any
-new rule it needs. A new rule needs Alex's decision and a `decisions.md` row.
+new rule it needs. A new rule needs Alex's decision and a file in `decisions/`.
 
 ## Components
 
