@@ -100,6 +100,7 @@ test('metadata is a per-action allowlist', () => {
     ['member.role_changed', { oldRole: 'member', newRole: 'admin' }],
     ['integration.permission_changed', { integration: 'Slack', capability: 'write', from: 'allow', to: 'deny' }],
     ['auth.signed_in', { newDevice: true, method: 'password' }],
+    ['auth.signed_in', { method: 'oauth' }],
     ['token.created', { tokenName: 'CI deploy' }],
   ]
   for (const [action, metadata] of ok) assert.deepEqual(toAuditRow({ ...base, action, metadata }).metadata, metadata, action)
@@ -130,4 +131,18 @@ test('CLI policy changes expose a bound revision, never policy instructions or r
   const event = { ...base,action: 'agent.policy_changed' as const, metadata: {scope:'project' as const,revision:'a'.repeat(64)} }
   assert.deepEqual(toAuditRow(event).metadata,event.metadata)
   assert.throws(() => toAuditRow({...event,metadata:{...event.metadata,policy:{networkAllow:['private.example']}}} as unknown as AuditEvent))
+})
+
+
+test('credential and Agent approval metadata excludes credential content and tool input', () => {
+  for (const action of ['credential.created', 'credential.replaced', 'credential.revoked'] as const) {
+    assert.deepEqual(toAuditRow({ ...base, action }).metadata, {})
+    for (const key of ['origin', 'username', 'password']) assert.throws(() => toAuditRow({ ...base, action, metadata: { [key]: 'private-input' } }), /allowlist/)
+  }
+  const metadata = { runId: ws, decision: 'approved' as const, revision: 'a'.repeat(64) }
+  assert.deepEqual(toAuditRow({ ...base, action: 'agent.approval_decided', metadata }).metadata, metadata)
+  assert.throws(() => toAuditRow({ ...base, action: 'agent.approval_decided', metadata: { ...metadata, input: { command: 'private-input' } } }), /allowlist/)
+  assert.throws(() => toAuditRow({ ...base, action: 'agent.approval_decided', metadata: { ...metadata, revision: 'unknown' } }), /allowlist/)
+  assert.deepEqual(toAuditRow({ ...base, action: 'agent.approval_consumed', metadata: { runId: ws, revision: metadata.revision } }).metadata, { runId: ws, revision: metadata.revision })
+  assert.throws(() => toAuditRow({ ...base, action: 'agent.approval_consumed', metadata }), /allowlist/)
 })
