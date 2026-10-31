@@ -281,6 +281,14 @@ test('a segmented control track comes from ToggleGroup variant="segment", not ca
   clean('<ToggleGroupItem className="h-7" />')
 })
 
+test('R-33: a dialog keeps the primitive radius', () => {
+  has(`${prefix} const ui = <DialogContent className="gap-4 rounded-2xl p-0" />`, 'style/dialog-radius')
+  has(`${prefix} const ui = <AlertDialogContent className={cn('rounded-lg')} />`, 'style/dialog-radius')
+  const clean = source => assert.ok(!rules(`${prefix} const ui = ${source}`).includes('style/dialog-radius'), source)
+  clean('<DialogContent className="gap-4 p-0" />')
+  clean('<DialogContent className="h-dvh w-screen rounded-none" />')
+})
+
 test('utility parser respects bracket expressions and variants', () => {
   assert.deepEqual(splitUtilities('flex [&_svg]:size-4 text-[length:var(--size)]'), ['flex', '[&_svg]:size-4', 'text-[length:var(--size)]'])
   assert.equal(utilityBase('dark:hover:text-[length:var(--size)]'), 'text-[length:var(--size)]')

@@ -90,7 +90,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   const failed = error || textError || detail === null
   return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
     <DialogContent showCloseButton={false} aria-describedby={undefined}
-      className="flex h-[min(53.75rem,calc(100dvh-2rem))] w-[min(80rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden rounded-2xl p-0 shadow-2xl ring-0 sm:max-w-none">
+      className="flex h-[min(53.75rem,calc(100dvh-2rem))] w-[min(80rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-2xl ring-0 sm:max-w-none">
       <header className="flex h-13 shrink-0 items-center gap-2 px-4">
         {detail && <ArtifactKindIcon kind={detail.kind} className="size-4 shrink-0 text-muted-foreground" />}
         <DialogTitle className="truncate text-sm leading-5 font-medium">{detail?.title ?? ''}</DialogTitle>
