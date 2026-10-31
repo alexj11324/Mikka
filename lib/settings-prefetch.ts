@@ -63,11 +63,19 @@ const idle = () => new Promise<void>(resolve => {
  * section sooner when the person gets there first.
  *
  * One section at a time: Next runs a page's server actions one after another,
- * so a burst of reads would hold back a save made meanwhile. A save waits for
- * at most one section's reads.
+ * so a burst of reads would hold back a save made meanwhile. It stops for good
+ * once the person types or clicks in a section (choosing one in the section
+ * list does not count), so reads never queue ahead of their edits; at most the
+ * section already in flight finishes.
  */
 export function prefetchAllSettings(workspaceId: string, admin: boolean, cache: Cache) {
   let cancelled = false
+  const stop = (event?: Event) => {
+    if (event?.target instanceof Element && event.target.closest('[data-slot="settings-list"]')) return
+    cancelled = true
+  }
+  const events = ['keydown', 'pointerdown'] as const
+  for (const type of events) window.addEventListener(type, stop, { capture: true })
   void (async () => {
     for (const { id } of visibleSettingsSections({ admin })) {
       await idle()
@@ -75,5 +83,5 @@ export function prefetchAllSettings(workspaceId: string, admin: boolean, cache: 
       await prefetchSettingsSection(id, workspaceId, cache)
     }
   })()
-  return () => { cancelled = true }
+  return () => { stop(); for (const type of events) window.removeEventListener(type, stop, { capture: true }) }
 }
