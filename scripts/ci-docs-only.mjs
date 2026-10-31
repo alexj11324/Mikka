@@ -115,6 +115,7 @@ const SCOPED_BROWSER = [
   { area: 'auth', paths: [/^lib\/(?:auth|session|email-sign-in)[-.]/, /^lib\/abuse\//, /^app\/api\/auth\//, /^components\/auth(?:\/|-form\.tsx$)/, /^app\/\[locale\]\/(?:sign-in|sign-up|verify-email|forgot-password|reset-password)\//], specs: ['sign-out.spec.ts', 'workspace.spec.ts', 'signup-turnstile.spec.ts'] },
   { area: 'relations', paths: [/^lib\/issue-relation/, /^components\/workspace\/issue-relations\.tsx$/], specs: ['relations.spec.ts'] },
   { area: 'active agents', paths: [/^lib\/active-agents\./], specs: ['active-agents.spec.ts'] },
+  { area: 'account menu', paths: [/^components\/workspace-menu\.tsx$/, /^components\/nav\/icon-rail\.tsx$/], specs: ['workspace-menu.spec.ts', 'workspace.spec.ts', 'sign-out.spec.ts', 'workspace-shortcuts.spec.ts'] },
   { area: 'agent ui', paths: [/^lib\/agent-ui[-.]/, /^lib\/legacy-chat-content\.ts$/, /^components\/workspace\/agent-(?:ui-library|generative-ui|theme|chart|report|editable-table|text-bubble|decision|citations)\.tsx$/], specs: ['agent.spec.ts', 'coordinator-choice-card.spec.ts', 'bot-image-read.spec.ts', 'e2b-machine-name.spec.ts'] },
 ]
 export const BROWSER_SCOPED_SPECS = Object.freeze([...new Set(SCOPED_BROWSER.flatMap(rule => rule.specs))].sort())

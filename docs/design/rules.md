@@ -267,6 +267,14 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   Mikka's own stacked-cards icon (R-56), never lucide Copy or Library.
   No sparkle for AI (unslop): thinking is Brain, a bot is Bot (ui-policy
   `icons/no-sparkle`).
+- **R-76** Every workspace feature is on by default. Only a workspace admin
+  turns one off (Settings › 工作区 or 团队权限), and members see the current
+  value read-only. A stored off is an admin's choice, never a leftover
+  default: a migration that turns a default on also rewrites rows that hold
+  the old default. A feature stays off only for real per-use cost, an
+  incident kill switch or a recorded Alex decision (`decisions.md`). Safety
+  and money defaults (approval requirements, auto-recharge) are not features;
+  they change only with Alex's decision. Source: Alex, 2026-10-31.
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
@@ -308,6 +316,16 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   profile and the background research sit behind deployment flags (off by
   default when self-hosted), a per-person entitlement, the person's own
   toggles and a daily budget.
+- **R-75** Workspaces are switched in one place: the account menu behind the
+  avatar at the bottom of the rail (the bot list's footer on phones).
+  Settings shows the current workspace's settings and has no switcher; its
+  column starts with the 设置 title and search. The account menu is one flat
+  `DropdownMenu`, no submenu, as Linear's and Notion's: each signed-in
+  account's email (small, muted) with its workspaces under it (avatar, name,
+  a check on the current one; about five show, more scroll), 创建工作区;
+  then 设置 with its shortcut as one quiet text hint (⌘, not keycaps); then
+  添加账户 and 退出登录. Menu text and item height are the defaults; the
+  menu is 240px wide and opens above the rail avatar, never over it.
 
 ## Look
 
