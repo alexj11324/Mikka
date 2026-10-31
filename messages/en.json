@@ -1828,6 +1828,7 @@
       "reconnect": "Reconnect",
       "disconnect": "Disconnect",
       "deviceInstructions": "Open the provider page and enter this code. Keep this page open while Mikka checks the connection.",
+      "browserInstructions": "Approve access in your browser. Mikka finishes on its own when you are done.",
       "callbackInstructions": "Open the provider page and approve access. If the browser ends on a localhost callback page, copy its full address into the field below.",
       "callbackLabel": "Callback page address",
       "openProvider": "Open the provider page",

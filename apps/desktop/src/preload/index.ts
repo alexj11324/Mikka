@@ -36,6 +36,7 @@ if (appOrigin && window.location.origin === appOrigin) {
       zeroUrl: '',
       openExternal: (url: unknown) => ipcRenderer.invoke(IPC.appOpenExternal, url),
       prepareAuth: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareAuth, state),
+      claudeCallback: (authorizationUrl: unknown) => ipcRenderer.invoke(IPC.appClaudeCallback, authorizationUrl),
       updateReady: () => ipcRenderer.invoke(IPC.appUpdateReady),
       onUpdateReady: (listener: (version: string) => void) => {
         const handler = (_event: IpcRendererEvent, version: string) => listener(version)

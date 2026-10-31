@@ -1828,6 +1828,7 @@
       "reconnect": "重新连接",
       "disconnect": "断开连接",
       "deviceInstructions": "打开服务商页面并输入以下代码。请保持此页面打开，Mikka 会检查连接状态。",
+      "browserInstructions": "请在浏览器中同意授权,完成后会自动回到这里。",
       "callbackInstructions": "打开服务商页面并同意授权。如果浏览器最后停在 localhost 回调页面，请将地址栏中的完整地址粘贴到下方。",
       "callbackLabel": "回调页面地址",
       "openProvider": "打开服务商页面",
