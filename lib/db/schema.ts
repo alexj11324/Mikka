@@ -310,7 +310,7 @@ export const agents = pgTable('agents', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('agents_user_name_key').on(table.userId, sql`lower(${table.name})`), index('agents_device_idx').on(table.deviceId)])
 
-export const RUN_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing', 'succeeded', 'stopped', 'failed', 'cancelled'] as const
+export const RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing', 'succeeded', 'stopped', 'failed', 'cancelled'] as const
 export type RunStatus = (typeof RUN_STATUSES)[number]
 
 /** One execution of one agent. The daemon claims it, runs it and reports back. */
@@ -325,6 +325,8 @@ export const agentRuns = pgTable('agent_runs', {
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
+  pauseReason: text('pauseReason').$type<'human_control' | null>(),
+  resumeStatus: text('resumeStatus').$type<RunStatus | null>(),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),
   /** Caller-supplied retry identity, scoped to userId. Null for older dispatchers. */
@@ -377,7 +379,7 @@ export const runPublications = pgTable('run_publications', {
   status: text('status').$type<'assigned' | 'pending' | 'processing' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
   workflowRunId: text('workflowRunId'), leaseToken: uuid('leaseToken'), leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   attempts: integer('attempts').notNull().default(0),
-  pullRequest: jsonb('pullRequest').$type<{ url: string; state: 'open' | 'draft' | 'merged' | 'closed' } | null>(),
+  pullRequest: jsonb('pullRequest').$type<{ url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed' } | null>(),
   errorCode: text('errorCode'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -924,6 +926,7 @@ export const factoryTasks = pgTable('factory_tasks', {
 }, table => [unique('factory_tasks_source_key').on(table.userId, table.issueId, table.sourceEventId), index('factory_tasks_owner_issue_idx').on(table.userId, table.issueId, table.updatedAt)])
 
 export const factoryCandidates = pgTable('factory_candidates', {
+  previewDatabaseBranch: text('previewDatabaseBranch'), machineName: text('machineName'),
   id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
   sha: text('sha').notNull(), repository: text('repository').notNull(), environment: text('environment').notNull(), scope: text('scope').notNull(),
   runId: uuid('runId').notNull(),

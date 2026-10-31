@@ -41,6 +41,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/secrets/store.ts', file: 'tests/workspace-secrets.db.test.ts', script: 'test:secrets-db' },
   { marker: 'lib/suggestions/time-zone.ts', file: 'tests/settings-preferences.db.test.ts', script: 'test:settings-prefs-db' },
   { marker: 'lib/tokens/store.ts', file: 'tests/personal-access-tokens.db.test.ts', script: 'test:pat-db' },
+  { marker: 'lib/api-auth.ts', file: 'tests/personal-access-token-api.db.test.ts', script: 'test:pat-api-db' },
   { marker: 'lib/coordinator/bot-instructions.ts', file: 'lib/coordinator/bot-chats.db.test.ts', script: 'test:bot-chats-db' },
   { marker: 'lib/workspace-admin/bot-threads.ts', file: 'tests/bot-threads.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/coordinator/store.ts', file: 'tests/coordinator-task-binding.db.ts', script: 'test:coordinator-task-binding-db' },

@@ -947,6 +947,14 @@
     "allStatuses": "全部状态"
   },
   "Errors": {
+    "botNotFound": "找不到这个 Bot。",
+    "executionPlaceInvalid": "请选择可用设备或云端。",
+    "executionHarnessUnavailable": "所选设备上没有这个 Agent。",
+    "executionModelUnknown": "此模型不可用。",
+    "executionRuleNotFound": "找不到这条执行规则。",
+    "executionRuleOrderInvalid": "执行规则顺序已更改，请刷新后重试。",
+    "executionCommandNotFound": "找不到这次检测。",
+    "executionAccountUnavailable": "此账号不可用。",
     "generic": "操作未成功，请稍后重试。",
     "authRequired": "需要先登录",
     "validationGeneric": "请检查填写内容。",

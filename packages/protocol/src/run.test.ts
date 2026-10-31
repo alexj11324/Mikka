@@ -102,3 +102,11 @@ describe("run completion contract", () => {
     expect(reachesReview("submitted", undefined)).toBe(false)
   })
 })
+
+ describe('candidate detail reporting', () => {
+  it('keeps preview branch and per-criterion commands without replacing daemon verification', () => {
+    const value = { ...report, previewDatabaseBranch: 'preview/acceptance', criteria: [{ criterionId: '10000000-0000-4000-8000-000000000001', passed: true, command: 'pnpm test:button', exitCode: 0 }] }
+    expect(runReport.parse(value)).toEqual(value)
+    expect(runReport.safeParse({ ...value, criteria: [{ ...value.criteria[0], exitCode: 0.5 }] }).success).toBe(false)
+  })
+})

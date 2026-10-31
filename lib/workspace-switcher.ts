@@ -4,11 +4,12 @@ import { and, asc, eq } from 'drizzle-orm'
 import { auth, type DeviceSessionSummary } from '@/lib/auth'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
+import type { ApiSession } from '@/lib/api-auth'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 
-export async function loadWorkspaceSwitcher() {
-  const context = await loadWorkspaceContext()
-  const deviceSessions: DeviceSessionSummary[] = await auth.api.listDeviceSessions({ headers: await headers() })
+export async function loadWorkspaceSwitcher(apiSession?: ApiSession) {
+  const context = await loadWorkspaceContext(undefined, apiSession?.user)
+  const deviceSessions: DeviceSessionSummary[] = apiSession?.tokenWorkspaceId ? [] : await auth.api.listDeviceSessions({ headers: await headers() })
   const accounts = await Promise.all(deviceSessions.filter(item => item.user.id !== context.currentUserId).map(async item => {
     const choices = await workspaceDb.select({ id: workspaces.id, name: workspaces.name }).from(workspaces)
       .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))

@@ -41,6 +41,7 @@ await copyFile(resolve(root, 'README.md'), resolve(out, 'README.md'))
 const exports = Object.fromEntries(Object.entries(source.exports).map(([key]) => [key, `./${key === '.' ? 'main' : key.slice(2)}.js`]))
 await writeFile(resolve(out, 'package.json'), `${JSON.stringify({
   name: packageName, version: source.version, description: source.description,
+  gitHead: source.gitHead,
   type: 'module', private: false, license: source.license,
   engines: source.engines, bin: { mikka: './mikka.js' }, exports,
   repository: { type: 'git', url: 'git+https://github.com/alexj11324/Mikka.git', directory: 'packages/daemon' },

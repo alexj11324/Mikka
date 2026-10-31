@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { ActionFailureError } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { parseSearchParams, searchIssues, SearchInputError } from '@/lib/issue-search'

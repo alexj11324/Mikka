@@ -63,10 +63,11 @@ export async function saveTeam(input: { id?: string; workspaceId: string; name: 
     })
   })
 }
-export async function listTeamMembers(id: string) {
+export async function listTeamMembers(id: string, tokenWorkspaceId?: string) {
   const user = await requireUser()
   return workspaceDb.transaction(async tx => {
     const team = await requireTeam(tx, id, user.id)
+    if (tokenWorkspaceId && tokenWorkspaceId !== team.workspaceId) throw new WorkspaceError('workspaceAccessDenied')
     const members = await tx.select({ userId: workspaceMembers.userId, name: workspaceMembers.name, email: workspaceMembers.email, status: workspaceMembers.status, role: teamMembers.role }).from(teamMembers)
       .innerJoin(workspaceMembers, and(eq(workspaceMembers.userId, teamMembers.userId), eq(workspaceMembers.workspaceId, team.workspaceId)))
       .where(eq(teamMembers.teamId, id)).orderBy(asc(teamMembers.createdAt))

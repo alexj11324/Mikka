@@ -28,6 +28,18 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const stored = async (id: string) => { const { rows: [row] } = await pool.query('select * from workspace_secrets where id=$1', [id]); return secretCrypto.openSecret(row, secretCrypto.secretAad(row)) }
   const META_KEYS = ['id', 'kind', 'name', 'scopeRef', 'scopeType']
 
+  await t.test('E2B status and capability report mandatory BYO regardless of the legacy flag and honor membership', async () => {
+    const previous = process.env.MIKKA_BYO_E2B_KEY
+    try {
+      for (const enabled of ['0', '1']) {
+        process.env.MIKKA_BYO_E2B_KEY = enabled
+        assert.deepEqual(await e2b.getE2BKeyCapabilityForUser(admin, ws.id), { canEdit: true, configured: false, byoEnabled: true, lastErrorCode: null, lastErrorAt: null })
+        assert.deepEqual(await e2b.getE2BKeyCapabilityForUser(member, ws.id), { canEdit: false, configured: false, byoEnabled: true, lastErrorCode: null, lastErrorAt: null })
+        await rejects(e2b.getE2BKeyCapabilityForUser(member, other.id), 'workspaceAccessDenied')
+      }
+    } finally { if (previous === undefined) delete process.env.MIKKA_BYO_E2B_KEY; else process.env.MIKKA_BYO_E2B_KEY = previous }
+  })
+
   await t.test('the recordAudit hook writes name-only rows inside the write transaction', async () => {
     const { secretAuditHook } = await import('../lib/secrets/audit')
     const auditWs = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
@@ -117,7 +129,7 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     assert.equal((await e2b.getE2BKeyStatus(admin, ws.id)).configured, false, 'nothing saved on failure')
     const events: string[] = []
     const status = await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }), audit: async (_tx, e) => { events.push(`${e.action}:${e.target.type}:${e.target.label}`) } })
-    assert.deepEqual(Object.keys(status).sort(), ['configured', 'lastErrorAt', 'lastErrorCode'], 'no last4 / verifiedAt / updatedAt')
+    assert.deepEqual(Object.keys(status).sort(), ['byoEnabled', 'configured', 'lastErrorAt', 'lastErrorCode'], 'no last4 / verifiedAt / updatedAt')
     assert.equal(status.configured, true)
     assert.ok((await pool.query('select last4, "verifiedAt" from workspace_e2b_keys where "workspaceId"=$1', [ws.id])).rows[0].verifiedAt, 'still stored')
     assert.ok(!JSON.stringify(status).includes(KEY))

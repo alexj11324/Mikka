@@ -1,6 +1,6 @@
 import { after, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { attentionBudgets, setAttentionEnabled } from '@/lib/attention/store'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 
