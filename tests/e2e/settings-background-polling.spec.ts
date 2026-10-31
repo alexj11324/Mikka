@@ -11,6 +11,7 @@ test('workspace idle reads stay within budget across settings, return and page d
   const originalTitle = `Before settings ${randomUUID()}`
   const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
   const windows: { state: string; durationMs: number; reads: number[]; total: number; budget: { perStreamMin: number; perStreamMax: number; totalMin: number; totalMax: number }; status: 'pass' | 'fail' }[] = []
+  const conditions: { durationMs: number; visibility: string; online: boolean; section: string; virtualElapsedMs: number }[] = []
   let completed = false
   await scope.recordResource(issue)
   try {
@@ -18,6 +19,7 @@ test('workspace idle reads stay within budget across settings, return and page d
       await scope.pool.current(client, scope.lease)
       await client.query('INSERT INTO issues (id, "userId", title, content, status, priority) VALUES ($1, $2, $3, $4, \'todo\', \'normal\')', [issue.id, issue.ownerId, originalTitle, { type: 'doc', content: [{ type: 'paragraph' }], attrs: { mikka: { number: 1 } } }])
     })
+    await page.bringToFront()
     await page.clock.install()
     await page.goto(app('/?section=all-issues'))
     await expect(page.getByText(originalTitle, { exact: true })).toBeVisible()
@@ -31,11 +33,23 @@ test('workspace idle reads stay within budget across settings, return and page d
       if (request.method() === 'POST' && action) actions.push(action)
     })
     async function advance(durationMs: number) {
+      const state = await page.evaluate(() => {
+        const url = new URL(window.location.href)
+        const section = url.pathname.includes('/settings') ? 'settings' : url.searchParams.has('settings') ? 'legacy-settings' : url.searchParams.get('section') === 'all-issues' ? 'tasks' : url.searchParams.get('section') === 'artifacts' ? 'artifacts' : 'away'
+        return { visibility: document.visibilityState, online: navigator.onLine, section }
+      })
+      const started = await page.evaluate(() => Date.now())
+      const condition = { durationMs, ...state, virtualElapsedMs: 0 }
+      conditions.push(condition)
+      expect(state.visibility).toBe('visible')
+      expect(state.online).toBe(true)
       for (let elapsed = 0; elapsed < durationMs; elapsed += 5_000) {
         await page.clock.runFor(Math.min(5_000, durationMs - elapsed))
         // SWR schedules its next poll only after the real action completes.
         await page.waitForLoadState('networkidle')
       }
+      condition.virtualElapsedMs = await page.evaluate(() => Date.now()) - started
+      expect(condition.virtualElapsedMs).toBe(durationMs)
     }
     let pollingActions: string[] = []
     function checkWindow(state: string, start: number, durationMs: number, perStreamMin: number, perStreamMax: number, totalMin = perStreamMin * 2, totalMax = perStreamMax * 2, observedActions = pollingActions) {
@@ -45,16 +59,20 @@ test('workspace idle reads stay within budget across settings, return and page d
       windows.push({ state, durationMs, reads, total, budget: { perStreamMin, perStreamMax, totalMin, totalMax }, status })
       expect(status, `${state}: ${JSON.stringify({ reads, total })}`).toBe('pass')
     }
+    // Initial reads must finish before identifying recurring action streams.
+    await advance(20_000)
+    const boardDiscovery = actions.length
     // The board also polls task runs and its visible Coordinator chat.
     await advance(16_000)
-    const boardPollingActions = [...new Set(actions)]
-    checkWindow('visible-board-periodic-discovery', 0, 16_000, 1, 2, 4, 6, boardPollingActions)
+    const boardPollingActions = [...new Set(actions.slice(boardDiscovery))]
+    checkWindow('visible-board-periodic-discovery', boardDiscovery, 16_000, 1, 2, 4, 6, boardPollingActions)
     expect(boardPollingActions.length).toBe(4)
 
     // Artifact has no extra periodic reads: learn the two shared workspace actions here.
     await rail(page, '产物').click()
     await expect(page.getByRole('heading', { level: 1, name: '产物', exact: true })).toBeVisible()
     await page.waitForLoadState('networkidle')
+    await advance(5_000)
     const sharedDiscovery = actions.length
     await advance(60_000)
     pollingActions = [...new Set(actions.slice(sharedDiscovery))]
@@ -124,7 +142,7 @@ test('workspace idle reads stay within budget across settings, return and page d
   } finally {
     try {
       await testInfo.attach('workspace-idle-request-budget', {
-        body: JSON.stringify({ headSha, normalCadencePer60Seconds: { listIssues: 6, listThreads: 4, combinedMax: 10 }, streamIdentity: 'dynamically-observed-actions-without-retained-identifiers', windows, status: completed ? 'pass' : 'fail' }, null, 2),
+        body: JSON.stringify({ headSha, normalCadencePer60Seconds: { listIssues: 6, listThreads: 4, combinedMax: 10 }, streamIdentity: 'dynamically-observed-actions-without-retained-identifiers', conditions, windows, status: completed ? 'pass' : 'fail' }, null, 2),
         contentType: 'application/json',
       })
     } finally {
