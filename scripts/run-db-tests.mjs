@@ -80,6 +80,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/account/runtime-cleanup.ts', file: 'lib/account/cloud-cleanup.db.test.ts', script: 'test:account-db' },
   { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-restore.db.test.ts', script: 'test:account-db' },
   { marker: 'lib/ops/monitor.ts', file: 'lib/ops/monitor.db.test.ts', script: 'test:ops-db' },
+  { marker: 'lib/linear-sync/archive.ts', file: 'tests/linear-archive.db.test.ts', script: 'test:scope-detachment-db' },
 ]
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.

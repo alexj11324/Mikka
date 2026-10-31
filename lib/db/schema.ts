@@ -196,6 +196,8 @@ export const linearIssueDetachments = pgTable('linear_issue_detachments', {
   issueId: uuid('issueId').notNull(), ownerId: text('ownerId').notNull(),
   teamSyncId: uuid('teamSyncId'), linearIdentifier: text('linearIdentifier'),
   sourceLinkId: uuid('sourceLinkId').unique(), publicationId: uuid('publicationId'),
+  externalTargetVerified: boolean('externalTargetVerified').notNull().default(false),
+  archivedAt: timestamp('archivedAt', { withTimezone: true }),
   detachedAt: timestamp('detachedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('linear_issue_detachments_issue_idx').on(table.issueId)])
 export const linearCommentLinks = pgTable('linear_comment_links', {
@@ -205,6 +207,7 @@ export const linearCommentLinks = pgTable('linear_comment_links', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('linear_comment_links_local_key').on(table.issueLinkId, table.threadId, table.messageId)])
 export const linearSyncOutbox = pgTable('linear_sync_outbox', {
+  operation: text('operation').$type<'sync' | 'archive'>().notNull().default('sync'), archiveTarget: jsonb('archiveTarget'),
   scopeVersion: integer('scopeVersion').notNull().default(1), claimToken: uuid('claimToken'),
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   status: text('status').notNull().default('queued'), attempts: integer('attempts').notNull().default(0),
