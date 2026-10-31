@@ -14,7 +14,7 @@ async function getUserId(): Promise<string> {
 }
 
 /** Approves (runs) or declines one proposal. */
-export async function decidePendingAction(id: string, approve: boolean): Promise<ActionResult<{ status: 'done' | 'failed' | 'declined'; reason: string | null }>> {
+export async function decidePendingAction(id: string, approve: boolean): Promise<ActionResult<{ status: 'done' | 'failed' | 'declined' | 'running'; reason: string | null }>> {
   return runAction(async () => {
     const userId = await getUserId()
     const parsed = z.uuid().safeParse(id)

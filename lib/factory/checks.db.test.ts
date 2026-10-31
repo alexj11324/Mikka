@@ -1,6 +1,6 @@
 // Real #192 migrations/store/dispatch/questions/claim and #193 consumers.
 // Run production code over isolated PG; queue, actor and terminal reports are fixtures.
-// #331 host invocation is real code with a Gateway HTTP stub and synthetic PNG.
+// #331 host invocation uses a real loopback HTTP provider fixture and synthetic PNG.
 // No real provider, account credential, screenshot or visual understanding is claimed.
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -16,6 +16,10 @@ import {
   type RunPolicy,
 } from "@mikka/protocol/agent-policy";
 import { Pool } from "pg";
+import { assertE2eTarget } from "../../tests/helpers/e2e-target.mjs";
+import { createRequestDatabaseScope } from "../db";
+import { hostedBillingScope } from "../abuse/context";
+import { HostedUsageStore } from "../abuse/store";
 import { exerciseFactoryRecoveryEntry } from "../../tests/support/factory-recovery-entry-fixture";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
@@ -49,28 +53,23 @@ test(
   "actual migrated PG/HTTP: review/verify receipt consumers and bounded repair",
   { timeout: 120000 },
   async (t) => {
-    assert.equal(
-      process.env.CI,
-      "true",
-      "Actions-only isolated test, no local application fallback",
-    );
-    assert.equal(process.env.GITHUB_ACTIONS, "true");
     assert.equal(process.env.REQUIRE_DB, "1");
     const url = process.env.E2E_DATABASE_URL;
     assert.ok(url);
     assert.equal(process.env.DATABASE_URL, url);
     assert.equal(process.env.MIKKA_DATABASE_URL, url);
-    const target = new URL(url);
-    assert.equal(target.hostname, "127.0.0.1");
-    assert.equal(target.port, "5432");
-    assert.equal(target.username, "e2e");
-    assert.equal(target.pathname, "/mikka_e2e");
-    assert.equal(target.search, "");
-    assert.equal(target.hash, "");
-    assert.ok(["postgres:", "postgresql:"].includes(target.protocol));
+    const target = assertE2eTarget(url);
+    if (process.env.GITHUB_ACTIONS === "true") {
+      assert.equal(process.env.CI, "true");
+      assert.equal(target.hostname, "127.0.0.1");
+      assert.equal(target.port, "5432");
+      assert.equal(target.username, "e2e");
+      assert.equal(target.pathname, "/mikka_e2e");
+    }
     const admin = new Pool({ connectionString: url });
-    const database = `factory193_consumers_${randomUUID().replaceAll("-", "")}`;
+    const database = `factory193_consumers_${randomUUID().replaceAll("-", "")}_e2e`;
     let pool: Pool | undefined;
+    let modelDatabase: ReturnType<typeof createRequestDatabaseScope> | undefined;
     let installedGatewayFixture = false;
     try {
       assert.equal(
@@ -84,7 +83,7 @@ test(
       );
       // Extensions are database-wide. A schema in shared mikka_e2e would install
       // pg_trgm into that schema and break later isolated-schema suites.
-      // Use this same disposable Actions service, role and credentials; no DROP.
+      // Use this same validated isolated service and role; no DROP.
       await admin.query(`CREATE DATABASE "${database}"`);
       const isolated = new URL(url);
       isolated.pathname = `/${database}`;
@@ -94,6 +93,7 @@ test(
         options: "-c statement_timeout=15000 -c lock_timeout=5000",
       });
       const db = pool;
+      modelDatabase = createRequestDatabaseScope(isolated.toString());
       const directory = new URL("../../drizzle/", import.meta.url);
       for (const file of orderMigrations(
         (await readdir(directory)).filter((f) => f.endsWith(".sql")),
@@ -102,6 +102,19 @@ test(
       await db.query(
         `INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','check@example.invalid',true,now(),now()),('other','Other','other-check@example.invalid',true,now(),now())`,
       );
+      const billingWorkspaceId = randomUUID();
+      await db.query(`INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,'owner','Factory model fixture',$2)`,
+        [billingWorkspaceId,`factory-${billingWorkspaceId}`]);
+      await db.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status)
+        VALUES($1,'owner','Fixture','check@example.invalid','admin','active')`,[billingWorkspaceId]);
+      const usage = new HostedUsageStore(db);
+      await usage.verify(billingWorkspaceId, "synthetic-factory-customer", `factory-${billingWorkspaceId}`);
+      // Bind the runtime to this test's actual accounting store, never a fake
+      // successful budget response. Model admission uses its real implementation.
+      t.mock.module(new URL("../abuse/runtime.ts",import.meta.url).href,{namedExports:{
+        canUseMikkaPaid:(workspaceId:string)=>usage.canUseMikkaPaid(workspaceId),
+        hostedUsage:usage,
+      }});
       const authorize = async (
         user: string,
         issue: string,
@@ -219,6 +232,34 @@ test(
       installedGatewayFixture = true;
       const networkRequests: unknown[] = [];
       const originalFetch = globalThis.fetch;
+      const providerErrors: unknown[] = [];
+      const provider = createServer(async (request, response) => {
+        try {
+          const chunks: Buffer[] = [];
+          for await (const chunk of request) chunks.push(Buffer.from(chunk));
+          const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          networkRequests.push(body);
+          assert.equal(request.headers.authorization,"Bearer synthetic-offline-fixture");
+          assert.equal(body.model, DECISION_MODEL);
+          response.writeHead(200,{"content-type":"application/json"}).end(JSON.stringify({
+            model: DECISION_MODEL,
+            provider_metadata: {
+              gateway: { generationId: `fixture_generation_${modelCalls}`, cost: "0.000001" },
+            },
+            answers: replyAnswers ?? [{
+              type: "choice", name: "recovery", choice: chosenAction,
+              ...(replyConfidence !== undefined ? {confidence:replyConfidence} : {}),
+            }],
+          }));
+        } catch(error) { providerErrors.push(error);response.writeHead(500).end(); }
+      });
+      await new Promise<void>(resolve=>provider.listen(0,"127.0.0.1",resolve));
+      const providerUrl=`http://127.0.0.1:${(provider.address() as {port:number}).port}`;
+      t.after(async()=>{
+        provider.closeAllConnections();
+        await new Promise<void>(resolve=>provider.close(()=>resolve()));
+        assert.deepEqual(providerErrors,[]);
+      });
       t.mock.method(
         globalThis,
         "fetch",
@@ -228,25 +269,8 @@ test(
         ) => {
           const url = String(resource);
           if (url === DECISIONS_URL) {
-            const body = JSON.parse(String(options?.body));
-            networkRequests.push(body);
-            assert.equal(body.model, DECISION_MODEL);
-            return Response.json({
-              model: DECISION_MODEL,
-              provider_metadata: {
-                gateway: { generationId: `fixture_generation_${modelCalls}` },
-              },
-              answers: replyAnswers ?? [
-                {
-                  type: "choice",
-                  name: "recovery",
-                  choice: chosenAction,
-                  ...(replyConfidence !== undefined
-                    ? { confidence: replyConfidence }
-                    : {}),
-                },
-              ],
-            });
+            assert.equal(options?.redirect,"error");
+            return originalFetch(providerUrl,options);
           }
           assert.match(
             url,
@@ -267,7 +291,12 @@ test(
         modelCalls++;
         await beforeModel?.();
         if (nullModel) return null;
-        const result = await invokeDecision(purpose, input, questions, signal);
+        // This explicitly injected model wrapper owns fixture scope; the
+        // default recovery wrapper cannot infer scope for a custom dependency.
+        const result = await modelDatabase!.run(()=>hostedBillingScope.run(
+          {workspaceId:billingWorkspaceId,ownerId:"owner"},
+          ()=>invokeDecision(purpose, input, questions, signal),
+        ));
         if (result) mutateReceipt?.(result);
         return result;
       };
@@ -1574,6 +1603,28 @@ test(
             }
           },
         );
+      await t.test("recovery requires a positive real balance and records actual cost without reserving funds",async()=>{
+        const {snapshot}=await failedReview(),binding=factoryBinding(snapshot.task);
+        const before=networkRequests.length;
+        const{rows:[allowance]}=await db.query('SELECT remaining FROM hosted_allowances WHERE "workspaceId"=$1',[billingWorkspaceId]);
+        await db.query('UPDATE hosted_allowances SET remaining=0 WHERE "workspaceId"=$1',[billingWorkspaceId]);
+        try {
+          const blocked=await recoverRaw("owner",{binding});
+          assert.ok("pending" in blocked);assert.equal(blocked.reason,"model_unavailable");
+          assert.equal(networkRequests.length,before,"exhausted balance must make zero provider requests");
+          assert.deepEqual(await state(snapshot.task.id),snapshot);
+        } finally {
+          await db.query('UPDATE hosted_allowances SET remaining=$2 WHERE "workspaceId"=$1',[billingWorkspaceId,allowance.remaining]);
+        }
+        const recovered=await recover("owner",{binding,choice:"retry_check"});
+        assert.equal(recovered.task.stage,"review");
+        assert.equal(networkRequests.length,before+1,"positive balance restores the real loopback request");
+        const{rows:[receipt]}=await db.query(`SELECT state,"costMicroUsd","reservedFree","reservedPurchased","reservedUnpaid"
+          FROM hosted_usage WHERE "workspaceId"=$1 ORDER BY "createdAt" DESC LIMIT 1`,[billingWorkspaceId]);
+        assert.equal(receipt.state,"settled");assert.equal(Number(receipt.costMicroUsd),1);
+        assert.deepEqual([receipt.reservedFree,receipt.reservedPurchased,receipt.reservedUnpaid].map(Number),[0,0,0]);
+        assert.equal((await usage.balance(billingWorkspaceId)).free,Number(allowance.remaining)-1);
+      });
       await exerciseFactoryRecoveryEntry(t, {
         db, failedReview, png, sha, modelInvoke,
         callCount: () => modelCalls,
@@ -1601,9 +1652,11 @@ test(
       );
     } finally {
       if (installedGatewayFixture) delete process.env.DECISION_GATEWAY_API_KEY;
+      await modelDatabase?.close();
       await pool?.end();
+      await (await import("../db")).pool.end();
       // Retain this database. Closing clients does not delete the database.
-      // Only this run's new hosted CI service is covered by the temporary-resource cleanup authorization.
+      // Preserve existing local resources; hosted CI owns its disposable service.
       await admin.end();
     }
   },

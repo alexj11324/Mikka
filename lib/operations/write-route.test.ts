@@ -26,9 +26,16 @@ test('public availability reports only the server gate as 200 no-store without r
   }
 })
 
-test('actual product POST is registered but disabled without initializing runtime', async () => {
-  assert.equal(PERSONAL_WRITES_ENABLED, false)
-  const response = await POST(request(proposal))
+test('the explicit incident switch closes product POST without initializing runtime', async () => {
+  assert.equal(PERSONAL_WRITES_ENABLED, true)
+  const previous = process.env.MIKKA_PERSONAL_WRITES_ENABLED
+  process.env.MIKKA_PERSONAL_WRITES_ENABLED = '0'
+  let response: Response
+  try { response = await POST(request(proposal)) }
+  finally {
+    if (previous === undefined) delete process.env.MIKKA_PERSONAL_WRITES_ENABLED
+    else process.env.MIKKA_PERSONAL_WRITES_ENABLED = previous
+  }
   assert.equal(response.status, 503)
   assert.deepEqual(await response.json(), { error: 'approvedWritesDisabled' })
   assert.equal(response.headers.get('cache-control'), 'no-store')
@@ -40,7 +47,7 @@ test('actual product POST is registered but disabled without initializing runtim
 
 test('production rollout delegates browser authority and durable IDs to the existing HTTP service', async () => {
   const calls: unknown[] = []
-  const handler = createPersonalWriteRoute({ enabled: () => personalWritesEnabled({VERCEL_ENV:'production',MIKKA_PERSONAL_WRITES_ENABLED:'1'}), load: async () => ({
+  const handler = createPersonalWriteRoute({ enabled: () => personalWritesEnabled({VERCEL_ENV:'production'}), load: async () => ({
     auth: { api: { getSession: async ({ query }) => { assert.equal(query.disableCookieCache, true); return { user: { id: 'owner' }, session: { id: 'session' } } } } },
     operations: action => ({
       propose: async (ownerId, input, intentId) => { calls.push({ action, ownerId, input, intentId }); return { status: 'awaiting_approval', actionId: id } },
