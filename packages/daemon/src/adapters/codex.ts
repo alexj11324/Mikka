@@ -20,8 +20,8 @@ import {
 } from "../agents/child"
 import {
   carryHistory,
-  guardCodexAuth,
   prepareCodexHome,
+  wipeRunCredentials,
 } from "../agents/harness-home"
 import { jsonlConnection } from "../agents/jsonl-rpc"
 import {
@@ -70,6 +70,8 @@ export interface CodexAdapterOptions {
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
   binary?: string
+  /** The daemon's pinned Codex, installed on first need. */
+  ensureBinary?: () => Promise<string>
   /** Trusted hosted transport, retaining the existing app-server adapter. */
   spawnCli?: typeof spawnCli
   /** Persist an owner-bound session before any prompt can execute. */
@@ -77,7 +79,7 @@ export interface CodexAdapterOptions {
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
   computerProvider?: ComputerSpecProvider
-  /** The user's own `CODEX_HOME` (for the auth link); `~/.codex` by default. */
+  /** @deprecated Ignored: the person's own `CODEX_HOME` is never read. */
   userHome?: string
   /** Trusted, owner-bound broker only; never a task/model-supplied credential. */
   subscriptionAuth?: {
@@ -320,12 +322,8 @@ export class CodexAdapter implements AgentAdapter {
       }
     }
     // Inside the run dir: one run's home is never another run's.
-    const codexHome = prepareCodexHome(
-      join(runDir, "codex-home"),
-      log,
-      this.options.userHome,
-      !externalAuth
-    )
+    const codexHome = prepareCodexHome(join(runDir, "codex-home"), log)
+    const binary = this.options.binary ?? await this.options.ensureBinary?.() ?? "codex"
     const ctx = new RunContext({
       github: options.github,
       apps: options.apps,
@@ -343,7 +341,6 @@ export class CodexAdapter implements AgentAdapter {
       skillReceipt: options.skillReceipt,
       runDir,
       privateDir: paths.privateDir,
-      extraWrite: codexHome.authFile ? [codexHome.authFile] : [],
     })
     // A hand-in the last daemon never got to act on ends the session now.
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
@@ -352,7 +349,7 @@ export class CodexAdapter implements AgentAdapter {
     const computerMcp = sandboxComputerSpec(this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy), this.options.sandbox.kind)
     const mcp = ctx.mcpServer()
     const argv = [
-      this.options.binary ?? "codex",
+      binary,
       "app-server",
       "-c", `features.shell_tool=${rawCliShellAvailable(runPolicy(options.policy))}`,
       "-c",
@@ -378,7 +375,6 @@ export class CodexAdapter implements AgentAdapter {
         `shell_environment_policy.set.${key}=${toml(value)}`,
       ]),
     ]
-    const checkAuth = guardCodexAuth(codexHome.authFile, log)
     const spawnOptions = {
       cwd: ctx.worktree,
       env: { ...options.env, ...ctx.tempEnv(), CODEX_HOME: codexHome.home },
@@ -401,7 +397,7 @@ export class CodexAdapter implements AgentAdapter {
       void child.exited.finally(off)
     }
     // After the whole group is gone (`exited` kills it first).
-    void child.exited.then(checkAuth)
+    void child.exited.then(() => wipeRunCredentials(runDir))
     const rpc: MessageConnection = jsonlConnection(
       child.process.stdout,
       child.process.stdin,

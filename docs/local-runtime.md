@@ -1,8 +1,10 @@
 # Local thread runtime
 
-Local threads run with the installed Claude Code or Codex on a connected
-computer. Registering the daemon or reporting a changed installed-harness set
-creates hidden execution records. Their names include the device UUID to
+Local threads run on a connected computer with the daemon's own pinned Claude
+Code or Codex, never one the person installed, in a run home of their own
+([devices are runners](design/decisions/2026-10-31-2300-devices-are-runners.md)).
+Registering the daemon or reporting a changed harness set creates hidden
+execution records. Their names include the device UUID to
 respect the per-person unique name constraint; conversations show the owning
 Bot or Coordinator. Removing a harness detaches its record, preserving run
 history. Reinstalling it reuses that record. An unchanged heartbeat only reads
