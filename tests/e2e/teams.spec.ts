@@ -55,8 +55,6 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await register(page, '/settings/teams')
   await createTeam(page, '产品团队', 'PRODUCT')
   await createTeam(page, '工程团队', 'ENGINEER')
-  // The settings sidebar rail is named in the UI language, not the library's English default.
-  await expect(page.locator('[data-sidebar="rail"]')).toHaveAttribute('aria-label', '展开或收起侧栏')
   await page.getByRole('textbox', { name: '搜索团队', exact: true }).fill('PRODUCT')
   await expect(page.getByRole('row').filter({ hasText: '工程团队' })).toHaveCount(0)
   const team = page.getByRole('row').filter({ hasText: '产品团队' })
@@ -76,7 +74,7 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await roster.getByRole('button', { name: /^设为成员：/ }).click()
   await expect(roster.getByRole('alert')).toContainText('至少一位')
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await rail(page, '主页').click()
   const privateTitle = `历史私有任务 ${randomUUID()}`
   const publicTitle = `公开任务 ${randomUUID()}`
   await createTask(page, privateTitle)
@@ -128,7 +126,7 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
   test.setTimeout(180000)
   await register(page, '/settings/teams')
   await createTeam(page, '共享团队', 'SHARED')
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await rail(page, '主页').click()
   const publicTitle = `工作区公开 ${randomUUID()}`
   const privateTitle = `个人保密 ${randomUUID()}`
   await createTask(page, publicTitle, 'SHARED · 共享团队')
@@ -189,7 +187,7 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
   test.setTimeout(180000)
   await register(page, '/settings/teams')
   await createTeam(page, '协作团队', 'COLLAB')
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await rail(page, '主页').click()
   const parentTitle = `他人父任务 ${randomUUID()}`
   const childTitle = `他人子任务 ${randomUUID()}`
   await createTask(page, parentTitle, 'COLLAB · 协作团队')

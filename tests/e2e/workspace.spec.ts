@@ -36,7 +36,7 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
   }
   await settings()
   await openSidebar()
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await sidebar.getByRole('button', { name: '主页', exact: true }).click()
   await workspaces()
   await page.getByRole('menuitem', { name: '创建工作区', exact: true }).click()
   const name = `工作区回归 ${randomUUID()}`
@@ -55,7 +55,7 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
   await page.getByRole('link', { name: '常规', exact: true }).click()
   await expect(page.getByLabel('名称', { exact: true })).toHaveValue(name)
   await openSidebar()
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await sidebar.getByRole('button', { name: '主页', exact: true }).click()
   await workspaces()
   await page.getByRole('menuitem', { name: '回归测试成员的工作区', exact: true }).click()
   await expect(page).toHaveURL(url => url.pathname === app('/'))

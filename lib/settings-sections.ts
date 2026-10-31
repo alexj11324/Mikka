@@ -5,7 +5,7 @@
  */
 export type SettingsSectionId =
   | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'models'
-  | 'logins' | 'privacy' | 'activity' | 'computers' | 'developer'
+  | 'logins' | 'privacy' | 'computers' | 'developer'
   | 'general' | 'members' | 'teams' | 'bots' | 'permissions' | 'secrets' | 'audit' | 'usage' | 'billing'
 
 export interface SettingsSectionDef {
@@ -34,7 +34,6 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'models', group: 'personal', title: 'Models' },
   { id: 'logins', group: 'personal', title: 'Logins and keys' },
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
-  { id: 'activity', group: 'personal', title: 'Activity' },
   { id: 'computers', group: 'personal', title: 'Devices' },
   // Hidden until an API accepts the tokens (Alex); the UI and token store are built. Delete `unbuilt` to ship it.
   { id: 'developer', group: 'personal', title: 'Personal access tokens', unbuilt: true },

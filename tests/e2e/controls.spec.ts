@@ -9,10 +9,12 @@ const surfaces: { name: string; scope?: 'dialog' | 'menu'; prepare: (page: Page)
     await expect(page.getByRole('heading', { name: '看板', exact: true })).toBeVisible()
   } },
   { name: '成员管理', prepare: async page => {
+    // Settings sit in the window frame; one history entry keeps its 后退 enabled on every fresh page alike.
+    await page.goto(app('/'))
     await page.goto(app('/settings/members'))
     await expect(page.getByRole('button', { name: '邀请成员', exact: true })).toBeEnabled()
     // Admin-only sections join the sidebar once the role is known (S-P); freeze the list after that.
-    await expect(page.locator('[data-slot="sidebar-container"]').getByRole('link', { name: '团队权限', exact: true })).toBeVisible()
+    await expect(page.locator('[data-slot="settings-list"]').getByRole('link', { name: '团队权限', exact: true })).toBeVisible()
   } },
   { name: '邀请弹窗', scope: 'dialog', prepare: async page => {
     await page.goto(app('/settings/members'))

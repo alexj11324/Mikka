@@ -21,6 +21,14 @@ supplies content.
 5. **Navigation and search stay in the sidebar.** Do not build a second list,
    selection region or scroll container inside the panel.
 
+## Layout
+
+Settings render inside the app window (`SettingsFrame` in
+`components/settings/settings-shell.tsx`): the window bar and icon rail stay,
+the section list is the card's first column, and the section scrolls beside it.
+There is no 「返回应用」; the rail leaves Settings. On phones the section list is
+the sheet behind the header's sidebar button, with the rail items at its foot.
+
 ## Sections
 
 - **Personal:** Preferences, Profile, Memory (记忆), Account (账户), Integrations, Devices (设备).

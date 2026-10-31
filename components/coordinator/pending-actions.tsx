@@ -63,7 +63,7 @@ export function PendingActions() {
       const repository = item.action === 'approve_repository_push'
       const browser = item.action === 'browser_operation' || item.action === 'credential_operation'
       const title = item.action === 'browser_operation' || item.action === 'credential_operation' ? String(input.summary ?? '') : t(item.action)
-      return <li key={item.id} className="flex flex-col gap-3 rounded-[14px] bg-muted/60 px-4 py-3">
+      return <li key={item.id} className="flex flex-col gap-3 rounded-xl bg-muted/60 px-4 py-3">
         <p className="flex items-center gap-2 text-sm font-medium">{repository ? <GitBranch className="size-4" /> : email ? <Mail className="size-4" /> : <CalendarClock className="size-4" />}{title}</p>
         <dl className="flex flex-col gap-1">
           {repository ? <>
