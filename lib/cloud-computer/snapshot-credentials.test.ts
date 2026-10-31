@@ -25,7 +25,7 @@ function fixture(found: string[], old?: { snapshotId: string }) {
     } },
     createSnapshot: async () => { calls.snapshots++; return { snapshotId: 'fresh' } },
   }
-  return { pool, source, calls }
+  return { pool: pool as never, source, calls }
 }
 
 test('a clean bot machine is snapshotted, after the credential probe', async () => {
