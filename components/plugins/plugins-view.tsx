@@ -120,7 +120,7 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
   const needle = trimmedQuery.toLowerCase()
   const shownApps = APP_IDS.filter(id => !needle || `${name(id)} ${description(id)}`.toLowerCase().includes(needle))
   // 添加 offers what is not connected yet: Composio apps connect at once, the rest open their page.
-  const addable = APP_IDS.filter(id => isComposioAppId(id) ? apps.state && !apps.accountsFor(id).length : ownStates?.[id] === 'notConnected')
+  const addable = APP_IDS.filter(id => isComposioAppId(id) ? apps.canLink && !apps.accountsFor(id).length : ownStates?.[id] === 'notConnected')
 
   if (app) {
     const back = () => openApp(null)
@@ -164,7 +164,7 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
             <DropdownMenuTrigger render={<Button type="button" variant="secondary" size="sm" disabled={!addable.length || Boolean(apps.pending)} />}><Plus data-icon="inline-start" />{t('add')}</DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuGroup>
-                {addable.map(id => <DropdownMenuItem key={id} disabled={isComposioAppId(id) && !apps.canLink} onClick={() => { if (isComposioAppId(id)) void apps.connect(id); else openApp(id) }}>
+                {addable.map(id => <DropdownMenuItem key={id} onClick={() => { if (isComposioAppId(id)) void apps.connect(id); else openApp(id) }}>
                   <AppTile app={id} />{name(id)}
                 </DropdownMenuItem>)}
               </DropdownMenuGroup>
@@ -177,7 +177,7 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
         {shownApps.length ? <SettingsSection id="plugin-apps">
             {shownApps.map(id => isComposioAppId(id)
               ? <ConnectedAppRow key={id} apps={apps} app={id as ComposioAppId} href={href(id)} onOpen={() => openApp(id)} />
-              : <PluginRow key={id} app={id} name={name(id)} description={description(id)} href={href(id)} onOpen={() => openApp(id)} dim={ownStates?.[id as OwnAppId] !== 'connected'}>
+              : <PluginRow key={id} app={id} name={name(id)} description={description(id)} href={href(id)} onOpen={() => openApp(id)} dim={ownStates?.[id as OwnAppId] === 'paused'}>
                 {ownStates?.[id as OwnAppId] && <span className="text-xs text-muted-foreground">{t(`state.${ownStates[id as OwnAppId]!}`)}</span>}
               </PluginRow>)}
         </SettingsSection> : <Empty className="min-h-48">
