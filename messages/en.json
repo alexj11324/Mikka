@@ -1618,9 +1618,6 @@
       "privacy": {
         "title": "Data and privacy"
       },
-      "activity": {
-        "title": "Activity"
-      },
       "computers": {
         "title": "Devices"
       },
@@ -2014,33 +2011,6 @@
       "exportReady": "Email isn’t available, so your export is ready to download here (valid for {hours, plural, one {# hour} other {# hours}}).",
       "exportDownload": "Download export",
       "manageNone": "You have no shared links right now"
-    },
-    "activity": {
-      "filtersLabel": "Filter activity",
-      "filters": {
-        "all": "All",
-        "accounts": "Used my accounts",
-        "reminders": "Reminders"
-      },
-      "loading": "Reading activity…",
-      "empty": "No activity yet.",
-      "loadError": "Activity could not be read.",
-      "loadMore": "Load older activity",
-      "loadingMore": "Loading…",
-      "view": "Open",
-      "credentialUse": "{bot} used the sign-in for {site}",
-      "someBot": "A bot",
-      "approved": "You approved: {action}",
-      "declined": "You declined: {action}",
-      "reminder": "Reminder: {title}",
-      "result": {
-        "input_inserted_guarded": "Filled, not submitted",
-        "password_submitted": "Password submitted",
-        "otp_submitted": "Code submitted",
-        "session_applied": "Session restored",
-        "denied_or_failed": "Refused or failed"
-      },
-      "emptyScope": "No activity yet. This lists bots using your logins, actions you approved or declined, and reminders from the Coordinator. Ordinary chats and tasks don’t show up here."
     },
     "logins": {
       "heading": "Site sign-ins",

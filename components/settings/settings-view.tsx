@@ -19,7 +19,6 @@ import { GoogleSignInSettings } from '@/components/settings/google-sign-in-setti
 import { AccountSettings } from '@/components/settings/account-settings'
 import { SecuritySettings } from '@/components/settings/security-settings'
 import { PrivacySettings } from '@/components/settings/privacy-settings'
-import { ActivitySettings } from '@/components/settings/activity-settings'
 import { SavedLoginsSettings } from '@/components/settings/saved-logins-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
 import { DevicesSettings } from '@/components/devices/devices-settings'
@@ -89,7 +88,6 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'account': return <AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />
     case 'security': return <><SecuritySettings /><GoogleSignInSettings googleEnabled={googleEnabled} /></>
     case 'privacy': return <PrivacySettings />
-    case 'activity': return <ActivitySettings />
     case 'logins': return <SavedLoginsSettings />
     case 'preferences': return <><AppearanceSection /><IssuePrefixSettings /></>
     case 'notifications': return <NotificationSettings />
