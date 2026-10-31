@@ -67,7 +67,7 @@ export function Header({ left, title, right, subtitle, style }: { left?: ReactNo
  * them), so a failed send loses nothing. Controlled when `value` and
  * `onChangeText` are passed.
  */
-export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false }: {
+export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight }: {
   placeholder: string
   onSend?: (text: string, attachments: Attachment[]) => boolean | void | Promise<boolean | void>
   initial?: string
@@ -75,6 +75,9 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   value?: string
   onChangeText?: (text: string) => void
   attach?: boolean
+  /** Float over the end of the list, the content fading out beneath it; `onHeight` reports its height so the list leaves room. */
+  overlay?: boolean
+  onHeight?: (height: number) => void
 }) {
   const insets = useSafeAreaInsets()
   const [own, setOwn] = useState(initial)
@@ -114,8 +117,8 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
     }
   }
   return (
-    <KeyboardStickyView offset={{ opened: Math.max(insets.bottom, 12) - 8 }}>
-      <View style={[styles.composerWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+    <KeyboardStickyView offset={{ opened: Math.max(insets.bottom, 12) - 8 }} style={overlay ? styles.overlay : undefined}>
+      <View onLayout={event => onHeight?.(event.nativeEvent.layout.height)} style={[styles.composerWrap, overlay && styles.fade, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {files.length || problem ? (
           <View style={styles.tray}>
             {files.map(file => (
@@ -145,6 +148,13 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
       </View>
     </KeyboardStickyView>
   )
+}
+
+/** A capsule for the bar's title (the bot's name): Liquid Glass on iOS 26, white with a lift elsewhere. */
+export function Capsule({ children }: { children: ReactNode }) {
+  return glass
+    ? <GlassView style={styles.capsule}>{children}</GlassView>
+    : <View style={[styles.capsule, { backgroundColor: '#fff' }, lift]}>{children}</View>
 }
 
 /** The field's surface: Liquid Glass on iOS 26, white with a lift elsewhere. */
@@ -184,6 +194,10 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 11, color: colors.secondary, marginTop: 1 },
   glassRound: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   composerWrap: { paddingHorizontal: 16, paddingTop: 10, gap: 8 },
+  overlay: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  // What scrolls under the composer fades out, as under the iOS bar at the top.
+  fade: { paddingTop: 28, backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 45%, rgba(255,255,255,0.97) 100%)' },
+  capsule: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, paddingHorizontal: 16, borderRadius: 20, maxWidth: 220 },
   composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
   field: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', minHeight: 52, borderRadius: 26, backgroundColor: '#fff', paddingLeft: 18, paddingRight: 6, paddingVertical: 6, gap: 10 },
   // Six lines of 22, then it scrolls.

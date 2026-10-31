@@ -62,7 +62,6 @@ export default function ThreadScreen() {
           </View>
         ) : undefined}
       />
-      <OfflineBanner top={insets.top + 66} />
       <KeyboardChatScrollView {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
         {error && !data ? <Text style={styles.error}>线程加载失败。</Text> : null}
@@ -85,6 +84,7 @@ export default function ThreadScreen() {
         {sendFailed ? <Text style={styles.error}>没发出去，再试一次。</Text> : null}
         {data && !data.active && data.error && !data.items.some(item => item.kind === 'error') ? <Text style={styles.error}>{data.error}</Text> : null}
       </KeyboardChatScrollView>
+      <OfflineBanner top={insets.top + 66} />
       {data?.active ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} /> : null}
     </View>
   )

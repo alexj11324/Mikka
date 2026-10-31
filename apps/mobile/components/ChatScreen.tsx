@@ -14,7 +14,7 @@ import { OpenUIReply } from '@/components/OpenUI'
 import { PendingActions } from '@/components/PendingActions'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
-import { Composer } from '@/components/ui'
+import { Capsule, Composer } from '@/components/ui'
 import { api } from '@/lib/api'
 import { outgoing, type Attachment } from '@/lib/attachments'
 import { clockTime } from '@/lib/clock'
@@ -51,6 +51,8 @@ export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId:
   const scroll = useRef<ScrollViewInstance>(null)
   const { offset, handlers } = useTimeReveal()
   const photos = useChatPhotos()
+  // The composer floats over the end of the list; the list leaves room for it.
+  const [composerHeight, setComposerHeight] = useState(90)
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
   const [fast, setFast] = useState(false)
   const { data, error, reload } = useApi<Chat>(path, fast ? 2500 : 15000)
@@ -120,16 +122,16 @@ export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId:
       <NavBar
         left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }}
         titleView={
-          <View style={styles.title}>
+          <Capsule>
             <BotAvatar color={color} shape={shape} size={22} />
             <Text style={styles.titleText} numberOfLines={1}>{name}</Text>
-          </View>
+          </Capsule>
         }
         right={{ icon: 'checklist', label: '线程', onPress: () => router.push('/threads'), web: <ListChecks size={21} color={colors.ink} strokeWidth={2} /> }}
       />
-      <OfflineBanner top={insets.top + 66} />
+      {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
       <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
-        <KeyboardChatScrollView ref={scroll} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.list} onContentSizeChange={() => { if (!pinned) scroll.current?.scrollToEnd({ animated: false }) }}>
+        <KeyboardChatScrollView ref={scroll} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onContentSizeChange={() => { if (!pinned) scroll.current?.scrollToEnd({ animated: false }) }}>
           {items.map((item, index) => {
             const time = clockTime(item.createdAt)
             return (
@@ -169,17 +171,17 @@ export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId:
           ) : null}
         </KeyboardChatScrollView>
       </View>
-      <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach />
+      <OfflineBanner top={insets.top + 66} />
+      <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} />
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
-  title: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: 220 },
   titleText: { fontSize: 17, fontWeight: '600' },
   // Space above the composer (适度留白).
-  list: { paddingBottom: 28, paddingHorizontal: 16, gap: 12 },
+  list: { paddingHorizontal: 16, gap: 12 },
   working: { alignSelf: 'flex-start', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
   failed: { alignItems: 'center', gap: 10, marginTop: 24 },
   empty: { alignSelf: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },

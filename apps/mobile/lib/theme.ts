@@ -47,6 +47,8 @@ export const screenOptions = (background: string) => ({
   headerShadowVisible: false,
   headerBackButtonDisplayMode: 'minimal' as const,
   headerTintColor: colors.ink,
+  // iOS 26 blurs content scrolling under the bar (and above the home indicator) with the system's soft edge.
+  scrollEdgeEffects: { top: 'soft' as const, bottom: 'soft' as const },
   contentStyle: { backgroundColor: background },
   ...(Platform.OS === 'ios' ? {} : { animation: 'slide_from_right' as const }),
 })
