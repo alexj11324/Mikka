@@ -26,6 +26,7 @@ be supplied in request bodies; all row operations include the authenticated owne
 | `PATCH /api/skills` | `{id,enabled}` | `{skill}` |
 | `DELETE /api/skills` | `{id}` | `{deleted:true}` |
 | `GET /api/integrations/composio/catalog` | — | `{configured,apps,popular,latest,categories}`; each app has id, name, one-line description, icon, Composio categories and created date; `popular`, `latest` and each category list app ids |
+| `GET /api/integrations/composio/catalog/{toolkit}` | — | One app's page: `{id,name,description,iconUrl,categories,website,version,tools:{write,read}}` from Composio, cached an hour per app; needs a signed-in person, not a connected account |
 | `POST /api/integrations/composio` | existing `{toolkit,returnTo?}` | Accepts any store toolkit (Composio-managed auth) through the existing Composio hosted connection flow |
 
 MCP accepts public HTTPS hostnames on port 443. Credentials in URL userinfo or

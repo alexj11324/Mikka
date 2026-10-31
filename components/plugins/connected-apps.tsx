@@ -3,13 +3,14 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ArrowUpRight, Blocks, ChevronRight, Ellipsis, Plus } from 'lucide-react'
+import { ArrowUpRight, Blocks, ChevronDown, ChevronRight, Ellipsis, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { APP_ICONS } from '@/components/plugins/app-icons'
 import { SettingsSection } from '@/components/settings/primitives'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -21,6 +22,7 @@ import { Switch } from '@/components/ui/switch'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type ConnectedAccountView as AccountView } from '@/lib/composio-accounts'
 import type { StoreApp, StoreCatalog } from '@/lib/plugins/catalog'
+import type { AppDetail, AppTool } from '@/lib/plugins/app-detail'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
 import { cn } from '@/lib/utils'
 
@@ -41,6 +43,15 @@ export async function readStoreCatalog(): Promise<StoreCatalogView> {
 /** The store, cached across visits like the accounts. */
 export function useStoreCatalog(enabled = true) {
   return useSWR(enabled ? storeCatalogKey : null, readStoreCatalog, { revalidateOnFocus: false })
+}
+
+/** One store app's page data (lib/plugins/app-detail.ts), cached like the store. */
+export function useAppDetail(app: string | null) {
+  return useSWR(app ? `${storeCatalogKey}/${encodeURIComponent(app)}` : null, async (key: string) => {
+    const response = await fetch(key)
+    if (!response.ok) throw new Error(String(response.status))
+    return await response.json() as AppDetail
+  }, { revalidateOnFocus: false, shouldRetryOnError: false })
 }
 
 /** Mikka's own integrations, not Composio's. */
@@ -339,6 +350,43 @@ export function ConnectedAppRow({ apps, app, href, onOpen }: { apps: ConnectedAp
   </PluginRow>
 }
 
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return <div className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
+    <span className="shrink-0 text-muted-foreground">{label}</span>
+    <span className="min-w-0 text-right">{children}</span>
+  </div>
+}
+
+/** 工具: Composio's tools for the app, 写入 and 读取 (by its readOnlyHint), each group collapsible and scrolling inside. */
+function AppTools({ tools }: { tools: AppDetail['tools'] }) {
+  const t = useTranslations('Settings.integrations')
+  const total = tools.write.length + tools.read.length
+  return <section aria-labelledby="app-tools-heading" className="flex flex-col gap-3">
+    <div className="flex flex-col gap-0.5">
+      <h2 id="app-tools-heading" className="text-sm font-medium">{t('toolsHeading')}</h2>
+      <p className="text-xs text-muted-foreground">{t('toolsSummary', { count: total, write: tools.write.length, read: tools.read.length })}</p>
+    </div>
+    {([['write', tools.write], ['read', tools.read]] as const).filter(([, list]) => list.length).map(([kind, list]) => <ToolGroup key={kind} label={t(kind === 'write' ? 'writeTools' : 'readTools', { count: list.length })} tools={list} />)}
+  </section>
+}
+
+function ToolGroup({ label, tools }: { label: string; tools: AppTool[] }) {
+  const [open, setOpen] = useState(true)
+  return <Collapsible open={open} onOpenChange={setOpen} className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/5">
+    <CollapsibleTrigger render={<Button type="button" variant="ghost" className="h-auto w-full justify-between rounded-none px-5 py-3 font-medium hover:bg-muted/50" />}>
+      {label}<ChevronDown data-icon="inline-end" aria-hidden="true" className={cn('text-muted-foreground transition-transform', !open && '-rotate-90')} />
+    </CollapsibleTrigger>
+    <CollapsibleContent>
+      <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto pb-3">
+        {tools.map(tool => <li key={tool.slug} className="flex flex-col gap-0.5 px-5 py-1.5">
+          <span className="text-sm">{tool.name}</span>
+          {tool.description && <span className="text-xs text-muted-foreground">{tool.description}</span>}
+        </li>)}
+      </ul>
+    </CollapsibleContent>
+  </Collapsible>
+}
+
 /** The way back from an app's page to the list. */
 export function PluginBreadcrumb({ rootLabel, rootHref, onBack, name }: { rootLabel: string; rootHref: string; onBack: () => void; name: string }) {
   return <Breadcrumb>
@@ -363,8 +411,11 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
   const accounts = apps.accountsFor(app)
   const several = accounts.length > 1
   const { name, iconUrl } = useAppInfo()(app)
-  // 关于 only where Mikka knows the facts; store apps carry none.
+  // Composio's own page data, for everyone, connected or not.
+  const detail = useAppDetail(app)
+  // 开发者 only where Mikka already knows it; Composio does not say.
   const about = isComposioAppId(app) ? APP_ABOUT[app] : null
+  const website = detail.data?.website ?? about?.website ?? null
   const busy = Boolean(apps.pending)
   const accountName = useAccountName()
   const takeoverText = useTakeoverText()
@@ -383,6 +434,10 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
       </div>
       {!accounts.length && !apps.loading && <WhyDisabled reason={apps.unavailable}><Button type="button" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
     </header>
+
+    {detail.data?.description ? <p className="max-w-prose text-sm leading-6 text-muted-foreground">{detail.data.description}</p>
+      : detail.isLoading && <div aria-hidden="true" className="flex flex-col gap-2"><Skeleton className="h-4 w-full max-w-prose" /><Skeleton className="h-4 w-2/3 max-w-prose" /></div>}
+    {detail.error && !detail.data && <div role="alert" className="flex items-center gap-2 text-sm text-muted-foreground">{t('detailLoadFailed')}<Button type="button" variant="ghost" size="sm" onClick={() => void detail.mutate()}>{common('retry')}</Button></div>}
 
     {accounts.length > 0 && <SettingsSection id="connected-accounts-heading" title={t('accountsHeading')}>
       {accounts.map(account => {
@@ -437,16 +492,14 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
       </Button></WhyDisabled>
     </SettingsSection>}
 
-    {about && <SettingsSection id="app-about-heading" title={t('about')}>
-      <div className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
-        <span className="text-muted-foreground">{t('developer')}</span>
-        <span>{about.developer}</span>
-      </div>
-      <div className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
-        <span className="text-muted-foreground">{t('website')}</span>
-        <a href={about.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:underline">{new URL(about.website).hostname}<ArrowUpRight className="size-3.5" aria-hidden="true" /></a>
-      </div>
-    </SettingsSection>}
+    {detail.data && detail.data.tools.write.length + detail.data.tools.read.length > 0 && <AppTools tools={detail.data.tools} />}
+
+    {(detail.data?.categories.length || about || website || detail.data?.version) ? <SettingsSection id="app-about-heading" title={t('info')}>
+      {detail.data?.categories.length ? <InfoRow label={t('category')}>{detail.data.categories.map(category => category.name).join(' · ')}</InfoRow> : null}
+      {about && <InfoRow label={t('developer')}>{about.developer}</InfoRow>}
+      {website && <InfoRow label={t('website')}><a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:underline">{new URL(website).hostname}<ArrowUpRight className="size-3.5" aria-hidden="true" /></a></InfoRow>}
+      {detail.data?.version && <InfoRow label={t('version')}>{detail.data.version}</InfoRow>}
+    </SettingsSection> : null}
 
     <Dialog open={Boolean(renaming)} onOpenChange={open => { if (!open && !busy) closeRename() }}>
       <DialogContent>

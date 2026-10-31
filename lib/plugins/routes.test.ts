@@ -20,6 +20,9 @@ stub('./runtime.ts', { personalPlugins: {
 stub('./skill-source.ts', { fetchSkillSource: async (input: unknown) => ({ ...input as object, body: '# Fixture' }) })
 stub('../composio.ts', { getComposio: () => ({}) })
 stub('./catalog.ts', { composioToolkitLister: () => async () => ({ items: [] }), listStoreCatalog: async () => ({ apps: [{ id: 'googledrive' }], popular: ['googledrive'], latest: [], categories: [] }) })
+stub('./app-detail.ts', { composioAppDetailSource: () => ({}), readAppDetail: async (_source: unknown, slug: string) => ({ id: slug, name: 'Supabase', description: 'Postgres', iconUrl: null, categories: [], website: null, version: null, tools: { write: [], read: [{ slug: 'SUPABASE_LIST_TABLES', name: 'List tables', description: '' }] } }) })
+let appDetail: typeof import('../../app/api/integrations/composio/catalog/[toolkit]/route')
+before(async () => { appDetail = await import('../../app/api/integrations/composio/catalog/[toolkit]/route') })
 let mcp: typeof import('../../app/api/integrations/mcp/route'), skills: typeof import('../../app/api/skills/route'), catalog: typeof import('../../app/api/integrations/composio/catalog/route')
 before(async () => { mcp = await import('../../app/api/integrations/mcp/route'); skills = await import('../../app/api/skills/route'); catalog = await import('../../app/api/integrations/composio/catalog/route') })
 function request(path: string, method = 'GET', data?: unknown, origin = 'https://mikka.acme.dev') {
@@ -48,4 +51,14 @@ test('actual routes use the authenticated owner, reject injected owners and expo
   assert.deepEqual(await store.json(), { configured: true, apps: [{ id: 'googledrive' }], popular: ['googledrive'], latest: [], categories: [] })
   const oversized = request('/api/skills', 'POST', { source: 'x'.repeat(17_000), slug: 'x' })
   assert.equal((await skills.POST(oversized)).status, 413)
+})
+
+test('an app page needs a signed-in person, not a connected account', async () => {
+  const params = { params: Promise.resolve({ toolkit: 'supabase' }) }
+  owner = null
+  assert.equal((await appDetail.GET(request('/api/integrations/composio/catalog/supabase'), params)).status, 401)
+  owner = 'owner'
+  const response = await appDetail.GET(request('/api/integrations/composio/catalog/supabase'), params)
+  assert.equal(response.status, 200)
+  assert.equal((await response.json() as { tools: { read: unknown[] } }).tools.read.length, 1)
 })
