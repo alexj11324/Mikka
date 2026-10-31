@@ -59,3 +59,24 @@ test('runs that disappear only update the map', () => {
   assert.deepEqual(update.notifications, [])
   assert.equal(update.next.size, 0)
 })
+
+test('a finished thread notifies the desktop when 线程完成 is on', () => {
+  const previous = new Map<string, DesktopRun['status']>([['a', 'running'], ['b', 'succeeded']])
+  const update = desktopRunUpdate(previous, [
+    run({ issueId: 'a', status: 'succeeded' }),
+    run({ issueId: 'b', status: 'succeeded' }),
+  ], 2_000, true)
+  assert.deepEqual(update.notifications, [
+    { id: 'run:a:finished:2000', kind: 'finished', title: 'Ship the desktop app', body: 'Coordinator', href: '/?issue=a' },
+  ])
+})
+
+test('a finished thread stays silent on the desktop when 线程完成 is off', () => {
+  const previous = new Map<string, DesktopRun['status']>([['a', 'running']])
+  assert.deepEqual(desktopRunUpdate(previous, [run({ issueId: 'a', status: 'succeeded' })], 2_000, false).notifications, [])
+  assert.deepEqual(desktopRunUpdate(previous, [run({ issueId: 'a', status: 'succeeded' })], 2_000).notifications, [])
+})
+
+test('the launch snapshot never replays finished threads', () => {
+  assert.deepEqual(desktopRunUpdate(null, [run({ issueId: 'a', status: 'succeeded' })], 2_000, true).notifications, [])
+})
