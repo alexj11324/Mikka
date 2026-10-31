@@ -4,7 +4,7 @@ name: Browser tests
 # - pull requests: the @smoke set plus the complete specs of the areas the change
 #   touches, in one job (install, build, start, run). Performance runs when a
 #   change touches what the budgets measure.
-# - push to main: the functional spec files on two shards. A red run opens or
+# - push to main: the functional spec files on four shards. A red run opens or
 #   updates one issue that names the merged pull request's author.
 # - nightly and manual runs: every spec, including visual, crawler and slower
 #   specs, plus performance, on four shards. integrate/* pull requests run this
@@ -717,13 +717,13 @@ jobs:
     needs: [changes, browser-build]
     if: needs.changes.result == 'success' && needs.browser-build.result == 'success' && (needs.changes.outputs.browser_tier == 'main' || needs.changes.outputs.browser_tier == 'full')
     runs-on: ubuntu-latest
-    # Independent shards (two for main, four for full): each matrix job gets its
+    # Four independent shards for main and full: each matrix job gets its
     # own PostgreSQL service and test-account directory, so no fixture or lease
     # is shared across shards.
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.changes.outputs.browser_tier == 'main' && '[1, 2]' || '[1, 2, 3, 4]') }}
+        shard: [1, 2, 3, 4]
     timeout-minutes: 45
     services:
       postgres:
@@ -755,7 +755,7 @@ jobs:
       SLACK_BOT_USER_ID: U123
       SLACK_USER_BINDINGS: '{"U456":"ci-only-mikka-user"}'
       NEXT_TELEMETRY_DISABLED: '1'
-      BROWSER_SHARDS: ${{ needs.changes.outputs.browser_tier == 'main' && '2' || '4' }}
+      BROWSER_SHARDS: '4'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install

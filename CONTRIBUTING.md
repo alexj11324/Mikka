@@ -81,7 +81,7 @@ cannot.
    other file escalates to the full tier. Failed classification or a
    skipped/failed selected job fails the required gate.
 4. **After merge** (CI, every code-bearing push to main): the functional spec
-   files (the main list) on two shards, plus the runtime gates and both MVP
+   files (the main list) on four shards, plus the runtime gates and both MVP
    tests. A red run opens one issue (or comments on the open one) that names the
    merged pull request's author, who fixes forward or reverts within one working
    day; the issue closes on the next green main run.

@@ -105,9 +105,9 @@ test('runner turns each tier into fixed argv and refuses anything else', () => {
   assert.deepEqual(browserArguments('smoke', '[]'), ['exec', 'playwright', 'test', '--grep', '@smoke', '--grep-invert', '@performance'])
   assert.deepEqual(browserArguments('targeted', JSON.stringify(['settings.spec.ts', 'teams.spec.ts'])),
     ['exec', 'playwright', 'test', '--grep', '@smoke|(?:^| )(?:settings\\.spec\\.ts|teams\\.spec\\.ts) ', '--grep-invert', '@performance'])
-  const main = browserArguments('main', '[]', '2/2')
+  const main = browserArguments('main', '[]', '2/4')
   assert.deepEqual(main.slice(3, -3), BROWSER_MAIN_SPECS.map(spec => `tests/e2e/${spec}`))
-  assert.deepEqual(main.slice(-3), ['--grep-invert', '@performance', '--shard=2/2'])
+  assert.deepEqual(main.slice(-3), ['--grep-invert', '@performance', '--shard=2/4'])
   assert.deepEqual(browserArguments('full', '[]'), ['exec', 'playwright', 'test', '--grep-invert', '@performance'])
   assert.deepEqual(browserArguments('full', '[]', '4/4').at(-1), '--shard=4/4')
   for (const [tier, list] of [
@@ -298,7 +298,8 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   assert(!pr.includes('name: browser-build-'), 'no build artifact round trip on pull requests')
   assert(!pr.includes('pnpm lint') && !pr.includes('pnpm build'), 'lint runs once, in ui-policy.yml')
   assert(!pr.includes('TURNSTILE_SECRET_KEY'), 'the secret reaches only the keyed run')
-  assert(source.includes("shard: ${{ fromJSON(needs.changes.outputs.browser_tier == 'main' && '[1, 2]' || '[1, 2, 3, 4]') }}"))
+  assert(source.includes('shard: [1, 2, 3, 4]'))
+  assert(source.includes("BROWSER_SHARDS: '4'"))
   assert(source.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/$BROWSER_SHARDS'))
   assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted'))
   assert(source.includes("cron: '17 19 * * *'"))

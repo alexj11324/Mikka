@@ -24,7 +24,7 @@ its existing protected status names and real acceptance coverage.
 ## Main pushes: postmerge checks
 
 - A push to `main` triggers `ui-policy.yml` again and the functional
-  `browser-tests.yml` tier (two shards). Nightly and manual browser runs
+  `browser-tests.yml` tier (four shards). Nightly and manual browser runs
   retain full coverage; expensive desktop/release workflows stay independent.
 - Both workflow concurrency keys include `github.run_id` only on `main`.
   This prevents GitHub from evicting an older *pending* main verification,
