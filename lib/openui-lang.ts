@@ -23,9 +23,18 @@ const SIGNATURES: Record<string, string[]> = {
   BeApproval: ['title', 'description', 'context'],
   BeFollowUps: ['items'],
   BeButton: ['label', 'action', 'variant'],
+  BeCardGrid: ['children'],
+  BeImageCard: ['title', 'query', 'description', 'tags', 'prompt'],
+  BeImage: ['query', 'alt', 'caption'],
   TaskChip: ['id'],
   RunChip: ['id'],
   SourceChip: ['url', 'label'],
+}
+
+/** Image search words the server accepts (agentImageQuery in lib/agent-images.ts): 2–160 characters, no line breaks, tags or links. */
+export function isImageQuery(query: string) {
+  const value = query.trim()
+  return value.length >= 2 && value.length <= 160 && !/[\r\n<>]/.test(value) && !/https?:\/\//i.test(value)
 }
 
 /** Whether a reply is OpenUI rather than Markdown; the same test the web's chat uses. */
@@ -221,6 +230,9 @@ export function openUIText(value: Value | undefined): string {
         }
         return
       case 'BeButton': walk(node.props.label); return
+      // The image search words are English for the lookup, not for the person.
+      case 'BeImageCard': walk(node.props.title); walk(node.props.description); return
+      case 'BeImage': walk(node.props.caption); return
       case 'TaskChip': case 'RunChip': case 'SourceChip': lines.push(inlineMarkdown(node)); return
       default:
         // An unknown card: its strings, positional or named (title, text, description…), in order.
