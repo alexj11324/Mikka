@@ -149,7 +149,13 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   const custodyWorkflow = readFileSync('.github/workflows/e2b-byos.yml', 'utf8')
   const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
   assert.match(browser, /run: pnpm test:factory-http/ , 'Factory HTTP probes remain mandatory against the built app')
-  assert.ok(browser.indexOf('run: pnpm build') < browser.indexOf('run: pnpm test:factory-http'))
+  assert.ok(browser.includes('pnpm exec next build'))
+  for (const job of ['\n  browser-pr:\n', '\n  browser-runtime:\n']) {
+    const section = browser.split(job)[1]
+    assert.ok(section.includes('run: pnpm test:factory-http'), `${job.trim()} runs Factory HTTP against the built app`)
+  }
+  const pullRequest = browser.split('\n  browser-pr:\n')[1]
+  assert.ok(pullRequest.indexOf('pnpm exec next build') < pullRequest.indexOf('run: pnpm test:factory-http'))
   for (const { runner } of SELF_MANAGED) {
     const dedicatedScript = Object.entries(pkg).find(([, command]) => command === `node ${runner}`)?.[0]
     assert.ok(workflow.includes(`run: node ${runner}`) || browser.includes(`run: node ${runner}`) || (dedicatedScript && custodyWorkflow.includes(`run: pnpm ${dedicatedScript}`)), `${runner} runs in CI`)
@@ -174,7 +180,7 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.match(workflow, /MIGRATION_BOOTSTRAP_CI: '1'/)
   assert.match(workflow, /REQUIRE_DB: '1'/)
   assert.match(browser, /pnpm test:performance --output=performance-results/)
-  assert.ok(browser.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/4 > "$log_file"'), 'each isolated shard runs the selected layer')
+  assert.ok(browser.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/$BROWSER_SHARDS > "$log_file"'), 'each isolated shard runs the selected layer')
   assert.deepEqual(browserArguments('full', '[]'), ['exec', 'playwright', 'test', '--grep-invert', '@performance'], 'integration retains every non-performance browser spec through the selected-layer runner')
   assert.match(browser, /^\s*pnpm test:e2e:mvp > "\$log_file" 2>&1 \|\| test_status=\$\?/m, 'the dedicated MVP browser gate remains required')
   assert.match(browser, /log_file=\.cache\/e2e\/playwright-mvp\.log[\s\S]*?audit-evidence --evidence "\$log_file"[\s\S]*?exit "\$test_status"/, 'MVP output is audited before display and the test result is preserved')
