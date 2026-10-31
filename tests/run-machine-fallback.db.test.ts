@@ -21,6 +21,9 @@ test('run machine fallback: cloud, own device, else wait and wake', { skip: !dbU
   const users: string[] = []
   t.after(async () => {
     await pool.query('DELETE FROM thread_machines WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM cloud_machines WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM byos_bindings WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM byos_connections WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agents WHERE "userId" = ANY($1)', [users])
@@ -84,18 +87,22 @@ test('run machine fallback: cloud, own device, else wait and wake', { skip: !dbU
     assert.equal((await waits(b.id)).length, 0)
   })
 
-  await t.test('(c) own E2B at its concurrency cap: falls back to the Mac, else waits; a freed slot wakes it', async () => {
+  await t.test('(c) own E2B refuses at its concurrency cap: the cloud run is ended, the Mac takes it, else it waits', async () => {
     const c = await person('cloud')
     const botId = await seedBot(pool, c.workspaceId, c.id)
-    const cloudDevice = randomUUID(), cloudAgent = randomUUID(), repoId = randomUUID()
+    const cloudDevice = randomUUID(), cloudAgent = randomUUID(), repoId = randomUUID(), connection = randomUUID()
+    // The bot's own cloud computer is awake, with its runtime and a bound Codex subscription.
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled) VALUES ($1,$2,'Cloud computer','cloud',true)`, [cloudDevice, c.id])
+    await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [c.workspaceId, c.id, randomUUID(), `sbx-${randomUUID()}`, cloudDevice])
+    await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [botId, c.workspaceId, c.id])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [cloudAgent, c.id, cloudDevice, `cloud-${cloudAgent.slice(0, 8)}`])
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,'/home/mikka-runner/w','main')`, [repoId, cloudDevice, c.id])
     await pool.query(`INSERT INTO bot_cloud_runtimes ("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES ($1,$2,$3,'codex',$4,$5)`, [botId, c.workspaceId, c.id, cloudAgent, repoId])
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") VALUES ($1,$2,$3,'codex','connected',1,'synthetic',$4,'synthetic-subject')`, [connection, c.id, c.workspaceId, 'a'.repeat(64)])
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,1,'codex_cli','gpt-5')`, [randomUUID(), c.id, c.workspaceId, cloudAgent, connection])
     await pool.query(`INSERT INTO workspace_e2b_keys ("workspaceId",ciphertext,iv,"keyVersion",last4,"createdBy","updatedBy") VALUES ($1,'x','x',1,'abcd',$2,$2)`, [c.workspaceId, c.id])
     await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), c.id, c.workspaceId])
-    // A teammate's twenty running thread machines fill the workspace (E2B concurrency 20);
-    // this person holds none, so the per-person limit is not what refuses.
+    // A teammate's twenty running thread machines fill the workspace (E2B concurrency 20).
     const teammate = await seedUser(pool, 'teammate')
     users.push(teammate)
     await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'member','active')`, [c.workspaceId, teammate, `${teammate}@example.invalid`])
@@ -106,12 +113,11 @@ test('run machine fallback: cloud, own device, else wait and wake', { skip: !dbU
       await pool.query(`INSERT INTO agent_runs (id,"userId","agentId",status) VALUES ($1,$2,$3,'running')`, [runId, teammate, teammateAgent])
       await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'snap',$5,'running')`, [runId, c.workspaceId, teammate, botId, randomUUID()])
     }
-    const { assertThreadMachineCapacity } = await import('../lib/cloud-computer/thread-machines')
-    await assert.rejects(assertThreadMachineCapacity(pool, { userId: c.id, workspaceId: c.workspaceId }, randomUUID()), /Workspace machine limit reached/)
-    const runsBefore = (await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [c.id])).rows[0].n
+
     const waiting = await dispatch(c.id, c.issueId) as unknown as { status: string }
     assert.equal(waiting.status, 'waiting_machine', 'no device: the task waits instead of failing')
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [c.id])).rows[0].n, runsBefore, 'no stuck cloud run is left behind')
+    const cloudRuns = (await pool.query(`SELECT r.status,m.state FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows
+    assert.deepEqual(cloudRuns, [{ status: 'stopped', state: 'ended' }], 'the refused cloud run was queued, then ended instead of left stuck')
     const [wait] = await waits(c.id)
     assert.deepEqual(await wakeMachineWaits(pool, null, { workspaceId: randomUUID() }), [], 'another workspace freeing a slot wakes nothing here')
     assert.deepEqual(await wakeMachineWaits(pool, null, { workspaceId: c.workspaceId }), [wait.id])
@@ -120,5 +126,15 @@ test('run machine fallback: cloud, own device, else wait and wake', { skip: !dbU
     const result = await dispatch(c.id, c.issueId) as unknown as { runId: string; status: string }
     assert.equal(result.status, 'queued')
     assert.equal((await runOf(result.runId)).deviceId, deviceId)
+  })
+
+  await t.test('own devices: a server goes ahead of a Mac', async () => {
+    const d = await person('devices')
+    await onlineMac(d.id)
+    const server = await onlineMac(d.id)
+    await pool.query(`UPDATE devices SET "deviceType"='server',"lastSeenAt"=now()-interval '20 seconds' WHERE id=$1`, [server])
+    await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), d.id, d.workspaceId])
+    const result = await dispatch(d.id, d.issueId) as unknown as { runId: string }
+    assert.equal((await runOf(result.runId)).deviceId, server)
   })
 })

@@ -412,11 +412,6 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   if (!issue) return { error: 'issueNotFound' }
   let queuedRunId: string | null = null
   try {
-    if (process.env.MIKKA_CLOUD_THREAD_MACHINES === '1') {
-      // At the cap the cloud is unavailable for this run: check before a thread row exists.
-      const client = await pool.connect()
-      try { await (await import('@/lib/cloud-computer/thread-machines')).assertThreadMachineCapacity(client, { userId, workspaceId: target.workspaceId }, crypto.randomUUID()) } finally { client.release() }
-    }
     if (input.suggestionId && !(await pool.query('SELECT 1 FROM suggestion_executions WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("botId" IS NULL OR "botId"=$4)', [input.suggestionId, userId, target.workspaceId, input.botId])).rowCount) return { error: 'suggestionUnavailable' }
     const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.repo ? input.model ?? 'auto' : input.model, reportToCoordinator:input.reportToCoordinator, ...(input.repo ? {deviceRepoId:(await (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo)).id} : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution })
     if (input.suggestionId) await pool.query('UPDATE suggestion_executions SET "botId"=$4,"runId"=$5,status=\'running\' WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("runId" IS NULL OR "runId"=$5)', [input.suggestionId, userId, target.workspaceId, input.botId, result.runId])
