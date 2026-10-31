@@ -29,7 +29,7 @@ async function fixture(browser: Browser, use: (value: {
   allowedCookieSeen: () => boolean; failures: string[]
   initialPopupHits: () => number
   detachProtection: () => Promise<void>
-}) => Promise<void>, options: { failProtocolAbort?: boolean; expectFailure?: boolean; failClose?: 'page' | 'context'; localImage?: boolean; pausedLease?: { entered: () => void; released: Promise<void>; canceled: () => void } } = {}) {
+}) => Promise<void>, options: { failProtocolAbort?: boolean; expectFailure?: boolean; failClose?: 'page' | 'context'; localImage?: boolean; pausedLease?: { entered: () => void; released: Promise<void>; canceled: () => void; continued?: () => void } } = {}) {
   let foreignRequests = 0, websocketRequests = 0, allowedCookie = false, initialPopupRequests = 0
   const foreign = createServer((_request, response) => {
     foreignRequests++
@@ -106,9 +106,11 @@ async function fixture(browser: Browser, use: (value: {
       protectionSessions.push(session)
       if (pausedLease) {
         let pendingNetworkId: string | undefined
+        let pendingRequestId: string | undefined
         session.on('Fetch.requestPaused', event => {
           if (new URL(event.request.url).pathname === '/pending-cancel') {
             pendingNetworkId = event.networkId
+            pendingRequestId = event.requestId
             holdLease = true
           }
         })
@@ -116,6 +118,11 @@ async function fixture(browser: Browser, use: (value: {
           if (pendingNetworkId && event.requestId === pendingNetworkId && event.canceled === true) pausedLease.canceled()
         })
         await session.send('Network.enable')
+        const send = session.send.bind(session)
+        Object.defineProperty(session, 'send', { value: async (method: string, params?: { requestId?: string }) => {
+          try { return await Reflect.apply(send, session, [method, params]) }
+          finally { if (method === 'Fetch.continueRequest' && params?.requestId === pendingRequestId) pausedLease.continued?.() }
+        } })
       }
       if (options.failClose === 'page') {
         Object.defineProperty(page, 'close', { configurable: true, value: async () => { throw new Error('SYNTHETIC_CLOSE_FAILURE') } })
@@ -234,6 +241,34 @@ test('origin fence survives an exact canceled request during its lease check and
       await expect.poll(f.blocked).toBe(1)
       expect(f.foreignHits()).toBe(0)
     }, { pausedLease: { entered: () => { entered = true }, released, canceled: () => { canceled = true } } })
+  } finally { releaseLease() }
+})
+
+test('origin fence survives reload replacing a paused subrequest document without a loadingFailed event', async ({ browser }) => {
+  let releaseLease!: () => void, continued!: () => void
+  const released = new Promise<void>(resolve => { releaseLease = resolve })
+  const resumed = new Promise<void>(resolve => { continued = resolve })
+  let entered = false
+  try {
+    await fixture(browser, async f => {
+      const page = await f.context.newPage()
+      await page.goto(`${f.origin}/final`)
+      await page.evaluate(() => { void fetch('/pending-cancel').catch(() => {}) })
+      await expect.poll(() => entered).toBe(true)
+      // Chromium retires this paused interception when committing the new
+      // document, but need not emit loadingFailed on the fence's CDP session.
+      await page.reload()
+      releaseLease()
+      await resumed
+      await expect(page.locator('p')).toHaveText('controlled allowed response')
+      expect(f.context.isClosed()).toBe(false)
+      expect(await page.evaluate(async () => {
+        try { await fetch('/foreign-via'); return false } catch { return true }
+      })).toBe(true)
+      await expect.poll(f.blocked).toBe(1)
+      expect(f.foreignHits()).toBe(0)
+      expect(f.failures).toEqual([])
+    }, { pausedLease: { entered: () => { entered = true }, released, canceled: () => {}, continued } })
   } finally { releaseLease() }
 })
 

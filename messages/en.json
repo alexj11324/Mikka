@@ -2160,6 +2160,15 @@
           "signed_in": "signed in",
           "sign_in_failed": "failed to sign in"
         },
+        "credential": {
+          "created": "saved a credential",
+          "replaced": "updated a credential",
+          "revoked": "revoked a credential"
+        },
+        "agent": {
+          "approval_decided": "{decision, select, approved {approved a tool request} denied {denied a tool request} other {decided a tool request}}",
+          "approval_consumed": "used a tool approval"
+        },
         "workspace": {
           "slug_changed": "changed the address from {from} to {to}",
           "deleted": "deleted the workspace",

@@ -372,6 +372,29 @@ export class TestAccountPool {
     })
   }
 
+  async cleanupLoginAudit(client, sessions) {
+  // Normal sign-in now creates durable audit intent. Only the exact login
+  // sessions registered by this lease are disposable authentication fixtures;
+  // failed attempts, business audit and historical/other-lease rows stay.
+  const auditTables = (await client.query("SELECT to_regclass('public.workspace_audit_events') AS sink,to_regclass('public.workspace_audit_outbox') AS source")).rows[0]
+  if (auditTables.sink && auditTables.source) for (const session of sessions) {
+    const args = [session.id, session.owner_id]
+    // Lock pending intent before checking the sink, so a concurrent relay
+    // either finishes first or cannot publish after this fixture is removed.
+    const pending = await client.query(`SELECT id FROM public.workspace_audit_outbox WHERE payload->>'action'='auth.signed_in'
+      AND payload->>'actorType'='user' AND payload->>'actorId'=$2
+      AND payload->>'targetType'='session' AND payload->>'targetId'=$1 FOR UPDATE`, args)
+    const delivered = await client.query(`SELECT id FROM public.workspace_audit_events WHERE action='auth.signed_in'
+      AND "actorType"='user' AND "actorId"=$2 AND "targetType"='session' AND "targetId"=$1`, args)
+    const ids = [...new Set([...pending.rows, ...delivered.rows].map(row => row.id))]
+    if (ids.length) {
+      await client.query('DELETE FROM public.workspace_audit_outbox WHERE id=ANY($1::uuid[])', [ids])
+      await client.query(`DELETE FROM public.workspace_audit_events WHERE id=ANY($3::uuid[]) AND action='auth.signed_in'
+        AND "actorType"='user' AND "actorId"=$2 AND "targetType"='session' AND "targetId"=$1`, [...args, ids])
+    }
+  }
+  }
+
   /** Retain tracked session rows while invalidating their issued tokens. */
   async revokeSessions(lease) {
     if (!this.environment.capabilities.reset) fail('SESSION_REVOCATION_NOT_AUTHORIZED')
@@ -400,6 +423,7 @@ export class TestAccountPool {
         const marked = await client.query("UPDATE mikka_test_accounts.resources SET state='retained' WHERE lease_id=$1 AND type='session' AND id=$2 AND owner_id=$3 AND state='created'", [lease.id, session.id, session.owner_id])
         if (marked.rowCount !== 1) fail('RESOURCE_NOT_OWNED')
       }
+      await this.cleanupLoginAudit(client, sessions)
       await this.current(client, lease)
       return { revoked }
     })
