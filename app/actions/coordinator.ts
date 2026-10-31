@@ -124,7 +124,7 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     const bot = await ownBot(session.user.id, botId)
     if (!coordinatorEnabled()) return { queued: false }
     const chat = await chatView(session.user.id, 1, bot?.id ?? null)
-    if (chat.items.length || chat.working) return { queued: false }
+    if (chat.items.length || chat.working || chat.error) return { queued: false }
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
     await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot?.name), { botId: bot?.id ?? null }))
     after(() => wakeCoordinator(session.user.id))

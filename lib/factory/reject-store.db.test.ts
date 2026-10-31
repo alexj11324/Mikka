@@ -10,6 +10,7 @@ import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { createFactoryStore } from "./store";
 import { createFactoryApprovals } from "./approval";
 import { FactoryError } from "./approval-contract";
+import { dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -114,13 +115,8 @@ test("reject through the real Factory store", { skip: !url, timeout: 180000 }, a
       assert.deepEqual(task, { stage: "approval", status: "failed" });
     });
   } finally {
-    // Concurrent rejects are settled above (allSettled). pg-pool resolves end()
-    // once clients are asked to close, not once their backends are gone; wait
-    // for that before the FORCE drop so it never kills a still-closing socket
-    // ("terminating connection due to administrator command" after the test).
-    await pool.end();
-    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++) await new Promise((r) => setTimeout(r, 50));
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    // Concurrent rejects are settled above (allSettled).
+    await dropTestDatabase(admin, database, pool);
     await admin.end();
   }
 });

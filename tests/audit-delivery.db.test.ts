@@ -10,6 +10,7 @@ import { PgDialect, PgTable, getTableConfig } from 'drizzle-orm/pg-core'
 import * as workspaceSchema from '../lib/db/workspace-schema'
 import * as teamSchema from '../lib/db/team-schema'
 import * as projectSchema from '../lib/db/project-schema'
+import { dropTestDatabase, endPoolsAndWait } from './support/drop-test-database'
 
 const mainURL = process.env.E2E_DATABASE_URL
 function isolated(value: string) {
@@ -64,8 +65,8 @@ test('workspace mutations retain and idempotently deliver audit intent across tw
   ])
   t.after(async () => {
     process.env.DATABASE_URL = previousWorkspace
-    await Promise.all([workspace.end(), workspacePool.end(), pool.end()])
-    if (allocated) await main.query(`DROP DATABASE "${databaseName}"`)
+    await endPoolsAndWait(workspace, workspacePool, pool)
+    if (allocated) await dropTestDatabase(main, databaseName)
     await main.end()
   })
   const seed = async () => {

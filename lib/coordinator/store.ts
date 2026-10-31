@@ -21,7 +21,7 @@ import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
-import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
+import { coordinatorChatState } from './chat-state'
 import { readPreferences } from '@/lib/preferences'
 import { pushReasons, type PushReason } from '@/lib/push-reasons'
 import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
@@ -309,7 +309,7 @@ export async function editMemory<T>(userId: string, edit: (memory: string) => { 
 
 export interface ChatView {
   items: ChatItem[]
-  /** A turn holds the lease or messages wait in the inbox: a reply is coming. */
+  /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
   /** Why the last turn failed, when no turn has answered since. */
   error: string | null
@@ -371,13 +371,10 @@ export async function chatView(userId: string, limit = 200, botId: string | null
   const pending = waiting.filter(event => event.kind === 'user_message' && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage, pending: true as const,
   }))
-  const leased = coordinatorLeaseActive(session)
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   return {
     items,
-    // A handoff waiting in the inbox is not shown as a reply coming: the Coordinator may decide to stay quiet.
-    working: leased || waiting.some(event => event.tier !== 'background' && !isHandoff(event.kind)),
-    error: session?.lastError ?? null,
+    ...coordinatorChatState(session, waiting),
     sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
     artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
   }
@@ -387,7 +384,7 @@ export interface BotChatSummary {
   /** The latest reply or message, as written; null before the first. */
   line: string | null
   at: string | null
-  /** A turn holds the lease or the person's messages wait: a reply is coming. */
+  /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
 }
 
@@ -397,16 +394,20 @@ export async function botChats(userId: string): Promise<Record<string, BotChatSu
     .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), isNotNull(coordinatorMessages.botId), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
   const sessions = await db.select().from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNotNull(coordinatorSessions.botId)))
-  const waiting = await wakingChats(userId)
+  const waiting = await db.select({ botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError })
+    .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), isNotNull(coordinatorEvents.botId), isNull(coordinatorEvents.deliveredAt)))
   const result: Record<string, BotChatSummary> = {}
+  for (const event of waiting) {
+    if (event.botId && !result[event.botId]) result[event.botId] = { line: null, at: null, working: coordinatorChatState(undefined, waiting.filter(row => row.botId === event.botId)).working }
+  }
   for (const session of sessions) {
     if (!session.botId) continue
-    result[session.botId] = { line: null, at: null, working: coordinatorLeaseActive(session) || waiting.includes(session.botId) }
+    result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId)).working }
   }
   for (const row of latest) {
     if (!row.botId) continue
     const [item] = chatItems([{ position: 0, message: row.message as unknown as ModelMessage, createdAt: row.createdAt }])
-    result[row.botId] = { ...(result[row.botId] ?? { working: waiting.includes(row.botId) }), line: item?.text || null, at: row.createdAt.toISOString() }
+    result[row.botId] = { ...(result[row.botId] ?? { working: false }), line: item?.text || null, at: row.createdAt.toISOString() }
   }
   return result
 }

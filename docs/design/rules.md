@@ -208,7 +208,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
   header's search, widen and close, and a list group's collapse chevron), the only
-  control is 「展开」 to expand a list. 详情 holds two lists, 例行 (routines)
+  controls are 「展开」 to expand a list and, in a bot's 概览 header, its own name
+  and avatar: clicking the name renames it in place (Enter or leaving saves, Esc
+  cancels) and clicking the avatar opens the 新建 Bot shape and colour picker
+  (2026-10-31). The Coordinator's header stays read-only. 详情 holds two lists, 例行 (routines)
   and 资料库 (library). The bot creates routines when asked in chat; files are
   uploaded with the composer's 「+」.
 - **R-52** Every thread list groups its rows in this order: 等待回复（N）,
@@ -264,6 +267,14 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   Mikka's own stacked-cards icon (R-56), never lucide Copy or Library.
   No sparkle for AI (unslop): thinking is Brain, a bot is Bot (ui-policy
   `icons/no-sparkle`).
+- **R-76** Every workspace feature is on by default. Only a workspace admin
+  turns one off (Settings › 工作区 or 团队权限), and members see the current
+  value read-only. A stored off is an admin's choice, never a leftover
+  default: a migration that turns a default on also rewrites rows that hold
+  the old default. A feature stays off only for real per-use cost, an
+  incident kill switch or a recorded Alex decision (`decisions.md`). Safety
+  and money defaults (approval requirements, auto-recharge) are not features;
+  they change only with Alex's decision. Source: Alex, 2026-10-31.
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
