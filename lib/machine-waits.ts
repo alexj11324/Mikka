@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import { defaultAgentCopy } from '@/lib/agent-copy'
 
 /**
  * A task that needs a machine when none is available (decision
@@ -12,13 +13,13 @@ export const MACHINE_WAIT_DAYS = 7
 
 export type MachineWaitRequest = { issueId: string; repo: string; note?: string; requestKey?: string }
 
-/** What the bot draws for the person: one choice card, its actions handled by the host. */
+/** What the bot draws for the person: one choice card, its rows handled by the host by action. */
 export const MACHINE_NEEDED_CARD = {
-  title: '这个任务需要一台电脑来跑',
+  title: defaultAgentCopy.needsMachineTitle,
   options: [
-    { value: 'mac', label: '在这台电脑上启用', action: 'enableThisMac' },
-    { value: 'server', label: '连接我的服务器', action: 'connectServer' },
-    { value: 'e2b', label: '填入 E2B Key', action: 'e2bKey' },
+    { value: 'mac', label: defaultAgentCopy.needsMachineMac, action: 'enableThisMac' },
+    { value: 'server', label: defaultAgentCopy.needsMachineServer, action: 'connectServer' },
+    { value: 'e2b', label: defaultAgentCopy.needsMachineE2B, action: 'e2bKey' },
   ],
 } as const
 

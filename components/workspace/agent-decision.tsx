@@ -211,12 +211,16 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
         const letter = String.fromCharCode(65 + index)
         // No E2B key yet: this row opens the settings where the key is set instead of answering. It stays an Item
         // once answered (dimmed, not a link) so the row never swaps component and jumps.
-        if (option.action === 'cloudKeySettings' || option.action === 'connectServer') return <Item key={option.value} size="sm" variant="muted" aria-disabled={answered || undefined} className={cn(answered && 'pointer-events-none opacity-50')} render={answered ? <div /> : <Link href={option.action === 'connectServer' ? CONNECT_SERVER_SETTINGS : CLOUD_KEY_SETTINGS} />}>
+        if (option.action === 'cloudKeySettings') return <Item key={option.value} size="sm" variant="muted" aria-disabled={answered || undefined} className={cn(answered && 'pointer-events-none opacity-50')} render={answered ? <div /> : <Link href={CLOUD_KEY_SETTINGS} />}>
           <ItemMedia><Kbd>{letter}</Kbd></ItemMedia>
           <ItemContent><ItemTitle>{label}</ItemTitle></ItemContent>
           <ItemActions><ChevronRight aria-hidden="true" /></ItemActions>
         </Item>
-        // These open their setup in a dialog here; like the links above they never answer.
+        // 这个任务需要一台电脑来跑: each row opens its setup (a dialog, or Settings › 电脑) and never answers.
+        if (option.action === 'connectServer') return <Button key={option.value} variant="secondary" nativeButton={false} role="link" aria-disabled={answered || undefined}
+          className={cn(answered && 'pointer-events-none opacity-50')} render={<Link href={CONNECT_SERVER_SETTINGS} />}>
+          <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ChevronRight data-icon="inline-end" aria-hidden="true" />
+        </Button>
         if (option.action === 'enableThisMac' || option.action === 'e2bKey') return <Button key={option.value} type="button" variant="secondary" disabled={answered}
           onClick={() => setDialog(option.action === 'e2bKey' ? 'e2b' : 'mac')}>
           <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ChevronRight data-icon="inline-end" aria-hidden="true" />

@@ -114,7 +114,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await expect(card.getByText('去设置 E2B 密钥', { exact: true }).locator('xpath=ancestor::*[@data-slot="item"][1]')).toHaveAttribute('aria-disabled', 'true')
   })
 
-  test(`no machine: the card opens this Mac's setup, the server settings and the E2B key dialog (${viewport.name})`, async ({ page }, testInfo) => {
+  test(`no machine: the card opens this computer's setup, the server settings and the E2B key dialog (${viewport.name})`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport)
     const { email } = await register(page)
     await seed(email, [{ role: 'user', content: '把首页压到 2 秒以内' }, { role: 'assistant', content: needsMachine }])
@@ -133,6 +133,8 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await shoot(page, testInfo, `machine-${viewport.name}-e2b`)
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog', { name: 'E2B API Key' })).toHaveCount(0)
-    await expect(page.getByText('填入 E2B Key', { exact: true })).toHaveCount(1)
+    // Nothing was answered, so every row is still open.
+    await expect(card.getByRole('button', { name: /填入 E2B Key/ })).toBeEnabled()
+    await expect(card.getByRole('button', { name: /在这台电脑上启用/ })).toBeEnabled()
   })
 }

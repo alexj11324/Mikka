@@ -3022,6 +3022,7 @@
     "cloudKeySetup": "Set up your E2B key",
     "dispatchWait": "Wait for it",
     "dispatchCloud": "Run on Mikka Cloud",
+    "needsMachineTitle": "This task needs a computer to run on",
     "needsMachineMac": "Enable on this computer",
     "needsMachineServer": "Connect my server",
     "needsMachineE2B": "Add E2B key"
