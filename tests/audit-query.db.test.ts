@@ -3,6 +3,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
+// The window test reads at a fixed instant, so the out-of-window row is dated from that instant, not the clock:
+// with now() it slid back inside the 90-day window once the wall clock passed the fixed instant by a day.
+const AUDIT_NOW = '2026-10-30T12:00:00Z'
+
 test('workspace audit read API', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 2 })
@@ -23,10 +27,10 @@ test('workspace audit read API', { skip: !dbUrl }, async t => {
   await recordAudit(db, { workspaceId: other.id, actor, action: 'token.revoked' })
   // Same timestamp for two rows: paging must neither skip nor repeat them.
   await pool.query(`update workspace_audit_events set "createdAt" = '2026-10-29T10:00:00.123456Z' where "workspaceId"=$1 and "targetLabel" in ('KEY_1','KEY_2')`, [ws.id])
-  await pool.query(`update workspace_audit_events set "createdAt" = now() - interval '91 days' where "workspaceId"=$1 and "targetLabel"='KEY_0'`, [ws.id])
+  await pool.query(`update workspace_audit_events set "createdAt" = $2::timestamptz - interval '91 days' where "workspaceId"=$1 and "targetLabel"='KEY_0'`, [ws.id, AUDIT_NOW])
 
   await t.test('admins page through the window newest first without gaps; members are refused', async () => {
-    const now = new Date('2026-10-30T12:00:00Z')
+    const now = new Date(AUDIT_NOW)
     const seen: string[] = []
     let cursor: string | null = null
     do {

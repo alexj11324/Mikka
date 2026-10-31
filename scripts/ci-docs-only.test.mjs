@@ -16,6 +16,9 @@ test('approved documentation paths are documentation-only', () => {
     'tasks/lessons.md',
     'LICENSE',
     '.github/pull_request_template.md',
+    'docs/assets/architecture-light.svg',
+    'scripts/generate-diagrams.mjs',
+    'scripts/diagram-svg.mjs',
   ]
   assert.equal(isDocsOnly(files), true)
   assert.equal(isDocsOnly(['AGENTS.md']), true)
@@ -38,11 +41,11 @@ test('code, workflows, configuration, messages and public assets are not documen
     'docs/tool.mjs',
     'tasks/migration.sql',
     'docs/generated.js',
-    'docs/assets/architecture-light.svg',
+    'docs/assets/nested/image.svg',
+    'docs/assets/photo.png',
     'docs/AGENTS.md',
     'tasks/AGENTS.md',
-    'scripts/generate-diagrams.mjs',
-    'scripts/diagram-svg.mjs',
+    'scripts/release/workspace-sbom.mjs',
   ]) {
     assert.equal(isDocsOnly([file]), false, file)
   }

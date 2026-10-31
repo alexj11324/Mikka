@@ -94,8 +94,8 @@ cannot.
    tier.
 
 A pull request that only changes documentation — non-executable Markdown in
-`docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`, or
-the pull request template — skips the heavy unit, build and browser jobs. The
+`docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`,
+the pull request template, or the README diagrams (`docs/assets/*.svg` and their generator scripts) — skips the heavy unit, build and browser jobs. The
 required status checks report success from small gate jobs (also on a docs-only main push). Other changes
 retain every source, migration and database integration gate and a production
 build (in the pull request browser job, and in "Production build and browser
