@@ -85,12 +85,15 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
 
   if (questions.length === 0) return null
   const [only] = questions
-  if (questions.length === 1 && !only.multiple && only.options?.length) return <ChoiceCard title={only.title} options={only.options} task={props.task} />
+  if (questions.length === 1 && !only.multiple && !only.input && only.options?.length) return <ChoiceCard title={only.title} options={only.options} task={props.task} />
 
   return <div className="flex min-w-0 flex-col gap-2">
     <p className="text-xs text-muted-foreground">{agentCopy.answerHereAgentWillContinueBasedOn}</p>
     <ApprovalCard
       questions={questions}
+      // A switch or slider always has a value, so it can be submitted untouched.
+      defaultAnswers={Object.fromEntries(questions.flatMap(question => question.input === 'switch' ? [[question.id, { selected: [], custom: agentCopy.answerNo }]]
+        : question.input === 'slider' && question.range ? [[question.id, { selected: [], custom: `${question.range.min}${question.range.unit ?? ''}` }]] : []))}
       status={sent ? 'answered' : status}
       submitLabel={agentCopy.submitAnswersAndContinue}
       result={(agentCopy.answersSubmittedToAgent + (summary))}

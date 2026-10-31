@@ -4,11 +4,11 @@ import type { OpenUIError, ParseResult } from '@openuidev/lang-core'
 export type AgentUIIssue = { title: string; message: string }
 
 const componentNames: Record<string, string> = {
-  Table: agentCopy.table, ShadcnTable: agentCopy.table, Col: agentCopy.tableColumn,
+  Table: agentCopy.table, ShadcnTable: agentCopy.table, BeTable: agentCopy.table, Col: agentCopy.tableColumn,
   BeImage: agentCopy.illustration, BeImageCard: agentCopy.illustratedCard, BeCardGrid: agentCopy.recommendationCard, BeCard: agentCopy.contentCard,
   BeQuestions: agentCopy.questionCard, BeApproval: agentCopy.confirmationCard, BeTodoList: agentCopy.taskList,
   Form: agentCopy.form, FormControl: agentCopy.formField, Input: agentCopy.input,
-  Tabs: agentCopy.tabs, ShadcnTabs: agentCopy.tabs, TextContent: agentCopy.textParagraph, BeResponse: agentCopy.responseContent,
+  Tabs: agentCopy.tabs, ShadcnTabs: agentCopy.tabs, BeTabs: agentCopy.tabs, TextContent: agentCopy.textParagraph, BeResponse: agentCopy.responseContent,
 }
 
 export function getAgentUIIssue(result: ParseResult | null, runtimeErrors: OpenUIError[] = []): AgentUIIssue | null {

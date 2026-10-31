@@ -17,6 +17,10 @@ import { AgentDisclosure } from "@/components/agents/agent-disclosure";
 import { ActionSwapRollText } from "@/components/motion/action-swap-roll";
 import { Button } from "@/components/motion/button";
 import { Checkbox } from "@/components/motion/checkbox";
+import { DateRangePickerDropdown } from "@/components/motion/date-range-picker";
+import { RangeSlider } from "@/components/motion/range-slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/motion/select";
+import { Switch } from "@/components/motion/switch";
 import { Input } from "@/components/motion/input";
 import { RadioGroup, RadioGroupItem } from "@/components/motion/radio";
 import { EASE_OUT, SPRING_SWAP } from "@/lib/ease";
@@ -97,7 +101,9 @@ function QuestionOptions({
 
   return (
     <div className="mt-3">
-      {question.options?.length ? (
+      {question.input ? (
+        <QuestionInput question={question} answer={answer} disabled={disabled} onChange={onChange} />
+      ) : question.options?.length ? (
         question.multiple ? (
           <div className="grid gap-0.5">
             {question.options.map((option) => (
@@ -164,6 +170,89 @@ function QuestionOptions({
       ) : null}
     </div>
   );
+}
+
+const SELECT_ROOM = ["pb-14", "pb-24", "pb-34", "pb-44", "pb-54", "pb-64"];
+const DATE_RANGE = /^(\d{4}-\d{2}-\d{2})(?: – (\d{4}-\d{2}-\d{2}))?$/;
+
+/** Mikka: Select, Switch, RangeSlider and DateRangePicker answers, kept as the answer's custom text. */
+function QuestionInput({
+  question,
+  answer,
+  disabled,
+  onChange,
+}: {
+  question: ApprovalCardQuestion;
+  answer: ApprovalCardAnswer;
+  disabled: boolean;
+  onChange: (answer: ApprovalCardAnswer) => void;
+}) {
+  const agentCopy = useAgentCopy();
+  const [selectOpen, setSelectOpen] = useState(false);
+  const custom = answer.custom ?? "";
+  const label = typeof question.title === "string" ? question.title : undefined;
+  if (question.input === "select") {
+    // The card clips its overflow, so make room under the field for the open panel.
+    return (
+      <div className={cn("transition-[padding] duration-200 motion-reduce:transition-none", selectOpen && SELECT_ROOM[Math.min(question.options?.length ?? 1, SELECT_ROOM.length) - 1])}>
+      <Select value={answer.selected[0] ?? ""} onValueChange={(value) => onChange({ selected: [value], custom: "" })} onOpenChange={setSelectOpen} disabled={disabled} className="w-full">
+        <SelectTrigger><SelectValue placeholder={agentCopy.chooseOption} /></SelectTrigger>
+        <SelectContent>
+          {question.options?.map((option) => (
+            <SelectItem key={option.value} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      </div>
+    );
+  }
+  if (question.input === "switch") {
+    return (
+      <Switch
+        checked={custom === agentCopy.answerYes}
+        onCheckedChange={(checked) => onChange({ selected: [], custom: checked ? agentCopy.answerYes : agentCopy.answerNo })}
+        disabled={disabled}
+        label={custom === agentCopy.answerYes ? agentCopy.answerYes : agentCopy.answerNo}
+        ariaLabel={label}
+      />
+    );
+  }
+  if (question.input === "slider" && question.range) {
+    const { min, max, step = 1, unit = "" } = question.range;
+    const parsed = Number.parseFloat(custom);
+    const value = Number.isFinite(parsed) ? parsed : min;
+    return (
+      <div className="flex items-center gap-3">
+        <RangeSlider
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          disabled={disabled}
+          aria-label={label}
+          formatValueText={(next) => `${next}${unit}`}
+          onValueChange={(next) => onChange({ selected: [], custom: `${next}${unit}` })}
+          showTicks={(max - min) / step <= 20}
+          className="min-w-0 flex-1"
+        />
+        <span className="w-16 shrink-0 text-right text-sm tabular-nums">{value}{unit}</span>
+      </div>
+    );
+  }
+  if (question.input === "dateRange") {
+    const match = DATE_RANGE.exec(custom);
+    return (
+      <DateRangePickerDropdown
+        value={match ? { from: match[1], to: match[2] ?? match[1] } : null}
+        onValueChange={(range) => onChange({ selected: [], custom: range ? `${range.from} – ${range.to ?? range.from}` : "" })}
+        disabled={disabled}
+        label={label}
+        placeholder={agentCopy.chooseDateRange}
+        closeOnSelect
+      />
+    );
+  }
+  return null;
 }
 
 function ProgressDots({ current, ids }: { current: number; ids: string[] }) {
