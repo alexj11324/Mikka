@@ -75,11 +75,18 @@ cases remain covered by their real internal HTTP/SQL tests.
 ## Original scope that remains unexecuted
 
 - **#211:** business task/run/approval/file/receipt data produced through a
-  real fixed Mikka application HTTP/tool flow across its two database roles.
-  The present restore drill seeds controlled business rows through SQL. The
-  current ordinary account adapter binds app/workspace URLs to one isolated
-  database; no adapter guard or attestation was changed to pretend a separate
-  two-database application has been accepted.
+  real fixed Mikka application HTTP/tool flow across its two logical data
+  domains. The present restore drill seeds controlled business rows through
+  SQL. Co-locating those domains in one physical database is a valid current
+  deployment topology and matches the ordinary isolated account adapter; two
+  physical source databases are not an added acceptance requirement.
+  The actual tool limitation is `validateTargets` in
+  `scripts/ops/isolated-recovery.mjs`: it requires two different database names
+  for both backup and restore. A read-only probe using the same owned target
+  for both source roles fails with `recoveryDistinctDatabasesRequired` before
+  SQL mutation, vault access or file creation. Thus the current backup tool
+  does not yet support source aliases. Restore targets must remain newly
+  isolated; no target guard or attestation was changed during this assessment.
 - **#212:** the whole fixed-application key-flow baseline and original
   end-to-end provider/cleanup failure matrix. Current evidence establishes
   collector, logged HTTP response and restore components, plus the separately
