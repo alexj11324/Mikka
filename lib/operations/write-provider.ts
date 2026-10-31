@@ -63,8 +63,12 @@ export function composioWriteProvider(client: ComposioActionClient | null, actio
   return {
     name: `composio-${d.toolkit}`,
     async prepare(owner, payload) {
-      const accountId = await account(owner), pinned = action === 'send_slack_message' && slackDelivery ? SLACK_DELIVERY_CONTRACT : await version(d.write)
-      return { accountId, version: pinned, context: await inspect(owner, accountId, payload) }
+      // The write tool's own annotations (MCP hints such as destructiveHint) go
+      // to the destructive judgment, also when Slack sends through its own transport.
+      const accountId = await account(owner), tool = await client!.tools.getRawComposioToolBySlug(d.write)
+      const custom = action === 'send_slack_message' && slackDelivery
+      if (!custom && (!tool.version || tool.version === 'latest')) throw new OperationError('integrationActionVersionUnavailable')
+      return { accountId, version: custom ? SLACK_DELIVERY_CONTRACT : tool.version!, context: await inspect(owner, accountId, payload), tool: d.write, annotations: tool.tags ?? [] }
     },
     async execute(p) {
       p.signal.throwIfAborted()

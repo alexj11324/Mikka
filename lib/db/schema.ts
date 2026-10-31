@@ -909,9 +909,12 @@ export const runCaptureShares = pgTable('run_capture_shares', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('run_capture_shares_token_key').on(table.tokenHash), index('run_capture_shares_capture_idx').on(table.captureId)])
 /**
- * Something an agent wants to do in the person's own accounts (send an email,
- * create or change a calendar event). It stays `pending` until the person
- * approves or declines it; approving runs exactly `input` (lib/pending-actions.ts).
+ * Something an agent does in the person's own accounts (send an email,
+ * create or change a calendar event, or an agent-run write). A write the
+ * connection and policy allow is inserted `running` with no `decidedAt` and
+ * stays as the record. One that needs approval stays `pending` until the
+ * person approves or declines it; approving runs exactly `input`
+ * (lib/pending-actions.ts).
  * `context` is what the card shows besides the input, such as the event being changed.
  */
 export const PENDING_ACTION_STATUSES = ['pending', 'running', 'done', 'failed', 'declined'] as const

@@ -3,11 +3,14 @@ import { test } from 'node:test'
 import { coordinatorPresentation, personalCoordinatorInstructions, nativeCoordinatorContext } from './native-prompt'
 import { coordinatorRuntimeSchema, nativeCoordinatorCommandSchema } from '@mikka/protocol/coordinator'
 
-test('personal instructions retain host approval and existing OpenUI vocabulary',()=>{
+test('personal instructions keep host-reported approval and existing OpenUI vocabulary',()=>{
   const instructions=personalCoordinatorInstructions()
   assert.match(instructions,/everyday life/)
   assert.match(instructions,/send_email/)
-  assert.match(instructions,/host's real approval/)
+  // Writes follow the connection's permission; a card only when the host reports one is needed (R-77).
+  assert.match(instructions,/follows the connection's permission and the host's policy, and asks only when the host reports it needs approval/)
+  assert.match(instructions,/awaiting_approval/)
+  assert.doesNotMatch(instructions,/host's real approval workflow/)
   assert.match(instructions,/TextContent\(/)
   assert.match(instructions,/BeQuestions\(/)
   // A report renders as cards and a table, not ASCII art in a code block.
