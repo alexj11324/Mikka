@@ -17,7 +17,7 @@ import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
 import { BotAvatar, COORDINATOR_AVATAR } from './bot-avatar'
 import { GroupHeader } from './group-header'
-import { ThreadList } from './thread-list'
+import { ThreadList, TWO_LINE_ROW } from './thread-list'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
 import { useCloudComputer } from '@/hooks/use-feature-availability'
 
@@ -62,7 +62,7 @@ function PullRequests({ threads, issues }: { threads: Thread[]; issues: Issue[] 
         <ul className="flex flex-col">{list.map(row => {
           const issue = issues.find(item => item.id === row.issueId)
           return <li key={row.url}>
-            <Button variant="ghost" className="flex h-auto w-full flex-col items-stretch justify-start gap-0.5 rounded-lg px-2 py-1.5 text-left font-normal whitespace-normal" render={<a href={row.url} target="_blank" rel="noreferrer" />} nativeButton={false}>
+            <Button variant="ghost" className={TWO_LINE_ROW} render={<a href={row.url} target="_blank" rel="noreferrer" />} nativeButton={false}>
               <span className="truncate text-sm">{issue?.title}</span>
               <span className="truncate text-xs text-muted-foreground"><span className={cn(group === 'review' && 'text-success', group === 'merged' && 'text-label-violet')}>#{row.number}</span>{issue && ` · ${issueIdentifier(issue)}`}</span>
             </Button>
