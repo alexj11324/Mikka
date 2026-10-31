@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { cn } from '@/lib/utils'
+import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
 import { SPRING_SIDEBAR } from '@/lib/ease'
 import { markdownLine, sessionPreview } from '@/lib/agent-history'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
@@ -40,63 +41,10 @@ type ListProps = {
   onBeforeChange?: (action: () => Promise<void>) => void
 }
 
-const WIDTH_KEY = 'mikka:bot-list-width'
-const LIST_WIDTH = { min: 208, max: 400, initial: 256 }
-const clampWidth = (value: number) => Math.round(Math.min(LIST_WIDTH.max, Math.max(LIST_WIDTH.min, value)))
-
-/**
- * Dragging the list's edge sets its width, as in Linear's sidebar; the width is
- * remembered on this device. A click without a drag still folds the list.
- */
-function useListWidth() {
-  const [width, setWidth] = useState(LIST_WIDTH.initial)
-  const [dragging, setDragging] = useState(false)
-  // The remembered width is applied on load without a spring.
-  const [restored, setRestored] = useState(false)
-  const moved = useRef(false)
-  useEffect(() => {
-    try {
-      const stored = Number(window.localStorage.getItem(WIDTH_KEY))
-      if (stored) setWidth(clampWidth(stored))
-    } catch { /* storage unavailable */ }
-    const frame = requestAnimationFrame(() => setRestored(true))
-    return () => cancelAnimationFrame(frame)
-  }, [])
-  function onPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (event.button !== 0) return
-    const strip = event.currentTarget, startX = event.clientX, startWidth = width
-    const direction = getComputedStyle(strip).direction === 'rtl' ? -1 : 1
-    let latest = startWidth
-    moved.current = false
-    strip.setPointerCapture(event.pointerId)
-    const move = (next: PointerEvent) => {
-      const delta = (next.clientX - startX) * direction
-      // A few pixels of jitter is still a click.
-      if (!moved.current && Math.abs(delta) < 3) return
-      if (!moved.current) { moved.current = true; setDragging(true) }
-      latest = clampWidth(startWidth + delta)
-      setWidth(latest)
-    }
-    const end = () => {
-      strip.removeEventListener('pointermove', move)
-      strip.removeEventListener('pointerup', end)
-      strip.removeEventListener('pointercancel', end)
-      if (!moved.current) return
-      setDragging(false)
-      try { window.localStorage.setItem(WIDTH_KEY, String(latest)) } catch { /* storage unavailable */ }
-    }
-    strip.addEventListener('pointermove', move)
-    strip.addEventListener('pointerup', end)
-    strip.addEventListener('pointercancel', end)
-  }
-  /** True once for the click that ends a drag, so that click does not fold the list. */
-  function endedDrag() {
-    const was = moved.current
-    moved.current = false
-    return was
-  }
-  return { width, dragging, instant: dragging || !restored, onPointerDown, endedDrag }
-}
+// Linear's sidebar range; the width is remembered on this device.
+const LIST_WIDTH = { storageKey: 'mikka:bot-list-width', min: 208, max: 400, initial: 256, edge: 'end' } as const
+// A click on the edge folds the list after this long, unless it turns out to be a double-click.
+const DOUBLE_CLICK_MS = 250
 
 const SEEN_KEY = 'mikka:conversations-seen'
 type Seen = { since: string; at: Record<string, string> }
@@ -178,7 +126,16 @@ export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail,
   if (lastReply?.from === 'coordinator') latest.coordinator = lastReply.createdAt
   const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : null
   const unread = useUnread(activeId, latest)
-  const { width, dragging, instant, onPointerDown, endedDrag } = useListWidth()
+  const { width, dragging, instant, endedDrag, reset, handleProps } = useResizableWidth(LIST_WIDTH)
+  const foldTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(foldTimer.current), [])
+  // Enter or a click folds the list; a double-click resets its width instead.
+  function onEdgeClick(event: ReactMouseEvent) {
+    window.clearTimeout(foldTimer.current)
+    if (endedDrag() || event.detail > 1) return
+    if (event.detail === 0) toggleSidebar()
+    else foldTimer.current = window.setTimeout(toggleSidebar, DOUBLE_CLICK_MS)
+  }
   const listRef = useRef<HTMLDivElement>(null)
   // The inner list keeps its full width while the column folds, so rows never squeeze.
   useLayoutEffect(() => { listRef.current?.style.setProperty('--bot-list-width', `${width}px`) }, [width])
@@ -222,7 +179,7 @@ export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail,
   // While dragging the edge the width follows the pointer with no spring.
   return <motion.div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} initial={false} animate={{ width: open ? width : 0 }} transition={instant ? { duration: 0 } : SPRING_SIDEBAR} className={cn('relative hidden shrink-0 overflow-hidden md:block', open ? 'border-r' : 'border-r-0', dragging && 'select-none')}>
     <Sidebar collapsible="none" className="w-[var(--bot-list-width,16rem)] bg-transparent">{body}</Sidebar>
-    {/* Comma's edge strip with a hairline on hover: drag it to resize the list, click it to fold the list. */}
-    <SidebarRail label={i18nText('Nav.sidebarRail')} title={i18nText('Nav.collapseList')} onPointerDown={onPointerDown} onClick={() => { if (!endedDrag()) toggleSidebar() }} className="right-0 left-auto w-2 cursor-col-resize ltr:translate-x-0 rtl:translate-x-0 after:inset-y-3 after:start-auto after:right-0 after:w-px after:bg-border after:opacity-0 after:transition-opacity hover:after:opacity-100" />
+    {/* Comma's edge strip with a hairline on hover: drag it or use the arrow keys to resize the list, double-click it to reset, click it to fold the list. */}
+    <SidebarRail {...handleProps} aria-expanded={undefined} label={i18nText('Nav.resizeList')} title={i18nText('Nav.collapseList')} onClick={onEdgeClick} onDoubleClick={reset} className={cn(RESIZE_EDGE, 'right-0 left-auto after:start-auto after:right-0')} />
   </motion.div>
 }

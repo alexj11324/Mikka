@@ -142,6 +142,7 @@
     "conversations": "Conversations",
     "board": "Board",
     "collapseList": "Collapse bot list",
+    "resizeList": "Resize bot list",
     "bots": "Bots",
     "newBot": "New bot",
     "writingWelcome": "Writing a welcome…",
@@ -3119,6 +3120,7 @@
       "search": "Search",
       "widen": "Widen panel",
       "narrow": "Restore panel width",
+      "resize": "Resize right panel",
       "close": "Close panel",
       "open": "Open panel"
     },
