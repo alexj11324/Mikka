@@ -2222,6 +2222,16 @@
           "exported": "导出审计日志",
           "retention_changed": "更改审计留存",
           "retention_applied": "执行审计留存清理"
+        },
+        "model": {
+          "policy_changed": "更改了模型权限",
+          "admitted": "允许了模型请求",
+          "denied": "拒绝了模型请求"
+        },
+        "skill": {
+          "registered": "登记了技能 {target}",
+          "reviewed": "批准了技能 {target}",
+          "withdrawn": "撤回了技能 {target}"
         }
       },
       "roles": {

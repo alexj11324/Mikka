@@ -2222,6 +2222,16 @@
           "exported": "exported audit log",
           "retention_changed": "changed audit retention",
           "retention_applied": "applied audit retention"
+        },
+        "model": {
+          "policy_changed": "changed model permissions",
+          "admitted": "allowed a model request",
+          "denied": "blocked a model request"
+        },
+        "skill": {
+          "registered": "registered skill {target}",
+          "reviewed": "approved skill {target}",
+          "withdrawn": "withdrew skill {target}"
         }
       },
       "roles": {

@@ -1,16 +1,16 @@
 name: CI
 
-# Three layers, as in large monorepos:
-# - presubmit: every push to any branch runs CI, with or without a PR;
-# - merge queue: merge_group tests the change on top of the latest main;
-# - postsubmit: every push to main runs CI gates; docs-only changes skip heavy jobs.
-# A PR from a branch in this repo is already covered by its push run, so the
-# pull_request run is kept only for PRs from forks (see the job conditions).
-# Browser tests (Playwright) are the slow part and live in browser-tests.yml,
-# which runs only on the way into main. See CONTRIBUTING.md, "How changes are tested".
+# Merge-blocking source and database checks run on GitHub's PR merge candidate,
+# not a same-repository branch push. This avoids duplicating the same expensive
+# jobs and detects integration failures against the target branch at PR time.
+# - pull_request: premerge checks (same-repo and fork PRs);
+# - merge_group: synthetic queue candidate, if a queue is enabled later;
+# - push main: postmerge verification of each distinct main commit.
+# Browser acceptance has its own smoke/targeted PR and full main/nightly tiers
+# in browser-tests.yml. Preserve the existing protected status-check names.
 on:
   push:
-    branches-ignore: ['gh-readonly-queue/**']
+    branches: [main]
   pull_request:
   merge_group:
 
@@ -18,8 +18,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ui-policy-${{ github.event_name }}-${{ github.ref }}
-  # Superseded branch pushes are cancelled; every commit on main finishes.
+  # Main commits need unique groups: a new pending run must not evict an older
+  # pending run (cancel-in-progress: false alone does not guarantee that).
+  group: ui-policy-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
@@ -107,7 +108,7 @@ jobs:
   ui-policy-full:
     name: UI policy (full)
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
     # Fixed standard Linux image; host namespace/security policy stays unchanged.
     runs-on: ubuntu-22.04
     timeout-minutes: 20
@@ -276,7 +277,7 @@ jobs:
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
     needs: [changes, ui-policy-full]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -304,7 +305,7 @@ jobs:
     # database suites that the required check names cover.
     name: Production build and browser interactions (full)
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     services:
@@ -374,17 +375,16 @@ jobs:
             /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
             ${{ runner.temp }}/pr13-personal-mailbox-results.xml
           if-no-files-found: warn
-      # Pull requests already build in browser-tests.yml (Browser tests (pull
-      # request)); branch pushes skip this second build. main, the merge queue
-      # and fork pull requests still build here. Lint runs in UI policy above.
+      # Browser tests (pull request) build the exact synthetic merge candidate.
+      # Avoid rebuilding that candidate here; main and merge-group still build.
       - run: pnpm build
-        if: github.event_name != 'push' || github.ref == 'refs/heads/main'
+        if: github.event_name != 'pull_request'
 
   browser-tests:
     # The required check name. Same docs-only behavior as UI policy above.
     name: Production build and browser interactions
     needs: [changes, browser-tests-full]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

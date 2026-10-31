@@ -23,8 +23,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: browser-tests-${{ github.event_name }}-${{ github.ref }}
-  # Superseded branch pushes are cancelled; every commit on main finishes.
+  # Keep each main commit's pending/running postmerge verification; otherwise
+  # GitHub concurrency would replace an older pending run with a newer one.
+  group: browser-tests-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
