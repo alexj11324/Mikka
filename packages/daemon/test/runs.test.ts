@@ -36,6 +36,7 @@ async function boot(
   const daemon = await new Daemon({
     dataDir,
     flavor: "dev",
+    agentSandbox: null,
     link: server.link(),
     credential: "cred-1",
     harnesses: [{ harness: "mock", installed: true, version: "test" }],
@@ -243,7 +244,7 @@ describe("mock runs", () => {
     link.claimRun = async (deviceId, runId) => ({
       ...await claim(deviceId, runId), remoteUrl, expectedRepoRemote: remoteUrl,
     })
-    const daemon = await new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "cred-1",
+    const daemon = await new Daemon({ dataDir: tempDir(), flavor: "dev", agentSandbox: null, link, credential: "cred-1",
       harnesses: [{ harness: "mock", installed: true, version: "test" }], mockSpeed: Number.POSITIVE_INFINITY,
       heartbeatMs: 60_000, quotaSource: null }).start()
     daemons.push(daemon)
