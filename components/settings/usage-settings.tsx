@@ -5,7 +5,8 @@ import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { Download } from 'lucide-react'
 import { Bar, BarChart, XAxis } from 'recharts'
-import { getUsage } from '@/app/actions/usage'
+import type { getUsage } from '@/app/actions/usage'
+import { settingsRead } from '@/lib/settings-read'
 import { creditBillingKey } from '@/components/billing/balance-section'
 import { getCreditBilling } from '@/lib/billing/verification-client'
 import { BotAvatar } from '@/components/nav/bot-avatar'
@@ -33,7 +34,7 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
   const [view, setView] = useState<View>('bots')
   const downloadRef = useRef<HTMLAnchorElement>(null)
   const [downloadUrl, setDownloadUrl] = useState<string | undefined>()
-  const usage = useSWR(['settings:usage', workspaceId, month], () => getUsage(month, workspaceId), { keepPreviousData: true })
+  const usage = useSWR(['settings:usage', workspaceId, month], () => settingsRead<Awaited<ReturnType<typeof getUsage>>>('usage', { month, workspace: workspaceId }), { keepPreviousData: true })
   const data = usage.data && !usage.data.error ? usage.data : null
   // 余额 in points, the card-verification $1 included (#559, Figma ALW-4 `709:28418`). Admins only, as 计费 is.
   const credits = useSWR(creditBillingKey(workspaceId), () => getCreditBilling(workspaceId))

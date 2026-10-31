@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { useTheme } from 'next-themes'
+import { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { AppShellContent } from '@/components/app-shell'
@@ -32,7 +33,7 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
 import type { RailDestination } from '@/components/nav/icon-rail'
-import { prefetchSettingsSection } from '@/lib/settings-prefetch'
+import { prefetchAllSettings, prefetchSettingsSection } from '@/lib/settings-prefetch'
 import { FieldError } from '@/components/ui/field'
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
@@ -62,13 +63,20 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const section = activeSection ?? localSection
   const { data: workspace, error: workspaceError } = useWorkspace(userKey ?? user.email, workspaceId)
   const admin = workspace?.role === 'admin'
+  const { cache } = useSWRConfig()
   // Settings opened without ?workspace= still has one: the default the API resolved.
   const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
+  const roleKnown = workspace !== undefined
+  // Once the role is known, load every section the viewer can open, so none shows a skeleton later.
+  useEffect(() => {
+    if (preview || !roleKnown || !resolvedWorkspaceId) return
+    return prefetchAllSettings(resolvedWorkspaceId, admin, cache)
+  }, [preview, roleKnown, resolvedWorkspaceId, admin, cache])
   const title = t(`sections.${section}.title`)
   const routedBody = section === 'members' || section === 'teams'
 
   return <>
-    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId) }} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} />
+    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache) }} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent className="gap-6">
