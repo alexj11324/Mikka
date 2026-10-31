@@ -33,7 +33,7 @@ test('桌面版：更新下载好后，头像上方出现重启更新按钮，�
   expect(button.y + button.height).toBeLessThanOrEqual(menu.y)
   expect(Math.abs(button.x + button.width / 2 - (menu.x + menu.width / 2))).toBeLessThan(2)
   await update.hover()
-  await expect(page.getByRole('tooltip')).toHaveText('重启以更新到 v0.2.0')
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('重启以更新到 v0.2.0')
   await update.click()
   await expect.poll(() => page.evaluate(() => (window as unknown as { updateCalls: string[] }).updateCalls)).toEqual(['install'])
 })
