@@ -157,7 +157,9 @@ test('插件 store stays put while the connected apps load', async ({ page }) =>
 
 test('an app page shows Composio\'s description, tools and facts before anything is connected', async ({ page }, testInfo) => {
   await controlled(page)
-  await register(page, '/?section=plugins&app=hubspot')
+  // Sign-in returns only to the first apps' pages (lib/auth-return.ts), so open the store first.
+  await register(page, '/?section=plugins')
+  await page.goto(app('/?section=plugins&app=hubspot'))
   await expect(page.getByRole('heading', { name: 'HubSpot', exact: true })).toBeVisible()
   // Not connected: 连接 is offered, and the page is full anyway.
   await expect(page.getByRole('button', { name: '连接', exact: true })).toBeVisible()
