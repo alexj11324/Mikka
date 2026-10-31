@@ -284,10 +284,15 @@ test(
       assert.equal((await pool.query(`SELECT count(*)::int AS count FROM byos_bindings WHERE "modelId"='stale-provider-model'`)).rows[0].count,0);
       await pool.query(`UPDATE byos_connections SET epoch=1 WHERE id=$1`,[connection]);
       const ruleValue = {label:'typed', place:own,harness:'codex' as const,model:'explicit-model'};
-      for (const [patch,code] of [[{place:'invalid'},'executionPlaceInvalid'],[{harness:'missing'},'executionHarnessUnavailable'],[{model:'missing'},'executionModelUnknown']] as const) {
+      for (const [patch,code] of [[{place:'invalid'},'executionPlaceInvalid'],[{harness:'missing'},'executionHarnessUnavailable'],[{harness:'mock'},'executionHarnessUnavailable'],[{model:'missing'},'executionModelUnknown']] as const) {
         await assert.rejects(settings.mutate(alice, {kind:'save',value:{...ruleValue,...patch} as typeof ruleValue}), {code});
       }
       await assert.rejects(settings.mutate(alice,{kind:'delete',id:randomUUID()}), {code:'executionRuleNotFound'});
+      const fixtureScope = {...alice,workspaceId:randomUUID()};
+      await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,$4,'mock','fixture-model',2147483647)`,[randomUUID(),alice.ownerId,fixtureScope.workspaceId,own]);
+      const fixtureRules = await settings.list(fixtureScope);
+      const {resolveExecution}=await import('./execution-rules');
+      assert.deepEqual(resolveExecution([],fixtureRules,[{id:own,enabled:true,online:true,harnesses:[{harness:'mock',installed:true,version:null}]}]),{place:own,harness:'mock',model:'fixture-model'});
       const labelled = randomUUID(), otherLabelled = randomUUID(), deletedLabelled = randomUUID(), personalLabelled = randomUUID();
       await pool.query('CREATE TABLE issues (id uuid PRIMARY KEY,content jsonb,scope text,"updatedAt" timestamptz DEFAULT now())');
       const labelledContent = (name: string, deletedAt: string | null = null) => ({type:'doc',attrs:{mikka:{labels:[{name,color:'blue'}],deletedAt}}});

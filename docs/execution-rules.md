@@ -56,7 +56,10 @@ in that same transaction. Actual metadata is required rather than guessing
 a model during deployment. Old auto-place rules preserve
 online-device/harness preference. Explicit fields are preserved. If metadata is
 unavailable the read fails and the transaction rolls back; retry after discovery.
-Repeated reads leave already concrete rows unchanged. No new table is introduced.
+Repeated reads leave already concrete rows unchanged. No new table is introduced. The database also permits the protocol's existing
+internal `mock` harness for isolated daemon acceptance fixtures; public settings
+validation still permits only the three real harnesses. Mock execution remains
+restricted by the daemon's existing test-mode guard.
 
 ## Discovery and execution
 

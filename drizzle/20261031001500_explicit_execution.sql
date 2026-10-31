@@ -2,6 +2,10 @@ ALTER TABLE execution_rules ALTER COLUMN label DROP NOT NULL;
 ALTER TABLE execution_rules ALTER COLUMN place DROP DEFAULT;
 ALTER TABLE execution_rules ALTER COLUMN harness DROP DEFAULT;
 ALTER TABLE execution_rules ALTER COLUMN model DROP DEFAULT;
+-- The internal mock harness is already part of the daemon protocol and is
+-- executable only in isolated test mode. Public settings validation excludes it.
+ALTER TABLE execution_rules DROP CONSTRAINT IF EXISTS execution_rules_harness_check;
+ALTER TABLE execution_rules ADD CONSTRAINT execution_rules_harness_check CHECK (harness IN ('auto','claude_code','codex','cursor','mock'));
 CREATE UNIQUE INDEX IF NOT EXISTS execution_rules_default_idx ON execution_rules ("ownerId","workspaceId") WHERE label IS NULL;
 ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "executionFallbacks" jsonb NOT NULL DEFAULT '{"whenDeviceOffline":"wait","whenQuotaExhausted":"stop"}';
 -- Resolve legacy rows using existing owner reports. Missing discovery metadata is
@@ -35,6 +39,6 @@ WHERE r.id=c.id AND c.place IS NOT NULL AND c.harness IS NOT NULL AND c.model IS
 AND c.place<>'auto' AND c.harness<>'auto' AND c.model<>'auto';
 DO $$ BEGIN
  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='execution_rules'::regclass AND conname='execution_rules_explicit') THEN
- ALTER TABLE execution_rules ADD CONSTRAINT execution_rules_explicit CHECK (place <> 'auto' AND harness IN ('claude_code','codex','cursor') AND model <> 'auto' AND length(model)>0) NOT VALID;
+ ALTER TABLE execution_rules ADD CONSTRAINT execution_rules_explicit CHECK (place <> 'auto' AND harness IN ('claude_code','codex','cursor','mock') AND model <> 'auto' AND length(model)>0) NOT VALID;
  END IF;
 END $$;
