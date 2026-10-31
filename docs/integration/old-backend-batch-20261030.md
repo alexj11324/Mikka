@@ -148,3 +148,27 @@ use `/tmp/mikka-old-a98-*`. The local mobile source check initially lacked
 its existing Expo dependency links; linking the already installed workspace
 dependencies, with the integration React renderer shared, made its normal
 script pass without source or configuration changes.
+
+## Final CI fixture alignment
+
+Application revision `11ebb049` passed full/strict source checks, production
+build, real packaged SSH/systemd, performance 5/5 and the real-daemon MVP
+fixture 2/2. Its full DB run exposed two older fixtures creating device-bound
+`running` runs without a lease: scope-completion rollback token verification
+and secret output/checkpoint masking. Production correctly refused that
+state. The fixtures now seed active leases; all original authorization,
+rollback, masking and target-isolation assertions remain. Secrets pass 57/57
+on fresh 153-schema `mikka_209_secrets_ci_e2e`; a fresh
+`mikka_scope_fixture207_e2e` proves NULL/valid/STOP/expired token behavior 4/4.
+The original scope suite's existing CI/retained-target guard is unchanged;
+its full acceptance runs in real GitHub Actions.
+
+The sole browser failure in that revision was the unadopted Factory retry
+fixture advertising an older daemon capability set: checkpoint recovery
+refused it before the intended Factory fence. The fixture now declares the
+same strict local-worktree continuation capability as the current daemon.
+Expected Factory errors, absent credentials/receipts and concurrent STOP
+assertions remain unchanged. Claim-boundary source tests pass 14/14. These
+follow-ups change tests and this report only, preserving application source,
+runtime guards, timeouts and skip policy. Final Git-linked CI is recorded on
+the aggregate PR, rather than treating these earlier runs as final success.
