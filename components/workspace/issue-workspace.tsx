@@ -437,12 +437,12 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     </AppShellContent>
     {browserShown && <BrowserPane onClose={() => showBrowser(false)} />}
     {/* The panel springs only when the person opens or closes it; leaving or entering a conversation shows it at its final width. */}
-    {isConversation && <AnimatePresence initial={false}>{panelOpen && !browserShown && <ContextPanel key="context-panel" issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
+    {isConversation && <AnimatePresence initial={false}>{panelOpen && !browserShown && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}</AnimatePresence>}
     {isConversation && !browserShown && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
       <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>
-        <ContextPanel sheet issues={tasks} threads={threads} onOpenIssue={id => { setPanelSheet(false); open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => setPanelSheet(false)}
+        <ContextPanel sheet workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenIssue={id => { setPanelSheet(false); open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => setPanelSheet(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />
       </SheetContent>
     </Sheet>}
