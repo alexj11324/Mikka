@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
+import { readFile } from 'node:fs/promises'
+import { runInNewContext } from 'node:vm'
+import { transpileModule, ModuleKind } from 'typescript'
+import { z } from 'zod'
 import test from 'node:test'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { Pool } from 'pg'
-import { readCliRunPolicy } from './policy-store'
-import { setCliPolicy } from './policy-settings'
+import { readCliRunPolicy, readCliAgentPolicy } from './policy-store'
+import { setCliPolicy, setCliAgentPolicy } from './policy-settings'
 import { AgentToolApprovalStore } from './store'
 import { issuePolicySnapshot, policyDistributionContext } from './policy-distribution'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
@@ -68,12 +72,25 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
   await pool.query('INSERT INTO device_tokens (id,"userId","tokenHash") VALUES ($1,$2,$3)', [tokenId, owner, createHash('sha256').update(token).digest('hex')])
   const { POST } = await import('../../app/v1/runs/[runId]/tool-approval/route')
   const snapshotRoutes = await import('../../app/v1/runs/[runId]/policy-snapshot/route')
+  // Execute the real browser route body/store against PG. Only the browser
+  // session identity is synthetic; this is not a login/OAuth acceptance test.
+  const settingsModules: Record<string, unknown> = { 'zod': { z }, '@/lib/db': { pool },
+    '@/lib/api-auth': { auth: { api: { getSession: async ({headers}: {headers: Headers}) => ({user:{id:headers.get('cookie')==='owner=1'?owner:'other-owner'}}) } } },
+    '@/lib/agent-tool-approval/policy-store': { readCliRunPolicy, readCliAgentPolicy },
+    '@/lib/agent-tool-approval/policy-settings': { setCliPolicy, setCliAgentPolicy },
+  }
+  const settingsExports: Record<string, unknown> = {}
+  const settingsSource = await readFile(new URL('../../app/api/agent-cli-policy/route.ts', import.meta.url), 'utf8')
+  runInNewContext(transpileModule(settingsSource, {compilerOptions:{module:ModuleKind.CommonJS}}).outputText,
+    {exports:settingsExports,require:(name:string)=>{if(!Object.hasOwn(settingsModules,name))throw Error(`Unexpected settings import ${name}`);return settingsModules[name]},Response,URL})
+  const settingsRoute = settingsExports.POST as (request:Request)=>Promise<Response>
   server = createServer(async (request, response) => {
     try {
       const chunks: Buffer[] = []
       for await (const chunk of request) chunks.push(Buffer.from(chunk))
       const route = request.url!.includes('/policy-snapshot') ? (request.method==='GET'?snapshotRoutes.GET:snapshotRoutes.POST) : POST
-      const result = await route(new Request(`http://${request.headers.host}${request.url}`, { method: request.method, headers: request.headers as HeadersInit, ...(request.method==='GET'?{}:{body:Buffer.concat(chunks)}) }), { params: Promise.resolve({ runId: new URL(request.url!, 'http://127.0.0.1').pathname.split('/')[3] }) })
+      const input = new Request(`http://${request.headers.host}${request.url}`, { method: request.method, headers: request.headers as HeadersInit, ...(request.method==='GET'?{}:{body:Buffer.concat(chunks)}) })
+      const result = request.url === '/api/agent-cli-policy' ? await settingsRoute(input) : await route(input, { params: Promise.resolve({ runId: new URL(request.url!, 'http://127.0.0.1').pathname.split('/')[3] }) })
       response.writeHead(result.status, Object.fromEntries(result.headers)); response.end(await result.text())
     } catch { response.writeHead(500).end() }
   })
@@ -194,10 +211,72 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])
     for (const target of ['team','project'] as const) await assert.rejects(setCliPolicy(pool,owner,a.run,target,before.revision,{permissions:{network:'allow'}}))
     assert.equal((await read(a.run)).revision,before.revision)
-    const audits = (await pool.query(`SELECT metadata FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='agent.policy_changed'`,[workspaceA])).rows
+    const audits = (await pool.query(`SELECT metadata FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='agent.policy_changed' AND metadata->>'scope' IN ('team','project')`,[workspaceA])).rows
     assert.equal(audits.length,4,'failed non-admin changes leave neither policy nor audit effects')
     assert.ok(audits.every(row => Object.keys(row.metadata).sort().join(',') === 'revision,scope'))
     await pool.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])
+  })
+  await t.test('organization defaults inherit by specificity, explicit Agent values override, forced ceilings and revisions remain binding', async () => {
+    const subject=await fixture(workspaceA),crossSubject=await fixture(workspaceA,botB),defaultProject=randomUUID()
+    await pool.query('UPDATE mikka_team_issues SET "teamId"=$2 WHERE "issueId"=$1',[crossSubject.issue,subject.team])
+    await pool.query(`INSERT INTO workspace_projects(id,"userId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) VALUES($1,$2,'Defaults project','','','started','none','','','','',$3,1)`,[defaultProject,owner,JSON.stringify([subject.issue,crossSubject.issue])])
+    await pool.query(`INSERT INTO mikka_team_projects("projectId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)`,[defaultProject,subject.team,workspaceA,owner])
+    const original=await read(subject.run),botOriginal=await read(b.run),origin=`http://127.0.0.1:${address.port}`
+    const settings=async(runId:string,target:string,policy:unknown,cookie='owner=1')=>fetch(`${origin}/api/agent-cli-policy`,{method:'POST',headers:{cookie,origin,'content-type':'application/json'},body:JSON.stringify({operation:'set',runId,target,expectedRevision:(await read(runId)).revision,policy})})
+    const publish=async(runId:string,target:string,policy:unknown)=>{const response=await settings(runId,target,policy);assert.equal(response.status,200);return response.json() as Promise<Awaited<ReturnType<typeof read>>>}
+    try {
+      await publish(b.run,'workspace',{...botOriginal.layers.workspace,defaults:{permissions:{network:'deny',git_push:'deny'},networkAllow:['bot-default.invalid'],approvalMode:'read_only'}})
+      const workspace=await publish(subject.run,'workspace',{...original.layers.workspace,defaults:{permissions:{network:'ask',git_push:'ask'},networkAllow:['task-default.invalid'],approvalMode:'ask'}})
+      assert.equal(workspace.policy.permissions.network,'ask');assert.deepEqual(workspace.policy.networkAllow,['task-default.invalid'])
+      const teamDefaults={permissions:{network:'allow',git_push:'deny'},networkAllow:['team-default.invalid'],approvalMode:'read_only'}
+      const team=await publish(subject.run,'team',{defaults:teamDefaults})
+      assert.equal(team.policy.readOnly,true);assert.equal(team.policy.permissions.git_push,'deny')
+      const projectDefaults={permissions:{git_push:'allow'},networkAllow:['project-default.invalid'],approvalMode:'ask'}
+      const projectPolicy=await publish(subject.run,'project',{defaults:projectDefaults})
+      assert.equal(projectPolicy.policy.permissions.network,'allow');assert.equal(projectPolicy.policy.permissions.git_push,'allow')
+      assert.equal(projectPolicy.policy.readOnly,undefined);assert.equal(projectPolicy.policy.permissions.install_dependency,'deny')
+      assert.deepEqual(projectPolicy.policy.networkAllow,['project-default.invalid'])
+      const inherited=await read(crossSubject.run)
+      assert.deepEqual(inherited.defaultSources.map(source=>[source.scope,source.scopeId]),[['workspace',workspaceB],['workspace',workspaceA],['team',subject.team],['project',defaultProject]])
+      assert.equal(inherited.policy.permissions.network,'allow');assert.equal(inherited.policy.permissions.git_push,'deny','Bot workspace forced denial survives task/project defaults')
+      assert.deepEqual(inherited.policy.networkAllow,['project-default.invalid']);assert.equal(inherited.policy.readOnly,undefined)
+      const explicit=await publish(subject.run,'agent',{permissions:{network:'ask',git_push:'deny'},networkAllow:['explicit.invalid'],approvalMode:'ask'})
+      assert.equal(explicit.policy.permissions.network,'ask');assert.equal(explicit.policy.permissions.git_push,'deny');assert.deepEqual(explicit.policy.networkAllow,['explicit.invalid'])
+      await publish(subject.run,'team',{permissions:{network:'deny'},defaults:teamDefaults})
+      const constrained=await publish(subject.run,'agent',{permissions:{network:'allow',git_push:'allow'},networkAllow:['explicit.invalid']})
+      assert.equal(constrained.policy.permissions.network,'deny');assert.equal(constrained.policy.permissions.install_dependency,'deny')
+      assert.equal((await settings(subject.run,'agent',{defaults:{permissions:{network:'allow'}}})).status,409)
+      assert.equal((await settings(subject.run,'worker',{defaults:{permissions:{network:'allow'}}})).status,409)
+      assert.equal((await settings(subject.run,'project',{defaults:{permissions:{computer_use:'allow'}}})).status,409)
+      const beforeDenied=await read(subject.run)
+      await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])
+      try {assert.equal((await settings(subject.run,'project',{defaults:projectDefaults})).status,409)}
+      finally {await pool.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])}
+      assert.equal((await read(subject.run)).revision,beforeDenied.revision)
+      await publish(subject.run,'agent',original.layers.agent)
+      await publish(subject.run,'team',{defaults:teamDefaults})
+      const before=await read(subject.run),store=new AgentToolApprovalStore(pool),actor={userId:owner,deviceId:device}
+      const approval=await store.propose(actor,{runId:subject.run,requestId:randomUUID(),harness:'codex',method:'item/commandExecution/requestApproval',input:{command:'synthetic'},policyRevision:before.revision})
+      await store.decide(owner,subject.run,approval.id,approval.digest,'approve')
+      const snapshot=issuePolicySnapshot(policyDistributionContext(origin,owner,device,subject.run,before),before.policy)
+      const changed=await publish(subject.run,'project',{defaults:{...projectDefaults,networkAllow:['changed-default.invalid']}})
+      assert.notEqual(changed.revision,before.revision)
+      assert.notEqual(issuePolicySnapshot(policyDistributionContext(origin,owner,device,subject.run,changed),changed.policy).payload.policyHash,snapshot.payload.policyHash)
+      assert.equal(await store.check(actor,subject.run,before.revision),false)
+      await assert.rejects(store.take(actor,subject.run,approval.id,approval.digest))
+      assert.equal((await fetch(`${origin}/v1/runs/${subject.run}/policy-snapshot`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({deviceId:device,snapshot})})).status,409)
+      const reverted=await publish(subject.run,'project',{defaults:projectDefaults})
+      assert.notEqual(reverted.revision,before.revision);await assert.rejects(store.take(actor,subject.run,approval.id,approval.digest))
+      const readResponse=await fetch(`${origin}/api/agent-cli-policy`,{method:'POST',headers:{cookie:'owner=1',origin,'content-type':'application/json'},body:JSON.stringify({operation:'read',runId:subject.run})})
+      assert.equal(readResponse.status,200);assert.deepEqual((await readResponse.json()).defaults,reverted.defaults)
+      const audits=(await pool.query(`SELECT metadata FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='agent.policy_changed'`,[workspaceA])).rows
+      assert.ok(audits.some(row=>row.metadata.scope==='workspace'))
+      assert.ok(audits.every(row=>Object.keys(row.metadata).sort().join(',')==='revision,scope'))
+    } finally {
+      await setCliPolicy(pool,owner,subject.run,'agent',(await read(subject.run)).revision,original.layers.agent)
+      await setCliPolicy(pool,owner,subject.run,'workspace',(await read(subject.run)).revision,original.layers.workspace)
+      await setCliPolicy(pool,owner,b.run,'workspace',(await read(b.run)).revision,botOriginal.layers.workspace)
+    }
   })
   await t.test('joining a stricter project invalidates an already admitted run and approval', async () => {
     const control = await fixture(workspaceA), candidate = await fixture(workspaceA), scopedProject = randomUUID()

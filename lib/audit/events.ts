@@ -79,7 +79,7 @@ export const AUDIT_METADATA = {
   'team.access_changed': z.object({ team: label, from: access, to: access }).partial().strict(),
   'bot.permissions_changed': z.object({ capability: label, from: access, to: access }).partial().strict(),
   'integration.permission_changed': z.object({ integration: label, capability: label, from: access, to: access }).strict(),
-  'agent.policy_changed': z.object({ scope: z.enum(['team','project']), revision: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
+  'agent.policy_changed': z.object({ scope: z.enum(['workspace','team','project']), revision: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
   'model.policy_changed': z.object({ revision: z.string().regex(/^[a-f0-9]{64}$/), configured: z.boolean() }).strict(),
   'model.admitted': z.object({ revision: z.string().regex(/^[a-f0-9]{64}$/),
     provider: z.enum(['vercel-gateway', 'openai-subscription', 'anthropic-subscription']),

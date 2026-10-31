@@ -234,3 +234,42 @@ The earlier paragraph saying the signed cache package was unimplemented is
 superseded by this increment. Broader product-default/UI choices and applicable
 real-user/harness acceptance remain separately tracked rather than silently
 classified as completed.
+
+
+## Overridable organization defaults, subsequent #230 completion
+
+The earlier missing defaults capability is implemented in the existing
+`cli_run_policy` JSON. Workspace/team/project layers accept optional `defaults`
+containing the existing CLI permissions, network allow list and approval mode.
+Top-level fields retain their forced-ceiling meaning. Computer authority is
+excluded from both CLI values and defaults; its broker remains authoritative.
+
+Inheritance follows Bot workspace → task workspace → task team → shared project,
+then explicit Agent settings override inherited choices. Permission defaults
+inherit per action; an explicit network list replaces the inherited list,
+including an empty list. A more specific `ask` approval mode can override an
+inherited default `read_only`. Worker limits and every organization top-level
+ceiling are applied afterward with the existing most-restrictive intersection,
+including both workspaces when different. Default precedence is independent of
+the UUID order used for database locks. Missing defaults preserve the existing
+local/cloud behavior and explicit Agent/worker settings.
+
+The existing run-bound settings API accepts the JSON through its same current
+admin check, optimistic revision and transaction. Agent/worker writes reject the
+organization-only defaults object. Reads expose `defaults`, ordered
+`defaultSources`, raw existing layers and the final policy/revision. The same
+JSON version triggers invalidate old run approvals and signed snapshot renewals
+on defaults changes or rollback. Workspace publishes now join team/project
+publishes in the existing transaction-bound `agent.policy_changed` audit, with
+only scope/revision metadata. The pre-run workspace settings write uses the same
+audit path. No production table, credential, protocol or UI is added.
+
+The retained PG/actual settings-route HTTP test passes precedence, explicit
+Agent override, cross-workspace forced denial, admin rejection, malformed
+computer/Agent/worker defaults rejection, signed hash changes, old approval and
+renewal rejection, monotonic rollback, defaults readback and minimal audit
+metadata. Only the browser session identity is a synthetic test boundary;
+the route parser, store, guards and PostgreSQL operations are actual code.
+Evidence: `/tmp/mikka-policy-defaults-db-initial.log`. This supersedes the earlier
+statement that separate organization defaults remained unimplemented. The
+already documented real-user/model/UI acceptance limits remain unchanged.

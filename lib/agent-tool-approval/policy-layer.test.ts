@@ -34,3 +34,11 @@ test('CLI policy layers reject unknown actions and layer fields', () => {
   assert.equal(cliPolicyLayerSchema.safeParse({ computer_use: 'allow' }).success, false)
   assert.equal(cliPolicyLayerSchema.safeParse({ future_layer: {} }).success, false)
 })
+
+
+test('organization defaults use the existing bounded CLI values and keep computer authority separate', () => {
+  const layer={permissions:{network:'deny'},defaults:{permissions:{network:'allow'},networkAllow:['example.test'],approvalMode:'ask'}}
+  assert.deepEqual(cliPolicyLayerSchema.parse(layer),layer)
+  assert.equal(cliPolicyLayerSchema.safeParse({defaults:{permissions:{computer_use:'allow'}}}).success,false)
+  assert.equal(cliPolicyLayerSchema.safeParse({defaults:{defaults:{permissions:{network:'allow'}}}}).success,false)
+})

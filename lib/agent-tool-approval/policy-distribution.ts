@@ -19,7 +19,7 @@ function signingKey(issuer: string) {
   const publicKey = createPublicKey(privateKey).export({format:'der',type:'spki'})
   return {privateKey,publicKey:publicKey.toString('base64url'),keyId:createHash('sha256').update(publicKey).digest('hex')}
 }
-export function policyDistributionContext(issuer: string, ownerId: string, deviceId: string, runId: string, current: Awaited<ReturnType<typeof readCliRunPolicy>>) {
+export function policyDistributionContext(issuer: string, ownerId: string, deviceId: string, runId: string, current: Pick<Awaited<ReturnType<typeof readCliRunPolicy>>, 'revision' | 'workspaceIds' | 'hierarchy' | 'policySnapshotRequired'>) {
   const key = signingKey(issuer)
   return policyDistributionContextSchema.parse({version:1,algorithm:'Ed25519',issuer:policyIssuer(issuer),ownerId,deviceId,runId,revision:current.revision,
     scope:{workspaceIds:current.workspaceIds,hierarchy:current.hierarchy ?? null},required:current.policySnapshotRequired === true,keyId:key.keyId,publicKey:key.publicKey})
