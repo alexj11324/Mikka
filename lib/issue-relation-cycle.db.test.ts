@@ -68,3 +68,95 @@ test('updateIssueRelation rejects a parent cycle on the server', { skip: !hasDb 
     await db.delete(users).where(eq(users.id, owner))
   }
 })
+
+// A graph read may inspect every owner issue, but it must not lock unrelated
+// rows. Keep the existing owner graph lock so concurrent, disjoint edits cannot
+// independently pass a cycle check against an obsolete graph.
+test('relation edits lock only their pair while preserving concurrent graph cycle checks', { skip: !hasDb && 'no isolated database' }, async t => {
+  const { eq, inArray, sql } = await import('drizzle-orm')
+  const { db, pool, withDatabaseClient } = await import('./db')
+  const { issues, issueVersions, users } = await import('./db/schema')
+  const { actAs } = await import('./acting-user')
+  const { updateIssueRelation } = await import('../app/actions/issue-operations')
+  const owner = `relation-locks-${randomUUID()}`
+  const [a, b, c, d, unrelated] = Array.from({ length: 5 }, () => randomUUID())
+  const ids = [a, b, c, d, unrelated]
+  const doc = (metadata: object = {}) => ({ type: 'doc', content: [], attrs: { mikka: metadata } })
+  await db.execute(sql`insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values (${owner},'Relation Locks',${owner + '@example.test'},false,now(),now())`)
+  try {
+    await db.insert(issues).values(ids.map(id => ({ id, userId: owner, title: 'relation lock fixture', status: 'todo', priority: 'normal', content: doc() })))
+
+    await t.test('an unrelated write lock does not block an edge edit or its full graph read', async () => {
+      const blocker = await pool.connect()
+      const writer = await pool.connect()
+      try {
+        await blocker.query('BEGIN')
+        await blocker.query('SELECT id FROM issues WHERE id=$1 FOR UPDATE', [unrelated])
+        await writer.query("SET lock_timeout='1s'")
+        // This used to time out on the full-owner FOR UPDATE scan. A parent
+        // edit also exercises the now nonlocking transitive graph read.
+        const result = await withDatabaseClient(writer, () => actAs(owner, () => updateIssueRelation({ id: a, revision: 1, targetId: b, kind: 'parent' })))
+        assert.ok('issue' in result, JSON.stringify(result))
+        assert.equal(result.issue.id, a)
+        assert.equal((result.issue.content.attrs as { mikka: { parentId: string } }).mikka.parentId, b)
+        assert.equal((await blocker.query('SELECT id FROM issues WHERE id=$1', [unrelated])).rowCount, 1)
+      } finally {
+        await blocker.query('ROLLBACK')
+        await writer.query('RESET lock_timeout')
+        blocker.release(); writer.release()
+      }
+    })
+
+    for (const [kind, field, cycleError] of [
+      ['parent', 'parentId', 'issueParentCycle'],
+      ['duplicate', 'duplicateOfId', 'issueDuplicateCycle'],
+      ['blockedBy', 'blockedByIds', 'issueBlockCycle'],
+    ] as const) {
+      await t.test(`${kind}: concurrent disjoint edges cannot jointly close a transitive cycle`, async () => {
+        // Existing A -> B and C -> D; B -> C plus D -> A would close a loop.
+        // The two edits touch disjoint row pairs, so row locks alone cannot
+        // serialize their graph observations.
+        for (const id of [a, b, c, d]) {
+          const target = id === a ? b : id === c ? d : null
+          await db.update(issues).set({ content: doc({ [field]: field === 'blockedByIds' ? target ? [target] : [] : target }), revision: sql`${issues.revision} + 1`, status: 'todo' }).where(eq(issues.id, id))
+        }
+        const revisions = new Map((await db.select({ id: issues.id, revision: issues.revision }).from(issues).where(inArray(issues.id, [b, d]))).map(row => [row.id, row.revision]))
+        const gate = await pool.connect(), left = await pool.connect(), right = await pool.connect()
+        let edits: ReturnType<typeof updateIssueRelation>[] = []
+        try {
+          await gate.query('BEGIN')
+          await gate.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [owner])
+          await left.query("SET lock_timeout='5s'")
+          await right.query("SET lock_timeout='5s'")
+          const leftPid = (await left.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid
+          const rightPid = (await right.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid
+          edits = [
+            withDatabaseClient(left, () => actAs(owner, () => updateIssueRelation({ id: b, revision: revisions.get(b)!, targetId: c, kind }))),
+            withDatabaseClient(right, () => actAs(owner, () => updateIssueRelation({ id: d, revision: revisions.get(d)!, targetId: a, kind }))),
+          ]
+          const deadline = Date.now() + 3000
+          let waiting = 0
+          while (Date.now() < deadline) {
+            waiting = Number((await pool.query(`SELECT count(*)::int AS n FROM pg_stat_activity WHERE pid=ANY($1::int[]) AND wait_event='advisory'`, [[leftPid, rightPid]])).rows[0].n)
+            if (waiting === 2) break
+            await new Promise(resolve => setTimeout(resolve, 20))
+          }
+          assert.equal(waiting, 2, 'both graph edits must serialize on the existing owner advisory lock')
+          await gate.query('ROLLBACK')
+          const results = await Promise.all(edits)
+          assert.equal(results.filter(result => 'issue' in result).length, 1, JSON.stringify(results))
+          assert.equal(results.filter(result => 'error' in result && result.error === cycleError).length, 1, JSON.stringify(results))
+        } finally {
+          await gate.query('ROLLBACK')
+          await Promise.allSettled(edits)
+          await left.query('RESET lock_timeout'); await right.query('RESET lock_timeout')
+          gate.release(); left.release(); right.release()
+        }
+      })
+    }
+  } finally {
+    await db.delete(issueVersions).where(inArray(issueVersions.issueId, ids))
+    await db.delete(issues).where(inArray(issues.id, ids))
+    await db.delete(users).where(eq(users.id, owner))
+  }
+})
