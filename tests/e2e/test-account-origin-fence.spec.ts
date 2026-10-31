@@ -29,7 +29,7 @@ async function fixture(browser: Browser, use: (value: {
   allowedCookieSeen: () => boolean; failures: string[]
   initialPopupHits: () => number
   detachProtection: () => Promise<void>
-}) => Promise<void>, options: { failProtocolAbort?: boolean; expectFailure?: boolean; failClose?: 'page' | 'context'; localImage?: boolean; pausedLease?: { entered: () => void; released: Promise<void>; canceled: () => void; continued?: () => void } } = {}) {
+}) => Promise<void>, options: { failProtocolAbort?: boolean; expectFailure?: boolean; failClose?: 'page' | 'context'; localImage?: boolean; slowLease?: boolean; pausedLease?: { entered: () => void; released: Promise<void>; canceled: () => void; continued?: () => void } } = {}) {
   let foreignRequests = 0, websocketRequests = 0, allowedCookie = false, initialPopupRequests = 0
   const foreign = createServer((_request, response) => {
     foreignRequests++
@@ -48,6 +48,11 @@ async function fixture(browser: Browser, use: (value: {
     if (path === '/foreign-via') return redirect('/foreign-middle')
     if (path === '/foreign-middle') return redirect(`${foreignOrigin}/blocked`, 307)
     if (path === '/fixture-image') return redirect(`${foreignOrigin}/fixture.png`)
+    if (path === '/busy') {
+      response.setHeader('content-type', 'text/html')
+      response.end("<p>controlled allowed response</p><script>setInterval(() => { fetch('/poll?' + Math.random()).catch(() => {}) }, 5)</script>")
+      return
+    }
     if (path === '/popup') { response.setHeader('content-type', 'text/html'); response.end('<a id="foreign" target="_blank" href="/foreign-via">foreign chain</a><a id="same" target="_blank" href="/same-start">same chain</a>'); return }
     if (path === '/worker.js') {
       response.setHeader('content-type', 'text/javascript')
@@ -137,6 +142,8 @@ async function fixture(browser: Browser, use: (value: {
       return session
     } })
     await installAccountOriginFence(context, { assertActive: async () => {
+      // The pooled lease check is a database round trip, not a microtask.
+      if (options.slowLease) await new Promise(resolve => setTimeout(resolve, 2))
       if (holdLease && pausedLease) { holdLease = false; pausedLease.entered(); await pausedLease.released }
     } }, origin,
       () => { blocked++ }, () => { failures.push('ORIGIN_FENCE_FAILED') },
@@ -270,6 +277,22 @@ test('origin fence survives reload replacing a paused subrequest document withou
       expect(f.failures).toEqual([])
     }, { pausedLease: { entered: () => { entered = true }, released, canceled: () => {}, continued } })
   } finally { releaseLease() }
+})
+
+test('origin fence survives reloads that discard many paused same-origin requests', async ({ browser }) => {
+  await fixture(browser, async f => {
+    const page = await f.context.newPage()
+    await page.goto(`${f.origin}/busy`)
+    for (let reload = 0; reload < 10; reload++) await page.reload()
+    await expect(page.locator('p')).toHaveText('controlled allowed response')
+    expect(f.context.isClosed()).toBe(false)
+    expect(await page.evaluate(async () => {
+      try { await fetch('/foreign-via'); return false } catch { return true }
+    })).toBe(true)
+    await expect.poll(f.blocked).toBe(1)
+    expect(f.foreignHits()).toBe(0)
+    expect(f.failures).toEqual([])
+  }, { slowLease: true })
 })
 
 test('origin fence blocks direct and same-origin-then-cross-port redirect hops before the sink receives a request', async ({ browser }) => {

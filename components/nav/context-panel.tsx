@@ -134,6 +134,9 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   const shown = tabs.includes(tab) ? tab : 'threads'
 
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
+  // The panel keeps its transparent pills while Alex compares them with the shared segmented control (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md);
+  // `indicator: false` opts out of the gliding pill. To switch, drop `pillTab` and the list overrides.
+  const pillTab = { className: pill, indicator: false }
   // R-37: opening, closing and widening move the width on a spring; while the edge is dragged
   // the width follows the pointer with no spring.
   return <motion.aside ref={asideRef} aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width }} exit={sheet ? undefined : { width: 0 }} transition={dragging ? { duration: 0 } : SPRING_SIDEBAR} className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l bg-background xl:flex', dragging && 'select-none')}>
@@ -142,8 +145,8 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
     <Tabs value={view} onValueChange={value => setView(value as PanelView)} className={cn('min-h-0 flex-1 gap-0', !sheet && 'min-w-[var(--context-panel-width,22.5rem)]')}>
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
         <TabsList aria-label={t('views')} className="gap-1 bg-transparent p-0">
-          <TabsTrigger value="overview" className={pill}>{t('overview')}</TabsTrigger>
-          <TabsTrigger value="all" className={pill}>{t('allThreads')}</TabsTrigger>
+          <TabsTrigger value="overview" {...pillTab}>{t('overview')}</TabsTrigger>
+          <TabsTrigger value="all" {...pillTab}>{t('allThreads')}</TabsTrigger>
         </TabsList>
         <div className="ml-auto flex items-center">
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('search')} onClick={onSearch} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('search')}</TooltipContent></Tooltip>
@@ -159,7 +162,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
               : coordinator ? <BotAvatar {...COORDINATOR_AVATAR} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
             {botId ? <BotNameEditor key={botId} botId={botId} name={conversation.name} /> : <h2 className="max-w-full truncate text-xl font-semibold">{conversation.name}</h2>}
             <TabsList aria-label={t('tabs')} className="mt-2 gap-1 bg-transparent p-0">
-              {tabs.map(item => <TabsTrigger key={item} value={item} className={pill}>{t(item)}</TabsTrigger>)}
+              {tabs.map(item => <TabsTrigger key={item} value={item} {...pillTab}>{t(item)}</TabsTrigger>)}
             </TabsList>
           </div>
           <TabsContent value="details" className="flex min-h-0 flex-col gap-4 overflow-y-auto px-4 pb-4">

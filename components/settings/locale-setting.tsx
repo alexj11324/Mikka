@@ -12,7 +12,7 @@ export function LocaleSetting() {
   const pathname = usePathname()
   const params = useSearchParams()
   const router = useRouter()
-  return <ToggleGroup aria-label={t('language')} variant="outline" spacing={0} value={[locale]} onValueChange={values => {
+  return <ToggleGroup aria-label={t('language')} variant="segment" spacing={0.5} value={[locale]} onValueChange={values => {
     const next = values[0] as 'zh-CN' | 'en' | undefined
     if (!next || next === locale) return
     // Keep ?section= and ?workspace=, so the person stays on this page in this workspace.

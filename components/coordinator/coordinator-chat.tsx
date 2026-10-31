@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
+import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { useTranslations } from 'next-intl'
 import { getCoordinatorChat, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
@@ -9,7 +10,7 @@ import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
 import { useActionError } from '@/lib/use-action-error'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
@@ -30,6 +31,7 @@ import { SubagentLoginNeeds } from './subagent-login-needs'
 import { UnreadDivider } from '@/components/chat/unread-divider'
 import { UnreadPill } from '@/components/chat/unread-pill'
 import { MESSAGE_POSITION_ATTR, useUnreadIndicators } from '@/lib/hooks/use-unread-indicators'
+import { useArrivals } from '@/lib/hooks/use-arrivals'
 import dynamic from 'next/dynamic'
 import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'
 import { ArtifactQuoteChip, ArtifactQuoteLine } from '@/components/artifacts/artifact-quote'
@@ -38,7 +40,13 @@ import { BrowserNoteChip, BrowserNoteLine, useBrowserNotesComposer } from '@/com
 import { SentSuggestion } from '@/components/suggestions/mobile-card'
 import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
+import { subscriptionRefusal } from '@/lib/subscription-refusal'
+import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
+import { RetryReplyButton } from './retry-reply-button'
 import { FieldError } from '@/components/ui/field'
+
+/** A new message's enter: a short fade (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md). */
+const ENTER = 'animate-in fade-in-0 duration-200 motion-reduce:animate-none'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
 
@@ -133,8 +141,27 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
   }, [prefill])
   const items = useMemo(() => data?.items ?? [], [data])
+  // New messages fade in briefly, as in Claude Code; what was there when the chat opened does not (R-37).
+  // A stored reply that replaces a reply already streamed on screen is not new.
+  const streamedThrough = useRef(-1)
+  useEffect(() => { for (const reply of stream.replies) if (reply.committedThrough !== undefined) streamedThrough.current = Math.max(streamedThrough.current, reply.committedThrough) })
+  const arriving = useArrivals(data ? [...items.map(item => `item-${item.position}`), ...stream.replies.map(reply => `stream-${reply.id}`)] : null)
+  // The working line fades in when a turn starts after the chat opened, not when the chat opens mid-run.
+  const loaded = useRef(false)
+  const workingAtOpen = useRef(false)
+  useEffect(() => {
+    if (!data) return
+    if (!loaded.current) { loaded.current = true; workingAtOpen.current = Boolean(data.working) }
+    else if (!data.working) workingAtOpen.current = false
+  })
+  const workingEnter = loaded.current && !workingAtOpen.current
+  const entering = (item: (typeof items)[number]) => arriving(`item-${item.position}`) && !(item.from === 'coordinator' && item.position <= streamedThrough.current)
   // A turn the hosted model (Mikka 默认) refused: verification, allowance or pause (#523, #525, #526).
   const refusal = data?.working ? null : hostedRefusal(data?.error)
+  // The chosen subscription refused it: the mapped line, never the raw step error.
+  const declined = data?.working || refusal ? null : subscriptionRefusal(data?.error)
+  // 重试 on any failed reply, never on a wake still being retried by the server.
+  const retry = <RetryReplyButton botId={botId} onQueued={mutate} />
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
   const unanswered = data?.enabled === false && items.findLast(item => item.from !== 'event')?.from === 'person'
@@ -223,7 +250,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               : <div className="flex flex-1 flex-col items-center justify-center gap-3">{avatar('profile')}<p className="text-sm font-medium">{name}</p></div>)}
             {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
               {unread.divider === item.position && <UnreadDivider />}
-              <MessageScrollerItem messageId={String(item.position)} className="[content-visibility:visible]" {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
+              <MessageScrollerItem messageId={String(item.position)} className={cn('[content-visibility:visible]', entering(item) && ENTER)} {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
               {item.from === 'event'
                 ? <p className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
@@ -245,22 +272,28 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                   </MessageContent></Message>}
             </MessageScrollerItem>
             </Fragment>)}
-            {stream.replies.map(reply => <MessageScrollerItem key={reply.id} messageId={reply.id} data-coordinator-stream-id={reply.id} data-streaming={reply.committedThrough === undefined} className="[content-visibility:visible]">
+            {stream.replies.map(reply => <MessageScrollerItem key={reply.id} messageId={reply.id} data-coordinator-stream-id={reply.id} data-streaming={reply.committedThrough === undefined} className={cn('[content-visibility:visible]', arriving(`stream-${reply.id}`) && ENTER)}>
               <Message align="start"><MessageContent>
                 <CoordinatorReply text={reply.text} citations={citations} isStreaming={reply.committedThrough === undefined} />
               </MessageContent></Message>
             </MessageScrollerItem>)}
-            {data?.working && items.length > 0 && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />{t('working')}</p>}
+            {/* The working line fades in (R-37: opacity on a duration). It leaves at once: an exit would keep its height
+                after the reply lands and pull the scroll position back (coordinator-scroll.spec). */}
+            {data?.working && items.length > 0 && <p role="status" className={cn('flex items-center gap-2 text-sm text-muted-foreground', workingEnter && ENTER)}><Spinner />{t('working')}</p>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
-        {unread.showTop && <UnreadPill direction="up" count={unread.topCount} onJump={unread.jumpToDivider} onDismiss={unread.dismissTop} />}
-        {unread.showBottom ? <UnreadPill direction="down" count={unread.bottomCount} onJump={unread.jumpToLatest} onDismiss={unread.dismissBottom} /> : <MessageScrollerButton />}
+        <AnimatePresence initial={false}>
+          {unread.showTop && <UnreadPill key="up" direction="up" count={unread.topCount} onJump={unread.jumpToDivider} onDismiss={unread.dismissTop} />}
+          {unread.showBottom && <UnreadPill key="down" direction="down" count={unread.bottomCount} onJump={unread.jumpToLatest} onDismiss={unread.dismissBottom} />}
+        </AnimatePresence>
+        {!unread.showBottom && <MessageScrollerButton />}
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
-      {refusal && <HostedRefusalNotice code={refusal} />}
-      {data?.error && !data.working && !refusal && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></>}</Alert>}
+      {refusal && <HostedRefusalNotice code={refusal} retry={retry} />}
+      {declined && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
+      {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription><AlertAction>{retry}</AlertAction></>}</Alert>}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {sendError && <FieldError className="text-xs">{sendError}</FieldError>}
       {botId && <SubagentLoginNeeds botId={botId} />}

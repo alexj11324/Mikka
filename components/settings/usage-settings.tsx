@@ -67,7 +67,7 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
         <SelectTrigger size="sm" aria-label={t('month')}><SelectValue /></SelectTrigger>
         <SelectContent><SelectGroup>{months.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
-      {admin && <ToggleGroup aria-label={t('groupBy')} variant="outline" size="sm" spacing={0} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'bots' || next === 'members') setView(next) }}>
+      {admin && <ToggleGroup aria-label={t('groupBy')} variant="segment" size="sm" spacing={0.5} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'bots' || next === 'members') setView(next) }}>
         <ToggleGroupItem value="bots">{t('byBot')}</ToggleGroupItem>
         <ToggleGroupItem value="members">{t('byMember')}</ToggleGroupItem>
       </ToggleGroup>}

@@ -183,3 +183,16 @@ test('Saved replies with retired component names still parse and render as their
   }
   assert.match(render('root = BeTimeline([{date: "2026-11-02", title: "Kickoff", description: "Scope"}])'), /2026-11-02 · Kickoff/)
 })
+
+test('a new bot\'s welcome card renders, empty entries included', () => {
+  const welcome = (options: string) => `root = Stack([TextContent("你好，我是 E2B acceptance 449729，可以帮你整理邮件和日程。"), BeQuestions("刚创建的 Bot", [{id:"start", title:"想先从什么开始？", options:[${options}], allowCustom:true}])])`
+  const options = '{value:"a", label:"整理邮件"}, {value:"b", label:"安排日程"}, {value:"c", label:"写周报"}, {value:"d", label:"查资料"}'
+  // The exact shape coordinatorWelcome asks for, then the same reply with the empty entries a stray `,,` parses to.
+  for (const source of [welcome(options), welcome(options.replace('}, {value:"b"', '},, {value:"b"')), welcome(options).replace('[{id:"start"', '[, {id:"start"')]) {
+    assert.deepEqual(parser.parse(source).meta.errors, [], source)
+    const html = render(source, 'zh-CN')
+    assert.match(html, /想先从什么开始？/, source)
+    for (const label of ['整理邮件', '安排日程', '写周报', '查资料']) assert.match(html, new RegExp(label), source)
+    assert.doesNotMatch(html, /显示时发生错误|无法显示/, source)
+  }
+})
