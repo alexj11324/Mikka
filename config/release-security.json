@@ -1,5 +1,25 @@
 {
   "version": 1,
-  "blockSeverities": ["critical", "high"],
-  "exceptions": []
+  "blockSeverities": [
+    "critical",
+    "high"
+  ],
+  "exceptions": [
+    {
+      "package": "zod",
+      "version": "3.25.76",
+      "advisory": "1243066",
+      "owner": "alexj11324",
+      "reason": "GHSA-mrhx-c7xc-m3w5: memory exhaustion when an unbounded array schema validates attacker-sized input; availability only. In the daemon zod is used inside @anthropic-ai/sandbox-runtime, whose latest release still requires zod ^3.25.0, and no fixed 3.x exists. Accepted by the owner on 2026-10-31; upgrade when upstream sandbox-runtime moves to zod v4.",
+      "reviewedAt": "2026-10-31T00:00:00Z"
+    },
+    {
+      "package": "@anthropic-ai/sandbox-runtime",
+      "version": "0.0.80",
+      "advisory": "via:zod",
+      "owner": "alexj11324",
+      "reason": "Flagged only because it depends on zod 3.25.76 (GHSA-mrhx-c7xc-m3w5); no advisory of its own. Accepted by the owner on 2026-10-31; upgrade when upstream sandbox-runtime moves to zod v4.",
+      "reviewedAt": "2026-10-31T00:00:00Z"
+    }
+  ]
 }

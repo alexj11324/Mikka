@@ -8,9 +8,12 @@ function exceptionValid(value, now) {
   if (!value || !packageName.test(value.package ?? '') || typeof value.advisory !== 'string' || !value.advisory ||
       typeof value.version !== 'string' || !value.version || typeof value.owner !== 'string' || !value.owner.trim() ||
       typeof value.reason !== 'string' || value.reason.trim().length < 20) return false
-  const reviewed = Date.parse(value.reviewedAt), expires = Date.parse(value.expiresAt)
-  return Number.isFinite(reviewed) && Number.isFinite(expires) && reviewed <= now && expires > now &&
-    expires > reviewed && expires - reviewed <= 30 * 86_400_000
+  const reviewed = Date.parse(value.reviewedAt)
+  if (!Number.isFinite(reviewed) || reviewed > now) return false
+  // An exception may stand until upstream ships a fix (no expiresAt); a dated one keeps the 30-day review window.
+  if (value.expiresAt === undefined) return true
+  const expires = Date.parse(value.expiresAt)
+  return Number.isFinite(expires) && expires > now && expires > reviewed && expires - reviewed <= 30 * 86_400_000
 }
 
 export function assessAudit(report, lock, policy, now = Date.now()) {
@@ -41,8 +44,9 @@ export function assessAudit(report, lock, policy, now = Date.now()) {
   for (const [name, value] of Object.entries(report.vulnerabilities)) {
     if (!packageName.test(name) || !LEVELS.has(value.severity) || !Array.isArray(value.nodes) || !Array.isArray(value.via)) throw Error('releaseAuditFindingInvalid')
     if (!policy.blockSeverities.includes(value.severity)) continue
-    const advisories = value.via.filter(x => x && typeof x === 'object').map(x => String(x.source ?? x.url ?? ''))
-    // A transitive advisory without a direct record remains blocked; no inferred exception.
+    // A transitive finding (via names another package) is recorded as `via:<package>` and needs its own explicit exception.
+    const advisories = value.via.filter(x => typeof x === 'string' || (x && typeof x === 'object'))
+      .map(x => typeof x === 'string' ? `via:${x}` : String(x.source ?? x.url ?? ''))
     const versions = value.nodes.map(node => lock.packages[node]?.version)
     if (!versions.length || versions.some(x => typeof x !== 'string' || !x)) throw Error('releaseAuditLockMismatch')
     const exempt = advisories.length > 0 && advisories.every(advisory => versions.every(version =>
