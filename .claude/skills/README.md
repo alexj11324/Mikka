@@ -18,17 +18,12 @@ Full license texts are in [`../skill-licenses/`](../skill-licenses/).
 
 ## Which skill to use
 
-- **UI craft review**: `interface-design` and `/interface-design:design-review`
-  for hierarchy, states, surfaces and reuse; `/interface-design:design-deslop`
-  for a diff-scoped pass. Three limits apply:
-  - Mikka's design source is `docs/design/`, not `.interface-design/system.md`.
-    Do not create that file; record decisions in `docs/design/decisions.md`.
-  - Type and palette are the theme tokens in `app/globals.css` and the
-    component library; the mark is `docs/design/brand.md`. The skill's "swap
-    test", per-screen signature and "avoid Inter/system fonts" advice applies
-    to those tokens as a product-wide decision, not to one screen.
-  - Use it when designing or reviewing UI, not as a mandatory preamble on
-    every UI edit. Run `docs/review-checklist.md` as well before showing UI.
+- **UI design and review**: `interface-design`, with
+  `/interface-design:design-review` (craft review with a pass bar) and
+  `/interface-design:design-deslop` (diff-scoped cleanup). Its design-system
+  file is `docs/design/`: record decisions in `docs/design/decisions.md`
+  instead of `.interface-design/system.md`.
+
 - **Bug or failing test**: `debug` (root cause before a fix).
 - **Production incident**: `incident`, then `debug`.
 - **Performance / production readiness**: `perf`, `node-ops`; `db-review` for
