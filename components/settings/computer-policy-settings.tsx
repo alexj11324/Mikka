@@ -49,7 +49,7 @@ export function ComputerPolicySettings({ workspaceId }: { workspaceId: string })
       <SettingRow title={t('label')}>
         {/* Only an admin can change it; everyone else sees the value, not a disabled control. */}
         {state.canEdit
-          ? <ToggleGroup aria-label={t('label')} variant="outline" spacing={0} disabled={pending} value={[state.permission]} onValueChange={values => { const value = values[0]; if ((value === 'allow' || value === 'deny') && value !== state.permission) void change(value) }}>
+          ? <ToggleGroup aria-label={t('label')} variant="segment" spacing={0.5} disabled={pending} value={[state.permission]} onValueChange={values => { const value = values[0]; if ((value === 'allow' || value === 'deny') && value !== state.permission) void change(value) }}>
             <ToggleGroupItem value="allow">{labels.allow}</ToggleGroupItem><ToggleGroupItem value="deny">{labels.deny}</ToggleGroupItem>
           </ToggleGroup>
           : <span className="text-sm">{labels[state.permission]}</span>}

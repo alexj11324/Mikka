@@ -123,7 +123,7 @@ function AppearanceSection() {
   useEffect(() => { setMounted(true) }, [])
   return <SettingsSection id="appearance-heading" title={t('title')}>
     <SettingRow title={t('theme')}>
-      <ToggleGroup aria-label={t('themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}>
+      <ToggleGroup aria-label={t('themeLabel')} variant="segment" spacing={0.5} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}>
         <ToggleGroupItem value="light" aria-label={t('light')}><Sun />{t('light')}</ToggleGroupItem>
         <ToggleGroupItem value="dark" aria-label={t('dark')}><Moon />{t('dark')}</ToggleGroupItem>
         <ToggleGroupItem value="system" aria-label={t('systemLabel')}><Monitor />{t('system')}</ToggleGroupItem>
