@@ -2337,7 +2337,6 @@
         "actions": "操作"
       },
       "defaults": "任务默认",
-      "noAccount": "未连接账号",
       "whenQuotaExhausted": "额度用完时",
       "quotaStop": "停下等我",
       "quotaSwitch": "换用另一个账号",

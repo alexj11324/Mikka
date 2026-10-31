@@ -345,8 +345,10 @@ test(
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3)',[revokedBot,alice.ownerId,alice.workspaceId]);
       await settings.setBotModel(alice,revokedBot,catalogue.bindingId);
       const { rows: [revoked] } = await pool.query('UPDATE byos_connections SET state=$2 WHERE id=(SELECT "connectionId" FROM byos_bindings WHERE id=$1) RETURNING id,state',[catalogue.bindingId,'disconnected']);
-      await assert.rejects(freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:revokedBot},dependencies),{code:'binding_required'},'a chosen subscription that was revoked refuses instead of taking the hosted default');
-      await pool.query('UPDATE byos_connections SET state=$2 WHERE id=$1',[revoked.id,'connected']);
+      const others = await pool.query(`UPDATE byos_connections SET state='disconnected' WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected' RETURNING id`,[alice.ownerId,alice.workspaceId]);
+      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:revokedBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'a saved choice whose account was disconnected, with nothing else bound, replies on Mikka Cloud');
+      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'the Coordinator with no bound subscription replies on Mikka Cloud');
+      await pool.query(`UPDATE byos_connections SET state='connected' WHERE id=ANY($1::uuid[])`,[[revoked.id,...others.rows.map(row=>row.id)]]);
       sessionOwner = null;
       await assert.rejects(actions.listExecutionRules());
       sessionOwner = "bob";

@@ -1,7 +1,6 @@
 import "server-only";
 import { pool } from "./db";
 import { ExecutionSettings, executionWorkspace } from "./execution-settings";
-import { SubscriptionRefusal } from "@mikka/protocol/subscription";
 import { COORDINATOR_MODEL } from "./coordinator/model";
 import {
   freezeHostedModelSelection,
@@ -21,15 +20,15 @@ export async function freezeBotModel(
   const settingsScope = { ownerId: scope.ownerId, workspaceId };
   const selected = await settings.botModel(settingsScope, scope.botId);
   const available = await settings.botModels(settingsScope);
-  const binding = selected
-    ? await settings.botBinding(settingsScope, selected)
-    : available[0];
-  if (!binding) {
-    // Nothing chosen and no subscription: every bot, the Coordinator included, runs on the hosted default
-    // through the same admission (verified card, allowance) and workspace billing. A missing chosen binding refuses.
-    if (!selected) return { harness: "ai_sdk", model: COORDINATOR_MODEL };
-    throw new SubscriptionRefusal("binding_required");
-  }
+  // A saved choice whose account was disconnected or signed in again is no longer bound:
+  // take a bound subscription (Claude first), otherwise Mikka Cloud (decision 2026-10-31-2110).
+  const binding =
+    (selected ? await settings.botBinding(settingsScope, selected) : undefined) ??
+    available.find((row) => row.provider === "claude") ??
+    available[0];
+  // No subscription bound: every bot, the Coordinator included, runs on the hosted default
+  // through the same admission (verified card, allowance) and workspace billing.
+  if (!binding) return { harness: "ai_sdk", model: COORDINATOR_MODEL };
   return freezeHostedModelSelection(
     { ...scope, workspaceId },
     { harness: "ai_sdk", model: null },

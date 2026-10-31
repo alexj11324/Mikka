@@ -2337,7 +2337,6 @@
         "actions": "Actions"
       },
       "defaults": "Task defaults",
-      "noAccount": "No account connected",
       "whenQuotaExhausted": "When quota runs out",
       "quotaStop": "Stop and wait for me",
       "quotaSwitch": "Switch to another account",

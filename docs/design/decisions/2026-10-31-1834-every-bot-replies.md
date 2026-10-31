@@ -3,6 +3,7 @@
 - Date: 2026-10-31
 - Source: Alex, relayed by the coordinator: 「现在只有 Coordinator 能够回复，另外一个 BOT 是没有办法进行回复的」; on subscriptions: 「我开 10 个，不是要绑 10 次吗？」; then a 重试 action on the failed-reply notice
 - Rule: R-40
+- Superseded in part by: [2026-10-31-2110-bots-reply-on-mikka-cloud](2026-10-31-2110-bots-reply-on-mikka-cloud.md) (a chosen subscription whose account is gone)
 - Replaces: bots without a subscription refused with `binding_required`, retried three times and shown as 「Reply failed — Step … failed after 3 retries: binding_required」
 
 A connected subscription belongs to the account and every bot uses it on its
@@ -17,8 +18,9 @@ runs on:
    workspace's billing. A hosted refusal shows the same line and next steps as
    in the Coordinator chat.
 
-A chosen subscription whose binding is missing or revoked still refuses and
-never falls back to a paid default
+~~A chosen subscription whose binding is missing or revoked still refuses and
+never falls back to a paid default~~ (superseded: it now moves to another bound
+subscription or the hosted default)
 ([coordinator-model-judgment](../../coordinator-model-judgment.md), Frozen
 subscription).
 

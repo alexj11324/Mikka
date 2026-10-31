@@ -252,7 +252,10 @@ function RuleRow({ t, rule, places, onChange, onDelete, onRedetect }: {
   </TableRow>
 }
 
-/** A Bot's own model. Bots always run on Mikka, so the row has no place or harness. */
+/**
+ * A Bot's own model. Bots always run on Mikka, so the row has no place or harness.
+ * With no connected subscription a Bot replies on Mikka Cloud's hosted model (decision 2026-10-31-2110).
+ */
 function BotRow({ t, botId, bot, rows, onSave, onRefresh }: {
   t: T
   botId: string | null
@@ -274,8 +277,8 @@ function BotRow({ t, botId, bot, rows, onSave, onRefresh }: {
   })
   return <Line data-bot={title} title={title}
     leading={bot ? <BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} /> : <CoordinatorAvatar size="row" />}>
-    <Picker t={t} wide ariaLabel={t('cell', { row: title, column: t('columns.model'), value: selected?.modelId ?? t('noAccount') })} disabled={choice.data === undefined || rows.length === 0}
-      value={selected ? <ModelLabel model={selected.modelId} source={selected.provider} /> : <span className="truncate text-muted-foreground">{t('noAccount')}</span>}>
+    <Picker t={t} wide ariaLabel={t('cell', { row: title, column: t('columns.model'), value: selected?.modelId ?? t('cloud') })} disabled={choice.data === undefined || rows.length === 0}
+      value={selected ? <ModelLabel model={selected.modelId} source={selected.provider} /> : <DeviceLabel kind="cloud" name={t('cloud')} online />}>
       {close => accounts.map((account, index) => <CommandGroup key={account.connectionId} className={cn(index > 0 && 'border-t')} heading={<PickerHeading t={t} title={<span className="flex items-center gap-1.5"><ProviderMark provider={modelProvider('', account.provider)} small />{account.provider === 'claude' ? t('claudeAccount') : t('openaiAccount')}</span>} onRefresh={onRefresh} />}>
         {account.models.map(model => <CommandItem key={model.key} value={model.key} keywords={[model.modelId]} data-checked={selected?.key === model.key} onSelect={() => { close(); void choose(model.bindingId) }}><ModelLabel model={model.modelId} source={account.provider} /></CommandItem>)}
       </CommandGroup>)}
