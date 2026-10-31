@@ -49,7 +49,8 @@ ship a smaller surface without the UI claiming a feature it cannot perform.
   settings list) paint no background of their own, so the material shows
   untinted; the content column and right panels stay opaque. Hover and current
   fills there (`--sidebar-accent`, `--sidebar-item`) become a black (light) or
-  white (dark) overlay, and the settings search field takes `--control`.
+  white (dark) overlay, and ghost buttons and the settings search field take
+  `--control` instead of the opaque `muted`.
   `tests/e2e/desktop-translucent.spec.ts` checks this over a solid page color.
   Reduce transparency, Windows and Linux keep the opaque window. The setting is
   read at launch.
