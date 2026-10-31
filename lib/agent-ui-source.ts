@@ -5,6 +5,8 @@ const TOP_LEVEL_COMPONENTS = [
   'InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'ComputerCard',
   'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'RadialChart', 'BeFileTree', 'BeCitations', 'BeFileDiff',
   'Tag', 'Steps', 'Form',
+  // Retired names that saved replies may still open with (legacyAgentComponentCatalog).
+  'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnProgress', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame', 'BeBadge', 'BeTimeline',
 ]
 
 /**

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { createParser, generateSystemPrompt } from '@openuidev/lang-core'
-import { agentComponentCatalog, agentComponentGroups, createAgentLibrary } from '../lib/agent-ui-catalog.ts'
+import { agentComponentCatalog, agentComponentGroups, agentPromptSpec, createAgentLibrary, legacyAgentComponentCatalog } from '../lib/agent-ui-catalog.ts'
 import { agentImageQuery, findAgentImage, parseAgentImage } from '../lib/agent-images.ts'
 import { getAgentUIIssue } from '../lib/agent-ui-status.ts'
 import { AGENT_DEMO_CODE, AGENT_DEMO_SECTIONS } from '../lib/agent-demo.ts'
@@ -304,11 +304,17 @@ button = BeButton("继续细化", "请根据本周完成12项任务的数据给�
 
 test('beUI 组件包含在运行时和可序列化规范中', async () => {
   const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
-  assert.deepEqual(spec.library, JSON.parse(JSON.stringify(library.toSpec())))
+  assert.deepEqual(spec.library, JSON.parse(JSON.stringify(agentPromptSpec(library.toSpec()))))
   assert.deepEqual(spec.localComponents, Object.keys(agentComponentCatalog))
   const prompt = generateSystemPrompt(spec)
   const compiled = JSON.parse(await readFile(new URL('../lib/agent-system-prompt.json', import.meta.url), 'utf8'))
   assert.equal(compiled, prompt)
+  // Retired names still parse saved replies, but the model is never offered them.
+  for (const name of Object.keys(legacyAgentComponentCatalog)) {
+    assert.ok(library.components[name], name)
+    assert.equal(name in spec.library.components, false, name)
+    assert.doesNotMatch(prompt, new RegExp(`\\b${name}\\(`), name)
+  }
   const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(route, /from '@openuidev\//)
   for (const name of Object.keys(agentComponentCatalog)) {
@@ -331,7 +337,7 @@ test('beUI 与 OpenUI 内置组件的输出可解析', () => {
   for (const name of ['Tag', 'Steps', 'Form', 'EditableTable', 'Tabs', 'Table']) {
     assert.ok(library.components[name])
   }
-  // Duplicates of OpenUI or beUI components are gone; old saved replies stay readable in the archive (tests/legacy-chat-content.test.tsx).
+  // Duplicates of OpenUI or beUI components left the catalog; legacyAgentComponentCatalog keeps saved replies parsing.
   for (const name of ['ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ShadcnProgress', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame', 'BeBadge', 'BeTimeline']) {
     assert.equal(name in agentComponentCatalog, false, name)
   }

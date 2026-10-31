@@ -183,6 +183,32 @@ export type AgentComponentRenderers = {
   [Name in AgentComponentName]: ComponentRenderer<z.infer<(typeof agentComponentCatalog)[Name]['props']>>
 }
 
+/**
+ * Components that saved replies still use, replaced on 2026-10-31 (docs/design/decisions.md).
+ * They parse with their old props and render as their replacement; the model never sees them.
+ */
+export const legacyAgentComponentCatalog = {
+  ShadcnCard: { description: '旧回复：内容卡片，显示为 BeCard。', props: z.object({ title: text, children, description: text.optional() }) },
+  ShadcnBadge: { description: '旧回复：状态标签。', props: z.object({ text, variant: z.enum(['default', 'secondary', 'outline', 'destructive']).optional() }) },
+  ShadcnAlert: { description: '旧回复：提示，显示为 BeAlert。', props: z.object({ title: text, description: text, variant: z.enum(['default', 'destructive']).optional() }) },
+  ShadcnProgress: { description: '旧回复：进度，显示为 RadialChart。', props: z.object({ label: text, value: z.number().min(0).max(100) }) },
+  ShadcnAccordion: { description: '旧回复：折叠列表，每项显示为 BeCollapsible。', props: z.object({ items: z.array(z.object({ title: text, content: text })).max(10), multiple: z.boolean().optional() }) },
+  ShadcnTabs: { description: '旧回复：标签页，显示为 BeTabs。', props: z.object({ items: z.array(z.object({ title: text, children })).max(6) }) },
+  ShadcnTable: { description: '旧回复：表格，显示为 BeTable。', props: z.object({ columns: z.array(text).min(1).max(6), rows: z.array(z.array(text).max(6)).max(30) }) },
+  ShadcnButton: { description: '旧回复：快捷提问按钮，显示为 BeButton。', props: z.object({ label: z.enum(['直接提问', '继续细化', '填入提问']), prompt: text, variant: z.enum(['default', 'secondary', 'outline', 'ghost']).optional() }) },
+  ReuiBadge: { description: '旧回复：状态标签。', props: z.object({ text, variant: z.enum(['outline', 'secondary', 'primary-light', 'info-light', 'success-light', 'warning-light', 'destructive-light']).optional() }) },
+  ReuiAlert: { description: '旧回复：提示，显示为 BeAlert。', props: z.object({ title: text, description: text, variant: z.enum(['default', 'info', 'success', 'warning', 'destructive']).optional() }) },
+  ReuiFrame: { description: '旧回复：分组面板，显示为 BeCard。', props: z.object({ title: text, children, description: text.optional() }) },
+  BeBadge: { description: '旧回复：状态标签。', props: z.object({ text: z.string().min(1).max(80), status: z.enum(['neutral', 'info', 'success', 'warning', 'danger', 'loading']).optional() }) },
+  BeTimeline: { description: '旧回复：时间线，显示为步骤列表。', props: z.object({ events: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), title: z.string().min(1).max(80), description: z.string().max(300).optional(), meta: z.string().max(80).optional() })).min(1).max(12) }) },
+} as const
+
+export type LegacyAgentComponentName = keyof typeof legacyAgentComponentCatalog
+export type LegacyAgentComponentRenderers = {
+  [Name in LegacyAgentComponentName]: ComponentRenderer<z.infer<(typeof legacyAgentComponentCatalog)[Name]['props']>>
+}
+const LEGACY_NAMES = new Set<string>(Object.keys(legacyAgentComponentCatalog))
+
 export const agentComponentGroups: { name: string; components: AgentComponentName[]; notes: string[] }[] = [
   { name: '消息回复', components: ['BeResponse'], notes: ['AI Elements MessageResponse → beUI StreamingResponse；回复正文可嵌套已注册组件。会话和输入框由宿主控制，不由模型创建。'] },
   { name: '审批与问题', components: ['BeApproval', 'BeQuestions'], notes: ['Confirmation → ApprovalCard；选择问题复用 ApprovalCard 提问模式。在回答区直接提交并继续对话，不执行工具、不持久保存审批。ToolApproval 已安装但仅供未来真实工具授权流程使用，不开放给模型伪造授权。'] },
@@ -196,10 +222,11 @@ export const agentComponentGroups: { name: string; components: AgentComponentNam
 type AnyRenderer = ComponentRenderer<any>
 
 /** `block` wraps OpenUI's own renderers, so the host can treat its cards, tables and charts like its own. */
-export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> = {}, block?: (name: string, render: AnyRenderer) => AnyRenderer) {
-  const names = Object.keys(agentComponentCatalog) as AgentComponentName[]
+export function createAgentLibrary(renderers: Partial<AgentComponentRenderers & LegacyAgentComponentRenderers> = {}, block?: (name: string, render: AnyRenderer) => AnyRenderer) {
+  const catalog = { ...agentComponentCatalog, ...legacyAgentComponentCatalog }
+  const names = Object.keys(catalog) as (keyof typeof catalog)[]
   const components = names.map(name => {
-    const definition = agentComponentCatalog[name]
+    const definition = catalog[name]
     return defineComponent({
       name,
       ...definition,
@@ -208,10 +235,22 @@ export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> =
   })
   return createLibrary({
     root: 'Stack',
-    components: [...Object.values(openuiLibrary.components).filter(component => !names.includes(component.name as AgentComponentName))
+    components: [...Object.values(openuiLibrary.components).filter(component => !names.includes(component.name as keyof typeof catalog))
       .map(component => block ? { ...component, component: block(component.name, component.component) } : component), ...components],
     functions: Object.values(openuiLibrary.functions),
     actions: Object.values(openuiLibrary.actions) as DefinedAction[],
     componentGroups: agentComponentGroups,
   })
+}
+
+type LibrarySpec = { components: Record<string, unknown>; schema: { properties?: Record<string, unknown>; required?: string[]; $defs?: Record<string, unknown> } }
+
+/** The library as the model sees it: the legacy names parse saved replies but are never offered. */
+export function agentPromptSpec<Spec extends LibrarySpec>(spec: Spec): Spec {
+  const keep = (record: Record<string, unknown> = {}) => Object.fromEntries(Object.entries(record).filter(([name]) => !LEGACY_NAMES.has(name)))
+  return {
+    ...spec,
+    components: keep(spec.components),
+    schema: { ...spec.schema, properties: keep(spec.schema.properties), required: spec.schema.required?.filter(name => !LEGACY_NAMES.has(name)), $defs: keep(spec.schema.$defs) },
+  }
 }
