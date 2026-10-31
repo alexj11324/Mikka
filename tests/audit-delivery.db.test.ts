@@ -143,6 +143,59 @@ test('workspace mutations retain and idempotently deliver audit intent across tw
     finally { user = actor }
     assert.equal((await pending(ws.id)).length, 0)
   })
+  await t.test('accepted and revoked invitations commit exact lifecycle events without bearer tokens or duplicate membership events', async () => {
+    const ws = await seed(), joiner = { id: `audit-joiner-${randomUUID()}`, name: 'New Member', email: 'joiner@example.invalid' }
+    const created = await actions.createWorkspaceInvitation({ workspaceId: ws.id, emails: [joiner.email], role: 'member' })
+    assert.equal(created.ok, true)
+    if (!created.ok) throw new Error('Invitation unexpectedly failed')
+    const token = created.data[0].path.split('/').at(-1)!
+    user = joiner
+    try {
+      assert.equal((await actions.acceptWorkspaceInvitation(token)).ok, true)
+      assert.equal((await actions.acceptWorkspaceInvitation(token)).ok, false, 'a consumed invitation cannot create another event')
+    } finally { user = actor }
+    assert.equal((await workspace.query('SELECT status FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [ws.id, joiner.id])).rows[0].status, 'active')
+    let receipts = await pending(ws.id)
+    assert.deepEqual(receipts.map(row => row.payload.action).sort(), ['member.invited', 'member.joined'])
+    const joined = receipts.find(row => row.payload.action === 'member.joined')!
+    assert.equal(joined.payload.actorId, joiner.id); assert.equal(joined.payload.targetId, joiner.id)
+    assert.equal(JSON.stringify(receipts).includes(token), false)
+
+    await actions.createWorkspaceInvitation({ workspaceId: ws.id, emails: ['revoke@example.invalid'], role: 'member' })
+    const invitationId = (await workspace.query('SELECT id FROM mikka_workspace_invitations WHERE "workspaceId"=$1 AND email=$2', [ws.id, 'revoke@example.invalid'])).rows[0].id
+    user = { ...actor, id: ws.peer }
+    try { assert.equal((await actions.revokeWorkspaceInvitation(ws.id, invitationId)).ok, false) }
+    finally { user = actor }
+    await actions.revokeWorkspaceInvitation(ws.id, invitationId); await actions.revokeWorkspaceInvitation(ws.id, invitationId)
+    receipts = await pending(ws.id)
+    const revoked = receipts.filter(row => row.payload.action === 'member.invitation_revoked')
+    assert.equal(revoked.length, 1); assert.equal(revoked[0].payload.actorId, actor.id); assert.equal(revoked[0].payload.targetId, invitationId)
+    assert.equal((await restart()).failed, 0)
+    const sink = (await main.query('SELECT action,"actorId","targetId" FROM workspace_audit_events WHERE "workspaceId"=$1 ORDER BY action', [ws.id])).rows
+    assert.equal(sink.length, 4)
+    assert.equal(sink.find(row => row.action === 'member.joined')?.actorId, joiner.id)
+    assert.equal(sink.find(row => row.action === 'member.invitation_revoked')?.targetId, invitationId)
+  })
+  await t.test('an unavailable invitation audit outbox rolls back both revoke and newly accepted membership', async () => {
+    const ws = await seed(), joiner = { id: `audit-blocked-joiner-${randomUUID()}`, name: 'New Member', email: 'blocked-joiner@example.invalid' }
+    const created = await actions.createWorkspaceInvitation({ workspaceId: ws.id, emails: [joiner.email], role: 'member' })
+    assert.equal(created.ok, true)
+    if (!created.ok) throw new Error('Invitation unexpectedly failed')
+    const token = created.data[0].path.split('/').at(-1)!
+    const invitationId = (await workspace.query('SELECT id FROM mikka_workspace_invitations WHERE "workspaceId"=$1', [ws.id])).rows[0].id
+    const name = `audit_invitation_fail_${randomUUID().replaceAll('-', '')}`
+    await workspace.query(`CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."workspaceId"='${ws.id}'::uuid THEN RAISE EXCEPTION 'fixture_audit_enqueue_failed'; END IF; RETURN NEW; END $$`)
+    await workspace.query(`CREATE TRIGGER ${name} BEFORE INSERT ON workspace_audit_outbox FOR EACH ROW EXECUTE FUNCTION ${name}()`)
+    try {
+      assert.equal((await actions.revokeWorkspaceInvitation(ws.id, invitationId)).ok, false)
+      user = joiner
+      try { assert.equal((await actions.acceptWorkspaceInvitation(token)).ok, false) }
+      finally { user = actor }
+      assert.equal((await workspace.query('SELECT status FROM mikka_workspace_invitations WHERE id=$1', [invitationId])).rows[0].status, 'pending')
+      assert.equal((await workspace.query('SELECT count(*)::int n FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [ws.id, joiner.id])).rows[0].n, 0)
+      assert.deepEqual((await pending(ws.id)).map(row => row.payload.action), ['member.invited'])
+    } finally { await workspace.query(`DROP TRIGGER ${name} ON workspace_audit_outbox`); await workspace.query(`DROP FUNCTION ${name}()`) }
+  })
   await t.test('invitation, promotion, ownership and removal snapshots are atomic and exclude invitation bearer material', async () => {
     const ws = await seed()
     const invitation = await actions.createWorkspaceInvitation({ workspaceId: ws.id, emails: ['invited@example.invalid'], role: 'member' })

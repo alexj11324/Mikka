@@ -186,10 +186,15 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
     await expect(panel.getByRole('button', { name: '重试停止', exact: true })).toBeEnabled()
     await testInfo.attach(`thread-stop-timeout-${view.name}-dark`, { body: await page.screenshot(), contentType: 'image/png' })
     await testInfo.attach(`thread-stop-${view.name}-bounds.json`, { body: JSON.stringify({ frame: '372:4786', viewport: { width: view.width, height: view.height }, bounds: await panel.boundingBox(), boundary: 'UI fixture with no daemon acknowledgement; the real stop action and 30-second timeout execute. Terminal acknowledgement below is seeded separately.' }, null, 2), contentType: 'application/json' })
+    const retryRequest = page.waitForRequest(request => request.method() === 'POST' && !!request.headers()['next-action'] && request.postData()?.includes(runs.running) === true)
     await panel.getByRole('button', { name: '重试停止', exact: true }).click()
     await expect(panel.getByRole('alert')).toHaveCount(0)
     await expect(composer).toHaveValue('Keep this draft while stopping')
     await expect(panel.getByText('正在停止…', { exact: true })).toBeVisible()
+    // The stopping UI is optimistic: finish this retry before seeding daemon acknowledgement.
+    const retryResponse = await (await retryRequest).response()
+    expect(retryResponse).not.toBeNull()
+    expect(retryResponse?.status()).toBe(200)
     expect((await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt).toEqual(originalStop)
     // The daemon ends the run: the thread shows it stopped and the composer goes away.
     await check.query('UPDATE agent_runs SET status = $2, "finishedAt" = now() WHERE id = $1', [runs.running, 'stopped'])

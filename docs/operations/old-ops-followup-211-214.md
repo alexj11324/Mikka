@@ -85,3 +85,8 @@ observation cycle. These are remaining original **nonproduction** tests, not
 requests for a new production monitoring or disaster-recovery platform.
 Record those items as unexecuted; do not close a whole issue by renaming its
 completed implementation/component scope as full system acceptance.
+
+The later controlled restore run and the correction which preserves historical
+failed SLO windows are recorded separately in
+[old-ops-completion-211-214.md](old-ops-completion-211-214.md). The measurements
+and limitations above remain attached to their original revisions.

@@ -58,3 +58,29 @@ Coordinate changes in Factory reconcile/dispatch/store, Coordinator steps/workfl
 5. Authorized fixed Preview: actual CC and Codex each ask, receive legitimate context/user answers in the correct task/run thread, resume the original session and finish; another independent task continues while one waits. Exercise restart and failed delivery. Real provider/Harness/Preview acceptance remains subject to existing authorization and #176 reliable wake; no deployment or new provider permission is attempted by this plan.
 
 Until all applicable layers and #181 same-version integration pass, #192 and Draft PR197 remain unfinished. Public repository notes contain only product/code facts; private runtime account/task/session evidence stays private.
+
+## Registered context handoff transport
+
+`request_help` is the existing local Mikka MCP handoff for a context question.
+The host records a durable `kind: context` question and lets the Orchestrator
+consult existing issue/request facts before escalating to the person. In the
+previous native callback registrations this tool was absent from both the shared
+transport policy and Codex's observed-MCP-item allowlist. The advertised context
+handoff was therefore denied by the Claude SDK callback and Codex native
+elicitation path, even though the actual MCP server already registered it.
+
+The fixed registrations permit this one existing internal transport alongside
+`ask_human`; they do not grant an answer, action permission or provider access.
+The existing live-run gate, request replay protection and Codex thread/turn/item
+binding remain mandatory. Unknown tools and other MCP servers remain refused.
+Read-only review/verification runs can also ask for context without acquiring a
+write capability.
+
+The regression was reproduced before the fix in three checks: shared policy,
+actual Claude SDK permission transport, and actual Codex adapter JSON-RPC
+transport. The native CLI frames are controlled subprocess fixtures, not real
+model inference. After the fix, those transport suites plus the existing actual
+MCP handoff/run-context suite pass (46 passed, 7 existing conditional skips);
+daemon typecheck and targeted lint pass. The existing real MCP subprocess test
+still records the durable context question. These layered results do not claim
+the full real-model question/answer/session-continuation acceptance for #192.

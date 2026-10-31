@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
+import { createHash } from 'node:crypto'
 import test from 'node:test'
-import { backupIsolated, restoreIsolated } from './isolated-recovery.mjs'
+import { backupIsolated, restoreIsolated, migrationDigest } from './isolated-recovery.mjs'
 import { notifyAlerts } from './monitor.mjs'
 
 test('a blocked restore emits a safe real internal alert; receiver failure is visible without replacing the recovery failure', async t => {
@@ -42,4 +43,28 @@ test('a blocked restore emits a safe real internal alert; receiver failure is vi
   assert.ok(!JSON.stringify({ received, logs }).includes('private-tenant-path-never-in-alert'))
   assert.ok(!JSON.stringify({ received, logs }).includes('SECRET'))
   console.log(JSON.stringify({ internalFailureEvents: received.length, primaryFailurePreserved: true, notificationFailureVisible: true, databasesCreated: 0 }))
+})
+
+test('source topology is hash-bound while co-located and legacy backups still require distinct restore targets', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mikka-recovery-topology-'))
+  const manifest = { format: 'mikka-isolated-recovery', version: 1,
+    sourceTopology: { kind: 'co-located', databases: ['mikka_owned_e2e', 'mikka_owned_e2e'] },
+    databases: [{ role: 'main', inventory: [] }, { role: 'workspace', inventory: [] }],
+    files: ['database-0.enc', 'database-1.enc', 'objects.enc'].map(name => ({ name })),
+    migrationSha256: await migrationDigest('drizzle') }
+  const target = { database: 'mikka_restore_e2e' }
+  async function attempt(value, pattern, anchor) {
+    const bytes = JSON.stringify(value)
+    await writeFile(join(root, 'manifest.json'), bytes, { mode: 0o600 })
+    const expectedManifestSha256 = anchor ?? createHash('sha256').update(bytes).digest('hex')
+    await assert.rejects(restoreIsolated({ backupDirectory: root, expectedManifestSha256, migrationsDirectory: 'drizzle', targets: [target, target] }), pattern)
+  }
+  // Source aliases never authorize destination aliases, before any Docker/SQL work.
+  await attempt(manifest, /recoveryDistinctDatabasesRequired/)
+  const { sourceTopology: _topology, ...legacy } = manifest
+  await attempt(legacy, /recoveryDistinctDatabasesRequired/)
+  await attempt({ ...manifest, sourceTopology: { ...manifest.sourceTopology, kind: 'separate' } }, /recoveryManifestInvalid/)
+  await attempt({ ...manifest, sourceTopology: { kind: 'co-located', databases: ['mikka_owned_e2e', 'mikka_other_e2e'] } }, /recoveryManifestInvalid/)
+  await attempt({ ...manifest, databases: [...manifest.databases].reverse() }, /recoveryManifestInvalid/)
+  await attempt(manifest, /recoveryManifestMismatch/, '0'.repeat(64))
 })

@@ -491,7 +491,7 @@ test("Vercel monitor actual loopback HTTP protocol substitute (not provider acce
   }
 });
 
-test("runtime registration is explicit and constrained to existing project resources", () => {
+test("runtime registration follows configured publication and stays constrained to existing project resources", () => {
   assert.deepEqual(configuredVercelMonitorProbes({}), []);
   assert.throws(() =>
     configuredVercelMonitorProbes({ FACTORY_VERCEL_MONITOR: "1" }),
@@ -503,11 +503,16 @@ test("runtime registration is explicit and constrained to existing project resou
     }),
   );
   const env = {
-    FACTORY_VERCEL_MONITOR: "1",
     FACTORY_VERCEL_PUBLICATION: "1",
     VERCEL_TOKEN: "fixture-only-token",
   };
+  // A configured publication must not strand its read-only monitor behind a
+  // second default-off rollout flag. Explicit operator stop still takes effect.
   assert.equal(configuredVercelMonitorProbes(env).length, 1);
+  assert.equal(configuredVercelMonitorProbes({ ...env, FACTORY_VERCEL_MONITOR: "1" }).length, 1);
+  assert.deepEqual(configuredVercelMonitorProbes({ ...env, FACTORY_VERCEL_MONITOR: "0" }), []);
+  assert.deepEqual(configuredVercelMonitorProbes({ VERCEL_TOKEN: env.VERCEL_TOKEN }), []);
+  assert.throws(() => configuredVercelMonitorProbes({ FACTORY_VERCEL_PUBLICATION: "1" }));
   const adapters = configuredVercelMonitorProbes({
     ...env,
     FACTORY_VERCEL_PRODUCTION: "1",
