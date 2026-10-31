@@ -44,7 +44,7 @@ export class HostedUsageStore {
       )
       if (!verified.rowCount) {
         if (fingerprint) {
-          const filled = await tx.query('UPDATE hosted_verifications SET "customerId"=$2,fingerprint=$3,last4=$4 WHERE "workspaceId"=$1 AND (fingerprint IS NULL OR (fingerprint=$3 AND last4 IS NULL AND $4 IS NOT NULL)) RETURNING "workspaceId"', [workspaceId, customerId, fingerprint, last4])
+          const filled = await tx.query('UPDATE hosted_verifications SET "customerId"=$2,fingerprint=$3,last4=$4 WHERE "workspaceId"=$1 AND (fingerprint IS NULL OR (fingerprint=$3 AND last4 IS NULL AND $4::text IS NOT NULL)) RETURNING "workspaceId"', [workspaceId, customerId, fingerprint, last4])
           if (filled.rowCount) await tx.query('INSERT INTO hosted_card_claims (fingerprint,"workspaceId") VALUES ($1,$2) ON CONFLICT DO NOTHING', [fingerprint, workspaceId])
         }
         return false
