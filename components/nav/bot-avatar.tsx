@@ -108,11 +108,15 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
   const latestSeed = useRef(seed)
   latestSeed.current = seed
 
+  const frozen = still || reducedMotion()
+  // A frozen blob is sampled at time 0, but bloub starts a shape morph at the current
+  // clock, so a frozen blob kept drawing the previous shape. It remounts on a shape
+  // change instead; an animated one still morphs.
+  const frozenShape = frozen ? form : null
   useLayoutEffect(() => {
     const node = host.current
     if (!node) return
     let alive = true
-    const frozen = still || reducedMotion()
     const mount = ([bloub, { render, createComponent }, { createSignal }]: Runtime) => {
       if (!alive) return
       const first = latest.current()
@@ -134,7 +138,7 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
     const watch = new MutationObserver(() => live.current?.set(latest.current()))
     watch.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
     return () => { alive = false; watch.disconnect(); live.current?.dispose(); live.current = null; node.replaceChildren() }
-  }, [px, still, label])
+  }, [px, frozen, label, frozenShape])
 
   useEffect(() => { live.current?.set(latest.current()) }, [tone, form, mood])
 
