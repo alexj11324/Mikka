@@ -61,7 +61,7 @@ export function SettingsSidebar({ user, section, activeSection, admin, selectedT
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-2">
       <h2 className="flex h-8 items-center px-2 text-sm font-semibold">{i18nText("Settings.title")}</h2>
-      <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} onSettings={openSettings} onSignOut={onSignOut} signingOut={signingOut} /></SidebarMenuItem></SidebarMenu>
+      <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} label={i18nText('Nav.switchWorkspace')} onSettings={openSettings} onSignOut={onSignOut} signingOut={signingOut} /></SidebarMenuItem></SidebarMenu>
       <div className="relative mt-1"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label={i18nText("Settings.searchLabel")} placeholder={i18nText("Settings.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} /></div>
     </SidebarHeader>
     <SidebarContent ref={contentRef} className="px-2 pb-6">
