@@ -7,7 +7,7 @@ import type { SshInstallState } from '@mikka/protocol/bridge'
 import type { DeviceView } from '@/app/actions/agents'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
@@ -171,7 +171,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
             <Input id="ssh-other-host" value={other} placeholder="user@host:port" className="font-mono text-xs" spellCheck={false} autoCapitalize="off" onChange={event => setOther(event.target.value)}
               onKeyDown={event => { if (event.key === 'Enter' && target) { event.preventDefault(); void begin(target) } }} />
           </Field></FieldGroup>
-          {startError && <p role="alert" className="text-xs text-destructive">{t('startFailed')}</p>}
+          {startError && <FieldError className="text-xs">{t('startFailed')}</FieldError>}
         </div>
         <DialogFooter>
           <Button variant="secondary" size="sm" onClick={() => close(false)}>{t('cancel')}</Button>

@@ -7,6 +7,7 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { withBasePath } from '@/lib/base-path'
 import { computerPermissions, type ComputerPermission } from '@/lib/computer/permission'
+import { FieldError } from '@/components/ui/field'
 
 const stateSchema = z.discriminatedUnion('enabled', [
   z.object({ enabled: z.literal(false) }),
@@ -35,7 +36,7 @@ export function ComputerPolicySettings({ workspaceId }: { workspaceId: string })
     } catch { setError(true); await refresh().catch(() => undefined) } finally { setPending(false) }
   }
   const labels = { allow: t('allow'), deny: t('deny') }
-  if (!state) return error ? <p role="alert" className="text-sm text-destructive">{t('error')}</p> : <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>
+  if (!state) return error ? <FieldError>{t('error')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>
   if (!state.enabled) return <p role="status" className="text-sm text-muted-foreground">{t('unavailable')}</p>
   return <div className="flex flex-col gap-2">
     <SettingsSection id="computer-policy-heading" title={t('heading')}>
@@ -48,6 +49,6 @@ export function ComputerPolicySettings({ workspaceId }: { workspaceId: string })
           : <span className="text-sm">{labels[state.permission]}</span>}
       </SettingRow>
     </SettingsSection>
-    {error && <p role="alert" className="px-1 text-sm text-destructive">{t('error')}</p>}
+    {error && <FieldError className="px-1">{t('error')}</FieldError>}
   </div>
 }

@@ -4,7 +4,7 @@ import { getPreferences } from '@/app/actions/preferences'
 import { listSavedLogins } from '@/app/actions/settings-activity'
 import { getWorkspaceGeneral } from '@/app/actions/workspace-settings'
 import { getAppPolicy } from '@/app/actions/app-policy'
-import { getE2BKey, listSecrets } from '@/app/actions/workspace-secrets'
+import { getE2BKeyCapability, listSecrets } from '@/app/actions/workspace-secrets'
 import { getUsage } from '@/app/actions/usage'
 import { getBilling } from '@/app/actions/billing'
 import { getCreditBilling } from '@/lib/billing/verification-client'
@@ -23,7 +23,7 @@ const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: un
   logins: () => [['account:saved-logins', listSavedLogins]],
   general: id => [[['workspace:general', id], () => getWorkspaceGeneral(id)]],
   permissions: id => [[['settings:app-policy', id], () => getAppPolicy(id)]],
-  secrets: id => [[['settings:secrets', id], () => listSecrets(id)], [['settings:e2b-key', id], () => getE2BKey()]],
+  secrets: id => [[['settings:secrets', id], () => listSecrets(id)], [['settings:e2b-key', id], () => getE2BKeyCapability(id)]],
   usage: id => { const month = currentMonth(); return [[['settings:usage', id, month], () => getUsage(month, id)], [creditBillingKey(id), () => getCreditBilling(id)]] },
   billing: id => [[['settings:billing', id], () => getBilling(id)], [creditBillingKey(id), () => getCreditBilling(id)]],
 }

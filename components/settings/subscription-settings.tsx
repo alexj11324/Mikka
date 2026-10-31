@@ -5,7 +5,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Progress } from '@/components/ui/progress'
 import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
@@ -141,7 +141,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     void connect(failure.provider, existing)
   }
 
-  if (loadFailed) return <p role="alert" className="px-1 text-sm text-destructive">{t('loadFailed')}</p>
+  if (loadFailed) return <FieldError className="px-1">{t('loadFailed')}</FieldError>
   if (!state) return <p role="status" className="px-1 text-sm text-muted-foreground">{t('loading')}</p>
   if (!state.enabled) return <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p>
   return <div className="flex flex-col gap-3">

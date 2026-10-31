@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { relativeTime } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
+import { FieldError } from '@/components/ui/field'
 
 /** V07: the site logins the broker may fill, and exactly where each was last used. */
 export function SavedLoginsSettings() {
@@ -45,7 +46,7 @@ export function SavedLoginsSettings() {
   return <>
     <SettingsSection id="saved-logins-heading" title={t('heading')}>
       {isLoading && <SettingsLoading label={t('loading')} rows={3} bare />}
-      {error && <p role="alert" className="px-5 py-3 text-sm text-destructive">{t('loadError')}</p>}
+      {error && <FieldError className="px-5 py-3">{t('loadError')}</FieldError>}
       {!isLoading && !error && logins.length === 0 && <div className="flex flex-col items-start gap-3 px-5 py-6">
         <p className="text-sm text-muted-foreground">{t('emptyHow')}</p>
         <Button variant="secondary" size="sm" nativeButton={false} render={<Link href="/" />}><Plus data-icon="inline-start" />{t('add')}</Button>
@@ -64,7 +65,7 @@ export function SavedLoginsSettings() {
           <DialogTitle>{t('deleteTitle', { site: removing ? withoutScheme(removing.site) : '' })}</DialogTitle>
           <DialogDescription>{t('deleteBody')}</DialogDescription>
         </DialogHeader>
-        {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+        {deleteError && <FieldError>{deleteError}</FieldError>}
         <DialogFooter>
           <Button type="button" variant="outline" disabled={deleting} onClick={() => setRemoving(null)}>{t('cancel')}</Button>
           <Button type="button" variant="destructive" disabled={deleting} onClick={() => { void remove() }}>{deleting ? t('deleting') : t('delete')}</Button>
@@ -89,7 +90,7 @@ function UsageList({ id }: { id: string }) {
   const { data, error, isLoading } = useSWR(['account:saved-login-usage', id], () => listSavedLoginUsage(id))
   const uses: SavedLoginUse[] = data && !('error' in data) ? data.uses : []
   if (isLoading) return <SettingsLoading label={t('usageLoading')} rows={2} bare />
-  if (error) return <p role="alert" className="text-sm text-destructive">{t('usageError')}</p>
+  if (error) return <FieldError>{t('usageError')}</FieldError>
   if (uses.length === 0) return <p className="text-sm text-muted-foreground">{t('usageEmpty')}</p>
   return <div className="flex max-h-80 flex-col divide-y divide-border overflow-auto">
     {uses.map(use => <div key={use.id} className="flex flex-col gap-0.5 py-2.5">

@@ -363,7 +363,7 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
                 ? COMPOSIO_APP_IDS.map(app => <Skeleton key={app} className="h-14 w-full rounded-lg" />)
                 : COMPOSIO_APP_IDS.map(app => <AppRow key={app} app={app} connected={connected.includes(app)} pending={apps.pending === app} disabled={Boolean(apps.pending)} onConnect={() => { void apps.connect(app) }} />)}
             </div>
-            {(apps.error || apps.notice?.tone === 'alert') && <p role="alert" className="text-sm text-destructive">{apps.error || apps.notice?.text}</p>}
+            {(apps.error || apps.notice?.tone === 'alert') && <FieldError>{apps.error || apps.notice?.text}</FieldError>}
             <div className="flex justify-end gap-2">
               {connected.length > 0
                 ? <Button onClick={doneApps}>{t('appsContinue')}</Button>

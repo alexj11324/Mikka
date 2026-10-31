@@ -19,6 +19,7 @@ import { useSiteSearch, type ListedSource } from '@/hooks/use-site-search'
 import type { ChatTarget } from './bot-list'
 import { LetterAvatar } from './letter-avatar'
 import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
+import { FieldError } from '@/components/ui/field'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Project = Awaited<ReturnType<typeof listProjects>>[number]
@@ -173,7 +174,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
         {search.searching && <div aria-hidden="true" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><Spinner role="presentation" aria-hidden="true" className="size-3.5" />{t('search.searching')}</div>}
         {!search.searching && resultCount === 0 && <p aria-hidden="true" className="py-6 text-center text-sm">{search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')}</p>}
         {failed.length > 0 && (authLost
-          ? <p role="alert" className="px-3 py-2 text-xs text-destructive">{t('search.authRequired')}</p>
+          ? <FieldError className="px-3 py-2 text-xs">{t('search.authRequired')}</FieldError>
           : <CommandGroup>
             <CommandItem value="retry search" onSelect={() => { for (const source of failed) search.retry(source) }} className="text-muted-foreground">
               <RotateCw />{t('search.failed', { sources: failed.map(source => t(`search.source.${source}`)).join(t('search.sourceSeparator')) })}

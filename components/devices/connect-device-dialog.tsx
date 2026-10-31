@@ -10,6 +10,7 @@ import { CodeBlock, CodeBlockCopyButton, CodeBlockHeader, CodeBlockTitle } from 
 import { IconTile } from '@/components/reui/icon-tile'
 import { BASE_PATH } from '@/lib/base-path'
 import { daemonCommands } from '@/lib/daemon-commands'
+import { FieldError } from '@/components/ui/field'
 
 /** The public name is confirmed with the release; no workspace checkout is needed. */
 const packageName = process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka'
@@ -58,7 +59,7 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
           </CodeBlockHeader>
         </CodeBlock>)}
         <p className="text-xs text-muted-foreground">{t('requirements')}</p>
-      </div> : <p role="alert" className="text-sm text-destructive">{t('configurationFailed')}</p>}
+      </div> : <FieldError>{t('configurationFailed')}</FieldError>}
       <DialogFooter>
         <Button size="sm" className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => changeOpen(false)}>{t('done')}</Button>
       </DialogFooter>

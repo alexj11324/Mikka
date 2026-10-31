@@ -9,6 +9,7 @@ import { AuthLogo } from '@/components/blocks/auth-19/components/auth-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { withBasePath } from '@/lib/base-path'
+import { FieldError } from '@/components/ui/field'
 
 // Its own client: the plugin attaches the page's signed query to every POST,
 // which only this page wants.
@@ -47,7 +48,7 @@ export function OAuthConsent({ clientName, clientUri, account }: { clientName: s
               <li>{t('scopeRead')}</li>
             </ul>
             {clientUri && <p className="text-muted-foreground text-xs break-all">{clientUri}</p>}
-            {error && <p role="alert" className="text-destructive text-sm">{error}</p>}
+            {error && <FieldError>{error}</FieldError>}
           </CardContent>
           <CardFooter className="flex gap-3 px-7 pt-5 pb-7 sm:px-9 sm:pb-8">
             <Button type="button" variant="outline" className="flex-1" disabled={pending !== null} onClick={() => answer(false)}>

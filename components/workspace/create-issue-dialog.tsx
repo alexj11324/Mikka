@@ -13,7 +13,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Field, FieldGroup, FieldLabel, FieldSet } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldSet, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Badge } from '@/components/ui/badge'
@@ -172,7 +172,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
             <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><LockKeyhole />{teamId ? i18nText("FeatureCopy.c_c30fccc5") : i18nText("Issue.create.private")}</Badge>
           </div>
           <FieldGroup><Field><FieldLabel htmlFor="new-issue-team">{i18nText("FeatureCopy.c_53d4919c")}</FieldLabel><NativeSelect id="new-issue-team" value={teamId} disabled={pending || !!teamsError} onChange={event => setTeamId(event.target.value)}><NativeSelectOption value="">{i18nText("FeatureCopy.c_a0860f69")}</NativeSelectOption>{teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.identifier} · {team.name}</NativeSelectOption>)}</NativeSelect>{teamsError && <p className="text-xs text-muted-foreground">{i18nText("FeatureCopy.c_d7d814ec")}</p>}</Field></FieldGroup>
-          {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+          {error && <FieldError className="text-xs">{error}</FieldError>}
           {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
         </FieldSet>
         <footer className="flex flex-wrap items-center justify-between gap-3 px-5 pt-1 pb-4 sm:px-6">

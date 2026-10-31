@@ -17,6 +17,7 @@ import type { PersonalAccessTokenView } from '@/lib/tokens/store'
 import { relativeTime } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
 import { usePresence, type PresenceProps } from '@/lib/use-presence'
+import { FieldError } from '@/components/ui/field'
 
 const EXPIRY_DAYS = { '30': 30, '90': 90, '365': 365, never: null } as const
 type Expiry = keyof typeof EXPIRY_DAYS
@@ -59,13 +60,13 @@ export function AccessTokensSettings({ workspaceId }: { workspaceId?: string }) 
   return <>
     <SettingsSection id="tokens-heading" action={<Button {...settingsSectionAction} onClick={() => setCreating(true)}>{t('create')}</Button>}>
       {!tokens.data && !tokens.error && <SettingsLoading label={t('loading')} rows={2} bare />}
-      {(tokens.error || tokens.data?.error) && <p role="alert" className="px-5 py-4 text-sm text-destructive">{actionError(tokens.data?.error)}</p>}
+      {(tokens.error || tokens.data?.error) && <FieldError className="px-5 py-4">{actionError(tokens.data?.error)}</FieldError>}
       {rows?.length === 0 && <p className="px-5 py-4 text-sm text-muted-foreground">{t('empty')}</p>}
       {rows?.map(token => <SettingRow key={token.id} title={token.name} description={describe(token)}>
         <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => setRevoking(token)}>{t('revoke')}</Button>
       </SettingRow>)}
     </SettingsSection>
-    {error && <p role="alert" className="px-1 text-sm text-destructive">{error}</p>}
+    {error && <FieldError className="px-1">{error}</FieldError>}
     {createDialog.value && <CreateTokenDialog open={createDialog.open} onOpenChangeComplete={createDialog.onOpenChangeComplete} workspaceId={workspaceId} onDone={() => { setCreating(false); void tokens.mutate() }} />}
     <AlertDialog open={revoking !== null} onOpenChange={open => { if (!open && !pending) setRevoking(null) }}>
       <AlertDialogContent>
@@ -131,7 +132,7 @@ function CreateTokenDialog({ workspaceId, onDone, open = true, onOpenChangeCompl
               <SelectContent><SelectGroup>{expiryItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
             </Select>
           </Label>
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {error && <FieldError>{error}</FieldError>}
         </div>}
       <DialogFooter>
         {token

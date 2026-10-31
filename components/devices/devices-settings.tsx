@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
@@ -208,7 +208,7 @@ export function DevicesSettings() {
       <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
       <Button size="sm" variant="secondary" aria-keyshortcuts="Meta+N Control+N" onClick={() => setAdding(true)}><Plus data-icon="inline-start" />{t('add.trigger')}</Button>
     </div>
-    {error && <p role="alert" className="text-xs text-destructive">{t('listError')}</p>}
+    {error && <FieldError className="text-xs">{t('listError')}</FieldError>}
     {devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>
       <DeviceGroup title={t('thisMachine')} devices={devices.filter(device => device.deviceType !== 'server')} onChanged={changed} onReconnect={reconnect} />
       <DeviceGroup title={t('otherDevices')} devices={devices.filter(device => device.deviceType === 'server')} onChanged={changed} onReconnect={reconnect} />

@@ -9,7 +9,7 @@ import { createWorkspace, switchWorkspace } from '@/app/actions/workspace'
 import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
@@ -71,7 +71,7 @@ export function WorkspaceSwitcher({ userKey, canLeave }: { userKey: string; canL
       <DialogContent><DialogHeader><DialogTitle>{agentCopy.newWorkspace}</DialogTitle></DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-5">
           <FieldGroup><Field data-invalid={!!error || undefined}><FieldLabel htmlFor="new-workspace-name">{agentCopy.workspaceName}</FieldLabel><Input id="new-workspace-name" autoFocus required maxLength={120} placeholder={agentCopy.forExampleProductTeam} value={name} disabled={busy} aria-invalid={!!error} onChange={event => setName(event.target.value)} /></Field></FieldGroup>
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {error && <FieldError>{error}</FieldError>}
           <DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setCreating(false)}>{agentCopy.cancel}</Button><Button type="submit" disabled={busy || !name.trim()}>{busy ? agentCopy.creating : agentCopy.createWorkspace}</Button></DialogFooter>
         </form>
       </DialogContent>

@@ -36,6 +36,7 @@ import { BrowserNoteChip, BrowserNoteLine, useBrowserNotesComposer } from '@/com
 import { SentSuggestion } from '@/components/suggestions/mobile-card'
 import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
+import { FieldError } from '@/components/ui/field'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
 
@@ -245,11 +246,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
-      {loadError && <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>}
+      {loadError && <FieldError className="text-xs">{t('loadError')}</FieldError>}
       {refusal && <HostedRefusalNotice code={refusal} />}
       {data?.error && !data.working && !refusal && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
-      {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
+      {sendError && <FieldError className="text-xs">{sendError}</FieldError>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }}

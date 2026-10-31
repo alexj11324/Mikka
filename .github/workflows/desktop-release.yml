@@ -29,7 +29,6 @@ permissions:
 concurrency:
   group: desktop-release
   cancel-in-progress: false
-  queue: max
 
 env:
   # A cache restore that fails (e.g. the account's cache egress limit) would
@@ -187,7 +186,8 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: Mikka Desktop ${{ env.RELEASE_VERSION }}
           draft: ${{ inputs.skip_notarization == true }}
-          make_latest: ${{ inputs.skip_notarization && 'false' || 'legacy' }}
+          # electron-updater follows releases/latest; 'legacy' compares tags as text, so .9 outranked .31.
+          make_latest: ${{ inputs.skip_notarization && 'false' || 'true' }}
           prerelease: false
           generate_release_notes: true
           files: |

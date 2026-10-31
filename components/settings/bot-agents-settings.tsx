@@ -23,6 +23,7 @@ import type { ExecutionRule } from '@/lib/execution-rules'
 import { botModelChoice, groupBotModels, harnessOptions, modelName, modelOptions, modelProvider, placeKind, redetectTargets, retarget, type BotModelRow, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
 import { cn } from '@/lib/utils'
 import { findLabel, listWorkspaceLabels, matchLabels } from '@/lib/workspace-labels'
+import { FieldError } from '@/components/ui/field'
 
 type T = ReturnType<typeof useTranslations<'Settings.botAgents'>>
 
@@ -48,7 +49,7 @@ export function BotAgentsSettings() {
     try { await change() } catch { setFailed(() => change) }
   }
 
-  if (stored.error || places.error || bots.error || accounts.error) return <p role="alert" className="text-sm text-destructive">{t('loadFailed')}</p>
+  if (stored.error || places.error || bots.error || accounts.error) return <FieldError>{t('loadFailed')}</FieldError>
   if (!stored.data || !places.data || !bots.data || !accounts.data) return <SettingsLoading label={t('loading')} rows={4} />
 
   const placeList = places.data

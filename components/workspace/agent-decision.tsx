@@ -160,7 +160,7 @@ export const ReplyAnswer = createContext<string | null>(null)
  * a check and the others dim. Anything else goes through the composer.
  */
 /** Where the user stores their own E2B key (the cloud computer runs on it). */
-export const CLOUD_KEY_SETTINGS = '/settings?section=integrations'
+export const CLOUD_KEY_SETTINGS = '/settings?section=secrets'
 
 function ChoiceCard({ title, options, task }: { title: string; options: { value: string; label: string; action?: 'cloudKeySettings' }[]; task?: string }) {
   const agentCopy = useAgentCopy()

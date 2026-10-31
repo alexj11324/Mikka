@@ -19,6 +19,7 @@ import { ApprovalBar } from './factory-approval-bar'
 import { RejectNote } from './factory-reject-note'
 import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha, shortSha } from './short-sha'
+import { FieldError } from '@/components/ui/field'
 
 type Candidate = { sha: string; repository: string; environment: string; scope: string }
 export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean }
@@ -244,7 +245,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const envChip = task.isSkillCandidate ? t('internalSkill') : environment ? t(`envChip.${environment}`) : null
   const open = viewing ? groups[viewing.group] : undefined
 
-  if (ledgerError || evidenceError) return <p role="alert" className="px-6 py-6 text-xs text-destructive">{t('loadError')}</p>
+  if (ledgerError || evidenceError) return <FieldError className="px-6 py-6 text-xs">{t('loadError')}</FieldError>
   if (!ledger || ((task.stage === 'approval' || superseded) && !evidence)) return <div className="flex flex-1 items-center justify-center py-10"><Spinner /></div>
   return <div className="flex min-h-0 flex-1 flex-col">
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-3 pb-4 sm:px-6">
@@ -263,7 +264,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
         <ul className="flex flex-col gap-1">{results.map(row => <ResultLine key={row.stage} row={row} onOpenThread={onOpenThread} />)}</ul>
       </section>}
       {state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
-      {error && <p role="alert" className="text-xs text-destructive">{t(ERROR_KEYS[error] ?? 'error')}</p>}
+      {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
     </div>
     {state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={Boolean(evidence && environment)} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}

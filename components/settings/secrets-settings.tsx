@@ -8,7 +8,7 @@ import { createSecret, deleteE2BKey, deleteSecret, getE2BKeyCapability, listSecr
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -41,7 +41,7 @@ export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
   return <>
     <SettingsSection id="secrets-heading" title={t('heading')} action={<Button {...settingsSectionAction} onClick={() => { setWarning(null); setEditing('new') }}>{t('add')}</Button>}>
       {!list.data && !list.error && <SettingsLoading label={t('loading')} rows={2} bare />}
-      {(list.error || list.data?.error) && <p role="alert" className="px-5 py-4 text-sm text-destructive">{actionError(list.data?.error)}</p>}
+      {(list.error || list.data?.error) && <FieldError className="px-5 py-4">{actionError(list.data?.error)}</FieldError>}
       {secrets?.length === 0 && <p className="px-5 py-4 text-sm text-muted-foreground">{t('empty')}</p>}
       {secrets && groupByScope(secrets).map(([repository, rows]) => <div key={repository || 'workspace'} role="group" aria-label={repository ? t('repositoryGroup', { repository }) : t('workspaceGroup')}>
         <p className="px-5 pt-3 text-xs font-medium text-muted-foreground">{repository ? t('repositoryGroup', { repository }) : t('workspaceGroup')}</p>
@@ -73,7 +73,7 @@ function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
   return <>
     <SettingsSection id="e2b-heading" title={t('heading')}>
       {!status.data && !status.error && <SettingsLoading label={t('loading')} rows={1} />}
-      {(status.error || status.data?.error) && <p role="alert" className="px-5 py-4 text-sm text-destructive">{actionError(status.data?.error)}</p>}
+      {(status.error || status.data?.error) && <FieldError className="px-5 py-4">{actionError(status.data?.error)}</FieldError>}
       {data && state && <SettingRow title="E2B API Key" icon={<Cloud aria-hidden="true" className="size-4 text-muted-foreground" />}>
         <div className="flex items-center gap-3">
           <span role="status" className={cn(data.lastErrorCode ? 'text-destructive' : 'text-muted-foreground')}>{t(state as 'missing')}</span>
@@ -116,7 +116,7 @@ function E2BKeyDialog({ workspaceId, configured, onClose, open = true, onOpenCha
             <FieldLabel htmlFor="e2b-api-key">{configured ? t('newKey') : t('key')}</FieldLabel>
             <Input id="e2b-api-key" type="password" value={apiKey} autoComplete="off" placeholder="e2b_…" onChange={event => setApiKey(event.target.value)} />
           </Field>
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {error && <FieldError>{error}</FieldError>}
         </FieldGroup>
         <DialogFooter className="mt-4">
           {configured && <Button type="button" variant="destructive" className="sm:mr-auto" disabled={pending !== null} onClick={() => void run('delete')}>{pending === 'delete' ? t('removing') : t('remove')}</Button>}
@@ -215,7 +215,7 @@ function SecretDialog({ workspaceId, secret, onClose, open = true, onOpenChangeC
         {scope === 'repository' && <Label className="flex flex-col items-start gap-1.5">{t('repository')}
           <Input value={repository} placeholder="owner/repo" autoComplete="off" onChange={event => setRepository(event.target.value)} />
         </Label>}
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {error && <FieldError>{error}</FieldError>}
       </div>
       <DialogFooter>
         {secret && <Button type="button" variant="destructive" className="sm:mr-auto" disabled={pending !== null} onClick={() => void remove()}>{pending === 'delete' ? t('deleting') : commonT('delete')}</Button>}

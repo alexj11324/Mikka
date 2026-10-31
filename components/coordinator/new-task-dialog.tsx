@@ -139,7 +139,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="new-issue-title" className="sr-only">{t('label')}</FieldLabel>
-          <Textarea id="new-issue-title" autoFocus value={draft} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-32 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 dark:bg-transparent" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
+          <Textarea id="new-issue-title" autoFocus value={draft} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-32 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 bg-transparent" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() }
           }} />
         </Field>

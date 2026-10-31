@@ -8,6 +8,7 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
 import { openSettingsInBrowser } from '@/lib/platform/open-settings'
+import { FieldError } from '@/components/ui/field'
 
 type GitHubState = { viewerId: string; configured: boolean; connected: boolean; installed: boolean; repositories: { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }[] }
 
@@ -101,8 +102,8 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
             {githubState.repositories.map(repository => <li key={repository.id} className="break-all">{repository.fullName}</li>)}
           </ul>
         </ScrollArea>}
-        {githubError && <p role="alert" className="text-sm text-destructive">{githubError}</p>}
-        {githubLinkError && <p role="alert" className="text-sm text-destructive">{githubLinkError}</p>}
+        {githubError && <FieldError>{githubError}</FieldError>}
+        {githubLinkError && <FieldError>{githubLinkError}</FieldError>}
       </div>
     </SettingRow>
   </SettingsSection>

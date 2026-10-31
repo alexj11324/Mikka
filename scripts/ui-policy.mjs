@@ -308,6 +308,8 @@ export function auditSource(file, text, policy) {
           const variantAttr = attr(node, 'variant')?.initializer
           const outline = !!variantAttr && ts.isStringLiteral(variantAttr) && ['outline', 'secondary'].includes(variantAttr.text)
           if (name === 'Button' && whiteFill && (stroke || outline)) add(classAttr, 'style/secondary-button-fill', '次级按钮用灰色填充、无描边（R-31）；不要给 Button 加白底 + 描边，也不要把 outline 按钮改回白底。')
+          // R-33: dialogs are rounded-xl from the primitive; only a full-screen viewer may drop the radius.
+          if (['DialogContent', 'AlertDialogContent'].includes(name) && bases.some(base => /^rounded(?:-|$)/.test(base) && base !== 'rounded-none')) add(classAttr, 'style/dialog-radius', '对话框圆角由 DialogContent 决定（14px，R-33），调用处不改；全屏查看器可用 rounded-none。')
           // A segmented control's track is ToggleGroup variant="segment"; a call-site track brought back three looks of one control.
           if (name === 'ToggleGroup' && bases.some(base => /^(?:h|p|rounded|bg)(?:-|$)/.test(base))) add(classAttr, 'style/segment-track', '分段控件的轨道用 ToggleGroup variant="segment"，不在调用处改高度、圆角、内边距或底色（R-31、R-33）。')
           for (const token of tokens) {

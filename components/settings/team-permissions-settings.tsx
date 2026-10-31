@@ -10,6 +10,7 @@ import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from 
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { APP_ACCESS, type AppAccess, type PolicyApp } from '@/lib/app-policy/apps'
 import { useActionError } from '@/lib/use-action-error'
+import { FieldError } from '@/components/ui/field'
 
 /** N4 团队权限: the existing 电脑操作 row, then which connected apps the workspace's bots may use. */
 export function TeamPermissionsSettings({ workspaceId }: { workspaceId: string }) {
@@ -45,7 +46,7 @@ function AppPolicySettings({ workspaceId }: { workspaceId: string }) {
   }
 
   if (!policy.data && !policy.error) return <SettingsLoading label={t('loading')} rows={4} />
-  if (!data) return <p role="alert" className="text-sm text-destructive">{actionError(policy.data?.error)}</p>
+  if (!data) return <FieldError>{actionError(policy.data?.error)}</FieldError>
   return <>
     <SettingsSection id="app-policy-heading" title={t('heading')}>
       {data.apps.map(({ app, access }) => <SettingRow key={app} title={t(`apps.${app}`)} icon={<AppTile app={app} />}>

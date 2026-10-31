@@ -34,6 +34,7 @@ import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
 import type { RailDestination } from '@/components/nav/icon-rail'
 import { prefetchSettingsSection } from '@/lib/settings-prefetch'
+import { FieldError } from '@/components/ui/field'
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
 
@@ -70,7 +71,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   return <>
     <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId) }} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
-      {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
+      {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent className="gap-6">
         {section === 'computers' ? <DevicesSettings /> : <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
         <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
@@ -82,7 +83,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
 function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, workspaceError = false, linearNotice, preview, onSignOut, signingOut }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; workspaceError?: boolean }) {
   // Workspace sections wait for the workspace instead of rendering nothing.
   const waiting = preview || !workspaceId
-    ? preview || workspaceError ? <p role="alert" className="text-sm text-destructive">{t('workspaceUnavailable')}</p> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
+    ? preview || workspaceError ? <FieldError>{t('workspaceUnavailable')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
     : null
   switch (section) {
     case 'account': return <AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />
