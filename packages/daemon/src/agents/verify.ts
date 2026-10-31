@@ -3,7 +3,7 @@
 // boundary: writes only to the worktree and its own temp dir (never the
 // `.git` file or the git dir), no credential stores, and only the repo's
 // own `networkAllow` domains (no model APIs).
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
 import { spawnCli } from "./child"
@@ -44,6 +44,15 @@ export interface VerifyResult {
 }
 
 const OUTPUT_TAIL = 4000
+/**
+ * bwrap masks a denied file by bind-mounting /dev/null on its path. The
+ * daemon replaces some of those files by rename (`runs.json` on every chunk,
+ * `device.json` on every sync), and a rename between bwrap's mount and its
+ * mount-table check aborts the sandbox before the command runs ("Can't bind
+ * mount /oldroot/dev/null on ..."). Such an attempt is started again; one
+ * where the command began is never repeated.
+ */
+const SETUP_ATTEMPTS = 3
 
 export async function runVerify(
   sandbox: AgentSandbox,
@@ -52,25 +61,57 @@ export async function runVerify(
   // Somewhere the agent could never write: nothing in it was planted.
   mkdirSync(options.tmpRoot, { recursive: true, mode: 0o700 })
   const tmpDir = mkdtempSync(join(realpathSync(options.tmpRoot), "verify-"))
-  const child = await spawnCli(sandbox, ["/bin/sh", "-c", options.command], {
-    cwd: options.worktree,
-    env: { ...options.env, TMPDIR: tmpDir },
-    policy: {
-      allowWrite: options.readOnly ? [tmpDir] : [options.worktree, tmpDir],
-      denyWrite: [
-        join(options.worktree, ".git"),
-        ...(options.readOnly ? [options.worktree] : []),
-      ],
-      denyRead: [
-        ...credentialDenyRead(null),
-        ...daemonSecrets(options.privateDir),
-      ],
-      allowDomains: [...(options.networkAllow ?? [])],
-    },
-    pidFile: options.pidFile,
-    // Every verify of this run carries the temp root in its profile.
-    marker: realpathSync(options.tmpRoot),
-  })
+  const deadline = Date.now() + options.timeoutMs
+  try {
+    for (let attempt = 1; ; attempt++) {
+      const started = join(tmpDir, `.started-${attempt}`)
+      const result = await attemptVerify(sandbox, options, tmpDir, started, deadline - Date.now())
+      if (
+        result.exitCode === 0 ||
+        result.timedOut ||
+        options.signal?.aborted ||
+        existsSync(started) ||
+        attempt >= SETUP_ATTEMPTS
+      )
+        return result
+    }
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true })
+  }
+}
+
+async function attemptVerify(
+  sandbox: AgentSandbox,
+  options: VerifyOptions,
+  tmpDir: string,
+  started: string,
+  timeoutMs: number
+): Promise<VerifyResult> {
+  // The marker is written inside the sandbox, so it exists only once the
+  // sandbox is set up and the command is about to run.
+  const child = await spawnCli(
+    sandbox,
+    ["/bin/sh", "-c", ': > "$0" && exec /bin/sh -c "$1"', started, options.command],
+    {
+      cwd: options.worktree,
+      env: { ...options.env, TMPDIR: tmpDir },
+      policy: {
+        allowWrite: options.readOnly ? [tmpDir] : [options.worktree, tmpDir],
+        denyWrite: [
+          join(options.worktree, ".git"),
+          ...(options.readOnly ? [options.worktree] : []),
+        ],
+        denyRead: [
+          ...credentialDenyRead(null),
+          ...daemonSecrets(options.privateDir),
+        ],
+        allowDomains: [...(options.networkAllow ?? [])],
+      },
+      pidFile: options.pidFile,
+      // Every verify of this run carries the temp root in its profile.
+      marker: realpathSync(options.tmpRoot),
+    }
+  )
   child.process.stdin.end()
   let output = ""
   for (const stream of [child.process.stdout, child.process.stderr]) {
@@ -83,7 +124,7 @@ export async function runVerify(
   const timer = setTimeout(() => {
     timedOut = true
     void child.kill()
-  }, options.timeoutMs)
+  }, Math.max(0, timeoutMs))
   const abort = () => void child.kill()
   options.signal?.addEventListener("abort", abort, { once: true })
   try {
@@ -100,7 +141,6 @@ export async function runVerify(
       ].join("\n"),
     }
   } finally {
-    rmSync(tmpDir, { recursive: true, force: true })
     clearTimeout(timer)
     options.signal?.removeEventListener("abort", abort)
   }
