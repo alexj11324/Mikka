@@ -6,7 +6,7 @@ import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { listDevices, removeDevice, renameDevice, sendDeviceCommand, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
-import { HarnessLabel } from '@/components/labels/entity-labels'
+import { HarnessLabel, harnessName } from '@/components/labels/entity-labels'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,7 @@ import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
 import { ConnectDeviceDialog } from './connect-device-dialog'
-import { AgentMarks, installedAgents } from './agent-marks'
+import { AgentMarks, installedAgents, sandboxBlockedAgents } from './agent-marks'
 import { SshAddDialog } from './ssh-add-dialog'
 
 type Command = 'redetect' | 'restart' | 'update'
@@ -55,6 +55,17 @@ function InstallAgents() {
   </Popover>
 }
 
+/** Why a device's agents cannot run. The daemon already tried to fetch the tools itself and rechecks on its own. */
+function SandboxBlocked({ missing }: { missing: string[] }) {
+  const t = useTranslations('Devices')
+  return <Popover>
+    <PopoverTrigger className="shrink-0 cursor-pointer text-foreground underline underline-offset-2">{t('sandboxFix')}</PopoverTrigger>
+    <PopoverContent align="start" className="w-96 gap-2">
+      <span className="text-xs">{missing.length > 0 ? t('sandboxMissing', { packages: missing.join(', ') }) : t('sandboxRefused')}</span>
+    </PopoverContent>
+  </Popover>
+}
+
 /** The device type with the online dot on its corner. */
 function DeviceTypeIcon({ device }: { device: DeviceView }) {
   const Icon = device.deviceType === 'server' ? Server : Laptop
@@ -72,6 +83,7 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
   const [renaming, setRenaming] = useState(false)
   const [removing, setRemoving] = useState(false)
   const agents = installedAgents(device.harnesses)
+  const blocked = sandboxBlockedAgents(device.harnesses)
 
   async function run(action: () => Promise<Result>, done?: () => void): Promise<boolean> {
     try {
@@ -97,10 +109,12 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
     <span className={cn('flex min-w-0 flex-1 flex-col gap-0.5', !device.online && 'text-muted-foreground')}>
       <span className="truncate text-sm font-medium">{device.name}</span>
       <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <span className="truncate">{device.online && agents.length === 0 ? `${status} · ${t('noAgent')}` : status}</span>
+        <span className="truncate">{device.online && agents.length === 0
+          ? `${status} · ${blocked.agents.length > 0 ? t('sandboxBlocked', { agents: blocked.agents.map(harnessName).join(', ') }) : t('noAgent')}`
+          : status}</span>
         {device.online && (agents.length > 0
           ? <AgentMarks harnesses={agents} />
-          : <InstallAgents />)}
+          : blocked.agents.length > 0 ? <SandboxBlocked missing={blocked.missing} /> : <InstallAgents />)}
       </span>
     </span>
     {!device.online && <Button variant="secondary" size="sm" onClick={onReconnect}>{t('reconnect')}</Button>}

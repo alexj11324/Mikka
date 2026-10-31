@@ -810,6 +810,10 @@
     "setup": "Set up repository and agent",
     "offlineSince": "Offline · {time}",
     "noAgent": "No agent found",
+    "sandboxBlocked": "{agents} found, sandbox unavailable",
+    "sandboxMissing": "The daemon could not install {packages}. Install them with the system package manager and the daemon recovers on its own.",
+    "sandboxRefused": "This machine does not let regular users create a sandbox. An administrator needs to enable user namespaces.",
+    "sandboxFix": "How to fix",
     "installAgent": "How to install",
     "copyInstall": "Copy {command}",
     "commands": {

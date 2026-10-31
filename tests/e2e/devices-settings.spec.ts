@@ -16,15 +16,18 @@ async function seed(page: Page) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   if (!cookie) throw new Error('需要已登录的页面。')
   const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
-  const ids = { laptop: randomUUID(), server: randomUUID(), bare: randomUUID(), offline: randomUUID() }
+  const ids = { laptop: randomUUID(), server: randomUUID(), bare: randomUUID(), offline: randomUUID(), blocked: randomUUID() }
   // A heartbeat in the future keeps a device online for the whole test.
   await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses) VALUES
     ($1, $5, 'E2E MacBook', 'local', true, 'laptop', now() + interval '1 hour', $6),
     ($2, $5, 'build-01', 'local', true, 'server', now() + interval '1 hour', $7),
     ($3, $5, 'dev-vps', 'local', true, 'server', now() + interval '1 hour', '[]'),
-    ($4, $5, 'gpu-box', 'local', false, 'server', now() - interval '3 days', '[]')`, [ids.laptop, ids.server, ids.bare, ids.offline, session.userId,
+    ($4, $5, 'gpu-box', 'local', false, 'server', now() - interval '3 days', '[]'),
+    ($8, $5, 'no-sandbox', 'local', true, 'server', now() + interval '1 hour', $9)`, [ids.laptop, ids.server, ids.bare, ids.offline, session.userId,
     JSON.stringify([{ harness: 'claude_code', installed: true, version: '1.0.0' }, { harness: 'codex', installed: true, version: '1.0.0' }]),
-    JSON.stringify([{ harness: 'claude_code', installed: true, version: '1.0.0' }, { harness: 'cursor', installed: false, version: null }])])
+    JSON.stringify([{ harness: 'claude_code', installed: true, version: '1.0.0' }, { harness: 'cursor', installed: false, version: null }]),
+    ids.blocked,
+    JSON.stringify([{ harness: 'claude_code', installed: false, version: '1.0.0', sandboxBlocked: { missing: ['socat', 'ripgrep'] } }])])
   return { ...ids, userId: session.userId }
 }
 
@@ -49,6 +52,11 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await expect(row(page, 'dev-vps')).toContainText('未检测到 Agent')
   await row(page, 'dev-vps').getByRole('button', { name: '安装方法' }).click()
   await expect(page.getByText('npm install -g @openai/codex')).toBeVisible()
+  await page.keyboard.press('Escape')
+  // A CLI the sandbox cannot run is named, never reported as absent.
+  await expect(row(page, 'no-sandbox')).toContainText('已检测到 Claude Code，但沙箱不可用')
+  await row(page, 'no-sandbox').getByRole('button', { name: '修复方法' }).click()
+  await expect(page.getByText('daemon 没能自动装好 socat, ripgrep', { exact: false })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
   await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许调度到 gpu-box' })).not.toBeChecked()

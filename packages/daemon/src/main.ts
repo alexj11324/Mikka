@@ -64,7 +64,8 @@ import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
 import { checkLatestVersion, type AutoUpdateRuntime } from "./auto-update"
 import { restartService, uninstallService } from "./service"
 import { detectDeviceType } from "./device-type"
-import { detectHarnesses } from "./harnesses"
+import { detectHarnesses, harnessFingerprint } from "./harnesses"
+import { ensureSandboxTools, missingSandboxTools } from "./sandbox-tools"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
@@ -187,6 +188,14 @@ export function loadDeviceFile(raw: unknown): DeviceFile {
     if (first) file.deviceId = first
   }
   return file
+}
+
+const HARNESS_RESCAN_MS = 5 * 60_000
+const SANDBOX_REPAIR_RETRY_MS = 60 * 60_000
+
+/** A person may install a missing tool themselves; that alone is worth a new attempt. */
+function missingToolsUnchanged(issue: { missing: string[] } | null) {
+  return !issue?.missing.length || missingSandboxTools().length === issue.missing.length
 }
 
 export class Daemon {
@@ -528,7 +537,8 @@ export class Daemon {
     // boundary and bind its lifetime to the run's authenticated gate.
     const runApprovalTransport = typeof this.options.link.prepareRunToolApproval === 'function'
     const localIsolation = this.ownedSandbox !== null && this.sandbox === this.ownedSandbox
-    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
+    if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint()
+    this.harnesses = [...detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
       ...info,
       // Local enforcement requires the successful owned SRT probe. Hosted
       // enforcement uses its existing network-none/read-only Docker boundary
@@ -536,7 +546,7 @@ export class Daemon {
       // that ceiling. Codex also verifies its pinned interface at initialize.
       toolApproval: runApprovalTransport && (hosted || (localIsolation && (info.harness === 'claude_code' || (info.harness === 'codex' && /(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(info.version ?? ''))))) ? true as const : undefined,
       coordinator: hosted ? false : coordinatorCapable(info),
-    }))
+    })), ...this.sandboxBlockedHarnesses(detected)]
     // Runs survive restarts: pick up what the journal says was active.
     await this.supervisor.resumeAll()
     if (!hosted && this.options.quotaSource !== null) {
@@ -740,6 +750,52 @@ export class Daemon {
     return acted
   }
 
+  /** Report a CLI the daemon cannot run as present but not installed, so no run is pinned here. */
+  private sandboxBlockedHarnesses(detected: HarnessInfo[]): HarnessInfo[] {
+    const issue = this.sandboxIssue
+    if (!issue) return []
+    return detected.filter(info => info.installed && !this.adapters.has(info.harness)).map(info => ({
+      harness: info.harness, installed: false, version: info.version, sandboxBlocked: { missing: issue.missing },
+    }))
+  }
+
+  private async redetectHarnesses() {
+    const repairing = this.sandboxIssue?.missing.length
+    if (this.sandboxIssue && repairing) {
+      this.lastSandboxRepair = Date.now()
+      this.sandboxIssue = { missing: await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log }) }
+    }
+    const detected = await detectHarnesses()
+    this.harnessPrint = harnessFingerprint()
+    this.harnesses = [...detected.filter(info => this.adapters.has(info.harness)).map(info => {
+      const previous = this.harnesses.find(old => old.harness === info.harness && old.version === info.version)
+      return { ...info, toolApproval: previous?.toolApproval, coordinator: coordinatorCapable(info) }
+    }), ...this.sandboxBlockedHarnesses(detected)]
+    // Adapters and verification are wired at startup, so a repaired sandbox needs a fresh start.
+    if (repairing && this.sandboxIssue?.missing.length === 0) {
+      this.startMaintenance(() => restartService(false, () => {}, undefined, () => !this.stopped))
+    }
+  }
+
+  /** Notice an agent installed after startup, or retry a failed tool download, without spawning anything per tick. */
+  private rescanHarnesses() {
+    const now = Date.now()
+    if (this.options.hostedSubscriptions || this.options.harnesses || this.rescanning || now - this.lastHarnessScan < HARNESS_RESCAN_MS) return
+    this.lastHarnessScan = now
+    const retryRepair = Boolean(this.sandboxIssue?.missing.length) && now - this.lastSandboxRepair >= SANDBOX_REPAIR_RETRY_MS
+    if (harnessFingerprint() === this.harnessPrint && !retryRepair && missingToolsUnchanged(this.sandboxIssue)) return
+    this.rescanning = true
+    void this.redetectHarnesses()
+      .then(() => this.syncWithServer())
+      .catch((err: unknown) => { this.log.warn({ err }, "harness rescan failed") })
+      .finally(() => { this.rescanning = false })
+  }
+
+  private harnessPrint = ""
+  private lastHarnessScan = Date.now()
+  private lastSandboxRepair = Date.now()
+  private rescanning = false
+  private sandboxIssue: { missing: string[] } | null = null
   private sandbox: AgentSandbox | null = null
   private ownedSandbox: SandboxRuntime | null = null
 
@@ -750,8 +806,10 @@ export class Daemon {
 
   private async createAgentSandbox(): Promise<AgentSandbox | null> {
     if (this.options.agentSandbox !== undefined) return this.options.agentSandbox
+    const missing = await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log })
     if (!SandboxRuntime.supported()) {
-      this.log.warn("agent sandbox unavailable: platform or dependencies unsupported")
+      this.log.warn({ missing }, "agent sandbox unavailable: platform or dependencies unsupported")
+      this.sandboxIssue = { missing }
       return null
     }
     const sandbox = new SandboxRuntime(async ({ host }) => {
@@ -768,6 +826,7 @@ export class Daemon {
       return sandbox
     } catch (err) {
       this.log.warn({ err }, "agent sandbox unavailable")
+      this.sandboxIssue = { missing: [] }
       if (!this.options.retainResources) await sandbox.reset().catch((resetError: unknown) => {
         this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
       })
@@ -951,6 +1010,7 @@ export class Daemon {
         this.revokeLocalComputerGrants()
         this.registered = false
       }
+      this.rescanHarnesses()
       const command = deviceCommands?.[0]
       if (command?.kind === 'uninstall') {
         this.draining = true
@@ -974,11 +1034,7 @@ export class Daemon {
         if (command.kind === 'redetect' || this.maintenanceIdle()) {
           try {
             if (command.kind === 'redetect') {
-              const detected = await detectHarnesses()
-              this.harnesses = detected.filter(info => this.adapters.has(info.harness)).map(info => {
-                const previous = this.harnesses.find(old => old.harness === info.harness && old.version === info.version)
-                return { ...info, toolApproval: previous?.toolApproval, coordinator: coordinatorCapable(info) }
-              })
+              await this.redetectHarnesses()
               this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
               // Queue an immediate heartbeat after this sync pass, without re-entering it.
               void this.syncWithServer().catch(() => undefined)

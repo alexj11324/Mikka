@@ -810,6 +810,10 @@
     "setup": "设置仓库和 Agent",
     "offlineSince": "离线 · {time}",
     "noAgent": "未检测到 Agent",
+    "sandboxBlocked": "已检测到 {agents}，但沙箱不可用",
+    "sandboxMissing": "daemon 没能自动装好 {packages}。用系统包管理器安装后，daemon 会自动恢复。",
+    "sandboxRefused": "这台机器的系统设置不允许普通用户创建沙箱，需要管理员开启 user namespace。",
+    "sandboxFix": "修复方法",
     "installAgent": "安装方法",
     "copyInstall": "复制 {command}",
     "commands": {
