@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { hashUserId, noteLogUser, requestIdFor, withRequestLog } from './request-log'
+import { hashUserId, noteLogOutcome, noteLogUser, requestIdFor, withRequestLog } from './request-log'
 
 function capture() {
   const lines: Array<{ line: string; level: string }> = []
@@ -59,4 +59,22 @@ test('generates a request id when x-vercel-id is missing or malformed', () => {
 test('a failing sink never breaks the request', async () => {
   const res = await withRequestLog('/api/x', () => new Response('ok'), () => { throw new Error('sink') })(new Request('https://x.test/api/x'))
   assert.equal(res.status, 200)
+})
+
+test('outcomes allow only fixed values and stay isolated between concurrent requests', async () => {
+  const { lines, sink } = capture()
+  let release!: () => void
+  const waiting = new Promise<void>(resolve => { release = resolve })
+  const empty = withRequestLog('/api/empty', async () => { noteLogOutcome('empty'); await waiting; return new Response(null) }, sink)
+  const work = withRequestLog('/api/work', async () => { noteLogOutcome('work'); release(); return new Response(null) }, sink)
+  noteLogOutcome('ignored')
+  await Promise.all([empty(new Request('https://x.test/empty')), work(new Request('https://x.test/work'))])
+  await withRequestLog('/api/invalid', () => {
+    noteLogOutcome('SECRET' as 'empty')
+    return new Response(null)
+  }, sink)(new Request('https://x.test/invalid'))
+  const completed = lines.map(item => JSON.parse(item.line)).filter(entry => entry.msg === 'api_request')
+  assert.deepEqual(Object.fromEntries(completed.map(entry => [entry.route, entry.outcome])), { '/api/empty': 'empty', '/api/work': 'work', '/api/invalid': undefined })
+  assert.ok(!lines.some(item => item.line.includes('SECRET')))
+  assert.ok(lines.filter(item => JSON.parse(item.line).msg === 'api_request_started').every(item => !('outcome' in JSON.parse(item.line))))
 })

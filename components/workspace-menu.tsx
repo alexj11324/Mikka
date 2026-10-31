@@ -3,14 +3,15 @@ import { useTranslations } from 'next-intl'
 
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { authClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
 import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import { switchWorkspace } from '@/app/actions/workspace'
-import { ShortcutKeys } from '@/components/shortcut-keys'
+import { useShortcutLabel } from '@/components/shortcut-keys'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,9 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar'
@@ -31,12 +30,20 @@ function WorkspaceAvatar({ name, large = false }: { name: string; large?: boolea
   return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center rounded-full bg-sidebar-primary-soft font-semibold text-sidebar-primary-soft-foreground', large ? 'size-8 text-sm' : 'size-6 text-xs')}>{name.slice(0, 1)}</span>
 }
 
-export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBeforeChange, compact = false, label }: {
+/** A workspace's mark inside the menu: the same soft initial as the trigger, at item size. */
+function ItemAvatar({ name }: { name: string }) {
+  return <Avatar size="sm" aria-hidden="true" className="size-5"><AvatarFallback className="bg-sidebar-primary-soft text-xs font-semibold text-sidebar-primary-soft-foreground">{name.slice(0, 1)}</AvatarFallback></Avatar>
+}
+
+/**
+ * The account menu behind the avatar, in the style of Linear's and Notion's:
+ * one flat list (no submenu) of the signed-in accounts' workspaces, then
+ * 设置, then 添加账户 and 退出登录. Switching workspaces lives only here.
+ */
+export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBeforeChange, compact = false }: {
   user: { name: string; email: string; image?: string | null }
   /** Avatar only, for the icon rail. */
   compact?: boolean
-  /** The trigger's name where the rail's own menu is on screen too, so the two differ. */
-  label?: string
   onSettings: (href?: string) => void
   onSignOut: () => void
   signingOut: boolean
@@ -47,7 +54,9 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
   const { data, error, mutate } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
   const [menuOpen, setMenuOpen] = useState(false)
   const [pending, setPending] = useState(false)
+  const settingsShortcut = useShortcutLabel(['mod', ','])
   const workspaceName = data?.workspace.name ?? i18nText("Settings.groups.workspace")
+  const busy = pending || signingOut
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
       if (event.isComposing || event.keyCode === 229 || event.repeat || pending || signingOut || event.altKey || event.shiftKey) return
@@ -66,7 +75,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
     setOpenMobile(false)
   }
   function run(action: () => Promise<void>) {
-    if (pending || signingOut) return
+    if (busy) return
     if (onBeforeChange) onBeforeChange(action)
     else void action()
   }
@@ -94,49 +103,52 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
       finally { setPending(false) }
     })
   }
-  return <>
-    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-      {compact ? <DropdownMenuTrigger render={<Button variant="ghost" size="icon-lg" aria-label={i18nText("Nav.workspaceMenu")} title={workspaceName} />}>
-        <WorkspaceAvatar name={workspaceName} large />
-        <span className="sr-only">{workspaceName}</span>
-      </DropdownMenuTrigger> : <DropdownMenuTrigger render={<SidebarMenuButton aria-label={label ?? i18nText("Nav.workspaceMenu")} className="h-10" />}>
-        <WorkspaceAvatar name={workspaceName} />
-        <span className="flex-1 truncate font-semibold">{workspaceName}</span>
-        <ChevronDown />
-      </DropdownMenuTrigger>}
-      <DropdownMenuContent align="start" side={compact ? 'right' : undefined} className="w-64 max-w-[calc(100vw-1rem)]">
-        <DropdownMenuGroup>
-          <DropdownMenuItem className="min-h-9" aria-label={i18nText("Settings.title")} aria-keyshortcuts="Control+, Meta+," onClick={() => settings()}><span className="flex-1">{i18nText("Settings.title")}</span><ShortcutKeys keys={['mod', ',']} aria-hidden="true" /></DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="min-h-9">{i18nText("FeatureCopy.c_646c2b4f")}</DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-72 max-w-[calc(100vw-1rem)]">
-              {data?.accounts.map(account => <DropdownMenuGroup key={account.id}>
-                <DropdownMenuLabel className="truncate" title={account.email}>{account.email}</DropdownMenuLabel>
-                {account.choices.map(workspace => <DropdownMenuItem key={workspace.id} className="min-h-10" disabled={pending || signingOut} aria-current={account.id === data.accounts[0].id && workspace.id === data.workspace.id ? 'true' : undefined} onClick={() => selectWorkspace(account.id, workspace.id)}>
-                  <WorkspaceAvatar name={workspace.name} />
-                  <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
-                  {account.id === data.accounts[0].id && workspace.id === data.workspace.id && <Check aria-hidden="true" />}
-                </DropdownMenuItem>)}
-                {!account.choices.length && <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => selectWorkspace(account.id)}>{i18nText("FeatureCopy.c_c352c6e7")}</DropdownMenuItem>}
-              </DropdownMenuGroup>)}
-              {!data && <DropdownMenuGroup>
-                <DropdownMenuLabel className="truncate" title={user.email}>{user.email}</DropdownMenuLabel>
-                {error ? <DropdownMenuItem className="min-h-9" onClick={() => void mutate()}>{i18nText("FeatureCopy.c_e3d18d12")}</DropdownMenuItem> : <DropdownMenuLabel>{i18nText("FeatureCopy.c_5d885f0b")}</DropdownMenuLabel>}
-              </DropdownMenuGroup>}
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>{i18nText("FeatureCopy.c_c3d92b20")}</DropdownMenuLabel>
-                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={() => run(async () => { setOpenMobile(false); window.location.assign(withBasePath('/workspaces/new')) })}>{i18nText("FeatureCopy.c_d92d1b8d")}</DropdownMenuItem>
-                <DropdownMenuItem className="min-h-9" disabled={pending || signingOut} onClick={addAccount}>{i18nText("FeatureCopy.c_c771c7d8")}</DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuItem className="min-h-9" onClick={onSignOut} disabled={signingOut || pending}>{signingOut ? i18nText("Nav.signingOut") : i18nText("Nav.signOut")}</DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  </>
+  return <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+    {compact ? <DropdownMenuTrigger render={<Button variant="ghost" size="icon-lg" aria-label={i18nText("Nav.workspaceMenu")} title={workspaceName} />}>
+      <WorkspaceAvatar name={workspaceName} large />
+      <span className="sr-only">{workspaceName}</span>
+    </DropdownMenuTrigger> : <DropdownMenuTrigger render={<SidebarMenuButton aria-label={i18nText("Nav.workspaceMenu")} className="h-10" />}>
+      <WorkspaceAvatar name={workspaceName} />
+      <span className="flex-1 truncate font-semibold">{workspaceName}</span>
+      <ChevronDown />
+    </DropdownMenuTrigger>}
+    {/* The rail's avatar sits at the window's bottom-left: the menu opens above it, never over it. */}
+    <DropdownMenuContent aria-label={i18nText("Nav.workspaceMenu")} align="start" side={compact ? 'top' : 'bottom'} sideOffset={compact ? 8 : 4} className="w-60 max-w-[calc(100vw-1rem)]">
+      {/* About five workspaces show; more scroll inside the menu. */}
+      <div className="max-h-44 overflow-y-auto">
+        {data?.accounts.map(account => <DropdownMenuGroup key={account.id}>
+          <DropdownMenuLabel className="truncate font-normal" title={account.email}>{account.email}</DropdownMenuLabel>
+          {account.choices.map(workspace => {
+            const current = account.id === data.accounts[0].id && workspace.id === data.workspace.id
+            return <DropdownMenuItem key={workspace.id} disabled={busy} aria-current={current ? 'true' : undefined} onClick={() => selectWorkspace(account.id, workspace.id)}>
+              <ItemAvatar name={workspace.name} />
+              <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
+              {current && <Check aria-hidden="true" />}
+            </DropdownMenuItem>
+          })}
+          {!account.choices.length && <DropdownMenuItem disabled={busy} onClick={() => selectWorkspace(account.id)}>{i18nText("FeatureCopy.c_c352c6e7")}</DropdownMenuItem>}
+        </DropdownMenuGroup>)}
+        {!data && <DropdownMenuGroup>
+          <DropdownMenuLabel className="truncate font-normal" title={user.email}>{user.email}</DropdownMenuLabel>
+          {error ? <DropdownMenuItem onClick={() => void mutate()}>{i18nText("FeatureCopy.c_e3d18d12")}</DropdownMenuItem> : <DropdownMenuLabel className="font-normal">{i18nText("FeatureCopy.c_5d885f0b")}</DropdownMenuLabel>}
+        </DropdownMenuGroup>}
+      </div>
+      <DropdownMenuGroup>
+        <DropdownMenuItem disabled={busy} onClick={() => run(async () => { setOpenMobile(false); window.location.assign(withBasePath('/workspaces/new')) })}>
+          <span aria-hidden="true" className="flex size-5 items-center justify-center text-muted-foreground"><Plus /></span>{i18nText("FeatureCopy.c_d92d1b8d")}
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem aria-keyshortcuts="Control+, Meta+," onClick={() => settings()}>
+          {i18nText("Settings.title")}<DropdownMenuShortcut aria-hidden="true" className="tracking-normal">{settingsShortcut}</DropdownMenuShortcut>
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem disabled={busy} onClick={addAccount}>{i18nText("FeatureCopy.c_c771c7d8")}</DropdownMenuItem>
+        <DropdownMenuItem onClick={onSignOut} disabled={busy}>{signingOut ? i18nText("Nav.signingOut") : i18nText("Nav.signOut")}</DropdownMenuItem>
+      </DropdownMenuGroup>
+    </DropdownMenuContent>
+  </DropdownMenu>
 }

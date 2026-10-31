@@ -582,13 +582,19 @@ export class Daemon {
           0,
           COMMANDS_MAX_SKIP
         )
+        const started = performance.now()
         const commands = await link.fetchCommands(deviceId, wait, {
           signal,
           skipRuns,
         })
+        if (this.stopped || signal.aborted) return
+        backoff = 1_000
         const acted = await this.applyCommands(commands)
         if (this.unacked.size > 0) continue // ack right away
-        backoff = 1_000
+        if (commands.length === 0 && !signal.aborted) {
+          const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
+          if (remaining > 0) await this.pauseCommands(remaining, signal)
+        }
         // A message for a run with no session yet (still preparing): retry
         // shortly instead of spinning on the same answer.
         if (commands.length > 0 && !acted) await this.pauseCommands(500, signal)
@@ -612,6 +618,7 @@ export class Daemon {
     const { link } = this.options
     if (!link.fetchFsRequests || !link.answerFsRequest) return
     const signal = this.commandsAbort.signal
+    const wait = this.options.commandsWaitSeconds ?? FS_REQUESTS_MAX_WAIT_SECONDS
     let backoff = 1_000
     while (!this.stopped) {
       const deviceId = this.device.deviceId
@@ -621,12 +628,19 @@ export class Daemon {
           await this.pauseCommands(1_000, signal)
           continue
         }
+        const started = performance.now()
         const requests = await link.fetchFsRequests(
           deviceId,
-          this.options.commandsWaitSeconds ?? FS_REQUESTS_MAX_WAIT_SECONDS,
+          wait,
           { signal }
         )
+        if (this.stopped || signal.aborted) return
         backoff = 1_000
+        // Some servers return an empty queue without honoring the long-poll wait.
+        if (requests.length === 0 && !signal.aborted) {
+          const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
+          if (remaining > 0) await this.pauseCommands(remaining, signal)
+        }
         await Promise.all(
           requests.map(async ({ id, ...request }) => {
             const result = await browseFolder(request).catch((): FsResult => ({
@@ -650,6 +664,7 @@ export class Daemon {
 
   /** Waits `ms`, or less if the daemon stops or the device registers. */
   private pauseCommands(ms: number, signal: AbortSignal): Promise<void> {
+    if (signal.aborted) return Promise.resolve()
     return new Promise((resolve) => {
       const done = () => {
         clearTimeout(timer)
