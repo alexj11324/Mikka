@@ -81,3 +81,29 @@ issue closure or merge is performed by this worktree. Full restricted approval
 and scope suites remain assigned to genuine GitHub Actions; their target guards
 are unchanged. The parent integrator registers the new task policy DB test and
 owns overall type/build/CI and independent review.
+
+## Billing call and presentation audit, 2026-10-31
+
+Reviewed the postpayment branch and provider-owner patches against the newer
+main `50def057`. Main's card-verification `verify`/grant changes remain owned by
+the integrator; this audit does not replace or edit them.
+
+| Path | Finding / owner |
+| --- | --- |
+| `lib/abuse/model.ts` → `hostedModel` | Provider-owner `3cd7754e` removes Gateway price lookup and estimated maximum. Each paid generate/stream uses the postpayment store. `61f5862e` also settles known pre-provider refusals as zero, keeping actual transport failures unknown. |
+| `lib/abuse/workflow-model.ts`, `lib/abuse/resolve.ts`, `lib/coordinator/group-runtime.ts`, `lib/profile/extract.ts`, `lib/suggestions/action-title-server.ts` | Hosted-model paths share that wrapper; no separate estimated-cost threshold. Provider-owner `8fef2fea` carries trusted billing identity through the relevant consumers. |
+| `lib/coordinator/decide.ts`, `workflows/subagent/steps.ts`, `lib/cloud-computer/visual-model.ts`, evaluation/recovery consumers | No separate estimated-cost rule. The baseline Decision call could omit billing scope; provider-owner `8fef2fea` refuses that path and carries trusted scope into Decisions and child inference. This audit does not duplicate those consumer changes. |
+| `lib/abuse/store.ts` | The ignored legacy fifth parameter is not a price gate. New pending rows carry zero reserved amounts. References to reserved-money columns preserve old already-prepaid accounting; they do not precharge new calls. No store changes in this audit. |
+| `lib/billing/history.ts`, `lib/billing/hosted-usage.ts`, `components/billing/balance-section.tsx`, `components/settings/usage-settings.tsx`, `components/billing/hosted-refusal-notice.tsx` | Display the actual backend balance/refusal state. No optimistic deduction, estimated affordability check, held balance or prepayment field was found. No UI change is needed. |
+| `lib/subscription-model-snapshot.ts`, `packages/daemon/src/subscription-quota.ts`, `lib/cloud-computer/thread-machine-limits.ts` | Existing provider subscription quotas and actual compute/concurrency limits are separate from Mikka balance prepayment; retained. |
+| `lib/abuse/alerts.ts` | Confirmed postpayment regression: first-free-use monitoring filtered only `reservedFree > 0`, so new zero-reservation receipts were invisible. Occurrence 10 × impact 3 = 30. Include actual `freeMicroUsd > 0`, preserving legacy rows and first-use deduplication. |
+
+The alert regression uses the actual function and PostgreSQL table definitions
+on connection-local temporary tables. Baseline returned no alert; after the
+query fix, two new free-use workspaces plus one legacy workspace produce one
+durable signup-spike alert. A repeat receipt in the same workspace is counted
+once; an old workspace's recent call is excluded. The repeat check creates no
+duplicate row. Test: 1 pass, zero skips, zero external email calls; logs
+`/tmp/mikka-postpay-alerts-{before,after}.log`. No existing ledger or alert rows
+are changed. These are candidate source/isolated-DB results, not confirmation
+of a production rollout.
