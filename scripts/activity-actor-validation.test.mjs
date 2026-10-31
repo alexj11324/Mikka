@@ -5,8 +5,8 @@ import { planMigration } from './migration-steps.mjs'
 
 test('actor checks are validated independently in replay-safe standalone files', () => {
   for (const [name, constraint] of [
-    ['20261030233501_validate_activity_actor_type.sql', 'issue_versions_actor_type_check'],
-    ['20261030233502_validate_activity_actor_id.sql', 'issue_versions_actor_id_needs_type_check'],
+    ['20261031044135_validate_activity_actor_type.sql', 'issue_versions_actor_type_check'],
+    ['20261031044136_validate_activity_actor_id.sql', 'issue_versions_actor_id_needs_type_check'],
   ]) {
     const sql = readFileSync(`drizzle/${name}`, 'utf8')
     const plan = planMigration(name, sql)

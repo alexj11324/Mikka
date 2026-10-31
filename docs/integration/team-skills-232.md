@@ -46,7 +46,7 @@ request cannot be recalled. Server protected actions reject revoked tokens/STOP.
 ## Local evidence
 
 Isolated PostgreSQL17 database `mikka_admission_closeout_e2e`, loopback55599,
-156 migrations including `20261031020440_team_skill_metadata.sql`:
+156 migrations including `20261031044142_team_skill_metadata.sql`:
 
 - `team-skills.db.test.ts`: 8/8. Real tables, admin/member/tenant boundaries,
   review/digest, selection/claim, raw bytes and mount verification, actual

@@ -167,7 +167,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   // Restore the subsequent tracked scope gate; the older migration replaces
   // its function body. This leaves the suite on the exact final policy.
   await pool.query(await readFile(new URL('../drizzle/20261029043644_team_issue_promotions.sql',import.meta.url),'utf8'))
-  await pool.query(await readFile(new URL('../drizzle/20261031021420_archive_linear_on_personal_scope.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../drizzle/20261031044144_archive_linear_on_personal_scope.sql',import.meta.url),'utf8'))
   assert.equal((await pool.query('select "externalTargetVerified" from linear_issue_links where id=$1',[legacyLink])).rows[0].externalTargetVerified,true)
   fixtureIds.push(legacyImported)
   const claimHarnesses = JSON.stringify([{harness:'codex',installed:true,toolApproval:true}])

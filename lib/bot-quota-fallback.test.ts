@@ -32,6 +32,16 @@ mock.module(new URL("./execution-settings.ts", import.meta.url).href, {
   },
 });
 
+mock.module(new URL("./model-admission/runtime.ts", import.meta.url).href, {
+  namedExports: {
+    assertUnmanagedModelTransport: async (scope: { ownerId: string; workspaceId: string }, model: string) => {
+      assert.equal(scope.ownerId, "alice");
+      assert.equal(scope.workspaceId, id(2));
+      assert.equal(model, "chosen-model");
+    },
+  },
+});
+
 const scope = { ownerId: "alice", botId: id(1), workspaceId: id(2) };
 function fixture(reason = "quota_exhausted") {
   const binding = (key: string) => ({

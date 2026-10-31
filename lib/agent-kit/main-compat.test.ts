@@ -51,6 +51,7 @@ const modelAdmissionCheck=mock.fn(async(_scope:{workspaceId:string;ownerId:strin
 stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck})
 stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64),workspaceIds:[workspace]})})
 stub('../mcp/worker.ts',{issueRunToken:async()=>{if(stopDuringToken)currentRun.stopRequestedAt=new Date();return {token:'synthetic-only'}}})
+stub('../issue-access.ts',{issueForUser:async(userId:string,id:string)=>userId===owner&&id===issueId?{id:issueId,userId:owner,scope:'personal',content:{type:'doc'}}:null})
 stub('../issue-team-access.ts',{issueTeamAccess:async()=>{throw Error('owner claim must not query team membership')}})
 stub('../mcp/resource.ts',{mcpResourceURL:null})
 stub('../device-repositories.ts',{readRepositorySettings:async()=>null})

@@ -218,7 +218,7 @@ test('actor constraint validation runs separately while a writer holds its table
     await writer.query(readFileSync('drizzle/20261025200000_activity_version_actor.sql', 'utf8'))
     await writer.query("insert into issue_versions values ('person','user','member')")
     const names = ['issue_versions_actor_type_check', 'issue_versions_actor_id_needs_type_check']
-    const files = ['20261030233501_validate_activity_actor_type.sql', '20261030233502_validate_activity_actor_id.sql']
+    const files = ['20261031044135_validate_activity_actor_type.sql', '20261031044136_validate_activity_actor_id.sql']
     assert.deepEqual((await writer.query('select convalidated from pg_constraint where conrelid = $1::regclass and conname = any($2) order by conname', ['issue_versions', names])).rows.map(r => r.convalidated), [false, false])
     await writer.query('begin')
     await writer.query("update issue_versions set actor_id = actor_id where id = 'person'")
@@ -243,7 +243,7 @@ test('actor validations preserve schema variants and reject invalid legacy rows 
   const pool = new Pool({ connectionString: connection, max: 1 })
   const client = await pool.connect()
   const actorMigration = readFileSync('drizzle/20261025200000_activity_version_actor.sql', 'utf8')
-  const validations = ['20261030233501_validate_activity_actor_type.sql', '20261030233502_validate_activity_actor_id.sql']
+  const validations = ['20261031044135_validate_activity_actor_type.sql', '20261031044136_validate_activity_actor_id.sql']
     .map(file => readFileSync(`drizzle/${file}`, 'utf8'))
   try {
     for (const variant of ['preexisting-columns', 'prevalidated-checks', 'invalid-type', 'id-without-type']) {

@@ -48,7 +48,7 @@ cloud choice. No server model-name constants or guessed model names are used.
 When no usable report/binding exists, return `executionModelUnknown` rather than
 inventing an automatic choice; redetect/connect an account first.
 
-`20261031001500_explicit_execution.sql` is idempotent: it makes the label nullable,
+`20261031044137_explicit_execution.sql` is idempotent: it makes the label nullable,
 adds a single-default unique index, removes auto column defaults, guards new
 writes, and adds `user.executionFallbacks`. Existing auto rows with available owner reports/bindings are converted during
 deployment. Rows awaiting discovery are retried on first scope read/dispatch,

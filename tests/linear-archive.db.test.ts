@@ -26,7 +26,7 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   process.env.LINEAR_TOKEN_ENCRYPTION_KEY = '1'.repeat(64)
   delete process.env.NEXT_PUBLIC_POSTHOG_KEY
   const migrated = await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], { env: { ...process.env, MIGRATE: '1', VERCEL_ENV: '' }, maxBuffer: 4 << 20 })
-  assert.match(migrated.stdout, /applied 20261031021420_archive_linear_on_personal_scope.sql/)
+  assert.match(migrated.stdout, /applied 20261031044144_archive_linear_on_personal_scope.sql/)
   const pool = new pg.Pool({ connectionString: url.href, max: 6 })
   t.after(async () => { await pool.end() })
   console.log(`Retained Linear archive database ${database}`)
