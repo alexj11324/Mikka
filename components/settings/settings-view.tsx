@@ -10,9 +10,8 @@ import { SettingsSidebar } from './settings-sidebar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { WorkspaceSettings } from '@/components/settings/workspace-settings'
 import { MembersPanel } from '@/components/settings/members-panel'
-import { LinearSettings } from '@/components/settings/linear-settings'
 import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
-import { IntegrationsSettings } from '@/components/settings/integrations-settings'
+import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
@@ -21,7 +20,6 @@ import { SecuritySettings } from '@/components/settings/security-settings'
 import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { ActivitySettings } from '@/components/settings/activity-settings'
 import { SavedLoginsSettings } from '@/components/settings/saved-logins-settings'
-import { TelegramSettings } from '@/components/settings/telegram-settings'
 import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
 import { LocaleSetting } from '@/components/settings/locale-setting'
@@ -92,7 +90,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'preferences': return <><AppearanceSection /><IssuePrefixSettings /></>
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
-    case 'connections': return <><IntegrationsSettings /><LinearSettings notice={linearNotice ?? null} /><TelegramSettings preview={preview} /></>
+    case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
     case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting

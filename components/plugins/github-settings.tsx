@@ -2,29 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { RotateCw } from 'lucide-react'
-import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
 import { openSettingsInBrowser } from '@/lib/platform/open-settings'
-import { ConnectedAppsList, ConnectedAppsStatus, useConnectedApps, usePluginHref } from '@/components/plugins/connected-apps'
 
 type GitHubState = { viewerId: string; configured: boolean; connected: boolean; installed: boolean; repositories: { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }[] }
 
-export function IntegrationsSettings({ showWebhookDetails = true, showConnectedApps = true }: { showWebhookDetails?: boolean; showConnectedApps?: boolean }) {
+/** GitHub's page on 插件: the account link, the app installation and the repositories it reaches. */
+export function GitHubSettings() {
   const { data: session, isPending } = authClient.useSession()
   const userId = !isPending ? session?.user.id : undefined
-  return <ViewerIntegrationsSettings key={userId ?? 'unconfirmed'} showWebhookDetails={showWebhookDetails} showConnectedApps={showConnectedApps} userId={userId} isPending={isPending} />
+  return <ViewerGitHubSettings key={userId ?? 'unconfirmed'} userId={userId} isPending={isPending} />
 }
 
-function ViewerIntegrationsSettings({ showWebhookDetails, showConnectedApps, userId, isPending }: { showWebhookDetails: boolean; showConnectedApps: boolean; userId: string | undefined; isPending: boolean }) {
+function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefined; isPending: boolean }) {
   const t = useTranslations('Settings.integrations')
-  const apps = useConnectedApps(Boolean(userId) && showConnectedApps)
-  const pluginHref = usePluginHref()
   const [githubState, setGithubState] = useState<GitHubState | null>(null)
   const [githubLoading, setGithubLoading] = useState(true)
   const [githubReconnect, setGithubReconnect] = useState(false)
@@ -93,36 +88,22 @@ function ViewerIntegrationsSettings({ showWebhookDetails, showConnectedApps, use
     }
   }
 
-  return <div className="flex flex-col gap-8">
-    <SettingsSection id="github-connection-heading" title={t('github')}>
-      <SettingRow title={t('github')} description={isPending || githubLoading ? t('githubLoading') : !userId ? t('githubSignInRequired') : !githubState ? undefined : !githubState.configured ? t('githubNotConfigured') : !githubState.connected ? t('githubAccountRequired') : !githubState.installed ? t('githubNotAuthorized') : t('githubRepositories', { count: githubState.repositories.length })}>
-        <div className="flex flex-col items-start gap-2 sm:items-end">
-          <div className="flex flex-wrap gap-2">
-            {(githubState?.configured || githubReconnect) && (githubState?.connected ? <Button variant="outline" size="sm" nativeButton={false} role="link" render={<a href="https://github.com/apps/mikka-github/installations/new" target="_blank" rel="noopener noreferrer" />}>
-              {githubState.installed ? t('githubManage') : t('githubAuthorize')}
-            </Button> : <Button type="button" variant="outline" size="sm" disabled={githubLinking} onClick={() => void linkGitHub()}>
-              {githubLinking ? t('working') : t('githubLink')}
-            </Button>)}
-            <Button type="button" variant="outline" size="sm" disabled={!userId || githubLoading || githubLinking} onClick={() => { void refreshGitHub().then(() => toast(t('githubRefreshed'))) }}><RotateCw data-icon="inline-start" className={cn(githubLoading && 'animate-spin')} />{t('githubRefresh')}</Button>
-          </div>
-          {githubState?.configured && githubState.connected && githubState.installed && githubState.repositories.length > 0 && <ScrollArea className="h-32 w-64 max-w-full">
-            <ul aria-label={t('githubRepositoryList')} className="flex flex-col gap-1 pr-3 text-xs text-muted-foreground">
-              {githubState.repositories.map(repository => <li key={repository.id} className="break-all">{repository.fullName}</li>)}
-            </ul>
-          </ScrollArea>}
-          {githubError && <p role="alert" className="text-sm text-destructive">{githubError}</p>}
-          {githubLinkError && <p role="alert" className="text-sm text-destructive">{githubLinkError}</p>}
-        </div>
-      </SettingRow>
-    </SettingsSection>
-    {showConnectedApps && <>
-      <ConnectedAppsList apps={apps} title={t('heading')} appHref={pluginHref} />
-      <ConnectedAppsStatus apps={apps} />
-    </>}
-    {showWebhookDetails && <SettingsSection id="composio-webhook-heading" title={t('webhookTitle')} description={t('webhookDescription')}>
-      <SettingRow title={t('webhookPath')} description={apps.state?.webhookConfigured ? t('webhookReady') : t('webhookSecretMissing')}>
-        <code className="text-xs">{withBasePath('/api/webhooks/composio')}</code>
-      </SettingRow>
-    </SettingsSection>}
-  </div>
+  return <SettingsSection id="github-connection-heading">
+    <SettingRow title={t('github')} description={isPending || githubLoading ? t('githubLoading') : !userId ? t('githubSignInRequired') : !githubState ? undefined : !githubState.configured ? t('githubNotConfigured') : !githubState.connected ? t('githubAccountRequired') : !githubState.installed ? t('githubNotAuthorized') : t('githubRepositories', { count: githubState.repositories.length })}>
+      <div className="flex flex-col items-start gap-2 sm:items-end">
+        {(githubState?.configured || githubReconnect) && (githubState?.connected ? <Button variant="outline" size="sm" nativeButton={false} role="link" render={<a href="https://github.com/apps/mikka-github/installations/new" target="_blank" rel="noopener noreferrer" />}>
+          {githubState.installed ? t('githubManage') : t('githubAuthorize')}
+        </Button> : <Button type="button" variant="outline" size="sm" disabled={githubLinking} onClick={() => void linkGitHub()}>
+          {githubLinking ? t('working') : t('githubLink')}
+        </Button>)}
+        {githubState?.configured && githubState.connected && githubState.installed && githubState.repositories.length > 0 && <ScrollArea className="h-32 w-64 max-w-full">
+          <ul aria-label={t('githubRepositoryList')} className="flex flex-col gap-1 pr-3 text-xs text-muted-foreground">
+            {githubState.repositories.map(repository => <li key={repository.id} className="break-all">{repository.fullName}</li>)}
+          </ul>
+        </ScrollArea>}
+        {githubError && <p role="alert" className="text-sm text-destructive">{githubError}</p>}
+        {githubLinkError && <p role="alert" className="text-sm text-destructive">{githubLinkError}</p>}
+      </div>
+    </SettingRow>
+  </SettingsSection>
 }

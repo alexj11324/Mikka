@@ -155,13 +155,9 @@
     "artifacts": "Artifact"
   },
   "Plugins": {
-    "title": "Plugins and skills",
-    "pluginsTab": "Plugins",
+    "title": "Plugins",
+    "appsTab": "Apps",
     "skillsTab": "Skills",
-    "agentRuntime": "Thread runtime",
-    "agentRuntimeDescription": "Devices can run Codex and Claude Code.",
-    "agentDevices": "Computers",
-    "manageDevices": "Manage devices",
     "searchAria": "Search skills.sh skills",
     "searchPlaceholder": "Search skills…",
     "searchHint": "Enter at least two characters to search.",
@@ -176,7 +172,21 @@
     "clearSearch": "Clear search",
     "installCount": "{count} installs",
     "openSkill": "Open details for {name}",
-    "openSkillAction": "View"
+    "openSkillAction": "View",
+    "add": "Add",
+    "searchAppsAria": "Search apps",
+    "searchAppsPlaceholder": "Search apps…",
+    "noApps": "No matching apps found.",
+    "state": {
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "paused": "Paused"
+    },
+    "descriptions": {
+      "github": "Open PRs in the repositories you authorize",
+      "linear": "Sync issues and comments with Linear both ways",
+      "telegram": "Create and follow tasks in a private Telegram chat"
+    }
   },
   "Auth": {
     "haveAccount": "Already have an account?",
@@ -1845,7 +1855,6 @@
       "googleNotConfigured": "Google sign-in is not configured yet.",
       "googleStatusFailed": "Could not check linked sign-in accounts.",
       "googleLinkFailed": "Could not start Google account linking.",
-      "heading": "Connected apps",
       "github": "GitHub",
       "githubLoading": "Loading GitHub authorization…",
       "githubNotConfigured": "GitHub integration is not configured for this deployment.",
@@ -1857,7 +1866,6 @@
       "githubLink": "Link GitHub",
       "githubAuthorize": "Authorize repositories",
       "githubManage": "Manage access",
-      "githubRefresh": "Refresh GitHub status",
       "githubLoadFailed": "Could not load GitHub authorization. Refresh to try again.",
       "githubReconnectRequired": "GitHub authorization expired. Link your account again.",
       "githubLinkFailed": "Could not link GitHub. Check that this GitHub account is not linked to another Mikka account, then try again.",
@@ -1881,11 +1889,6 @@
       "disconnectFailed": "Could not disconnect this account.",
       "connectionCompleted": "The Composio connection was verified for this Mikka account.",
       "callbackVerificationFailed": "Composio could not verify this connection for the signed-in Mikka account. Sign in with the account that started it and try again.",
-      "webhookTitle": "Event delivery",
-      "webhookDescription": "The endpoint verifies and acknowledges Composio events. Choose an event and action before using it to change Mikka data.",
-      "webhookPath": "Receiver endpoint",
-      "webhookReady": "The API key and signing secret are set. Register the public URL in Composio to deliver events.",
-      "webhookSecretMissing": "Set COMPOSIO_API_KEY and COMPOSIO_WEBHOOK_SECRET on the server to receive verified webhooks.",
       "needsReconnect": "Needs reconnecting",
       "enableApp": "Turn on {name}",
       "openApp": "Open {name}",
@@ -1919,14 +1922,10 @@
       "takeoverNone": "Bots can no longer use {name}",
       "turnedOff": "Turned off {name}",
       "madeDefault": "{account} is now the default",
-      "openInSettings": "Manage in Settings",
       "linkInBrowser": "Continue in the browser window to finish linking. Return here when you’re done.",
-      "browserUpdateRequired": "Update Mikka before linking accounts from the desktop app.",
-      "githubRefreshed": "GitHub status refreshed"
+      "browserUpdateRequired": "Update Mikka before linking accounts from the desktop app."
     },
     "telegram": {
-      "heading": "Messaging",
-      "description": "Link a private Telegram chat to create and follow Mikka tasks.",
       "title": "Telegram",
       "statusDescription": "Only your Telegram account can use this connection.",
       "loading": "Checking…",
@@ -1940,7 +1939,6 @@
       "openTelegram": "Open Telegram",
       "linkTitle": "Finish linking",
       "linkDescription": "Open the link and press Start in the private chat.",
-      "refresh": "Refresh status",
       "disconnect": "Disconnect",
       "disconnectConfirm": "Disconnect Telegram and delete this chat's unconfirmed draft?",
       "notConfigured": "Telegram is not configured for this deployment yet.",

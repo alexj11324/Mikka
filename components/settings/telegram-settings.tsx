@@ -39,7 +39,10 @@ export function TelegramSettings({ preview = false }: { preview?: boolean }) {
     }).finally(() => {
       if (active) setBusy(false)
     })
-    return () => { active = false }
+    // Coming back from Telegram after Start re-reads the state.
+    const onFocus = () => { void getTelegramIntegrationStatus().then(value => { if (active) setStatus(value) }).catch(() => {}) }
+    window.addEventListener('focus', onFocus)
+    return () => { active = false; window.removeEventListener('focus', onFocus) }
   }, [preview])
 
   async function connect() {
@@ -74,7 +77,7 @@ export function TelegramSettings({ preview = false }: { preview?: boolean }) {
     }
   }
 
-  return <SettingsSection id="telegram-heading" title={t('heading')} description={t('description')}>
+  return <SettingsSection id="telegram-heading">
     {preview ? <SettingRow title={t('title')} description={t('previewDescription')} /> : <>
       <SettingRow title={t('title')} description={t('statusDescription')}>
         {status === null
@@ -92,9 +95,7 @@ export function TelegramSettings({ preview = false }: { preview?: boolean }) {
           <Button variant="outline" size="sm" disabled={busy || status === null || !status.configured || status.connected} onClick={() => void connect()}>
             {connectLink ? t('newLink') : t('connect')}
           </Button>
-          {status?.connected
-            ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void disconnect()}>{t('disconnect')}</Button>
-            : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void refresh()}>{t('refresh')}</Button>}
+          {status?.connected && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void disconnect()}>{t('disconnect')}</Button>}
         </div>
       </SettingRow>
       {status && !status.configured && <p role="status" className="px-5 py-3 text-xs text-muted-foreground">{t('notConfigured')}</p>}
