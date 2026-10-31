@@ -70,7 +70,7 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
         privateDir: root, skills: [BASELINE_SKILL], skillReceipt: receipt })
       if (mode === 'tampered') writeFileSync(join(context.skillsDir, 'run-report', 'SKILL.md'), 'changed')
       const runDir = runPaths(adapterStateDir, runId).runDir
-      for (const file of ['github/config.json', 'runtime-home/.codex/auth.json', 'runtime-home/.claude/.credentials.json']) {
+      for (const file of ['github/config.json', 'runtime-home/.codex/auth.json', 'runtime-home/.claude/.credentials.json', 'codex-home/auth.json', 'native-home/.claude/.credentials.json']) {
         mkdirSync(join(runDir, file, '..'), { recursive: true })
         writeFileSync(join(runDir, file), '{}')
       }
@@ -176,7 +176,7 @@ it('rereads real RunContext bytes and ignores model-supplied evidence', async ()
   expect(skillMarkdown(BASELINE_SKILL)).toContain('Run report')
   // A finished turn leaves no credential behind, but keeps what a resume reads.
   const runDir = runPaths(join(result.worktree, '..', 'adapters'), result.runId).runDir
-  for (const file of ['github', 'runtime-home/.codex/auth.json', 'runtime-home/.claude/.credentials.json'])
+  for (const file of ['github', 'runtime-home/.codex/auth.json', 'runtime-home/.claude/.credentials.json', 'codex-home/auth.json', 'native-home/.claude/.credentials.json'])
     expect(existsSync(join(runDir, file))).toBe(false)
   expect(existsSync(join(runDir, 'runtime-home'))).toBe(true)
   expect(existsSync(join(runDir, 'skills'))).toBe(true)

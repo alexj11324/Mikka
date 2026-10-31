@@ -18,6 +18,10 @@ export const RUN_CREDENTIAL_PATHS: readonly string[] = [
   // Coding-CLI homes inside a run: only placeholders today, but a real login must never be kept.
   "runtime-home/.claude/.credentials.json",
   "runtime-home/.codex/auth.json",
+  // Per-run harness homes on a device runner (agents/harness-home.ts).
+  "codex-home/auth.json",
+  "native-home/.claude/.credentials.json",
+  "native-home/.codex/auth.json",
 ]
 
 /** Run-scoped paths under a state dir that can hold a credential. */
