@@ -39,8 +39,8 @@ export function ComputerPolicySettings({ workspaceId }: { workspaceId: string })
   if (!state) return error ? <FieldError>{t('error')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>
   if (!state.enabled) return <p role="status" className="text-sm text-muted-foreground">{t('unavailable')}</p>
   return <div className="flex flex-col gap-2">
-    <SettingsSection id="computer-policy-heading" title={t('heading')} description={t('description')}>
-      <SettingRow title={t('label')} description={state.canEdit ? t('help') : t('adminOnly')}>
+    <SettingsSection id="computer-policy-heading" title={t('heading')}>
+      <SettingRow title={t('label')} description={state.canEdit ? undefined : t('adminOnly')}>
         {/* Only an admin can change it; everyone else sees the value, not a disabled control. */}
         {state.canEdit
           ? <ToggleGroup aria-label={t('label')} variant="outline" spacing={0} disabled={pending} value={[state.permission]} onValueChange={values => { const value = values[0]; if ((value === 'allow' || value === 'ask' || value === 'deny') && value !== state.permission) void change(value) }}>

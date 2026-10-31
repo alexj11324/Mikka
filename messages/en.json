@@ -1670,7 +1670,6 @@
     "profile": {
       "heading": "Account",
       "avatar": "Avatar",
-      "avatarDescription": "Generated from your account name.",
       "name": "Name",
       "email": "Email",
       "notSet": "Not set",
@@ -1681,10 +1680,8 @@
       "uploading": "Uploading…",
       "sessionHeading": "Session",
       "signOut": "Sign out",
-      "signOutDescription": "This device signs out now; other devices stay signed in.",
       "signingOut": "Signing out…",
       "deleteAccount": "Delete account",
-      "deleteAccountDescription": "Your account, bots, threads and memories are deleted for good.",
       "deleteTitle": "Delete account",
       "deleteBody": "This cannot be undone. Other members are not affected, but your own bots and threads are deleted.",
       "deleteConfirmLabel": "Type {email} to confirm",
@@ -1737,9 +1734,7 @@
     },
     "computerPolicy": {
       "heading": "Computer use",
-      "description": "Control whether Bots may operate computers in this workspace.",
       "label": "Bot computer use",
-      "help": "Denying stops computer tasks and revokes their approvals. People can still take control.",
       "adminOnly": "Only workspace admins can change this setting.",
       "ask": "Ask for approval",
       "deny": "Deny",
@@ -1749,7 +1744,6 @@
     },
     "issuePrefix": {
       "title": "Personal task ids",
-      "description": "Personal tasks stay in Mikka and never go to Linear; they use your own four-letter prefix. Workspace tasks use their Linear id.",
       "label": "Prefix",
       "current": "Personal tasks show as {example}.",
       "needsChoice": "No usable prefix yet: your email has fewer than four letters, or it matches a connected Linear team. Enter four letters.",
@@ -1836,10 +1830,7 @@
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
-      "googleSignInDescription": "Link a verified Google account to this Mikka account for future sign-in.",
       "googleSignIn": "Google account",
-      "googleLinkDescription": "Link this Mikka account to Google with a verified matching email.",
-      "googleLinkedDescription": "This Mikka account can sign in with Google.",
       "googleLinked": "Google linked",
       "googleLinkSuccess": "Google is linked. Its verified email now confirms this Mikka account.",
       "linkGoogle": "Link Google",
@@ -1962,7 +1953,6 @@
       "saving": "Saving…",
       "cancel": "Cancel",
       "devices": "Signed-in devices",
-      "devicesDescription": "A revoked device has to sign in again.",
       "devicesError": "Signed-in devices could not be read.",
       "devicesLoading": "Reading signed-in devices…",
       "unknownDevice": "Unknown device",
@@ -1970,13 +1960,11 @@
       "currentDevice": "This device",
       "signOut": "Sign out",
       "signingOut": "Signing out…",
-      "signOutOthers": "Sign out all",
-      "signOutOthersDescription": "Sign out every device except this one."
+      "signOutOthers": "Sign out all"
     },
     "privacy": {
       "data": "Data",
       "export": "Export my data",
-      "exportDescription": "Profile, bots, threads, tasks and memories — no passwords or keys.",
       "exportButton": "Export",
       "exporting": "Preparing…",
       "exportSent": "Sent to {email}; the link works for 24 hours.",
@@ -1997,7 +1985,6 @@
     },
     "logins": {
       "heading": "Site sign-ins",
-      "description": "Bots use these only in operations you approve. Passwords and codes are never shown.",
       "loading": "Reading site sign-ins…",
       "loadError": "Site sign-ins could not be read.",
       "empty": "No saved site sign-ins yet.",
