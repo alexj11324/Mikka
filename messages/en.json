@@ -1571,7 +1571,6 @@
   },
   "Settings": {
     "title": "Settings",
-    "backToApp": "Back to app",
     "searchLabel": "Search settings",
     "searchPlaceholder": "Search settings…",
     "noResults": "No matching settings",

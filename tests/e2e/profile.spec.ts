@@ -8,7 +8,7 @@ test('个人资料名称可以编辑，保存后刷新仍然生效', { tag: '@sm
   await register(page)
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
-  const sidebar = page.locator('[data-slot="sidebar-container"]')
+  const sidebar = page.locator('[data-slot="settings-list"]')
   await sidebar.getByRole('link', { name: '账户', exact: true }).click()
 
   const name = page.getByRole('textbox', { name: '名称', exact: true })
@@ -18,7 +18,7 @@ test('个人资料名称可以编辑，保存后刷新仍然生效', { tag: '@sm
   await expect(page.getByText('已保存', { exact: true })).toBeVisible()
 
   await page.reload()
-  await page.locator('[data-slot="sidebar-container"]').getByRole('link', { name: '账户', exact: true }).click()
+  await page.locator('[data-slot="settings-list"]').getByRole('link', { name: '账户', exact: true }).click()
   await expect(page.getByRole('textbox', { name: '名称', exact: true })).toHaveValue('新的显示名')
 })
 
@@ -37,7 +37,7 @@ test('通知设置可以关闭主动消息，刷新后保持', async ({ page }) 
   await register(page)
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
-  const sidebar = () => page.locator('[data-slot="sidebar-container"]')
+  const sidebar = () => page.locator('[data-slot="settings-list"]')
   await sidebar().getByRole('link', { name: '通知', exact: true }).click()
 
   const proactive = page.getByRole('switch', { name: '主动消息', exact: true })

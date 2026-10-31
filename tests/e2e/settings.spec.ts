@@ -1,4 +1,4 @@
-import { test, expect, register, app, expectItems } from './fixtures'
+import { test, expect, register, rail, app, expectItems } from './fixtures'
 
 test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立即切走', async ({ page }) => {
   const navigations: string[] = []
@@ -28,10 +28,10 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
   await expect(page.getByRole('group', { name: '界面主题', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toHaveCount(1)
+  await expect(page.locator('[data-slot="settings-list"]').getByRole('button', { name: '工作区菜单', exact: true })).toHaveCount(1)
   await expect(page.getByRole('button', { name: '账户菜单', exact: true })).toHaveCount(0)
   await expect(page.locator('[data-slot="sidebar-footer"]')).toHaveCount(0)
-  const sidebar = page.locator('[data-slot="sidebar-container"]')
+  const sidebar = page.locator('[data-slot="settings-list"]')
   await sidebar.getByRole('link', { name: '账户', exact: true }).click()
   await expect(page.getByRole('heading', { name: '账户', exact: true })).toBeVisible()
   await sidebar.getByRole('link', { name: '成员', exact: true }).click()
@@ -51,7 +51,7 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
   await expect(page.getByRole('combobox', { name: '团队目录工作区', exact: true })).toHaveCount(0)
   await sidebar.getByRole('link', { name: '成员', exact: true }).click()
   await expect(page.getByRole('textbox', { name: '搜索成员或邀请', exact: true })).toBeVisible()
-  await sidebar.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await rail(page, '主页').click()
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeVisible()
   expect(navigations).toEqual([])
   await page.goBack()
@@ -80,7 +80,7 @@ test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', as
 
 test('个人设置切换不请求服务端，并保持 URL、历史记录与跨页导航一致', async ({ page }) => {
   await register(page, '/settings?section=preferences')
-  const sidebar = page.locator('[data-slot="sidebar-container"]')
+  const sidebar = page.locator('[data-slot="settings-list"]')
   await expect(page.getByRole('button', { name: '浅色', exact: true })).toBeEnabled()
   const serverNavigations: string[] = []
   await page.route('**/settings?**', route => {
@@ -167,7 +167,7 @@ test('成员首屏使用服务端结果，不立即重复读取成员 API', asyn
 
 test('团队创建、常规设置与成员管理都在同一设置页内完成', async ({ page }, testInfo) => {
   await register(page, '/settings/teams')
-  const sidebar = page.locator('[data-slot="sidebar-container"]')
+  const sidebar = page.locator('[data-slot="settings-list"]')
   await expect(sidebar).toHaveCount(1)
   await expect(page.getByRole('main')).toHaveCount(1)
   await sidebar.getByRole('link', { name: '成员', exact: true }).click()

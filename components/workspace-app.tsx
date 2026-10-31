@@ -10,6 +10,7 @@ import type { loadTeamDirectory } from '@/app/actions/teams'
 import type { WorkspaceSettings } from '@/lib/workspace-access'
 import { DesktopIntegration } from '@/components/desktop/desktop-integration'
 import { IssueWorkspace } from '@/components/workspace/issue-workspace'
+import { sectionFromQuery } from '@/components/workspace/workspace-navigation'
 import { SettingsShell } from '@/components/settings/settings-shell'
 import { SettingsDataPreloader } from '@/components/settings/settings-data-preloader'
 import { memberSettingsKey, teamDirectoryKey } from '@/lib/settings-data'
@@ -41,6 +42,6 @@ export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers
     <SettingsDataPreloader workspaceId={params.get('workspace') ?? initialWorkspaceId} onWorkspaceResolved={setWorkspaceId} />
     {pathname.startsWith('/settings')
       ? <SettingsShell user={user} defaultWorkspaceId={workspaceId} googleEnabled={googleEnabled} />
-      : <IssueWorkspace user={user} initialIssues={initialIssues} initialSelected={initialSelected} googleEnabled={googleEnabled} />}
+      : <IssueWorkspace user={user} initialIssues={initialIssues} initialSelected={initialSelected} initialSection={sectionFromQuery(params.get('section') ?? undefined)} googleEnabled={googleEnabled} />}
   </SWRConfig>
 }

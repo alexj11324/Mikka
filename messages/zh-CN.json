@@ -1571,7 +1571,6 @@
   },
   "Settings": {
     "title": "设置",
-    "backToApp": "返回应用",
     "searchLabel": "搜索设置",
     "searchPlaceholder": "搜索设置…",
     "noResults": "没有匹配的设置",

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register, watchRuntime, seedTask, openSearch, openIssueFromSearch, app } from './fixtures'
+import { test, expect, register, rail, watchRuntime, seedTask, openSearch, openIssueFromSearch, app } from './fixtures'
 
 // Real app, real routes, real server actions: no request or action is mocked.
 // Scope promotion requires an explicitly saved team choice; returning to personal
@@ -54,7 +54,7 @@ async function prepareTeam(page: import('@playwright/test').Page) {
   await form.getByLabel('团队标识', { exact: true }).fill('SCOPE')
   await form.getByRole('button', { name: '创建团队', exact: true }).click()
   await expect(page.getByRole('heading', { name: '范围测试团队', exact: true })).toBeVisible()
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await rail(page, '主页').click()
 }
 
 async function share(page: import('@playwright/test').Page, title: string) {

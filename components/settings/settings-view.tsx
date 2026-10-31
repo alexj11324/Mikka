@@ -34,6 +34,7 @@ import { BillingSettings } from '@/components/settings/billing-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
+import type { RailDestination } from '@/components/nav/icon-rail'
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
 
@@ -41,7 +42,8 @@ interface SettingsViewProps {
   user: { name: string; email: string; image?: string | null }
   userKey?: string
   googleEnabled?: boolean
-  onBack: () => void
+  /** Leaves Settings for a rail destination; phones, which have no rail, list them in the section sheet. */
+  onRail: (destination: RailDestination) => void
   onSignOut: () => void
   signingOut: boolean
   accountError: string
@@ -55,7 +57,7 @@ interface SettingsViewProps {
   preview?: boolean
 }
 
-export function SettingsView({ user, userKey, googleEnabled = false, onBack, onSignOut, signingOut, accountError, activeSection, initialSection, inviteInitially = false, workspaceId, selectedTeamId, children, linearNotice = null, preview = false }: SettingsViewProps) {
+export function SettingsView({ user, userKey, googleEnabled = false, onRail, onSignOut, signingOut, accountError, activeSection, initialSection, inviteInitially = false, workspaceId, selectedTeamId, children, linearNotice = null, preview = false }: SettingsViewProps) {
   const t = useTranslations('Settings')
   const [localSection, setSection] = useState<SettingsSectionId>(activeSection ?? initialSection ?? 'preferences')
   const section = activeSection ?? localSection
@@ -67,7 +69,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onBack, onS
   const routedBody = section === 'members' || section === 'teams'
 
   return <>
-    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onBack={onBack} onSignOut={onSignOut} signingOut={signingOut} />
+    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent className="gap-6">
