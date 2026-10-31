@@ -6,7 +6,7 @@
 // again could repeat its side effects, so it goes to the person.
 
 /** Runs a device has claimed and must keep renewing the lease of. */
-export const LEASED_RUN_STATUSES = ['preparing', 'running', 'waiting_input', 'finishing'] as const
+export const LEASED_RUN_STATUSES = ['preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
 
 /** First run plus retries. */
 export const MAX_RUN_ATTEMPTS = 3
@@ -45,9 +45,10 @@ export type LostRunOutcome =
   | { kind: 'failed'; error: string }
 
 /** What to do with a run whose lease ran out. */
-export function lostRunOutcome(run: { attempt: number; stopRequestedAt: Date | null; issueId: string | null; deviceRepoId: string | null; questionContinuation?: unknown }): LostRunOutcome {
+export function lostRunOutcome(run: { attempt: number; stopRequestedAt: Date | null; issueId: string | null; deviceRepoId: string | null; questionContinuation?: unknown; status?: string }): LostRunOutcome {
   // The person already asked it to stop; losing the machine finished the job.
   if (run.stopRequestedAt) return { kind: 'stopped' }
+  if (run.status === 'paused') return { kind: 'failed', error: 'The device went offline while the run was paused for human control; explicit recovery is required.' }
   // An answer may already have reached its original session. Generic device
   // takeover cannot preserve that guarantee and must never replay the answer.
   if (run.questionContinuation != null) return { kind: 'failed', error: 'The device went offline during an original-session question continuation; explicit recovery is required.' }

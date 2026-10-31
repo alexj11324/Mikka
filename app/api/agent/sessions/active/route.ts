@@ -1,5 +1,5 @@
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { activeAgentsResponse, listActiveAgents } from '@/lib/active-agents'
 

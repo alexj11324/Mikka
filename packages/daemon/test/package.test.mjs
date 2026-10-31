@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { isAbsolute, join, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { test } from 'node:test'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
@@ -38,6 +38,9 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
   const manifest = JSON.parse(await readFile(join(installed, 'package.json'), 'utf8'))
   assert.equal(manifest.name, '@aspectlylabs/mikka')
   assert.equal(manifest.private, false)
+  if (process.env.RELEASE_EXPECTED_SHA) assert.equal(manifest.gitHead, process.env.RELEASE_EXPECTED_SHA)
+  const { DAEMON_VERSION } = await import(pathToFileURL(join(installed, 'paths.js')).href)
+  assert.equal(DAEMON_VERSION, manifest.version)
   assert.equal(manifest.bin.mikka, './mikka.js')
   assert.ok(!manifest.dependencies['@mikka/protocol'])
   assert.ok(!manifest.dependencies.tsx)

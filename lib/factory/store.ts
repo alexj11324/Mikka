@@ -568,11 +568,13 @@ export function createFactoryStore(
             attempt.runId !== change.runId
           )
             fail("factoryTransition");
-          await runFor(tx, task, change.runId);
+          const producingRun = await runFor(tx, task, change.runId);
+          const machine = (await tx.query('SELECT name FROM devices WHERE id=$1 AND "ownerId"=$2', [producingRun.deviceId, task.userId])).rows[0];
+          const branch = typeof producingRun.report?.previewDatabaseBranch === "string" ? producingRun.report.previewDatabaseBranch.trim().slice(0, 500) || null : null;
           const candidate = candidateSchema.parse(change.candidate),
             candidateId = randomUUID();
           await tx.query(
-            'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,$4,$5,$6,$7)',
+            'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
             [
               candidateId,
               task.id,
@@ -581,6 +583,8 @@ export function createFactoryStore(
               candidate.environment,
               candidate.scope,
               change.runId,
+              branch,
+              machine?.name ?? null,
             ],
           );
           task.candidateId = candidateId;

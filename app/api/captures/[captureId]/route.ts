@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { auth } from '@/lib/api-auth'
 import { readCapture } from '@/lib/captures/store'
 import { captureFileResponse } from '@/lib/captures/serve'
 

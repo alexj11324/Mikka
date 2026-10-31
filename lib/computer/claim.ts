@@ -48,6 +48,8 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
       JOIN bot_desktops d ON d."botId"=b."botId" AND d."workspaceId"=b."workspaceId" AND d."ownerId"=b."ownerId"
       WHERE b."runId"=$1 AND b."workspaceId"=$3 AND b."ownerId"=$4`, [runId, deviceId, actor.workspaceId, actor.userId])).rows[0]
     if (!binding) { await client.query('COMMIT'); return null }
+    const held = await client.query(`SELECT 1 FROM bot_desktops WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND control='user' AND "controlUntil">now()`, [binding.botId, actor.userId, actor.workspaceId])
+    if (held.rowCount) { await client.query('COMMIT'); return null }
     const subscription = await client.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "consumerId"=$4', [subscriptionBindingId, actor.userId, actor.workspaceId, run.agentId])
     if (!subscription.rowCount) { await client.query('COMMIT'); return null }
     await client.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [runId, subscriptionBindingId])

@@ -194,14 +194,15 @@ export type PickRepoResult = z.infer<typeof pickRepoResult>
 
 export interface SshInstallState {
   id: string; target: string; step: 'login' | 'check' | 'install' | 'service' | 'connect'
-  status: 'fingerprint' | 'running' | 'online' | 'failed'; deviceId?: string; fingerprint?: string; reason?: string; retryable?: boolean
+  status: 'fingerprint' | 'running' | 'online' | 'failed'; deviceId?: string; fingerprint?: string; keyType?: string; reason?: string; retryable?: boolean
 }
 
 export interface MikkaBridge {
   ssh?: {
     onChange(listener: (state: SshInstallState) => void): () => void
-    hosts(): Promise<string[]>
+    hosts(): Promise<{ alias: string; user: string; hostName: string; port: number }[]>
     begin(target: string): Promise<SshInstallState | null>
+    cancel(id: string): Promise<SshInstallState | null>
     accept(id: string): Promise<SshInstallState | null>
     state(): Promise<SshInstallState | null>
   }

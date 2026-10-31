@@ -89,6 +89,15 @@ test('run result publication commits one owner-scoped result through retries and
   try {
     assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
 
+    await t.test('a run that ends during human control accepts its terminal report and clears pause metadata', async () => {
+      const f = await fixture()
+      await pool.query(`UPDATE agent_runs SET status='paused',"pauseReason"='human_control',"resumeStatus"='running' WHERE id=$1`, [f.runId])
+      const result = await persistRunCompletion(f.userId,f.runId,{stopReason:'timeout'})
+      assert.ok(result)
+      const ended = (await pool.query('SELECT status,"pauseReason","resumeStatus" FROM agent_runs WHERE id=$1',[f.runId])).rows[0]
+      assert.deepEqual(ended,{status:'failed',pauseReason:null,resumeStatus:null})
+    })
+
     await t.test('concurrent completions and workers create one PR, one history row, and one chat event', async () => {
       const f = await fixture({ approved: true })
       const pinned = await prepareRunPublication(assignment(f), f.remoteUrl)

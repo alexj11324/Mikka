@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { AUDIT_FILTERS, csvField } from '@/lib/audit/cursor'
 import { exportWorkspaceAudit } from '@/lib/audit/query'
 import { WorkspaceError } from '@/lib/workspace-access'
@@ -15,6 +15,7 @@ export async function GET(request: Request, { params }: Context) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) return new NextResponse(null, { status: 401 })
   const { workspaceId } = await params
+  if (!apiWorkspaceAllowed(session, workspaceId)) return new NextResponse(null, { status: 403 })
   if (!z.uuid().safeParse(workspaceId).success) return new NextResponse(null, { status: 404 })
   const filter = new URL(request.url).searchParams.get('filter') ?? 'all'
   if (!(AUDIT_FILTERS as readonly string[]).includes(filter)) return new NextResponse(null, { status: 400 })

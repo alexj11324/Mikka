@@ -676,6 +676,7 @@ test(
           }),
         "factoryTransition",
       );
+      await pool.query('UPDATE agent_runs SET "deviceId"=$2,report=$3 WHERE id=$1', [runId, deviceId, JSON.stringify({ previewDatabaseBranch: 'preview/factory-541' })]);
       const oldCandidateBinding = binding(state.task);
       state = await store.apply("owner", oldCandidateBinding, randomUUID(), {
         action: "candidate",
@@ -687,6 +688,11 @@ test(
           scope: "backend fixture",
         },
       });
+      const details = await store.read("owner", state.task.id);
+      assert.equal(details.delivery?.previewDatabaseBranch, 'preview/factory-541');
+      assert.equal(details.delivery?.machineName, 'CI fixture device');
+      await pool.query('UPDATE devices SET name=$2 WHERE id=$1', [deviceId, 'Renamed later']);
+      assert.equal((await store.read("owner", state.task.id)).delivery?.machineName, 'CI fixture device', 'delivery preserves the producing machine name');
       await rejects(() => store.apply("owner", binding(state.task), randomUUID(), {
         action: "candidate", runId,
         candidate: { sha: "b".repeat(40), repository: "fixture/repo", environment: "ci-pg17", scope: "backend fixture" },

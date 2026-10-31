@@ -9,7 +9,7 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 
-const LIVE_STATUSES = ['queued', 'preparing', 'running', 'waiting_input', 'finishing'] as const
+const LIVE_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
 type Issue = typeof issues.$inferSelect
 type Executor = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -42,7 +42,7 @@ async function completeRunTransaction(userId: string, hint: { id: string; issueI
     const { stopReason, report } = input
     let status: RunStatus = runStateForStop(stopReason)
     if (stopReason === 'submitted' && report?.verify.status !== 'passed' && run.run.kind !== 'plan') status = report?.verify.status === 'failed' ? 'failed' : 'stopped'
-    const [ended] = await tx.update(agentRuns).set({ status, stopReason, report: report ?? null, finishedAt: new Date(), updatedAt: new Date() })
+    const [ended] = await tx.update(agentRuns).set({ status, pauseReason: null, resumeStatus: null, stopReason, report: report ?? null, finishedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(agentRuns.id, hint.id), inArray(agentRuns.status, [...LIVE_STATUSES]))).returning({ id: agentRuns.id })
     if (!ended) return null
     await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, ended.id), isNull(runTokens.revokedAt)))

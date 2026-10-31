@@ -26,7 +26,7 @@ test(
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
-      CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text);
+      CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
       await pool.query(
         await readFile(
@@ -46,6 +46,8 @@ test(
       );
       await pool.query(migration);
       await pool.query(migration);
+      const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
+      await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const settings = new ExecutionSettings(pool),
         alice = { ownerId: "alice", workspaceId: randomUUID() },
         bob = { ...alice, ownerId: "bob" },
@@ -56,7 +58,7 @@ test(
         binding = randomUUID(),
         connection = randomUUID();
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",kind,enabled,harnesses) VALUES ($1,'alice','local',true,'[]'),($2,'bob','local',true,'[]')`,
+        `INSERT INTO devices (id,"ownerId",kind,enabled,harnesses) VALUES ($1,'alice','local',true,'[{"harness":"codex","installed":true,"models":["explicit-model"]}]'),($2,'bob','local',true,'[]')`,
         [own, foreign],
       );
       const value = {
@@ -116,7 +118,13 @@ test(
       await settings.mutate(alice, { kind: "delete", id: ids[1] });
       assert.equal((await settings.list(alice))[0].position, 0);
       await assert.rejects(settings.redetect(bob, own));
-      await settings.redetect(alice, own);
+      const receipt = await settings.redetect(alice, own);
+      assert.equal((await settings.redetectStatus(alice, receipt.commandId)).status, 'pending');
+      await assert.rejects(settings.redetectStatus(bob, receipt.commandId), { code: 'executionCommandNotFound' });
+      await pool.query('UPDATE device_management_commands SET "completedAt"=now() WHERE id=$1', [receipt.commandId]);
+      assert.equal((await settings.redetectStatus(alice, receipt.commandId)).status, 'completed');
+      await pool.query('UPDATE device_management_commands SET error=$2 WHERE id=$1', [receipt.commandId, 'detection_failed']);
+      assert.equal((await settings.redetectStatus(alice, receipt.commandId)).status, 'failed');
       assert.ok(
         (
           await pool.query(
@@ -181,6 +189,52 @@ test(
         ).rows[0].consumerId,
         secondBot,
       );
+      assert.equal((await settings.botModels(alice)).length, 1, 'copied Bot bindings do not duplicate models');
+      assert.equal((await settings.botBinding(alice,binding)).bindingId,binding,'runtime can resolve a hidden original binding');
+      assert.equal(await settings.botBinding(bob,binding),undefined,'runtime binding lookups remain scoped');
+      await settings.setBotModel(alice, secondBot, copiedBinding!);
+      assert.equal(await settings.botModel(alice, secondBot), copiedBinding, 'a saved duplicate binding remains selectable');
+      await pool.query(`UPDATE byos_connections SET "accountLabel"='Claude Max', quota='{"plan":"Max"}' WHERE id=$1`, [connection]);
+      const option = (await settings.botModels(alice))[0];
+      assert.equal(option.accountLabel, 'Claude Max'); assert.equal(option.plan, 'Max');
+      const refreshed = await settings.refreshBotModels(alice, connection, async (owner, id) => {
+        assert.equal(owner, 'alice'); assert.equal(id, connection);
+        return [{id:'provider-model'}, {id:'provider-model'}, {id:'second-provider-model'}];
+      });
+      assert.deepEqual(refreshed.map(row=>row.modelId).sort(), ['provider-model','second-provider-model']);
+      await assert.rejects(settings.refreshBotModels(bob, connection, async () => { throw new Error('must not discover foreign account') }), { code: 'executionAccountUnavailable' });
+      await assert.rejects(settings.refreshBotModels(other, connection, async () => []), { code: 'executionAccountUnavailable' });
+      await settings.refreshBotModels(alice, connection, async () => [{id:'fresh-only'}]);
+      assert.deepEqual((await settings.botModels(alice)).map(row=>row.modelId),['fresh-only']);
+      assert.equal(await settings.botModel(alice,secondBot),copiedBinding,'refresh preserves saved binding');
+      await settings.refreshBotModels(alice, connection, async () => []);
+      assert.deepEqual(await settings.botModels(alice),[],'empty provider catalogue remains authoritative');
+      await settings.refreshBotModels(alice, connection, async () => [{id:'dynamic-model'}]);
+      assert.equal(await settings.botModelOption(alice,secondBot),(await settings.botModels(alice))[0].bindingId,'UI selection maps the saved copy to its visible option');
+      await assert.rejects(settings.refreshBotModels(alice, connection, async () => { throw new Error('raw provider response'); }), {code:'executionAccountUnavailable'});
+      await assert.rejects(settings.refreshBotModels(alice, connection, async () => {
+        await pool.query(`UPDATE byos_connections SET epoch=2 WHERE id=$1`,[connection]);
+        return [{id:'stale-provider-model'}];
+      }), {code:'executionAccountUnavailable'});
+      assert.equal((await pool.query(`SELECT count(*)::int AS count FROM byos_bindings WHERE "modelId"='stale-provider-model'`)).rows[0].count,0);
+      await pool.query(`UPDATE byos_connections SET epoch=1 WHERE id=$1`,[connection]);
+      const ruleValue = {label:'typed', place:own,harness:'codex' as const,model:'auto'};
+      for (const [patch,code] of [[{place:'invalid'},'executionPlaceInvalid'],[{harness:'missing'},'executionHarnessUnavailable'],[{model:'missing'},'executionModelUnknown']] as const) {
+        await assert.rejects(settings.mutate(alice, {kind:'save',value:{...ruleValue,...patch} as typeof ruleValue}), {code});
+      }
+      await assert.rejects(settings.mutate(alice,{kind:'delete',id:randomUUID()}), {code:'executionRuleNotFound'});
+      const labelled = randomUUID(), otherLabelled = randomUUID(), deletedLabelled = randomUUID(), personalLabelled = randomUUID();
+      await pool.query('CREATE TABLE issues (id uuid PRIMARY KEY,content jsonb,scope text,"updatedAt" timestamptz DEFAULT now())');
+      const labelledContent = (name: string, deletedAt: string | null = null) => ({type:'doc',attrs:{mikka:{labels:[{name,color:'blue'}],deletedAt}}});
+      for (const [id,name,kind,deletedAt] of [[labelled,'backend','workspace',null],[otherLabelled,'foreign','workspace',null],[deletedLabelled,'deleted','workspace',new Date().toISOString()],[personalLabelled,'private','personal',null]]) {
+        await pool.query('INSERT INTO issues (id,content,scope) VALUES ($1,$2,$3)', [id,JSON.stringify(labelledContent(name!,deletedAt)),kind]);
+      }
+      mock.module(new URL('./issue-team-access.ts',import.meta.url).href,{namedExports:{issueTeamScope:async () => [
+        {issueId:labelled,workspaceId:alice.workspaceId},{issueId:otherLabelled,workspaceId:other.workspaceId},
+        {issueId:deletedLabelled,workspaceId:alice.workspaceId},{issueId:personalLabelled,workspaceId:alice.workspaceId}
+      ]}});
+      assert.deepEqual(await settings.labels(alice), [{name:'backend',color:'blue'}]);
+      assert.deepEqual(await settings.labels(other), [{name:'foreign',color:'blue'}]);
       let sessionOwner: string | null = "alice";
       const stub = (path: string, exports: Record<string, unknown>) =>
         mock.module(new URL(path, import.meta.url).href, {
@@ -204,6 +258,16 @@ test(
       });
       stub("./db/index.ts", { pool });
       const actions = await import("../app/actions/execution-settings");
+      const { freezeBotModel } = await import('./bot-model-selection');
+      const { SubscriptionRepository } = await import('./subscription-repository');
+      const dependencies = {service:()=>({repository:new SubscriptionRepository(pool)}) as never, workspace:async () => {}};
+      const frozen = await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:secondBot},dependencies);
+      assert.equal(frozen.modelSelection?.bindingId,copiedBinding,'execution uses its stored hidden binding after model list deduplication');
+      const catalogue = (await settings.botModels(alice))[0];
+      await settings.setBotModel(alice,null,catalogue.bindingId);
+      const coordinator = await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies);
+      assert.equal(coordinator.modelSelection?.modelId,'dynamic-model','refreshed catalogue bindings support Coordinator execution');
+      assert.equal(await actions.getBotModel(secondBot),catalogue.bindingId,'action returns the visible option for a saved copied binding');
       sessionOwner = null;
       await assert.rejects(actions.listExecutionRules());
       sessionOwner = "bob";

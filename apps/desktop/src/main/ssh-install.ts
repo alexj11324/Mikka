@@ -22,18 +22,27 @@ export function parseHosts(config: string): string[] {
     return match ? match[1].split(/\s+/).filter(host => /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(host)) : []
   }))]
 }
+export function parseHostDetails(config: string) {
+  const fields = Object.fromEntries(config.split(/\r?\n/).map(line => { const [key, ...value] = line.trim().split(/\s+/); return [key, value.join(' ')] }))
+  return { user: fields.user ?? '', hostName: fields.hostname ?? '', port: Number(fields.port ?? 22) }
+}
 export const quote = (s: string) => `'${s.replaceAll("'", "'\\''")}'`
 
-export function runProcess(command: string, args: string[], input?: string, timeout = 60_000): Promise<string> {
+export function runProcess(command: string, args: string[], input?: string, timeout = 60_000, signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, SSH_ASKPASS_REQUIRE: 'never' } })
     let output = ''; let error = ''
+    const abort = () => { child.kill('SIGKILL') }
+    signal?.addEventListener('abort', abort, { once: true })
+    if (signal?.aborted) abort()
     const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('SSH operation timed out')) }, timeout)
     child.stdout.on('data', chunk => { output = (output + chunk).slice(-65536) })
     child.stderr.on('data', chunk => { error = (error + chunk).slice(-4096) })
     child.on('error', reason => { clearTimeout(timer); reject(reason) })
     child.on('close', code => {
       clearTimeout(timer)
+      signal?.removeEventListener('abort', abort)
+      if (signal?.aborted) { reject(new Error('cancelled')); return }
       if (code === 0) resolve(output.trim())
       else reject(new Error(error.trim() || `Remote command failed (${code})`))
     })
@@ -43,6 +52,9 @@ export function runProcess(command: string, args: string[], input?: string, time
 }
 
 export class SshInstaller {
+  private controller = new AbortController()
+  private beginning = false
+  private pending: Promise<unknown> = Promise.resolve()
   private current?: SshInstallState
   private keyLine?: string
   private options: string[] = []
@@ -62,10 +74,25 @@ export class SshInstaller {
   }
   state() { return this.current ? { ...this.current } : null }
   async hosts() {
-    return parseHosts(await readFile(join(this.home, '.ssh/config'), 'utf8').catch(() => ''))
+    const aliases = parseHosts(await readFile(this.configFile ?? join(this.home, '.ssh/config'), 'utf8').catch(() => ''))
+    return Promise.all(aliases.map(async alias => {
+      const config = await this.execute('ssh', ['-G', ...(this.configFile ? ['-F', this.configFile] : []), alias])
+      return { alias, ...parseHostDetails(config) }
+    }))
   }
   async begin(target: string) {
-    if (this.current?.status === 'running') throw new Error('Installation already running')
+    if (this.beginning || this.current?.status === 'running' || this.current?.status === 'fingerprint') throw new Error('Installation already active')
+    this.beginning = true
+    try {
+      await this.pending
+      this.controller = new AbortController()
+      const starting = this.start(target)
+      this.pending = starting
+      await starting
+      return this.state()
+    } finally { this.beginning = false }
+  }
+  private async start(target: string) {
     this.current = { id: randomUUID(), target, step: 'login', status: 'running' }
     this.keyLine = undefined
     this.report({})
@@ -73,40 +100,64 @@ export class SshInstaller {
       const parsed = parseTarget(target)
       this.destination = parsed.destination
       const port = [...(this.configFile ? ['-F', this.configFile] : []), ...(parsed.port ? ['-p', parsed.port] : [])]
-      const config = await this.execute('ssh', ['-G', ...port, this.destination])
+      const config = await this.run('ssh', ['-G', ...port, this.destination])
       const value = (key: string) => config.split('\n').find(line => line.startsWith(`${key} `))?.slice(key.length + 1)
       const host = value('hostname') ?? parsed.host
       const actualPort = value('port') ?? '22'
       // ssh -G resolves aliases, users, key paths and ports through OpenSSH.
       this.options = ['-oUserKnownHostsFile=' + join(this.home, '.ssh/known_hosts'), '-oBatchMode=yes', '-oPasswordAuthentication=no', '-oKbdInteractiveAuthentication=no', '-oStrictHostKeyChecking=yes', '-oConnectTimeout=15', ...port]
       const knownName = actualPort === '22' ? host : `[${host}]:${actualPort}`
-      const known = await this.execute('ssh-keygen', ['-F', knownName, '-f', join(this.home, '.ssh/known_hosts')]).catch(() => '')
+      const known = await this.run('ssh-keygen', ['-F', knownName, '-f', join(this.home, '.ssh/known_hosts')]).catch(() => '')
       if (!known) {
-        const scanned = await this.execute('ssh-keyscan', ['-T', '10', '-p', actualPort, '-t', 'ed25519', host])
+        const scanned = await this.run('ssh-keyscan', ['-T', '10', '-p', actualPort, '-t', 'ed25519', host])
         const key = scanned.split('\n').find(line => !line.startsWith('#') && line.split(' ').length === 3)
         if (!key) throw new Error('No supported host key returned')
         this.keyLine = key
         const fingerprint = `SHA256:${createHash('sha256').update(Buffer.from(key.split(' ')[2], 'base64')).digest('base64').replace(/=+$/, '')}`
-        this.report({ status: 'fingerprint', fingerprint })
+        this.report({ status: 'fingerprint', fingerprint, keyType: key.split(' ')[1].replace(/^ssh-/, '').toUpperCase() })
       } else {
-        void this.install()
+        this.pending = this.install()
       }
     } catch (error) { this.fail(error) }
     return this.state()
   }
   async accept(id: string) {
     if (this.current?.id !== id || this.current.status !== 'fingerprint' || !this.keyLine) throw new Error('No pending fingerprint')
-    await mkdir(join(this.home, '.ssh'), { recursive: true, mode: 0o700 })
-    await appendFile(join(this.home, '.ssh/known_hosts'), `\n${this.keyLine}\n`, { mode: 0o600 })
+    const signal = this.controller.signal
+    const keyLine = this.keyLine
     this.report({ status: 'running' })
-    void this.install()
+    const confirming = (async () => {
+      try {
+        await mkdir(join(this.home, '.ssh'), { recursive: true, mode: 0o700 })
+        signal.throwIfAborted()
+        await appendFile(join(this.home, '.ssh/known_hosts'), `\n${keyLine}\n`, { mode: 0o600 })
+        signal.throwIfAborted()
+        this.pending = this.install()
+      } catch (error) { this.fail(error) }
+    })()
+    this.pending = confirming
+    await confirming
     return this.state()
   }
+  async cancel(id: string) {
+    if (this.current?.id !== id || !['running', 'fingerprint'].includes(this.current.status)) throw new Error('No active installation')
+    this.controller.abort()
+    this.report({ status: 'failed', reason: 'cancelled', retryable: true })
+    await this.pending
+    return this.state()
+  }
+  private async run(command: string, args: string[], input?: string, timeout?: number) {
+    const signal = this.controller.signal
+    signal.throwIfAborted()
+    const output = await this.execute(command, args, input, timeout, signal)
+    signal.throwIfAborted()
+    return output
+  }
   private fail(error: unknown) {
-    if (this.current) this.report({ status: 'failed', retryable: true, reason: error instanceof Error ? error.message : 'SSH installation failed' })
+    if (!this.controller.signal.aborted && this.current) this.report({ status: 'failed', retryable: true, reason: error instanceof Error ? error.message : 'SSH installation failed' })
   }
   private remote(command: string, input?: string, timeout?: number) {
-    return this.execute('ssh', [...this.options, this.destination, command], input, timeout)
+    return this.run('ssh', [...this.options, this.destination, command], input, timeout)
   }
   private async install() {
     try {
@@ -124,9 +175,11 @@ export class SshInstaller {
       await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type server`)
       this.report({ step: 'connect' })
       const token = await this.mintToken()
+      this.controller.signal.throwIfAborted()
       // Token travels only on encrypted stdin, never argv, logs or shell text.
       await this.remote(`mikka daemon login --server ${quote(this.appUrl)} --registration-token-stdin`, `${token}\n`)
       for (let attempt = 0; attempt < 30; attempt++) {
+        this.controller.signal.throwIfAborted()
         const status = await this.remote('mikka daemon status').catch(() => '')
         try {
           const remote = JSON.parse(status) as { server?: string; deviceId?: string }
