@@ -262,13 +262,23 @@ test('R-31: a Button may not bring back a white fill with a border', () => {
   has(`${prefix} const ui = <Button variant="outline" className="border-border bg-background" />`, 'style/secondary-button-fill')
   has(`${prefix} const ui = <Button className={cn('border bg-card')} />`, 'style/secondary-button-fill')
   has(`${prefix} const ui = <Button variant="outline" className="rounded-full bg-background" />`, 'style/secondary-button-fill')
+  has(`${prefix} const ui = <Button variant="secondary" className="bg-background hover:bg-background/80" />`, 'style/secondary-button-fill')
   const clean = source => assert.ok(!rules(`${prefix} const ui = ${source}`).includes('style/secondary-button-fill'), source)
   clean('<Button variant="outline" className="rounded-full" />')
   clean('<Button variant="ghost" className="border-transparent hover:bg-background" />')
-  clean('<Button variant="secondary" className="bg-background hover:bg-background/80" />')
   clean('<Button className="border-0 bg-background" />')
   clean('<Button className="focus-visible:border-input bg-card" />')
   clean('<Button className="hover:border bg-card" />')
+})
+
+test('a segmented control track comes from ToggleGroup variant="segment", not call-site classes', () => {
+  has(`${prefix} const ui = <ToggleGroup className="rounded-lg bg-muted p-0.5" />`, 'style/segment-track')
+  has(`${prefix} const ui = <ToggleGroup className={cn('h-7')} />`, 'style/segment-track')
+  const clean = source => assert.ok(!rules(`${prefix} const ui = ${source}`).includes('style/segment-track'), source)
+  clean('<ToggleGroup variant="segment" size="sm" spacing={0.5} />')
+  clean('<ToggleGroup className="ml-auto flex-wrap" />')
+  clean('<ToggleGroup className="grid grid-cols-6 gap-y-3 px-6" />')
+  clean('<ToggleGroupItem className="h-7" />')
 })
 
 test('utility parser respects bracket expressions and variants', () => {
