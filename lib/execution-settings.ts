@@ -61,9 +61,10 @@ export class ExecutionSettings {
   ): Promise<ExecutionRule> {
     const places = await this.places(scope, query);
     const models = await this.botModels(scope, query);
-    const preferred = models.some((m) => m.provider === "claude")
+    const providers = (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected'`,[scope.ownerId,scope.workspaceId])).rows;
+    const preferred = providers.some((m) => m.provider === "claude")
       ? "claude_code"
-      : models.some((m) => m.provider === "codex")
+      : providers.some((m) => m.provider === "codex")
         ? "codex"
         : undefined;
     const devices = places
