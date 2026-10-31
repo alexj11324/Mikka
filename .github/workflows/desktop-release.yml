@@ -29,7 +29,6 @@ permissions:
 concurrency:
   group: desktop-release
   cancel-in-progress: false
-  queue: max
 
 env:
   # A cache restore that fails (e.g. the account's cache egress limit) would

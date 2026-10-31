@@ -79,8 +79,8 @@ export function GoogleSignInSettings({ googleEnabled }: { googleEnabled: boolean
     }
   }
 
-  return <SettingsSection id="google-sign-in-heading" title={t('googleSignInTitle')} description={t('googleSignInDescription')}>
-    <SettingRow title={t('googleSignIn')} description={googleLinked ? t('googleLinkedDescription') : t('googleLinkDescription')}>
+  return <SettingsSection id="google-sign-in-heading" title={t('googleSignInTitle')}>
+    <SettingRow title={t('googleSignIn')}>
       <div className="flex items-center gap-3">
         {googleLinked && <span className="text-xs text-muted-foreground">{t('googleLinked')}</span>}
         {!googleLinked && <Button type="button" variant="secondary" size="sm" disabled={!googleEnabled || googleLinked === null || googlePending} onClick={() => void linkGoogle()}>

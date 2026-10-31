@@ -42,7 +42,7 @@ export function IssuePrefixSettings() {
   }
 
   const unchanged = value.trim().toUpperCase() === state?.prefix
-  return <SettingsSection id="issue-prefix-heading" title={t('title')} description={t('description')}>
+  return <SettingsSection id="issue-prefix-heading" title={t('title')}>
     <form onSubmit={event => { event.preventDefault(); void save() }}>
       <FieldGroup className="gap-0">
         <Field orientation="responsive" className="justify-between gap-3 px-5 py-4">
