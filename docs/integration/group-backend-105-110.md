@@ -69,3 +69,35 @@ acceptance remain outstanding. The current directory/runtime selects rows from
 `agents`, whereas the current glossary defines chat Bots in `bots`; that product
 binding also needs explicit integration/acceptance rather than silently treating
 worker IDs as Bot IDs. Neither issue is closed by this scoped read-route fix.
+
+## #110 bounded linked-DM read candidate
+
+The next independent patch adds only
+`GET /api/conversation-links/:id/messages?before=<position>&limit=<1..100>`.
+It resolves the link's source group and reuses current group membership,
+workspace/PAT scope and Origin checks. The target must be a same-workspace
+`agent_dm` in the current group creator's legacy agent context. The API exposes
+only the recorded `firstPosition..lastPosition` segment; arbitrary cursors cannot
+widen it. Source-group membership grants this view without adding a user to
+the private DM. Direct DM history remains denied.
+
+Responses contain link/source IDs, recorded range/count, two participants,
+bounded messages and `nextBefore`. Sender projection is limited to ID, public
+name, harness and the existing nullable `avatarUrl` contract; worker instructions
+and out-of-segment messages are never returned. Legacy `agents` have no stored
+avatar image, so `avatarUrl` remains null rather than fabricating one. No UI,
+new schema, model invocation, link producer or unread mutation is added.
+
+The real exported-route/PG test now passes 7/7 with zero skips. Added coverage:
+an ordinary group member reads a two-agent DM despite no direct membership;
+both pagination pages contain only positions 2 and 3 from a five-message DM;
+sender names are returned, private worker instructions are absent, and forged
+cursors stay bounded. Unknown/foreign/kind-mismatched links, scoped callers,
+removed group members and suspended workspace members are refused. The GET
+leaves source read/unread state unchanged and has no POST export. Evidence:
+`/tmp/mikka-group110-link-reads.log`, same isolated 155-migration database.
+
+Remaining #110 work is explicit: real exchange creation/contiguous aggregation,
+timeline `agent_exchange` projection and its pagination/unread behavior, actual
+Bot/avatar binding and frontend read-only presentation with full system
+acceptance. The bounded read API alone does not complete #110 or parent #105.

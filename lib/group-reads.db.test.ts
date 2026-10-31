@@ -24,7 +24,7 @@ test('group read routes advance actual group history without opening private DMs
   const { workspacePool } = await import('./workspace-db')
   t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
   const owner = `group105-owner-${randomUUID()}`, member = `group105-member-${randomUUID()}`, outsider = `group105-outsider-${randomUUID()}`
-  const workspace = randomUUID(), otherWorkspace = randomUUID(), group = randomUUID(), otherGroup = randomUUID(), dm = randomUUID(), agent = randomUUID()
+  const workspace = randomUUID(), otherWorkspace = randomUUID(), group = randomUUID(), otherGroup = randomUUID(), dm = randomUUID(), agent = randomUUID(), exchangeLink = randomUUID()
   for (const user of [owner, member, outsider]) await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [user, `${user}@example.invalid`])
   for (const [id, user] of [[workspace, owner], [otherWorkspace, outsider]]) await pool.query('INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$2,\'Group read fixture\')', [id, user])
   for (const [id, user, role] of [[workspace, owner, 'admin'], [workspace, member, 'member'], [otherWorkspace, outsider, 'admin']]) await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,$4,\'active\')', [id, user, `${user}@example.invalid`, role])
@@ -35,6 +35,8 @@ test('group read routes advance actual group history without opening private DMs
   await pool.query('INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body) VALUES ($1,$2,1,\'user\',$3,\'Private fixture\')', [foreign, otherGroup, outsider])
   const route = await import('../app/api/conversations/[id]/read/route')
   const list = await import('../app/api/conversations/route')
+  const links = await import('../app/api/conversation-links/[id]/messages/route')
+  const linked = (id = exchangeLink, query = '') => links.GET(new Request(`http://127.0.0.1/api/conversation-links/${id}/messages${query}`), { params: Promise.resolve({ id }) })
   const call = (method: 'GET' | 'POST', id = group, messageId?: string, origin?: string) => route[method](new Request(`http://127.0.0.1/api/conversations/${id}/read`, {
     method, headers: { host: '127.0.0.1', ...(origin ? { origin } : {}), 'content-type': 'text/plain' },
     ...(method === 'POST' ? { body: JSON.stringify({ messageId }) } : {}),
@@ -60,6 +62,46 @@ test('group read routes advance actual group history without opening private DMs
     assert.equal((await (await call('GET')).json()).lastReadPosition, 4)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM conversation_reads WHERE "conversationId"=$1', [group])).rows[0].n, 2)
   })
+  await t.test('a source member reads only the linked exchange range with public sender metadata', async () => {
+    const secondAgent = randomUUID()
+    for (const [id, harness, name] of [[agent, 'codex', 'Worker A'], [secondAgent, 'claude_code', 'Worker B']]) {
+      await pool.query('INSERT INTO agents (id,"userId",harness,name,instructions) VALUES ($1,$2,$3,$4,\'private-worker-instructions\')', [id, owner, harness, name])
+      await pool.query('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,\'agent\',$2,\'member\')', [dm, id])
+    }
+    for (let position = 1; position <= 5; position++) await pool.query('INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body) VALUES ($1,$2,$3,\'agent\',$4,$5)', [randomUUID(), dm, position, position % 2 ? agent : secondAgent, position < 2 || position > 3 ? 'private-outside-segment' : `exchange-${position}`])
+    await pool.query('UPDATE conversations SET "lastPosition"=5 WHERE id=$1', [dm])
+    await pool.query('INSERT INTO conversation_links (id,"sourceConversationId","linkedConversationId","anchorPosition","firstPosition","lastPosition","messageCount") VALUES ($1,$2,$3,4,2,3,2)', [exchangeLink, group, dm])
+    caller = member
+    const priorRead = await (await call('GET')).json()
+    const response = await linked(exchangeLink, '?limit=1')
+    assert.equal(response.status, 200)
+    const first = await response.json()
+    assert.equal(first.messageCount, '2')
+    assert.deepEqual(first.messages.map((m: { position: string }) => m.position), ['3'])
+    assert.equal(first.messages[0].author.name, 'Worker A')
+    assert.equal(first.messages[0].author.avatarUrl, null)
+    assert.deepEqual(first.participants.map((p: { name: string }) => p.name).sort(), ['Worker A', 'Worker B'])
+    const second = await (await linked(exchangeLink, `?limit=1&before=${first.nextBefore}`)).json()
+    assert.deepEqual(second.messages.map((m: { position: string }) => m.position), ['2'])
+    assert.equal(second.nextBefore, null)
+    const all = await (await linked(exchangeLink, '?before=999')).json()
+    assert.deepEqual(all.messages.map((m: { position: string }) => m.position), ['3', '2'])
+    assert.equal(JSON.stringify(all).includes('private-outside-segment'), false)
+    assert.equal(JSON.stringify(all).includes('private-worker-instructions'), false)
+    assert.equal('linkedConversationId' in all, false)
+    assert.equal('POST' in links, false)
+    assert.deepEqual(await (await call('GET')).json(), priorRead, 'viewing an exchange neither marks nor adds unread source messages')
+    const messages = await import('../app/api/conversations/[id]/messages/route')
+    assert.equal((await messages.GET(new Request(`http://127.0.0.1/api/conversations/${dm}/messages`), { params: Promise.resolve({ id: dm }) })).status, 404)
+    for (const query of ['?limit=0', '?limit=101', '?before=0']) assert.equal((await linked(exchangeLink, query)).status, 422)
+    const wrongKind = randomUUID(), foreignDM = randomUUID(), crossed = randomUUID(), unrelated = randomUUID()
+    await pool.query('INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy") VALUES ($1,$2,\'agent_dm\',\'Foreign fixture\',$3)', [foreignDM, otherWorkspace, outsider])
+    for (const [id, source, target] of [[wrongKind, group, otherGroup], [crossed, group, foreignDM], [unrelated, otherGroup, foreignDM]]) await pool.query('INSERT INTO conversation_links (id,"sourceConversationId","linkedConversationId","anchorPosition","firstPosition","lastPosition","messageCount") VALUES ($1,$2,$3,1,1,1,1)', [id, source, target])
+    for (const id of [randomUUID(), wrongKind, crossed, unrelated]) assert.equal((await linked(id)).status, 404)
+    tokenWorkspaceId = otherWorkspace
+    assert.equal((await linked()).status, 404)
+    tokenWorkspaceId = undefined
+  })
   await t.test('unknown groups, unrelated workspaces, scoped callers and raw DMs stay private', async () => {
     for (const id of [randomUUID(), otherGroup, dm]) assert.equal((await call('GET', id)).status, 404)
     tokenWorkspaceId = otherWorkspace
@@ -73,10 +115,12 @@ test('group read routes advance actual group history without opening private DMs
     caller = member
     await pool.query('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberId"=$2', [group, member])
     assert.equal((await call('GET')).status, 404)
+    assert.equal((await linked()).status, 404)
     assert.equal((await call('POST', group, ids[1])).status, 404)
     caller = owner
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspace, owner])
     assert.equal((await call('GET')).status, 404)
+    assert.equal((await linked()).status, 404)
     assert.equal((await call('POST', group, ids[1])).status, 404)
   })
 })
