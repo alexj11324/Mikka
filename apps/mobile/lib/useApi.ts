@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, onWorkspaceChange } from '@/lib/api'
 
 /**
  * Loads `path`, reloads it every `every` ms while the app is in front (0: no
@@ -30,6 +30,8 @@ export function useApi<T>(path: string | null, every = 0) {
     void load()
     return () => { alive.current = false }
   }, [load, path])
+
+  useEffect(() => onWorkspaceChange(() => void load()), [load])
 
   useEffect(() => {
     if (!every || !path) return

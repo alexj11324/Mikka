@@ -211,6 +211,8 @@ mobile drawer.
   button pushes that bot's threads over the chat (Back returns to it); a thread
   card or a push about a thread pushes the thread. The drawer's swipe works
   only where nothing is pushed, so the system's swipe back always wins.
+- **Workspace:** switching it in 设置 reloads every screen's data at once.
+- **任务:** a row opens the task on the web, signed in (`/?issue=<id>`).
 - **Lists:** 线程, 任务 and 建议 pull to refresh; message text can be selected
   and copied by long press.
 - **Lost session:** a 401 signs the app out locally and shows sign-in with
