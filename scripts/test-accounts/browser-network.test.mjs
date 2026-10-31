@@ -6,16 +6,19 @@ import { SYNTHETIC_PNG } from '../../tests/helpers/browser-image.ts'
 
 // Protocol event interleavings only. Actual Chromium and reachable loopback
 // sinks remain covered by test-account-origin-fence.spec.ts in Browser CI.
-async function fixture({ failAbort = false, failFulfill = false, failLease = false, failContinue, cancelDuringLease, failNetwork = false, images = [] } = {}) {
+async function fixture({ failAbort = false, failFulfill = false, failLease = false, failContinue, cancelDuringLease, navigationDuringLease, networkDuringLease, failNetwork = false, failPage = false, images = [] } = {}) {
   let blocked = 0, failures = 0, closed = false, routeHandler
   const diagnostics = []
   let pendingCancellation = cancelDuringLease
+  let pendingNavigation = navigationDuringLease
+  let pendingNetwork = networkDuringLease
   const consoleSnapshots = []
   const transport = []
   const session = new EventEmitter()
   session.send = async (method, params) => {
-    if (!['Fetch.enable', 'Network.enable'].includes(method)) transport.push({ method, params })
+    if (!['Fetch.enable', 'Network.enable', 'Page.enable'].includes(method)) transport.push({ method, params })
     if (method === 'Network.enable' && failNetwork) throw new Error('SYNTHETIC_NETWORK_SETUP_FAILURE')
+    if (method === 'Page.enable' && failPage) throw new Error('SYNTHETIC_PAGE_SETUP_FAILURE')
     if (method === 'Fetch.continueRequest' && failContinue) throw new Error(failContinue)
     if (method === 'Fetch.fulfillRequest' && failFulfill) throw new Error('SYNTHETIC_PROTOCOL_FULFILL_FAILURE')
     if (method !== 'Fetch.failRequest') return
@@ -34,6 +37,8 @@ async function fixture({ failAbort = false, failFulfill = false, failLease = fal
   }
   await installAccountOriginFence(context, { assertActive: async () => {
     if (pendingCancellation) { session.emit('Network.loadingFailed', pendingCancellation); pendingCancellation = undefined }
+    if (pendingNavigation) { session.emit('Page.frameNavigated', pendingNavigation); pendingNavigation = undefined }
+    if (pendingNetwork) { session.emit('Network.requestWillBeSent', pendingNetwork); pendingNetwork = undefined }
     if (failLease) throw new Error('SYNTHETIC_LEASE_LOST')
   } }, 'http://localhost:3100',
     () => { blocked++ }, diagnostic => { failures++; diagnostics.push(diagnostic) }, images)
@@ -41,7 +46,7 @@ async function fixture({ failAbort = false, failFulfill = false, failLease = fal
   const defaults = { url: 'http://localhost:3199/foreign', method: 'GET', resourceType: 'image' }
   async function protocolRequest(request = {}) {
     const value = { ...defaults, ...request }
-    session.emit('Fetch.requestPaused', { requestId: 'synthetic-request', networkId: value.networkId, request: { url: value.url, method: value.method }, resourceType: value.resourceType })
+    session.emit('Fetch.requestPaused', { requestId: 'synthetic-request', networkId: value.networkId, frameId: value.frameId, request: { url: value.url, method: value.method }, resourceType: value.resourceType })
     await new Promise(resolve => setImmediate(resolve))
   }
   async function routeRequest(request = {}) {
@@ -65,12 +70,52 @@ async function fixture({ failAbort = false, failFulfill = false, failLease = fal
     transport: () => transport,
     diagnostics: () => diagnostics,
     cancelNetwork: event => session.emit('Network.loadingFailed', event),
+    requestNetwork: event => session.emit('Network.requestWillBeSent', event),
+    finishNetwork: event => session.emit('Network.loadingFinished', event),
     state: () => ({ blocked, failures, closed, consoleSnapshots }),
   }
 }
 
 const invalidInterception = 'cdpSession.send: Protocol error (Fetch.continueRequest): Invalid InterceptionId.'
 const allowed = { url: 'http://localhost:3100/allowed', resourceType: 'Fetch', networkId: 'synthetic-network' }
+const requestDocument = { requestId: allowed.networkId, frameId: 'synthetic-frame', loaderId: 'old-document', type: 'Fetch', request: { url: allowed.url } }
+const replacement = { frame: { id: requestDocument.frameId, loaderId: 'new-document' } }
+test('only the exact old subrequest document permits a stale continuation after reload', async () => {
+  for (const lateMetadata of [false, true]) {
+    const f = await fixture({ failContinue: invalidInterception, navigationDuringLease: replacement, networkDuringLease: lateMetadata ? requestDocument : undefined })
+    if (!lateMetadata) f.requestNetwork(requestDocument)
+    await f.protocolRequest({ ...allowed, frameId: requestDocument.frameId })
+    assert.equal(f.state().closed, false)
+    assert.equal(f.state().failures, 0)
+    assert.deepEqual(f.transport().map(call => call.method), ['Fetch.continueRequest'])
+    // Consumed metadata cannot authorize another request with a reused network ID.
+    await f.protocolRequest({ ...allowed, frameId: requestDocument.frameId })
+    assert.equal(f.state().failures, 1)
+  }
+})
+test('navigation needs a matching network/frame and a replaced loader; Document and finished requests remain fenced', async () => {
+  for (const change of ['missing-network', 'missing-metadata', 'different-frame', 'same-loader', 'missing-loader', 'document', 'finished', 'foreign-metadata']) {
+    const f = await fixture({ failContinue: invalidInterception, navigationDuringLease: change === 'same-loader' ? { frame: { ...replacement.frame, loaderId: requestDocument.loaderId } } : replacement })
+    if (change !== 'missing-metadata') f.requestNetwork({ ...requestDocument,
+      ...(change === 'missing-loader' ? { loaderId: '' } : {}),
+      ...(change === 'foreign-metadata' ? { request: { url: 'http://localhost:3199/foreign' } } : {}) })
+    if (change === 'finished') f.finishNetwork({ requestId: allowed.networkId })
+    await f.protocolRequest({ ...allowed, frameId: change === 'different-frame' ? 'other-frame' : requestDocument.frameId,
+      ...(change === 'document' ? { resourceType: 'Document' } : {}), ...(change === 'missing-network' ? { networkId: undefined } : {}) })
+    assert.equal(f.state().closed, true, change)
+    assert.equal(f.state().failures, 1, change)
+  }
+})
+test('a replaced document cannot suppress a lost lease, failed image fulfillment, foreign abort or another protocol error', async () => {
+  for (const failure of [{ failLease: true }, { failFulfill: true }, { failAbort: true }, { failContinue: 'SYNTHETIC_OTHER_PROTOCOL_FAILURE' }]) {
+    const f = await fixture({ ...failure, navigationDuringLease: replacement, images: [{ url: allowed.url, body: SYNTHETIC_PNG }] })
+    f.requestNetwork(requestDocument)
+    await f.protocolRequest({ ...allowed, frameId: requestDocument.frameId,
+      ...(failure.failAbort ? { url: 'http://localhost:3199/foreign' } : {}), ...(failure.failFulfill ? { resourceType: 'Image' } : {}) })
+    assert.equal(f.state().closed, true)
+    assert.equal(f.state().failures, 1)
+  }
+})
 test('only an exact canceled request exempts an invalid interception when continuing', async () => {
   const f = await fixture({ failContinue: invalidInterception, cancelDuringLease: { requestId: allowed.networkId, canceled: true } })
   await f.protocolRequest(allowed)
@@ -119,6 +164,7 @@ test('fence diagnostics expose only fixed phase and category, never protocol pay
 
 test('Network instrumentation setup failure refuses the browser page', async () => {
   await assert.rejects(fixture({ failNetwork: true }), /TEST_ACCOUNT_ORIGIN_FENCE_FAILED/)
+  await assert.rejects(fixture({ failPage: true }), /TEST_ACCOUNT_ORIGIN_FENCE_FAILED/)
 })
 
 const imageURL = 'http://localhost:3199/fixture.png'
