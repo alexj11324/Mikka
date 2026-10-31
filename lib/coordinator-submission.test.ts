@@ -222,7 +222,7 @@ test('the app\'s photos reach the stored message through the signed-in action', 
   current = fixture(); callbacks.length = 0; userId = 'owner'
   const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
   assert.deepEqual(await sendCoordinatorMessage('', null, null, undefined, undefined, null, [{ dataUrl }]), { queued: true })
-  const [stored] = [...current.rows.values()] as { payload: { text: string; images: { dataUrl: string; mediaType: string }[] } }[]
+  const [stored] = [...current.rows.values()] as unknown as { payload: { text: string; images: { dataUrl: string; mediaType: string }[] } }[]
   assert.equal(stored.payload.text, '')
   assert.equal(stored.payload.images[0].dataUrl, dataUrl)
   assert.equal(stored.payload.images[0].mediaType, 'image/png')
