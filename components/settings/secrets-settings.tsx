@@ -4,7 +4,7 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { Cloud } from 'lucide-react'
-import { createSecret, deleteE2BKey, deleteSecret, getE2BKey, listSecrets, replaceSecret, saveE2BKey } from '@/app/actions/workspace-secrets'
+import { createSecret, deleteE2BKey, deleteSecret, getE2BKeyCapability, listSecrets, replaceSecret, saveE2BKey } from '@/app/actions/workspace-secrets'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -64,7 +64,7 @@ export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
 function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.secrets.e2b')
   const actionError = useActionError()
-  const status = useSWR(['settings:e2b-key', workspaceId], () => getE2BKey())
+  const status = useSWR(['settings:e2b-key', workspaceId], () => getE2BKeyCapability(workspaceId))
   const [open, setOpen] = useState(false)
   const keyDialog = usePresence(open)
   const data = status.data && !status.data.error ? status.data : null
@@ -77,15 +77,15 @@ function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
       {data && state && <SettingRow title="E2B API Key" icon={<Cloud aria-hidden="true" className="size-4 text-muted-foreground" />}>
         <div className="flex items-center gap-3">
           <span role="status" className={cn(data.lastErrorCode ? 'text-destructive' : 'text-muted-foreground')}>{t(state as 'missing')}</span>
-          <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>{data.configured ? t('replace') : t('set')}</Button>
+          {data.canEdit && <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>{data.configured ? t('replace') : t('set')}</Button>}
         </div>
       </SettingRow>}
     </SettingsSection>
-    {keyDialog.value && data && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={data.configured} onClose={changed => { setOpen(false); if (changed) void status.mutate() }} />}
+    {keyDialog.value && data && <E2BKeyDialog workspaceId={workspaceId} open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={data.configured} onClose={changed => { setOpen(false); if (changed) void status.mutate() }} />}
   </>
 }
 
-function E2BKeyDialog({ configured, onClose, open = true, onOpenChangeComplete }: { configured: boolean; onClose: (changed: boolean) => void } & PresenceProps) {
+function E2BKeyDialog({ workspaceId, configured, onClose, open = true, onOpenChangeComplete }: { workspaceId: string; configured: boolean; onClose: (changed: boolean) => void } & PresenceProps) {
   const t = useTranslations('Settings.secrets.e2b')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
@@ -97,7 +97,7 @@ function E2BKeyDialog({ configured, onClose, open = true, onOpenChangeComplete }
     setPending(kind)
     setError(null)
     try {
-      const result = kind === 'save' ? await saveE2BKey({ apiKey: apiKey.trim() }) : await deleteE2BKey()
+      const result = kind === 'save' ? await saveE2BKey({ apiKey: apiKey.trim() }, workspaceId) : await deleteE2BKey(workspaceId)
       if (result.error) { setError(actionError(result.error)); return }
       onClose(true)
     } catch {

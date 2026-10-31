@@ -1797,7 +1797,10 @@
       "transferTo": "New owner",
       "transferring": "Transferring…",
       "transferNoMembers": "No other members",
-      "transferred": "Transferred to {name}"
+      "transferred": "Transferred to {name}",
+      "replayOnboarding": "Replay onboarding",
+      "replay": "Replay",
+      "replaying": "Replaying…"
     },
     "computerPolicy": {
       "heading": "Computer use",
