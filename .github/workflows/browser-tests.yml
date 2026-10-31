@@ -345,12 +345,16 @@ jobs:
 
   browser-selection:
     # Selection-policy pull requests also run the union of every scoped spec
-    # (plus the smoke tag) as a real subset, on its own runner.
-    name: Browser selection validation
+    # (plus the smoke tag) as four isolated whole-file subsets.
+    name: Browser selection validation (${{ matrix.shard }}/4)
     needs: changes
     if: github.event_name == 'pull_request' && !github.event.pull_request.draft && needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.verify_selection == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     services:
       postgres:
         image: postgres:17
@@ -436,7 +440,7 @@ jobs:
           : > "$log_file"
           chmod 600 "$log_file"
           test_status=0
-          node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted > "$log_file" 2>&1 || test_status=$?
+          node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted --shard=${{ matrix.shard }}/4 > "$log_file" 2>&1 || test_status=$?
           if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
             if [ "$test_status" -eq 0 ]; then test_status=1; fi
             exit "$test_status"
@@ -451,7 +455,7 @@ jobs:
         if: ${{ !cancelled() && steps.account-evidence-audit.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: browser-test-report-selection-targeted-${{ github.sha }}
+          name: browser-test-report-selection-targeted-${{ github.sha }}-${{ matrix.shard }}
           path: |
             playwright-selection-targeted-report/
             selection-targeted-results/

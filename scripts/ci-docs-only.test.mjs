@@ -209,8 +209,8 @@ test('all required gates reject failed classification and skipped full jobs', ()
     assert.equal(blocks.length, file.includes('ui-policy') ? 2 : 1)
     for (const [, block] of blocks) {
       const script = block.split('        run: |\n')[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
-      const result = (changes, docs, full, source = full, daemon = full) => {
-        try { execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { env: { PATH: process.env.PATH, CHANGES_RESULT: changes, DOCS_ONLY: docs, FULL_RESULT: full, SOURCE_RESULT: source, DAEMON_RESULT: daemon }, stdio: 'ignore' }); return true } catch { return false }
+      const result = (changes, docs, full, source = full, daemon = full, integrations = full) => {
+        try { execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { env: { PATH: process.env.PATH, CHANGES_RESULT: changes, DOCS_ONLY: docs, FULL_RESULT: full, SOURCE_RESULT: source, DAEMON_RESULT: daemon, INTEGRATIONS_RESULT: integrations }, stdio: 'ignore' }); return true } catch { return false }
       }
       assert.equal(result('failure', 'true', 'skipped'), false)
       assert.equal(result('success', 'false', 'skipped'), false)
@@ -221,6 +221,7 @@ test('all required gates reject failed classification and skipped full jobs', ()
         for (const status of ['skipped', 'failure', 'cancelled', '']) {
           assert.equal(result('success', 'false', 'success', status), false)
           assert.equal(result('success', 'false', 'success', 'success', status), false)
+          assert.equal(result('success', 'false', 'success', 'success', 'success', status), false)
         }
       }
     }
@@ -403,12 +404,14 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   assert.match(database, /services:\n      postgres:\n        image: postgres:17/)
   assert(database.includes('name: pr13-http-cli-approval-${{ github.sha }}-${{ matrix.shard }}'))
   assert.match(database, /if: github\.event_name == 'merge_group' && matrix\.shard == 1/)
+  assert(job('ui-policy-integrations').includes('run: pnpm test:issues'))
+  assert(!job('ui-policy-full').includes('run: pnpm test:issues'))
   const checks = job('source-checks')
   for (const command of ['pnpm lint:code', 'pnpm exec next typegen', 'pnpm typecheck', 'pnpm --filter @mikka/protocol typecheck', 'pnpm --filter @mikka/mobile typecheck']) assert(checks.includes(`run: ${command}\n`), command)
   const daemon = job('daemon-checks')
   assert(daemon.includes("MIKKA_SANDBOX_ACCEPTANCE: '1'"))
   assert(daemon.includes('pnpm --filter @mikka/daemon test:package'))
   const gate = job('ui-policy')
-  assert(gate.includes('needs: [changes, ui-policy-full, source-checks, daemon-checks]'))
-  for (const name of ['ui-policy-full', 'source-checks', 'daemon-checks']) assert(gate.includes(`needs.${name}.result`))
+  assert(gate.includes('needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks]'))
+  for (const name of ['ui-policy-full', 'ui-policy-integrations', 'source-checks', 'daemon-checks']) assert(gate.includes(`needs.${name}.result`))
 })

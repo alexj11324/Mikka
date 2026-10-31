@@ -49,7 +49,7 @@ cannot.
    branch pushes without a PR do not run a duplicate blocking suite.
    The production build runs in the browser job of a ready pull request,
    and in the browser build on main. Merge-group events retain a build in source CI.
-   Source checks, source tests and daemon acceptance run independently. Database
+   Source checks, two source-test groups and daemon acceptance run independently. Database
    suites are partitioned across four isolated PostgreSQL jobs; every shard
    validates the complete inventory before running its share sequentially, and
    the protected gate requires every shard to succeed.
@@ -66,7 +66,7 @@ cannot.
    | Mapped paths (search, settings, Slack, Factory, threads, suggestions, devices, auth, relations, active agents) | Smoke plus the complete specs of each touched area |
    | An edited spec under `tests/e2e/` | Smoke plus that complete spec |
    | Paths the performance budgets measure (navigation shell, settings, saved history) or a performance spec | Also the desktop/mobile performance suite |
-   | Selection-policy changes (classifier, runner, this workflow) | Also "Browser selection validation": every scoped spec as one real subset |
+   | Selection-policy changes (classifier, runner, this workflow) | Also "Browser selection validation": every scoped spec partitioned across four isolated subsets, each retaining the smoke tag |
    | Unsafe file modes, unavailable comparisons, `integrate/` branches | The full tier (below) before merge |
 
    The smoke set covers anonymous redirects, sign-up (with Cloudflare's public

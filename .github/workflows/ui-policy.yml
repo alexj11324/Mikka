@@ -106,7 +106,7 @@ jobs:
           JS
 
   ui-policy-full:
-    name: UI policy (full)
+    name: Core unit checks
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
     # Fixed standard Linux image; host namespace/security policy stays unchanged.
@@ -159,6 +159,22 @@ jobs:
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope
       - run: pnpm test:coordinator-issue-tools
+
+  ui-policy-integrations:
+    name: Integration unit checks
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    # Fixed standard Linux image; host namespace/security policy stays unchanged.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
       - run: pnpm test:active-agents
         env:
           # Database regressions run against ephemeral Postgres in browser-tests below.
@@ -211,6 +227,7 @@ jobs:
           name: ui-policy-audit
           path: ui-audit.json
           if-no-files-found: ignore
+
 
   source-checks:
     name: Source checks
@@ -308,7 +325,7 @@ jobs:
     # The required check name. It reports success when only documentation
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
-    needs: [changes, ui-policy-full, source-checks, daemon-checks]
+    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -318,6 +335,7 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           FULL_RESULT: ${{ needs.ui-policy-full.result }}
+          INTEGRATIONS_RESULT: ${{ needs.ui-policy-integrations.result }}
           SOURCE_RESULT: ${{ needs.source-checks.result }}
           DAEMON_RESULT: ${{ needs.daemon-checks.result }}
         run: |
@@ -329,7 +347,7 @@ jobs:
             echo "Documentation-only change; the full UI policy suite is skipped."
             exit 0
           fi
-          for result in "$FULL_RESULT" "$SOURCE_RESULT" "$DAEMON_RESULT"; do
+          for result in "$FULL_RESULT" "$INTEGRATIONS_RESULT" "$SOURCE_RESULT" "$DAEMON_RESULT"; do
             if [ "$result" != "success" ]; then
               echo "A required source, unit or daemon job did not succeed: $result"
               exit 1

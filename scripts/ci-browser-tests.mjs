@@ -10,6 +10,13 @@ export const TURNSTILE_TAG = '@turnstile'
 
 const SHARDED_TIERS = new Set(['main', 'full'])
 
+function browserShard(shard) {
+  if (typeof shard !== 'string' || !/^[1-9]\d*\/[1-9]\d*$/.test(shard)) throw new Error('Invalid browser shard')
+  const [index, total] = shard.split('/').map(Number)
+  if (!Number.isSafeInteger(index) || !Number.isSafeInteger(total) || index > total || `${index}/${total}` !== shard) throw new Error('Invalid browser shard')
+  return [index, total]
+}
+
 /** Playwright matches --grep against "project file describe title tags"; a whole
  * file is selected by its name between spaces. Names are validated first. */
 export function specGrep(specs) {
@@ -36,9 +43,7 @@ export function browserArguments(tier, encodedSpecs, shard, { specExists = spec 
   args.push('--grep-invert', '@performance')
   if (shard !== undefined) {
     if (!SHARDED_TIERS.has(tier)) throw new Error('Only the main and full tiers are sharded')
-    if (!/^[1-9]\d*\/[1-9]\d*$/.test(shard)) throw new Error('Invalid browser shard')
-    const [index, total] = shard.split('/').map(Number)
-    if (index > total) throw new Error('Invalid browser shard')
+    browserShard(shard)
     args.push(`--shard=${shard}`)
   }
   return args
@@ -57,10 +62,18 @@ export function selectionValidationPlans() {
 }
 
 /** One named subset, so each policy plan can run as its own job. */
-export function selectionPlan(name) {
+export function selectionPlan(name, shard) {
   const [critical, scoped] = selectionValidationPlans()
-  if (name === 'smoke') return critical
-  if (name === 'targeted') return scoped
+  if (name === 'smoke') {
+    if (shard !== undefined) throw new Error('Smoke selection validation must run unsharded')
+    return critical
+  }
+  if (name === 'targeted') {
+    if (shard === undefined) return scoped
+    const [index, total] = browserShard(shard)
+    if (total > scoped.specs.length) throw new Error('Targeted selection shards must not be empty')
+    return { ...scoped, specs: scoped.specs.filter((_, position) => position % total === index - 1) }
+  }
   throw new Error('Invalid selection plan')
 }
 
@@ -75,10 +88,10 @@ export function main() {
   const planName = process.argv.find(argument => argument.startsWith('--verify-selection-plan='))?.slice('--verify-selection-plan='.length)
   const validating = legacyValidation || planName !== undefined
   const shard = process.argv.find(argument => argument.startsWith('--shard='))?.slice('--shard='.length)
-  if (validating && shard) throw new Error('Selection validation must run unsharded')
+  if (legacyValidation && shard !== undefined) throw new Error('Legacy selection validation must run unsharded')
   if (legacyValidation && planName !== undefined) throw new Error('Choose one selection validation mode')
   if (process.argv.includes('--turnstile')) {
-    if (validating || shard) throw new Error('The Turnstile run is a single unsharded subset')
+    if (validating || shard !== undefined) throw new Error('The Turnstile run is a single unsharded subset')
     const args = turnstileArguments()
     console.log(`Browser acceptance layer: turnstile; ${args.join(' ')}`)
     const result = run(args, { ...process.env, TURNSTILE_SECRET_KEY: TURNSTILE_TEST_SECRET, PLAYWRIGHT_HTML_OUTPUT_DIR: 'playwright-turnstile-report' })
@@ -86,7 +99,7 @@ export function main() {
     return
   }
   const plans = planName !== undefined
-    ? [selectionPlan(planName)]
+    ? [selectionPlan(planName, shard)]
     : validating
       ? selectionValidationPlans()
       : [{ tier: process.env.BROWSER_TIER, specs: JSON.parse(process.env.BROWSER_SPECS) }]
@@ -106,7 +119,7 @@ export function main() {
         const info = lstatSync(receipt)
         if (!info.isFile() || info.isSymbolicLink()) throw new Error('UNSAFE_SELECTION_RECEIPT')
         copyFileSync(receipt, 'selection-targeted-results/site-search-fixtures.json', constants.COPYFILE_EXCL)
-      } else if (result.status === 0) throw new Error('MISSING_SELECTION_RECEIPT')
+      } else if (result.status === 0 && plan.specs.includes('site-search.spec.ts')) throw new Error('MISSING_SELECTION_RECEIPT')
     }
     if (result.status !== 0) { process.exitCode = result.status ?? 1; return }
   }

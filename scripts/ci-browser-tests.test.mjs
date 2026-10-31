@@ -118,7 +118,7 @@ test('runner turns each tier into fixed argv and refuses anything else', () => {
   ]) assert.throws(() => browserArguments(tier, JSON.stringify(list)), `${tier} ${JSON.stringify(list)}`)
   assert.throws(() => browserArguments('full', 'not JSON'))
   assert.throws(() => browserArguments('full', '{}'))
-  for (const shard of ['0/4', '4/3', '1/0', '1', '1/x', '../1/2', '01/4', ' 1/4']) assert.throws(() => browserArguments('full', '[]', shard), shard)
+  for (const shard of ['', '0/4', '4/3', '1/0', '1', '1/x', '../1/2', '01/4', '1/04', ' 1/4', '1/1.0', '1/4\n', '1/4\r\n', '1/9007199254740992', '9007199254740992/9007199254740992']) assert.throws(() => browserArguments('full', '[]', shard), shard)
   assert.throws(() => browserArguments('smoke', '[]', '1/2'))
   assert.throws(() => browserArguments('targeted', '["routes.spec.ts"]', '1/2'))
 })
@@ -168,8 +168,30 @@ test('each selection plan can run as an independent unsharded job', () => {
   assert.throws(() => selectionPlan(''))
 })
 
-test('selection validation cannot be sharded or use both modes', () => {
-  for (const args of [['--verify-selection', '--shard=1/4'], ['--verify-selection-plan=smoke', '--shard=1/4']]) {
+test('targeted selection shards are deterministic, disjoint and exhaustive, with smoke on every shard', () => {
+  const shards = Array.from({ length: 4 }, (_, index) => selectionPlan('targeted', `${index + 1}/4`))
+  const union = shards.flatMap(plan => plan.specs)
+  assert.equal(new Set(union).size, union.length, 'no scoped file runs in two partitions')
+  assert.deepEqual([...union].sort(), [...BROWSER_SCOPED_SPECS].sort(), 'every scoped file still runs')
+  for (let index = 0; index < shards.length; index++) {
+    const plan = shards[index]
+    assert.deepEqual(plan, selectionPlan('targeted', `${index + 1}/4`))
+    assert(plan.specs.length > 0)
+    const args = browserArguments(plan.tier, JSON.stringify(plan.specs))
+    const grep = new RegExp(args[args.indexOf('--grep') + 1])
+    assert(grep.test(' chromium routes.spec.ts redirect @smoke'))
+    for (const spec of BROWSER_SCOPED_SPECS) assert.equal(grep.test(` chromium ${spec} scoped test`), plan.specs.includes(spec), spec)
+    assert(!args.some(argument => argument.startsWith('--shard=')), 'partition whole files without Playwright sharding')
+  }
+  for (const shard of ['', '0/4', '4/3', '1/0', '1', '01/4', '1/04', ' 1/4', '1/1.0', '1/4\n', '1/4\r\n', '1/9007199254740992', '9007199254740992/9007199254740992', null]) {
+    assert.throws(() => selectionPlan('targeted', shard), /Invalid browser shard/, String(shard))
+  }
+  assert.throws(() => selectionPlan('targeted', `1/${BROWSER_SCOPED_SPECS.length + 1}`), /must not be empty/)
+  assert.throws(() => selectionPlan('targeted', `${BROWSER_SCOPED_SPECS.length + 1}/${BROWSER_SCOPED_SPECS.length + 1}`), /must not be empty/)
+})
+
+test('legacy and smoke selection validation reject sharding and combined validation modes', () => {
+  for (const args of [['--verify-selection', '--shard=1/4'], ['--verify-selection', '--shard='], ['--verify-selection-plan=smoke', '--shard=1/4'], ['--verify-selection-plan=smoke', '--shard=']]) {
     const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), ...args], { encoding: 'utf8' })
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /must run unsharded/)
@@ -301,11 +323,15 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   assert(source.includes('shard: [1, 2, 3, 4]'))
   assert(source.includes("BROWSER_SHARDS: '4'"))
   assert(source.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/$BROWSER_SHARDS'))
-  assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted'))
+  const selection = source.split('\n  browser-selection:\n')[1].split('\n  browser-build:\n')[0]
+  assert(selection.includes('name: Browser selection validation (${{ matrix.shard }}/4)\n'))
+  assert(selection.includes('fail-fast: false\n'))
+  assert(selection.includes('shard: [1, 2, 3, 4]\n'))
+  assert(selection.includes('node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted --shard=${{ matrix.shard }}/4'))
   assert(source.includes("cron: '17 19 * * *'"))
   assert(source.includes('  workflow_dispatch:\n'))
   for (const name of ['browser-build-${{ github.sha }}', 'browser-test-report-runtime-${{ github.sha }}', 'browser-test-report-pull-request-${{ github.sha }}',
-    'browser-test-report-selection-targeted-${{ github.sha }}', 'browser-test-report-shard-${{ matrix.shard }}-${{ github.sha }}']) assert(source.includes(`name: ${name}`), name)
+    'browser-test-report-selection-targeted-${{ github.sha }}-${{ matrix.shard }}', 'browser-test-report-shard-${{ matrix.shard }}-${{ github.sha }}']) assert(source.includes(`name: ${name}`), name)
   // Every uploaded path is one the evidence scanner audits first.
   const scanned = readFileSync('scripts/test-accounts/evidence.mjs', 'utf8')
   for (const path of ['playwright-turnstile-report', 'turnstile-results', '.cache/e2e/playwright-turnstile.log', 'playwright-selection-targeted-report', 'selection-targeted-results', '.cache/e2e/playwright-selection.log']) {
@@ -379,33 +405,54 @@ test('the runtime archive excludes compiler cache and preserves runtime output f
   }
 })
 
-test('real subset entrypoint retains search receipts and rejects missing evidence or failed subsets', () => {
-  for (const [receipt, status, expected] of [[true, 0, 0], [false, 0, 1], [true, 7, 7]]) {
+test('real subset entrypoint requires search receipts only on the search shard and preserves child failures', () => {
+  const partitions = Array.from({ length: 4 }, (_, index) => `${index + 1}/4`)
+  const searchShard = partitions.find(shard => selectionPlan('targeted', shard).specs.includes('site-search.spec.ts'))
+  const otherShard = partitions.find(shard => !selectionPlan('targeted', shard).specs.includes('site-search.spec.ts'))
+  assert(searchShard && otherShard)
+  const named = shard => ['--verify-selection-plan=targeted', `--shard=${shard}`]
+  for (const [receipt, status, expected, args] of [
+    ['file', 0, 0, ['--verify-selection']], ['missing', 0, 1, ['--verify-selection']], ['file', 7, 7, ['--verify-selection']],
+    ['file', 0, 0, named(searchShard)], ['missing', 0, 1, named(searchShard)], ['missing', 7, 7, named(searchShard)], ['file', 7, 7, named(searchShard)],
+    ['missing', 0, 0, named(otherShard)], ['file', 0, 0, named(otherShard)], ['missing', 7, 7, named(otherShard)], ['file', 7, 7, named(otherShard)],
+    ['symlink', 0, 1, named(searchShard)], ['directory', 0, 1, named(searchShard)], ['symlink', 0, 1, named(otherShard)],
+  ]) {
     const dir = mkdtempSync(join(tmpdir(), 'browser-subset-retained-'))
     console.log(`Retained subset entrypoint evidence: ${dir}`)
     // The runner checks spec names against tests/e2e in its working directory.
     mkdirSync(join(dir, 'tests'))
     symlinkSync(resolve('tests/e2e'), join(dir, 'tests/e2e'))
     const stub = `#!${process.execPath}
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 const targeted = process.argv.includes('--output=selection-targeted-results');
+writeFileSync('argv.json', JSON.stringify({args:process.argv.slice(2),report:process.env.PLAYWRIGHT_HTML_OUTPUT_DIR}));
 if (targeted) {
   mkdirSync('selection-targeted-results', {recursive:true});
-  if (process.env.TEST_RECEIPT === 'true') {
+  if (process.env.TEST_RECEIPT !== 'missing') {
     mkdirSync('test-results', {recursive:true});
-    writeFileSync('test-results/site-search-fixtures.json', JSON.stringify({retained:'synthetic evidence'}));
+    if (process.env.TEST_RECEIPT === 'directory') mkdirSync('test-results/site-search-fixtures.json');
+    else if (process.env.TEST_RECEIPT === 'symlink') {
+      writeFileSync('test-results/receipt.json', '{}');
+      symlinkSync('receipt.json', 'test-results/site-search-fixtures.json');
+    } else writeFileSync('test-results/site-search-fixtures.json', JSON.stringify({retained:'synthetic evidence'}));
   }
 }
 process.exit(targeted ? Number(process.env.TEST_EXIT) : 0);
 `
     writeFileSync(join(dir, 'pnpm'), stub, { mode: 0o700 })
-    const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), '--verify-selection'], {
-      cwd: dir, encoding: 'utf8', env: { PATH: dir, TEST_RECEIPT: String(receipt), TEST_EXIT: String(status) },
+    const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), ...args], {
+      cwd: dir, encoding: 'utf8', env: { PATH: dir, TEST_RECEIPT: receipt, TEST_EXIT: String(status) },
     })
     assert.equal(result.status, expected, result.stderr)
-    if (receipt) {
+    const shard = args.find(argument => argument.startsWith('--shard='))?.slice('--shard='.length)
+    const plan = selectionPlan('targeted', shard)
+    assert.deepEqual(JSON.parse(readFileSync(join(dir, 'argv.json'), 'utf8')), {
+      args: [...browserArguments(plan.tier, JSON.stringify(plan.specs)), '--output=selection-targeted-results'], report: 'playwright-selection-targeted-report',
+    })
+    if (receipt === 'file') {
       assert.equal(readFileSync(join(dir, 'selection-targeted-results/site-search-fixtures.json'), 'utf8'), readFileSync(join(dir, 'test-results/site-search-fixtures.json'), 'utf8'))
-    } else assert(result.stderr.includes('MISSING_SELECTION_RECEIPT'))
+    } else if (receipt === 'symlink' || receipt === 'directory') assert(result.stderr.includes('UNSAFE_SELECTION_RECEIPT'))
+    else if (status === 0 && plan.specs.includes('site-search.spec.ts')) assert(result.stderr.includes('MISSING_SELECTION_RECEIPT'))
   }
 })
 
