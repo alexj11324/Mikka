@@ -4,7 +4,7 @@ import { useCallback, useReducer, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { CircleCheck, CircleDashed, CircleX, ExternalLink, GitCommitHorizontal, Server } from 'lucide-react'
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { withBasePath } from '@/lib/base-path'
@@ -159,9 +159,9 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const t = useTranslations('FactoryAcceptance')
   const { ledger, reload, ledgerError, derived: acceptance } = useAcceptance(task)
   // A voided approval puts the task back to pending, so the current candidate's evidence is needed to enable it again.
-  const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded ? `/api/factory/tasks/${task.id}/approval` : null, request)
+  const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? `/api/factory/tasks/${task.id}/approval` : null, request)
   // Checks and the delivery header (B8/B9/B11) are read-only extras; the pane works without them.
-  const { data: detail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
+  const { data: detail, mutate: reloadDetail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<{ group: number; index: number } | null>(null)
@@ -209,7 +209,8 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       if (MERGE_REFUSALS.has(code)) setRefused(code)
       else setError(code)
     } finally {
-      await reload().catch(() => {})
+      // The candidate card's PR reads merged once the merge lands.
+      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {})])
       setBusy(false)
     }
   }
@@ -278,17 +279,12 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
         <h4 className="pl-3 text-xs font-medium text-muted-foreground">{t('results')}</h4>
         <ul className="flex flex-col gap-1">{results.map(row => <ResultLine key={row.stage} row={row} onOpenThread={onOpenThread} />)}</ul>
       </section>}
-      {refusal && <Alert variant="destructive">
-        <AlertTitle>{t('cannotMerge')}</AlertTitle>
-        <AlertDescription>{t(`mergeRefusal.${refusal}` as 'mergeRefusal.githubUnavailable')}</AlertDescription>
-        {pullRequestUrl && <AlertAction><Button size="sm" variant="outline" render={<a href={pullRequestUrl} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-start" aria-hidden="true" />{t('openOnGitHub')}</Button></AlertAction>}
-      </Alert>}
       {state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
       {error && <p role="alert" className="text-xs text-destructive">{t(ERROR_KEYS[error] ?? 'error')}</p>}
     </div>
     {state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(pullRequestUrl)}
-        onAccept={task.isSkillCandidate ? undefined : () => { void accept() }} pullRequestUrl={pullRequestUrl ?? undefined} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
+        onAccept={task.isSkillCandidate ? undefined : () => { void accept() }} pullRequestUrl={pullRequestUrl ?? undefined} refusal={refusal ?? undefined} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
         environment={envChip ?? undefined}
         sha={candidate?.sha} superseded={superseded?.candidate?.sha}
         reference={reference ? { href: reference, label: publication?.request?.targetEnvironment === 'production' ? t('production') : t('preview') } : undefined}

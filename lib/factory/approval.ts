@@ -493,9 +493,22 @@ export function createFactoryApprovals(
       if (!z.uuid().safeParse(taskId).success) fail("factoryInvalid");
       return transaction(async (tx) => {
         const task = await owned(tx, actor, taskId);
+        // A merged candidate (#528) keeps showing what it was accepted on.
+        const merged =
+          task.stage === "publish" &&
+          task.status === "passed" &&
+          Boolean(
+            (
+              await tx.query(
+                `SELECT 1 FROM factory_merges WHERE "taskId"=$1 AND "candidateId"=$2 AND status='merged'`,
+                [task.id, task.candidateId],
+              )
+            ).rowCount,
+          );
         if (
-          task.stage !== "approval" ||
-          !["pending", "waiting"].includes(task.status)
+          !merged &&
+          (task.stage !== "approval" ||
+            !["pending", "waiting"].includes(task.status))
         )
           fail("factoryTransition");
         const current = await approvalEvidence(tx, task);

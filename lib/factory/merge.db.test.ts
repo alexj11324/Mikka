@@ -87,6 +87,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       const ledger = await f.service([]).ledger(actor, x.task.id);
       assert.equal(ledger.merges.length, 1);
       assert.equal(ledger.merges[0].status, "merged");
+      const shown = await f.service([]).evidence(actor, x.task.id);
+      assert.ok(shown.manifest.artifacts.length > 0, "a merged candidate keeps showing its evidence");
     });
 
     await t.test("head moved → refused before merging; GitHub's sha mismatch is refused the same way", async () => {
