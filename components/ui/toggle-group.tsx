@@ -4,14 +4,17 @@ import * as React from "react"
 import { Toggle as TogglePrimitive } from "@base-ui/react/toggle"
 import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group"
 import { type VariantProps } from "class-variance-authority"
+import { motion } from "motion/react"
 import { cn } from "cn"
 
 import { toggleVariants } from '@/components/ui/toggle'
+import { SPRING_LAYOUT } from '@/lib/ease'
 
 const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants> & {
     spacing?: number
     orientation?: "horizontal" | "vertical"
+    id?: string
   }
 >({
   size: "default",
@@ -33,6 +36,7 @@ function ToggleGroup({
     spacing?: number
     orientation?: "horizontal" | "vertical"
   }) {
+  const id = React.useId()
   return (
     <ToggleGroupPrimitive
       data-slot="toggle-group"
@@ -50,7 +54,7 @@ function ToggleGroup({
       {...props}
     >
       <ToggleGroupContext.Provider
-        value={{ variant, size, spacing, orientation }}
+        value={{ variant, size, spacing, orientation, id }}
       >
         {children}
       </ToggleGroupContext.Provider>
@@ -66,15 +70,22 @@ function ToggleGroupItem({
   ...props
 }: TogglePrimitive.Props & VariantProps<typeof toggleVariants>) {
   const context = React.useContext(ToggleGroupContext)
+  const segment = (context.variant || variant) === "segment"
 
   return (
     <TogglePrimitive
+      // In a segmented control the raised pill is one element per group that glides to the
+      // pressed item (R-37: a position change moves on a spring), instead of each item swapping its fill.
+      render={segment && !props.render ? (itemProps, state) => <button {...itemProps}>
+        {state.pressed && <motion.span layoutId={`segment-${context.id}`} transition={SPRING_LAYOUT} aria-hidden="true" className="absolute inset-0 -z-10 rounded-sm bg-background shadow-xs dark:bg-control-hover" />}
+        {itemProps.children}
+      </button> : undefined}
       data-slot="toggle-group-item"
       data-variant={context.variant || variant}
       data-size={context.size || size}
       data-spacing={context.spacing}
       className={cn(
-        "shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-[variant=segment]/toggle-group:h-full group-data-[variant=segment]/toggle-group:rounded-sm",
+        "shrink-0 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-[variant=segment]/toggle-group:relative group-data-[variant=segment]/toggle-group:isolate group-data-[variant=segment]/toggle-group:h-full group-data-[variant=segment]/toggle-group:rounded-sm",
         toggleVariants({
           variant: context.variant || variant,
           size: context.size || size,
