@@ -21,7 +21,7 @@ export function toolApprovalDecision(request: Readonly<ToolApprovalRequest>, pol
     if (['get_desktop_state','click','type_text','press_key','scroll','capture_screenshot','start_screen_recording','stop_screen_recording'].some(name => tool === `mcp__mikka_computer__${name}`)) {
       return policy.readOnly || !policy.permissions.computer_use || policy.permissions.computer_use === 'deny' ? 'deny' : 'allow'
     }
-    if (['submit','ask_human','report_blocked','submit_capture'].some(name => tool === `mcp__mikka__${name}`)) return 'allow'
+    if (['submit','request_help','ask_human','report_blocked','submit_capture'].some(name => tool === `mcp__mikka__${name}`)) return 'allow'
     if (tool === 'Bash' || tool === 'PowerShell') return rawCliShellAvailable(policy) ? 'allow' : 'unavailable'
     const input = request.input as {file_path?: unknown; notebook_path?: unknown} | null
     if (['Write','Edit','MultiEdit','NotebookEdit'].includes(tool)) {
