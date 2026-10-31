@@ -276,10 +276,11 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   assert(source.includes('needs: [changes, browser-pr, browser-selection, browser-build, browser-runtime, browser-e2e-full]'))
   // One pull request runner: build, runtime gates, MVP smoke, smoke/targeted, performance.
   const pr = source.split('\n  browser-pr:\n')[1].split('\n  browser-selection:\n')[0]
-  for (const step of ['pnpm build', 'pnpm test:test-accounts-db', 'pnpm test:factory-http', 'node scripts/test-accounts/run-http.mjs',
+  for (const step of ['pnpm exec next build', 'pnpm test:test-accounts-db', 'pnpm test:factory-http', 'node scripts/test-accounts/run-http.mjs',
     'pnpm test:e2e:mvp --grep @smoke', 'node scripts/ci-browser-tests.mjs >', 'pnpm test:performance',
     'node scripts/test-accounts/evidence.mjs']) assert(pr.includes(step), step)
   assert(!pr.includes('name: browser-build-'), 'no build artifact round trip on pull requests')
+  assert(!pr.includes('pnpm lint') && !pr.includes('pnpm build'), 'lint runs once, in ui-policy.yml')
   assert(source.includes("shard: ${{ fromJSON(needs.changes.outputs.browser_tier == 'main' && '[1, 2]' || '[1, 2, 3, 4]') }}"))
   assert(source.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/$BROWSER_SHARDS'))
   assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted'))
@@ -298,6 +299,18 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   assert(issue.includes('issues: write'))
   assert(issue.includes('listPullRequestsAssociatedWithCommit'))
   assert(issue.includes("github.event_name == 'push' && github.ref == 'refs/heads/main'"))
+  // Every install goes through the read-only-on-PR cache action.
+  assert(!source.includes('cache: pnpm'))
+  assert.equal(source.match(/uses: \.\/\.github\/actions\/pnpm-install/g).length, 5)
+})
+
+test('pnpm store cache is restored everywhere and saved only on main', () => {
+  const action = readFileSync('.github/actions/pnpm-install/action.yml', 'utf8')
+  assert(action.includes('uses: actions/cache/restore@v4'))
+  assert(action.includes('uses: actions/cache/save@v4'))
+  assert(action.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'"))
+  assert(!action.includes('cache: pnpm'))
+  assert(!readFileSync('.github/workflows/ui-policy.yml', 'utf8').includes('cache: pnpm'))
 })
 
 test('real subset entrypoint retains search receipts and rejects missing evidence or failed subsets', () => {

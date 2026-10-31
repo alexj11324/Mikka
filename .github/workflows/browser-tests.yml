@@ -87,7 +87,7 @@ jobs:
           import { appendFileSync, readFileSync } from 'node:fs'
           import { pathToFileURL } from 'node:url'
           const { isDocsOnly, hasUnsafeModes } = await import(pathToFileURL(process.argv[2]).href)
-          const infra = new Set([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
+          const infra = new Set([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/actions/pnpm-install/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
           const pullRequest = process.env.GITHUB_EVENT_NAME === 'pull_request'
           const integration = !pullRequest || process.env.INTEGRATION_ACCEPTANCE === 'true'
           let ciOnly = false, performance = integration
@@ -160,14 +160,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/pnpm-install
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'
@@ -192,7 +185,11 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
-      - run: pnpm build
+      - name: Build the application (lint runs once, in the CI workflow's UI policy job)
+        run: |
+          node scripts/build-subscription-worker.mjs
+          pnpm generate:agent-ui
+          pnpm exec next build
       - name: Test account allocation across independent PostgreSQL clients
         run: pnpm test:test-accounts-db
       - name: Factory HTTP regressions against the built application (no skips)
@@ -341,14 +338,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/pnpm-install
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'
@@ -371,7 +361,11 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
-      - run: pnpm build
+      - name: Build the application
+        run: |
+          node scripts/build-subscription-worker.mjs
+          pnpm generate:agent-ui
+          pnpm exec next build
       - name: Test account allocation across independent PostgreSQL clients
         run: pnpm test:test-accounts-db
       - name: Validate the targeted browser subset
@@ -447,14 +441,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/pnpm-install
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'
@@ -474,7 +461,11 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
-      - run: pnpm build
+      - name: Build the application (lint runs once, in the CI workflow's UI policy job)
+        run: |
+          node scripts/build-subscription-worker.mjs
+          pnpm generate:agent-ui
+          pnpm exec next build
       - name: Package the build for the parallel test jobs
         run: tar -czf browser-build.tar.gz .next
       - uses: actions/upload-artifact@v4
@@ -522,14 +513,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/pnpm-install
       - uses: actions/download-artifact@v4
         with:
           name: browser-build-${{ github.sha }}
@@ -689,14 +673,7 @@ jobs:
       BROWSER_SHARDS: ${{ needs.changes.outputs.browser_tier == 'main' && '2' || '4' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/pnpm-install
       - uses: actions/download-artifact@v4
         with:
           name: browser-build-${{ github.sha }}

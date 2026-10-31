@@ -37,9 +37,10 @@ cannot.
 1. **While writing** (seconds, on your machine or the agent's container):
    `pnpm typecheck`, `pnpm lint` and the unit tests for what you changed. Run a
    browser test only for the flow you changed, and only if you can.
-2. **Every push and pull request** (minutes, CI): production build, every unit
-   test, database migrations and integration tests such as thread privacy.
-   This is the gate review waits on.
+2. **Every push and pull request** (minutes, CI): every unit test, lint, type
+   checks, database migrations and integration tests such as thread privacy.
+   This is the gate review waits on. The production build runs in the browser
+   job of a ready pull request, and on main, the merge queue and fork PRs.
 3. **Ready pull requests** (CI job "Browser tests (before merge)"): the browser
    smoke set plus the specs of the areas the change touches, against the PR
    merged with main, in one job ("Browser tests (pull request)": install, build,
@@ -87,8 +88,10 @@ A pull request that only changes documentation — non-executable Markdown in
 `docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`, or
 the pull request template — skips the heavy unit, build and browser jobs. The
 required status checks report success from small gate jobs (also on a docs-only main push). Other changes
-retain every source, production build, migration and database integration gate;
-only browser scenario selection and performance timing are tiered. Test selection
+retain every source, migration and database integration gate and a production
+build (in the pull request browser job, and in "Production build and browser
+interactions" on main, the merge queue and fork pull requests); only browser
+scenario selection and performance timing are tiered. Test selection
 is printed in the Changed files job and its summary. The browser environment
 remains an isolated PostgreSQL service and the built application on the GitHub
 Linux runner's localhost; this workflow does not test a Vercel Preview.

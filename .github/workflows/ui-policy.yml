@@ -118,14 +118,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/pnpm-install
       - run: pnpm test:factory-check-independence
       - run: pnpm test:factory-check-recovery
       - run: pnpm test:factory-routing
@@ -332,14 +325,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/pnpm-install
       - name: Install native dependencies for the CLI approval database roundtrip
         run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
       - name: Generate ephemeral test-only auth secret
@@ -379,7 +365,11 @@ jobs:
             /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
             ${{ runner.temp }}/pr13-personal-mailbox-results.xml
           if-no-files-found: warn
+      # Pull requests already build in browser-tests.yml (Browser tests (pull
+      # request)); branch pushes skip this second build. main, the merge queue
+      # and fork pull requests still build here. Lint runs in UI policy above.
       - run: pnpm build
+        if: github.event_name != 'push' || github.ref == 'refs/heads/main'
 
   browser-tests:
     # The required check name. Same docs-only behavior as UI policy above.
