@@ -209,11 +209,10 @@ function Store({ apps, ownStates, category, rootLabel, href, go }: {
   const stateOf = (id: string) => isOwnApp(id)
     ? storeItemState({ kind: 'own', state: ownStates?.[id] })
     : storeItemState({ kind: 'composio', accounts: apps.accountsFor(id).length, canLink: apps.canLink, loading: apps.loading })
-  // The sections, in order: ours, then Composio's 热门, 新品推荐 and its categories.
+  // The sections, as Codex's: 热门 (ours first, then Composio's usage order), 新品推荐, then Composio's categories.
   const sections: { id: string; name: string; items: StoreEntry[]; preview: number }[] = [
-    { id: 'builtin', name: t('builtIn'), items: own, preview: OWN_APPS.length },
+    { id: 'popular', name: t('popular'), items: [...own, ...entries(catalog.data?.popular ?? [])], preview: SECTION_PREVIEW },
     ...catalog.data ? [
-      { id: 'popular', name: t('popular'), items: entries(catalog.data.popular), preview: SECTION_PREVIEW },
       { id: 'latest', name: t('latest'), items: entries(catalog.data.latest), preview: SECTION_PREVIEW },
       ...catalog.data.categories.map(item => ({ id: `c:${item.id}`, name: item.name, items: entries(item.apps), preview: CATEGORY_PREVIEW })),
     ] : [],

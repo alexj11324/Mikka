@@ -35,7 +35,9 @@ async function controlled(page: Page, options: { hold?: () => Promise<void> } = 
 test('插件 is a store of every app; 设置 › 连接 lists only what is connected', async ({ page }, testInfo) => {
   await controlled(page)
   await register(page, '/?section=plugins')
-  for (const section of ['内置', '热门', '新品推荐']) await expect(page.getByRole('heading', { name: section, exact: true })).toBeVisible()
+  // As Codex: 热门 (ours first, then Composio's order) and 新品推荐; no separate section for ours.
+  await expect(page.getByRole('heading', { name: '内置', exact: true })).toHaveCount(0)
+  for (const section of ['热门', '新品推荐']) await expect(page.getByRole('heading', { name: section, exact: true })).toBeVisible()
   // Connected: … opens a menu. Not connected: + starts the connect flow.
   await expect(page.getByRole('button', { name: 'Gmail 的操作', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: '连接 Gmail', exact: true })).toHaveCount(0)
