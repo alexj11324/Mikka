@@ -25,8 +25,14 @@ Thank you for helping improve Mikka.
   pnpm check
   ```
 
-- A pull request merges once the required checks pass. See "How changes are
-  tested" below for which checks run when.
+- A pull request merges once the required checks pass. CI evaluates GitHub's
+  synthetic PR merge commit (the PR combined with its target branch) rather
+  than just the standalone PR head. An unrelated merge to `main` does not
+  require rebasing a still-mergeable PR; a real conflict must be resolved and
+  the updated candidate reverified. The GitHub branch protection setting
+  "Require branches to be up to date before merging" must be disabled for
+  this loose-check policy; the workflow alone cannot change that setting.
+  See "How changes are tested" below for which checks run when.
 - Never commit credentials. Project secrets live in Infisical Cloud.
 
 ## How changes are tested
@@ -37,10 +43,12 @@ cannot.
 1. **While writing** (seconds, on your machine or the agent's container):
    `pnpm typecheck`, `pnpm lint` and the unit tests for what you changed. Run a
    browser test only for the flow you changed, and only if you can.
-2. **Every push and pull request** (minutes, CI): every unit test, lint, type
+2. **Every pull request and push to main** (minutes, CI): unit tests, lint, type
    checks, database migrations and integration tests such as thread privacy.
-   This is the gate review waits on. The production build runs in the browser
-   job of a ready pull request, and on main, the merge queue and fork PRs.
+   PR checks run against GitHub's synthetic merge candidate. Same-repository
+   branch pushes without a PR do not run a duplicate blocking suite.
+   The production build runs in the browser job of a ready pull request,
+   and in the source CI for main and merge-group events.
 3. **Ready pull requests** (CI job "Browser tests (before merge)"): the browser
    smoke set plus the specs of the areas the change touches, against the PR
    merged with main, in one job ("Browser tests (pull request)": install, build,
@@ -91,7 +99,7 @@ the pull request template — skips the heavy unit, build and browser jobs. The
 required status checks report success from small gate jobs (also on a docs-only main push). Other changes
 retain every source, migration and database integration gate and a production
 build (in the pull request browser job, and in "Production build and browser
-interactions" on main, the merge queue and fork pull requests); only browser
+interactions" on main and merge-group events); only browser
 scenario selection and performance timing are tiered. Test selection
 is printed in the Changed files job and its summary. The browser environment
 remains an isolated PostgreSQL service and the built application on the GitHub
