@@ -117,6 +117,13 @@ jobs:
             echo "::error::Public macOS releases need notarization secrets (APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID or APPLE_API_KEY_P8_BASE64/APPLE_API_KEY_ID/APPLE_API_ISSUER). Use skip_notarization only for internal builds."
             exit 1
           fi
+      - name: Select Xcode 26 for actool
+        run: |
+          # electron-builder compiles mac.icon (an Icon Composer .icon) with actool 26+.
+          xcode=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
+          test -n "$xcode" || { echo "::error::No Xcode 26 on this runner; build/icon.icon needs actool 26+"; exit 1; }
+          sudo xcode-select -s "$xcode"
+          actool --version
       - name: Stamp the release version
         working-directory: apps/desktop
         run: npm pkg set version="$RELEASE_VERSION"

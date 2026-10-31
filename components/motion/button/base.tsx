@@ -5,8 +5,8 @@ import {
   AnimatePresence,
   type HTMLMotionProps,
   motion,
-  useReducedMotion,
 } from "motion/react";
+import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import {
   forwardRef,
   type PointerEvent,

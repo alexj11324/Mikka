@@ -4,10 +4,13 @@ import { z } from 'zod'
 
 export const POLICY_APPS = ['gmail', 'googlecalendar', 'slack', 'notion'] as const
 export type PolicyApp = (typeof POLICY_APPS)[number]
+/** Backend catalog may expand before the settings page adopts its new rows. */
+export const POLICY_TOOLKIT_IDS = [...POLICY_APPS, 'googledrive'] as const
+export type PolicyToolkitId = (typeof POLICY_TOOLKIT_IDS)[number]
 export const APP_ACCESS = ['allow', 'deny'] as const
 export type AppAccess = (typeof APP_ACCESS)[number]
 
-export const setAppPolicyInput = z.object({ app: z.enum(POLICY_APPS), access: z.enum(APP_ACCESS) }).strict()
+export const setAppPolicyInput = z.object({ app: z.enum(POLICY_TOOLKIT_IDS), access: z.enum(APP_ACCESS) }).strict()
 
 /** The personal write tools (lib/operations/model-write-tools) and the app each one writes to. */
 export const WRITE_TOOL_APPS: Record<string, PolicyApp> = {
@@ -16,7 +19,7 @@ export const WRITE_TOOL_APPS: Record<string, PolicyApp> = {
   cancel_calendar_event: 'googlecalendar',
 }
 
-export const isPolicyApp = (value: string): value is PolicyApp => (POLICY_APPS as readonly string[]).includes(value)
+export const isPolicyApp = (value: string): value is PolicyToolkitId => (POLICY_TOOLKIT_IDS as readonly string[]).includes(value)
 
 /** What a blocked tool call returns to the model: a plain error code, as other tool failures do. */
 export const APP_BLOCKED = { error: 'integrationBlockedByWorkspace' } as const

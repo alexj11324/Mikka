@@ -230,6 +230,8 @@ export interface MorphPopoverContentProps {
   sideOffset?: number;
   /** Panel corner radius, in px. Default 16. */
   radius?: number;
+  /** Mikka: least gap kept to the viewport edges, in px. Default 12. */
+  collisionPadding?: number;
   /** Draw the surface shadow. Default true. */
   shadow?: boolean;
   /** Runs after the portalled surface is positioned and visible. */
@@ -258,6 +260,7 @@ function MorphPopoverSurface({
   align = "end",
   sideOffset = 8,
   radius = 16,
+  collisionPadding = 12,
   shadow = true,
   onOpenAutoFocus,
   className,
@@ -278,7 +281,7 @@ function MorphPopoverSurface({
     : 0;
   // Keep larger compositions, such as calendars, inside the viewport. Prefer
   // the requested side, then use the roomier side when it cannot fit there.
-  const gutter = 12;
+  const gutter = collisionPadding;
   const below = layout
     ? Math.max(
         0,
@@ -308,7 +311,8 @@ function MorphPopoverSurface({
         gutter,
         Math.min(
           preferredLeft,
-          window.innerWidth - layout.content.width - gutter,
+          // Mikka: clientWidth leaves out a page scrollbar; innerWidth does not.
+          document.documentElement.clientWidth - layout.content.width - gutter,
         ),
       )
     : 0;

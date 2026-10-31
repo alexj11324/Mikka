@@ -76,7 +76,7 @@ test('main pushes run the main tier, nightly and manual runs run full plus perfo
   }
   assert.deepEqual(browserPlan([]), full)
   assert.deepEqual(browserPlan(['README.md'], { unsafeModes: true }), full)
-  assert.deepEqual(browserPlan(['app/page.tsx'], { unsafeModes: true, mainPush: true }), full)
+  assert.deepEqual(browserPlan(['app/page.tsx'], { unsafeModes: true, mainPush: true }), { ...full, performance: true })
 })
 
 test('every spec file has exactly one post-merge tier, and every listed spec exists', () => {
@@ -411,5 +411,22 @@ test('actual workflow bootstrap cannot let an edited classifier narrow app chang
     assert.equal(outputs.browser_tier, tier)
     assert.equal(outputs.browser_performance, performance)
     assert.deepEqual(JSON.parse(outputs.browser_specs), [])
+  }
+})
+
+// Run 41155092993: an unsafe main push was classified push:full without performance, which the gate refuses.
+test('the required browser gate accepts every plan the classifier emits', () => {
+  const workflow = readFileSync(resolve('.github/workflows/browser-tests.yml'), 'utf8')
+  const accepted = workflow.match(/case "\$EVENT_NAME:\$BROWSER_TIER:\$DOCS_ONLY:\$BROWSER_PERFORMANCE" in\n([\s\S]*?)\n\s*\*\) fail/)[1]
+  const patterns = [...accepted.matchAll(/^\s*([^)]+)\)/gm)].flatMap(match => match[1].split('|'))
+  const allowed = key => patterns.some(pattern => new RegExp(`^${pattern.replaceAll('*', '.*')}$`).test(key))
+  const plans = {
+    push: [browserPlan(['app/page.tsx'], { mainPush: true }), browserPlan(['app/page.tsx'], { mainPush: true, unsafeModes: true }), browserPlan([], { mainPush: true }), browserPlan(['README.md'], { mainPush: true })],
+    pull_request: [browserPlan(['app/page.tsx']), browserPlan(['components/settings/x.tsx']), browserPlan(['README.md'], { unsafeModes: true }), browserPlan([])],
+    schedule: [browserPlan([], { integration: true })],
+  }
+  for (const [event, list] of Object.entries(plans)) for (const plan of list) {
+    const key = `${event}:${plan.tier}:${plan.tier === 'docs'}:${plan.performance}`
+    assert.ok(allowed(key), `gate refuses ${key}`)
   }
 })

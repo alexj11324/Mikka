@@ -29,6 +29,13 @@ function defined(values: Record<string, unknown>) {
 }
 
 export const COMPOSIO_ACTIONS = {
+  list_drive_files: {
+    title: 'List Google Drive files',
+    description: 'List files visible to the connected Google Drive account. Use the returned page token for pagination.',
+    toolkit: 'googledrive', slug: 'GOOGLEDRIVE_LIST_FILES',
+    inputSchema: z.object({ query: z.string().max(1000).optional(), page_size: z.number().int().min(1).max(100).optional(), page_token: z.string().max(2048).optional() }).strict(),
+    toArguments: (input: { query?: string; page_size?: number; page_token?: string }) => defined({ q: input.query, pageSize: input.page_size ?? 25, pageToken: input.page_token }),
+  },
   search_notion_pages: {
     title: 'Search Notion pages',
     description: 'Search the connected Notion workspace for pages and databases by title.',
@@ -247,6 +254,7 @@ function separateAccount(input: Record<string, unknown>) {
 export function createComposioAITools(execute: (action: ComposioActionName, input: unknown, accountId?: string) => Promise<unknown>) {
   const run = (action: ComposioActionName, input: Record<string, unknown>) => { const selection = separateAccount(input); return execute(action, selection.actionInput, selection.accountId) }
   return {
+    list_drive_files: tool({ ...COMPOSIO_ACTIONS.list_drive_files, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.list_drive_files.inputSchema), execute: input => run('list_drive_files', input) }),
     search_notion_pages: tool({ ...COMPOSIO_ACTIONS.search_notion_pages, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.search_notion_pages.inputSchema), execute: input => run('search_notion_pages', input) }),
     read_notion_page_blocks: tool({ ...COMPOSIO_ACTIONS.read_notion_page_blocks, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.read_notion_page_blocks.inputSchema), execute: input => run('read_notion_page_blocks', input) }),
     search_slack_messages: tool({ ...COMPOSIO_ACTIONS.search_slack_messages, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.search_slack_messages.inputSchema), execute: input => run('search_slack_messages', input) }),

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { agentModelSourceSchema } from '../agent-model'
 import type { HostedRuntimeSnapshot } from '../subscription-model-snapshot'
 import { AGENT_HOOK_IDS, AGENT_TOOL_IDS } from './registry'
+import type { PersonalPluginSnapshot } from '@/lib/plugins/contracts'
 
 export const MAX_DEFINITION_BYTES = 256_000
 const identifier = z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/)
@@ -17,7 +18,7 @@ export const agentDefinitionSchema = z.strictObject({
   id: identifier,
   /** Additive, user-owned guidance. Never replaces the platform's system/permission policy. */
   instructions: z.string().max(24_000),
-  tools: z.array(z.enum(AGENT_TOOL_IDS)).max(64),
+  tools: z.array(z.enum(AGENT_TOOL_IDS)).max(AGENT_TOOL_IDS.length),
   skills: z.array(skillDefinitionSchema).max(20),
   hooks: z.array(z.enum(AGENT_HOOK_IDS)).max(2),
   memory: z.strictObject({ scope: z.literal('owner-bot') }),
@@ -82,6 +83,8 @@ export interface DefinitionSnapshot {
   hostInstructionsDigest: string
   effectiveTools: string[]
   runtime: HostedRuntimeSnapshot
+  /** Explicit personal installations frozen when this execution starts. No credentials. */
+  personalPlugins?: PersonalPluginSnapshot
 }
 export function makeSnapshot(revisionId: string, revision: number, input: unknown, hostInstructions: string, runtime: DefinitionSnapshot['runtime']): DefinitionSnapshot {
   const definition = parseDefinition(input)

@@ -54,18 +54,6 @@
         "signature": "EditableTable(name?: string, columns?: {type: \"text\" | \"number\" | \"date-single\" | \"select\" | \"url\", key?: string, header?: string, width?: number, options?: {value: string, label: string}[]}[], data?: {id: string, values: (string | number)[]}[])",
         "description": "Spreadsheet-like table whose cells the user can edit inline (text, number, url, date, select columns); edits are saved back as a form field"
       },
-      "BarChart": {
-        "signature": "BarChart(labels: string[], series: Series[], variant?: \"grouped\" | \"stacked\", xLabel?: string, yLabel?: string, height?: number)",
-        "description": "Vertical bars; use for comparing values across categories with one or more series"
-      },
-      "LineChart": {
-        "signature": "LineChart(labels: string[], series: Series[], variant?: \"linear\" | \"natural\" | \"step\", xLabel?: string, yLabel?: string, height?: number)",
-        "description": "Lines over categories; use for trends and continuous data over time"
-      },
-      "AreaChart": {
-        "signature": "AreaChart(labels: string[], series: Series[], variant?: \"linear\" | \"natural\" | \"step\", xLabel?: string, yLabel?: string, height?: number)",
-        "description": "Filled area under lines; use for cumulative totals or volume trends over time"
-      },
       "RadarChart": {
         "signature": "RadarChart(labels: string[], series: Series[])",
         "description": "Spider/web chart; use for comparing multiple variables across one or more entities"
@@ -226,10 +214,6 @@
         "signature": "Carousel(children: (TextContent | MarkDownRenderer | CardHeader | Callout | TextCallout | CodeBlock | Image | ImageBlock | ImageGallery | Separator | HorizontalBarChart | RadarChart | PieChart | RadialChart | SingleStackedBarChart | ScatterChart | AreaChart | BarChart | LineChart | Table | TagBlock | Form | Buttons | IconButton | Steps | InlineHeader | EntityList | EditableTable | SnippetCardBlock | OverviewCardBlock | ContextCardBlock | CompositeCardBlock | VisualCardBlock)[][], variant?: \"card\" | \"sunk\")",
         "description": "Horizontal scrollable carousel"
       },
-      "Separator": {
-        "signature": "Separator(orientation?: \"horizontal\" | \"vertical\", decorative?: boolean)",
-        "description": "Visual divider between content sections"
-      },
       "TagBlock": {
         "signature": "TagBlock(tags: string[], size?: \"sm\" | \"md\" | \"lg\")",
         "description": "tags is an array of strings; optional size sm | md | lg"
@@ -375,8 +359,8 @@
         "description": "对应 AI Elements Confirmation 的 beUI ApprovalCard，用于确认建议方案，不是工具授权。title 和 description 必须完整描述待确认建议；context 包含完整上下文。用户在卡片内确认、拒绝或要求修改后，直接提交意见并继续对话，不经输入框；不授权或执行工作区操作。"
       },
       "BeQuestions": {
-        "signature": "BeQuestions(context: string, questions: {id: string, title: string, options?: {value: string, label: string, description?: string, action?: \"cloudKeySettings\"}[], multiple?: boolean, allowCustom?: boolean}[], task?: string)",
-        "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。派发失败的云端选项是在用户自己的 E2B 密钥上运行云电脑（不是 Mikka 自有云），问题写“派不出去：{设备名} 不在线。等它上线，还是用你的 E2B 在云端运行？”，选项 value 固定为 wait（等它上线）与 cloud（用你的 E2B 运行），宿主按 value 本地化，不加解释段落；用户未配置 E2B 密钥时该选项设 action:\"cloudKeySettings\"，宿主显示为去设置密钥的入口，不发送回答。"
+        "signature": "BeQuestions(context: string, questions: {id: string, title: string, options?: {value: string, label: string, description?: string, action?: \"cloudKeySettings\"}[], multiple?: boolean, allowCustom?: boolean, input?: \"select\" | \"switch\" | \"slider\" | \"dateRange\", range?: {min: number, max: number, step?: number, unit?: string}}[], task?: string)",
+        "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。派发失败的云端选项是在用户自己的 E2B 密钥上运行云电脑（不是 Mikka 自有云），问题写“派不出去：{设备名} 不在线。等它上线，还是用你的 E2B 在云端运行？”，选项 value 固定为 wait（等它上线）与 cloud（用你的 E2B 运行），宿主按 value 本地化，不加解释段落；用户未配置 E2B 密钥时该选项设 action:\"cloudKeySettings\"，宿主显示为去设置密钥的入口，不发送回答。input 可选，用 beUI 控件作答：select 为下拉选择（需 options），switch 为是/否开关，slider 为数值滑块（需 range:{min,max,step?,unit?}），dateRange 为日期区间；未设 input 时单选用 Radio、多选用 Checkbox。"
       },
       "BeTodoList": {
         "signature": "BeTodoList(title: string, items: {id: string, title: string, status?: \"pending\" | \"in-progress\" | \"completed\" | \"cancelled\", progress?: number, detail?: string}[], source?: \"suggestion\" | \"user\")",
@@ -405,6 +389,58 @@
       "ComputerCard": {
         "signature": "ComputerCard(botId: string, runId: string, task: string, state?: \"working\" | \"approval\" | \"done\" | \"failed\", botName?: string, thread?: string)",
         "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。botId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
+      },
+      "BeAlert": {
+        "signature": "BeAlert(title: string, description: string, variant?: \"default\" | \"info\" | \"success\" | \"warning\" | \"destructive\")",
+        "description": "beUI 动效提示框，用作报告中的结论、风险或注意事项（callout）。variant 为 default、info、success、warning、destructive。只展示信息，不表示执行了操作。"
+      },
+      "BeTable": {
+        "signature": "BeTable(columns: string[], rows: (string | number)[][])",
+        "description": "beUI 数据表格，点击表头可排序。columns 为列名，rows 为二维数组，单元格为文本或数字；数字单元格按数值排序。最多 6 列、30 行。"
+      },
+      "BeTabs": {
+        "signature": "BeTabs(items: {title: string, children: any[]}[])",
+        "description": "beUI 标签页。items 中每项包含 title 和 children 组件数组，最多 6 项。"
+      },
+      "BeCollapsible": {
+        "signature": "BeCollapsible(title: string, children: any[], defaultOpen?: boolean)",
+        "description": "beUI 动效折叠区，标题常显、children 折叠。只放补充内容，重要结论不要折叠；defaultOpen 可选。"
+      },
+      "BeTimeline": {
+        "signature": "BeTimeline(events: {date: string, title: string, description?: string, meta?: string}[])",
+        "description": "beUI 时间线，横向浏览按日期排列的事件，适合里程碑、计划和回顾。events 为 1–12 项，date 为 YYYY-MM-DD，title 为短标题，description 和 meta 可选。计划中的日期是建议，不代表已排期。"
+      },
+      "BarChart": {
+        "signature": "BarChart(labels: string[], series: {name: string, values: number[]}[], horizontal?: boolean, unit?: string)",
+        "description": "柱状图（shadcn chart，颜色来自主题图表色）。labels 为分类，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个分类；horizontal 为 true 时横向；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
+      },
+      "LineChart": {
+        "signature": "LineChart(labels: string[], series: {name: string, values: number[]}[], unit?: string)",
+        "description": "折线图（shadcn chart），用于随时间变化的趋势。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
+      },
+      "AreaChart": {
+        "signature": "AreaChart(labels: string[], series: {name: string, values: number[]}[], unit?: string)",
+        "description": "堆叠面积图（ReUI c-chart-14），用于累计或构成随时间的变化。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；第一组画在最上层；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
+      },
+      "DonutChart": {
+        "signature": "DonutChart(slices: {name: string, value: number}[], unit?: string, total?: string)",
+        "description": "环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。"
+      },
+      "Separator": {
+        "signature": "Separator()",
+        "description": "段落分隔，用于分开报告中的部分。按界面规范显示为留白而不是横线。不带参数。"
+      },
+      "BeFileTree": {
+        "signature": "BeFileTree(paths: string[])",
+        "description": "beUI 文件树。paths 为以 / 分隔的相对路径（最多 60 个），宿主自动按目录分组。只展示用户或工具给出的真实路径，或明确标为建议的目录结构。"
+      },
+      "BeCitations": {
+        "signature": "BeCitations(sources: {title: string, url: string}[])",
+        "description": "beUI 引用来源列表。sources 为 1–10 个 {title, url}，url 为 http(s) 地址。只列出本次真正读取过的网页或用户提供的链接，不编造来源；正文内引用单个网页用 SourceChip。"
+      },
+      "BeFileDiff": {
+        "signature": "BeFileDiff(file: string, diff: string, language?: \"bash\" | \"diff\" | \"json\" | \"text\" | \"tsx\")",
+        "description": "beUI 代码差异，用于展示建议的修改。file 为文件路径；diff 为逐行文本，以 \"+\" 开头为新增、\"-\" 为删除、空格为上下文；language 可选。只表示建议，不代表修改已应用或文件已保存；真实工具结果由宿主展示，不由模型生成。"
       },
       "ShadcnCard": {
         "signature": "ShadcnCard(title: string, children: any[], description?: string)",
@@ -501,9 +537,11 @@
           "TaskChip",
           "RunChip",
           "SourceChip",
+          "BeCitations",
           "ComputerCard"
         ],
         "notes": [
+          "BeCitations 列出本次真正读取过的网页，不编造来源。",
           "引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。",
           "Agent 用自己的电脑做事时放一张 ComputerCard，画面、状态和审批都在卡片里，正文不再复述操作过程。"
         ]
@@ -517,6 +555,18 @@
           "BeCardGrid",
           "BeImageCard",
           "BeImage",
+          "BeAlert",
+          "BeTable",
+          "BeTabs",
+          "BeCollapsible",
+          "BeTimeline",
+          "BarChart",
+          "LineChart",
+          "AreaChart",
+          "DonutChart",
+          "Separator",
+          "BeFileTree",
+          "BeFileDiff",
           "ShadcnCard",
           "ShadcnBadge",
           "ShadcnAlert",
@@ -529,7 +579,8 @@
           "ReuiFrame"
         ],
         "notes": [
-          "复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。"
+          "复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；BeFileDiff 只展示建议修改；ToolResult、AgentActivity、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不开放给模型，不自动生成虚构工具记录。",
+          "报告优先使用 beUI：提示用 BeAlert，表格用 BeTable，标签页用 BeTabs；趋势用 LineChart，分类对比用 BarChart，图表颜色来自主题图表色，只用用户或工具提供的数字。"
         ]
       }
     ],
@@ -575,15 +626,6 @@
         },
         "EditableTable": {
           "$ref": "#/$defs/EditableTable"
-        },
-        "BarChart": {
-          "$ref": "#/$defs/BarChart"
-        },
-        "LineChart": {
-          "$ref": "#/$defs/LineChart"
-        },
-        "AreaChart": {
-          "$ref": "#/$defs/AreaChart"
         },
         "RadarChart": {
           "$ref": "#/$defs/RadarChart"
@@ -704,9 +746,6 @@
         },
         "Carousel": {
           "$ref": "#/$defs/Carousel"
-        },
-        "Separator": {
-          "$ref": "#/$defs/Separator"
         },
         "TagBlock": {
           "$ref": "#/$defs/TagBlock"
@@ -840,6 +879,45 @@
         "ComputerCard": {
           "$ref": "#/$defs/ComputerCard"
         },
+        "BeAlert": {
+          "$ref": "#/$defs/BeAlert"
+        },
+        "BeTable": {
+          "$ref": "#/$defs/BeTable"
+        },
+        "BeTabs": {
+          "$ref": "#/$defs/BeTabs"
+        },
+        "BeCollapsible": {
+          "$ref": "#/$defs/BeCollapsible"
+        },
+        "BeTimeline": {
+          "$ref": "#/$defs/BeTimeline"
+        },
+        "BarChart": {
+          "$ref": "#/$defs/BarChart"
+        },
+        "LineChart": {
+          "$ref": "#/$defs/LineChart"
+        },
+        "AreaChart": {
+          "$ref": "#/$defs/AreaChart"
+        },
+        "DonutChart": {
+          "$ref": "#/$defs/DonutChart"
+        },
+        "Separator": {
+          "$ref": "#/$defs/Separator"
+        },
+        "BeFileTree": {
+          "$ref": "#/$defs/BeFileTree"
+        },
+        "BeCitations": {
+          "$ref": "#/$defs/BeCitations"
+        },
+        "BeFileDiff": {
+          "$ref": "#/$defs/BeFileDiff"
+        },
         "ShadcnCard": {
           "$ref": "#/$defs/ShadcnCard"
         },
@@ -888,9 +966,6 @@
         "Table",
         "Col",
         "EditableTable",
-        "BarChart",
-        "LineChart",
-        "AreaChart",
         "RadarChart",
         "HorizontalBarChart",
         "Series",
@@ -931,7 +1006,6 @@
         "Steps",
         "StepsItem",
         "Carousel",
-        "Separator",
         "TagBlock",
         "Tag",
         "Icon",
@@ -976,6 +1050,19 @@
         "RunChip",
         "SourceChip",
         "ComputerCard",
+        "BeAlert",
+        "BeTable",
+        "BeTabs",
+        "BeCollapsible",
+        "BeTimeline",
+        "BarChart",
+        "LineChart",
+        "AreaChart",
+        "DonutChart",
+        "Separator",
+        "BeFileTree",
+        "BeCitations",
+        "BeFileDiff",
         "ShadcnCard",
         "ShadcnBadge",
         "ShadcnAlert",
@@ -1044,7 +1131,20 @@
                     "$ref": "#/$defs/ImageGallery"
                   },
                   {
-                    "$ref": "#/$defs/Separator"
+                    "type": "object",
+                    "properties": {
+                      "orientation": {
+                        "type": "string",
+                        "enum": [
+                          "horizontal",
+                          "vertical"
+                        ]
+                      },
+                      "decorative": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/HorizontalBarChart"
@@ -1065,13 +1165,120 @@
                     "$ref": "#/$defs/ScatterChart"
                   },
                   {
-                    "$ref": "#/$defs/AreaChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
-                    "$ref": "#/$defs/BarChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "grouped",
+                          "stacked"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
-                    "$ref": "#/$defs/LineChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/Table"
@@ -1353,23 +1560,6 @@
           "additionalProperties": false,
           "description": "Gallery grid of images with modal preview"
         },
-        "Separator": {
-          "type": "object",
-          "properties": {
-            "orientation": {
-              "type": "string",
-              "enum": [
-                "horizontal",
-                "vertical"
-              ]
-            },
-            "decorative": {
-              "type": "boolean"
-            }
-          },
-          "additionalProperties": false,
-          "description": "Visual divider between content sections"
-        },
         "HorizontalBarChart": {
           "type": "object",
           "properties": {
@@ -1593,125 +1783,6 @@
           ],
           "additionalProperties": false,
           "description": "Data point with numeric coordinates"
-        },
-        "AreaChart": {
-          "type": "object",
-          "properties": {
-            "labels": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "series": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/Series"
-              }
-            },
-            "variant": {
-              "type": "string",
-              "enum": [
-                "linear",
-                "natural",
-                "step"
-              ]
-            },
-            "xLabel": {
-              "type": "string"
-            },
-            "yLabel": {
-              "type": "string"
-            },
-            "height": {
-              "type": "number"
-            }
-          },
-          "required": [
-            "labels",
-            "series"
-          ],
-          "additionalProperties": false,
-          "description": "Filled area under lines; use for cumulative totals or volume trends over time"
-        },
-        "BarChart": {
-          "type": "object",
-          "properties": {
-            "labels": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "series": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/Series"
-              }
-            },
-            "variant": {
-              "type": "string",
-              "enum": [
-                "grouped",
-                "stacked"
-              ]
-            },
-            "xLabel": {
-              "type": "string"
-            },
-            "yLabel": {
-              "type": "string"
-            },
-            "height": {
-              "type": "number"
-            }
-          },
-          "required": [
-            "labels",
-            "series"
-          ],
-          "additionalProperties": false,
-          "description": "Vertical bars; use for comparing values across categories with one or more series"
-        },
-        "LineChart": {
-          "type": "object",
-          "properties": {
-            "labels": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "series": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/Series"
-              }
-            },
-            "variant": {
-              "type": "string",
-              "enum": [
-                "linear",
-                "natural",
-                "step"
-              ]
-            },
-            "xLabel": {
-              "type": "string"
-            },
-            "yLabel": {
-              "type": "string"
-            },
-            "height": {
-              "type": "number"
-            }
-          },
-          "required": [
-            "labels",
-            "series"
-          ],
-          "additionalProperties": false,
-          "description": "Lines over categories; use for trends and continuous data over time"
         },
         "Table": {
           "type": "object",
@@ -3544,13 +3615,120 @@
                     "$ref": "#/$defs/Image"
                   },
                   {
-                    "$ref": "#/$defs/AreaChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
-                    "$ref": "#/$defs/BarChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "grouped",
+                          "stacked"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
-                    "$ref": "#/$defs/LineChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/ListBlock"
@@ -3866,7 +4044,20 @@
                     "$ref": "#/$defs/ImageGallery"
                   },
                   {
-                    "$ref": "#/$defs/Separator"
+                    "type": "object",
+                    "properties": {
+                      "orientation": {
+                        "type": "string",
+                        "enum": [
+                          "horizontal",
+                          "vertical"
+                        ]
+                      },
+                      "decorative": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/HorizontalBarChart"
@@ -3887,13 +4078,120 @@
                     "$ref": "#/$defs/ScatterChart"
                   },
                   {
-                    "$ref": "#/$defs/AreaChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
-                    "$ref": "#/$defs/BarChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "grouped",
+                          "stacked"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
-                    "$ref": "#/$defs/LineChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/Table"
@@ -4005,7 +4303,20 @@
                       "$ref": "#/$defs/ImageGallery"
                     },
                     {
-                      "$ref": "#/$defs/Separator"
+                      "type": "object",
+                      "properties": {
+                        "orientation": {
+                          "type": "string",
+                          "enum": [
+                            "horizontal",
+                            "vertical"
+                          ]
+                        },
+                        "decorative": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     {
                       "$ref": "#/$defs/HorizontalBarChart"
@@ -4026,13 +4337,120 @@
                       "$ref": "#/$defs/ScatterChart"
                     },
                     {
-                      "$ref": "#/$defs/AreaChart"
+                      "type": "object",
+                      "properties": {
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "series": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Series"
+                          }
+                        },
+                        "variant": {
+                          "type": "string",
+                          "enum": [
+                            "linear",
+                            "natural",
+                            "step"
+                          ]
+                        },
+                        "xLabel": {
+                          "type": "string"
+                        },
+                        "yLabel": {
+                          "type": "string"
+                        },
+                        "height": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "labels",
+                        "series"
+                      ],
+                      "additionalProperties": false
                     },
                     {
-                      "$ref": "#/$defs/BarChart"
+                      "type": "object",
+                      "properties": {
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "series": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Series"
+                          }
+                        },
+                        "variant": {
+                          "type": "string",
+                          "enum": [
+                            "grouped",
+                            "stacked"
+                          ]
+                        },
+                        "xLabel": {
+                          "type": "string"
+                        },
+                        "yLabel": {
+                          "type": "string"
+                        },
+                        "height": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "labels",
+                        "series"
+                      ],
+                      "additionalProperties": false
                     },
                     {
-                      "$ref": "#/$defs/LineChart"
+                      "type": "object",
+                      "properties": {
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "series": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Series"
+                          }
+                        },
+                        "variant": {
+                          "type": "string",
+                          "enum": [
+                            "linear",
+                            "natural",
+                            "step"
+                          ]
+                        },
+                        "xLabel": {
+                          "type": "string"
+                        },
+                        "yLabel": {
+                          "type": "string"
+                        },
+                        "height": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "labels",
+                        "series"
+                      ],
+                      "additionalProperties": false
                     },
                     {
                       "$ref": "#/$defs/Table"
@@ -4316,7 +4734,20 @@
                     "$ref": "#/$defs/ImageGallery"
                   },
                   {
-                    "$ref": "#/$defs/Separator"
+                    "type": "object",
+                    "properties": {
+                      "orientation": {
+                        "type": "string",
+                        "enum": [
+                          "horizontal",
+                          "vertical"
+                        ]
+                      },
+                      "decorative": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/HorizontalBarChart"
@@ -4337,13 +4768,120 @@
                     "$ref": "#/$defs/ScatterChart"
                   },
                   {
-                    "$ref": "#/$defs/AreaChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
-                    "$ref": "#/$defs/BarChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "grouped",
+                          "stacked"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
-                    "$ref": "#/$defs/LineChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/Table"
@@ -4459,7 +4997,20 @@
                     "$ref": "#/$defs/ImageGallery"
                   },
                   {
-                    "$ref": "#/$defs/Separator"
+                    "type": "object",
+                    "properties": {
+                      "orientation": {
+                        "type": "string",
+                        "enum": [
+                          "horizontal",
+                          "vertical"
+                        ]
+                      },
+                      "decorative": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/HorizontalBarChart"
@@ -4480,13 +5031,120 @@
                     "$ref": "#/$defs/ScatterChart"
                   },
                   {
-                    "$ref": "#/$defs/AreaChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
-                    "$ref": "#/$defs/BarChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "grouped",
+                          "stacked"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
-                    "$ref": "#/$defs/LineChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "$ref": "#/$defs/Table"
@@ -4939,6 +5597,44 @@
                   },
                   "allowCustom": {
                     "type": "boolean"
+                  },
+                  "input": {
+                    "type": "string",
+                    "enum": [
+                      "select",
+                      "switch",
+                      "slider",
+                      "dateRange"
+                    ]
+                  },
+                  "range": {
+                    "type": "object",
+                    "properties": {
+                      "min": {
+                        "type": "number",
+                        "minimum": -1000000000,
+                        "maximum": 1000000000
+                      },
+                      "max": {
+                        "type": "number",
+                        "minimum": -1000000000,
+                        "maximum": 1000000000
+                      },
+                      "step": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1000000000
+                      },
+                      "unit": {
+                        "type": "string",
+                        "maxLength": 12
+                      }
+                    },
+                    "required": [
+                      "min",
+                      "max"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -4958,7 +5654,7 @@
             "questions"
           ],
           "additionalProperties": false,
-          "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。派发失败的云端选项是在用户自己的 E2B 密钥上运行云电脑（不是 Mikka 自有云），问题写“派不出去：{设备名} 不在线。等它上线，还是用你的 E2B 在云端运行？”，选项 value 固定为 wait（等它上线）与 cloud（用你的 E2B 运行），宿主按 value 本地化，不加解释段落；用户未配置 E2B 密钥时该选项设 action:\"cloudKeySettings\"，宿主显示为去设置密钥的入口，不发送回答。"
+          "description": "beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。派发失败的云端选项是在用户自己的 E2B 密钥上运行云电脑（不是 Mikka 自有云），问题写“派不出去：{设备名} 不在线。等它上线，还是用你的 E2B 在云端运行？”，选项 value 固定为 wait（等它上线）与 cloud（用你的 E2B 运行），宿主按 value 本地化，不加解释段落；用户未配置 E2B 密钥时该选项设 action:\"cloudKeySettings\"，宿主显示为去设置密钥的入口，不发送回答。input 可选，用 beUI 控件作答：select 为下拉选择（需 options），switch 为是/否开关，slider 为数值滑块（需 range:{min,max,step?,unit?}），dateRange 为日期区间；未设 input 时单选用 Radio、多选用 Checkbox。"
         },
         "BeTodoList": {
           "type": "object",
@@ -5164,6 +5860,479 @@
           ],
           "additionalProperties": false,
           "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。botId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
+        },
+        "BeAlert": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "variant": {
+              "type": "string",
+              "enum": [
+                "default",
+                "info",
+                "success",
+                "warning",
+                "destructive"
+              ]
+            }
+          },
+          "required": [
+            "title",
+            "description"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 动效提示框，用作报告中的结论、风险或注意事项（callout）。variant 为 default、info、success、warning、destructive。只展示信息，不表示执行了操作。"
+        },
+        "BeTable": {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            },
+            "rows": {
+              "maxItems": 30,
+              "type": "array",
+              "items": {
+                "maxItems": 6,
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    {
+                      "type": "number",
+                      "minimum": -1000000000000,
+                      "maximum": 1000000000000
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "required": [
+            "columns",
+            "rows"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 数据表格，点击表头可排序。columns 为列名，rows 为二维数组，单元格为文本或数字；数字单元格按数值排序。最多 6 列、30 行。"
+        },
+        "BeTabs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "minItems": 1,
+              "maxItems": 6,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "children": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {}
+                  }
+                },
+                "required": [
+                  "title",
+                  "children"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 标签页。items 中每项包含 title 和 children 组件数组，最多 6 项。"
+        },
+        "BeCollapsible": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "children": {
+              "maxItems": 30,
+              "type": "array",
+              "items": {}
+            },
+            "defaultOpen": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "title",
+            "children"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 动效折叠区，标题常显、children 折叠。只放补充内容，重要结论不要折叠；defaultOpen 可选。"
+        },
+        "BeTimeline": {
+          "type": "object",
+          "properties": {
+            "events": {
+              "minItems": 1,
+              "maxItems": 12,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "meta": {
+                    "type": "string",
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "date",
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "events"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 时间线，横向浏览按日期排列的事件，适合里程碑、计划和回顾。events 为 1–12 项，date 为 YYYY-MM-DD，title 为短标题，description 和 meta 可选。计划中的日期是建议，不代表已排期。"
+        },
+        "BarChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "minItems": 1,
+              "maxItems": 24,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              }
+            },
+            "series": {
+              "minItems": 1,
+              "maxItems": 5,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "values": {
+                    "maxItems": 24,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": -1000000000000,
+                      "maximum": 1000000000000
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "values"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "horizontal": {
+              "type": "boolean"
+            },
+            "unit": {
+              "type": "string",
+              "maxLength": 12
+            }
+          },
+          "required": [
+            "labels",
+            "series"
+          ],
+          "additionalProperties": false,
+          "description": "柱状图（shadcn chart，颜色来自主题图表色）。labels 为分类，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个分类；horizontal 为 true 时横向；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
+        },
+        "LineChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "minItems": 1,
+              "maxItems": 24,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              }
+            },
+            "series": {
+              "minItems": 1,
+              "maxItems": 5,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "values": {
+                    "maxItems": 24,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": -1000000000000,
+                      "maximum": 1000000000000
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "values"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "unit": {
+              "type": "string",
+              "maxLength": 12
+            }
+          },
+          "required": [
+            "labels",
+            "series"
+          ],
+          "additionalProperties": false,
+          "description": "折线图（shadcn chart），用于随时间变化的趋势。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
+        },
+        "AreaChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "minItems": 1,
+              "maxItems": 24,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              }
+            },
+            "series": {
+              "minItems": 1,
+              "maxItems": 5,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "values": {
+                    "maxItems": 24,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": -1000000000000,
+                      "maximum": 1000000000000
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "values"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "unit": {
+              "type": "string",
+              "maxLength": 12
+            }
+          },
+          "required": [
+            "labels",
+            "series"
+          ],
+          "additionalProperties": false,
+          "description": "堆叠面积图（ReUI c-chart-14），用于累计或构成随时间的变化。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；第一组画在最上层；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
+        },
+        "DonutChart": {
+          "type": "object",
+          "properties": {
+            "slices": {
+              "minItems": 2,
+              "maxItems": 5,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "value": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000000
+                  }
+                },
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "unit": {
+              "type": "string",
+              "maxLength": 12
+            },
+            "total": {
+              "type": "string",
+              "maxLength": 20
+            }
+          },
+          "required": [
+            "slices"
+          ],
+          "additionalProperties": false,
+          "description": "环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。"
+        },
+        "Separator": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false,
+          "description": "段落分隔，用于分开报告中的部分。按界面规范显示为留白而不是横线。不带参数。"
+        },
+        "BeFileTree": {
+          "type": "object",
+          "properties": {
+            "paths": {
+              "minItems": 1,
+              "maxItems": 60,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              }
+            }
+          },
+          "required": [
+            "paths"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 文件树。paths 为以 / 分隔的相对路径（最多 60 个），宿主自动按目录分组。只展示用户或工具给出的真实路径，或明确标为建议的目录结构。"
+        },
+        "BeCitations": {
+          "type": "object",
+          "properties": {
+            "sources": {
+              "minItems": 1,
+              "maxItems": 10,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "title",
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "sources"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 引用来源列表。sources 为 1–10 个 {title, url}，url 为 http(s) 地址。只列出本次真正读取过的网页或用户提供的链接，不编造来源；正文内引用单个网页用 SourceChip。"
+        },
+        "BeFileDiff": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "diff": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20000
+            },
+            "language": {
+              "type": "string",
+              "enum": [
+                "bash",
+                "diff",
+                "json",
+                "text",
+                "tsx"
+              ]
+            }
+          },
+          "required": [
+            "file",
+            "diff"
+          ],
+          "additionalProperties": false,
+          "description": "beUI 代码差异，用于展示建议的修改。file 为文件路径；diff 为逐行文本，以 \"+\" 开头为新增、\"-\" 为删除、空格为上下文；language 可选。只表示建议，不代表修改已应用或文件已保存；真实工具结果由宿主展示，不由模型生成。"
         },
         "ShadcnCard": {
           "type": "object",
@@ -5527,6 +6696,19 @@
     "RunChip",
     "SourceChip",
     "ComputerCard",
+    "BeAlert",
+    "BeTable",
+    "BeTabs",
+    "BeCollapsible",
+    "BeTimeline",
+    "BarChart",
+    "LineChart",
+    "AreaChart",
+    "DonutChart",
+    "Separator",
+    "BeFileTree",
+    "BeCitations",
+    "BeFileDiff",
     "ShadcnCard",
     "ShadcnBadge",
     "ShadcnAlert",

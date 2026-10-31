@@ -33,7 +33,7 @@ export function legacyChatContent(response: string): { format: 'markdown' | 'sou
             const marker = fence(props.code)
             return `${marker}\n${props.code}\n${marker}`
           }
-          if (value.typeName === 'ShadcnTable' && Array.isArray(props.columns) && Array.isArray(props.rows)) {
+          if ((value.typeName === 'ShadcnTable' || value.typeName === 'BeTable') && Array.isArray(props.columns) && Array.isArray(props.rows)) {
             const row = (cells: unknown[]) => `| ${cells.map(cell => text(cell).replace(/\|/g, '\\|').replace(/\n/g, ' ')).join(' | ')} |`
             return [row(props.columns), row(props.columns.map(() => '---')), ...props.rows.filter(Array.isArray).map(row)].join('\n')
           }

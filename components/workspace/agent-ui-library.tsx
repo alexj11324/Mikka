@@ -27,6 +27,11 @@ import { Alert as ReuiAlert, AlertDescription as ReuiAlertDescription, AlertTitl
 import { Badge as ReuiBadge } from '@/components/reui/badge'
 import { AgentTextBubble, InsideBlock } from './agent-text-bubble'
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '@/components/reui/frame'
+import { Alert as BeAlert, AlertContent as BeAlertContent, AlertDescription as BeAlertDescription, AlertIcon as BeAlertIcon, AlertTitle as BeAlertTitle } from '@/components/motion/alert'
+import { Collapsible as BeCollapsible, CollapsibleContent as BeCollapsibleContent, CollapsibleIndicator as BeCollapsibleIndicator, CollapsibleTrigger as BeCollapsibleTrigger } from '@/components/motion/collapsible'
+import { Tabs as BeTabs, TabsContent as BeTabsContent, TabsList as BeTabsList, TabsTrigger as BeTabsTrigger } from '@/components/motion/tabs'
+import { AgentAreaChart, AgentBarChart, AgentDonutChart, AgentLineChart } from './agent-chart'
+import { AgentCitations, AgentFileDiff, AgentFileTree, AgentTable, AgentTimeline } from './agent-report'
 
 const renderers = {
   TextContent: AgentTextContent,
@@ -69,6 +74,26 @@ const renderers = {
   RunChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="run" />,
   SourceChip: ({ props }) => <WebCitation url={props.url} label={props.label ?? null} />,
   ComputerCard: ({ props }) => <ComputerCard {...props} />,
+  BeAlert: ({ props }) => <BeAlert variant={props.variant} role="status"><BeAlertIcon /><BeAlertContent><BeAlertTitle>{props.title}</BeAlertTitle><BeAlertDescription>{props.description}</BeAlertDescription></BeAlertContent></BeAlert>,
+  BeTable: ({ props }) => <AgentTable columns={props.columns} rows={props.rows} />,
+  BeTabs: ({ props, renderNode }) => <BeTabs defaultValue="0" variant="underline" className="min-w-0">
+    <BeTabsList>{(props.items ?? []).map((item, index) => <BeTabsTrigger key={index} value={String(index)}>{item.title}</BeTabsTrigger>)}</BeTabsList>
+    {(props.items ?? []).map((item, index) => <BeTabsContent key={index} value={String(index)} className="flex min-w-0 flex-col gap-3 pt-3">{renderNode(item.children)}</BeTabsContent>)}
+  </BeTabs>,
+  BeCollapsible: ({ props, renderNode }) => <BeCollapsible defaultOpen={props.defaultOpen} className="min-w-0">
+    <BeCollapsibleTrigger>{props.title}<BeCollapsibleIndicator /></BeCollapsibleTrigger>
+    <BeCollapsibleContent contentClassName="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</BeCollapsibleContent>
+  </BeCollapsible>,
+  BeTimeline: ({ props }) => <AgentTimeline events={props.events} />,
+  BarChart: ({ props }) => <AgentBarChart labels={props.labels} series={props.series} horizontal={props.horizontal} unit={props.unit} />,
+  LineChart: ({ props }) => <AgentLineChart labels={props.labels} series={props.series} unit={props.unit} />,
+  AreaChart: ({ props }) => <AgentAreaChart labels={props.labels} series={props.series} unit={props.unit} />,
+  DonutChart: ({ props }) => <AgentDonutChart slices={props.slices} unit={props.unit} total={props.total} />,
+  // UI policy draws no horizontal rules: a section break is space, still announced as a separator.
+  Separator: () => <div role="separator" className="h-2" />,
+  BeFileTree: ({ props }) => <AgentFileTree paths={props.paths} />,
+  BeCitations: ({ props }) => <AgentCitations sources={props.sources} />,
+  BeFileDiff: ({ props }) => <AgentFileDiff file={props.file} diff={props.diff} language={props.language} />,
   ShadcnCard: ({ props, renderNode }) => <Card size="sm" className="min-w-0">
     <CardHeader><CardTitle>{props.title}</CardTitle>{props.description && <CardDescription>{props.description}</CardDescription>}</CardHeader>
     <CardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</CardContent>

@@ -1,11 +1,13 @@
 'use client'
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
+import { useLocale, useTranslations } from 'next-intl'
 import { createContext, use, useRef, useState } from 'react'
 import { Check, ChevronRight } from 'lucide-react'
 import { Link } from '@/i18n/navigation'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { ApprovalCard, type ApprovalCardStatus } from '@/components/agents/approval-card'
+import type { DateRangePickerLabels } from '@/components/motion/date-range-picker'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -61,10 +63,10 @@ export const AgentApproval: AgentComponentRenderers['BeApproval'] = ({ props }) 
     void send((agentCopy.taskContext + (props.context) + agentCopy.proposal + (props.title) + agentCopy.description + (props.description) + agentCopy.myDecision + (value) + agentCopy.ContinueAdvisingBasedOnThisWithout))
   }
 
-  return <div className="flex min-w-0 flex-col gap-2">
+  return <div className="flex w-full max-w-xl min-w-0 flex-col gap-2">
     <ApprovalCard
       title={props.title}
-      description={<>{props.description}<span className="mt-2 block">{agentCopy.chooseHereToContinueThisDoesNot}</span></>}
+      description={props.description}
       status={sent ? 'answered' : status}
       approveLabel={agentCopy.approveAndContinue}
       onApprove={() => choose(agentCopy.iApproveThisProposal)}
@@ -76,8 +78,41 @@ export const AgentApproval: AgentComponentRenderers['BeApproval'] = ({ props }) 
   </div>
 }
 
+function useDateRangeLabels(): DateRangePickerLabels {
+  const t = useTranslations('BeUi.dateRange')
+  return {
+    startDate: t('startDate'),
+    endDate: t('endDate'),
+    selectDate: t('selectDate'),
+    selectEnd: t('selectEnd'),
+    chooseMonth: t('chooseMonth'),
+    chooseYear: t('chooseYear'),
+    previousMonth: t('previousMonth'),
+    nextMonth: t('nextMonth'),
+    previousYear: t('previousYear'),
+    nextYear: t('nextYear'),
+    previousYears: t('previousYears'),
+    nextYears: t('nextYears'),
+    monthsIn: year => t('monthsIn', { year }),
+    yearsFrom: (start, end) => t('yearsFrom', { start, end }),
+    keyboardHelp: t('keyboardHelp'),
+    daysSelected: count => t('daysSelected', { count }),
+    chooseStartDate: t('chooseStartDate'),
+    chooseEndDate: t('chooseEndDate'),
+    clear: t('clear'),
+    clearRange: t('clearRange'),
+    startChosen: date => t('startChosen', { date }),
+    unavailableRange: t('unavailableRange'),
+    rangeSelected: (from, to) => t('rangeSelected', { from, to }),
+    cleared: t('cleared'),
+    presetSelected: name => t('presetSelected', { name }),
+  }
+}
+
 export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }) => {
   const agentCopy = useAgentCopy()
+  const locale = useLocale()
+  const dateRangeLabels = useDateRangeLabels()
 
   const { send, sent, error, status } = useAgentDecision()
   const [summary, setSummary] = useState('')
@@ -85,14 +120,18 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
 
   if (questions.length === 0) return null
   const [only] = questions
-  if (questions.length === 1 && !only.multiple && only.options?.length) return <ChoiceCard title={only.title} options={only.options} task={props.task} />
+  if (questions.length === 1 && !only.multiple && !only.input && only.options?.length) return <ChoiceCard title={only.title} options={only.options} task={props.task} />
 
-  return <div className="flex min-w-0 flex-col gap-2">
-    <p className="text-xs text-muted-foreground">{agentCopy.answerHereAgentWillContinueBasedOn}</p>
+  // Same width cap as ChoiceCard: a question card never stretches across the chat column.
+  return <div className="flex w-full max-w-xl min-w-0 flex-col gap-2">
     <ApprovalCard
       questions={questions}
+      // A switch or slider always has a value, so it can be submitted untouched.
+      defaultAnswers={Object.fromEntries(questions.flatMap(question => question.input === 'switch' ? [[question.id, { selected: [], custom: agentCopy.answerNo }]]
+        : question.input === 'slider' && question.range ? [[question.id, { selected: [], custom: `${question.range.min}${question.range.unit ?? ''}` }]] : []))}
       status={sent ? 'answered' : status}
       submitLabel={agentCopy.submitAnswersAndContinue}
+      dateRangePicker={{ locale, labels: dateRangeLabels }}
       result={(agentCopy.answersSubmittedToAgent + (summary))}
       onSubmit={answers => {
         const response = questions.map(question => {
