@@ -101,7 +101,13 @@ export const questionSkillAssignments: QuestionSkillGuards = {
     // question, task and origin before a continuation can be created.
     const {rows:[question]}=await tx.query('SELECT "originRunId" FROM factory_questions WHERE id=$1 AND "userId"=$2',[questionId,userId]);
     if (!question) throw new FactoryError("factoryNotFound");
-    await lockCliRunPolicy(tx,question.originRunId,userId);
+    try {
+      await lockCliRunPolicy(tx,question.originRunId,userId);
+    } catch (error) {
+      if (error instanceof Error && error.message === "agentPolicyUnavailable")
+        throw new FactoryError("factoryNotFound");
+      throw error;
+    }
   },
   lockOrigin: async (...args) => {
     try {

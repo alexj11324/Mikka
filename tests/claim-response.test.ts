@@ -23,6 +23,7 @@ function fixture() {
     lost: undefined as {deviceId:string;sessionId:string}|undefined,
     preparation:[] as string[],
     memberAllowed:true,questionRetryBlocked:false,tokenError:false,locks:[] as string[],transactions:0,transactionErrors:[] as Error[],beforeToken:undefined as (()=>Promise<void>)|undefined,
+    issueAccessError: undefined as Error | undefined,
   }
   Object.assign(globalThis,{claimResponseProbe:probe})
   return probe
@@ -35,6 +36,22 @@ async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-pr
     assert.deepEqual(probe.preparation,preparation)
   }
 }
+
+test('revoked task access keeps issue_unavailable ahead of policy and claim preparation', async () => {
+  const probe = fixture()
+  probe.memberAllowed = false
+  const response = await claim(probe, ['issue-unavailable'])
+  assert.equal(response.status, 409)
+  assert.deepEqual(await response.json(), { error: 'The task is no longer available to this thread.', code: 'issue_unavailable' })
+  assert.equal(probe.run.status, 'queued')
+  assert.equal(probe.run.leaseExpiresAt, null)
+})
+
+test('task access database errors are not misclassified as a permission denial', async () => {
+  const probe = fixture(), failure = new Error('synthetic task access database fault')
+  probe.issueAccessError = failure
+  await assert.rejects(() => claim(probe, []), error => error === failure)
+})
 function validCheckpoint(): RunCheckpoint {
   return {baseCommit:'a'.repeat(40),patch:gzipSync(Buffer.alloc(0)).toString('base64'),files:0,takenAt:new Date().toISOString()}
 }

@@ -16,6 +16,7 @@ import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
+import { issueForUser } from '@/lib/issue-access'
 import { latestCheckpoint } from '@/lib/run-leases'
 import { checkpointRecoveryError, retryNote } from '@/lib/run-retry'
 import { constrainedAssignmentPolicy } from '@/lib/run-assignment-policy'
@@ -72,6 +73,15 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId || repo.deviceId !== deviceId) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   if (device.kind === 'local' && !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return NextResponse.json({ error: 'Repository identity must be confirmed before scheduling a new thread.' }, { status: 409 })
   if (repo.remoteUrl && request.headers.get(REPO_ORIGIN_HEADER) !== '1') return NextResponse.json({ error: 'Device update required for repository verification.' }, { status: 409 })
+  const rejectPublication = async (error: PublicationError) => {
+    const { persistRunCompletion } = await import('@/lib/run-publications')
+    await persistRunCompletion(caller.userId, runId, { stopReason: 'error', report: { summary: error.message, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } })
+    after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
+    return NextResponse.json({ error: error.message, code: error.code }, { status: 409 })
+  }
+  // Preserve the task-access denial before narrower policy parsing or any
+  // claim preparation. Publication and the final response recheck it later.
+  if (!await issueForUser(caller.userId, run.issueId)) return rejectPublication(new PublicationError('issue_unavailable'))
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
@@ -144,13 +154,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id, beforeClaim, afterClaim)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
   } else {
-    const { prepareRunPublication, persistRunCompletion } = await import('@/lib/run-publications')
+    const { prepareRunPublication } = await import('@/lib/run-publications')
     try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
     catch (error) {
       if (!(error instanceof PublicationError)) throw error
-      await persistRunCompletion(caller.userId, runId, { stopReason: 'error', report: { summary: error.message, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } })
-      after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
-      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 })
+      return rejectPublication(error)
     }
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim)
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
