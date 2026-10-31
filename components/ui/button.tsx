@@ -14,8 +14,9 @@ const buttonVariants = cva(
         // 「Add folder…」. `control` is a translucent overlay so it reads on white and grey alike.
         outline:
           "bg-control text-foreground hover:bg-control-hover aria-expanded:bg-control-hover",
+        // R-31: same grey as outline. Settings and the composer used `secondary` for the same role, so one row showed two greys.
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "bg-control text-foreground hover:bg-control-hover aria-expanded:bg-control-hover",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
         destructive:
