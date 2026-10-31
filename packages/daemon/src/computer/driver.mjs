@@ -1,3 +1,5 @@
+// Invokes the optional standalone cua-driver 0.38.0 (MIT), Copyright (c) 2025 Cua AI, Inc.
+// See packages/daemon/THIRD_PARTY_NOTICES.md. No perception or Spaces extension is installed here.
 import { spawn } from "node:child_process";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -161,7 +163,7 @@ export function driverArguments(input, platform = process.platform) {
     ? { ...call.arguments, scope: "desktop",
         ...(platform === "darwin" ? {} : { coordinate_frame: "desktop" }),
         delivery_mode: "foreground" }
-    : call.name === "press_key" ? { ...call.arguments, scope: "desktop", delivery_mode: "foreground" }
+    : ["type_text", "press_key"].includes(call.name) ? { ...call.arguments, scope: "desktop", delivery_mode: "foreground" }
       : call.name === "scroll" ? { ...call.arguments, scope: "desktop", ...(platform === "darwin" ? {} : { coordinate_frame: "desktop" }), delivery_mode: "foreground" }
         : call.arguments;
 }

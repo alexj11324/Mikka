@@ -7,10 +7,11 @@ import { resolveSubagentBrowserTarget, resolveThreadBrowserTarget } from '@/lib/
 import { canonicalOrigin, CredentialError, type BrowserCaller } from './contracts'
 import { awsKms } from './kms'
 import { CredentialStore, type BrowserTarget } from './store'
+import { credentialVaultEnabled } from './feature'
 
 export const credentialStore = new CredentialStore(pool, awsKms('app'))
 export async function credentialActor(request: Request) {
-  if (process.env.CREDENTIAL_VAULT_ENABLED !== '1') throw new CredentialError()
+  if (!credentialVaultEnabled()) throw new CredentialError()
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) throw new CredentialError('credential_auth_required', 401)
   const context = await loadWorkspaceContext(undefined, session.user)
@@ -18,7 +19,7 @@ export async function credentialActor(request: Request) {
 }
 
 export async function login(caller: BrowserCaller, site: string, submittedUsername?: string, options?: { forcePassword?: boolean }) {
-  if (process.env.CREDENTIAL_VAULT_ENABLED !== '1') throw new CredentialError()
+  if (!credentialVaultEnabled()) throw new CredentialError()
   const origin = canonicalOrigin(site)
   await credentialStore.authorize(caller)
   const target: BrowserTarget = await resolveCredentialBrowser(caller)

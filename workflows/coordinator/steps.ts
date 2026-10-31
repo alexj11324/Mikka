@@ -170,7 +170,7 @@ export async function preparePrompt(userId: string, botId: string | null = null,
   const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
   const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
   // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
-  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions), memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS, messages: promptMessages(summary, messages, summaryTrust) }
+  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
@@ -227,6 +227,22 @@ export async function composioAction(userId: string, action: ComposioActionName,
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return accountId ? runComposioAction(userId, action, input, accountId) : runComposioAction(userId, action, input)
 }
+
+export async function personalMcp(userId: string, botId: string | null, executionId: string | undefined, input: import('@/lib/plugins/mcp').PersonalMcpCommand, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  // Scheduled read grants never authorize arbitrary remote MCP tools.
+  if (scope?.scheduledRead) return { error: 'mcpNotAllowedForScheduledRead' }
+  const { agentScope, agentKitStore } = await import('@/lib/agent-kit/service')
+  const ownerScope = await agentScope(userId, botId)
+  const execution = executionId ? await agentKitStore.readExecution(ownerScope, executionId) : null
+  if (execution && execution.status !== 'running') return { error: 'agentExecutionClosed' }
+  const { runPersonalMcp } = await import('@/lib/plugins/runtime')
+  return runPersonalMcp(userId, execution ? execution.snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined, input)
+}
+// Remote tools may have side effects and no idempotency key. The workflow must
+// preserve the first uncertain outcome rather than replaying this step.
+personalMcp.maxRetries = 0
 
 export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
   'use step'

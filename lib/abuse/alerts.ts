@@ -16,7 +16,7 @@ export async function checkAbuseAlerts(
   const {
     rows: [first],
   } = await pool.query(
-    `SELECT count(*)::int AS n FROM (SELECT "workspaceId",min("createdAt") AS first FROM hosted_usage WHERE "reservedFree">0 GROUP BY "workspaceId") u WHERE first>now()-interval '1 hour'`,
+    `SELECT count(*)::int AS n FROM (SELECT "workspaceId",min("createdAt") AS first FROM hosted_usage WHERE "reservedFree">0 OR "freeMicroUsd">0 GROUP BY "workspaceId") u WHERE first>now()-interval '1 hour'`,
   )
   const now = Date.now()
   const kinds = abuseAlertKinds(usage.spent, first.n, limits)

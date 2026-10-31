@@ -72,11 +72,13 @@ export async function tick(actor:Actor,botId:string,id:string):Promise<WebTick> 
       return 'waiting'
     }
     const {chooseVisualBrowserStep,judgeVisualBrowserAction}=await import('@/lib/cloud-computer/visual-model')
+    const {hostedBillingScope}=await import('@/lib/abuse/context')
+    const modelScope={workspaceId:actor.workspaceId,ownerId:actor.userId}
     const {mutationFromStep}=await import('@/lib/cloud-computer/visual-contract')
-    const chosen=await chooseVisualBrowserStep(row.task,row.step,observation)
+    const chosen=await hostedBillingScope.run(modelScope,()=>chooseVisualBrowserStep(row.task,row.step,observation))
     const next=chosen.next
     if(next.action==='observe') return 'running'
-    const judgment=await judgeVisualBrowserAction(row.task,next,chosen.observation)
+    const judgment=await hostedBillingScope.run(modelScope,()=>judgeVisualBrowserAction(row.task,next,chosen.observation))
     if(judgment.scope==='outside_task') {
       await store.update(actor,botId,id,'failed','Proposed browser operation is outside the requested task')
       return 'terminal'

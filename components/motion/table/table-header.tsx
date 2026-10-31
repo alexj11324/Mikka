@@ -21,6 +21,7 @@ import type {
   InsertPosition,
   SortState,
   TableColumn,
+  TableLabels,
 } from "./types";
 import { alignFlex, alignText, COLUMN_ACTIVE_SHADOW } from "./utils";
 
@@ -51,12 +52,14 @@ export interface TableHeaderProps<T> {
   activeColumn: string | null;
   onColumnActivate?: (key: string) => void;
   onColumnDeactivate?: () => void;
+  labels: TableLabels;
 }
 
 /** Column insert / delete menu items shared by the header cell and the portal handle. */
 function columnMenuItems<T>(
   column: TableColumn<T>,
   index: number,
+  labels: TableLabels,
   onInsertColumn?: (index: number, position: InsertPosition) => void,
   onDeleteColumn?: (columnKey: string, index: number) => void,
 ) {
@@ -64,12 +67,12 @@ function columnMenuItems<T>(
     ...(onInsertColumn
       ? [
           {
-            label: "Insert before",
+            label: labels.insertBefore,
             icon: <ArrowLeftToLine />,
             onSelect: () => onInsertColumn(index, "before"),
           },
           {
-            label: "Insert after",
+            label: labels.insertAfter,
             icon: <ArrowRightToLine />,
             onSelect: () => onInsertColumn(index, "after"),
           },
@@ -78,7 +81,7 @@ function columnMenuItems<T>(
     ...(onDeleteColumn
       ? [
           {
-            label: "Delete column",
+            label: labels.deleteColumn,
             icon: <Trash2 />,
             destructive: true,
             onSelect: () => onDeleteColumn(column.key, index),
@@ -98,6 +101,7 @@ function ColumnHandle<T>({
   onDeleteColumn,
   onEnter,
   onLeave,
+  labels,
 }: {
   column: TableColumn<T>;
   index: number;
@@ -106,6 +110,7 @@ function ColumnHandle<T>({
   onDeleteColumn?: (columnKey: string, index: number) => void;
   onEnter: () => void;
   onLeave: () => void;
+  labels: TableLabels;
 }) {
   useEffect(() => {
     window.addEventListener("scroll", onLeave, true);
@@ -129,10 +134,10 @@ function ColumnHandle<T>({
       onPointerLeave={onLeave}
     >
       <TableMenu
-        ariaLabel={`${column.key} column options`}
+        ariaLabel={labels.columnOptions(column.key)}
         triggerClassName="flex h-2 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
         trigger={<MoreHorizontal className="h-3 w-3" />}
-        items={columnMenuItems(column, index, onInsertColumn, onDeleteColumn)}
+        items={columnMenuItems(column, index, labels, onInsertColumn, onDeleteColumn)}
       />
     </div>,
     document.body,
@@ -166,6 +171,7 @@ export function TableHeader<T>({
   activeColumn,
   onColumnActivate,
   onColumnDeactivate,
+  labels,
 }: TableHeaderProps<T>) {
   const hasColumnMenu = !!(onInsertColumn || onDeleteColumn);
   const activeIndex = columns.findIndex((c) => c.key === activeColumn);
@@ -180,6 +186,7 @@ export function TableHeader<T>({
           onDeleteColumn={onDeleteColumn}
           onEnter={() => onColumnActivate?.(activeColumn)}
           onLeave={() => onColumnDeactivate?.()}
+          labels={labels}
         />
       ) : null}
       <thead>
@@ -191,7 +198,7 @@ export function TableHeader<T>({
                 checked={allSelected}
                 indeterminate={!allSelected && someSelected}
                 onCheckedChange={onToggleAll}
-                aria-label="Select all rows"
+                aria-label={labels.selectAll}
                 className="size-6"
               />
             </div>
@@ -248,7 +255,7 @@ export function TableHeader<T>({
                 {reorderable ? (
                   <motion.button
                     type="button"
-                    aria-label={`Reorder ${column.key} column`}
+                    aria-label={labels.reorderColumn(column.key)}
                     onPointerDown={(e) => onReorderStart(column.key, e)}
                     onPointerMove={onReorderMove}
                     onPointerUp={onReorderEnd}
@@ -294,7 +301,7 @@ export function TableHeader<T>({
                     value={
                       typeof column.header === "string" ? column.header : ""
                     }
-                    aria-label={`Rename ${column.key} column`}
+                    aria-label={labels.renameColumn(column.key)}
                     size={1}
                     onChange={(e) =>
                       onColumnRename(column.key, e.target.value)
@@ -318,7 +325,7 @@ export function TableHeader<T>({
               {resizable ? (
                 <motion.button
                   type="button"
-                  aria-label={`Resize ${column.key} column`}
+                  aria-label={labels.resizeColumn(column.key)}
                   tabIndex={-1}
                   onPointerDown={(e) => onResizeStart(column.key, e)}
                   onPointerMove={onResizeMove}

@@ -10,7 +10,41 @@ import {
 } from "react";
 import { useHoverCapable } from "@/lib/hooks/use-hover-capable";
 import { DAY, parse, iso, monthOf, shiftMonth, ordered } from "./date-utils";
-import type { DateRange, DateRangePickerProps } from "./types";
+import type {
+  DateRange,
+  DateRangePickerLabels,
+  DateRangePickerProps,
+} from "./types";
+
+const DEFAULT_LABELS: DateRangePickerLabels = {
+  startDate: "Start date",
+  endDate: "End date",
+  selectDate: "Select date",
+  selectEnd: "Select end",
+  chooseMonth: "Choose month",
+  chooseYear: "Choose year",
+  previousMonth: "Previous month",
+  nextMonth: "Next month",
+  previousYear: "Previous year",
+  nextYear: "Next year",
+  previousYears: "Previous years",
+  nextYears: "Next years",
+  monthsIn: (year) => `Choose a month in ${year}`,
+  yearsFrom: (start, end) => `Choose a year from ${start} to ${end}`,
+  keyboardHelp:
+    "Use arrow keys to navigate dates, Home and End for the week, Page Up and Page Down for months, Shift with Page Up or Page Down for years. Enter or Space selects a date. Use the month and year buttons to jump directly. In the month or year choices, use arrow keys to move and Escape to return.",
+  daysSelected: (count) => `${count} ${count === 1 ? "day" : "days"} selected`,
+  chooseStartDate: "Choose a start date",
+  chooseEndDate: "Choose an end date",
+  clear: "Clear",
+  clearRange: "Clear date range",
+  startChosen: (date) => `Start date ${date}. Choose an end date.`,
+  unavailableRange:
+    "This range includes unavailable dates. Choose another end date.",
+  rangeSelected: (from, to) => `${from} to ${to} selected.`,
+  cleared: "Date range cleared.",
+  presetSelected: (name) => `${name} selected.`,
+};
 
 export function useDateRangePickerController({
   value: controlledValue,
@@ -23,6 +57,7 @@ export function useDateRangePickerController({
   presets = [],
   locale = "en-US",
   label = "Choose a date range",
+  labels: labelOverrides,
   disabled = false,
   autoFocus = false,
   showSummary = true,
@@ -31,6 +66,7 @@ export function useDateRangePickerController({
   onOpenChange,
   closeOnSelect = false,
 }: DateRangePickerProps) {
+  const labels = { ...DEFAULT_LABELS, ...labelOverrides };
   const [today] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -191,19 +227,22 @@ export function useDateRangePickerController({
     if (!value || value.to) {
       change({ from: date });
       setAnnouncement(
-        `Start date ${dateFormat.format(parse(date))}. Choose an end date.`,
+        labels.startChosen(dateFormat.format(parse(date))),
       );
     } else {
       const next = ordered(value.from, date);
       if (!rangeAvailable(next)) {
         setAnnouncement(
-          "This range includes unavailable dates. Choose another end date.",
+          labels.unavailableRange,
         );
         return;
       }
       change(next);
       setAnnouncement(
-        `${shortFormat.format(parse(next.from))} to ${shortFormat.format(parse(next.to))} selected.`,
+        labels.rangeSelected(
+          shortFormat.format(parse(next.from)),
+          shortFormat.format(parse(next.to)),
+        ),
       );
     }
   };
@@ -421,7 +460,7 @@ export function useDateRangePickerController({
     if (view === "days") pendingFocus.current = true;
     else returnToTrigger.current = view;
     change(null);
-    setAnnouncement("Date range cleared.");
+    setAnnouncement(labels.cleared);
   };
   const selectPreset = (range: DateRange, name: string) => {
     if (!rangeAvailable(range)) return;
@@ -430,7 +469,7 @@ export function useDateRangePickerController({
     setDirection(range.from >= month ? 1 : -1);
     setMonth(monthOf(range.from));
     setCursor(range.from);
-    setAnnouncement(`${name} selected.`);
+    setAnnouncement(labels.presetSelected(name));
   };
   const [wasOpen, setWasOpen] = useState(open);
   if (wasOpen !== open) {
@@ -453,6 +492,7 @@ export function useDateRangePickerController({
     trigger,
     content,
     label,
+    labels,
     locale,
     disabled,
     autoFocus,

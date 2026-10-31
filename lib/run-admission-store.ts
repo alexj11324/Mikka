@@ -12,7 +12,7 @@ import { readIssueMetadata } from './issue-metadata'
 import { taskIdentifiers } from './task-identifier-server'
 import { publicationBranch } from './run-publication-policy'
 import { admitRepositoryTask, effectiveRepositoryPush, matchesRepositoryAdmission } from './repository-admission'
-import { lockCliAgentPolicy } from './agent-tool-approval/policy-store'
+import { lockCliAgentPolicy, lockCliTaskScope } from './agent-tool-approval/policy-store'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
 import { dispatchFingerprint, type DispatchInput } from './run-dispatch'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
@@ -31,7 +31,8 @@ export async function acceptLocalRun(input: {
     const invalid = () => new ActionFailureError('runInvalid')
     // The setters acquire these locks before reading runs or updating workers.
     // Internal hosts prelock the same policy before taking their domain locks.
-    const currentPolicy = await lockCliAgentPolicy(client, input.userId, input.agentId, input.botId)
+    const taskScope = await lockCliTaskScope(client, input.userId, input.issueId)
+    const currentPolicy = await lockCliAgentPolicy(client, input.userId, input.agentId, input.botId, taskScope)
     const dispatchHash = input.dispatch?.requestKey ? dispatchFingerprint(input.dispatch) : null
     if (input.dispatch?.requestKey)
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['dispatch-key', input.userId, input.dispatch.requestKey])}, 0))`)
@@ -51,6 +52,7 @@ export async function acceptLocalRun(input: {
     }
     const [task] = await tx.select().from(issues).where(eq(issues.id, input.issueId)).for('share')
     if (!task || !await issueForUser(input.userId, task.id)) throw invalid()
+    if (JSON.stringify(await lockCliTaskScope(client,input.userId,task.id)) !== JSON.stringify(taskScope)) throw invalid()
     const [agent] = await tx.select().from(agents).where(and(eq(agents.id, input.agentId), eq(agents.userId, input.userId))).for('share')
     const [device] = await tx.select().from(devices).where(and(eq(devices.id, input.deviceId), eq(devices.ownerId, input.userId), eq(devices.kind, 'local'))).for('share')
     if (!agent || agent.deviceId !== input.deviceId || agent.harness !== input.definition.harness || !device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw invalid()

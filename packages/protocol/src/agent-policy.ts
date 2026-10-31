@@ -169,8 +169,8 @@ export const READ_ONLY_DENIED: readonly PermissionAction[] = [
 ]
 
 /** What a run is sent (`RunAssignment.policy`): every choice filled in. */
-export const runPolicySchema = z.object({
-  permissions: z.object({
+export const runPolicySchema = z.strictObject({
+  permissions: z.strictObject({
     install_dependency: z.enum(PERMISSION_DECISIONS),
     write_outside_repo: z.enum(PERMISSION_DECISIONS),
     git_push: z.enum(PERMISSION_DECISIONS),

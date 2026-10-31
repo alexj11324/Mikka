@@ -4,9 +4,13 @@ import { readIssueMetadata } from "./issue-metadata";
 import type { JSONContent } from "@tiptap/core";
 import { enqueueDeviceCommand } from "./device-management";
 import { createHash, randomUUID } from "node:crypto";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
-import { DEFAULT_EXECUTION_RULE, type ExecutionRule } from "./execution-rules";
+import {
+  DEFAULT_EXECUTION_FALLBACKS,
+  type ExecutionFallbacks,
+  type ExecutionRule,
+} from "./execution-rules";
 import { isDeviceOnline } from "@mikka/protocol/device";
 
 export interface ExecutionSettingsScope {
@@ -15,9 +19,9 @@ export interface ExecutionSettingsScope {
 }
 const ruleInput = z
   .object({
-    label: z.string().trim().min(1).max(200),
-    place: z.union([z.literal("auto"), z.literal("cloud"), z.uuid()]),
-    harness: z.enum(["auto", "claude_code", "codex", "cursor"]),
+    label: z.string().trim().min(1).max(200).nullable().optional(),
+    place: z.union([z.literal("cloud"), z.uuid()]),
+    harness: z.enum(["claude_code", "codex", "cursor"]),
     model: z.string().trim().min(1).max(128),
   })
   .strict();
@@ -25,12 +29,187 @@ const ruleInput = z
 /** Callers obtain scope from the session and current workspace, never from input. */
 export class ExecutionSettings {
   constructor(readonly pool: Pool) {}
-  async list(scope: ExecutionSettingsScope): Promise<ExecutionRule[]> {
-    const { rows } = await this.pool.query(
-      'SELECT id,label,place,harness,model,position FROM execution_rules WHERE "ownerId"=$1 AND "workspaceId"=$2 ORDER BY position,id',
-      [scope.ownerId, scope.workspaceId],
+  async fallbacks(ownerId: string): Promise<ExecutionFallbacks> {
+    return (
+      (
+        await this.pool.query(
+          'SELECT "executionFallbacks" FROM "user" WHERE id=$1',
+          [ownerId],
+        )
+      ).rows[0]?.executionFallbacks ?? DEFAULT_EXECUTION_FALLBACKS
     );
-    return [...rows, DEFAULT_EXECUTION_RULE];
+  }
+  async setFallbacks(ownerId: string, value: ExecutionFallbacks) {
+    const parsed = z
+      .object({
+        whenDeviceOffline: z.enum(["wait", "cloud"]),
+        whenQuotaExhausted: z.enum(["stop", "switchAccount"]),
+      })
+      .strict()
+      .safeParse(value);
+    if (!parsed.success) throw new ActionFailureError("validationGeneric");
+    await this.pool.query(
+      'UPDATE "user" SET "executionFallbacks"=$2::jsonb WHERE id=$1',
+      [ownerId, JSON.stringify(parsed.data)],
+    );
+    return parsed.data;
+  }
+  /** A suggestion must come from a real installed harness or connected binding. */
+  async suggested(
+    scope: ExecutionSettingsScope,
+    query: Pick<PoolClient, "query"> = this.pool,
+  ): Promise<ExecutionRule> {
+    const places = await this.places(scope, query);
+    const models = await this.botModels(scope, query);
+    const providers = (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected'`,[scope.ownerId,scope.workspaceId])).rows;
+    const preferred = providers.some((m) => m.provider === "claude")
+      ? "claude_code"
+      : providers.some((m) => m.provider === "codex")
+        ? "codex"
+        : undefined;
+    const devices = places
+      .filter((p) => p.id !== "cloud" && p.enabled && p.online)
+      .sort(
+        (a, b) =>
+          Number(b.deviceType === "server") - Number(a.deviceType === "server"),
+      );
+    for (const device of devices) {
+      const harness = device.harnesses.find(
+        (h: import("@mikka/protocol/harness").HarnessInfo) =>
+          h.installed &&
+          (!preferred || h.harness === preferred) &&
+          (h.harness === "claude_code"
+            ? h.modelSlots?.some((s) => s.slot === "opus")
+            : h.harness === "codex"
+              ? h.defaultModelSlot
+              : h.models?.length),
+      );
+      if (harness)
+        return {
+          id: "default",
+          label: null,
+          place: device.id,
+          harness: harness.harness,
+          model:
+            harness.harness === "claude_code"
+              ? (harness.modelSlots?.find(
+                  (s: { slot: string }) => s.slot === "opus",
+                )?.slot ??
+                harness.defaultModelSlot ??
+                harness.models![0])
+              : (harness.defaultModelSlot ?? harness.models![0]),
+          position: 2147483647,
+        };
+    }
+    const model = models.find(
+      (m) =>
+        !preferred ||
+        m.provider === (preferred === "claude_code" ? "claude" : "codex"),
+    );
+    if (!model) throw new ActionFailureError("executionModelUnknown");
+    return {
+      id: "default",
+      label: null,
+      place: "cloud",
+      harness: model.provider === "claude" ? "claude_code" : "codex",
+      model: model.modelId,
+      position: 2147483647,
+    };
+  }
+  async list(scope: ExecutionSettingsScope): Promise<ExecutionRule[]> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+        [`execution-settings:${scope.ownerId}:${scope.workspaceId}`],
+      );
+      let rows: ExecutionRule[] = (
+        await client.query(
+          'SELECT id,label,place,harness,model,position FROM execution_rules WHERE "ownerId"=$1 AND "workspaceId"=$2 ORDER BY position,id',
+          [scope.ownerId, scope.workspaceId],
+        )
+      ).rows;
+      if (
+        !rows.some((r) => r.label === null) ||
+        rows.some((r) => [r.place, r.harness, r.model].includes("auto"))
+      ) {
+        const suggestion = await this.suggested(scope, client);
+        for (const row of rows.filter((r) =>
+          [r.place, r.harness, r.model].includes("auto"),
+        )) {
+          const places = await this.places(scope, client);
+          const chosen =
+            row.place === "auto"
+              ? places
+                  .filter((p) => p.id !== "cloud" && p.enabled && p.online)
+                  .sort(
+                    (a, b) =>
+                      Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt),
+                  )
+                  .find((p) =>
+                    p.harnesses.some(
+                      (h: { installed: boolean; harness: string }) =>
+                        h.installed &&
+                        (row.harness === "auto" || h.harness === row.harness),
+                    ),
+                  )
+              : places.find((p) => p.id === row.place);
+          const place =
+            row.place === "auto" ? (chosen?.id ?? "cloud") : row.place;
+          const device = chosen;
+          const harness =
+            row.harness === "auto"
+              ? (device?.harnesses.find(
+                  (h: { installed: boolean }) => h.installed,
+                )?.harness ?? suggestion.harness)
+              : row.harness;
+          const info = device?.harnesses.find(
+            (h: { harness: string }) => h.harness === harness,
+          );
+          const model =
+            row.model === "auto"
+              ? (info?.defaultModelSlot ??
+                info?.models?.[0] ??
+                (await this.botModels(scope, client)).find(
+                  (m) =>
+                    m.provider ===
+                    (harness === "claude_code" ? "claude" : "codex"),
+                )?.modelId)
+              : row.model;
+          if (!model) throw new ActionFailureError("executionModelUnknown");
+          await client.query(
+            "UPDATE execution_rules SET place=$2,harness=$3,model=$4 WHERE id=$1",
+            [row.id, place, harness, model],
+          );
+        }
+        if (!rows.some((r) => r.label === null))
+          await client.query(
+            'INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,$4,$5,$6,2147483647)',
+            [
+              randomUUID(),
+              scope.ownerId,
+              scope.workspaceId,
+              suggestion.place,
+              suggestion.harness,
+              suggestion.model,
+            ],
+          );
+        rows = (
+          await client.query(
+            'SELECT id,label,place,harness,model,position FROM execution_rules WHERE "ownerId"=$1 AND "workspaceId"=$2 ORDER BY position,id',
+            [scope.ownerId, scope.workspaceId],
+          )
+        ).rows;
+      }
+      await client.query("COMMIT");
+      return rows.map((r) => (r.label === null ? { ...r, id: "default" } : r));
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
   async mutate(
     scope: ExecutionSettingsScope,
@@ -39,6 +218,15 @@ export class ExecutionSettings {
       | { kind: "delete"; id: string }
       | { kind: "reorder"; ids: string[] },
   ) {
+    if (
+      operation.kind === "save" &&
+      [
+        operation.value?.place,
+        operation.value?.harness,
+        operation.value?.model,
+      ].some(value=>typeof value === "string" && value.trim() === "auto")
+    )
+      throw new ActionFailureError("executionAutoNotAllowed");
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -48,13 +236,14 @@ export class ExecutionSettings {
       );
       const rows = (
         await client.query(
-          'SELECT id FROM execution_rules WHERE "ownerId"=$1 AND "workspaceId"=$2 ORDER BY position,id',
+          'SELECT id,label FROM execution_rules WHERE "ownerId"=$1 AND "workspaceId"=$2 ORDER BY position,id',
           [scope.ownerId, scope.workspaceId],
         )
       ).rows;
-      let ids: string[] = rows.map((r) => r.id);
+      let ids: string[] = rows.filter((r) => r.label !== null).map((r) => r.id);
       if (operation.kind === "reorder") {
-        if (!z.array(z.uuid()).safeParse(operation.ids).success) throw new ActionFailureError("executionRuleOrderInvalid");
+        if (!z.array(z.uuid()).safeParse(operation.ids).success)
+          throw new ActionFailureError("executionRuleOrderInvalid");
         if (
           new Set(operation.ids).size !== ids.length ||
           operation.ids.length !== ids.length ||
@@ -63,7 +252,8 @@ export class ExecutionSettings {
           throw new ActionFailureError("executionRuleOrderInvalid");
         ids = operation.ids;
       } else if (operation.kind === "delete") {
-        if (!ids.includes(operation.id)) throw new ActionFailureError("executionRuleNotFound");
+        if (!ids.includes(operation.id))
+          throw new ActionFailureError("executionRuleNotFound");
         await client.query(
           'DELETE FROM execution_rules WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3',
           [operation.id, scope.ownerId, scope.workspaceId],
@@ -73,30 +263,73 @@ export class ExecutionSettings {
         const parsed = ruleInput.safeParse(operation.value);
         if (!parsed.success) {
           const field = parsed.error.issues[0]?.path[0];
-          throw new ActionFailureError(field === "place" ? "executionPlaceInvalid" : field === "harness" ? "executionHarnessUnavailable" : field === "model" ? "executionModelUnknown" : "validationGeneric");
+          throw new ActionFailureError(
+            field === "place"
+              ? "executionPlaceInvalid"
+              : field === "harness"
+                ? "executionHarnessUnavailable"
+                : field === "model"
+                  ? "executionModelUnknown"
+                  : "validationGeneric",
+          );
         }
         const value = parsed.data;
-        if (!["auto", "cloud"].includes(value.place)) {
+        if (operation.id !== "default" && !value.label)
+          throw new ActionFailureError("validationGeneric");
+        if (operation.id === "default") value.label = null;
+        if (value.place !== "cloud") {
           const device = await client.query(
             `SELECT id,harnesses FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL`,
             [value.place, scope.ownerId],
           );
-          if (!device.rowCount) throw new ActionFailureError("executionPlaceInvalid");
-          const available = z.array(z.object({ harness: z.string(), installed: z.boolean(), models: z.array(z.string()).optional() })).safeParse(device.rows[0].harnesses);
-          const harnesses = available.success ? available.data.filter(h => h.installed && (value.harness === "auto" || h.harness === value.harness)) : [];
-          if (!harnesses.length) throw new ActionFailureError("executionHarnessUnavailable");
-          if (value.model !== "auto" && !harnesses.some(h => h.models?.includes(value.model))) throw new ActionFailureError("executionModelUnknown");
+          if (!device.rowCount)
+            throw new ActionFailureError("executionPlaceInvalid");
+          const available = z
+            .array(
+              z.object({
+                harness: z.string(),
+                installed: z.boolean(),
+                models: z.array(z.string()).optional(),
+                modelSlots: z.array(z.object({ slot: z.string() })).optional(),
+              }),
+            )
+            .safeParse(device.rows[0].harnesses);
+          const harnesses = available.success
+            ? available.data.filter(
+                (h) => h.installed && h.harness === value.harness,
+              )
+            : [];
+          if (!harnesses.length)
+            throw new ActionFailureError("executionHarnessUnavailable");
+          if (
+            !harnesses.some(
+              (h) =>
+                h.models?.includes(value.model) ||
+                h.modelSlots?.some((s) => s.slot === value.model),
+            )
+          )
+            throw new ActionFailureError("executionModelUnknown");
         }
-        if (["auto", "cloud"].includes(value.place) && value.model !== "auto") {
-          const models = await client.query(`SELECT b.id FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId"
+        if (value.place === "cloud") {
+          const models = await client.query(
+            `SELECT b.id FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId"
             AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected'
-            WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b."modelId"=$3 AND ($4='auto' OR c.provider=CASE WHEN $4='claude_code' THEN 'claude' WHEN $4='codex' THEN 'codex' END)`,
-            [scope.ownerId,scope.workspaceId,value.model,value.harness]);
-          if (!models.rowCount) throw new ActionFailureError("executionModelUnknown");
+            WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b."modelId"=$3 AND c.provider=CASE WHEN $4='claude_code' THEN 'claude' WHEN $4='codex' THEN 'codex' END`,
+            [scope.ownerId, scope.workspaceId, value.model, value.harness],
+          );
+          if (!models.rowCount)
+            throw new ActionFailureError("executionModelUnknown");
         }
-        const id = operation.id ?? randomUUID();
-        if (operation.id) {
-          if (!ids.includes(id)) throw new ActionFailureError("executionRuleNotFound");
+        const id =
+          operation.id === "default"
+            ? (rows.find((r) => r.label === null)?.id ?? randomUUID())
+            : (operation.id ?? randomUUID());
+        if (
+          operation.id &&
+          !(operation.id === "default" && !rows.some((r) => r.label === null))
+        ) {
+          if (operation.id !== "default" && !ids.includes(id))
+            throw new ActionFailureError("executionRuleNotFound");
           await client.query(
             'UPDATE execution_rules SET label=$4,place=$5,harness=$6,model=$7 WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3',
             [
@@ -120,10 +353,10 @@ export class ExecutionSettings {
               value.place,
               value.harness,
               value.model,
-              ids.length,
+              operation.id === "default" ? 2147483647 : ids.length,
             ],
           );
-          ids.push(id);
+          if (operation.id !== "default") ids.push(id);
         }
       }
       for (const [position, id] of ids.entries())
@@ -140,8 +373,11 @@ export class ExecutionSettings {
     }
     return this.list(scope);
   }
-  async places(scope: ExecutionSettingsScope) {
-    const { rows } = await this.pool.query(
+  async places(
+    scope: ExecutionSettingsScope,
+    query: Pick<PoolClient, "query"> = this.pool,
+  ) {
+    const { rows } = await query.query(
       `SELECT id,name,"deviceType",enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "createdAt",id`,
       [scope.ownerId],
     );
@@ -195,27 +431,41 @@ export class ExecutionSettings {
     }
     return [...labels.values()].sort((a,b) => a.name.localeCompare(b.name));
   }
-  private async connectedBindings(scope: ExecutionSettingsScope, bindingId?: string) {
-    return (await this.pool.query(
-      `SELECT b.id AS "bindingId",b."consumerId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan
+  private async connectedBindings(
+    scope: ExecutionSettingsScope,
+    bindingId?: string,
+    query: Pick<PoolClient, "query"> = this.pool,
+  ) {
+    return (
+      await query.query(
+        `SELECT b.id AS "bindingId",b."consumerId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan
        FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
        AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected'
        WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
        AND ($3::uuid IS NULL OR b.id=$3)
-       AND ($3::uuid IS NOT NULL OR c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId") ORDER BY b."createdAt" DESC,b.id`, [scope.ownerId, scope.workspaceId, bindingId ?? null])).rows;
+       AND ($3::uuid IS NOT NULL OR c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId") ORDER BY b."createdAt" DESC,b.id`,
+        [scope.ownerId, scope.workspaceId, bindingId ?? null],
+      )
+    ).rows;
   }
   /** Execution resolves its saved binding independently of the deduplicated catalogue. */
   async botBinding(scope: ExecutionSettingsScope, bindingId: string) {
-    return (await this.connectedBindings(scope,bindingId))[0];
+    return (await this.connectedBindings(scope, bindingId))[0];
   }
   /** One option per model/account. Binding lookups remain independent of this presentation deduplication. */
-  async botModels(scope: ExecutionSettingsScope) {
+  async botModels(
+    scope: ExecutionSettingsScope,
+    query: Pick<PoolClient, "query"> = this.pool,
+  ) {
     const seen = new Set<string>();
-    return (await this.connectedBindings(scope)).filter(row => {
-      const key = JSON.stringify([row.connectionId,row.modelId]);
-      if (seen.has(key)) return false;
-      seen.add(key); return true;
-    });
+    return (await this.connectedBindings(scope, undefined, query)).filter(
+      (row) => {
+        const key = JSON.stringify([row.connectionId, row.modelId]);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      },
+    );
   }
   async refreshBotModels(scope: ExecutionSettingsScope, connectionId: string, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
     if (!z.uuid().safeParse(connectionId).success) throw new ActionFailureError("executionAccountUnavailable");
@@ -252,7 +502,8 @@ export class ExecutionSettings {
     bindingId: string | null,
   ) {
     if (botId !== null) {
-      if (!z.uuid().safeParse(botId).success) throw new ActionFailureError("botNotFound");
+      if (!z.uuid().safeParse(botId).success)
+        throw new ActionFailureError("botNotFound");
       if (
         !(
           await this.pool.query(
@@ -264,14 +515,10 @@ export class ExecutionSettings {
         throw new ActionFailureError("botNotFound");
     }
     const key = botId ?? "coordinator";
-    if (bindingId === null) {
-      await this.pool.query(
-        'DELETE FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
-        [scope.ownerId, scope.workspaceId, key],
-      );
-      return;
-    }
-    if (!z.uuid().safeParse(bindingId).success) throw new ActionFailureError("executionModelUnknown");
+    if (bindingId === null || bindingId === "auto")
+      throw new ActionFailureError("executionAutoNotAllowed");
+    if (!z.uuid().safeParse(bindingId).success)
+      throw new ActionFailureError("executionModelUnknown");
     const choice = (await this.connectedBindings(scope, bindingId)).find(
       (row) => row.bindingId === bindingId,
     );
@@ -319,13 +566,25 @@ export class ExecutionSettings {
     if (!saved) return bindingId;
     return (await this.botModels(scope)).find(option => option.connectionId === saved.connectionId && option.modelId === saved.modelId)?.bindingId ?? bindingId;
   }
-  async botModel(scope: ExecutionSettingsScope, botId: string | null) {
-    return (
+  async botModel(
+    scope: ExecutionSettingsScope,
+    botId: string | null,
+  ): Promise<string | undefined> {
+    const saved = (
       await this.pool.query(
         'SELECT "bindingId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
         [scope.ownerId, scope.workspaceId, botId ?? "coordinator"],
       )
-    ).rows[0]?.bindingId as string | undefined;
+    ).rows[0]?.bindingId;
+    if (saved) return saved;
+    const first = (await this.botModels(scope))[0];
+    if (!first) return undefined;
+    const bindingId = await this.bindingForBot(scope, botId, first.bindingId);
+    await this.pool.query(
+      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO NOTHING',
+      [scope.ownerId, scope.workspaceId, botId ?? "coordinator", bindingId],
+    );
+    return this.botModel(scope, botId);
   }
 }
 

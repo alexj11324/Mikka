@@ -2,10 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   resolveExecution,
-  DEFAULT_EXECUTION_RULE,
   type ExecutionRule,
   type ExecutionDevice,
 } from "./execution-rules";
+const rule: ExecutionRule = {
+  id: "a",
+  label: "backend",
+  place: "laptop",
+  harness: "codex",
+  model: "default",
+  position: 0,
+};
 const device: ExecutionDevice = {
   id: "laptop",
   online: true,
@@ -15,87 +22,62 @@ const device: ExecutionDevice = {
       harness: "codex",
       installed: true,
       version: null,
-      models: ["account-model"],
+      models: ["reported-model"],
+      modelSlots: [
+        { slot: "default", model: "reported-model", name: "Reported model" },
+      ],
     },
   ],
 };
-const rule: ExecutionRule = {
-  id: "a",
-  label: "backend",
-  place: "laptop",
-  harness: "codex",
-  model: "auto",
-  position: 0,
-};
-test("first matching label in position order wins", () => {
+test("ordered label rules and the persisted editable default", () => {
   assert.deepEqual(
     resolveExecution(
-      ["backend", "frontend"],
-      [
-        { ...rule, place: "cloud", position: 2 },
-        { ...rule, id: "b", position: 1, model: "chosen" },
-      ],
+      ["backend"],
+      [{ ...rule, place: "cloud", position: 2 }, rule],
       [device],
     ),
-    { place: "laptop", harness: "codex", model: "chosen" },
+    { place: "laptop", harness: "codex", model: "reported-model" },
   );
-});
-test("fixed default ignores editable rows labelled null, prefers own online device", () => {
   assert.deepEqual(
     resolveExecution(
       [],
-      [{ ...DEFAULT_EXECUTION_RULE, place: "cloud" }],
+      [{ ...rule, label: null, place: "cloud", model: "chosen" }],
       [device],
     ),
-    { place: "laptop", harness: "codex" },
+    { place: "cloud", harness: "codex", model: "chosen" },
+  );
+  assert.throws(
+    () => resolveExecution([], [], [device]),
+    /executionModelUnknown/,
   );
 });
-test("explicit offline or disabled device waits without cloud fallback", () => {
-  for (const d of [
-    { ...device, online: false },
-    { ...device, enabled: false },
-  ])
-    assert.deepEqual(resolveExecution(["backend"], [rule], [d]), {
+test("offline waits unless cloud fallback is explicit", () => {
+  for (const devices of [
+    [],
+    [{ ...device, online: false }],
+    [{ ...device, enabled: false }],
+  ]) {
+    assert.deepEqual(resolveExecution(["backend"], [rule], devices), {
       waitFor: "laptop",
     });
-  assert.deepEqual(resolveExecution(["backend"], [rule], []), {
-    waitFor: "laptop",
-  });
+    assert.deepEqual(
+      resolveExecution(
+        ["backend"],
+        [{ ...rule, model: "reported-model" }],
+        devices,
+        { whenDeviceOffline: "cloud", whenQuotaExhausted: "stop" },
+      ),
+      { place: "cloud", harness: "codex", model: "reported-model" },
+    );
+  }
 });
-test("auto skips offline, disabled and incompatible devices then uses cloud", () => {
-  assert.deepEqual(resolveExecution([], [], [{ ...device, online: false }]), {
-    place: "cloud",
-    harness: "auto",
-  });
-  assert.deepEqual(
-    resolveExecution(
-      ["backend"],
-      [{ ...rule, place: "auto", harness: "claude_code" }],
-      [device],
-    ),
-    { place: "cloud", harness: "claude_code" },
-  );
-});
-test("explicit cloud does not use the online laptop", () =>
-  assert.deepEqual(
-    resolveExecution(["backend"], [{ ...rule, place: "cloud" }], [device]),
-    { place: "cloud", harness: "codex" },
-  ));
-test("auto model is absent; explicit model passes through", () => {
-  assert.equal(
-    Object.hasOwn(resolveExecution(["backend"], [rule], [device]), "model"),
-    false,
-  );
-  assert.deepEqual(
-    resolveExecution(
-      ["backend"],
-      [{ ...rule, model: "account-model" }],
-      [device],
-    ),
-    { place: "laptop", harness: "codex", model: "account-model" },
-  );
-});
-test("an explicit device never substitutes a different harness", () =>
+test("auto is refused in every field and harness never changes", () => {
+  for (const field of ["place", "harness", "model"])
+    assert.throws(
+      () =>
+        resolveExecution(["backend"], [{ ...rule, [field]: "auto" }], [device]),
+      /executionAutoNotAllowed/,
+    );
   assert.throws(
     () =>
       resolveExecution(
@@ -104,4 +86,24 @@ test("an explicit device never substitutes a different harness", () =>
         [device],
       ),
     /agentHarnessMissing/,
-  ));
+  );
+});
+test("a saved slot follows a changed device mapping", () => {
+  const devices = [
+    {
+      ...device,
+      harnesses: [
+        {
+          ...device.harnesses[0],
+          modelSlots: [
+            { slot: "default", model: "new-model", name: "New model" },
+          ],
+        },
+      ],
+    },
+  ];
+  assert.equal(
+    (resolveExecution(["backend"], [rule], devices) as { model: string }).model,
+    "new-model",
+  );
+});

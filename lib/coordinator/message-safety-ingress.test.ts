@@ -71,7 +71,10 @@ const transport = {
 }
 const database = { ...transport, async transaction<T>(fn: (tx: typeof transport) => Promise<T>): Promise<T> { return fn(transport) } }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
-stub('../db/index.ts', { db: database })
+stub('../db/index.ts', { db: database, pool: { query: async (sql: string) => {
+  assert.match(sql, /to_regclass\('credential_secrets'\)/)
+  return { rows: [{ present: false }] }
+} } })
 stub('../agent-runs.ts', { visibleRuns: () => {}, readRun: () => {} })
 stub('../issue-access.ts', { issueForUser: () => {} })
 stub('../issue-visibility.ts', { issueVisibility: () => {} })

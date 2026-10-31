@@ -26,10 +26,9 @@ export async function previewPersonalScope(userId: string, issueId: string) {
   })
 }
 
-/** Local half of the two-way transition. The linked path remains gated at the
- * action boundary until #184's archive/unlink decision is confirmed.
- * No provider request is made here. The DB trigger atomically detaches the link,
- * cancels outgoing work and revokes other people's runs before commit. */
+/** The DB trigger detaches the old link, queues its frozen archive request,
+ * cancels ordinary outgoing sync and revokes other people's runs atomically.
+ * Provider IO stays in the existing outbox worker, after this transaction. */
 export async function changeIssueScopeLocally(userId: string, input: { id: string; revision: number; scope: TaskScope }, options: { allowLinkedPersonal: boolean; confirmation?: string }) {
   for (let attempt = 0; ; attempt++) {
     try { return await changeScopeTransaction(userId, input, options) }
@@ -67,6 +66,7 @@ async function changeScopeTransaction(userId: string, input: { id: string; revis
     // The owner's explicit local action is sufficient when the locked checks
     // above prove no recorded or uncertain external publication. A preview
     // digest, when supplied, still has to match the current state.
+    if (options.allowLinkedPersonal) await tx.execute(sql`select set_config('mikka.personal_scope_request', ${latest.id}, true)`)
     const [saved] = await tx.update(issues).set({ scope: input.scope, scopeSetBy: 'user', scopeConfidence: null, revision: latest.revision + 1, updatedAt: new Date() })
       .where(and(eq(issues.id, latest.id), eq(issues.userId, userId), eq(issues.revision, input.revision))).returning()
     await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(userId) })

@@ -71,7 +71,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     if (row.action === 'browser_operation') await (await import('@/lib/cloud-computer/action-reviews')).scrubBrowserMutation(pool, row.id)
     throw new ActionFailureError('pendingActionUnavailable')
   }
-  let status: 'done' | 'failed' | 'declined' = 'declined'
+  let status: 'done' | 'failed' | 'declined' | 'running' = 'declined'
   let error: string | null = null
   let outcome: Record<string, string> = {}
   if (approve || (row.action === 'browser_operation' || row.action === 'credential_operation')) {
@@ -83,7 +83,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
         ? await runComposioAction(userId, row.action, row.input, row.connectedAccountId)
         : { error: 'integrationAccountNotBound' }
     if ('error' in result) {
-      status = 'failed'
+      status = isApprovalAction(row.action) && result.error === 'operationUncertain' ? 'running' : 'failed'
       error = result.error
     } else {
       status = approve ? 'done' : 'declined'

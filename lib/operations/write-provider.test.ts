@@ -20,7 +20,7 @@ for (const action of WRITE_ACTIONS) test(action+' pins owner/account/target/vers
  assert.ok((await provider.execute(args)).providerObjectId);assert.equal(checks,4);assert.equal(writes,1)
  revoked=true;await assert.rejects(provider.execute(args),/revoked/);assert.equal(writes,1)
  wrongTarget=true;await assert.rejects(provider.prepare('owner',input),/integrationTargetUnavailable/)
- assert.equal(await provider.lookup({ownerId:'owner',accountId:'bound',idempotencyKey:'stable'}),null)
+ assert.equal(await provider.lookup({ownerId:'owner',accountId:'bound',version:selected.version,payload:input,idempotencyKey:'stable'}),null)
  if(action==='send_slack_message')assert.equal(writeArguments(action,input).text,'<!channel> & literal')
 })
 

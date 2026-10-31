@@ -24,7 +24,10 @@ publish:
 
 mac:
   category: public.app-category.productivity
-  icon: build/icon.png
+  # Icon Composer bundle: actool (Xcode 26+) compiles it to Assets.car for
+  # macOS 26 and a legacy icon.icns for older macOS. build/icon.png is the same
+  # artwork flattened on Apple's 824/1024 grid.
+  icon: build/icon.icon
   target: [dmg, zip]
   hardenedRuntime: true
   gatekeeperAssess: false

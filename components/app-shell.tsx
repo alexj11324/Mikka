@@ -21,11 +21,11 @@ const SETTINGS_COLORS = '[--background:var(--settings-background)] [--foreground
  */
 export function AppFrame({ bar, rail, children, settings = false }: { bar: ReactNode; rail: ReactNode; children: ReactNode; settings?: boolean }) {
   const t = useTranslations('Shell')
-  return <TooltipProvider><SidebarProvider className={cn('h-svh min-h-0 flex-col overflow-hidden bg-shell-chrome', settings && SETTINGS_COLORS)}>
+  return <TooltipProvider><SidebarProvider className={cn('h-svh min-h-0 flex-col overflow-hidden bg-shell-chrome in-data-desktop-translucent:bg-shell-chrome/80', settings && SETTINGS_COLORS)}>
     {bar}
     <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">
       {rail}
-      <section data-slot="app-frame-content" aria-label={t('window')} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">{children}</section>
+      <section data-slot="app-frame-content" aria-label={t('window')} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background in-data-desktop-translucent:bg-transparent md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">{children}</section>
     </div>
   </SidebarProvider></TooltipProvider>
 }

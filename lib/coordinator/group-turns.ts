@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { hostedBillingScope } from '@/lib/abuse/context'
 import type { Pool, PoolClient } from 'pg'
 import { checkedCorrection, GroupJudgmentPendingError, type CorrectionInput, type CorrectionJudgment } from './group-correction'
 export { GroupJudgmentPendingError } from './group-correction'
@@ -38,6 +39,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       WHERE t."conversationId"=$1 AND t.status='queued' ORDER BY m.position LIMIT 1`, [conversationId])
     const root = rows[0]
     if (!root) return false
+    const modelScope = <T>(work: () => Promise<T>) => hostedBillingScope.run({ workspaceId: root.workspaceId, ownerId: root.createdBy }, work)
     messageId = root.messageId
     await client.query(`UPDATE group_turns SET status='running',"updatedAt"=now() WHERE "messageId"=$1`, [messageId])
     const authorized = async () => {
@@ -61,7 +63,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     if (previous.rows[0]) {
       const route = previous.rows[0].route as GroupRoute
       const prior = route.responders.length === 1 && route.by !== 'mention' ? { message: previous.rows[0].body as string, responderId: route.responders[0] } : null
-      const judgment = prior ? await runtime.correction({ previous: prior, current: input, members }) : null
+      const judgment = prior ? await modelScope(() => runtime.correction({ previous: prior, current: input, members })) : null
       if (judgment?.kind === 'uncertain') throw new GroupJudgmentPendingError()
       if (prior && judgment?.kind === 'correction') {
         // Membership mutations acquire the same row lock. Revalidate and persist
@@ -79,13 +81,13 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     if (!members.length) throw new GroupJudgmentPendingError()
     {
       const corrections = await client.query(`SELECT message,"wrongId","rightId" FROM group_routing_corrections WHERE "conversationId"=$1 ORDER BY "createdAt" DESC,"messageId" DESC LIMIT 10`, [conversationId])
-      const route = mentionRoute(input, members) ?? await runtime.route(input, members, members.some(m => m.id === root.leadAgentId) ? root.leadAgentId : null, corrections.rows.reverse().map(c => ({ ...c, rightId: c.rightId ?? undefined })))
+      const route = mentionRoute(input, members) ?? await modelScope(() => runtime.route(input, members, members.some(m => m.id === root.leadAgentId) ? root.leadAgentId : null, corrections.rows.reverse().map(c => ({ ...c, rightId: c.rightId ?? undefined }))))
       const unknown = route.responders.filter(id => !members.some(m => m.id === id))
       if (unknown.length) throw new UnknownMentionError(unknown)
       await client.query('UPDATE group_turns SET route=$2 WHERE "messageId"=$1', [messageId, JSON.stringify(route)])
       await runGroupRounds(route, input, {
         eligible,
-        generate: runtime.generate,
+        generate: (agent, input) => modelScope(() => runtime.generate(agent, input)),
         async status(id, outcome = 'succeeded') {
           await client.query('BEGIN')
           try {

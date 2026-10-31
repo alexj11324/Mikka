@@ -301,6 +301,7 @@ export function createFactoryCheckRecovery(
       );
       return {
         kind: "invoke",
+        botId: task.botId,
         context,
         requestDigest,
         imageDigests,
@@ -313,12 +314,21 @@ export function createFactoryCheckRecovery(
     if (prepared.kind === "done") return prepared.done;
     let result: Awaited<ReturnType<typeof invokeDecision>> = null;
     try {
-      result = await invoke(
-        "factory-check-recovery",
-        prepared.context,
-        questions,
-        signal,
-      );
+      const call = () => invoke("factory-check-recovery", prepared.context, questions, signal);
+      if (invoke !== invokeDecision || !process.env.DECISION_GATEWAY_API_KEY) result = await call();
+      else {
+        const [{ hostedBillingScope }, { executionWorkspace }, { lockCliTaskScope }] = await Promise.all([
+          import('../abuse/context'), import('../execution-settings'), import('../agent-tool-approval/policy-store'),
+        ]);
+        const tx = await pool.connect();
+        let taskScope: Awaited<ReturnType<typeof lockCliTaskScope>>;
+        try { taskScope = await lockCliTaskScope(tx, userId, binding.issueId); }
+        finally { tx.release(); }
+        const workspaceId = prepared.botId ? await executionWorkspace(userId, prepared.botId)
+          : taskScope.workspaceId ?? await executionWorkspace(userId, null);
+        result = await hostedBillingScope.run({ workspaceId, ownerId: userId,
+          workspaceIds: taskScope.workspaceId ? [taskScope.workspaceId] : [] }, call);
+      }
     } catch {
       /* No semantic fallback. */
     }

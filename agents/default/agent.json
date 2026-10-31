@@ -3,6 +3,9 @@
   "id": "mikka-personal",
   "instructions": "",
   "tools": [
+    "list_drive_files",
+    "list_personal_mcp_tools",
+    "call_personal_mcp_tool",
     "search_notion_pages",
     "read_notion_page_blocks",
     "search_slack_messages",

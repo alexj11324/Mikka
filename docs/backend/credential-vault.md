@@ -16,11 +16,12 @@ project/team/environment identity before consuming an opaque, database-bound
 Preview database and source commit when testing together.
 
 Infisical supplies the five AWS settings from `staging:/aws` for Preview and
-`prod:/aws` for Production. Runtime settings are `CREDENTIAL_VAULT_ENABLED=1`,
+`prod:/aws` for Production. The vault is enabled by default; the optional
+`CREDENTIAL_VAULT_ENABLED=0` is an incident kill switch. Runtime settings are
 `CREDENTIAL_BROKER_URL` (a frozen deployment origin) and, for protected
 Previews, `CREDENTIAL_BROKER_PREVIEW_BYPASS`. Store settings in Infisical and
-scope delivery to the selected environment/branch. Never enable the vault
-before its explicit migration has been applied to the matching database.
+scope delivery to the selected environment/branch. Deployment applies the
+credential migration to the matching database before serving the feature.
 
 ## Data and authorization
 
@@ -126,21 +127,22 @@ next invocation. Logical revocation/expiry is checked independently of cleanup.
 
 ## Enablement
 
-Off by default. With the flag unset, `GET /api/credentials` answers
-`503 credential_unavailable` and no broker call is made.
+Enabled by default, with the existing authentication, owner, target and KMS
+checks. `CREDENTIAL_VAULT_ENABLED=0` retains the incident `503` path. Default
+availability does not supply missing KMS configuration or provider authority.
 
 1. Apply the credential migration to the target database. It is already applied
-   in Production (2026-10-29); a fresh Preview database needs it before the flag.
+   in Production (2026-10-29); deployment migrates a fresh database.
 2. Confirm `prod:/aws` and `staging:/aws` have their five values and are synced
    to both Vercel projects, as `aws-kms-credential-setup.md` records.
 3. Deploy `services/credential-broker` as the `mikka-credential-broker` project
    so `CREDENTIAL_BROKER_URL` can point at a frozen origin.
-4. In Preview only, set `CREDENTIAL_VAULT_ENABLED=1` and
-   `CREDENTIAL_BROKER_URL`. Verify: signed out gets `401`, signed in gets
+4. Configure `CREDENTIAL_BROKER_URL` for the frozen Preview. Verify: signed out
+   gets `401`, signed in gets
    `200 {"logins":[]}`, and the protected `/api/credentials/oidc` probe reports
    own-role and same-context KMS success with cross-role and wrong-owner denial.
-5. Repeat for Production only after the Preview result is recorded. Turning the
-   flag off restores the `503` path; saved ciphertext rows remain.
+5. Record the matching Production verification. An explicit incident kill
+   switch restores the `503` path; saved ciphertext rows remain.
 
 ## Verification
 
