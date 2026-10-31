@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
+import useSWRInfinite from 'swr/infinite'
 import { useTranslations } from 'next-intl'
 import { ArrowUpRight, Plus, Puzzle, Search } from 'lucide-react'
 
@@ -20,6 +21,7 @@ import { IconTile } from '@/components/reui/icon-tile'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -34,14 +36,16 @@ function isPluginAppId(value: string | null): value is PluginAppId {
   return value !== null && (APP_IDS as readonly string[]).includes(value)
 }
 
-async function fetchSkills([path, query]: readonly [string, string]): Promise<SkillsSearchResult[]> {
+type SkillsPage = { data: SkillsSearchResult[]; hasMore: boolean }
+
+async function fetchSkills([path, query, page]: readonly [string, string, number]): Promise<SkillsPage> {
   const params = new URLSearchParams()
   if (query) params.set('q', query)
+  if (page) params.set('page', String(page))
   const search = params.toString()
   const response = await fetch(withBasePath(search ? path + '?' + search : path))
   if (!response.ok) throw new Error('skills search failed')
-  const result = await response.json() as { data: SkillsSearchResult[] }
-  return result.data
+  return await response.json() as SkillsPage
 }
 
 /** The state word for GitHub, Linear and Telegram rows; null hides it (not set up, or unreadable). */
@@ -107,11 +111,23 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
     const timeout = window.setTimeout(() => setDebouncedQuery(trimmedQuery), 300)
     return () => window.clearTimeout(timeout)
   }, [trimmedQuery])
-  const { data: skills, error, isLoading, mutate } = useSWR(
-    tab === 'skills' && queryReady ? ['/api/skills/search', debouncedQuery] as const : null,
+  // skills.sh's all-time leaderboard, or the search, a page at a time as the list is scrolled.
+  const { data: pages, error, isLoading, isValidating, mutate, size, setSize } = useSWRInfinite(
+    (index, previous: SkillsPage | null) => tab !== 'skills' || !queryReady || (previous && !previous.hasMore) ? null : ['/api/skills/search', debouncedQuery, index] as const,
     fetchSkills,
-    { shouldRetryOnError: false },
+    { shouldRetryOnError: false, revalidateFirstPage: false },
   )
+  const skills = pages?.flatMap(page => page.data)
+  const hasMore = Boolean(pages?.at(-1)?.hasMore)
+  const loadingMore = Boolean(pages) && size > pages!.length && !error
+  const moreRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const sentinel = moreRef.current
+    if (!sentinel || !hasMore || loadingMore || error) return
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) void setSize(current => current + 1) }, { rootMargin: '400px' })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, error, setSize, pages?.length])
 
   const name = (id: PluginAppId) => id === 'linear' ? tLinear('title') : id === 'telegram' ? tTelegram('title') : tApps(id)
   const needle = trimmedQuery.toLowerCase()
@@ -183,8 +199,8 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
         </Empty>}
       </TabsContent>
       <TabsContent value="skills" className="flex flex-col gap-5 pt-4">
-        <h2 className="text-sm font-semibold">{trimmedQuery ? t('results') : t('trending')}</h2>
-        {shortQuery ? null : error ? (
+        <h2 className="text-sm font-semibold">{trimmedQuery ? t('results') : t('leaderboard')}</h2>
+        {shortQuery ? null : error && !skills?.length ? (
           <Empty className="min-h-48" role="alert">
             <EmptyHeader>
               <EmptyMedia variant="icon"><Puzzle aria-hidden="true" /></EmptyMedia>
@@ -225,6 +241,9 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
                 <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
               </div>
             ))}
+            {loadingMore && <div aria-hidden="true" className="flex items-center gap-3 py-3 pr-4 pl-5"><Skeleton className="size-8 rounded-lg" /><Skeleton className="h-4 w-40" /></div>}
+            {error && <div className="flex justify-center py-3"><Button type="button" variant="secondary" size="sm" disabled={isValidating} onClick={() => void mutate()}>{t('retry')}</Button></div>}
+            {hasMore && <div ref={moreRef} aria-hidden="true" />}
           </SettingsSection>
         )}
       </TabsContent>
