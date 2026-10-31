@@ -117,3 +117,24 @@ without installing packages; the root pnpm lock is unchanged. This declaration
 closes the service-only installation dependency rather than relying on the
 root installation being present. A fresh independent install was not performed
 locally; the broker CI remains the final installation gate.
+
+
+## Settings saved-login deletion caller
+
+PR #660 PG shard1 exposed a production caller still passing `workspaceId:''`
+from `deleteSavedLoginFor`; mandatory audit validation therefore refused every
+normal settings deletion (occurrence10 × impact6 = 60). The existing server
+action now obtains the full cookie-authenticated user and calls the existing
+current-workspace loader. Its validated membership/cookie context and actual
+user actor flow into the owner-scoped vault removal. The credential owner check,
+owner-wide revocation and existing lease/session invalidation are unchanged;
+no client-supplied workspace or actor is trusted and auditing is not bypassed.
+
+The existing real PG `settings-activity.db.test.ts` suite passed5/5, zero skipped,
+on the same fully migrated isolated target. It now initializes a real current
+workspace/member and asserts that deletion emits exactly the expected current
+workspace/user/opaque credential reference with empty metadata, while retaining
+peer refusal, invalid-ID refusal, session requirements and outstanding-lease
+invalidation checks. Session/request and request locale are explicit ports;
+the workspace loader, protected actions and database remain real. Log:
+`/tmp/mikka-audit210-settings-pg.log`. Typecheck, focused lint and diff checks pass.
