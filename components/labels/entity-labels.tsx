@@ -25,8 +25,8 @@ function EntityLabel({ icon: Icon, children, muted }: { icon: Mark; children: Re
 const DEVICE_ICONS: Record<DeviceKind, LucideIcon> = { laptop: Laptop, server: Server, cloud: Cloud, unknown: Monitor }
 
 /**
- * A device: its type (laptop, server, 云端托管), the online dot, then its name.
- * 云端托管 is always available, so it has no dot.
+ * A device: its type (laptop, server, Mikka Cloud), the online dot, then its name.
+ * Mikka Cloud is always available, so it has no dot.
  */
 export function DeviceLabel({ kind, name, online }: { kind: DeviceKind; name: string; online: boolean }) {
   const t = useTranslations('Settings.botAgents')

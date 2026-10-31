@@ -32,7 +32,7 @@ async function seed(page: Page) {
   }
 }
 
-test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用任务默认，改运行位置、Harness 和模型，设置 Coordinator 模型', async ({ page }, testInfo) => {
+test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用任务默认，改运行位置、Agent 和模型，设置 Coordinator 模型', async ({ page }, testInfo) => {
   await register(page, '/settings?section=bots')
   await expect(page.getByRole('heading', { level: 1, name: 'Bot 与 Agents' })).toBeVisible()
   // The first workspace load creates the person's workspace; seed into it.
@@ -43,7 +43,7 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
   // 任务默认: a Claude subscription starts on Claude Code at the online device, on its opus slot, shown by its resolved name.
   const fallback = page.locator('[data-rule="default"]')
   await expect(fallback.getByRole('button', { name: '默认 运行位置：E2E MacBook', exact: true })).toBeVisible()
-  await expect(fallback.getByRole('button', { name: '默认 Harness：Claude Code', exact: true })).toBeVisible()
+  await expect(fallback.getByRole('button', { name: '默认 Agent：Claude Code', exact: true })).toBeVisible()
   await expect(fallback.getByRole('button', { name: '默认 模型：E2E Opus Resolved', exact: true })).toBeVisible()
   await expect(fallback.getByRole('button', { name: '默认 设备离线时：等它上线', exact: true })).toBeVisible()
   await expect(fallback.getByRole('button', { name: /更多操作/ })).toHaveCount(0)
@@ -59,22 +59,22 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
   await expect(row.getByRole('button', { name: '前端 标签：前端', exact: true })).toBeEnabled()
   // A new rule starts from the task defaults.
   await expect(row.getByRole('button', { name: '前端 运行位置：E2E MacBook', exact: true })).toBeVisible()
-  await expect(row.getByRole('button', { name: '前端 Harness：Claude Code', exact: true })).toBeVisible()
+  await expect(row.getByRole('button', { name: '前端 Agent：Claude Code', exact: true })).toBeVisible()
   await expect(row.getByRole('button', { name: '前端 模型：E2E Opus Resolved', exact: true })).toBeVisible()
 
   await row.getByRole('button', { name: '前端 运行位置：E2E MacBook', exact: true }).click()
   await expect(page.getByRole('option').filter({ hasText: 'gpu-box' })).toContainText('离线')
   await expect(page.getByRole('option')).toHaveCount(3)
-  await page.getByRole('option').filter({ hasText: '云端托管' }).click()
-  await expect(row.getByRole('button', { name: '前端 运行位置：云端托管', exact: true })).toBeVisible()
-  await row.getByRole('button', { name: '前端 运行位置：云端托管', exact: true }).click()
+  await page.getByRole('option').filter({ hasText: 'Mikka Cloud' }).click()
+  await expect(row.getByRole('button', { name: '前端 运行位置：Mikka Cloud', exact: true })).toBeVisible()
+  await row.getByRole('button', { name: '前端 运行位置：Mikka Cloud', exact: true }).click()
   await page.getByRole('option').filter({ hasText: 'E2E MacBook' }).click()
   await expect(row.getByRole('button', { name: '前端 运行位置：E2E MacBook', exact: true })).toBeVisible()
 
   // Another harness takes its default model.
-  await row.getByRole('button', { name: '前端 Harness：Claude Code', exact: true }).click()
+  await row.getByRole('button', { name: '前端 Agent：Claude Code', exact: true }).click()
   await page.getByRole('option', { name: 'Codex' }).click()
-  await expect(row.getByRole('button', { name: '前端 Harness：Codex', exact: true })).toBeVisible()
+  await expect(row.getByRole('button', { name: '前端 Agent：Codex', exact: true })).toBeVisible()
   await expect(row.getByRole('button', { name: '前端 模型：e2e-reported-model', exact: true })).toBeVisible()
 
   await row.getByRole('button', { name: '前端 模型：e2e-reported-model', exact: true }).click()
@@ -90,7 +90,7 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
   // Every change saved: a reload shows the same table.
   await page.reload()
   await expect(row.getByRole('button', { name: '前端 运行位置：E2E MacBook', exact: true })).toBeVisible()
-  await expect(row.getByRole('button', { name: '前端 Harness：Codex', exact: true })).toBeVisible()
+  await expect(row.getByRole('button', { name: '前端 Agent：Codex', exact: true })).toBeVisible()
   await expect(row.getByRole('button', { name: '前端 模型：e2e-other-model', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Coordinator 模型：codex-e2e-model', exact: true })).toBeVisible()
   await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
