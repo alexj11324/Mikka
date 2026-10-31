@@ -11,7 +11,7 @@ import { cn } from 'cn'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { Badge } from '@/components/reui/badge'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
-import { SourceAvatar, SourcesList, SourcesSummary, type StreamingSource } from '@/components/ui/streaming-text'
+import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type StreamingSource } from '@/components/ui/streaming-text'
 import { Claude } from '@/components/ui/svgs/claude'
 import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
@@ -24,7 +24,7 @@ export const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destru
 }
 
 /** A task chip is wider than a source chip: it carries the title too. */
-const TASK_CHIP = 'max-w-72 pl-1.5'
+const TASK_CHIP = 'max-w-72'
 
 export type LinkPreviews = Record<string, LinkPreview | null>
 
@@ -195,7 +195,7 @@ export function LinkCitation({ url, label, preview }: { url: string; label: stri
   if (!link) return <>{url}</>
   return <InlineCitation>
     <InlineCitationTrigger render={<a href={url} target="_blank" rel="noopener noreferrer" />}>
-      <SourceAvatar source={{ name: link.name, domain: link.host, image: preview?.icon, icon: <Globe /> }} />
+      <SourceAvatar source={{ name: link.name, domain: link.host, image: preview?.icon, icon: <Globe /> }} className={sourceTileClassName} />
       <InlineCitationLabel>{link.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
