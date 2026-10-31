@@ -11,10 +11,10 @@ import { ReplyBubbles } from '@/components/workspace/agent-text-bubble'
  * Cited issues, runs and web pages show as source chips in the text, then an
  * "N sources" toggle lists them all. A citation it cannot show stays as written.
  */
-export function CoordinatorReply({ text, citations }: { text: string; citations: AgentCitations }) {
+export function CoordinatorReply({ text, citations, isStreaming = false }: { text: string; citations: AgentCitations; isStreaming?: boolean }) {
   return <AgentCitationsContext value={citations}>
     <div className="flex w-full min-w-0 flex-col gap-2 break-words">
-      <ReplyBubbles value><AgentGenerativeUI response={text} isStreaming={false} onAction={() => {}} showErrors={false} /></ReplyBubbles>
+      <ReplyBubbles value><AgentGenerativeUI response={text} isStreaming={isStreaming} onAction={() => {}} showErrors={false} /></ReplyBubbles>
       {/* A choice card already shows its task chip; no "N sources" footnote under it. */}
       {!/\bBeQuestions\(/.test(text) && <CitationSources text={text} />}
     </div>

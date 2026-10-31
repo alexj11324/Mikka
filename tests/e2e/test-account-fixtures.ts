@@ -104,7 +104,10 @@ export const test = base.extend<{ testAccounts: AccountBrowsers; peerPage: Page;
         contexts.push(context)
         guardContextRequests(context, scope, origin)
         const fence = await installAccountOriginFence(context, scope, origin,
-          () => { blockedOrigins++ }, () => { runtimeFailures.push('BROWSER_ORIGIN_FENCE_FAILED') }, localImageFixtures)
+          () => { blockedOrigins++ }, failure => {
+            runtimeFailures.push('BROWSER_ORIGIN_FENCE_FAILED')
+            if (failure) diagnose({ category: 'origin-fence', phase: failure.phase, protocolCategory: failure.category })
+          }, localImageFixtures)
         context.on('page', page => {
           // Never attach raw browser errors, responses or request URLs: those
           // may carry a credential in a query, response or diagnostic message.

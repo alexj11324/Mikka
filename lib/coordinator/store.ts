@@ -22,6 +22,7 @@ import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorChatState } from './chat-state'
+import { coordinatorLeaseActive } from './lease'
 import { readPreferences } from '@/lib/preferences'
 import { pushReasons, type PushReason } from '@/lib/push-reasons'
 import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
@@ -253,19 +254,22 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
  * Appends the turn's new messages and renews the lease. `warning` says why the
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null): Promise<void> {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null, streamId?: string): Promise<number> {
   await assertCredentialSafeChat(userId, messages)
-  await db.transaction(async tx => {
+  return db.transaction(async tx => {
     await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId" IS NOT DISTINCT FROM ${botId}::uuid FOR UPDATE`)
+    const first = await nextPosition(tx, userId, botId)
     if (messages.length) {
-      const first = await nextPosition(tx, userId, botId)
-      await tx.insert(coordinatorMessages).values(messages.map((message, index) => ({
-        id: crypto.randomUUID(), userId, botId, position: first + index, message: message as unknown as Record<string, unknown>,
-      })))
+      await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
+        const { mikkaStreamId: _untrusted, ...plain } = message as unknown as Record<string, unknown>
+        return { id: crypto.randomUUID(), userId, botId, position: first + index,
+          message: { ...plain, ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}) } }
+      }))
     }
     const now = new Date()
     await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning, lastErrorAt: warning ? now : null, updatedAt: now })
       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
+    return first + messages.length - 1
   })
 }
 
@@ -285,7 +289,10 @@ export async function loadConversation(userId: string, botId: string | null = nu
     .orderBy(asc(coordinatorMessages.position))
   // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
   const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
-  return { summary: session?.summary ?? null, memory, messages: rows.map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })) }
+  return { summary: session?.summary ?? null, memory, messages: rows.map(row => {
+    const { mikkaStreamId: _streamId, ...message } = row.message
+    return { position: row.position, message: message as unknown as ModelMessage }
+  }) }
 }
 
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */
@@ -309,6 +316,12 @@ export async function editMemory<T>(userId: string, edit: (memory: string) => { 
 
 export interface ChatView {
   items: ChatItem[]
+  /** Active Workflow lease for this exact owner and bot. */
+  streamRunId?: string
+  /** Last stored message position, excluding pending inbox items. */
+  cursor?: number
+  /** Server-owned IDs already represented in these stored assistant messages. */
+  persistedStreamIds?: string[]
   /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
   /** Why the last turn failed, when no turn has answered since. */
@@ -374,6 +387,9 @@ export async function chatView(userId: string, limit = 200, botId: string | null
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   return {
     items,
+    cursor: last,
+    persistedStreamIds: [...new Set(rows.flatMap(({message}) => message.role === 'assistant' && typeof message.mikkaStreamId === 'string' ? [message.mikkaStreamId] : []))],
+    ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
     ...coordinatorChatState(session, waiting),
     sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
     artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),

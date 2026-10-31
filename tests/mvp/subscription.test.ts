@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import { setTimeout as delay } from 'node:timers/promises'
 import { streamText, stepCountIs, tool } from 'ai'
 import { z } from 'zod'
 import { SubscriptionService } from '../../lib/subscription-service'
@@ -34,6 +35,21 @@ test('MVP subscription boundary retains real service authorization, private work
   }})
   assert.match(await result.text,/启动线程/)
   assert.deepEqual(calls,['issue','dispatch']);assert.ok(scopeChecks>=4)
+  const streamMarker=`mvp-stream-${randomUUID()}`
+  const control=async(path:string)=>{
+   const response=await fetch(`${services.origin}/streaming/${path}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({marker:streamMarker,first:'First visible',last:' then complete'})})
+   assert.equal(response.ok,true)
+   return response.json()
+  }
+  await control('scenario')
+  const reader=streamText({model:await service.model({ownerId:owner,workspaceId,consumerId,bindingId,execution:'model'}),prompt:streamMarker,maxRetries:0}).textStream.getReader()
+  assert.deepEqual(await reader.read(),{value:'First visible',done:false})
+  assert.deepEqual(await control('state'),{started:1,released:false})
+  const pending=reader.read()
+  assert.equal(await Promise.race([pending.then(()=>true),delay(100).then(()=>false)]),false,'the worker must expose the first delta before the held model tail')
+  await control('release')
+  assert.deepEqual(await pending,{value:' then complete',done:false})
+  assert.equal((await reader.read()).done,true)
   row.state='disconnected'
   await assert.rejects(service.model({ownerId:owner,workspaceId,consumerId,bindingId,execution:'model'}))
   const remote=new SubscriptionWorkerClient({binary:fileURLToPath(new URL('./subscription-worker.mjs',import.meta.url))},{...config,databaseUrl:'postgresql://ci:fixture@remote.invalid/production'})
