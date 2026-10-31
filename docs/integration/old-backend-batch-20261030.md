@@ -186,3 +186,14 @@ every main check command is retained, with this batch's schedules and run
 recovery checks added. The complete migration history now contains 154
 files; the four pending migrations still sort after main. The latest
 aggregate PR checks verify this final compatibility revision separately.
+
+The complete `d3ef96e8` runs subsequently finished green: source/full and
+strict, DB/build/final gate in [41151903647](https://github.com/alexj11324/Mikka/actions/runs/41151903647),
+all 59 required DB scripts (scope 68/68 and secrets 57/57, no skips), plus
+[browser 41151909584](https://github.com/alexj11324/Mikka/actions/runs/41151909584).
+Browser shards passed 46/46/44/45 cases (181 total); the exact Factory claim
+case passed 5.4 seconds with its original rejection/credential assertions.
+Performance 5/5, MVP 2/2 and the before-merge gate passed. Four existing
+conditional design-screenshot cases were skipped; no skip was introduced.
+All evidence audits passed. These are preserved results for that application
+revision, preceding the final unrelated-main compatibility merge.
