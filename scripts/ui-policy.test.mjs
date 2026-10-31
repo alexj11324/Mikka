@@ -271,6 +271,16 @@ test('R-31: a Button may not bring back a white fill with a border', () => {
   clean('<Button className="hover:border bg-card" />')
 })
 
+test('a segmented control track comes from ToggleGroup variant="segment", not call-site classes', () => {
+  has(`${prefix} const ui = <ToggleGroup className="rounded-lg bg-muted p-0.5" />`, 'style/segment-track')
+  has(`${prefix} const ui = <ToggleGroup className={cn('h-7')} />`, 'style/segment-track')
+  const clean = source => assert.ok(!rules(`${prefix} const ui = ${source}`).includes('style/segment-track'), source)
+  clean('<ToggleGroup variant="segment" size="sm" spacing={0.5} />')
+  clean('<ToggleGroup className="ml-auto flex-wrap" />')
+  clean('<ToggleGroup className="grid grid-cols-6 gap-y-3 px-6" />')
+  clean('<ToggleGroupItem className="h-7" />')
+})
+
 test('utility parser respects bracket expressions and variants', () => {
   assert.deepEqual(splitUtilities('flex [&_svg]:size-4 text-[length:var(--size)]'), ['flex', '[&_svg]:size-4', 'text-[length:var(--size)]'])
   assert.equal(utilityBase('dark:hover:text-[length:var(--size)]'), 'text-[length:var(--size)]')
