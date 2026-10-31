@@ -1,132 +1,116 @@
-# Execution settings backend (#490)
+# Explicit execution settings (#490, #537)
 
-No page, component, Figma or other frontend change is included.
+Backend only. The settings UI is maintained separately in #529 and its dependent PRs.
 
-## Storage and scope
+## Frontend contract
 
-`20261030200610_execution_rules.sql` is idempotent. `execution_rules` belongs to
-an owner and workspace, matching `bots` and the settings workspace boundary.
-Devices remain personal infrastructure: a rule can reference only its owner's
-local device. Positions are serialized per settings scope and use a deferred
-unique constraint so reorder is atomic. The all-auto default is a virtual row
-with id `default`; CRUD and reorder cannot change or delete it.
+`app/actions/execution-settings.ts` derives owner/workspace from the authenticated
+session. The existing action names remain:
 
-`bot_model_choices` records an optional connected subscription binding per Bot,
-or `coordinator` for the Coordinator. Clearing a choice selects automatically
-from connected bindings. Models come from the owner's connected, current-epoch
-account bindings; this API does not claim to enumerate models that an account
-has never reported or bound. Choosing a model already used by another owned Bot
-copies its non-secret binding reference to the target Bot. Immutable execution
-snapshots retain the selected binding and continue to check owner, workspace,
-consumer, connection revision and connection state on every model call.
+- `listExecutionRules()`: ordered label rules followed by a persisted default with
+  public `id: 'default'`, `label: null`, and position `2147483647`.
+- `createExecutionRule(value)` and `updateExecutionRule(id, value)`: fields are
+  `label`, `place` (owned local device UUID or `cloud`), `harness`
+  (`claude_code`, `codex`, `cursor`), and `model` (reported model or slot).
+  `updateExecutionRule('default', value)` saves the default in `execution_rules`;
+  its label is always null. A label is required for other rules.
+- `deleteExecutionRule(id)` and `reorderExecutionRules(ids)` still reject the
+  default. Reorder requires the exact set of editable UUIDs.
+- `listExecutionPlaces()`: devices, `deviceType`, enabled/online state and
+  `harnesses`, plus the cloud choice. `HarnessInfo` now optionally includes
+  `modelSlots: {slot, model, name}[]` and `defaultModelSlot`. Persist the slot;
+  show only its resolved `name`, without an alias prefix. Legacy `models` stays
+  available. Cloud models come from connected subscription bindings.
+- `getExecutionFallbacks()` and `updateExecutionFallbacks(value)`: per-person
+  `{whenDeviceOffline: 'wait' | 'cloud', whenQuotaExhausted: 'stop' | 'switchAccount'}`.
+  Both fields are required when updating. Defaults are `wait` and `stop`.
+- `listBotModels()`, `getBotModel(botId)`, `setBotModel(botId, bindingId)`:
+  null Bot means Coordinator. A binding must be explicit; null/`auto` choices
+  are refused. First access persists the first connected binding when none is
+  saved. A saved unavailable binding is retained and execution refuses it.
 
-Bot workflows use AI SDK subscription execution, including when versioned
-Agent Kit definitions are disabled. No new model ids or model environment
-variables are introduced. A missing connected model refuses execution.
+`auto` in any execution field, or clearing a Bot model, returns the stable
+`executionAutoNotAllowed` action error. Existing field errors remain
+`executionPlaceInvalid`, `executionHarnessUnavailable`, `executionModelUnknown`;
+ordering/ownership failures retain their existing codes.
 
-Without browser cookies, the Coordinator uses the owner's first active workspace
-in creation order, matching the settings fallback. Named Bots use their exact
-workspace. Workspace authorization is checked before resolving either target.
+## Initial choice and migration
 
-## Resolution and execution
+Initial values are persisted on the first settings read or issue dispatch,
+under the same advisory transaction lock as CRUD. Concurrent reads cannot create
+multiple defaults or overwrite a person's selection.
 
-`resolveExecution(labels, rules, devices)` checks label rules by ascending
-position. The first match wins; otherwise it uses the fixed default. Auto prefers
-an enabled online local device with a compatible installed harness and then
-selects cloud. Explicit devices never fall back. Their runs stay queued on the
-same device and the owner read API includes `waitFor` while it is offline.
-Pinned retries are excluded from device takeover and offline queue expiry.
+A connected Claude subscription prefers Claude Code and its reported `opus`
+slot, first on an enabled online server, then another enabled online device.
+Otherwise a connected Codex subscription prefers Codex's reported default slot.
+Without a matching local install, a connected cloud binding supplies an explicit
+cloud choice. No server model-name constants or guessed model names are used.
+When no usable report/binding exists, return `executionModelUnknown` rather than
+inventing an automatic choice; redetect/connect an account first.
 
-Coordinator `dispatch_run` resolves these settings before entering existing local
-admission or cloud queue/claim gates. Device-specific source-event authorization
-cannot be redirected to cloud. Cloud dispatch retains the requested repository.
-The Coordinator can use an existing owned cloud Bot execution environment in
-the same workspace while retaining Coordinator attribution. Cloud execution
-requires the existing configured E2B runtime and subscription binding; missing
-runtime/account prerequisites return an unavailable result, never a success.
+`20261031001500_explicit_execution.sql` is idempotent: it makes the label nullable,
+adds a single-default unique index, removes auto column defaults, guards new
+writes, and adds `user.executionFallbacks`. Existing auto rows with available owner reports/bindings are converted during
+deployment. Rows awaiting discovery are retried on first scope read/dispatch,
+in that same transaction. Actual metadata is required rather than guessing
+a model during deployment. Old auto-place rules preserve
+online-device/harness preference. Explicit fields are preserved. If metadata is
+unavailable the read fails and the transaction rolls back; retry after discovery.
+Repeated reads leave already concrete rows unchanged. No new table is introduced. The database also permits the protocol's existing
+internal `mock` harness for isolated daemon acceptance fixtures; public settings
+validation still permits only the three real harnesses. Mock execution remains
+restricted by the daemon's existing test-mode guard.
 
-The frozen worker snapshot marks automatic versus explicit CLI model selection.
-New automatic assignments omit `model`; explicit assignments carry only the
-chosen model. Claude's SDK and Codex's app-server receive an explicit model only
-in the latter case; Cursor adds `--model` only in that case. The subscription
-broker honors that same run-frozen selection. Historical snapshots without the
-marker retain their binding model. Owner, active run, lease, quota, route and
-credential isolation checks remain in both TypeScript and Go.
+## Discovery and execution
 
-## API
+Claude Code discovery uses the Agent SDK initialization `supportedModels()`
+metadata, including `resolvedModel`, without sending a prompt. Model remaps from
+CLI settings and the non-secret `ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL`
+identifiers are retained. No credentials are added to the discovery environment.
+Codex uses app-server `initialize` / `model/list`; its `isDefault` row supplies
+the internal `default` slot. Cursor uses `--list-models`. Discovery failures
+advertise no catalogue; they never fabricate one. Slot resolution follows the
+latest heartbeat report at each new dispatch; in-flight snapshots remain frozen.
 
-`app/actions/execution-settings.ts` derives user and workspace from the session:
+First matching label by position wins, otherwise the saved default. Explicit
+harness/model values reach the existing local/cloud admission and subscription
+checks. With `wait`, offline/disabled devices remain pinned and queued; takeover
+and offline expiry do not reroute them. `cloud` explicitly routes to cloud using
+the last reported resolved model, retaining runtime and account authorization.
+Device-specific source-event authorization still cannot be redirected to cloud.
 
-- `listExecutionRules`, `createExecutionRule`, `updateExecutionRule`,
-  `deleteExecutionRule`, `reorderExecutionRules`.
-- `listExecutionPlaces`: owner devices, type, enabled/online state, installed
-  harnesses and optional per-harness models, plus the cloud option. The frontend
-  supplies its localized cloud label.
-- `listBotModels`, `getBotModel`, `setBotModel`: `null` Bot means Coordinator;
-  `null` binding means automatic selection.
-- `redetectDevice`: owner-local-device only.
+Bot quota `stop` propagates the exhaustion error. `switchAccount` only tries
+another connected account of the same owner/workspace, route and model. Each
+candidate is independently bound to the consumer and reauthorized for epoch,
+workspace, connection and quota. No paid provider fallback, model substitution,
+or retry of a partially emitted generation is introduced. Unavailable accounts,
+unknown quota and authorization errors do not trigger switching.
 
-Mutations validate ids and ownership. Rule ordering requires the exact current
-set of editable ids; missing, duplicate, foreign and default ids are rejected.
+## Other existing handoff actions (#539)
 
-## Daemon discovery
+`listWorkspaceIssueLabels(workspaceId?)` returns `{name,color}[]` for visible,
+nondeleted workspace issues via their team links. Personal issues are excluded;
+names are deduplicated case-insensitively.
 
-`HarnessInfo.models`, `deviceType` and heartbeat device-command acknowledgements are optional,
-so older daemon payloads remain valid.
+Bot model options remain deduplicated by `(connectionId,modelId)` and include
+`bindingId`, `consumerId`, `modelId`, `route`, `connectionId`, `provider`,
+`accountLabel`, `plan`. `getBotModel()` returns the visible option corresponding
+to a saved copied binding; execution retains the original stored binding.
+`refreshBotModels(connectionId,workspaceId?)` refreshes an owner/workspace/epoch
+scoped catalogue and returns those options. Provider failures return
+`executionAccountUnavailable` without exposing response bodies.
 
-- Codex: installed `codex app-server`, JSON-RPC `initialize` followed by
-  `model/list`; report the CLI account's returned model identifiers.
-- Cursor: installed `cursor-agent` or `agent`, `--list-models`; parse returned
-  identifiers without supplying a built-in list.
-- Claude Code: no CLI list operation is used; report no models, leaving only
-  automatic selection. Failed or unsupported discovery also reports none.
+`redetectDevice(deviceId)` enqueues owner-local discovery;
+`getRedetectDeviceStatus(commandId,workspaceId?)` returns
+`{commandId,status:'pending'|'completed'|'failed',completedAt,error}`.
+Only the daemon acknowledgement completes the command.
 
-The shared device-management command channel from #491 delivers `redetect` by
-command id in the heartbeat response. The daemon reruns detection and sends an
-immediate follow-up heartbeat with its refreshed harness/model report and the
-completed command id. Normal heartbeats cannot consume an unacknowledged command.
+## Verification and risk
 
-## Frontend handoff (#539)
-
-These additions are backend contracts; they do not implement #537's explicit
-initial choices or remove the existing automatic options.
-
-- `listWorkspaceIssueLabels(workspaceId?)` returns `{name, color}[]` for
-  nondeleted workspace issues visible through the current workspace's team
-  links. Personal issues have no workspace association and are excluded.
-  `color` uses the existing issue-label palette. Duplicate names are folded
-  case-insensitively; the newest visible issue supplies its spelling and color.
-- `listBotModels()` returns one row per `(connectionId, modelId)`, with
-  `bindingId`, `consumerId`, `modelId`, `route`, `connectionId`, `provider`,
-  `accountLabel`, and `plan`. Label and plan are nullable when the connection
-  has not reported them. The account label is the existing connection label;
-  the plan comes from its last quota snapshot. Saved Bot-specific binding ids
-  remain accepted even when another copy represents the model in the list.
-  `getBotModel()` returns the visible option id for an available saved model;
-  internal execution reads keep their original stored binding id.
-- `refreshBotModels(connectionId, workspaceId?)` asks that connected account's
-  provider for its current model list and returns matching model options in the
-  same shape. It creates idempotent catalogue bindings in the existing
-  `byos_bindings` table; choosing one still copies its binding for the target
-  Bot. A nullable `byos_connections.modelCatalog` snapshot records the last
-  successful catalogue and its revision; rereading the model list excludes
-  models removed by that provider, including when its current list is empty.
-  Existing bindings are retained for saved choices and run snapshots. The
-  idempotent `20261030233002_byos_model_catalog.sql` migration adds this column.
-  Discovery and storage both check the account owner, workspace and epoch;
-  a disconnect/reconnect during discovery rejects the refresh. Provider errors
-  become `executionAccountUnavailable` rather than exposing response bodies.
-- `getRedetectDeviceStatus(commandId, workspaceId?)` reads the existing receipt:
-  `{commandId, status: 'pending' | 'completed' | 'failed', completedAt, error}`.
-  Only the device owner can read a local, nonremoved device's redetect command.
-  Completion is the daemon's acknowledgement; polling does not complete it.
-
-`ExecutionSettings` now throws `ActionFailureError` for expected failures:
-`executionPlaceInvalid`, `executionHarnessUnavailable`, `executionModelUnknown`,
-`executionRuleNotFound`, `executionRuleOrderInvalid`,
-`executionCommandNotFound`, `executionAccountUnavailable`, and `botNotFound`.
-Malformed remaining rule fields use the existing `validationGeneric` code.
-Explicit device rules check installed harnesses and the device's reported
-model list. Cloud/automatic-place explicit models must belong to a connected
-account binding for the selected harness. Automatic model selection retains
-its current behavior until #537.
+The previous automatic default affected every owner without a saved rule
+(occurrence 10/10, impact 7/10): an unlabeled dispatch silently selected its
+execution place/harness/model. Regression tests cover explicit defaults and
+rejection, idempotent scope migration, concurrency, owner/workspace boundaries,
+subscription preference, slot mappings, offline decisions and quota decisions.
+Database tests run against an isolated loopback `mikka_e2e` schema; discovery
+and generation policy tests use fixtures without real model calls.

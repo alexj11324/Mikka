@@ -13,6 +13,17 @@ export async function seedMvpSubscription(pool, ownerId) {
   return { connectionId,bindingId,workspaceId:workspace.id }
 }
 
+/** The real daemon uses its existing test-only mock adapter. Seed a concrete
+ * choice just as a person would save one; never rely on an automatic default. */
+export async function seedMvpExecutionRule(pool,ownerId,workspaceId,deviceId) {
+  assertMvpEnvironment()
+  const device=await pool.query(`SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL AND harnesses @> '[{"harness":"mock","installed":true}]'::jsonb`,[deviceId,ownerId])
+  assert.equal(device.rowCount,1,'MVP rule requires the actual registered mock daemon')
+  await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position)
+    VALUES ($1,$2,$3,NULL,$4,'mock',$5,2147483647)
+    ON CONFLICT ("ownerId","workspaceId") WHERE label IS NULL DO UPDATE SET place=EXCLUDED.place,harness=EXCLUDED.harness,model=EXCLUDED.model`,[randomUUID(),ownerId,workspaceId,deviceId,MVP_SUBSCRIPTION_MODEL])
+}
+
 /** Adapt the real OpenAI-compatible subscription request to the same scripted model. */
 export function subscriptionPrompt(payload) {
   const names=new Map()

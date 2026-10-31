@@ -950,6 +950,7 @@
     "botNotFound": "This bot does not exist in this workspace.",
     "executionPlaceInvalid": "Choose an available device or cloud.",
     "executionHarnessUnavailable": "This harness is unavailable on the selected device.",
+    "executionAutoNotAllowed": "Choose an explicit execution value.",
     "executionModelUnknown": "This model is unavailable.",
     "executionRuleNotFound": "This execution rule was not found.",
     "executionRuleOrderInvalid": "The execution rule order has changed. Reload and retry.",

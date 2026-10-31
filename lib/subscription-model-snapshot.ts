@@ -76,7 +76,69 @@ export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime:
   await verify()
   const model = await resolveAgentExecutionModel({ ownerId: scope.ownerId, consumerId: frozen.consumerId, source: { type: 'subscription', bindingId: frozen.bindingId }, signal }, {
     defaultModel: () => { throw refuse() }, subscriptionService: () => service, workspace: dependencies.workspace,
-  })
+  }).catch(async (error) => {
+    if (
+      !(error instanceof SubscriptionRefusal) ||
+      error.code !== "quota_exhausted"
+    )
+      throw error;
+    const { ExecutionSettings } = await import("./execution-settings");
+    const { pool } = await import("./db");
+    const settings = new ExecutionSettings(pool);
+    if (
+      (await settings.fallbacks(scope.ownerId)).whenQuotaExhausted !==
+      "switchAccount"
+    )
+      throw error;
+    const settingsScope = {
+      ownerId: scope.ownerId,
+      workspaceId: frozen.workspaceId,
+    };
+    const candidates = (await settings.botModels(settingsScope)).filter(
+      (b) =>
+        b.connectionId !== frozen.connectionId &&
+        b.modelId === frozen.modelId &&
+        b.route === frozen.route,
+    );
+    for (const candidate of candidates) {
+      const bindingId = await settings.bindingForBot(
+        settingsScope,
+        scope.botId,
+        candidate.bindingId,
+      );
+      const next = await freezeHostedModelSelection(
+        scope,
+        runtime,
+        { type: "subscription", bindingId },
+        dependencies,
+      );
+      try {
+        // Re-authorize the alternate account, consumer, workspace and quota.
+        return await resolveAgentExecutionModel(
+          {
+            ownerId: scope.ownerId,
+            consumerId: next.modelSelection!.consumerId,
+            source: { type: "subscription", bindingId },
+            signal,
+          },
+          {
+            defaultModel: () => {
+              throw refuse();
+            },
+            subscriptionService: () => service,
+            workspace: dependencies.workspace,
+          },
+        );
+      } catch (nextError) {
+        if (
+          !(nextError instanceof SubscriptionRefusal) ||
+          nextError.code !== "quota_exhausted"
+        )
+          throw nextError;
+      }
+    }
+    throw error;
+  });
   await verify()
   if (typeof model === 'string') throw refuse()
   return new Proxy(model, { get(target, property) {
