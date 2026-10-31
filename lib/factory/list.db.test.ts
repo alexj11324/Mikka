@@ -7,6 +7,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { createFactoryStore } from "./store";
+import { dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -81,11 +82,7 @@ test("list: candidate sha + newest publication of the current candidate only", {
     assert.equal(after.publication?.finishedAt, "2026-10-30T05:02:00.000Z");
     assert.equal(after.publication?.createdAt, "2026-10-30T05:00:00.000Z");
   } finally {
-    // pg-pool resolves end() before backends are gone; wait so the FORCE drop
-    // never kills a still-closing socket after the test.
-    await pool.end();
-    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++) await new Promise((r) => setTimeout(r, 50));
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await dropTestDatabase(admin, database, pool);
     await admin.end();
   }
 });

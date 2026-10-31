@@ -390,12 +390,20 @@ test('with the Coordinator off a new task is refused, not queued silently; a cha
   delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
 })
 
-test('new-task submission fails closed when issue tools are disabled', async () => {
+test('new-task submission fails closed when the issue-tools kill switch is set', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'issueToolsDisabled', params: undefined })
   assert.equal(current.rows.size, 0)
   assert.equal(callbacks.length, 0)
+  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+})
+
+test('new-task submission is on by default with no issue-tools setting', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { queued: true })
+  assert.equal(current.rows.size, 1)
 })
 
 // Regression for current-main integration: neither source can erase the other.

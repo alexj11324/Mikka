@@ -13,6 +13,7 @@ import { createFactoryReconciler } from "./reconcile";
 import { factoryCheckIndependent } from "./check-independence";
 import { reconcileFactoryAfterCompletion } from "../run-completion-effects";
 import { orchestratorSettings } from "@mikka/protocol/orchestrator";
+import { dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -215,12 +216,7 @@ test("run completion enters review without the Coordinator; replays do not advan
   } finally {
     if (flags.r === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = flags.r;
     if (flags.l === undefined) delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED; else process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = flags.l;
-    // pg-pool resolves end() once clients are asked to close, not once their
-    // backends are gone; wait for that before the FORCE drop so it never
-    // terminates a still-closing socket (an uncaught 57P01 after the test).
-    await pool.end();
-    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++) await new Promise((r) => setTimeout(r, 50));
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await dropTestDatabase(admin, database, pool);
     await admin.end();
   }
 });

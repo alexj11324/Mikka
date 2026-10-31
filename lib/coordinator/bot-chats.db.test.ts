@@ -15,6 +15,50 @@ try {
 if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')
 const dbTest = databaseUrl ? test : test.skip
 
+dbTest('failed wake state stays with its owner and bot, and recovery keeps the original message', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-wake-state-${randomUUID()}`, peer = `test-wake-peer-${randomUUID()}`
+  const botId = randomUUID(), peerBotId = randomUUID()
+  t.after(async () => {
+    t.diagnostic(JSON.stringify({ event: 'coordinator_db_fixture_retained', fixtureOwnerIds: [owner, peer], database: 'mikka_e2e' }))
+    await scope.close()
+  })
+  await scope.run(async () => {
+    for (const id of [owner, peer]) await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${id}, 'Wake fixture', ${`${id}@example.invalid`}, false, now(), now())`)
+    await db.insert(schema.bots).values([
+      { id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Owner bot' },
+      { id: peerBotId, ownerId: peer, workspaceId: randomUUID(), name: 'Peer bot' },
+    ])
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'Original pending request', { botId }))
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'Separate Coordinator request'))
+    await recordCoordinatorEvent(db, userMessageEvent(peer, 'Peer private request', { botId: peerBotId }))
+    const botEvents = and(eq(schema.coordinatorEvents.userId, owner), eq(schema.coordinatorEvents.botId, botId))
+    assert.equal((await store.botChats(owner))[botId].working, true, 'a new pending bot has a spinner even before its session exists')
+    await db.update(schema.coordinatorEvents).set({ wakeAttempts: 1, wakeLeaseUntil: new Date(Date.now() - 1) }).where(botEvents)
+    const unconfirmed = await store.chatView(owner, 200, botId)
+    assert.deepEqual([unconfirmed.working, unconfirmed.error], [false, 'wake_start_unconfirmed'])
+    assert.deepEqual(unconfirmed.items.map(item => [item.text, item.pending]), [['Original pending request', true]])
+    assert.equal((await store.botChats(owner))[botId].working, false)
+    assert.equal((await store.chatView(owner)).working, true, 'another chat keeps its own pending state')
+    assert.deepEqual(Object.keys(await store.botChats(owner)), [botId], 'peer bot metadata stays private')
+    assert.equal((await store.chatView(peer, 200, peerBotId)).working, true)
+    await db.update(schema.coordinatorEvents).set({ wakeLastError: 'wake_failed', wakeLeaseUntil: null }).where(botEvents)
+    assert.equal((await store.chatView(owner, 200, botId)).error, 'wake_failed')
+    await db.update(schema.coordinatorEvents).set({ wakeAttempts: 8, wakeLastError: 'wake_exhausted' }).where(botEvents)
+    assert.equal((await store.chatView(owner, 200, botId)).error, 'wake_exhausted')
+    await store.takeInbox(owner, 'recovered-turn', botId)
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'a real turn supersedes old wake errors')
+    await store.appendMessages(owner, 'recovered-turn', [{ role: 'assistant', content: 'Recovered reply' }], null, botId)
+    await store.releaseLease(owner, 'recovered-turn', botId)
+    const recovered = await store.chatView(owner, 200, botId)
+    assert.deepEqual([recovered.working, recovered.error], [false, null])
+    assert.deepEqual(recovered.items.map(item => item.text), ['Original pending request', 'Recovered reply'])
+  })
+})
+
 dbTest('a bot and the Coordinator keep their own conversation, inbox and memory', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),

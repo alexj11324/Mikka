@@ -21,10 +21,19 @@ const previousFlag = process.env.MIKKA_ISSUE_TOOLS_ENABLED
 beforeEach(() => { process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1' })
 afterEach(() => { if (previousFlag === undefined) delete process.env.MIKKA_ISSUE_TOOLS_ENABLED; else process.env.MIKKA_ISSUE_TOOLS_ENABLED = previousFlag })
 
-test('rollout defaults off and never widens a frozen execution grant', () => {
-  assert.equal(issueMutationsEnabled({}), false)
+test('issue tools default on; only an explicit kill switch turns them off', () => {
+  assert.equal(issueMutationsEnabled({}), true)
+  assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: '1' }), true)
+  assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: '0' }), false)
   assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: 'true' }), false)
   delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  const unset = registry.createCoordinatorRegistry('owner', null)
+  assert.ok(unset.create_issue)
+  assert.ok(unset.update_issue)
+})
+
+test('the kill switch removes the tools and never widens a frozen execution grant', () => {
+  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
   const disabled = registry.createCoordinatorRegistry('owner', null)
   assert.equal(disabled.create_issue, undefined)
   assert.equal(disabled.update_issue, undefined)

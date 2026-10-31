@@ -1,0 +1,148 @@
+[
+  {
+    "type": "built-in",
+    "name": "Mikka CPU and invocation anomalies",
+    "ruleScope": {
+      "type": "include",
+      "projectIds": [
+        "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+      ]
+    },
+    "triggers": {
+      "mode": "selected",
+      "items": [
+        {
+          "type": "usage_anomaly",
+          "filter": "metrics:(fluid_cpu_duration OR function_invocations)"
+        }
+      ]
+    },
+    "matchMinimumSeverityLevel": "medium",
+    "notificationSettings": {
+      "enableTeamOwnerNotifications": true
+    }
+  },
+  {
+    "type": "custom",
+    "ruleScope": {
+      "type": "project",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+    },
+    "severity": "medium",
+    "notificationSettings": {
+      "enableTeamOwnerNotifications": true
+    },
+    "name": "Mikka idle filesystem polling budget",
+    "evaluation": {
+      "window": "5m",
+      "query": {
+        "groupBy": [
+          "requestPath"
+        ],
+        "filter": "route = \"/v1/devices/[deviceId]/fs/requests\"",
+        "metrics": {
+          "requests": {
+            "metric": "vercel.function_invocation.count",
+            "aggregation": "count"
+          }
+        },
+        "outputs": [
+          "requests"
+        ]
+      }
+    },
+    "trigger": {
+      "type": "threshold",
+      "output": "requests",
+      "operator": "gt",
+      "threshold": 18
+    }
+  },
+  {
+    "type": "custom",
+    "ruleScope": {
+      "type": "project",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+    },
+    "severity": "medium",
+    "notificationSettings": {
+      "enableTeamOwnerNotifications": true
+    },
+    "name": "Mikka route CPU total anomaly",
+    "evaluation": {
+      "window": "15m",
+      "query": {
+        "groupBy": [
+          "route"
+        ],
+        "filter": "environment = \"production\"",
+        "metrics": {
+          "cpu": {
+            "metric": "vercel.function_invocation.function_cpu_time_ms",
+            "aggregation": "sum"
+          }
+        },
+        "outputs": [
+          "cpu"
+        ]
+      }
+    },
+    "trigger": {
+      "type": "anomaly",
+      "output": "cpu",
+      "standardDeviations": 3,
+      "direction": "above",
+      "minimum": {
+        "output": "cpu",
+        "threshold": 10000
+      }
+    }
+  },
+  {
+    "type": "custom",
+    "ruleScope": {
+      "type": "project",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+    },
+    "severity": "medium",
+    "notificationSettings": {
+      "enableTeamOwnerNotifications": true
+    },
+    "name": "Mikka CPU per invocation anomaly",
+    "evaluation": {
+      "window": "15m",
+      "query": {
+        "groupBy": [
+          "route"
+        ],
+        "filter": "environment = \"production\"",
+        "metrics": {
+          "cpu": {
+            "metric": "vercel.function_invocation.function_cpu_time_ms",
+            "aggregation": "sum"
+          },
+          "requests": {
+            "metric": "vercel.function_invocation.count",
+            "aggregation": "count"
+          }
+        },
+        "formulas": {
+          "formula": "cpu / requests"
+        },
+        "outputs": [
+          "formula"
+        ]
+      }
+    },
+    "trigger": {
+      "type": "anomaly",
+      "output": "formula",
+      "standardDeviations": 3,
+      "direction": "above",
+      "minimum": {
+        "output": "cpu",
+        "threshold": 10000
+      }
+    }
+  }
+]

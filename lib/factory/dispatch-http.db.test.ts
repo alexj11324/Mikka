@@ -12,6 +12,7 @@ import { handleFactoryDispatch } from "./dispatch-http";
 import { runPrompt } from "../run-prompt";
 import { factoryEventId } from "./event-id";
 import { isE2eTarget, E2E_DB_RULE } from "../../tests/helpers/e2e-target.mjs";
+import { dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) assert.ok(isE2eTarget(url), E2E_DB_RULE);
@@ -81,12 +82,7 @@ test("POST /api/factory/tasks dispatches once, replays idempotently and is owner
     assert.deepEqual(stale, { status: 409, body: { error: "factoryReplayMismatch" } }, "same binding, different note");
   } finally {
     if (previousKey === undefined) delete process.env.E2B_API_KEY; else process.env.E2B_API_KEY = previousKey;
-    await pool.end();
-    // pool.end() resolves before the backends exit; a FORCE drop right away kills
-    // closing sockets ("terminating connection due to administrator command").
-    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++)
-      await new Promise((r) => setTimeout(r, 50));
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await dropTestDatabase(admin, database, pool);
     await admin.end();
   }
 });
