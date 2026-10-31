@@ -44,7 +44,7 @@ function eventText(text: string, sources: Record<string, CitationSource>) {
  * person (approve or decline, as on the web); `focus` marks the one a push
  * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
-export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string }) {
+export function ChatScreen({ botId, name, color, shape, draft, focus, compose }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean }) {
   const drawer = useDrawer()
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -127,7 +127,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId:
             <Text style={styles.titleText} numberOfLines={1}>{name}</Text>
           </Capsule>
         }
-        right={{ icon: 'checklist', label: '线程', onPress: () => router.push('/threads'), web: <ListChecks size={21} color={colors.ink} strokeWidth={2} /> }}
+        right={{ icon: 'checklist', label: '线程', onPress: () => router.push(botId ? { pathname: '/threads', params: { bot: name } } : '/threads'), web: <ListChecks size={21} color={colors.ink} strokeWidth={2} /> }}
       />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
       <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
@@ -172,7 +172,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId:
         </KeyboardChatScrollView>
       </View>
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} />
+      <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)} />
     </View>
   )
 }

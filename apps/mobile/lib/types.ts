@@ -113,3 +113,17 @@ export interface PendingAction {
   status: string
   createdAt: string
 }
+
+/** 插件 › 应用: the store (GET /api/integrations/composio/catalog, lib/plugins/catalog.ts). */
+export interface StoreCatalog {
+  configured: boolean
+  apps: { id: string; name: string; description: string; iconUrl: string | null }[]
+  popular: string[]
+  latest: string[]
+}
+
+/** The person's connected accounts (GET /api/integrations/composio). */
+export interface ComposioAccounts { configured: boolean; accounts: { id: string; toolkit: string; status: string; alias: string | null; email: string | null }[] }
+
+/** 插件 › 技能: one page of skills.sh (GET /api/skills/search). */
+export interface SkillsPage { data: { id: string; name: string; source: string; installs: number; url: string }[]; hasMore: boolean }

@@ -20,7 +20,7 @@ export function MyBubble({ text, photos }: { text: string; photos?: ImageURISour
       {photos?.length ? <Photos photos={photos} /> : null}
       {text ? (
         <View style={[styles.myBubble, { maxWidth: '100%' }]}>
-          <Text style={[styles.body, { color: '#fff' }]}>{text}</Text>
+          <Text selectable style={[styles.body, { color: '#fff' }]}>{text}</Text>
         </View>
       ) : null}
     </View>

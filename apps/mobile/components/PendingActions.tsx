@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { CalendarClock, Mail } from 'lucide-react-native'
 import { CardButton, ChatCard, Field, cardText } from '@/components/cards'
+import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { api, ApiError } from '@/lib/api'
+import { tap } from '@/lib/haptics'
 import type { PendingAction } from '@/lib/types'
 import { colors } from '@/lib/theme'
 
@@ -37,6 +39,7 @@ export function PendingActions({ items, focus, reload, onFocusLayout }: { items:
     setErrors(current => ({ ...current, [item.id]: '' }))
     try {
       const result = await api<{ status: 'done' | 'failed' | 'declined'; reason: string | null }>(`/api/mobile/pending-actions/${item.id}`, { method: 'POST', body: { approve } })
+      if (result.status !== 'failed') tap()
       if (result.status === 'done') setOutcomes(current => [...current, { item, line: item.action === 'send_email' ? '邮件已发送' : '日历已更新' }])
       else if (result.status === 'failed') setOutcomes(current => [...current, { item, line: `没做成：${result.reason ?? ''}`, failed: true }])
       await reload()
@@ -104,10 +107,11 @@ export function PendingActions({ items, focus, reload, onFocusLayout }: { items:
 }
 
 function Heading({ item }: { item: PendingAction }) {
-  const Icon = item.action === 'send_email' ? Mail : CalendarClock
+  const email = item.action === 'send_email'
+  const Icon = email ? Mail : CalendarClock
   return (
     <View style={styles.heading}>
-      <Icon size={18} color={colors.ink} strokeWidth={1.8} />
+      <Symbol name={email ? 'envelope' : 'calendar'} size={17} web={<Icon size={18} color={colors.ink} strokeWidth={1.8} />} />
       <Text style={cardText.title}>{TITLE[item.action] ?? item.action}</Text>
     </View>
   )

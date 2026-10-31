@@ -5,13 +5,14 @@ import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } f
 import { scheduleOnRN } from 'react-native-worklets'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { usePathname, useRouter, type Href } from 'expo-router'
-import { CircleArrowDown, CodeXml, Inbox, ListChecks, PenLine, Search } from 'lucide-react-native'
+import { CircleArrowDown, CodeXml, Inbox, ListChecks, PenLine, Puzzle, Search } from 'lucide-react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { Symbol } from '@/components/Symbol'
 import { Dot, Field, RoundButton } from '@/components/ui'
 import { tap } from '@/lib/haptics'
 import { useHome } from '@/lib/home'
+import { switchTo } from '@/lib/navigate'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
 import { colors, font } from '@/lib/theme'
 
@@ -23,7 +24,7 @@ export const useDrawer = () => useContext(DrawerContext)
 const SPRING = { damping: 30, stiffness: 300, mass: 0.9, overshootClamping: true }
 
 /** Screens the drawer belongs to; a pushed page (a thread, Settings) keeps the system's swipe back instead. */
-const drawerRoot = (path: string) => path === '/' || path === '/suggestions' || path === '/threads' || path === '/tasks' || path.startsWith('/bots/')
+const drawerRoot = (path: string) => path === '/' || path === '/suggestions' || path === '/threads' || path === '/tasks' || path === '/plugins' || path.startsWith('/bots/')
 
 /**
  * The side drawer, like the ChatGPT iOS app (mobile.md "Where it lives"): it
@@ -36,6 +37,7 @@ export function DrawerHost({ children }: { children: ReactNode }) {
   const { width } = useWindowDimensions()
   const panel = Math.min(width * 0.82, 340)
   const path = usePathname()
+  const router = useRouter()
   const [isOpen, setOpen] = useState(false)
   // 0 closed … 1 open.
   const progress = useSharedValue(0)
@@ -60,7 +62,8 @@ export function DrawerHost({ children }: { children: ReactNode }) {
   }), [changed, isOpen, settle])
 
   const pan = Gesture.Pan()
-    .enabled(isOpen || drawerRoot(path))
+    // A screen pushed over another (threads from a chat) keeps the system's swipe back.
+    .enabled(isOpen || (drawerRoot(path) && !router.canGoBack()))
     // Closed: only a rightward swipe takes over, so the chat's leftward swipe (message times) and vertical scrolling stay theirs.
     .activeOffsetX(isOpen ? [-12, 12] : [-10000, 14])
     .failOffsetY([-14, 14])
@@ -105,7 +108,7 @@ function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const path = usePathname()
-  const go = (href: Href) => { onNavigate(); setQuery(null); Keyboard.dismiss(); router.replace(href) }
+  const go = (href: Href) => { onNavigate(); setQuery(null); Keyboard.dismiss(); switchTo(href) }
   const { data } = useHome()
   const updateReady = useUpdateReady()
   // 最近: newest chat first (mobile.md). Pinning is not on the server yet, so there is no 置顶 group.
@@ -115,7 +118,7 @@ function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
   const shows = (label: string) => !needle || label.toLowerCase().includes(needle)
   const bots = [...data?.bots ?? []].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? '')).filter(bot => shows(bot.name))
   const initials = (data?.user.name || data?.user.email || '').trim().slice(0, 2).toUpperCase()
-  const nothing = needle && !bots.length && !['Coordinator', '建议', '线程', '任务'].some(shows)
+  const nothing = needle && !bots.length && !['Coordinator', '建议', '线程', '任务', '插件'].some(shows)
 
   return (
     <View style={{ flex: 1, paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 8) }}>
@@ -125,7 +128,7 @@ function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
           <TextInput value={query ?? ''} onChangeText={setQuery} placeholder="搜索" placeholderTextColor={colors.secondary} returnKeyType="search"
             accessibilityLabel="搜索" style={styles.search} clearButtonMode="while-editing" />
         </Field>
-        <RoundButton label="新建" onPress={() => go('/')}>
+        <RoundButton label="新建" onPress={() => go({ pathname: '/', params: { compose: '1' } })}>
           <Symbol name="square.and.pencil" size={19} web={<PenLine size={19} color={colors.ink} strokeWidth={2} />} />
         </RoundButton>
       </View>
@@ -136,6 +139,7 @@ function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
         {shows('线程') ? <Row active={path.startsWith('/threads')} onPress={() => go('/threads')} icon={<Symbol name="chevron.left.forwardslash.chevron.right" size={18} web={<CodeXml size={22} color={colors.ink} strokeWidth={1.8} />} />} label="线程"
           trailing={data?.threads.waiting ? <Dot /> : data?.threads.running ? <Text style={styles.count}>{data.threads.running} 运行中</Text> : null} /> : null}
         {shows('任务') ? <Row active={path === '/tasks'} onPress={() => go('/tasks')} icon={<Symbol name="checklist" web={<ListChecks size={22} color={colors.ink} strokeWidth={1.8} />} />} label="任务" /> : null}
+        {shows('插件') ? <Row active={path === '/plugins'} onPress={() => go('/plugins')} icon={<Symbol name="puzzlepiece.extension" web={<Puzzle size={22} color={colors.ink} strokeWidth={1.8} />} />} label="插件" /> : null}
         {updateReady && !needle ? <Row onPress={restartToUpdate} icon={<Symbol name="arrow.down.circle" web={<CircleArrowDown size={22} color={colors.ink} strokeWidth={1.8} />} />} label="重启以更新" /> : null}
         {nothing ? <Text style={styles.none}>没有找到「{query?.trim()}」</Text> : null}
         {bots.length && !needle ? <Text style={styles.section}>最近</Text> : null}

@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native'
 import { useNetworkState } from 'expo-network'
 import { WifiOff } from 'lucide-react-native'
+import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { colors, lift } from '@/lib/theme'
 
@@ -17,7 +18,7 @@ export function OfflineBanner({ top }: { top: number }) {
   return (
     <View pointerEvents="none" style={[styles.wrap, { top }]} accessibilityRole="alert" accessibilityLiveRegion="polite">
       <View style={styles.pill}>
-        <WifiOff size={14} color={colors.secondary} strokeWidth={2.2} />
+        <Symbol name="wifi.slash" size={13} color={colors.secondary} web={<WifiOff size={14} color={colors.secondary} strokeWidth={2.2} />} />
         <Text style={styles.text}>没有网络</Text>
       </View>
     </View>
