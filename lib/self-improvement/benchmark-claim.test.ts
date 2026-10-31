@@ -8,10 +8,13 @@ import * as deviceProtocol from '@mikka/protocol/device'
 import * as repositoryProtocol from '@mikka/protocol/repository'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy } from '../run-assignment-policy'
+import { ModelAdmissionError } from '../model-admission/contract'
 
 // Execute the actual route in memory, with its database/auth boundaries replaced.
-async function routeFixture(unavailable=false,stopped=false) {
+async function routeFixture(unavailable=false,stopped=false,modelDenied=false) {
   const calls:string[]=[]
+  const admissionScopes:string[]=[]
+  const workspaceIds=['bot-workspace','task-workspace']
   const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',deviceTokenId:null as string|null,status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1}
   const agent={id:'agent',userId:'owner',harness:'codex'},repo={id:'repo',userId:'owner',deviceId:'device',repoPath:'v2/github.com/mikka-ci/benchmark-claim',remoteUrl:'https://github.com/mikka-ci/benchmark-claim.git',verifyCommand:'mutable-repo-command'}
   const selections=[run,agent,repo]
@@ -31,7 +34,16 @@ async function routeFixture(unavailable=false,stopped=false) {
     '@/lib/device-agents':{localExecutionHarnesses:()=>['codex']},
     '@/lib/device-repositories':{readRepositorySettings:async()=>({verifyCommand:repo.verifyCommand})},
     '@/lib/run-test-fixture':{runTestFixture:()=>undefined},
-    '@/lib/agent-tool-approval/policy-store':{readCliRunPolicy:async()=>({policy:defaultRunPolicy(),revision:'synthetic-current-policy'})},
+    '@/lib/agent-tool-approval/policy-store':{readCliRunPolicy:async()=>({policy:defaultRunPolicy(),revision:'synthetic-current-policy',workspaceIds})},
+    '@/lib/model-admission/contract':{ModelAdmissionError},
+    '@/lib/model-admission/runtime':{assertUnmanagedModelTransport:async(scope:{workspaceId:string;ownerId:string},model:string)=>{
+      assert.deepEqual(Object.keys(scope).sort(),['ownerId','workspaceId'])
+      assert.equal(scope.ownerId,'owner');assert.ok(workspaceIds.includes(scope.workspaceId));assert.equal(model,'native-default')
+      admissionScopes.push(scope.workspaceId)
+      // These ordinary benchmark namespaces have no organization model rule.
+      // The explicit rejection case proves the route still consults both scopes.
+      if(modelDenied&&scope.workspaceId==='task-workspace')throw new ModelAdmissionError('modelRouteDenied')
+    }},
     '@/lib/run-assignment-policy':{constrainedAssignmentPolicy},
     '@/lib/run-claim-response':{authorizedClaimResponse:async(_user:string,_run:unknown,_lease:string,respond:(current:typeof run)=>Response)=>respond(run)},
     '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{throw Error('unexpected publication failure')}},
@@ -70,17 +82,18 @@ async function routeFixture(unavailable=false,stopped=false) {
   const exports:Record<string,unknown>={}
   runInNewContext(transpileModule(source,{compilerOptions:{module:ModuleKind.CommonJS}}).outputText,
     {exports,require:(name:string)=>{if(!Object.hasOwn(modules,name))throw Error(`Unexpected import ${name}`);return modules[name]},Response,URL,Date,process:{env:{MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}}})
-  return {calls,run,benchmark,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
+  return {calls,admissionScopes,run,benchmark,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
 }
 
 const claimRequest=()=>new Request('https://fixture.invalid/v1/claim',{headers:{[deviceProtocol.REPO_ORIGIN_HEADER]:'1','x-mikka-skill-artifacts':'1'}})
 
 test('actual claim route resolves frozen benchmark exactly once after claim and receipt and overrides mutable config',async()=>{
-  const {post,calls,benchmark,run}=await routeFixture()
+  const {post,calls,admissionScopes,benchmark,run}=await routeFixture()
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,200)
   const assignment=await response.json()
   assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark'])
+  assert.deepEqual(admissionScopes,['bot-workspace','task-workspace'])
   assert.equal(assignment.verifyCommand,benchmark.verifyCommand)
   assert.equal(assignment.model,benchmark.model)
   assert.equal(assignment.remoteUrl,'https://github.com/mikka-ci/benchmark-claim.git')
@@ -107,5 +120,15 @@ test('actual claim route refuses a stopped Factory before receipt, benchmark or 
   assert.equal(response.status,409)
   assert.deepEqual(await response.json(),{error:'Run is no longer queued for this device.'})
   assert.deepEqual(calls,['preflight','guard'])
+  assert.equal(run.status,'queued')
+})
+
+test('benchmark claim cannot bypass its task workspace model rule through the Bot namespace',async()=>{
+  const {post,calls,admissionScopes,run}=await routeFixture(false,false,true)
+  const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
+  assert.equal(response.status,409)
+  assert.deepEqual(await response.json(),{error:'modelRouteDenied'})
+  assert.deepEqual(admissionScopes,['bot-workspace','task-workspace'])
+  assert.deepEqual(calls,['preflight'])
   assert.equal(run.status,'queued')
 })
