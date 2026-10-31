@@ -605,6 +605,7 @@ export class Daemon {
     const { link } = this.options
     if (!link.fetchFsRequests || !link.answerFsRequest) return
     const signal = this.commandsAbort.signal
+    const wait = this.options.commandsWaitSeconds ?? FS_REQUESTS_MAX_WAIT_SECONDS
     let backoff = 1_000
     while (!this.stopped) {
       const deviceId = this.device.deviceId
@@ -614,12 +615,18 @@ export class Daemon {
           await this.pauseCommands(1_000, signal)
           continue
         }
+        const started = performance.now()
         const requests = await link.fetchFsRequests(
           deviceId,
-          this.options.commandsWaitSeconds ?? FS_REQUESTS_MAX_WAIT_SECONDS,
+          wait,
           { signal }
         )
         backoff = 1_000
+        // Some servers return an empty queue without honoring the long-poll wait.
+        if (requests.length === 0 && !signal.aborted) {
+          const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
+          if (remaining > 0) await this.pauseCommands(remaining, signal)
+        }
         await Promise.all(
           requests.map(async ({ id, ...request }) => {
             const result = await browseFolder(request).catch((): FsResult => ({
