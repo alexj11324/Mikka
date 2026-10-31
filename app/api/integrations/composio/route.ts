@@ -4,14 +4,14 @@ import { z } from 'zod'
 import { auth } from '@/lib/api-auth'
 import { authBaseURL } from '@/lib/auth'
 import { BASE_PATH } from '@/lib/base-path'
-import { COMPOSIO_TOOLKITS, getComposio, isComposioToolkit, readComposioAccountEmail, renameComposioAccount, retireComposioAccount } from '@/lib/composio'
+import { getComposio, readComposioAccountEmail, renameComposioAccount, retireComposioAccount } from '@/lib/composio'
 import { chooseComposioDefault, listComposioAccountRecords, noteComposioEmailAttempt, saveComposioAccountEmail } from '@/lib/composio-account-store'
 import { backfillComposioEmails } from '@/lib/composio-connect'
-import { accountUpdateSchema, isDuplicateAliasError, safeReturnPath, toConnectedAccountView, withAccountRecords } from '@/lib/composio-accounts'
+import { accountUpdateSchema, isDuplicateAliasError, isToolkitSlug, TOOLKIT_SLUG, safeReturnPath, toConnectedAccountView, withAccountRecords } from '@/lib/composio-accounts'
 import { isComposioCallbackVerifierConfigured } from '@/lib/composio-config'
 import { COMPOSIO_FLOW_COOKIE, composioFlowCookieOptions, encodeComposioFlow } from '@/lib/composio-flow'
 import { listComposioPages } from '@/lib/composio-pagination'
-import { assertCatalogToolkit } from '@/lib/plugins/catalog'
+import { assertCatalogToolkit, composioToolkitLister } from '@/lib/plugins/catalog'
 import { PluginError } from '@/lib/plugins/contracts'
 
 const accountIdSchema = z.string().trim().min(1).max(255)
@@ -19,7 +19,7 @@ const returnToSchema = z.string().max(512).optional()
 // Connect a new account for a toolkit, or reconnect one the person has;
 // `returnTo` is where the callback sends them back (validated again there).
 const connectSchema = z.union([
-  z.object({ toolkit: z.enum(COMPOSIO_TOOLKITS), returnTo: returnToSchema }).strict(),
+  z.object({ toolkit: z.string().regex(TOOLKIT_SLUG), returnTo: returnToSchema }).strict(),
   z.object({ accountId: accountIdSchema, returnTo: returnToSchema }).strict(),
 ])
 /** Each provider lookup while loading the list; the page waits for these. */
@@ -32,10 +32,10 @@ function sameOrigin(request: Request) {
 
 type ComposioClient = NonNullable<ReturnType<typeof getComposio>>
 
-/** The person's own account with this id, on one of our toolkits, or undefined. */
+/** The person's own account with this id, or undefined. */
 async function findOwnAccount(composio: ComposioClient, userId: string, accountId: string) {
   const items = await listComposioPages(cursor => composio.connectedAccounts.list({ userIds: [userId], cursor }))
-  return items.find(item => item.id === accountId && isComposioToolkit(item.toolkit.slug))
+  return items.find(item => item.id === accountId && isToolkitSlug(item.toolkit.slug))
 }
 
 async function handleGET(request: Request) {
@@ -84,9 +84,9 @@ async function handlePOST(request: Request) {
     const replacing = 'accountId' in parsed.data ? await findOwnAccount(composio, session.user.id, parsed.data.accountId) : undefined
     if ('accountId' in parsed.data && !replacing) return NextResponse.json({ error: 'integrationNotFound' }, { status: 404 })
     const toolkit = 'toolkit' in parsed.data ? parsed.data.toolkit : replacing!.toolkit.slug
-    // Only a newly offered catalog app needs provider availability validation.
+    // A new connection must be a store toolkit with Composio-managed auth.
     // Reconnecting an existing account remains possible during catalog outages.
-    if ('toolkit' in parsed.data) await assertCatalogToolkit(composio, toolkit)
+    if ('toolkit' in parsed.data) await assertCatalogToolkit(composioToolkitLister(composio), toolkit)
     const composioSession = await composio.create(session.user.id)
     const connection = await composioSession.authorize(toolkit)
     if (!connection.redirectUrl) return NextResponse.json({ error: 'integrationStartFailed' }, { status: 502 })

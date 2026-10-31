@@ -443,6 +443,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   - Test: delete the string. If the screen still says the same thing, keep it
     deleted. This applies to copy written in specs and agent briefs too: do not
     hand a designer or subagent an explanatory sentence to draw.
+  - Data is not filler. An item in the 插件 store shows Composio's one-line
+    description when Composio has one, as Codex's store does (decision
+    2026-10-31); Mikka writes none of its own, so an item without one, and
+    GitHub, Linear and Telegram, show icon and name only. Rows in 设置 › 连接
+    have none.
 - **R-41** An empty state is one colloquial line plus one button (often
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and

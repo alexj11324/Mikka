@@ -2694,7 +2694,10 @@
       "site": "Site",
       "approveClear": "Clear fields",
       "approveSubmit": "Submit login",
-      "approveBrowser": "Approve operation"
+      "approveBrowser": "Approve operation",
+      "app": "App",
+      "arguments": "Details",
+      "approveRun": "Run"
     },
     "working": "Coordinator is working…",
     "loadError": "Could not load the conversation. Retrying.",
