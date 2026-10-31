@@ -40,47 +40,46 @@ cannot.
 2. **Every push and pull request** (minutes, CI): production build, every unit
    test, database migrations and integration tests such as thread privacy.
    This is the gate review waits on.
-3. **Ready pull requests** (CI job "Browser tests (before merge)"): critical
-   browser flows plus the affected browser scenarios, against the PR merged with
-   main. Draft PRs defer this layer. The trusted classifier on `main` chooses:
+3. **Ready pull requests** (CI job "Browser tests (before merge)"): the browser
+   smoke set plus the specs of the areas the change touches, against the PR
+   merged with main, in one job ("Browser tests (pull request)": install, build,
+   start, run). Draft PRs defer this layer. The trusted classifier on `main`
+   chooses:
 
    | Change | Browser acceptance before merge |
    | --- | --- |
    | Documentation only | No browser runtime; the required gate confirms classification |
-   | Source-only tests, CI workflows, CI policy and test-runner changes | Critical flows; selection-policy changes also validate both browser subsets |
-   | Search, settings, Slack webhook paths | Critical flows plus complete relevant specs |
-   | Schema-only migrations (`drizzle/*.sql`, with documentation) | Migration bootstrap and database checks, then critical flows |
-   | Authentication, permissions, shared UI/runtime, dependencies, mixed schema and application changes, shared browser fixtures or unknown paths | Full functionality |
+   | Any other change | The smoke set: the tests tagged `@smoke` (about ten) and the first MVP real-daemon test, plus the Factory HTTP, real HTTP authentication and test-account gates |
+   | Mapped paths (search, settings, Slack, Factory, threads, suggestions, devices, auth, relations, active agents) | Smoke plus the complete specs of each touched area |
+   | An edited spec under `tests/e2e/` | Smoke plus that complete spec |
+   | Paths the performance budgets measure (navigation shell, settings, saved history) or a performance spec | Also the desktop/mobile performance suite |
+   | Selection-policy changes (classifier, runner, this workflow) | Also "Browser selection validation": every scoped spec as one real subset |
+   | Unsafe file modes, unavailable comparisons, `integrate/` branches | The full tier (below) before merge |
 
-   The browser layer runs as parallel jobs: one build, one runtime-gate job
-   (Factory HTTP, real HTTP authentication, MVP daemon and performance), two
-   selection-validation jobs (critical and scoped subsets) and four regression
-   shards. Every job has its own PostgreSQL service, test-account directory and
+   The smoke set covers anonymous redirects, sign-up, task creation, account
+   isolation, a settings save, Factory acceptance and approval, device
+   authorization, share revocation, an approval card and the real daemon loop.
+   The tags live in the specs; the area map, the main list and the nightly-only
+   list live in `scripts/ci-docs-only.mjs`, and every spec file is in exactly one
+   of the main or nightly-only lists. During policy updates the workflow uses a
+   fixed CI-only allowlist plus the trusted main classifier's documentation/mode
+   checks; it cannot classify its own change as documentation-only, and any
+   other file escalates to the full tier. Failed classification or a
+   skipped/failed selected job fails the required gate.
+4. **After merge** (CI, every code-bearing push to main): the functional spec
+   files (the main list) on two shards, plus the runtime gates and both MVP
+   tests.
+5. **Nightly** (19:17 UTC) and manual Actions → Browser tests → Run workflow:
+   every spec, including visual/layout, the click crawler, slower edge cases
+   and specs waiting to move to component or HTTP tests, plus the
+   desktop/mobile performance suite, on four shards. Thresholds, assertions,
+   worker count and retry policy are unchanged; moving a spec to a later tier
+   never skips it.
+
+   Each sharded job has its own PostgreSQL service, test-account directory and
    artifact name, so no database, lease or fixture is shared concurrently. The
-   build runs once and its `.next` artifact is reused; parallelism changes
-   wall-clock time, not which assertions run.
-
-   Critical flows cover anonymous redirects, registration/login, task creation,
-   search/navigation, account isolation, and sign-out with server revocation.
-   The scoped paths and complete spec lists live in `scripts/ci-docs-only.mjs`.
-   Known browser spec changes include that spec; new specs and shared fixtures
-   fall back to full functionality. Mixed changes take the union of scenarios
-   or escalate to full. Unsafe file modes and unavailable comparisons also
-   escalate. Pure CI policy changes run dedicated classifier/runner/gate tests,
-   real HTTP authentication, critical browser flows and both actual browser
-   subsets; they do not require full functionality or performance. The critical
-   subset is not rerun after selection validation has already exercised it.
-   During policy updates the workflow uses a fixed CI-only allowlist plus the
-   trusted main classifier's documentation/mode checks; it cannot classify its
-   own change as documentation-only. Any application or unknown file in that
-   update escalates to full functionality. Failed classification or a
-   skipped/failed selected test job fails the required gate.
-4. **Integration** (CI): every code-bearing push to main, nightly on main, and manual
-   Actions → Browser tests → Run workflow run full functionality **and** the
-   desktop/mobile performance suite. Consolidation PRs on `integrate/` branches
-   run both complete layers before merge as well. A PR changing a performance
-   spec also runs performance before merge. Other PRs defer performance to integration;
-   thresholds, assertions, worker count and retry policy remain unchanged.
+   evidence scanner audits every log and report before any upload, in every
+   tier.
 
 A pull request that only changes documentation — non-executable Markdown in
 `docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`, or

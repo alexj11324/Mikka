@@ -1,108 +1,132 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { browserPlan, BROWSER_SMOKE, BROWSER_SCOPED_SPECS, BROWSER_INFRA_FILES, needsSelectionValidation } from './ci-docs-only.mjs'
-import { browserArguments, selectionPlan, selectionValidationPlans } from './ci-browser-tests.mjs'
+import {
+  browserPlan, BROWSER_MAIN_SPECS, BROWSER_NIGHTLY_SPECS, BROWSER_SCOPED_SPECS, BROWSER_SMOKE_FILES,
+  BROWSER_INFRA_FILES, needsSelectionValidation,
+} from './ci-docs-only.mjs'
+import { browserArguments, selectionPlan, selectionValidationPlans, specGrep } from './ci-browser-tests.mjs'
 
-const smoke = [...BROWSER_SMOKE].sort()
+const smoke = { tier: 'smoke', specs: [], performance: false }
 const full = { tier: 'full', specs: [], performance: false }
+const specFiles = readdirSync('tests/e2e').filter(file => file.endsWith('.spec.ts')).sort()
+const workflow = () => readFileSync('.github/workflows/browser-tests.yml', 'utf8')
 
-test('documentation alone skips browser runtime; mixed source tests retain every critical flow', () => {
+test('documentation alone skips browser runtime; everything else runs at least the smoke set', () => {
   assert.deepEqual(browserPlan(['README.md', 'docs/backend/checks.md']), { tier: 'docs', specs: [], performance: false })
   assert.deepEqual(browserPlan(['AGENTS.md']), { tier: 'docs', specs: [], performance: false })
-  assert.deepEqual(browserPlan(['AGENTS.md', 'README.md']), { tier: 'docs', specs: [], performance: false })
-  for (const files of [['lib/model.test.ts'], ['README.md', '.github/workflows/analytics-ci.yml']]) {
-    assert.deepEqual(browserPlan(files), { tier: 'smoke', specs: smoke, performance: false })
-  }
+  for (const files of [
+    ['lib/model.test.ts'], ['README.md', '.github/workflows/analytics-ci.yml'], ['drizzle/202610290001.sql'],
+    ['lib/db/schema.ts'], ['package.json'], ['pnpm-lock.yaml'], ['playwright.config.ts'], ['tests/e2e/fixtures.ts'],
+    ['components/ui/button.tsx'], ['new/unknown.ts'], ['messages/zh-CN.json'], ['drizzle/202610290001.sql', 'app/page.tsx'],
+  ]) assert.deepEqual(browserPlan(files), smoke, files.join(','))
 })
 
-test('schema-only migrations run migration gates plus critical flows; any application code still runs full', () => {
-  assert.deepEqual(browserPlan(['drizzle/202610290001.sql']), { tier: 'smoke', specs: smoke, performance: false })
-  assert.deepEqual(browserPlan(['README.md', 'drizzle/202610290001.sql']), { tier: 'smoke', specs: smoke, performance: false })
-  assert.deepEqual(browserPlan(['drizzle/202610290001.sql', 'drizzle/202610290002.sql']), { tier: 'smoke', specs: smoke, performance: false })
-  for (const file of ['app/page.tsx', 'lib/db/schema.ts', 'tests/e2e/fixtures.ts', 'playwright.config.ts']) {
-    assert.deepEqual(browserPlan(['drizzle/202610290001.sql', file]), full, file)
-  }
-  assert.deepEqual(browserPlan(['drizzle/202610290001.sql'], { unsafeModes: true }), full)
-})
-
-test('scoped backend and settings paths add complete relevant specs to the critical flows', () => {
+test('mapped paths add whole area specs next to the smoke set', () => {
   for (const [file, expected] of [
-    ['app/api/search/route.ts', 'site-search.spec.ts'],
-    ['lib/search/search.ts', 'site-search.spec.ts'],
-    ['lib/federated-search/input.ts', 'site-search.spec.ts'],
-    ['app/api/issues/search/route.ts', 'site-search.spec.ts'],
-    ['lib/slack/webhook.ts', 'slack-webhook.spec.ts'],
-    ['app/api/webhooks/slack/route.ts', 'slack-webhook.spec.ts'],
-    ['components/settings/members.tsx', 'members.spec.ts'],
-    ['app/[locale]/settings/page.tsx', 'settings.spec.ts'],
+    ['app/api/search/route.ts', ['site-search.spec.ts', 'global-search-scope.spec.ts']],
+    ['lib/federated-search/input.ts', ['site-search.spec.ts']],
+    ['lib/slack/webhook.ts', ['slack-webhook.spec.ts']],
+    ['components/settings/members-panel.tsx', ['members.spec.ts', 'settings.spec.ts', 'profile.spec.ts', 'bots.spec.ts']],
+    ['app/[locale]/settings/page.tsx', ['settings.spec.ts', 'teams.spec.ts']],
+    ['lib/factory/store.ts', ['factory-acceptance-ui.spec.ts', 'factory-acceptance-a2.spec.ts', 'thread-question.spec.ts', 'factory-execution-claim.spec.ts']],
+    ['components/workspace/factory-approval-bar.tsx', ['factory-acceptance-a2.spec.ts']],
+    ['components/coordinator/thread-card.tsx', ['thread-cards.spec.ts', 'thread-stop.spec.ts', 'issue-threads.spec.ts', 'coordinator-choice-card.spec.ts']],
+    ['lib/device-enrollment.ts', ['device-authorization.spec.ts', 'mobile-handoff.spec.ts']],
+    ['components/device-authorization.tsx', ['device-authorization.spec.ts']],
+    ['lib/auth.ts', ['sign-out.spec.ts', 'workspace.spec.ts']],
+    ['lib/suggestions/card.ts', ['suggestions-rail.spec.ts', 'suggestion-entry-contract.spec.ts']],
+    ['lib/issue-relations.ts', ['relations.spec.ts']],
   ]) {
     const plan = browserPlan([file])
     assert.equal(plan.tier, 'targeted', file)
-    assert.equal(plan.performance, false)
-    assert(plan.specs.includes(expected), file)
-    for (const spec of BROWSER_SMOKE) assert(plan.specs.includes(spec), file)
+    for (const spec of expected) assert(plan.specs.includes(spec), `${file} → ${spec}`)
+    assert.deepEqual(plan.specs, [...plan.specs].sort())
   }
-  const mixed = browserPlan(['lib/slack/webhook.ts', 'lib/search/search.ts'])
-  assert(mixed.specs.includes('site-search.spec.ts'))
-  assert(mixed.specs.includes('slack-webhook.spec.ts'))
-  assert.equal(new Set(mixed.specs).size, mixed.specs.length)
+  const mixed = browserPlan(['lib/slack/webhook.ts', 'lib/search/search.ts', 'README.md'])
+  assert.deepEqual(mixed.specs, ['global-search-scope.spec.ts', 'site-search.spec.ts', 'slack-webhook.spec.ts'])
 })
 
-test('unknown, shared, auth, permission, dependency, schema and test infrastructure changes run full functionality', () => {
-  for (const file of [
-    'lib/auth.ts', 'lib/db/schema.ts', 'lib/issue-team-access-policy.ts',
-    'app/api/auth/[...all]/route.ts', 'middleware.ts', 'proxy.ts',
-    'components/ui/button.tsx', 'components/app-sidebar.tsx', 'app/globals.css',
-    'next.config.mjs', 'pnpm-lock.yaml', 'package.json', 'messages/zh.json',
-    'drizzle/202610290001.sql', 'packages/protocol/src/events.ts',
-    'scripts/setup-e2e-db.mjs', 'tests/e2e/fixtures.ts', 'playwright.config.ts',
-    'docs/generate.mjs', 'docs/AGENTS.md', 'new/unknown.ts',
-  ]) assert.deepEqual(browserPlan(['README.md', 'lib/search/search.ts', file]), full, file)
-  assert.deepEqual(browserPlan([]), full)
-  assert.deepEqual(browserPlan(['README.md'], { unsafeModes: true }), full)
-  assert.deepEqual(browserPlan(['lib/model.test.ts'], { unsafeModes: true }), full)
+test('an edited spec runs whole; fixtures and deleted specs do not widen the run', () => {
+  for (const file of specFiles) {
+    const plan = browserPlan([`tests/e2e/${file}`])
+    assert.equal(plan.tier, 'targeted', file)
+    assert.deepEqual(plan.specs, [file])
+  }
+  assert.deepEqual(browserPlan(['tests/e2e/fixtures.ts', 'tests/e2e/support/server.ts']), smoke)
+  assert.deepEqual(browserPlan(['tests/e2e/removed-flow.spec.ts']), smoke)
+  assert.deepEqual(browserPlan(['tests/e2e/../../evil.spec.ts']), smoke)
 })
 
-test('main, nightly and manual integration run all functionality and performance, including docs-only changes', () => {
-  for (const files of [[], ['README.md'], ['lib/model.test.ts'], ['lib/slack/webhook.ts']]) {
+test('performance runs before merge only when its budgets or specs change', () => {
+  for (const file of ['tests/e2e/navigation-performance.spec.ts', 'tests/e2e/agent-performance.spec.ts', 'components/app-sidebar.tsx', 'components/settings/settings-sidebar.tsx', 'lib/settings-navigation.ts', 'next.config.mjs']) {
+    assert.equal(browserPlan([file]).performance, true, file)
+  }
+  for (const file of ['lib/auth.ts', 'app/page.tsx', 'lib/model.test.ts']) assert.equal(browserPlan([file]).performance, false, file)
+})
+
+test('main pushes run the main tier, nightly and manual runs run full plus performance; unsafe input fails closed', () => {
+  assert.deepEqual(browserPlan(['app/page.tsx'], { mainPush: true }), { tier: 'main', specs: [], performance: false })
+  assert.deepEqual(browserPlan(['README.md'], { mainPush: true }), { tier: 'docs', specs: [], performance: false })
+  for (const files of [[], ['README.md'], ['lib/slack/webhook.ts']]) {
     assert.deepEqual(browserPlan(files, { integration: true }), { ...full, performance: true })
   }
-  for (const file of ['tests/e2e/navigation-performance.spec.ts', 'tests/e2e/agent-performance.spec.ts']) {
-    assert.deepEqual(browserPlan([file]), { ...full, performance: true })
-  }
+  assert.deepEqual(browserPlan([]), full)
+  assert.deepEqual(browserPlan(['README.md'], { unsafeModes: true }), full)
+  assert.deepEqual(browserPlan(['app/page.tsx'], { unsafeModes: true, mainPush: true }), full)
 })
 
-test('every existing spec either adds its complete file or escalates to the full regression', () => {
-  for (const file of readdirSync('tests/e2e').filter(file => file.endsWith('.spec.ts'))) {
-    const plan = browserPlan([`tests/e2e/${file}`])
-    if (plan.tier === 'targeted') assert(plan.specs.includes(file))
-    else assert.equal(plan.tier, 'full', file)
-  }
-  for (const spec of [...BROWSER_SMOKE, ...BROWSER_SCOPED_SPECS]) assert(existsSync(`tests/e2e/${spec}`), spec)
-  assert.deepEqual(browserPlan(['tests/e2e/new-flow.spec.ts']), full)
+test('every spec file has exactly one post-merge tier, and every listed spec exists', () => {
+  const main = new Set(BROWSER_MAIN_SPECS), nightly = new Set(BROWSER_NIGHTLY_SPECS)
+  assert.equal(main.size, BROWSER_MAIN_SPECS.length)
+  assert.equal(nightly.size, BROWSER_NIGHTLY_SPECS.length)
+  for (const file of specFiles) assert.notEqual(main.has(file), nightly.has(file), `${file} must be in exactly one of main or nightly-only`)
+  for (const spec of [...main, ...nightly, ...BROWSER_SCOPED_SPECS]) assert(existsSync(`tests/e2e/${spec}`), spec)
+  for (const spec of BROWSER_SMOKE_FILES) assert(main.has(spec), spec)
 })
 
-test('runner selects only fixed files, refuses partial critical flows, and never narrows a full run', () => {
+test('the smoke tag marks exactly the approved tests, and only in the declared files', () => {
+  const tagged = specFiles.filter(file => readFileSync(`tests/e2e/${file}`, 'utf8').includes("'@smoke'"))
+  assert.deepEqual(tagged, [...BROWSER_SMOKE_FILES].sort())
+  const count = specFiles.reduce((sum, file) => sum + (readFileSync(`tests/e2e/${file}`, 'utf8').match(/'@smoke'/g) ?? []).length, 0)
+  assert.equal(count, 10)
+  assert.equal((readFileSync('tests/mvp/core-loop.spec.ts', 'utf8').match(/'@smoke'/g) ?? []).length, 1)
+})
+
+test('runner turns each tier into fixed argv and refuses anything else', () => {
+  assert.deepEqual(browserArguments('smoke', '[]'), ['exec', 'playwright', 'test', '--grep', '@smoke', '--grep-invert', '@performance'])
+  assert.deepEqual(browserArguments('targeted', JSON.stringify(['settings.spec.ts', 'teams.spec.ts'])),
+    ['exec', 'playwright', 'test', '--grep', '@smoke|(?:^| )(?:settings\\.spec\\.ts|teams\\.spec\\.ts) ', '--grep-invert', '@performance'])
+  const main = browserArguments('main', '[]', '2/2')
+  assert.deepEqual(main.slice(3, -3), BROWSER_MAIN_SPECS.map(spec => `tests/e2e/${spec}`))
+  assert.deepEqual(main.slice(-3), ['--grep-invert', '@performance', '--shard=2/2'])
   assert.deepEqual(browserArguments('full', '[]'), ['exec', 'playwright', 'test', '--grep-invert', '@performance'])
-  assert.deepEqual(browserArguments('full', '[]', '2/4'), ['exec', 'playwright', 'test', '--grep-invert', '@performance', '--shard=2/4'])
-  const args = browserArguments('smoke', JSON.stringify(smoke))
-  assert.deepEqual(args.slice(3, -2), smoke.map(spec => `tests/e2e/${spec}`))
+  assert.deepEqual(browserArguments('full', '[]', '4/4').at(-1), '--shard=4/4')
   for (const [tier, list] of [
-    ['full', smoke], ['smoke', smoke.slice(1)], ['targeted', []],
-    ['docs', []], ['', []], ['targeted', [...smoke, '../evil.spec.ts']],
-    ['targeted', [...smoke, '--pass-with-no-tests']], ['smoke', [...smoke, smoke[0]]],
-    ['targeted', [...smoke, '$(touch /tmp/injected)']], ['smoke', [null]],
-  ]) assert.throws(() => browserArguments(tier, JSON.stringify(list)))
+    ['full', ['routes.spec.ts']], ['main', ['routes.spec.ts']], ['smoke', ['routes.spec.ts']], ['targeted', []],
+    ['docs', []], ['', []], ['targeted', ['../evil.spec.ts']], ['targeted', ['--pass-with-no-tests']],
+    ['targeted', ['routes.spec.ts', 'routes.spec.ts']], ['targeted', ['$(touch /tmp/injected)']], ['smoke', [null]],
+    ['targeted', ['missing-flow.spec.ts']], ['targeted', ['fixtures.ts']], ['targeted', ['a|b.spec.ts']],
+  ]) assert.throws(() => browserArguments(tier, JSON.stringify(list)), `${tier} ${JSON.stringify(list)}`)
   assert.throws(() => browserArguments('full', 'not JSON'))
   assert.throws(() => browserArguments('full', '{}'))
-  for (const shard of ['0/4', '4/3', '1/0', '1', '1/x', '../1/2', '01/4', ' 1/4']) {
-    assert.throws(() => browserArguments('full', '[]', shard), shard)
-  }
-  assert.deepEqual(browserArguments('full', '[]', '4/4').at(-1), '--shard=4/4')
+  for (const shard of ['0/4', '4/3', '1/0', '1', '1/x', '../1/2', '01/4', ' 1/4']) assert.throws(() => browserArguments('full', '[]', shard), shard)
+  assert.throws(() => browserArguments('smoke', '[]', '1/2'))
+  assert.throws(() => browserArguments('targeted', '["routes.spec.ts"]', '1/2'))
+})
+
+test('targeted grep selects whole files by name and the smoke tag, nothing else', () => {
+  const grep = new RegExp(specGrep(['settings.spec.ts', 'teams.spec.ts']))
+  // Playwright's grep title: root (empty), project, file, describe, test title, tags.
+  assert(grep.test(' chromium settings.spec.ts 工作区访问拒绝 拒绝访问'))
+  assert(grep.test(' chromium teams.spec.ts 公开团队'))
+  assert(grep.test(' chromium routes.spec.ts 旧入口 @smoke'))
+  assert(!grep.test(' chromium settings-surface.spec.ts settings row dividers'))
+  assert(!grep.test(' chromium workspace-settings.spec.ts x'))
+  assert(!grep.test(' chromium profile.spec.ts 切换界面语言'))
 })
 
 test('runner invokes pnpm without a shell and preserves actual command failure', () => {
@@ -112,27 +136,24 @@ test('runner invokes pnpm without a shell and preserves actual command failure',
   writeFileSync(join(dir, 'pnpm'), `#!${process.execPath}\nimport {writeFileSync} from 'node:fs'; writeFileSync(process.env.TEST_TRACE, JSON.stringify(process.argv.slice(2))); process.exit(Number(process.env.TEST_EXIT));\n`, { mode: 0o700 })
   for (const status of [0, 7]) {
     const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs')], {
-      encoding: 'utf8', env: { PATH: dir, BROWSER_TIER: 'smoke', BROWSER_SPECS: JSON.stringify(smoke), TEST_TRACE: trace, TEST_EXIT: String(status) },
+      encoding: 'utf8', env: { PATH: dir, BROWSER_TIER: 'smoke', BROWSER_SPECS: '[]', TEST_TRACE: trace, TEST_EXIT: String(status) },
     })
     assert.equal(result.status, status, result.stderr)
-    assert.deepEqual(JSON.parse(readFileSync(trace, 'utf8')), browserArguments('smoke', JSON.stringify(smoke)))
+    assert.deepEqual(JSON.parse(readFileSync(trace, 'utf8')), browserArguments('smoke', '[]'))
   }
 })
 
 test('each selection plan can run as an independent unsharded job', () => {
-  assert.equal(selectionPlan('smoke').tier, 'smoke')
+  assert.deepEqual(selectionPlan('smoke'), smoke)
   assert.equal(selectionPlan('targeted').tier, 'targeted')
-  for (const spec of BROWSER_SMOKE) assert(selectionPlan('smoke').specs.includes(spec))
-  for (const spec of [...BROWSER_SMOKE, ...BROWSER_SCOPED_SPECS]) assert(selectionPlan('targeted').specs.includes(spec))
+  assert.deepEqual(selectionPlan('targeted').specs, [...BROWSER_SCOPED_SPECS])
+  assert.equal(selectionValidationPlans().length, 2)
   assert.throws(() => selectionPlan('full'))
   assert.throws(() => selectionPlan(''))
 })
 
 test('selection validation cannot be sharded or use both modes', () => {
-  for (const args of [
-    ['--verify-selection', '--shard=1/4'],
-    ['--verify-selection-plan=smoke', '--shard=1/4'],
-  ]) {
+  for (const args of [['--verify-selection', '--shard=1/4'], ['--verify-selection-plan=smoke', '--shard=1/4']]) {
     const result = spawnSync(process.execPath, [resolve('scripts/ci-browser-tests.mjs'), ...args], { encoding: 'utf8' })
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /must run unsharded/)
@@ -153,117 +174,134 @@ test('trusted classifier writes actual GitHub outputs for event ranges and integ
   git(['init', '--bare', '--template=', '.'])
   const tree = text => git(['mktree'], text)
   const blob = git(['hash-object', '-w', '--stdin'], 'baseline')
-  const baseTree = tree(`100644 blob ${blob}\tREADME.md\n`)
-  const base = git(['commit-tree', baseTree, '-m', 'base'])
+  const base = git(['commit-tree', tree(`100644 blob ${blob}\tREADME.md\n`), '-m', 'base'])
   const changed = git(['hash-object', '-w', '--stdin'], 'source-only test')
   const libTree = tree(`100644 blob ${changed}\tmodel.test.ts\n`)
-  const headTree = tree(`100644 blob ${blob}\tREADME.md\n040000 tree ${libTree}\tlib\n`)
-  const head = git(['commit-tree', headTree, '-p', base, '-m', 'test-only'])
+  const head = git(['commit-tree', tree(`100644 blob ${blob}\tREADME.md\n040000 tree ${libTree}\tlib\n`), '-p', base, '-m', 'test-only'])
+  const slackTree = tree(`100644 blob ${changed}\twebhook.ts\n`)
+  const scopedHead = git(['commit-tree', tree(`100644 blob ${blob}\tREADME.md\n040000 tree ${tree(`040000 tree ${slackTree}\tslack\n`)}\tlib\n`), '-p', base, '-m', 'slack'])
   const executableTree = tree(`100755 blob ${changed}\tmodel.test.ts\n`)
   const unsafeHead = git(['commit-tree', tree(`040000 tree ${executableTree}\tlib\n`), '-p', base, '-m', 'unsafe mode'])
   const script = resolve('scripts/ci-docs-only.mjs')
   let count = 0
   for (const [event, payload, ref, tier, perf] of [
     ['pull_request', { pull_request: { base: { sha: base }, head: { sha: head } } }, '', 'smoke', 'false'],
+    ['pull_request', { pull_request: { base: { sha: base }, head: { sha: scopedHead } } }, '', 'targeted', 'false'],
     ['pull_request', { pull_request: { base: { sha: base }, head: { sha: unsafeHead } } }, '', 'full', 'false'],
     ['pull_request', {}, '', 'full', 'false'],
     ['pull_request', { pull_request: { base: { sha: 'missing' }, head: { sha: head } } }, '', 'full', 'false'],
+    ['push', { before: base, after: head }, 'refs/heads/main', 'main', 'false'],
     ['push', {}, 'refs/heads/main', 'full', 'true'],
     ['schedule', {}, '', 'full', 'true'], ['workflow_dispatch', {}, '', 'full', 'true'],
   ]) {
     const eventPath = join(dir, `${count}-event.json`), output = join(dir, `${count++}-output`)
     writeFileSync(eventPath, JSON.stringify(payload))
-    execFileSync(process.execPath, [script], { cwd: dir, encoding: 'utf8', env: { ...env, GITHUB_EVENT_NAME: event, GITHUB_EVENT_PATH: eventPath, GITHUB_REF: ref, GITHUB_OUTPUT: output } })
+    execFileSync(process.execPath, [script], { cwd: dir, encoding: 'utf8', env: { ...env, GITHUB_EVENT_NAME: event, GITHUB_EVENT_PATH: eventPath, GITHUB_REF: ref, GITHUB_SHA: payload.after ?? '', GITHUB_OUTPUT: output } })
     const outputs = Object.fromEntries(readFileSync(output, 'utf8').trim().split('\n').map(line => { const at = line.indexOf('='); return [line.slice(0, at), line.slice(at + 1)] }))
-    assert.equal(outputs.browser_tier, tier)
+    assert.equal(outputs.browser_tier, tier, `${event} ${tier}`)
     assert.equal(outputs.browser_performance, perf)
     assert.equal(outputs.docs_only, 'false')
-    browserArguments(outputs.browser_tier, outputs.browser_specs)
+    assert.equal(outputs.verify_selection, 'false')
+    browserArguments(outputs.browser_tier, outputs.browser_specs, tier === 'main' || tier === 'full' ? '1/2' : undefined)
   }
 })
 
-test('protected browser gate requires build, runtime, selection and regression results', () => {
-  const source = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
-  const block = source.split('      - name: Require the selected browser layer\n')[1]
-  const script = block.split('        run: |\n')[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
-  const result = (options = {}) => spawnSync('bash', ['-e', '-c', script], {
-    env: {
-      PATH: process.env.PATH,
-      CHANGES_RESULT: options.changes ?? 'success',
-      BUILD_RESULT: options.build ?? 'success',
-      RUNTIME_RESULT: options.runtime ?? 'success',
-      SELECTION_RESULT: options.selection ?? (options.verify === 'true' ? 'success' : 'skipped'),
-      FULL_RESULT: options.full ?? 'success',
-      DOCS_ONLY: options.docs ?? 'false',
-      BROWSER_TIER: options.tier ?? 'full',
-      BROWSER_PERFORMANCE: options.performance ?? 'false',
-      EVENT_NAME: options.event ?? 'pull_request',
-      VERIFY_SELECTION: options.verify ?? 'false',
-    },
-  }).status === 0
-  assert(result())
-  for (const tier of ['smoke', 'targeted', 'full']) assert(result({ tier }))
+function gateScript() {
+  const block = workflow().split('      - name: Require the selected browser layer\n')[1].split('\n\n  main-red-issue:\n')[0]
+  return block.split('        run: |\n')[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
+}
+
+test('protected browser gate requires exactly the jobs of the selected tier', () => {
+  const script = gateScript()
+  const result = (options = {}) => {
+    const tier = options.tier ?? 'smoke'
+    const sharded = !['smoke', 'targeted'].includes(tier)
+    return spawnSync('bash', ['-e', '-c', script], {
+      env: {
+        PATH: process.env.PATH,
+        CHANGES_RESULT: options.changes ?? 'success',
+        PR_RESULT: options.pr ?? (sharded ? 'skipped' : 'success'),
+        SELECTION_RESULT: options.selection ?? (options.verify === 'true' ? 'success' : 'skipped'),
+        BUILD_RESULT: options.build ?? (sharded ? 'success' : 'skipped'),
+        RUNTIME_RESULT: options.runtime ?? (sharded ? 'success' : 'skipped'),
+        FULL_RESULT: options.full ?? (sharded ? 'success' : 'skipped'),
+        DOCS_ONLY: options.docs ?? 'false',
+        BROWSER_TIER: tier,
+        BROWSER_PERFORMANCE: options.performance ?? 'false',
+        EVENT_NAME: options.event ?? 'pull_request',
+        VERIFY_SELECTION: options.verify ?? 'false',
+      },
+    }).status === 0
+  }
+  // Pull request tiers: the single job, nothing sharded.
+  for (const tier of ['smoke', 'targeted']) {
+    assert(result({ tier }))
+    assert(result({ tier, performance: 'true' }))
+    for (const value of ['failure', 'cancelled', 'skipped', '']) assert(!result({ tier, pr: value }), `${tier} pr ${value}`)
+    for (const job of ['build', 'runtime', 'full']) assert(!result({ tier, [job]: 'success' }), `${tier} ${job} must not run`)
+    assert(result({ tier, verify: 'true', selection: 'success' }))
+    assert(!result({ tier, verify: 'true', selection: 'failure' }))
+    assert(!result({ tier, verify: 'true', selection: 'skipped' }))
+    assert(!result({ tier, verify: 'false', selection: 'success' }))
+  }
   assert(!result({ changes: 'failure' }))
-  for (const value of ['failure', 'cancelled', 'skipped', '']) {
-    assert(!result({ build: value }), `build ${value}`)
-    assert(!result({ runtime: value }), `runtime ${value}`)
-    assert(!result({ full: value }), `full ${value}`)
+  assert(!result({ verify: 'maybe' }))
+  assert(!result({ performance: 'maybe' }))
+  // Sharded tiers: build, runtime and every shard, never the pull request job.
+  for (const [event, tier, performance] of [['push', 'main', 'false'], ['push', 'full', 'true'], ['schedule', 'full', 'true'], ['workflow_dispatch', 'full', 'true'], ['pull_request', 'full', 'true'], ['pull_request', 'full', 'false']]) {
+    assert(result({ event, tier, performance }), `${event} ${tier}`)
+    for (const value of ['failure', 'cancelled', 'skipped', '']) {
+      for (const job of ['build', 'runtime', 'full']) assert(!result({ event, tier, performance, [job]: value }), `${event} ${tier} ${job} ${value}`)
+    }
+    assert(!result({ event, tier, performance, pr: 'success' }))
   }
-  assert(result({ docs: 'true', tier: 'docs', full: 'skipped', build: 'skipped', runtime: 'skipped', selection: 'skipped' }))
-  assert(!result({ docs: 'true', changes: 'failure', tier: 'docs', full: 'skipped' }))
-  // A selection-policy change runs both subsets and skips the regression layer.
-  assert(result({ verify: 'true', tier: 'smoke', selection: 'success', full: 'skipped' }))
-  assert(!result({ verify: 'true', tier: 'smoke', selection: 'failure', full: 'skipped' }))
-  assert(!result({ verify: 'true', tier: 'smoke', selection: 'success', full: 'success' }))
-  // A policy change mixed with application code still runs the full regression.
-  assert(result({ verify: 'true', tier: 'full', selection: 'success', full: 'success' }))
-  assert(!result({ verify: 'true', tier: 'full', selection: 'success', full: 'skipped' }))
-  assert(!result({ verify: 'false', selection: 'success' }))
-  for (const [tier, docs, performance, verify] of [['', 'false', 'false', 'false'], ['docs', 'false', 'false', 'false'], ['smoke', 'false', 'true', 'false'], ['targeted', 'false', 'true', 'false'], ['smoke', 'false', 'false', 'maybe']]) {
-    assert(!result({ tier, docs, performance, verify }), `${tier}:${docs}:${performance}:${verify}`)
-  }
-  for (const event of ['push', 'schedule', 'workflow_dispatch']) {
-    assert(result({ event, tier: 'full', performance: 'true' }))
-    assert(!result({ event, tier: 'full', performance: 'false' }))
-    assert(!result({ event, tier: 'smoke', performance: 'false' }))
-    // A docs-only main push has no browser runtime to exercise; the classifier
-    // selects the docs tier and nightlies/manual runs still require full.
-    assert(result({ event, tier: 'docs', docs: 'true', performance: 'false' }))
-    assert(!result({ event, tier: 'docs', docs: 'false', performance: 'false' }))
+  assert(result({ event: 'pull_request', tier: 'full', verify: 'true', selection: 'success' }))
+  assert(!result({ event: 'pull_request', tier: 'full', verify: 'true', selection: 'failure' }))
+  // Tier and event must agree.
+  for (const [event, tier, performance] of [
+    ['push', 'main', 'true'], ['push', 'smoke', 'false'], ['push', 'full', 'false'], ['schedule', 'main', 'false'],
+    ['schedule', 'full', 'false'], ['workflow_dispatch', 'targeted', 'false'], ['pull_request', 'main', 'false'], ['pull_request', '', 'false'],
+  ]) assert(!result({ event, tier, performance }), `${event} ${tier} ${performance}`)
+  // Documentation: no browser runtime, but the classification must have succeeded.
+  for (const event of ['pull_request', 'push']) {
+    assert(result({ event, tier: 'docs', docs: 'true', pr: 'skipped', build: 'skipped', runtime: 'skipped', full: 'skipped' }))
+    assert(!result({ event, tier: 'docs', docs: 'false' }))
+    assert(!result({ event, tier: 'docs', docs: 'true', changes: 'failure' }))
   }
 })
 
-
-test('policy validation exercises both subsets and covers every scoped spec without duplicating critical flows or replacing a required full layer', () => {
-  const [critical, scoped] = selectionValidationPlans()
-  assert.equal(critical.tier, 'smoke')
-  assert.equal(scoped.tier, 'targeted')
-  for (const spec of [...BROWSER_SMOKE, ...BROWSER_SCOPED_SPECS]) assert(scoped.specs.includes(spec), spec)
-  assert.equal(browserArguments(critical.tier, JSON.stringify(critical.specs)).length, 9)
-  const source = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
-  for (const path of ['playwright-selection-smoke-report', 'selection-smoke-results', 'playwright-selection-targeted-report', 'selection-targeted-results', '.cache/e2e/playwright-selection.log']) {
-    assert(source.includes(path))
-    assert(readFileSync('scripts/test-accounts/evidence.mjs', 'utf8').includes(path))
+test('workflow wires each tier to its jobs and keeps the protected check name', () => {
+  const source = workflow()
+  assert(source.includes('    name: Browser tests (before merge)\n'))
+  assert(source.includes('needs: [changes, browser-pr, browser-selection, browser-build, browser-runtime, browser-e2e-full]'))
+  // One pull request runner: build, runtime gates, MVP smoke, smoke/targeted, performance.
+  const pr = source.split('\n  browser-pr:\n')[1].split('\n  browser-selection:\n')[0]
+  for (const step of ['pnpm build', 'pnpm test:test-accounts-db', 'pnpm test:factory-http', 'node scripts/test-accounts/run-http.mjs',
+    'pnpm test:e2e:mvp --grep @smoke', 'node scripts/ci-browser-tests.mjs >', 'pnpm test:performance',
+    'node scripts/test-accounts/evidence.mjs']) assert(pr.includes(step), step)
+  assert(!pr.includes('name: browser-build-'), 'no build artifact round trip on pull requests')
+  assert(source.includes("shard: ${{ fromJSON(needs.changes.outputs.browser_tier == 'main' && '[1, 2]' || '[1, 2, 3, 4]') }}"))
+  assert(source.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/$BROWSER_SHARDS'))
+  assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted'))
+  assert(source.includes("cron: '17 19 * * *'"))
+  assert(source.includes('  workflow_dispatch:\n'))
+  for (const name of ['browser-build-${{ github.sha }}', 'browser-test-report-runtime-${{ github.sha }}', 'browser-test-report-pull-request-${{ github.sha }}',
+    'browser-test-report-selection-targeted-${{ github.sha }}', 'browser-test-report-shard-${{ matrix.shard }}-${{ github.sha }}']) assert(source.includes(`name: ${name}`), name)
+  // Every uploaded path is one the evidence scanner audits first.
+  const scanned = readFileSync('scripts/test-accounts/evidence.mjs', 'utf8')
+  for (const path of ['playwright-selection-targeted-report', 'selection-targeted-results', '.cache/e2e/playwright-selection.log']) {
+    assert(source.includes(path), path)
+    assert(scanned.includes(path), path)
   }
-  assert(source.includes("needs.changes.outputs.verify_selection == 'true' && needs.changes.outputs.browser_tier != 'full'"))
-  assert(source.includes('node scripts/ci-browser-tests.mjs --verify-selection-plan=${{ matrix.plan }}'))
-  assert(source.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/4'))
-  // Independent jobs: build, runtime, two selection plans and four regression
-  // shards each get their own PostgreSQL service and artifact name.
-  assert(source.includes('matrix:\n        plan: [smoke, targeted]'))
-  assert(source.includes('matrix:\n        shard: [1, 2, 3, 4]'))
-  assert(source.includes('name: browser-build-${{ github.sha }}'))
-  assert(source.includes('name: browser-test-report-runtime-${{ github.sha }}'))
-  assert(source.includes('name: browser-test-report-selection-${{ matrix.plan }}-${{ github.sha }}'))
-  assert(source.includes('name: browser-test-report-shard-${{ matrix.shard }}-${{ github.sha }}'))
-  assert(source.includes('needs: [changes, browser-build, browser-runtime, browser-selection, browser-e2e-full]'))
 })
 
-
-test('real subset entrypoint retains search receipts before full initialization and rejects missing evidence or failed subsets', () => {
+test('real subset entrypoint retains search receipts and rejects missing evidence or failed subsets', () => {
   for (const [receipt, status, expected] of [[true, 0, 0], [false, 0, 1], [true, 7, 7]]) {
     const dir = mkdtempSync(join(tmpdir(), 'browser-subset-retained-'))
     console.log(`Retained subset entrypoint evidence: ${dir}`)
+    // The runner checks spec names against tests/e2e in its working directory.
+    mkdirSync(join(dir, 'tests'))
+    symlinkSync(resolve('tests/e2e'), join(dir, 'tests/e2e'))
     const stub = `#!${process.execPath}
 import { mkdirSync, writeFileSync } from 'node:fs';
 const targeted = process.argv.includes('--output=selection-targeted-results');
@@ -287,11 +325,10 @@ process.exit(targeted ? Number(process.env.TEST_EXIT) : 0);
   }
 })
 
-
-test('CI-only updates use dedicated policy validation and critical flows, without full functionality or performance', () => {
+test('CI-only updates run smoke with dedicated policy validation, without full functionality or performance', () => {
   for (const file of BROWSER_INFRA_FILES) {
-    assert.deepEqual(browserPlan([file]), { tier:'smoke', specs:smoke, performance:false }, file)
-    assert.deepEqual(browserPlan([file, 'app/page.tsx']), full, `${file} mixed with application code`)
+    assert.deepEqual(browserPlan([file]), smoke, file)
+    assert.deepEqual(browserPlan([file, 'lib/slack/webhook.ts']).specs, ['slack-webhook.spec.ts'], `${file} mixed with a mapped path`)
   }
   assert(needsSelectionValidation(['scripts/ci-docs-only.mjs']))
   assert(needsSelectionValidation(['.github/workflows/browser-tests.yml']))
@@ -299,9 +336,8 @@ test('CI-only updates use dedicated policy validation and critical flows, withou
   assert.equal(needsSelectionValidation(['README.md']), false)
 })
 
-test('actual workflow bootstrap cannot let an edited classifier skip app changes, unknown modes, or integration', () => {
-  const workflow = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
-  const wrapper = workflow.split(`<<'BROWSER_BOOTSTRAP'\n`)[1].split('          BROWSER_BOOTSTRAP')[0].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
+test('actual workflow bootstrap cannot let an edited classifier narrow app changes, unknown modes, or integration', () => {
+  const wrapper = workflow().split(`<<'BROWSER_BOOTSTRAP'\n`)[1].split('          BROWSER_BOOTSTRAP')[0].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
   const dir = mkdtempSync(join(tmpdir(), 'browser-bootstrap-retained-'))
   console.log(`Retained workflow bootstrap evidence: ${dir}`)
   const trusted = join(dir, 'trusted-main.mjs')
@@ -321,16 +357,17 @@ test('actual workflow bootstrap cannot let an edited classifier skip app changes
   }
   const base = git(['commit-tree', tree([['README.md','100644']]), '-m', 'base'])
   let count = 0
-  for (const [files, mode, event, tier, performance] of [
-    [BROWSER_INFRA_FILES, '100644', 'pull_request', 'smoke', 'false'],
-    [['scripts/ci-docs-only.mjs', 'app/page.tsx'], '100644', 'pull_request', 'full', 'false'],
-    [['scripts/ci-docs-only.mjs', 'new/unknown.ts'], '100644', 'pull_request', 'full', 'false'],
-    [['scripts/ci-docs-only.mjs'], '100755', 'pull_request', 'full', 'false'],
-    [['scripts/ci-docs-only.mjs'], '120000', 'pull_request', 'full', 'false'],
-    [['scripts/ci-docs-only.mjs', 'tests/e2e/navigation-performance.spec.ts'], '100644', 'pull_request', 'full', 'true'],
-    [BROWSER_INFRA_FILES, '100644', 'push', 'full', 'true'],
-    [BROWSER_INFRA_FILES, '100644', 'schedule', 'full', 'true'],
-    [BROWSER_INFRA_FILES, '100644', 'workflow_dispatch', 'full', 'true'],
+  for (const [files, mode, event, tier, performance, verify] of [
+    [BROWSER_INFRA_FILES, '100644', 'pull_request', 'smoke', 'false', 'true'],
+    [['scripts/ci-docs-only.mjs', 'app/page.tsx'], '100644', 'pull_request', 'full', 'false', 'true'],
+    [['scripts/ci-docs-only.mjs', 'new/unknown.ts'], '100644', 'pull_request', 'full', 'false', 'true'],
+    [['scripts/ci-docs-only.mjs', 'tests/e2e/routes.spec.ts'], '100644', 'pull_request', 'full', 'false', 'true'],
+    [['scripts/ci-docs-only.mjs'], '100755', 'pull_request', 'full', 'false', 'true'],
+    [['scripts/ci-docs-only.mjs'], '120000', 'pull_request', 'full', 'false', 'true'],
+    [['scripts/ci-docs-only.mjs', 'tests/e2e/navigation-performance.spec.ts'], '100644', 'pull_request', 'full', 'true', 'true'],
+    [BROWSER_INFRA_FILES, '100644', 'push', 'full', 'true', 'false'],
+    [BROWSER_INFRA_FILES, '100644', 'schedule', 'full', 'true', 'false'],
+    [BROWSER_INFRA_FILES, '100644', 'workflow_dispatch', 'full', 'true', 'false'],
   ]) {
     const head = git(['commit-tree', tree([['README.md','100644'], ...files.map(file => [file,mode])]), '-p', base, '-m', 'change'])
     const eventFile = join(dir, `${count}-event.json`), outputFile = join(dir, `${count++}-output`)
@@ -338,9 +375,9 @@ test('actual workflow bootstrap cannot let an edited classifier skip app changes
     execFileSync(process.execPath, ['--input-type=module','-',trusted], {cwd:dir, encoding:'utf8', input:wrapper, env:{...env,GITHUB_EVENT_NAME:event,GITHUB_EVENT_PATH:eventFile,GITHUB_OUTPUT:outputFile}})
     const outputs = Object.fromEntries(readFileSync(outputFile,'utf8').trim().split('\n').map(line => { const at=line.indexOf('='); return [line.slice(0,at),line.slice(at+1)] }))
     assert.equal(outputs.docs_only, 'false')
-    assert.equal(outputs.verify_selection, 'true')
+    assert.equal(outputs.verify_selection, verify)
     assert.equal(outputs.browser_tier, tier)
     assert.equal(outputs.browser_performance, performance)
-    assert.deepEqual(JSON.parse(outputs.browser_specs), tier==='smoke' ? smoke : [])
+    assert.deepEqual(JSON.parse(outputs.browser_specs), [])
   }
 })
