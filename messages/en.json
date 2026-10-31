@@ -3243,7 +3243,7 @@
         "delete": "Delete",
         "agent": {
           "running": "Running",
-          "waiting": "Needs approval",
+          "waiting": "Waiting on you",
           "failed": "Run failed"
         }
       },

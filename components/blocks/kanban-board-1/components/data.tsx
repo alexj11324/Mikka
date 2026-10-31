@@ -11,7 +11,7 @@ export const boardColumnOf = (status: string) => BOARD_COLUMNS.some(column => co
 /** What a card shows; the 显示 popover toggles these (Figma 86:2). */
 export const CARD_PROPERTIES = ['identifier', 'priority', 'assignee', 'labels', 'pullRequests', 'subtasks', 'agentState', 'project', 'dueDate', 'createdAt'] as const
 export type CardProperty = typeof CARD_PROPERTIES[number]
-export const DEFAULT_CARD_PROPERTIES: CardProperty[] = ['identifier', 'priority', 'assignee', 'labels', 'pullRequests', 'subtasks', 'agentState']
+export const DEFAULT_CARD_PROPERTIES: CardProperty[] = ['identifier', 'priority', 'assignee', 'labels', 'pullRequests', 'subtasks', 'agentState', 'dueDate']
 
 /** The latest agent run on a task, folded into the three states a card shows. */
 export type AgentState = 'running' | 'waiting' | 'failed'
