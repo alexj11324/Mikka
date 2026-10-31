@@ -38,6 +38,8 @@ test('mapped paths add whole area specs next to the smoke set', () => {
     ['lib/device-enrollment.ts', ['device-authorization.spec.ts', 'mobile-handoff.spec.ts']],
     ['components/device-authorization.tsx', ['device-authorization.spec.ts']],
     ['lib/auth.ts', ['sign-out.spec.ts', 'workspace.spec.ts']],
+    // The avatar menu is the only place to switch workspaces and sign out.
+    ['components/workspace-menu.tsx', ['workspace-menu.spec.ts', 'workspace.spec.ts', 'sign-out.spec.ts', 'workspace-shortcuts.spec.ts']],
     ['lib/suggestions/card.ts', ['suggestions-rail.spec.ts', 'suggestion-entry-contract.spec.ts']],
     ['lib/issue-relations.ts', ['relations.spec.ts']],
     // The OpenUI catalog parses saved replies: the archive spec must run when it changes.

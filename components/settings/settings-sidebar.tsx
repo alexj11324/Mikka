@@ -9,10 +9,8 @@ import { Bell, Blocks, Bot, Brain, Building2, ChartColumn, CircleCheck, CreditCa
 import { listTeams } from '@/app/actions/teams'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { RAIL_ITEMS, type RailDestination } from '@/components/nav/icon-rail'
-import { WorkspaceMenu } from '@/components/workspace-menu'
-import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { settingsItemVisible } from '@/lib/settings-sidebar-search'
-import { resolveSettingsSection, settingsHref, visibleSettingsSections, type SettingsSectionId } from '@/lib/settings-sections'
+import { settingsHref, visibleSettingsSections, type SettingsSectionId } from '@/lib/settings-sections'
 
 const icons: Record<SettingsSectionId, LucideIcon> = {
   account: UserRound, security: Shield, preferences: SlidersHorizontal, notifications: Bell, memory: Brain, connections: Blocks,
@@ -21,8 +19,9 @@ const icons: Record<SettingsSectionId, LucideIcon> = {
   audit: FileText, usage: ChartColumn, billing: CreditCard,
 }
 
-export function SettingsSidebar({ user, section, activeSection, admin, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail, onSignOut, signingOut }: {
-  user: { name: string; email: string; image?: string | null }
+export function SettingsSidebar({ section, activeSection, admin, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: {
+  /** Unused: the account menu (and workspace switching) lives only behind the rail's avatar. */
+  user?: unknown
   section: SettingsSectionId
   activeSection?: SettingsSectionId
   /** Viewer is a workspace admin. Admin-only sections stay hidden until this is known (S-P). */
@@ -33,8 +32,9 @@ export function SettingsSidebar({ user, section, activeSection, admin, selectedT
   /** A pointer or focus on an item: time to fetch its section. */
   onIntent?: (section: SettingsSectionId) => void
   onRail: (destination: RailDestination) => void
-  onSignOut: () => void
-  signingOut: boolean
+  /** Unused, as `user`. */
+  onSignOut?: unknown
+  signingOut?: unknown
 }) {
   const i18nText = useTranslations();
   const [query, setQuery] = useState('')
@@ -49,19 +49,9 @@ export function SettingsSidebar({ user, section, activeSection, admin, selectedT
   const normalizedQuery = query.trim().toLowerCase()
   const joinedTeams = teams.filter(team => team.role && (!workspaceId || team.workspaceId === workspaceId) && `${team.name} ${team.identifier}`.toLowerCase().includes(normalizedQuery))
   const href = (id: SettingsSectionId) => settingsHref(id, workspaceId)
-  function openSettings(href = '/settings') {
-    const destination = new URL(href, window.location.origin)
-    if (activeSection) {
-      if (workspaceId) destination.searchParams.set('workspace', workspaceId)
-      pushSettingsHistory(`${destination.pathname}${destination.search}`, workspaceId)
-      return
-    }
-    onSectionChange(resolveSettingsSection(destination.pathname, destination.searchParams.get('section')))
-  }
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-2">
       <h2 className="flex h-8 items-center px-2 text-sm font-semibold">{i18nText("Settings.title")}</h2>
-      <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} label={i18nText('Nav.switchWorkspace')} onSettings={openSettings} onSignOut={onSignOut} signingOut={signingOut} /></SidebarMenuItem></SidebarMenu>
       <div className="relative mt-1"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label={i18nText("Settings.searchLabel")} placeholder={i18nText("Settings.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} /></div>
     </SidebarHeader>
     <SidebarContent ref={contentRef} className="px-2 pb-6">

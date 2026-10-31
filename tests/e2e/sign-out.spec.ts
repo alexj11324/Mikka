@@ -25,7 +25,7 @@ for (const path of ['/', '/settings/members', '/en/settings?section=devices']) {
         else await route.continue()
       })
       await accountMenu.click()
-      await page.getByRole('menuitem', { name: english ? 'Sign out' : '退出登录', exact: true }).click()
+      await page.getByRole('menu', { name: english ? 'Workspace menu' : '工作区菜单', exact: true }).getByRole('menuitem', { name: english ? 'Sign out' : '退出登录', exact: true }).click()
       await expect(pending).toBeVisible()
       await page.keyboard.press('ControlOrMeta+k')
       await page.keyboard.press('c')
@@ -84,7 +84,7 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
   })
   async function signOut() {
     await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-    await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
+    await page.getByRole('menu', { name: '工作区菜单', exact: true }).getByRole('menuitem', { name: '退出登录', exact: true }).click()
   }
   await title.fill('')
   await signOut()
@@ -126,7 +126,7 @@ test('failed sign-out preserves an invalid project draft and its validation erro
     await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'SIGN_OUT_FAILED', message: 'Sign out failed' }) })
   })
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
+  await page.getByRole('menu', { name: '工作区菜单', exact: true }).getByRole('menuitem', { name: '退出登录', exact: true }).click()
   await expect(page.getByRole('status', { name: '正在退出…', exact: true })).toBeVisible()
   await expect(name).toHaveCount(0)
   const mountedName = page.locator('[role="textbox"][aria-label="项目名称"]')
