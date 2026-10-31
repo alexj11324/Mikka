@@ -9,21 +9,12 @@
 // - Retention defaults to retain; only an explicit admin policy enables expiry (./retention.ts).
 import 'server-only'
 import { db as defaultDb } from '@/lib/db'
-import { workspaceAuditEvents } from '@/lib/db/audit-schema'
-import { toAuditRow, type AuditEvent } from './events'
+import type { AuditEvent } from './events'
+import { recordAudit, type RecordedAudit } from './write'
+
+export { recordAudit, type RecordedAudit } from './write'
 
 export * from './events'
-
-type Insertable = Pick<typeof defaultDb, 'insert'>
-
-export type RecordedAudit = { id: string; createdAt: Date }
-
-export async function recordAudit(executor: Insertable, event: AuditEvent): Promise<RecordedAudit> {
-  const row = toAuditRow(event)
-  const [saved] = await executor.insert(workspaceAuditEvents).values(row)
-    .returning({ id: workspaceAuditEvents.id, createdAt: workspaceAuditEvents.createdAt })
-  return saved
-}
 
 /**
  * What may be logged about a failed audit write: the error class, the Postgres

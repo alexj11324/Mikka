@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
 import type { ActivityFilter } from '@/lib/settings/activity-cursor'
 import { activityFor, type ActivityPage } from '@/lib/settings/activity'
 import { deleteSavedLoginFor, savedLoginUsage, savedLogins, type SavedLogin, type SavedLoginUse } from '@/lib/settings/saved-logins'
@@ -11,10 +12,14 @@ import { deleteSavedLoginFor, savedLoginUsage, savedLogins, type SavedLogin, typ
 // Settings > saved logins and activity. Every read and write is scoped to the
 // signed-in person; ids from the client are only ever matched with that owner.
 
-async function getUserId(): Promise<string> {
+async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
+  return session.user
+}
+
+async function getUserId(): Promise<string> {
+  return (await getUser()).id
 }
 
 /** The person's saved logins: site, account and last use. Never a secret. */
@@ -24,7 +29,11 @@ export async function listSavedLogins(): Promise<ActionResult<{ logins: SavedLog
 
 /** Revokes one saved login; the broker can no longer fill it. */
 export async function deleteSavedLogin(id: string): Promise<ActionResult<{ id: string }>> {
-  return runAction(async () => deleteSavedLoginFor(await getUserId(), id))
+  return runAction(async () => {
+    const user = await getUser()
+    const context = await loadWorkspaceContext(undefined, user)
+    return deleteSavedLoginFor({ userId: user.id, workspaceId: context.workspace.id, auditActor: { type: 'user', id: user.id, name: user.name || user.id } }, id)
+  })
 }
 
 /** Recent uses of one saved login: when, which Bot, which thread, result. */
