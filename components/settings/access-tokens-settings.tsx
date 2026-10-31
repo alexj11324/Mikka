@@ -16,6 +16,7 @@ import { SettingRow, SettingsLoading, SettingsSection, settingsSectionAction } f
 import type { PersonalAccessTokenView } from '@/lib/tokens/store'
 import { relativeTime } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
+import { usePresence, type PresenceProps } from '@/lib/use-presence'
 
 const EXPIRY_DAYS = { '30': 30, '90': 90, '365': 365, never: null } as const
 type Expiry = keyof typeof EXPIRY_DAYS
@@ -27,6 +28,7 @@ export function AccessTokensSettings({ workspaceId }: { workspaceId?: string }) 
   const actionError = useActionError()
   const tokens = useSWR(['settings:tokens', workspaceId ?? ''], () => listAccessTokens(workspaceId))
   const [creating, setCreating] = useState(false)
+  const createDialog = usePresence(creating)
   const [revoking, setRevoking] = useState<PersonalAccessTokenView | null>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,7 +66,7 @@ export function AccessTokensSettings({ workspaceId }: { workspaceId?: string }) 
       </SettingRow>)}
     </SettingsSection>
     {error && <p role="alert" className="px-1 text-sm text-destructive">{error}</p>}
-    {creating && <CreateTokenDialog workspaceId={workspaceId} onDone={() => { setCreating(false); void tokens.mutate() }} />}
+    {createDialog.value && <CreateTokenDialog open={createDialog.open} onOpenChangeComplete={createDialog.onOpenChangeComplete} workspaceId={workspaceId} onDone={() => { setCreating(false); void tokens.mutate() }} />}
     <AlertDialog open={revoking !== null} onOpenChange={open => { if (!open && !pending) setRevoking(null) }}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>{t('revokeTitle', { name: revoking?.name ?? '' })}</AlertDialogTitle></AlertDialogHeader>
@@ -77,7 +79,7 @@ export function AccessTokensSettings({ workspaceId }: { workspaceId?: string }) 
   </>
 }
 
-function CreateTokenDialog({ workspaceId, onDone }: { workspaceId?: string; onDone: () => void }) {
+function CreateTokenDialog({ workspaceId, onDone, open = true, onOpenChangeComplete }: { workspaceId?: string; onDone: () => void } & PresenceProps) {
   const t = useTranslations('Settings.tokens')
   const actionError = useActionError()
   const [name, setName] = useState('')
@@ -108,7 +110,7 @@ function CreateTokenDialog({ workspaceId, onDone }: { workspaceId?: string; onDo
     try { await navigator.clipboard.writeText(token); setCopied(true) } catch { setCopied(false) }
   }
 
-  return <Dialog open onOpenChange={open => { if (!open && !pending) onDone() }}>
+  return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={open => { if (!open && !pending) onDone() }}>
     <DialogContent>
       <DialogHeader><DialogTitle>{token ? t('createdTitle', { name: name.trim() }) : t('createTitle')}</DialogTitle></DialogHeader>
       {token

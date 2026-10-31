@@ -24,10 +24,11 @@ import { ProjectPicker, ProjectPropertyControl } from './project-property-contro
 import { ProjectMilestones } from './project-milestones'
 import { WORKSPACE_NAME } from './issue-properties'
 import { ShortcutKeys } from '@/components/shortcut-keys'
+import type { PresenceProps } from '@/lib/use-presence'
 
 const FIELDS: ProjectControlField[] = ['status', 'priority', 'lead', 'members', 'startDate', 'targetDate', 'labels', 'dependencyIds']
 
-export function ProjectForm({ project, initialTeamId = '', projects = [], userName, onClose, onSaved }: { project?: Project; initialTeamId?: string; projects?: Project[]; userName?: string; onClose: () => void; onSaved: (project: Project) => void }) {
+export function ProjectForm({ project, initialTeamId = '', projects = [], userName, onClose, onSaved, open = true, onOpenChangeComplete }: { project?: Project; initialTeamId?: string; projects?: Project[]; userName?: string; onClose: () => void; onSaved: (project: Project) => void } & PresenceProps) {
   const i18nText = useTranslations();
   const resolvedUserName = userName ?? i18nText("FeatureCopy.c_34f201bc")
   const [initial] = useState<ProjectDraft>(() => ({ name: project?.name ?? '', summary: project?.summary ?? '', description: project?.description || project?.summary || '', status: (project?.status ?? 'backlog') as ProjectDraft['status'], priority: (project?.priority ?? 'none') as ProjectDraft['priority'], lead: (project?.lead ?? '') as '' | 'me', team: WORKSPACE_NAME, startDate: project?.startDate ?? '', targetDate: project?.targetDate ?? '', properties: project?.properties ?? DEFAULT_PROJECT_PROPERTIES }))
@@ -62,7 +63,7 @@ export function ProjectForm({ project, initialTeamId = '', projects = [], userNa
     } catch { setError(i18nText("FeatureCopy.c_85f5c4d3")) }
     finally { submitting.current = false; setPending(false) }
   }
-  return <Dialog open onOpenChange={value => { if (!value) close() }}><DialogContent showCloseButton={false} className="flex h-[min(88svh,58rem)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0 shadow-2xl sm:max-w-4xl">
+  return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={value => { if (!value) close() }}><DialogContent showCloseButton={false} className="flex h-[min(88svh,58rem)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0 shadow-2xl sm:max-w-4xl">
     <DialogHeader className="flex-row items-center justify-between gap-3 px-5 pt-5 sm:px-7"><div className="flex items-center gap-2"><Badge variant="outline" className="gap-1.5 rounded-full px-2 py-1 font-normal"><ContactRound className="text-info-foreground" />{i18nText("Projects.title")}</Badge><ChevronRight className="size-3 text-muted-foreground" /><DialogTitle className="text-sm font-normal">{project ? i18nText("Projects.form.editTitle") : i18nText("Projects.form.createTitle")}</DialogTitle></div><Button type="button" variant="ghost" size="icon-sm" aria-label={i18nText("Projects.form.close")} disabled={pending} onClick={close}><X data-icon="inline-start" /></Button><DialogDescription className="sr-only">{i18nText("Projects.form.description")}</DialogDescription></DialogHeader>
     <form className="flex min-h-0 flex-1 flex-col" onSubmit={event => { event.preventDefault(); void submit() }} onKeyDown={event => { if (event.nativeEvent.isComposing || event.keyCode === 229) return; if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); if (draft.name.trim()) void submit() } }}>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pt-4 pb-5 sm:px-7">
