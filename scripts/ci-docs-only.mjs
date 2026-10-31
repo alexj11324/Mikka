@@ -74,7 +74,7 @@ export const BROWSER_MAIN_SPECS = Object.freeze([
   'agent.spec.ts', 'bot-image-read.spec.ts', 'bots.spec.ts', 'computer-policy-settings.spec.ts',
   'coordinator-choice-card.spec.ts', 'coordinator-scroll.spec.ts', 'global-search-scope.spec.ts', 'invalid-issue-content.spec.ts',
   'issue-threads.spec.ts', 'linear-sync-disabled.spec.ts', 'members.spec.ts', 'mobile-handoff.spec.ts',
-  'plugins-page.spec.ts',
+  'plugins-page.spec.ts', 'question-card.spec.ts',
   'settings.spec.ts', 'sign-out.spec.ts', 'suggestion-entry-contract.spec.ts', 'suggestions-rail.spec.ts',
   'teams.spec.ts', 'thread-cards.spec.ts', 'thread-projection.spec.ts', 'thread-stop.spec.ts',
   'workspace-menu.spec.ts',
@@ -108,13 +108,13 @@ const SCOPED_BROWSER = [
   { area: 'plugins', paths: [/^components\/plugins\//, /^app\/api\/integrations\//], specs: ['plugins-page.spec.ts', 'linear-sync-disabled.spec.ts', 'github-integration.spec.ts'] },
   { area: 'slack', paths: [/^lib\/slack\//, /^app\/api\/webhooks\/slack\//], specs: ['slack-webhook.spec.ts'] },
   { area: 'factory', paths: [/^lib\/factory\//, /^app\/api\/factory\//, /^components\/(?:factory|workspace\/factory-)/, /^lib\/self-improvement\//, /^app\/api\/self-improvement\//, /^components\/workspace\/self-improvement\.tsx$/], specs: ['factory-acceptance-ui.spec.ts', 'factory-acceptance-a2.spec.ts', 'thread-question.spec.ts', 'factory-api.spec.ts', 'factory-check-api.spec.ts', 'factory-execution-claim.spec.ts', 'self-improvement-api.spec.ts'] },
-  { area: 'threads', paths: [/^components\/coordinator\//, /^lib\/coordinator[-/.]/, /^lib\/(?:issue-threads|thread-groups|issue-thread-questions|run-control)\./, /^components\/workspace\/issue-thread/, /^app\/api\/(?:threads|coordinator)\//], specs: ['thread-cards.spec.ts', 'thread-projection.spec.ts', 'thread-stop.spec.ts', 'issue-threads.spec.ts', 'thread-question.spec.ts', 'coordinator-choice-card.spec.ts', 'coordinator-scroll.spec.ts'] },
+  { area: 'threads', paths: [/^components\/coordinator\//, /^lib\/coordinator[-/.]/, /^lib\/(?:issue-threads|thread-groups|issue-thread-questions|run-control)\./, /^components\/workspace\/issue-thread/, /^app\/api\/(?:threads|coordinator)\//], specs: ['thread-cards.spec.ts', 'thread-projection.spec.ts', 'thread-stop.spec.ts', 'issue-threads.spec.ts', 'thread-question.spec.ts', 'coordinator-choice-card.spec.ts', 'coordinator-scroll.spec.ts', 'question-card.spec.ts'] },
   { area: 'suggestions', paths: [/^lib\/suggestions\//, /^components\/suggestions\//, /^app\/api\/suggestions\//], specs: ['suggestions-rail.spec.ts', 'suggestion-entry-contract.spec.ts'] },
   { area: 'devices', paths: [/^lib\/(?:device|mobile)-/, /^components\/(?:device-authorization\.tsx|devices\/)/, /^app\/api\/(?:devices|mobile)\//, /^app\/\[locale\]\/device\//], specs: ['device-authorization.spec.ts', 'mobile-handoff.spec.ts'] },
   { area: 'auth', paths: [/^lib\/(?:auth|session|email-sign-in)[-.]/, /^lib\/abuse\//, /^app\/api\/auth\//, /^components\/auth(?:\/|-form\.tsx$)/, /^app\/\[locale\]\/(?:sign-in|sign-up|verify-email|forgot-password|reset-password)\//], specs: ['sign-out.spec.ts', 'workspace.spec.ts', 'signup-turnstile.spec.ts'] },
   { area: 'relations', paths: [/^lib\/issue-relation/, /^components\/workspace\/issue-relations\.tsx$/], specs: ['relations.spec.ts'] },
   { area: 'active agents', paths: [/^lib\/active-agents\./], specs: ['active-agents.spec.ts'] },
-  { area: 'agent ui', paths: [/^lib\/agent-ui[-.]/, /^lib\/legacy-chat-content\.ts$/, /^components\/workspace\/agent-(?:ui-library|generative-ui|theme|chart|report|editable-table|text-bubble|decision|citations)\.tsx$/], specs: ['agent.spec.ts', 'coordinator-choice-card.spec.ts', 'bot-image-read.spec.ts', 'e2b-machine-name.spec.ts'] },
+  { area: 'agent ui', paths: [/^lib\/agent-ui[-.]/, /^lib\/legacy-chat-content\.ts$/, /^components\/workspace\/agent-(?:ui-library|generative-ui|theme|chart|report|editable-table|text-bubble|decision|citations)\.tsx$/, /^components\/agents\/approval-card\//], specs: ['agent.spec.ts', 'coordinator-choice-card.spec.ts', 'question-card.spec.ts', 'bot-image-read.spec.ts', 'e2b-machine-name.spec.ts'] },
 ]
 export const BROWSER_SCOPED_SPECS = Object.freeze([...new Set(SCOPED_BROWSER.flatMap(rule => rule.specs))].sort())
 const PERFORMANCE_SPECS = ['tests/e2e/navigation-performance.spec.ts', 'tests/e2e/agent-performance.spec.ts']
