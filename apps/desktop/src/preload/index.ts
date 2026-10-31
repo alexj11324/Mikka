@@ -35,7 +35,14 @@ if (appOrigin && window.location.origin === appOrigin) {
       serverUrl: __MIKKA_APP_URL__,
       zeroUrl: '',
       openExternal: (url: unknown) => ipcRenderer.invoke(IPC.appOpenExternal, url),
-    prepareAuth: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareAuth, state),
+      prepareAuth: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareAuth, state),
+      updateReady: () => ipcRenderer.invoke(IPC.appUpdateReady),
+      onUpdateReady: (listener: (version: string) => void) => {
+        const handler = (_event: IpcRendererEvent, version: string) => listener(version)
+        ipcRenderer.on(IPC.appUpdateReady, handler)
+        return () => { ipcRenderer.removeListener(IPC.appUpdateReady, handler) }
+      },
+      installUpdate: () => ipcRenderer.invoke(IPC.appInstallUpdate),
     },
     notifications: {
       show: (notification: unknown) => ipcRenderer.invoke(IPC.notificationsShow, notification),

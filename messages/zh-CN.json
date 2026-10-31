@@ -136,6 +136,7 @@
     "toggleTeam": "展开或收起 {name} 团队",
     "sidebarRail": "展开或收起侧栏边轨",
     "rail": "主导航",
+    "restartToUpdate": "重启以更新到 v{version}",
     "conversations": "对话",
     "board": "看板",
     "collapseList": "收起 Bot 列表",

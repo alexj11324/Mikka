@@ -136,6 +136,7 @@
     "toggleTeam": "Expand or collapse the {name} team",
     "sidebarRail": "Expand or collapse the sidebar rail",
     "rail": "Main navigation",
+    "restartToUpdate": "Restart to update to v{version}",
     "conversations": "Conversations",
     "board": "Board",
     "collapseList": "Collapse bot list",
