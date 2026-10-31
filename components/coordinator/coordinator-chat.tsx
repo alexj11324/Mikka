@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { useTranslations } from 'next-intl'
 import { getCoordinatorChat, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
@@ -142,6 +142,15 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const streamedThrough = useRef(-1)
   useEffect(() => { for (const reply of stream.replies) if (reply.committedThrough !== undefined) streamedThrough.current = Math.max(streamedThrough.current, reply.committedThrough) })
   const arriving = useArrivals(data ? [...items.map(item => `item-${item.position}`), ...stream.replies.map(reply => `stream-${reply.id}`)] : null)
+  // The working line fades in when a turn starts after the chat opened, not when the chat opens mid-run.
+  const loaded = useRef(false)
+  const workingAtOpen = useRef(false)
+  useEffect(() => {
+    if (!data) return
+    if (!loaded.current) { loaded.current = true; workingAtOpen.current = Boolean(data.working) }
+    else if (!data.working) workingAtOpen.current = false
+  })
+  const workingEnter = loaded.current && !workingAtOpen.current
   const entering = (item: (typeof items)[number]) => arriving(`item-${item.position}`) && !(item.from === 'coordinator' && item.position <= streamedThrough.current)
   // A turn the hosted model (Mikka 默认) refused: verification, allowance or pause (#523, #525, #526).
   const refusal = data?.working ? null : hostedRefusal(data?.error)
@@ -260,8 +269,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 <CoordinatorReply text={reply.text} citations={citations} isStreaming={reply.committedThrough === undefined} />
               </MessageContent></Message>
             </MessageScrollerItem>)}
-            {/* The working line fades in and out (R-37: opacity on a duration); a chat that opens mid-run shows it at once. */}
-            <AnimatePresence initial={false}>{data?.working && items.length > 0 && <motion.p key="working" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />{t('working')}</motion.p>}</AnimatePresence>
+            {/* The working line fades in (R-37: opacity on a duration). It leaves at once: an exit would keep its height
+                after the reply lands and pull the scroll position back (coordinator-scroll.spec). */}
+            {data?.working && items.length > 0 && <p role="status" className={cn('flex items-center gap-2 text-sm text-muted-foreground', workingEnter && ENTER)}><Spinner />{t('working')}</p>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <AnimatePresence initial={false}>
