@@ -42,15 +42,27 @@ These are Next server actions exported by `app/actions/issues.ts` under the exis
 | `createIssueForTeam` | `{ requestId, teamId, title, content, status, priority }`; both IDs are UUIDs; `content` is a JSONContent document object, with a 250,000-character JSON serialization limit. A human session and the selected team's active workspace membership are required. |
 | `promoteIssueToTeam` | `{ requestId, issueId, revision, teamId, expectedTeamId }`; IDs are UUIDs, revision is a positive integer, and `expectedTeamId` is the confirmed current relation UUID or null. Keeps the existing task and owner. |
 | `getIssueTeam` | Existing collaboration action returns the current team ID as `string | null`. A successful null means no relation; pending or failed reads are not null. Relation is unique per issue. |
-| `setIssueScope` | `{ id, revision, scope: 'personal' }` performs a local-only owner transition without a second approval. External/uncertain publication fails with `issueScopeInLinear`; stale revisions fail. Untargeted workspace promotion is refused; use the explicit-team action. |
+| `setIssueScope` | `{ id, revision, scope: 'personal' }` performs the owner's explicit transition, including already-linked tasks. It atomically detaches the old link and queues its frozen archive target; stale revisions fail. Untargeted workspace promotion is refused; use the explicit-team action. |
 | `previewIssuePersonalScope` | Takes the task UUID; owner-only result `{ preview: { revision, scope, scopeVersion, hasLinearLink, hasRetainedPublication, externalCopyPossible, confirmation } }`. The confirmation is a SHA256 digest of the current task and recorded external activity. No provider request. |
-| `confirmIssuePersonalScope` | `{ id, revision, confirmation }`; owner and digest are rechecked under the task lock. Changed state returns `issueStale`. Recorded links, retained publications or queued/processing/failed outbound jobs keep the action closed with `issueScopeInLinear`. |
+| `confirmIssuePersonalScope` | `{ id, revision, confirmation }`; owner and digest are rechecked under the task lock. Changed state returns `issueStale`. A matching confirmation retires the local relation and durably queues the previous external target for archive; an unknown legacy target is retained for review rather than guessed. |
 
 Team actions return `{ issue, linearSync: { enabled: false, reason: 'no_explicit_target' } }`. An explicit Mikka team selection authorizes that local target only. The durable per-task `linearSyncBlocked` gate prevents publication/outbox/link creation without a verified external target. There is no new Linear authorization product flow. The six typed errors are `teamIssueInvalid`, `teamIssueAccessDenied`, `teamIssueRequestConflict`, `teamIssueChanged`, `teamIssueRetry`, and `teamIssueOutcomeUnknown`; errors after database work include `requestId`, which is optional at the general action type boundary. Missing session returns `authRequired`. Unknown internal exceptions are not exposed in the payload.
 
 Freeze request ID and the complete body for retries. App request records, workspace receipts and locked phase-two permission/revision checks handle cross-database failure without duplicating a task or restoring a subsequently changed association. An unknown outcome must remain unknown until readback or same-request retry resolves it. This is not a distributed database transaction.
 
-The old untargeted `setIssueScope(...scope:'workspace')` returns `issueScopeTeamRequired`. The personal path cannot bypass confirmation. A confirmed, unlinked conversion restores the personal identifier and atomically revokes other people's runs/tokens and outgoing claims. Delayed writers cannot restore the prior identity. Already-shared external disposition remains gated: a warning does not authorize archive/delete or prove an external copy is private. Claude owns frontend action integration and modal layout.
+The old untargeted `setIssueScope(...scope:'workspace')` returns `issueScopeTeamRequired`. The personal path requires the owner and current revision; any supplied preview digest must still match. Conversion restores the original personal identifier and atomically revokes other people's runs/tokens and ordinary outgoing claims. Delayed writers cannot restore the prior identity. The owner's explicit personal-scope request archives the frozen previous Linear target through the existing outbox. It never deletes team history or copies newly private content to Linear. This cleanup can run while ordinary bidirectional sync remains disabled. Claude owns frontend action integration and modal layout.
+
+The 2026-10-31 #184 backend check uses `tests/linear-archive.db.test.ts` against
+fresh tracked migrations, real PG17 and an actual loopback GraphQL HTTP receiver.
+Ten concurrent workers produce one archive; a dropped success response is read
+back without another mutation. Owner/revision, frozen-target immutability,
+connection revocation, personal numbering, task/run privacy and delayed-import
+fences are asserted. New archive claims also reject the older sync-worker
+protocol, preventing a rolling deployment from consuming cleanup as stale sync.
+This is backend protocol evidence with synthetic callers/resources, not live
+Linear/OAuth or browser acceptance. Older dedicated scope/CI environment guards
+are unchanged; the final integrating revision and Git-linked CI are recorded by
+the integrating parent.
 
 ## Released main compatibility
 

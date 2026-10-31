@@ -1,0 +1,256 @@
+# Audit and account-data closeout (#210, #213)
+
+Base: `375d670937ca06c53e47f336870481d38520c1fe`, cloud Linux.
+This report records component evidence; it does not close either broad issue.
+
+## Audit export
+
+The previous CSV export stopped after reaching its cap and returned an ordinary
+array without saying that later pages were missing. On real PostgreSQL a
+controlled 121-row workspace returned 100 rows with a cap of 100, silently
+omitting 21. The updated path refuses an oversized export with
+`auditExportLimitExceeded`/HTTP 413, before publishing a partial file or receipt.
+Occurrence 6 × impact 6 = 36: a successful-looking partial security export
+omits incident evidence. The before/after probe is retained in
+`/tmp/mikka-audit-cap-before-after.log`.
+
+An export now reads a repeatable-read snapshot while holding the current
+workspace-admin membership lease. It records the preparation in the existing
+allowlisted audit table. Its manifest contains exact record count, ordered
+record digests, UTC bounds and expiry. A separate workspace-database receipt
+anchors those digests independently of the application event rows. This is
+verifiable snapshot integrity, not a signature or a claim that an administrator
+with access to both databases cannot rewrite them.
+
+The existing authenticated CSV download keeps its format and gains export-ID,
+count and SHA-256 headers. `format=json` returns a manifest, events and explicit
+`nextOffset`; `exportId`, `offset` and `limit` resume the same snapshot. New
+events cannot shift that snapshot. Each page checks current admin membership,
+tenant, fifteen-minute link expiry and the anchored row hashes. Modified or
+missing rows and reordered receipt entries return `auditExportChanged`/409.
+Ordinary members and other tenants remain denied. Snapshot expiry does not
+choose a retention/deletion policy for historical audit data.
+
+Local isolated target: PostgreSQL 17,
+`127.0.0.1:55599/mikka_audit_closeout_e2e`, 155 migrations including the new
+workspace-target receipt migration. Existing databases/ledgers were retained.
+
+- Real PG snapshot/resume/denial/tamper/failure tests: 7/7, no skips,
+  `/tmp/mikka-audit-export-db.log`.
+- Existing real PG audit query regression: 3/3, no skips,
+  `/tmp/mikka-audit-query-regression.log`.
+- Actual route-function adapter with explicit auth/service fixtures: 3/3,
+  `/tmp/mikka-audit-route-final.log`. This is not full Next/session acceptance.
+- Audit event contract source tests: 12/12; root TypeScript, targeted lint and
+  diff checks passed. A parent integration build/HTTP-account-pool run and
+  Git-linked CI still need to cover the final merged revision.
+
+## Remaining scope
+
+The existing event catalogue and member/token/secret writers remain in use.
+Complete current authentication/denial/Agent-event coverage, cross-database
+delivery recovery and explicit retention/legal-hold configuration still need
+their full issue evidence. No historical-data cleanup policy or legal period
+has been invented. Snapshot integrity does not silently promise immutable
+storage or prove that a pre-snapshot event was never changed.
+
+Account deletion currently needs a durable phase journal: its application
+database commits before the workspace transaction finishes, and failed object
+cleanup is only logged. The next component will preserve deletion intent,
+cross-database progress and pending objects so retries and restore replay do
+not claim unfinished work succeeded. Real provider/backup exceptions must be
+listed rather than reported as deleted.
+
+## Account deletion journal (#213)
+
+The previous path committed the main store before the workspace store, then
+logged and swallowed object-delete errors. A workspace failure could leave no
+account available to retry; an R2 failure lost the only object references.
+Occurrence 6/10, impact 8/10 (48): an ordinary provider/storage outage or process
+restart after an acknowledged database commit takes this path. The owner-column
+INSERT race is a privacy defect even on tables such as `user_facts` without a
+user FK; its fix does not depend on a low likelihood score.
+
+`account_deletion_jobs` now retains a content-free receipt outside the deleted
+user's foreign-key cascade. Its phases are `preparing`, `requested`,
+`external_pending`, `main_deleted`, `workspace_deleted`, `storage_pending`,
+`completed` or `cancelled`. Main data deletion and its object list/phase commit
+in one main-store transaction. Workspace deletion has a separate commit and is
+idempotently replayable. No distributed atomic transaction is claimed.
+
+The owner write barrier waits for in-flight managed file writes and INSERTs.
+After request confirmation it rejects new owned INSERTs, including tables
+without FKs; solo workspaces reject new memberships/content while pending.
+A fresh workspace plan is checked while its row locks span main deletion and
+workspace deletion, preserving shared issues/projects/group messages. An owner
+can cancel only before external cleanup begins. Owner IDs, plans and object
+keys are excluded from the public lifecycle receipt. The receipt UUID is a
+private capability passed in a request header, never a URL; store it privately.
+The backend POST takes the current human session and typed email, so device/API
+principals cannot impersonate an account owner. The existing settings action
+keeps its typed-email confirmation and reports pending cleanup rather than
+reporting deletion success. New backend POST supports a client-kept request UUID
+for lost-response recovery; its settings UI integration is still a dependency.
+
+`GET /api/cron/account-deletions` resumes at most five jobs using the existing
+cron workload secret. The existing minute worker must include this endpoint.
+Database-only receipts remain queryable after the user/sessions disappear.
+Capture upload grants must expire before final object cleanup; both staging
+and verified keys are retained. Failed old-avatar cleanup retains its key.
+Composio deletion enumerates all states with the trusted owner filter and
+requests upstream revocation through the existing SDK adapter; provider data
+contents are not deleted. BYOS uses owner-scoped worker custody cleanup before removing mappings. Known
+owned cloud computers and snapshots require acknowledged provider deletion;
+unfinished allocation or provider/storage failures keep the job pending.
+
+The restore adapter requires an independently retained **current** deletion
+manifest, its protected digest anchor and an isolated explicit target pair.
+`applyAccountDeletionManifest` rejects altered manifests and any unfinished
+live job. Completed deletions replay the same local deletion path and saved
+shared-data preservation decision; they do not redo remote provider effects.
+A failed restore/object cleanup leaves recovery quarantined. Manifest SHA256
+is corruption detection, not an authenticity or freshness proof. Backup-local
+journals cannot prove that no deletion occurred after the backup.
+
+### Data ownership and remaining policy/acceptance
+
+| Assets | Purpose / current deletion treatment | Retention / outstanding boundary |
+| --- | --- | --- |
+| Main owner rows, sign-in/session/device/OAuth tokens, local vault envelopes | Owned service data; deleted in the main transaction, existing FK/dependency order retained | No invented legal retention period |
+| Solo workspaces, membership, invitation, owned projects | Workspace commit; invitations matched using normalized email hash | Shared team issues/projects/group messages stay for remaining members |
+| Artifact versions, captures, avatar and known retired avatar objects | Persist keys before removing DB pointers; retry acknowledged object DELETEs after upload grant expiry | Historical unreferenced bucket objects from failed PUT/database transactions need an independently verified bucket inventory/lifecycle policy |
+| Composio connections | Owner-filtered list and managed authorization removal before local mapping deletion | Upstream revocation may be asynchronous; real provider acceptance still required |
+| BYOS Infisical artifacts, native model state | Owner-scoped disconnect fences state/revision; cleanup/status and DB verify all custody copies | Actual custody failures stay pending; unsupported upstream global revocation is disclosed as a non-blocking warning |
+| Cloud sandbox files / run runtime | Fence owned runs/tokens, end dedicated threads and kill only the owner’s `(workspaceId, ownerId)` Bot computers; enumerate/delete their snapshots | Unacknowledged provider cleanup and uncertain allocations remain pending; user-device files are outside service custody |
+| Audit rows, shared message authorship, immutable evaluation ledgers | Existing accountability/team records are retained, not silently rewritten/deleted | Explicit data minimization, legal hold and retention policy remains required; account deletion is not claimed to erase every actor reference |
+| Deletion receipt and restore-suppression guards | Restore must not resurrect an erased account | Default `retentionUntil = NULL`; no destructive expiry without an explicit policy |
+| Backups / provider-held logs and user-owned upstream contents | Recovery replays current tombstones before exposure; it never uses an old dump as proof of current deletion state | Backup expiry, independent storage custody, upstream retention and policy approval remain concrete deployment acceptance requirements |
+
+Real PG17 component checks cover sole-admin refusal, owner-only cancellation,
+external cleanup blocking, file retry, upload-grant delay, main/workspace commit
+failure, a new pool resuming the committed phase, and concurrent no-FK INSERT
+rejection. A second real PostgreSQL schema tests explicit restore targets,
+altered/pending manifests, preserved peer data and post-replay suppression.
+That schema fixture is not a complete backup/restore drill. Route adapters use
+explicit module fixtures; they are not deployed Mikka HTTP/provider acceptance.
+No customer data, real external authorization or production history was deleted.
+
+Still required before closing #213: full fixed-revision app HTTP acceptance,
+settings request/receipt status integration and reauthentication navigation,
+complete portable export coverage (files/harness checkpoints), real BYOS/cloud
+cleanup evidence, verified historical object inventory/lifecycle, current
+manifest backup drill, and the explicit retention/hold/backup policy above.
+
+## Explicit audit retention and hold (#210)
+
+`workspace_audit_retention` lives beside the main audit sink, so each explicit
+admin policy change and its audit record commit together. No row or NULL days
+means retain. `legalHold` blocks cleanup. The backend API accepts only a human
+session, a current active workspace admin, same-origin mutation and explicit
+`{retentionDays: integer|null, legalHold: boolean}`; it never infers a period
+from a product default or invents a legal policy. The numeric bound is a storage
+validation bound, not a recommended legal retention period.
+
+The existing cron workload can call `/api/cron/audit-retention`. It applies only
+explicit non-held policies. Event deletion and its exact-count audit record
+share one transaction; an audit failure rolls deletion back. A workspace lock
+serializes export publication with cleanup, and any unexpired export receipt
+postpones cleanup so resumable snapshots retain their promised data window.
+Receipt digests/anchors are retained separately; their own destruction and any
+legal retention mandate still require an explicit policy.
+
+PG17 tests cover default retain, member/other-tenant denial, hold, policy rollback
+on failed audit, scoped expiry/count, live-export delay, deletion rollback on
+failed audit, and restoring NULL retention. Only disposable fixture history was
+deleted. No production retention policy was selected or changed. Endpoint tests
+are route fixtures; fixed-revision Mikka HTTP acceptance and the existing design
+owner's policy/hold controls remain required. Cross-database member/permission
+writes still use log-only `recordAuditSafe`; its durable event delivery and the
+full event catalogue/failure paths remain concrete #210 gaps, so this component
+work alone does not justify closing #210.
+
+### Owner-bound external cleanup
+
+The account adapter drives each BYOS connection through its existing
+owner-checked repository, worker `disconnect`, connection-scoped `cleanup` and
+`status`; it never invokes the global cleanup batch. `Disconnect` advances its
+epoch, sets disconnected and removes grant/access/staged pointers; stale
+bindings/native requests fail the current state/revision check. The adapter
+verifies all custody/enrollment copies are acknowledged. A genuine pending,
+failed or uncertain copy keeps the job pending with its mapping intact.
+
+When Mikka custody is fully removed, `providerRevocation: not_implemented` is
+an external capability exception, not evidence that Mikka retains access.
+Deletion can complete with the non-blocking receipt warning
+`subscription_upstream_revocation_not_supported_revoke_at_provider`. It tells
+the person to revoke the provider grant themselves and never claims global
+provider logout. Composio's requested asynchronous upstream revocation is also
+disclosed separately. Warnings survive deletion and restore in the existing
+receipt; they do not add a new deletion phase. The existing settings server
+action forwards a warning receipt on successful deletion. Its visible
+presentation remains with the existing settings/design owner; the backend
+receipt API already provides the disclosure after sessions are gone.
+
+Dedicated thread machines use the existing owner/workspace-bound `end` path,
+including its run/token fence, recording finalization and acknowledged kill.
+Pending creation leases remain pending including an ended row with an
+unresolved worker lease. No new recording/object is accepted after the account
+write barrier; deletion intentionally discards the person's remaining content.
+
+The Bot-computer schema has an explicit `(workspaceId, ownerId)` primary key
+(20261029080001). Account cleanup fences only that owner's active runs and
+bound tokens, then kills only their concrete sandbox, preserving peers' live
+machines in the same workspace. It enumerates provider snapshots by those
+owned source sandbox IDs and deletes both currently referenced and discovered
+historical snapshots through the actual SDK. Failed kills/inventory/deletes
+retain all local references for retry. An elapsed provisioning lease alone
+cannot prove no external allocation occurred and remains pending.
+
+Remote adapters reject caller-supplied SQL targets differing from the server's
+credential scope; isolated restoration uses explicit local replay. Historical
+provider resources whose source IDs were already lost before this change still
+require an independent inventory/retention verification, rather than a claim
+that a local database scan proves their absence.
+
+Real PG component tests verify BYOS custody failure then successful deletion
+with a persistent non-blocking provider warning, peer connections remaining
+live, no duplicate disconnect revision, owner-only run/token fencing, pending
+creation retention, retry of failed kill and deletion of discovered snapshots.
+Worker/provider responses are explicit fixtures, not real external acceptance.
+No real external account, sandbox or snapshot was changed by these tests.
+
+
+## Existing fresh-session boundary for deletion (#213)
+
+The settings deletion action and `POST /api/account/deletion` now require the
+existing Better Auth fresh-session contract before calling any deletion code.
+`lib/auth.ts` configures session lifetime/update cadence but does not override
+`freshAge`; the installed Better Auth 1.7.12 resolves it to 86400 seconds.
+The helper reads `auth.$context.sessionConfig.freshAge` at runtime rather than
+introducing another product time limit. It also honors Better Auth's explicit
+server-side zero opt-out if that configuration is ever selected.
+
+The identity read disables cookie-cache reuse and session refresh. Freshness
+is measured from the server-issued `session.createdAt`; a current `updatedAt`
+cannot reauthenticate an old sign-in. Missing/invalid session times cannot
+approve deletion. Stale identity returns Better Auth's existing
+`SESSION_NOT_FRESH` code with HTTP 403, or the same recognized action error;
+there is no new password, token or authentication state machine.
+
+The private receipt only reads lifecycle. A known receipt/request UUID cannot
+use stale identity to start or renew deletion authority. Already approved
+background jobs continue under their durable request and existing workload
+credential; freshness is not reapplied as a new approval on every retry.
+Owner cancellation retains its existing session check because it does not
+create deletion authority or undo an irreversible stage.
+
+Occurrence 3/10, impact 10/10 (30): an older still-valid seven-day browser
+session previously sufficed for irreversible deletion using its visible account
+email. This is also an explicit #213 authorization requirement. Component tests
+use the real installed Better Auth context to verify its default and configured
+freshAge, plus explicit identity fixtures for stale/updated/fresh/missing
+sessions, authoritative query flags, both public start entry points, known
+receipt reuse and continued status/background access. These are 18 passing
+component tests, not fixed-revision application sign-in acceptance. The
+existing settings/design owner still needs to route `SESSION_NOT_FRESH` back
+through ordinary sign-in and restore the pending deletion intent visibly.

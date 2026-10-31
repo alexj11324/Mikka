@@ -1,5 +1,5 @@
 import 'server-only'
-import { createGateway, generateText } from 'ai'
+import { generateText } from 'ai'
 import { and, eq, sql } from 'drizzle-orm'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { db } from '@/lib/db'
@@ -29,17 +29,20 @@ export async function rememberLocale(userId: string, locale: ActionLocale): Prom
  */
 export async function writeActionTitles(userId: string, items: readonly ActionTitleInput[]): Promise<void> {
   'use step'
-  const { hostedModel } = await import('@/lib/abuse/model')
+  const { hostedModel, createTrustedGatewayModel } = await import('@/lib/abuse/model')
+  const { modelAdmission } = await import('@/lib/model-admission/runtime')
   const { executionWorkspace } = await import('@/lib/execution-settings')
   const key = process.env.DECISION_GATEWAY_API_KEY
   if (!key || !items.length) return
   try {
     const locale = await personLocale(userId)
-    const gateway = createGateway({ apiKey: key })
+    const workspaceId=await executionWorkspace(userId,null)
+    await modelAdmission.gateway({workspaceId,ownerId:userId},ACTION_TITLE_MODEL,undefined,{auditAllowed:false})
+    const model=await hostedModel(workspaceId,ACTION_TITLE_MODEL,await createTrustedGatewayModel(ACTION_TITLE_MODEL,key),userId)
     for (let start = 0; start < items.length; start += ACTION_BATCH) {
       const batch = items.slice(start, start + ACTION_BATCH)
       const { instructions, prompt } = actionTitlePrompt(batch, locale)
-      const { text } = await generateText({ model: await hostedModel(await executionWorkspace(userId,null),ACTION_TITLE_MODEL,gateway(ACTION_TITLE_MODEL)), instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(ACTION_TITLE_TIMEOUT_MS) })
+      const { text } = await generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(ACTION_TITLE_TIMEOUT_MS) })
       for (const [id, actionTitle] of parseActionTitles(text, batch.map(item => item.id), locale)) {
         await db.update(suggestions).set({ actionTitle }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId)))
       }

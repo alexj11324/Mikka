@@ -201,3 +201,83 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     await pool.end()
   }
 })
+
+test('actor constraint validation runs separately while a writer holds its table lock', { skip: !enabled }, async () => {
+  const pool = new Pool({ connectionString: connection, max: 2 })
+  const writer = await pool.connect()
+  const validator = await pool.connect()
+  const schema = `actor_validate_${randomUUID().replaceAll('-', '')}`
+  try {
+    assert.equal((await writer.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+    await writer.query(`create schema "${schema}"`)
+    await writer.query(`set search_path to "${schema}"`)
+    await validator.query(`set search_path to "${schema}"`)
+    await validator.query("set lock_timeout = '2s'")
+    await writer.query('create table issue_versions(id text primary key)')
+    await writer.query("insert into issue_versions(id) values ('legacy')")
+    await writer.query(readFileSync('drizzle/20261025200000_activity_version_actor.sql', 'utf8'))
+    await writer.query("insert into issue_versions values ('person','user','member')")
+    const names = ['issue_versions_actor_type_check', 'issue_versions_actor_id_needs_type_check']
+    const files = ['20261031054015_validate_activity_actor_type.sql', '20261031054016_validate_activity_actor_id.sql']
+    assert.deepEqual((await writer.query('select convalidated from pg_constraint where conrelid = $1::regclass and conname = any($2) order by conname', ['issue_versions', names])).rows.map(r => r.convalidated), [false, false])
+    await writer.query('begin')
+    await writer.query("update issue_versions set actor_id = actor_id where id = 'person'")
+    // This uncommitted update holds ROW EXCLUSIVE. The validations must complete
+    // while it is held, proving they do not need ACCESS EXCLUSIVE.
+    for (const file of files) await validator.query(readFileSync(`drizzle/${file}`, 'utf8'))
+    await writer.query('commit')
+    for (const file of files) await validator.query(readFileSync(`drizzle/${file}`, 'utf8'))
+    assert.deepEqual((await writer.query('select convalidated from pg_constraint where conrelid = $1::regclass and conname = any($2) order by conname', ['issue_versions', names])).rows.map(r => r.convalidated), [true, true])
+    assert.deepEqual((await writer.query("select actor_type, actor_id from issue_versions where id='legacy'")).rows, [{ actor_type: null, actor_id: null }])
+    assert.deepEqual((await writer.query("select actor_type, actor_id from issue_versions where id='person'")).rows, [{ actor_type: 'user', actor_id: 'member' }])
+  } finally {
+    await writer.query('rollback')
+    console.log(`Retained actor validation schema: ${schema}`)
+    writer.release()
+    validator.release()
+    await pool.end()
+  }
+})
+
+test('actor validations preserve schema variants and reject invalid legacy rows without deleting data', { skip: !enabled }, async () => {
+  const pool = new Pool({ connectionString: connection, max: 1 })
+  const client = await pool.connect()
+  const actorMigration = readFileSync('drizzle/20261025200000_activity_version_actor.sql', 'utf8')
+  const validations = ['20261031054015_validate_activity_actor_type.sql', '20261031054016_validate_activity_actor_id.sql']
+    .map(file => readFileSync(`drizzle/${file}`, 'utf8'))
+  try {
+    for (const variant of ['preexisting-columns', 'prevalidated-checks', 'invalid-type', 'id-without-type']) {
+      const schema = `actor_variant_${randomUUID().replaceAll('-', '')}`
+      await client.query(`create schema "${schema}"`)
+      console.log(`Retained actor variant schema: ${schema} (${variant})`)
+      await client.query(`set search_path to "${schema}"`)
+      await client.query('create table issue_versions(id text primary key, actor_type text, actor_id text)')
+      if (variant === 'invalid-type') await client.query("insert into issue_versions values ('legacy','invalid','id')")
+      else if (variant === 'id-without-type') await client.query("insert into issue_versions values ('legacy',null,'id')")
+      else await client.query("insert into issue_versions values ('legacy',null,null)")
+      await client.query('begin')
+      await client.query(actorMigration)
+      await client.query('commit')
+      const validate = async (sql: string) => client.query(sql)
+      if (variant === 'prevalidated-checks') for (const sql of validations) await validate(sql)
+      for (let i = 0; i < validations.length; i++) {
+        const invalid = (variant === 'invalid-type' && i === 0) || (variant === 'id-without-type' && i === 1)
+        if (invalid) await assert.rejects(validate(validations[i]), { code: '23514' })
+        else await validate(validations[i])
+      }
+      const legacy = (await client.query("select actor_type,actor_id from issue_versions where id='legacy'")).rows[0]
+      if (variant === 'invalid-type') assert.deepEqual(legacy, { actor_type: 'invalid', actor_id: 'id' })
+      else if (variant === 'id-without-type') assert.deepEqual(legacy, { actor_type: null, actor_id: 'id' })
+      else assert.deepEqual(legacy, { actor_type: null, actor_id: null })
+      const checks = (await client.query("select conname,convalidated from pg_constraint where conrelid='issue_versions'::regclass and conname in ('issue_versions_actor_type_check','issue_versions_actor_id_needs_type_check') order by conname")).rows
+      assert.equal(checks.length, 2)
+      for (const check of checks) {
+        const shouldFail = (variant === 'invalid-type' && check.conname === 'issue_versions_actor_type_check') || (variant === 'id-without-type' && check.conname === 'issue_versions_actor_id_needs_type_check')
+        assert.equal(check.convalidated, !shouldFail, `${variant}: ${check.conname}`)
+      }
+    }
+  } finally {
+    client.release()
+    await pool.end()
+  }
+})

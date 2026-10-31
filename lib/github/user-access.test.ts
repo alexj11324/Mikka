@@ -150,6 +150,23 @@ test('a mismatched repository or malformed PR response is never persisted as tru
   await assert.rejects(access.readAuthorizedPullRequest(requestHeaders, 'https://github.com/Owner/Project/pull/7'), failure('githubUnavailable', 502))
 })
 
+test('issue readback uses the selected repository and rejects PR objects without returning private content', async () => {
+  const previous=answer
+  const issue={id:703,number:7,html_url:'https://github.com/Owner/Project/issues/7',state:'open',updated_at:'2026-10-31T04:00:00Z',body:'private provider body'}
+  answer=url=>url.pathname==='/repos/Owner/Project/issues/7'?json(issue):previous(url)
+  assert.deepEqual(await access.readAuthorizedIssue(requestHeaders,issue.html_url),{userId:'person-1',githubAccountId:'42',repoId:'91',installationId:'11',issueId:'703',number:7,url:issue.html_url,state:'open',updatedAt:issue.updated_at})
+  answer=url=>url.pathname==='/repos/Owner/Project/issues/7'?json({...issue,pull_request:{url:'https://api.github.com/repos/Owner/Project/pulls/7'}}):previous(url)
+  await assert.rejects(access.readAuthorizedIssue(requestHeaders,issue.html_url),failure('githubUnavailable',502))
+})
+
+test('issue URLs cannot choose another host, redirect credentials, or infer an issue from a PR',async()=>{
+  for(const url of ['https://github.com/Owner/Project/pull/7','https://github.com.evil.test/Owner/Project/issues/7','http://github.com/Owner/Project/issues/7','https://github.com/Owner/Project/issues/7?x=1','https://github.com/Owner/Project/issues/7#x'])
+    await assert.rejects(access.readAuthorizedIssue(requestHeaders,url),failure('githubIssueInvalid',400))
+  assert.equal(fetchMock.mock.callCount(),0)
+  await assert.rejects(access.readAuthorizedIssue(requestHeaders,'https://github.com/Owner/Unselected/issues/7'),failure('githubRepositoryForbidden',403))
+  assert.equal(paths().some(path=>path.startsWith('/repos/')),false)
+})
+
 test('settings API exposes connection/install state and never credentials', async () => {
   const call = () => GET({ headers: requestHeaders } as Request)
   let response = await call()

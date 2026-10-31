@@ -8,10 +8,10 @@ import {
   motion,
   useMotionValue,
   useMotionValueEvent,
-  useReducedMotion,
   useTransform,
   type Variants,
 } from "motion/react";
+import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import {
   createContext,
   type ReactNode,

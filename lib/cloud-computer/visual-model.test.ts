@@ -6,6 +6,8 @@ let choose:typeof import('./visual-model').chooseVisualBrowserStep
 let judge:typeof import('./visual-model').judgeVisualBrowserAction
 before(async()=>{
  mock.module('@/lib/coordinator/decide',{namedExports:{invokeDecision:async()=>null}})
+ mock.module('@/lib/abuse/context',{namedExports:{hostedBillingScope:{getStore:()=>({workspaceId:'fixture-workspace',ownerId:'fixture-owner'})}}})
+ mock.module('@/lib/abuse/model',{namedExports:{hostedModel:async(workspaceId:string,modelId:string,_provider:unknown,ownerId:string)=>{assert.equal(workspaceId,'fixture-workspace');assert.equal(ownerId,'fixture-owner');return {modelId}}}})
  const implementation=await import('./visual-model');choose=implementation.chooseVisualBrowserStep;judge=implementation.judgeVisualBrowserAction
 })
 const bytes=Buffer.from([0xff,0xd8,0xff,...Array.from({length:40},()=>0),0xff,0xd9])

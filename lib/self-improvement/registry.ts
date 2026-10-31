@@ -26,15 +26,20 @@ export async function lockSkillScope(tx: PoolClient, userId: string, issueId: st
 
 /** Content and scope only. Selection must separately enforce current execution policy. */
 export async function resolveSkillVersion(tx: PoolClient, userId: string,
-  run: { issueId: string; agentId: string; deviceRepoId: string }, versionId: string) {
+  run: { id?: string; issueId: string; agentId: string; deviceRepoId: string }, versionId: string) {
   if (!z.uuid().safeParse(versionId).success) throw new ImprovementError('sourceMismatch')
   const { rows: [version] } = await tx.query('SELECT artifact,markdown FROM improvement_skill_versions WHERE id=$1', [versionId])
   if (!version) throw new ImprovementError('sourceRequired')
   const parsed = skillArtifactRefSchema.safeParse(version.artifact)
-  if (!parsed.success || parsed.data.versionId !== versionId || parsed.data.skillId !== BASELINE_ARTIFACT.skillId ||
+  if (!parsed.success || parsed.data.versionId !== versionId ||
     typeof version.markdown !== 'string' ||
     createHash('sha256').update(version.markdown, 'utf8').digest('hex') !== parsed.data.sha256)
     throw new ImprovementError('sourceMismatch')
+  if (parsed.data.registryId === 'mikka-team') {
+    const {resolveTeamRunSkill}=await import('./team-skills')
+    return resolveTeamRunSkill(tx,userId,run,parsed.data)
+  }
+  if (parsed.data.skillId !== BASELINE_ARTIFACT.skillId) throw new ImprovementError('sourceMismatch')
   const skill = canonicalSkill(version.markdown)
   let metadata: SkillCandidateMetadata | null = null
   if (versionId === BASELINE_ARTIFACT.versionId) {
@@ -60,6 +65,7 @@ export type SkillEvaluationAuthorization = (tx: PoolClient, userId: string, run:
 export async function currentSkillEligibility(tx: PoolClient, userId: string, run: CurrentSkillRun,
   artifact: SkillArtifactRef, authorizeEvaluation?: SkillEvaluationAuthorization): Promise<void> {
   if (digest(artifact) === digest(BASELINE_ARTIFACT)) return
+  if (artifact.registryId === 'mikka-team') { const {resolveTeamRunSkill}=await import('./team-skills');await resolveTeamRunSkill(tx,userId,run,artifact);return }
   await lockSkillScope(tx, userId, run.issueId, run.deviceRepoId)
   const resolved = await resolveSkillVersion(tx, userId, run, artifact.versionId)
   if (!resolved.metadata || digest(resolved.artifact) !== digest(artifact)) throw new ImprovementError('sourceMismatch')

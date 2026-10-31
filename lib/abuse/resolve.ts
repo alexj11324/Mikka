@@ -10,5 +10,7 @@ export async function resolveDefaultHostedModel(
   return hostedModel(
     scope.workspaceId ?? (await executionWorkspace(scope.ownerId, scope.botId)),
     modelId,
+    undefined,
+    scope.ownerId,
   )
 }

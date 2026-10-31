@@ -190,7 +190,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     assert.equal((await pool.query('select 1 from "user" where id = $1', [carol])).rowCount, 1)
     assert.equal((await pool.query('select 1 from user_facts where "userId" = $1', [carol])).rowCount, 1)
 
-    assert.deepEqual(await deletion.deleteAccount(alice, `${alice}@example.com`), { ok: true })
+    assert.deepEqual(await deletion.deleteAccount(alice, `${alice}@example.com`, { externalCleanup: async () => [] }), { ok: true })
 
     // Nothing with Alice as its owner is left, in any table (bar the append-only skill ledgers).
     const { rows: columns } = await pool.query<{ table: string; column: string }>(

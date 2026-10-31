@@ -3,19 +3,23 @@ import { before, mock, test } from 'node:test'
 
 let row: Record<string, unknown> = {}
 let selected = 'account-a'
+let actionError: string | null = null
 const calls: unknown[][] = []
 const reviews: unknown[][] = []
 const db = {
   $count: async () => 0,
   select: () => ({ from: () => ({ where: () => ({ limit: async () => [row] }) }) }),
   insert: () => ({ values: async (value: Record<string, unknown>) => { row = { ...value, status: 'pending' } } }),
-  update: () => ({ set: (value: Record<string, unknown>) => ({ where: () => Object.assign(Promise.resolve(), { returning: async () => { row = { ...row, ...value }; return [row] } }) }) }),
+  update: () => ({ set: (value: Record<string, unknown>) => ({ where: () => {
+    row = { ...row, ...value }
+    return Object.assign(Promise.resolve(), { returning: async () => [row] })
+  } }) }),
 }
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { exports })
 stub('./db/index.ts', { db, pool: {} })
 stub('./composio.ts', {
   resolveActionAccount: async (_userId: string, _action: string, requested?: string) => ({ accountId: requested ?? selected, accounts: [] }),
-  runComposioAction: async (...args: unknown[]) => { calls.push(args); return { data: { summary: 'event' }, accountId: args[3] } },
+  runComposioAction: async (...args: unknown[]) => { calls.push(args); return actionError ? { error: actionError } : { data: { summary: 'event' }, accountId: args[3] } },
 })
 stub('./coordinator-event-store.ts', { recordCoordinatorEvent: async () => {} })
 stub('./coordinator/wake.ts', { wakeCoordinator: async () => {} })
@@ -40,6 +44,17 @@ test('an old unbound proposal fails closed without a provider call', async () =>
   const result = await actions.decidePendingAction('u', 'old', true)
   assert.equal(result.error, 'integrationAccountNotBound')
   assert.deepEqual(calls, [])
+})
+
+test('an unknown dispatched outcome keeps the consumed proposal running instead of reporting a failed effect', async () => {
+  row = { id: 'unknown', action: 'send_email', input: {}, connectedAccountId: 'account-a' }
+  actionError = 'operationUncertain'
+  try {
+    const result = await actions.decidePendingAction('u', 'unknown', true)
+    assert.deepEqual(result, { status: 'running', error: 'operationUncertain' })
+    assert.equal(row.status, 'running')
+    assert.equal(row.error, 'operationUncertain')
+  } finally { actionError = null }
 })
 
 

@@ -163,6 +163,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
       const outcome = payload.outcome && typeof payload.outcome === 'object' && Object.keys(payload.outcome).length ? ` Result: ${JSON.stringify(payload.outcome)}.` : ''
       return [
         payload.status === 'done' ? `[Event] The person approved ${what} and it is done.${outcome}`
+          : payload.status === 'running' && payload.error === 'operationUncertain' ? `[Event] The person approved ${what}; its external outcome is unknown. It may already have happened. Read back the connected account before reporting success or failure. Do not resend or create another proposal for the same effect.`
           : payload.status === 'failed' ? `[Event] The person approved ${what} but it failed: ${payload.error}.`
           : payload.status === 'declined' ? `[Event] The person declined ${what}. It did not happen.`
             : `[Event] Proposal ${payload.actionId} has status ${String(payload.status ?? 'unknown')}. This is not evidence of user approval.`,

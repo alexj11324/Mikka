@@ -2,10 +2,15 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { handleRead, requestHost, type ReadRequest } from '@/lib/conversation-reads-store'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
 async function respond(request: Request, id: string, method: ReadRequest['method']) {
+  if (z.uuid().safeParse(id).success) {
+    const { respondGroup } = await import('@/lib/group-conversations-route')
+    return respondGroup(request, 'read', id)
+  }
   const session = await auth.api.getSession({ headers: request.headers })
   const result = await handleRead(pool, {
     method,

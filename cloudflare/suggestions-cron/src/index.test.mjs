@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import worker, { runSchedule, SCHEDULES, MINUTE_ENDPOINTS } from './index.mjs'
 
 const SCHEDULE = '0 * * * *'
+const ONE_PAST_HOUR = Date.UTC(2026, 0, 1, 0, 1)
 
 const env = { MIKKA_URL: 'https://mikka.example.test/mikka/', CRON_SECRET: 'worker-test-cron-secret' }
 
@@ -25,7 +26,7 @@ test('each schedule calls its endpoints and logs only whitelisted numeric counts
   })
   for (const [schedule, endpoint] of Object.entries(SCHEDULES)) {
     const before = calls.length
-    assert.equal(await runSchedule(schedule, env, fetcher), 200)
+    assert.equal(await runSchedule(schedule, env, fetcher, ONE_PAST_HOUR), 200)
     const endpoints = schedule === '* * * * *' ? MINUTE_ENDPOINTS : [endpoint]
     assert.deepEqual(calls.slice(before).map(call => call.url), endpoints.map(path => `https://mikka.example.test/mikka${path}`))
     for (const call of calls.slice(before)) {
@@ -55,7 +56,7 @@ test('wake recovery exposes started and exhausted counts in existing Worker logs
   const logs = []
   t.mock.method(console, 'log', line => logs.push(line))
   const { fetcher } = recorder(200, { due: 3, started: 1, failed: 1, deferred: 1, exhausted: 2, eventId: 'private-event-id' })
-  await runSchedule('* * * * *', env, fetcher)
+  await runSchedule('* * * * *', env, fetcher, ONE_PAST_HOUR)
   assert.deepEqual(logs, MINUTE_ENDPOINTS.map(path => `${path} 200 {"due":3,"failed":1,"deferred":1,"started":1,"exhausted":2}`))
 })
 
@@ -71,7 +72,7 @@ test('a failed wake sweep still waits for schedule execution and lease recovery'
     if (path === MINUTE_ENDPOINTS[0]) return new Response(null, { status: 503 })
     if (path === MINUTE_ENDPOINTS[1]) await held
     return Response.json({ owners: 1, materialized: 2, executed: 2, reported: 1 })
-  }).finally(() => { settled = true })
+  }, ONE_PAST_HOUR).finally(() => { settled = true })
   const failure = assert.rejects(tick, /coordinator-wakes answered 503/)
   await new Promise(resolve => setImmediate(resolve))
   assert.deepEqual(calls, MINUTE_ENDPOINTS)
@@ -80,14 +81,14 @@ test('a failed wake sweep still waits for schedule execution and lease recovery'
   await failure
 })
 
-test('wrangler uploads the native module with every production schedule', () => {
+test('wrangler uses one minute trigger for all existing production cadences', () => {
   const source = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8')
   const config = JSON.parse(source.replace(/^\s*\/\/.*$/gm, ''))
   assert.equal(config.main, 'src/index.mjs')
   assert.equal(config.workers_dev, false)
   assert.equal(config.preview_urls, false)
   assert.equal(config.routes, undefined)
-  assert.deepEqual(config.triggers.crons, Object.keys(SCHEDULES))
+  assert.deepEqual(config.triggers.crons, ['* * * * *'])
   assert.deepEqual(config.vars, { MIKKA_URL: 'https://app.aspectlylabs.com/mikka' })
 })
 
@@ -103,9 +104,9 @@ test('HTTP and network failures reject without exposing a body or underlying err
   for (const [schedule, endpoint] of Object.entries(SCHEDULES)) {
     for (const status of [301, 302, 303, 307, 308, 401, 503]) {
       const { fetcher } = recorder(status)
-      await assert.rejects(runSchedule(schedule, env, fetcher), { message: `${endpoint} answered ${status}` })
+      await assert.rejects(runSchedule(schedule, env, fetcher, ONE_PAST_HOUR), { message: `${endpoint} answered ${status}` })
     }
-    await assert.rejects(runSchedule(schedule, env, async () => { throw new Error(env.CRON_SECRET) }), { message: `${endpoint} request failed` })
+    await assert.rejects(runSchedule(schedule, env, async () => { throw new Error(env.CRON_SECRET) }, ONE_PAST_HOUR), { message: `${endpoint} request failed` })
   }
 })
 
@@ -113,8 +114,37 @@ test('scheduled execution passes its failure to waitUntil and serves no public H
   const { fetcher } = recorder(401)
   t.mock.method(globalThis, 'fetch', fetcher)
   const pending = []
-  worker.scheduled({ cron: SCHEDULE }, env, { waitUntil: promise => pending.push(promise) })
+  worker.scheduled({ cron: SCHEDULE, scheduledTime: ONE_PAST_HOUR }, env, { waitUntil: promise => pending.push(promise) })
   assert.equal(pending.length, 1)
   await assert.rejects(pending[0], /401/)
   assert.equal(worker.fetch().status, 404)
+})
+
+test('one minute trigger retains every UTC cadence without duplicate endpoints', async t => {
+  t.mock.method(console, 'log', () => {})
+  for (const [minute, extra] of [
+    [1, []],
+    [15, ['/api/cron/briefings']],
+    [30, ['/api/cron/briefings', '/api/cron/user-facts']],
+    [45, ['/api/cron/briefings']],
+    [0, ['/api/cron/briefings', '/api/cron/suggestions-reconcile']],
+  ]) {
+    const { calls, fetcher } = recorder()
+    await runSchedule('* * * * *', env, fetcher, Date.UTC(2026, 0, 1, 0, minute))
+    const paths = calls.map(call => new URL(call.url).pathname.replace('/mikka', ''))
+    assert.deepEqual(paths, [...MINUTE_ENDPOINTS, ...extra])
+    assert.equal(new Set(paths).size, paths.length)
+  }
+})
+
+test('scheduled dispatch uses the event timestamp even when wall time has advanced', async t => {
+  t.mock.method(console, 'log', () => {})
+  t.mock.method(Date, 'now', () => Date.UTC(2026, 0, 1, 0, 31))
+  const { calls, fetcher } = recorder()
+  t.mock.method(globalThis, 'fetch', fetcher)
+  const pending = []
+  worker.scheduled({ cron: '* * * * *', scheduledTime: Date.UTC(2026, 0, 1, 0, 0) }, env, { waitUntil: promise => pending.push(promise) })
+  await Promise.all(pending)
+  assert.deepEqual(calls.map(call => new URL(call.url).pathname.replace('/mikka', '')),
+    [...MINUTE_ENDPOINTS, '/api/cron/briefings', '/api/cron/suggestions-reconcile'])
 })

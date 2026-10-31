@@ -8,13 +8,15 @@ import { execFile } from 'node:child_process'
 import { createServer } from 'node:http'
 import { promisify } from 'node:util'
 import test from 'node:test'
+import { assertE2eTarget } from './helpers/e2e-target.mjs'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) {
-  const target = new URL(url)
+  const target = assertE2eTarget(url)
   const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.port === '5432' && target.pathname === '/mikka_e2e'
   const cloud = process.env.ISSUE184_LOCAL_TEST === '1' && target.port === '55484' && target.pathname === '/issue184_e2e'
-  if (target.hostname !== '127.0.0.1' || (!ci && !cloud) || target.search || target.hash || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) throw new Error('Team task tests require the isolated PG17 service')
+  const local = process.env.GITHUB_ACTIONS !== 'true' && process.env.ISSUE184_LOCAL_TEST !== '1' && process.env.REQUIRE_DB === '1'
+  if ((!ci && !cloud && !local) || process.env.GITHUB_ACTIONS === 'true' && !ci || process.env.ISSUE184_LOCAL_TEST === '1' && !cloud || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) throw new Error('Team task tests require the isolated PG17 service')
 }
 if (!url && process.env.REQUIRE_DB === '1') throw new Error('Team task DB tests cannot skip in required CI')
 
@@ -26,7 +28,10 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   const resumed=await teamResumeBootstrap(appName,workspaceName)
   if(!resumed){
   const admin=new Pool({connectionString:url,max:1})
-  try { await admin.query(`create database "${appName}"`);await admin.query(`create database "${workspaceName}"`) } finally {await admin.end()}
+  try {
+    assert.equal(String((await admin.query('show server_version_num')).rows[0].server_version_num).slice(0,2),'17')
+    await admin.query(`create database "${appName}"`);await admin.query(`create database "${workspaceName}"`)
+  } finally {await admin.end()}
   }
   const appUrl=new URL(url!), workspaceUrl=new URL(url!);appUrl.pathname=`/${appName}`;workspaceUrl.pathname=`/${workspaceName}`
   process.env.MIKKA_DATABASE_URL=appUrl.toString();process.env.DATABASE_URL=workspaceUrl.toString()
@@ -64,13 +69,19 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   const {exchangeDocument}=await import('../app/actions/collaboration')
   const {AfterContext}=await import('next/dist/server/after/after-context')
   const {workAsyncStorage}=await import('next/dist/server/app-render/work-async-storage.external')
+  const {workUnitAsyncStorage}=await import('next/dist/server/app-render/work-unit-async-storage.external')
+  const {createRequestStoreForAPI}=await import('next/dist/server/async-storage/request-store')
+  const {NextRequest}=await import('next/server')
   const Y=await import('yjs')
   async function withAfter<T>(fn:()=>Promise<T>) {
-    const waits:Promise<unknown>[]=[],errors:unknown[]=[];let close=()=>{}
-    const afterContext=new AfterContext({waitUntil:promise=>{waits.push(promise)},onClose:callback=>{close=callback},onTaskError:error=>{errors.push(error)}})
-    return workAsyncStorage.run({afterContext} as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,async()=>{
-      try{return await fn()}finally{close();await Promise.all(waits);assert.deepEqual(errors,[])}
-    })
+    const waits:Promise<unknown>[]=[],errors:unknown[]=[],closes:Array<()=>void>=[]
+    const afterContext=new AfterContext({waitUntil:promise=>{waits.push(promise)},onClose:callback=>{closes.push(callback)},onTaskError:error=>{errors.push(error)}})
+    const request=new NextRequest('http://127.0.0.1/mikka')
+    // Include Next 16.4's optional HMR argument; local 16.1 ignores it.
+    const requestStore:ReturnType<typeof createRequestStoreForAPI>=Reflect.apply(createRequestStoreForAPI,undefined,[request,new URL(request.url),{tags:[],expirationsByCacheKind:new Map()},undefined,undefined,undefined])
+    return workAsyncStorage.run({afterContext} as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,()=>workUnitAsyncStorage.run(requestStore,async()=>{
+      try{return await fn()}finally{for(const close of closes)close();await Promise.all(waits);assert.deepEqual(errors,[])}
+    }))
   }
   const {retryLinearIssue}=await import('../app/actions/linear-sync')
   const {syncAppIssueToLinear}=await import('../lib/linear-sync/issue-sync')

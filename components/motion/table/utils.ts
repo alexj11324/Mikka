@@ -1,5 +1,21 @@
 import type { ReactNode } from "react";
-import type { TableColumn } from "./types";
+import type { TableColumn, TableLabels } from "./types";
+
+export const DEFAULT_TABLE_LABELS: TableLabels = {
+  selectAll: "Select all rows",
+  selectRow: (row) => `Select row ${row}`,
+  columnOptions: (column) => `${column} column options`,
+  rowOptions: (row) => `Row ${row} options`,
+  reorderColumn: (column) => `Reorder ${column} column`,
+  renameColumn: (column) => `Rename ${column} column`,
+  resizeColumn: (column) => `Resize ${column} column`,
+  editCell: (column, row) => `${column} for row ${row}`,
+  emptyCell: "Empty",
+  insertBefore: "Insert before",
+  insertAfter: "Insert after",
+  deleteColumn: "Delete column",
+  deleteRow: "Delete row",
+};
 
 export const CHECKBOX_PX = 48;
 export const CHECKBOX_WIDTH = `${CHECKBOX_PX}px`;

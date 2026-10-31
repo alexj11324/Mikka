@@ -112,13 +112,13 @@ export const bots = pgTable('bots', {
 }, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
 
 /** Personal execution preferences in the same workspace scope as Bots. The
- * fixed default rule is virtual and is never stored in this editable table. */
+ * default uses a null label and is stored alongside label rules. */
 export const executionRules = pgTable('execution_rules', {
   id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull().references(()=>users.id,{onDelete:'cascade'}),
-  workspaceId: uuid('workspaceId').notNull(), label: text('label').notNull(),
-  place: text('place').notNull().default('auto'), harness: text('harness').notNull().default('auto'),
-  model: text('model').notNull().default('auto'), position: integer('position').notNull(),
-}, table=>[index('execution_rules_scope_idx').on(table.ownerId,table.workspaceId)])
+  workspaceId: uuid('workspaceId').notNull(), label: text('label'),
+  place: text('place').notNull(), harness: text('harness').notNull(),
+  model: text('model').notNull(), position: integer('position').notNull(),
+}, table=>[index('execution_rules_scope_idx').on(table.ownerId,table.workspaceId), uniqueIndex('execution_rules_default_idx').on(table.ownerId,table.workspaceId).where(sql`${table.label} IS NULL`)])
 export const botModelChoices = pgTable('bot_model_choices', {
   ownerId:text('ownerId').notNull().references(()=>users.id,{onDelete:'cascade'}),workspaceId:uuid('workspaceId').notNull(),
   botKey:text('botKey').notNull(),bindingId:uuid('bindingId').notNull(),
@@ -196,6 +196,8 @@ export const linearIssueDetachments = pgTable('linear_issue_detachments', {
   issueId: uuid('issueId').notNull(), ownerId: text('ownerId').notNull(),
   teamSyncId: uuid('teamSyncId'), linearIdentifier: text('linearIdentifier'),
   sourceLinkId: uuid('sourceLinkId').unique(), publicationId: uuid('publicationId'),
+  externalTargetVerified: boolean('externalTargetVerified').notNull().default(false),
+  archivedAt: timestamp('archivedAt', { withTimezone: true }),
   detachedAt: timestamp('detachedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('linear_issue_detachments_issue_idx').on(table.issueId)])
 export const linearCommentLinks = pgTable('linear_comment_links', {
@@ -205,6 +207,7 @@ export const linearCommentLinks = pgTable('linear_comment_links', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('linear_comment_links_local_key').on(table.issueLinkId, table.threadId, table.messageId)])
 export const linearSyncOutbox = pgTable('linear_sync_outbox', {
+  operation: text('operation').$type<'sync' | 'archive'>().notNull().default('sync'), archiveTarget: jsonb('archiveTarget'),
   scopeVersion: integer('scopeVersion').notNull().default(1), claimToken: uuid('claimToken'),
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   status: text('status').notNull().default('queued'), attempts: integer('attempts').notNull().default(0),

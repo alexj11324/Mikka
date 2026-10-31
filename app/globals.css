@@ -8,6 +8,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+--color-brand-claude: #D97757;
 --color-accent-soft: var(--accent);
 --color-accent-soft-foreground: var(--accent-foreground);
 --color-accent-soft-hover: var(--secondary);

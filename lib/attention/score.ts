@@ -32,7 +32,7 @@ export async function scoreNotification(notification: ExternalNotification, matt
   if (ruled) return { level: ruled, decidedBy: 'rule', assessment: null, continues: null }
   let current = notification
   for (let attempt = 0; attempt <= UNCLEAR_REJUDGMENTS; attempt++) {
-    const answers = await hostedBillingScope.run({workspaceId:await executionWorkspace(notification.userId,null)},()=>decide('attention', decisionInput(attentionState(current, now, matters, same)), attentionQuestions(matters)))
+    const answers = await hostedBillingScope.run({workspaceId:await executionWorkspace(notification.userId,null),ownerId:notification.userId},()=>decide('attention', decisionInput(attentionState(current, now, matters, same)), attentionQuestions(matters)))
     const judgment = answers && readJudgment(answers, now.getTime() - current.occurredAt.getTime(), matters.map(matter => matter.id))
     if (!judgment) return { level: fallbackLevel(notification), decidedBy: 'fallback', assessment: null, continues: null }
     if (judgment.level !== 'unclear') return { level: judgment.level, decidedBy: 'model', assessment: judgment.assessment, continues: judgment.continues }

@@ -11,7 +11,8 @@ import {
   MessageSquareText,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentDisclosure } from "@/components/agents/agent-disclosure";
 import { ActionSwapRollText } from "@/components/motion/action-swap-roll";
@@ -88,12 +89,14 @@ function QuestionOptions({
   disabled,
   onChange,
   onSingleSelect,
+  dateRangePicker,
 }: {
   question: ApprovalCardQuestion;
   answer: ApprovalCardAnswer;
   disabled: boolean;
   onChange: (answer: ApprovalCardAnswer) => void;
   onSingleSelect?: () => void;
+  dateRangePicker?: ApprovalCardProps["dateRangePicker"];
 }) {
   const agentCopy = useAgentCopy()
 
@@ -102,7 +105,7 @@ function QuestionOptions({
   return (
     <div className="mt-3">
       {question.input ? (
-        <QuestionInput question={question} answer={answer} disabled={disabled} onChange={onChange} />
+        <QuestionInput question={question} answer={answer} disabled={disabled} onChange={onChange} dateRangePicker={dateRangePicker} />
       ) : question.options?.length ? (
         question.multiple ? (
           <div className="grid gap-0.5">
@@ -181,11 +184,13 @@ function QuestionInput({
   answer,
   disabled,
   onChange,
+  dateRangePicker,
 }: {
   question: ApprovalCardQuestion;
   answer: ApprovalCardAnswer;
   disabled: boolean;
   onChange: (answer: ApprovalCardAnswer) => void;
+  dateRangePicker?: ApprovalCardProps["dateRangePicker"];
 }) {
   const agentCopy = useAgentCopy();
   const [selectOpen, setSelectOpen] = useState(false);
@@ -243,6 +248,7 @@ function QuestionInput({
     const match = DATE_RANGE.exec(custom);
     return (
       <DateRangePickerDropdown
+        {...dateRangePicker}
         value={match ? { from: match[1], to: match[2] ?? match[1] } : null}
         onValueChange={(range) => onChange({ selected: [], custom: range ? `${range.from} – ${range.to ?? range.from}` : "" })}
         disabled={disabled}
@@ -302,6 +308,7 @@ export function ApprovalCard({
   approveLabel: approveLabelProp,
   submitLabel: submitLabelProp,
   result,
+  dateRangePicker,
   className,
 }: ApprovalCardProps) {
   const agentCopy = useAgentCopy()
@@ -473,6 +480,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                     disabled={busy}
                     onChange={updateCurrentAnswer}
                     onSingleSelect={queueAutoAdvance}
+                    dateRangePicker={dateRangePicker}
                   />
                 </motion.div>
               </AnimatePresence>

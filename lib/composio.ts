@@ -1,11 +1,11 @@
 import 'server-only'
 import { Composio } from '@composio/core'
 import { COMPOSIO_ACTIONS, executeComposioAction, resolveComposioAccount, type ComposioActionName, type ComposioActionResult } from '@/lib/composio-actions'
-import { COMPOSIO_APP_IDS, disconnectAndForgetAccount, PROVIDER_IDENTITY, providerAnswer, SLACK_USER_INFO, sanitizeEmail, slackAnswer, slackUserEmail, slackUserId, type ComposioAppId } from '@/lib/composio-accounts'
+import { COMPOSIO_TOOLKIT_IDS, disconnectAndForgetAccount, PROVIDER_IDENTITY, providerAnswer, SLACK_USER_INFO, sanitizeEmail, slackAnswer, slackUserEmail, slackUserId, type ComposioToolkitId } from '@/lib/composio-accounts'
 import { chosenComposioDefault, forgetComposioAccount } from '@/lib/composio-account-store'
 
-export const COMPOSIO_TOOLKITS = COMPOSIO_APP_IDS
-export type ComposioToolkit = ComposioAppId
+export const COMPOSIO_TOOLKITS = COMPOSIO_TOOLKIT_IDS
+export type ComposioToolkit = ComposioToolkitId
 
 export function getComposio() {
   const apiKey = process.env.COMPOSIO_API_KEY
@@ -44,7 +44,7 @@ export async function renameComposioAccount(composio: ComposioClient, id: string
  * callers try again later. Only the sanitised
  * address is returned.
  */
-export async function readComposioAccountEmail(composio: ComposioClient, userId: string, toolkit: ComposioAppId, accountId: string, timeoutMs = 8_000): Promise<string | null> {
+export async function readComposioAccountEmail(composio: ComposioClient, userId: string, toolkit: ComposioToolkitId, accountId: string, timeoutMs = 8_000): Promise<string | null> {
   const identity = PROVIDER_IDENTITY[toolkit]
   const signal = AbortSignal.timeout(timeoutMs)
   const call = async (endpoint: string, parameters: { in: 'query' | 'header'; name: string; value: string }[] = []) => {

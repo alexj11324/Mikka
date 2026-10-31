@@ -485,14 +485,16 @@ export function createFactoryMonitor(
           },
           tx,
         );
+      let recoveredIssueIds: string[] = [];
       if (outcome === "passed" && !transitionBlocked) {
         const { rows: open } = await tx.query(
-          'SELECT "issueId" FROM factory_monitor_incidents WHERE "userId"=$1 AND "workspaceKey"=$2 AND "checkKey"=$3 AND status=\'open\' FOR UPDATE',
+          'SELECT coalesce("followupIssueId","issueId") AS "issueId" FROM factory_monitor_incidents WHERE "userId"=$1 AND "workspaceKey"=$2 AND "checkKey"=$3 AND status=\'open\' FOR UPDATE',
           [userId, scope, keys.checkKey],
         );
         for (const row of open)
           if (!(await authorize(userId, row.issueId, tx)))
             fail("factoryNotFound");
+        recoveredIssueIds = [...new Set(open.map(row => String(row.issueId)))];
         await tx.query(
           'UPDATE factory_monitor_incidents SET status=\'recovered\',"recoveredObservationId"=$4,"updatedAt"=now() WHERE "userId"=$1 AND "workspaceKey"=$2 AND "checkKey"=$3 AND status=\'open\'',
           [userId, scope, keys.checkKey, id],
@@ -518,6 +520,7 @@ export function createFactoryMonitor(
             }
           : {}),
       };
+      if (!(await authorize(userId, notice.issueId, tx))) fail("factoryNotFound");
       await tx.query(
         "UPDATE factory_monitor_observations SET result=$2 WHERE id=$1",
         [id, JSON.stringify(notice)],
@@ -547,6 +550,8 @@ export function createFactoryMonitor(
         ],
       );
       await appendEvidence(tx, notice);
+      for (const issueId of recoveredIssueIds)
+        if (issueId !== notice.issueId) await appendEvidence(tx, { ...notice, issueId });
       if (!existing) await tx.query("COMMIT");
       return { ...notice, replayed: false };
     } catch (error) {
@@ -624,7 +629,7 @@ async function noticeFor(
     observationId: observation.id,
     sourceEventId: observation.sourceEventId,
     taskId: observation.taskId,
-    issueId: incident?.issueId ?? task.issueId,
+    issueId: incident?.followupIssueId ?? incident?.issueId ?? task.issueId,
     candidateId: observation.candidateId,
     runId: observation.runId,
     sessionId: observation.sessionId,

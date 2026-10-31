@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { CLIENT_VERSION_HEADER, emptyRunReport } from "@mikka/protocol"
 import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
+import { TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { RECOVERY_WORKTREE_HEADER } from "@mikka/protocol/device"
 
 import {
@@ -88,6 +89,7 @@ describe("HttpServerLink", () => {
   it('advertises strict local-worktree continuation and preserves the required assignment', async () => {
     const fetcher = (async (_url, init) => {
       expect(new Headers(init?.headers).get(RECOVERY_WORKTREE_HEADER)).toBe('1')
+      expect(new Headers(init?.headers).get(TEAM_SKILL_HEADER)).toBe('1')
       return json({...assignment('run-1'),continuesRunId:'lost-run',requireWorktreeContinuation:true})
     }) as typeof fetch
     const result=await new HttpServerLink('http://server.test',fetcher).claimRun('dev-1','run-1')
