@@ -309,10 +309,20 @@ test('beUI 组件包含在运行时和可序列化规范中', async () => {
   const prompt = generateSystemPrompt(spec)
   const compiled = JSON.parse(await readFile(new URL('../lib/agent-system-prompt.json', import.meta.url), 'utf8'))
   assert.equal(compiled, prompt)
-  // Retired names still parse saved replies, but the model is never offered them.
-  for (const name of Object.keys(legacyAgentComponentCatalog)) {
+  // Replaced and host-only components still render, but are never offered as model calls.
+  const hidden = new Set([
+    ...Object.keys(legacyAgentComponentCatalog),
+    'Card', 'CardHeader', 'MarkDownRenderer', 'Callout', 'TextCallout', 'Image', 'ImageBlock', 'ImageGallery',
+    'CodeBlock', 'Table', 'Col', 'Tabs', 'TabItem', 'Accordion', 'AccordionItem',
+    'RadarChart', 'HorizontalBarChart', 'Series', 'PieChart', 'SingleStackedBarChart', 'Slice', 'ScatterChart', 'ScatterSeries', 'Point',
+    'ComputerCard',
+  ])
+  assert.deepEqual(Object.keys(spec.library.components).sort(), Object.keys(library.components).filter(name => !hidden.has(name)).sort())
+  for (const name of hidden) {
     assert.ok(library.components[name], name)
     assert.equal(name in spec.library.components, false, name)
+    assert.equal(name in spec.library.schema.properties, false, name)
+    assert.equal(spec.library.componentGroups.some(group => group.components.includes(name)), false, name)
     assert.doesNotMatch(prompt, new RegExp(`\\b${name}\\(`), name)
   }
   const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
@@ -320,8 +330,9 @@ test('beUI 组件包含在运行时和可序列化规范中', async () => {
   for (const name of Object.keys(agentComponentCatalog)) {
     assert.ok(library.components[name])
     assert.ok(spec.library.schema.$defs[name])
-    assert.match(prompt, new RegExp(`${name}\\(`))
+    if (!hidden.has(name)) assert.match(prompt, new RegExp(`${name}\\(`))
   }
+  assert.match(prompt, /ComputerCard 的画面、真实状态和审批由宿主控制/)
   assert.match(prompt, /数字只能来自用户输入/)
   assert.match(prompt, /宿主保存历史到数据库/)
   assert.match(prompt, /每次模型请求不会自动包含历史/)

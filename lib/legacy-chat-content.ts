@@ -10,9 +10,11 @@ const RETIRED: Record<string, string[]> = {
   BeBadge: ['text', 'status'], BeTimeline: ['events'],
 }
 const retired = Object.entries(RETIRED)
+const savedComponents = Object.fromEntries(Object.keys(spec.library.schema.$defs)
+  .filter(name => name !== 'ActionExpression').map(name => [name, { $ref: `#/$defs/${name}` }]))
 const schema = {
   ...spec.library.schema,
-  properties: { ...spec.library.schema.properties, ...Object.fromEntries(retired.map(([name]) => [name, { $ref: `#/$defs/${name}` }])) },
+  properties: { ...spec.library.schema.properties, ...savedComponents, ...Object.fromEntries(retired.map(([name]) => [name, { $ref: `#/$defs/${name}` }])) },
   $defs: { ...spec.library.schema.$defs, ...Object.fromEntries(retired.map(([name, props]) => [name, { type: 'object', properties: Object.fromEntries(props.map(prop => [prop, {}])), required: [props[0]], additionalProperties: false }])) },
 }
 

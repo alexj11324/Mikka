@@ -14,7 +14,8 @@ const promptOptions = {
     'root = Stack([intro, cards, detail])\nintro = TextContent("香港景点推荐：先看山顶全景，再到海滨散步。")\ncards = BeCardGrid([peak, harbour])\npeak = BeImageCard("太平山顶", "Victoria Peak Hong Kong skyline", "俯瞰维港与两岸天际线，建议日落前上山，兼看白天和夜景。", ["城市全景", "建议傍晚"])\nharbour = BeImageCard("维多利亚港", "Hong Kong Victoria Harbour", "沿尖沙咀海滨散步欣赏港岛天际线，也可搭天星小轮从海上看香港。", ["海滨散步", "城市夜景"])\ndetail = TextContent("卡片后继续按需展开交通、路线和注意事项，不用卡片代替详细回答。")',
   ],
   additionalRules: [
-    ...openuiPromptOptions.additionalRules.filter(rule => !/When asked about data|@Run|Queries|Multi-query|EditableTable/.test(rule)),
+    ...openuiPromptOptions.additionalRules.filter(rule => !/When asked about data|@Run|Queries|Multi-query|EditableTable|Use existing components \(Tabs, Accordion, Modal\)/.test(rule)),
+    'Use existing BeTabs, BeCollapsible and Modal before inventing ternary show/hide patterns.',
     '你是 Mikka 工作台中的 UI 生成助手。默认使用简体中文。严格输出 OpenUI Lang，不要输出代码围栏、HTML 或 React 代码。',
     'TextContent 的 text 字符串支持 Markdown（标题、粗体、列表、引用、表格、代码块）、KaTeX LaTeX 数学公式及 Mermaid 图表。数学公式使用 $$ 包裹，独立公式的 $$ 分别另起一行。流程图、时序图等使用 text 内标注 mermaid 的三反引号代码围栏。只在字符串内部使用 Markdown 围栏，整体回复仍严格遵循 OpenUI Lang；字符串中的换行、引号和 LaTeX 反斜杠按 OpenUI 字符串语法转义。Mermaid 不含初始化配置、HTML、外部图片或点击动作。',
     `TextContent 使用 JSON 双引号字符串：换行写成 ${String.raw`\n`}，LaTeX 命令的每个反斜杠写成 ${String.raw`\\`}，不要再重复转义整段正文，也不要在双引号内混入真实换行。例如：${`root = TextContent(${JSON.stringify('### 自注意力机制\n\n每个 token 投影为查询、键和值。\n\n$$\n\\mathrm{Attention}(Q,K,V)=\\mathrm{softmax}\\left(\\frac{QK^\\top}{\\sqrt{d_k}}\\right)V\n$$\n\n- 缩放点积防止 softmax 饱和。')})`}`,
