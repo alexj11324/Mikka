@@ -31,10 +31,12 @@ function WorkspaceAvatar({ name, large = false }: { name: string; large?: boolea
   return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center rounded-full bg-sidebar-primary-soft font-semibold text-sidebar-primary-soft-foreground', large ? 'size-8 text-sm' : 'size-6 text-xs')}>{name.slice(0, 1)}</span>
 }
 
-export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBeforeChange, compact = false }: {
+export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBeforeChange, compact = false, label }: {
   user: { name: string; email: string; image?: string | null }
   /** Avatar only, for the icon rail. */
   compact?: boolean
+  /** The trigger's name where the rail's own menu is on screen too, so the two differ. */
+  label?: string
   onSettings: (href?: string) => void
   onSignOut: () => void
   signingOut: boolean
@@ -97,7 +99,7 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
       {compact ? <DropdownMenuTrigger render={<Button variant="ghost" size="icon-lg" aria-label={i18nText("Nav.workspaceMenu")} title={workspaceName} />}>
         <WorkspaceAvatar name={workspaceName} large />
         <span className="sr-only">{workspaceName}</span>
-      </DropdownMenuTrigger> : <DropdownMenuTrigger render={<SidebarMenuButton aria-label={i18nText("Nav.workspaceMenu")} className="h-10" />}>
+      </DropdownMenuTrigger> : <DropdownMenuTrigger render={<SidebarMenuButton aria-label={label ?? i18nText("Nav.workspaceMenu")} className="h-10" />}>
         <WorkspaceAvatar name={workspaceName} />
         <span className="flex-1 truncate font-semibold">{workspaceName}</span>
         <ChevronDown />

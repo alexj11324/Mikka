@@ -118,6 +118,7 @@
     "sidebarDescription": "Displays the mobile sidebar.",
     "toggleStatusFilter": "Expand or collapse the status filter",
     "workspaceMenu": "Workspace menu",
+    "switchWorkspace": "Switch workspace",
     "workspaceProjects": "Workspace projects",
     "teamHome": "Team home",
     "inbox": "Inbox",

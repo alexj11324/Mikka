@@ -49,9 +49,10 @@ export function SearchPill({ onSearch }: { onSearch: () => void }) {
  * stay authorized by the server; opening one goes through the destination's own
  * access check.
  */
-export function GlobalSearch({ open, onOpenChange, bots, sessions, coordinatorLine, issues, projects, workspaceId, onChat, onNewBot, onIssue, onProject, onCreateIssue }: {
+export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, sessions, coordinatorLine, issues, projects, workspaceId, onChat, onNewBot, onIssue, onProject, onCreateIssue }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onOpenChangeComplete?: (open: boolean) => void
   bots: BotView[]
   sessions: SavedAgentSession[]
   coordinatorLine?: string
@@ -111,7 +112,7 @@ export function GlobalSearch({ open, onOpenChange, bots, sessions, coordinatorLi
     return <>{loading ? <Spinner role="presentation" aria-hidden="true" /> : <Plus />}{loading ? t('search.loadingMore') : t('search.more')}</>
   }
 
-  return <CommandDialog open={open} onOpenChange={onOpenChange} title={t('searchLabel')} description={t('searchDescription')} className="top-1/2 -translate-y-1/2 sm:max-w-xl">
+  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-1/2 -translate-y-1/2 sm:max-w-xl">
     {/* Filtering is ours: server hits must not be dropped by cmdk's client-side match. */}
     <Command shouldFilter={false} className="**:data-[selected=true]:bg-muted">
       <CommandInput aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={setQuery} maxLength={400} />
