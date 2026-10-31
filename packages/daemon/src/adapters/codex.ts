@@ -23,6 +23,7 @@ import {
   prepareCodexHome,
   wipeRunCredentials,
 } from "../agents/harness-home"
+import { codexCredential, credentialDomain } from "../agents/run-credential"
 import { jsonlConnection } from "../agents/jsonl-rpc"
 import {
   MCP_SERVER_NAME,
@@ -324,7 +325,11 @@ export class CodexAdapter implements AgentAdapter {
     // Inside the run dir: one run's home is never another run's.
     const codexHome = prepareCodexHome(join(runDir, "codex-home"), log)
     const binary = this.options.binary ?? await this.options.ensureBinary?.() ?? "codex"
+    if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_AUTH_ERROR)
+    const credential = codexCredential(options.credential)
+    const providerDomain = credentialDomain(options.credential)
     const ctx = new RunContext({
+      harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
@@ -369,6 +374,7 @@ export class CodexAdapter implements AgentAdapter {
         ...Object.entries(computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
       ] : []),
       ...codexAppArgs(options.apps),
+      ...credential.args,
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
         "-c",
@@ -377,7 +383,7 @@ export class CodexAdapter implements AgentAdapter {
     ]
     const spawnOptions = {
       cwd: ctx.worktree,
-      env: { ...options.env, ...ctx.tempEnv(), CODEX_HOME: codexHome.home },
+      env: { ...options.env, ...ctx.tempEnv(), ...credential.env, CODEX_HOME: codexHome.home },
       policy: computerSandboxPolicy(ctx.policy(), computerMcp),
       pidFile: paths.pidFile,
       marker: ctx.runDir,

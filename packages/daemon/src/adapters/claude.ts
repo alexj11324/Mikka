@@ -54,6 +54,7 @@ import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
 import { runNetworkApproval } from "../agents/run-network"
 import { runAppsHost, type RunApps } from "../agents/run-apps"
 import { carryHistory, ownDir, wipeRunCredentials } from "../agents/harness-home"
+import { claudeCredentialEnv, credentialDomain } from "../agents/run-credential"
 import { buildChildEnv } from "../env"
 import { mailboxInputs } from '@mikka/protocol/mailbox'
 import { mailboxToolResult, type RunMailbox } from '../run-mailbox'
@@ -471,7 +472,11 @@ export class ClaudeAdapter implements AgentAdapter {
       carryHistory(join(runPaths(this.options.stateDir, options.continueSession.runId).runDir, "native-home", ".claude"), configDir, ["projects"])
     }
     const binary = this.options.binary ?? await this.options.ensureBinary?.()
+    if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_ERROR)
+    const credentialEnv = claudeCredentialEnv(options.credential)
+    const providerDomain = credentialDomain(options.credential)
     const ctx = new RunContext({
+      harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
@@ -555,6 +560,7 @@ export class ClaudeAdapter implements AgentAdapter {
           ...ctx.tempEnv(),
           ...CLAUDE_RUN_ENV,
           CLAUDE_CODE_TMPDIR: ctx.tmpDir,
+          ...credentialEnv,
           HOME: nativeHome,
           CLAUDE_CONFIG_DIR: configDir,
         },

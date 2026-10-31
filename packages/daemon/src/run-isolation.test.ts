@@ -53,7 +53,7 @@ function recordingCli(fake: string, record: string, credential: string) {
   const wrapper = join(tempDir(), "cli")
   writeFileSync(wrapper, [
     "#!/bin/sh",
-    `printf '%s\\n%s\\n%s\\n' "$HOME" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" > "${record}"`,
+    `printf '%s\\n%s\\n%s\\n%s\\n' "$HOME" "$CLAUDE_CONFIG_DIR" "$CODEX_HOME" "$ANTHROPIC_API_KEY$MIKKA_MODEL_API_KEY" > "${record}"`,
     `mkdir -p "$(dirname "${credential}")" && echo injected > "${credential}"`,
     `exec node "${join(FAKES, fake)}" "$@"`,
     "",
@@ -100,9 +100,11 @@ describe("run homes", () => {
     const binary = recordingCli("fake-claude.mjs", record, join(runDir, "native-home", ".claude", ".credentials.json"))
     const adapter = new ClaudeAdapter({ stateDir, sandbox: new NoSandbox(), binary })
     const session = await adapter.start({ runId: "claude-isolated", cwd: await makeRepo(), prompt: "MODEL", env: buildChildEnv(),
-      log: createLogger(), toolApproval: gate("claude-isolated") })
+      log: createLogger(), toolApproval: gate("claude-isolated"), credential: { kind: "api_key", key: "run-key-claude" } })
     expect((await runToExit(session))?.outcome).toBe("succeeded")
-    const [home, configDir] = readFileSync(record, "utf8").split("\n")
+    const [home, configDir, , key] = readFileSync(record, "utf8").split("\n")
+    expect(key).toBe("run-key-claude")
+    expect(JSON.stringify(snapshot(runDir))).not.toContain("run-key-claude")
     expect(home).toBe(join(runDir, "native-home"))
     expect(configDir).toBe(join(runDir, "native-home", ".claude"))
     expect(existsSync(join(runDir, "native-home", ".claude", ".credentials.json"))).toBe(false)
@@ -117,9 +119,11 @@ describe("run homes", () => {
     const binary = recordingCli("fake-codex.mjs", record, join(runDir, "codex-home", "auth.json"))
     const adapter = new CodexAdapter({ stateDir, sandbox: new NoSandbox(), binary })
     const session = await adapter.start({ runId: "codex-isolated", cwd: await makeRepo(), prompt: "MODEL", env: buildChildEnv(),
-      log: createLogger(), toolApproval: gate("codex-isolated") })
+      log: createLogger(), toolApproval: gate("codex-isolated"), credential: { kind: "api_key", key: "run-key-codex" } })
     expect((await runToExit(session))?.outcome).toBe("succeeded")
-    const codexHome = readFileSync(record, "utf8").split("\n")[2]
+    const [, , codexHome, key] = readFileSync(record, "utf8").split("\n")
+    expect(key).toBe("run-key-codex")
+    expect(JSON.stringify(snapshot(runDir))).not.toContain("run-key-codex")
     expect(codexHome).toBe(join(runDir, "codex-home"))
     await expect.poll(() => existsSync(join(runDir, "codex-home", "auth.json"))).toBe(false)
     expect(readFileSync(join(runDir, "codex-home", "config.toml"), "utf8")).not.toContain("person-choice")

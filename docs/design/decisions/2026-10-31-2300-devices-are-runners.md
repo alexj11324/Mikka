@@ -24,3 +24,14 @@ contract as an E2B sandbox:
 - A device reports what it can run (OS/arch, free disk, Docker, each managed
   harness's install state), not which agents are installed. Pickers no longer
   require the person to install Claude Code or Codex.
+
+## Harness per model
+
+Added by Alex the same day: GPT/OpenAI models run on Codex; every other
+model (Mikka 默认, models reached through an API key or a custom provider)
+runs on Claude Code (`harnessForModel` in `@mikka/protocol`). A per-model
+override in settings wins, and more harnesses can be added later. A run's
+credential is a subscription token, an API key, or a custom provider (base
+URL plus protocol plus key): Anthropic-compatible endpoints go to Claude Code
+as `ANTHROPIC_BASE_URL` plus key, OpenAI-compatible endpoints go to Codex as a
+custom model provider in the run's config, with the key only in its env.
