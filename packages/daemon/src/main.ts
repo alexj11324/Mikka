@@ -67,6 +67,7 @@ import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { sweepRunCredentials } from "./agents/harness-home"
+import { containerOwner, ensureRunnerImage, openRunContainer, selectIsolation, sweepRunContainers, type RunContainerOptions } from "./run-container"
 import { codexSupportsRunApproval } from "./adapters/codex-version"
 import { ensureSandboxTools, missingSandboxTools } from "./sandbox-tools"
 import { isSafeId } from "./ids"
@@ -368,6 +369,12 @@ export class Daemon {
         },
       })
     }
+    // Docker decides the run isolation (run-container.ts), so probe it before the adapters exist.
+    // Tests drive fake CLIs on the host.
+    if (!this.options.hostedSubscriptions && !this.options.harnesses && !this.options.harnessBinaries && !daemonTestMode(process.env)) {
+      this.docker = await dockerAvailable()
+      if (this.docker) await sweepRunContainers(containerOwner(paths.dataDir)).catch(() => undefined)
+    }
     const hosted = this.options.hostedSubscriptions
       ? await createHostedBotRunner({
           stateDir: paths.adapterState,
@@ -537,7 +544,6 @@ export class Daemon {
     // A callback alone is insufficient: the host must own the enforcement
     // boundary and bind its lifetime to the run's authenticated gate.
     if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
-    if (!hosted) this.docker = await dockerAvailable()
     this.harnesses = [...detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
       ...info,
       // Local enforcement requires the successful owned SRT probe. Hosted
@@ -896,6 +902,10 @@ export class Daemon {
     if (!sandbox) return []
     const stateDir = this.paths.adapterState
     const bin = this.options.harnessBinaries ?? {}
+    const openContainer = selectIsolation(process.platform, this.docker)
+      === "container" ? async (run: Omit<RunContainerOptions, "image" | "owner">) =>
+        openRunContainer({ ...run, image: await ensureRunnerImage(), owner: containerOwner(this.paths.dataDir) })
+      : undefined
     const computerProvider = (runId: string) => {
       const assignment = this.journal.get(runId)?.assignment
       if (!assignment?.localComputer || assignment.computer || !assignment.policy?.permissions.computer_use) return undefined
@@ -904,8 +914,8 @@ export class Daemon {
         proxyPath: fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url)), nodeBinary: process.execPath })
     }
     return [
-      ["claude_code", new ClaudeAdapter({ sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), computerProvider })],
-      ["codex", new CodexAdapter({ sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), computerProvider })],
+      ["claude_code", new ClaudeAdapter({ sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), openContainer, computerProvider })],
+      ["codex", new CodexAdapter({ sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), openContainer, computerProvider })],
       ["cursor", new CursorAdapter({ sandbox, stateDir, binary: bin.cursor, computerProvider })],
     ]
   }

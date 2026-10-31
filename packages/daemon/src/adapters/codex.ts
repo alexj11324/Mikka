@@ -18,6 +18,7 @@ import {
   spawnCli,
   untilReady,
 } from "../agents/child"
+import type { RunContainer, RunContainerOptions } from "../run-container"
 import {
   carryHistory,
   prepareCodexHome,
@@ -73,6 +74,8 @@ export interface CodexAdapterOptions {
   binary?: string
   /** The daemon's pinned Codex, installed on first need. */
   ensureBinary?: () => Promise<string>
+  /** Docker mode (run-container.ts): set by the daemon when this device runs harnesses in containers. */
+  openContainer?: (run: Omit<RunContainerOptions, "image" | "owner">) => Promise<RunContainer>
   /** Trusted hosted transport, retaining the existing app-server adapter. */
   spawnCli?: typeof spawnCli
   /** Persist an owner-bound session before any prompt can execute. */
@@ -324,11 +327,15 @@ export class CodexAdapter implements AgentAdapter {
     }
     // Inside the run dir: one run's home is never another run's.
     const codexHome = prepareCodexHome(join(runDir, "codex-home"), log)
-    const binary = this.options.binary ?? await this.options.ensureBinary?.() ?? "codex"
+    const assignedComputer = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
+    // Docker mode: the CLI runs in a disposable container of the runner image.
+    const inContainer = !this.options.spawnCli && this.options.sandbox.kind !== 'none' && !assignedComputer && Boolean(this.options.openContainer)
+    const binary = this.options.binary ?? (inContainer ? "codex" : await this.options.ensureBinary?.()) ?? "codex"
     if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_AUTH_ERROR)
     const credential = codexCredential(options.credential)
     const providerDomain = credentialDomain(options.credential)
     const ctx = new RunContext({
+      ...(inContainer ? { nodeBinary: "node" } : {}),
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
       apps: options.apps,
@@ -351,7 +358,7 @@ export class CodexAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
-    const computerMcp = sandboxComputerSpec(this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy), this.options.sandbox.kind)
+    const computerMcp = sandboxComputerSpec(assignedComputer, this.options.sandbox.kind)
     const mcp = ctx.mcpServer()
     const argv = [
       binary,
@@ -393,8 +400,12 @@ export class CodexAdapter implements AgentAdapter {
       : spawnOptions.policy.allowDomains.includes('*') ? [...requestedCeiling]
       : requestedCeiling.includes('*') ? spawnOptions.policy.allowDomains
       : requestedCeiling.filter(domain => spawnOptions.policy.allowDomains.includes(domain))
-    let launcher: ReturnType<typeof spawnRunSandbox> | undefined
-    const child = this.options.spawnCli || this.options.sandbox.kind === 'none'
+    let launcher: { revoke(): Promise<void> } | undefined
+    const onNetwork = runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps))
+    const container = inContainer ? await this.options.openContainer!({ runId: options.runId, cwd: ctx.worktree, policy: spawnOptions.policy, onNetwork }) : undefined
+    const child = container
+      ? (launcher = container.spawn(argv[0], argv.slice(1), spawnOptions.env))
+      : this.options.spawnCli || this.options.sandbox.kind === 'none'
       ? await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
       : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps)) }))
     if (launcher) {
@@ -403,7 +414,7 @@ export class CodexAdapter implements AgentAdapter {
       void child.exited.finally(off)
     }
     // After the whole group is gone (`exited` kills it first).
-    void child.exited.then(() => wipeRunCredentials(runDir))
+    void child.exited.then(async () => { await container?.close(); wipeRunCredentials(runDir) })
     const rpc: MessageConnection = jsonlConnection(
       child.process.stdout,
       child.process.stdin,
