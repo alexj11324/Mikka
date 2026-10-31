@@ -813,7 +813,11 @@ export class Daemon {
 
   private async createAgentSandbox(): Promise<AgentSandbox | null> {
     if (this.options.agentSandbox !== undefined) return this.options.agentSandbox
-    const missing = await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log })
+    // Tests use the host's tools as they are; fetching them with apt would
+    // make every test daemon's start depend on the network.
+    const missing = daemonTestMode(process.env)
+      ? missingSandboxTools()
+      : await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log })
     if (!SandboxRuntime.supported()) {
       this.log.warn({ missing }, "agent sandbox unavailable: platform or dependencies unsupported")
       this.sandboxIssue = { missing }
