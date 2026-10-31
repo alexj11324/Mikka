@@ -61,6 +61,7 @@ import {
   ServerUnreachableError,
 } from "./errors"
 import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
+import { checkLatestVersion, type AutoUpdateRuntime } from "./auto-update"
 import { restartService, uninstallService } from "./service"
 import { detectDeviceType } from "./device-type"
 import { detectHarnesses } from "./harnesses"
@@ -97,6 +98,8 @@ export { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
 
 export interface DaemonOptions {
   dataDir: string
+  /** Supplied only by the managed public npm CLI. */
+  autoUpdate?: AutoUpdateRuntime
   flavor: Flavor
   link: ServerLink
   /** Set with `--server memory`: enables `dev.mockRun` (dev flavor only). */
@@ -202,6 +205,11 @@ export class Daemon {
   private server: DaemonStatus["server"] = "unregistered"
   private timer: NodeJS.Timeout | null = null
   private tick: Promise<void> = Promise.resolve()
+  private updating = false
+  private claimsInFlight = 0
+  private updateCheck: Promise<void> | null = null
+  private maintenance: Promise<void> | null = null
+  private updateVersion: string | undefined
   private draining = false
   private stopped = false
   private stopPromise: Promise<void> | null = null
@@ -900,6 +908,8 @@ export class Daemon {
   }
 
   private async syncPass() {
+    if (this.stopped) return
+    this.checkAutoUpdate()
     const { link } = this.options
     const { credential, workspaceId } = this.device
     if (!credential) {
@@ -954,7 +964,7 @@ export class Daemon {
         return
       }
       if (command && !this.device.completedDeviceCommands?.includes(command.id) && !this.device.failedDeviceCommands?.some(failure => failure.id === command.id)) {
-        if (command.kind === 'redetect' || this.supervisor.heartbeatRuns().length === 0) {
+        if (command.kind === 'redetect' || this.maintenanceIdle()) {
           try {
             if (command.kind === 'redetect') {
               const detected = await detectHarnesses()
@@ -966,9 +976,13 @@ export class Daemon {
               // Queue an immediate heartbeat after this sync pass, without re-entering it.
               void this.syncWithServer().catch(() => undefined)
             } else {
-              await restartService(command.kind === 'update', () => {
-                // Persist only after an update succeeds and before scheduling restart.
-                this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+              this.startMaintenance(async () => {
+                await restartService(command.kind === 'update', () => {
+                  if (this.stopped) throw new Error('Daemon stopped during update')
+                  this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+                }, undefined, () => !this.stopped)
+              }, () => {
+                this.saveDevice({ completedDeviceCommands: [], failedDeviceCommands: [{ id: command.id, error: 'Device command failed; check daemon service logs.' }] })
               })
             }
           } catch {
@@ -987,7 +1001,7 @@ export class Daemon {
       // Resume only reservations already made while a run was live. Do not
       // hold the heartbeat or recreate uploads after a run has ended.
       for (const entry of this.journal.all()) if (isTerminalRunState(entry.state)) void this.captureUploader.flush(entry.assignment.runId, true)
-      if (!this.draining) {
+      if (!this.draining && !this.updating && !this.stopped) {
         // A receipted run blocked while offline may resume only after its
         // server authorization is available; no second recovery scheduler.
         await this.supervisor.resumeAll(true)
@@ -1030,6 +1044,15 @@ export class Daemon {
   }
 
   private async claimAndStart(runId: string) {
+    if (this.draining || this.updating || this.stopped) {
+      throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
+    }
+    this.claimsInFlight++
+    try { return await this.claimAndStartInternal(runId) }
+    finally { this.claimsInFlight-- }
+  }
+
+  private async claimAndStartInternal(runId: string) {
     if (this.draining) {
       throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
     }
@@ -1067,7 +1090,7 @@ export class Daemon {
       }
     }
     if (assignment.computer && (!this.cloudComputerBroker || !assignment.subscriptionBinding || assignment.computer.ownerId !== assignment.subscriptionBinding.ownerId)) throw new Error('Cloud computer runtime unavailable')
-    return this.supervisor.start(assignment)
+    return await this.supervisor.start(assignment)
   }
 
   /**
@@ -1294,7 +1317,7 @@ export class Daemon {
   private startCoordinatorPass(deviceId: string) {
     const link = this.options.link
     const sandbox = this.agentSandbox()
-    if (this.nativeCoordinator || !link.claimCoordinator || !sandbox || this.stopped || !this.harnesses.some(info => info.coordinator)) return
+    if (this.updating || this.draining || this.nativeCoordinator || !link.claimCoordinator || !sandbox || this.stopped || !this.harnesses.some(info => info.coordinator)) return
     const controller = new AbortController()
     this.nativeAbort = controller
     this.nativeCoordinator = (async () => {
@@ -1309,6 +1332,39 @@ export class Daemon {
     }).finally(() => { this.nativeCoordinator = null; this.nativeAbort = null })
   }
 
+  private maintenanceIdle() {
+    return !this.stopped && !this.draining && !this.updating && !this.nativeCoordinator && this.claimsInFlight === 0 && this.supervisor.heartbeatRuns().length === 0
+  }
+
+  private startMaintenance(work: () => Promise<void>, failed: () => void = () => {}) {
+    if (!this.maintenanceIdle()) return
+    this.updating = true
+    this.maintenance = work().catch(() => {
+      this.updating = false
+      failed()
+      this.log.warn('Daemon update or restart failed; check service installation and npm configuration')
+    }).finally(() => { this.maintenance = null })
+  }
+
+  private checkAutoUpdate() {
+    const runtime = this.options.autoUpdate
+    if (!runtime || this.draining || this.updating) return
+    if (this.updateVersion && this.maintenanceIdle()) {
+      const version = this.updateVersion
+      this.updateVersion = undefined
+      this.startMaintenance(async () => {
+        await runtime.install(version)
+        if (this.stopped) return
+        await restartService(false, () => {}, undefined, () => !this.stopped)
+      })
+    } else if (!this.updateCheck && !this.updateVersion) {
+      this.updateCheck = checkLatestVersion(join(this.paths.dataDir, 'auto-update.json'), DAEMON_VERSION, runtime)
+        .then(version => { this.updateVersion = version })
+        .catch(() => { this.log.warn('Daemon automatic update check failed') })
+        .finally(() => { this.updateCheck = null })
+    }
+  }
+
   stop(): Promise<void> {
     return (this.stopPromise ??= this.stopInternal())
   }
@@ -1317,6 +1373,8 @@ export class Daemon {
     this.stopped = true
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
+    await this.updateCheck
+    await this.maintenance
     this.nativeAbort?.abort()
     await this.nativeCoordinator
     if (this.timer) clearTimeout(this.timer)

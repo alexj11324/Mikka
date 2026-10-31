@@ -43,8 +43,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Desktop state-machine and service tests
         run: |
+          pnpm --filter @mikka/daemon typecheck
           pnpm --filter @mikka/desktop test
-          pnpm --filter @mikka/daemon exec vitest run test/service.test.ts test/registration-login.test.ts test/device-file.test.ts test/commands.test.ts
+          pnpm --filter @mikka/daemon exec vitest run test/auto-update.test.ts test/service.test.ts test/registration-login.test.ts test/device-file.test.ts test/commands.test.ts
       - name: Enrollment and command isolation against PostgreSQL
         env:
           E2E_DATABASE_URL: postgres://postgres@127.0.0.1:55491/mikka_491_e2e
