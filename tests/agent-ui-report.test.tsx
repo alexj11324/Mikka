@@ -153,3 +153,26 @@ test('An OpenUI button or form submit continues the chat with its label and the 
   assert.equal(prompt, 'Create these tasks\n\ntasks\n- Write brief · high\n- Review design · low')
   assert.equal(actionPrompt({ type: 'continue_conversation', params: {}, humanFriendlyMessage: 'Next' }), 'Next')
 })
+
+// tests/e2e/legacy-chat-fixture.ts stores this reply; it predates the 2026-10-31 consolidation.
+const savedReply = 'root = Stack([TextContent("Saved answer"), BeButton("继续细化", "never run", "outline"), ShadcnAccordion([{title:"First item",content:"First detail"},{title:"Second item",content:"Second detail"}]), ShadcnTabs([{title:"First tab",children:[TextContent("First pane")]},{title:"Second tab",children:[TextContent("Second pane")]}])])'
+
+test('Saved replies with retired component names still parse and render as their replacements', () => {
+  const parsed = parser.parse(savedReply)
+  assert.deepEqual(parsed.meta.errors, [])
+  assert.deepEqual(parsed.meta.unresolved, [])
+  const html = render(savedReply)
+  for (const text of ['First item', 'Second item', 'First tab', 'Second tab', 'First pane']) assert.match(html, new RegExp(text))
+  for (const source of [
+    'root = ShadcnCard("Card", [TextContent("Body")], "Note")', 'root = ReuiFrame("Frame", [TextContent("Body")])',
+    'root = ShadcnBadge("Late", "destructive")', 'root = ReuiBadge("Done", "success-light")', 'root = BeBadge("Review", "info")',
+    'root = ShadcnAlert("Heads up", "Detail")', 'root = ReuiAlert("Risk", "Detail", "warning")', 'root = ShadcnProgress("Quota", 60)',
+    'root = ShadcnTable(["Name", "Value"], [["a", "1"]])', 'root = ShadcnButton("继续细化", "Ask more", "default")',
+    'root = BeTimeline([{date: "2026-11-02", title: "Kickoff", description: "Scope"}])',
+  ]) {
+    assert.deepEqual(parser.parse(source).meta.errors, [], source)
+    assert.equal(detectAgentUISource(source).isOpenUI, true, source)
+    assert.doesNotMatch(render(source), /Unable to|could not be displayed|unsupported|root = /i, source)
+  }
+  assert.match(render('root = BeTimeline([{date: "2026-11-02", title: "Kickoff", description: "Scope"}])'), /2026-11-02 · Kickoff/)
+})

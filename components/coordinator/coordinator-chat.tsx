@@ -12,7 +12,7 @@ import { useActionError } from '@/lib/use-action-error'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
-import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from '@/components/ui/message-scroller'
+import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
 import { Spinner } from '@/components/ui/spinner'
 import { useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
@@ -50,6 +50,18 @@ export function coordinatorChatKey(botId?: string | null) {
 /** The tools a reply used, less a dispatch that already shows as its thread card. */
 function footerTools(item: Chat['items'][number]) {
   return [...new Set(item.tools.filter(tool => !((tool === 'dispatch_run' || tool === 'dispatch_bot_computer') && item.threads.length)))]
+}
+
+/** A message the person just sent brings the chat back to its end, wherever they had scrolled. */
+function FollowSentMessages({ count }: { count: number | null }) {
+  const { scrollToEnd } = useMessageScroller()
+  const seen = useRef(count)
+  useEffect(() => {
+    if (count === null) return
+    if (seen.current !== null && count > seen.current) scrollToEnd()
+    seen.current = count
+  }, [count, scrollToEnd])
+  return null
 }
 
 /**
@@ -125,6 +137,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     welcomed.current = true
     void (botId ? welcomeCoordinator(botId) : welcomeCoordinator()).then(() => mutate())
   })
+  const sentCount = useMemo(() => items.filter(item => item.from === 'person').length, [items])
   const rootRef = useRef<HTMLElement>(null)
   // Events are system lines, not messages; the person's own messages never count as unread.
   const unreadItems = useMemo(() => items.filter(item => item.from !== 'event').map(item => ({ position: item.position, messageId: item.id ?? String(item.position), own: item.from === 'person', reportable: !item.pending })), [items])
@@ -189,7 +202,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
   <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 flex-1 flex-col">
-    <MessageScrollerProvider defaultScrollPosition="end">
+    {/* Follow the end while the person is there, never anchor rows to the top: the scroller re-anchors any person row
+        whose element it has not seen, and a stored message remounts its pending row, so the chat jumped up the history.
+        Rows render at their real height: an estimated height on a new row shifts the end by the difference. */}
+    <MessageScrollerProvider defaultScrollPosition="end" autoScroll>
+      <FollowSentMessages count={data ? sentCount : null} />
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')}>
           <MessageScrollerContent className={cn('flex w-full min-w-0 max-w-full flex-col gap-5 pb-6', compact ? 'px-3 pt-4' : 'px-4 pt-18 sm:px-6')}>
@@ -198,7 +215,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               : <div className="flex flex-1 flex-col items-center justify-center gap-3">{avatar('profile')}<p className="text-sm font-medium">{name}</p></div>)}
             {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
               {unread.divider === item.position && <UnreadDivider />}
-              <MessageScrollerItem messageId={String(item.position)} scrollAnchor={item.from === 'person'} {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
+              <MessageScrollerItem messageId={String(item.position)} className="[content-visibility:visible]" {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
               {item.from === 'event'
                 ? <p className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
