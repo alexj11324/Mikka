@@ -107,6 +107,26 @@ test('desktop staging publishes only intended installers and the selected produc
   assert.equal(bom.metadata.properties[0].value, sourceSha)
 })
 
+test('the release SBOM skips optional platform packages pnpm did not install, and still fails on any other missing package', async () => {
+  const sourceSha = 'a'.repeat(40)
+  const manifests = { root: { name: 'desktop', version: '1.0.0', dependencies: { vite: '8' } }, vite: { name: 'vite', version: '8.3.4', optionalDependencies: { fsevents: '2' } },
+    esbuild: { name: 'esbuild', version: '0.28.2', optionalDependencies: { '@esbuild/aix-ppc64': '0.28.2', '@esbuild/linux-x64': '0.28.2' } },
+    'esbuild-linux': { name: '@esbuild/linux-x64', version: '0.28.2' } }
+  const readManifest = async path => {
+    if (manifests[path]) return manifests[path]
+    throw Object.assign(Error(`ENOENT: ${path}`), { code: 'ENOENT' })
+  }
+  const vite = { path: 'vite', dependencies: { fsevents: { path: 'fsevents' }, esbuild: { path: 'esbuild', dependencies: { '@esbuild/aix-ppc64': { path: 'esbuild-aix' }, '@esbuild/linux-x64': { path: 'esbuild-linux' } } } } }
+  const bom = await workspaceSbom([{ path: 'root', dependencies: { vite } }], { sourceSha, readManifest })
+  assert.deepEqual(bom.components.map(value => value.name), ['@esbuild/linux-x64', 'esbuild', 'vite'])
+  assert.deepEqual(bom.dependencies.find(value => value.ref === 'pkg:npm/esbuild@0.28.2').dependsOn, ['pkg:npm/%40esbuild/linux-x64@0.28.2'])
+  await assert.rejects(workspaceSbom([{ path: 'root', dependencies: { vite: { path: 'missing' } } }], { sourceSha, readManifest }), /ENOENT/)
+  await assert.rejects(workspaceSbom([{ path: 'root', dependencies: { vite } }], { sourceSha, readManifest: async path => {
+    if (path === 'fsevents') throw Object.assign(Error('EACCES'), { code: 'EACCES' })
+    return readManifest(path)
+  } }), /EACCES/)
+})
+
 test('third-party actions in workflows and local composite actions use immutable SHA refs', async () => {
   for (const folder of ['workflows', 'actions']) {
     const directory = new URL(`../../.github/${folder}/`, import.meta.url)

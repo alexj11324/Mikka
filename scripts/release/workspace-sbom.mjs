@@ -7,8 +7,13 @@ import { join } from 'node:path'
 export async function workspaceSbom(trees, { sourceSha, bundledEntries = [], readManifest = async path => JSON.parse(await readFile(join(path, 'package.json'), 'utf8')) } = {}) {
   if (!/^[a-f0-9]{40}$/.test(sourceSha ?? '') || !Array.isArray(trees) || trees.length !== 1) throw Error('releaseSbomInputInvalid')
   const components = new Map(), edges = new Map(), visited = new Set()
-  async function visit(node) {
-    const manifest = await readManifest(node.path)
+  async function visit(node, optional = false) {
+    let manifest
+    try { manifest = await readManifest(node.path) } catch (error) {
+      // pnpm lists optional platform packages (fsevents, @esbuild/<other-os>) that it never installed on this runner.
+      if (optional && error?.code === 'ENOENT') return null
+      throw error
+    }
     if (typeof manifest.name !== 'string' || typeof manifest.version !== 'string') throw Error('releaseSbomPackageInvalid')
     const ref = `pkg:npm/${manifest.name.replace(/^@/, '%40')}@${encodeURIComponent(manifest.version)}`
     const license = typeof manifest.license === 'string' ? manifest.license : manifest.license?.type
@@ -17,13 +22,19 @@ export async function workspaceSbom(trees, { sourceSha, bundledEntries = [], rea
     edges.set(ref, edges.get(ref) ?? new Set())
     if (!visited.has(node)) {
       visited.add(node)
-      const children = { ...node.dependencies, ...node.optionalDependencies }
+      // `pnpm list --json` reports optional dependencies under `dependencies`, so the declaring manifest decides.
+      const isOptional = name => name in (node.optionalDependencies ?? {}) || name in (manifest.optionalDependencies ?? {})
+        || manifest.peerDependenciesMeta?.[name]?.optional === true
+      const children = new Map(Object.entries({ ...node.dependencies, ...node.optionalDependencies }).map(([name, child]) => [name, [child, isOptional(name)]]))
       if (node === trees[0]) for (const name of bundledEntries) {
-        const child = children[name] ?? node.devDependencies?.[name]
+        const child = children.get(name)?.[0] ?? node.devDependencies?.[name]
         if (!child) throw Error('releaseBundledDependencyMissing')
-        children[name] = child
+        children.set(name, [child, false])
       }
-      for (const child of Object.values(children)) edges.get(ref).add(await visit(child))
+      for (const [child, optionalChild] of children.values()) {
+        const childRef = await visit(child, optionalChild)
+        if (childRef) edges.get(ref).add(childRef)
+      }
     }
     return ref
   }
