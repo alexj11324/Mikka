@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { beforeEach, mock, test } from 'node:test'
+import { before, beforeEach, mock, test } from 'node:test'
 import { COORDINATOR_MODEL } from './coordinator/model'
 import type { SubscriptionService } from './subscription-service'
 
@@ -31,8 +31,12 @@ mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExp
 mock.module(new URL('./abuse/resolve.ts', import.meta.url).href, { namedExports: {
   resolveDefaultHostedModel: async (...args: unknown[]) => { hostedCalls.push(args); return hostedModel },
 } })
-const { freezeBotModel } = await import('./bot-model-selection')
-const { resolveFrozenHostedModel } = await import('./subscription-model-snapshot')
+let freezeBotModel: typeof import('./bot-model-selection')['freezeBotModel']
+let resolveFrozenHostedModel: typeof import('./subscription-model-snapshot')['resolveFrozenHostedModel']
+before(async () => {
+  ;({ freezeBotModel } = await import('./bot-model-selection'))
+  ;({ resolveFrozenHostedModel } = await import('./subscription-model-snapshot'))
+})
 const noSubscription = {
   service: () => { throw new Error('subscription backend must not be constructed') },
   workspace: async () => { throw new Error('subscription authority must not be requested') },
