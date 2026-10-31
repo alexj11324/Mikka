@@ -8,12 +8,12 @@ import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartToo
 
 type Chart = { labels?: string[]; series?: { name: string; values: number[] }[]; unit?: string }
 
-// Theme chart tokens, mid-tones first so a single series reads on light and dark cards.
-const TOKENS = [2, 1, 3, 4, 5]
+// Series take the theme chart tokens in order, so the first series is --chart-1.
+const token = (index: number) => `var(--chart-${index % 5 + 1})`
 const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 })
 
 function chartData({ labels = [], series = [], unit }: Chart) {
-  const config = Object.fromEntries(series.map((item, index) => [`s${index}`, { label: item.name, color: `var(--chart-${TOKENS[index % TOKENS.length]})` }])) satisfies ChartConfig
+  const config = Object.fromEntries(series.map((item, index) => [`s${index}`, { label: item.name, color: token(index) }])) satisfies ChartConfig
   const data = labels.map((label, row) => ({ label, ...Object.fromEntries(series.map((item, index) => [`s${index}`, item.values?.[row] ?? null])) }))
   const tick = (value: number) => `${compact.format(value)}${unit ?? ''}`
   const label = series.map(item => item.name).join(', ')
@@ -88,21 +88,14 @@ type Donut = { slices?: { name: string; value: number }[]; unit?: string; total?
 /** ReUI c-chart-19 (donut with the total in the centre) with the slices passed in. */
 export function AgentDonutChart({ slices = [], unit, total }: Donut) {
   const reduce = useReducedMotion() ?? false
-  const id = useId().replace(/:/g, '')
-  const config = Object.fromEntries(slices.map((slice, index) => [`s${index}`, { label: slice.name, color: `var(--chart-${TOKENS[index % TOKENS.length]})` }])) satisfies ChartConfig
+  const config = Object.fromEntries(slices.map((slice, index) => [`s${index}`, { label: slice.name, color: token(index) }])) satisfies ChartConfig
   const data = slices.map((slice, index) => ({ key: `s${index}`, value: slice.value }))
   const sum = slices.reduce((all, slice) => all + slice.value, 0)
   return <ChartContainer config={config} role="img" aria-label={slices.map(slice => slice.name).join(', ')} className="mx-auto aspect-square max-h-70 w-full min-w-0">
     <PieChart accessibilityLayer>
-      <defs>
-        {data.map(({ key }) => <linearGradient key={key} id={`${id}-${key}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={`var(--color-${key})`} stopOpacity={1} />
-          <stop offset="100%" stopColor={`var(--color-${key})`} stopOpacity={0.8} />
-        </linearGradient>)}
-      </defs>
       <ChartTooltip content={<ChartTooltipContent nameKey="key" className="min-w-40 gap-2.5" />} />
       <Pie data={data} dataKey="value" nameKey="key" innerRadius={65} outerRadius={95} cornerRadius={8} paddingAngle={4} stroke="var(--background)" strokeWidth={4} isAnimationActive={!reduce}>
-        {data.map(({ key }) => <Cell key={key} fill={`url(#${id}-${key})`} />)}
+        {data.map(({ key }) => <Cell key={key} fill={`var(--color-${key})`} />)}
         <Label content={({ viewBox }) => viewBox && 'cx' in viewBox && 'cy' in viewBox ? <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
           <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-3xl font-bold tabular-nums">{compact.format(sum)}{unit ?? ''}</tspan>
           {total && <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 22} className="fill-muted-foreground text-xs">{total}</tspan>}
