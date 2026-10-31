@@ -68,6 +68,7 @@
     "browser-pane.spec.ts",
     "desktop-translucent.spec.ts",
     "issue-header-breadcrumb.spec.ts",
+    "side-panel-resize.spec.ts",
     "issue-menu-collision.spec.ts",
     "offline-layout.spec.ts",
     "settings-surface.spec.ts",
@@ -247,6 +248,16 @@
         "sign-out.spec.ts",
         "workspace.spec.ts",
         "signup-turnstile.spec.ts"
+      ]
+    },
+    {
+      "area": "side panels",
+      "paths": [
+        "^components\\/nav\\/(?:bot-list|context-panel)\\.tsx$",
+        "^hooks\\/use-resizable-width\\.ts$"
+      ],
+      "specs": [
+        "side-panel-resize.spec.ts"
       ]
     },
     {
