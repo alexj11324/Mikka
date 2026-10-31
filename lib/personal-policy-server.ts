@@ -39,17 +39,20 @@ export interface SubscriptionShareView {
   personal: boolean; shared: boolean; allowOthers: boolean; allowed: boolean
   /** Members whose subscriptions this member's bots may use here; names only, never the credential. */
   available: { name: string; provider: 'claude' | 'codex' }[]
+  /** This member's own connected providers, named in the 分享给团队成员 confirmation. */
+  own: ('claude' | 'codex')[]
 }
 export const shareInput = z.strictObject({ shared: z.boolean(), allowOthers: z.boolean().optional() })
 
 export async function getSubscriptionShare(actorId: string, workspaceId: string): Promise<SubscriptionShareView> {
   const { workspace } = await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId))
   // A personal workspace always uses its owner's subscriptions (loadWorkspaceContext keeps its share row).
-  if (workspace.kind === 'personal') return { personal: true, shared: true, allowOthers: false, allowed: true, available: [] }
-  const [row, allowed, owners] = await Promise.all([
+  if (workspace.kind === 'personal') return { personal: true, shared: true, allowOthers: false, allowed: true, available: [], own: [] }
+  const [row, allowed, owners, own] = await Promise.all([
     pool.query<{ allowOthers: boolean }>('SELECT "allowOthers" FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [actorId, workspaceId]),
     memberSubscriptionsAllowed(pool, workspaceId),
     pooledOwners(pool, actorId, workspaceId),
+    pool.query<{ provider: 'claude' | 'codex' }>(`SELECT DISTINCT provider FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND "removedAt" IS NULL ORDER BY provider`, [actorId]),
   ])
   let available: SubscriptionShareView['available'] = []
   if (owners.length) {
@@ -61,7 +64,7 @@ export async function getSubscriptionShare(actorId: string, workspaceId: string)
     const byId = new Map(names.map(member => [member.userId, member.name]))
     available = owners.flatMap(owner => providers.rows.filter(row => row.ownerId === owner && byId.has(owner)).map(row => ({ name: byId.get(owner)!, provider: row.provider })))
   }
-  return { personal: false, shared: Boolean(row.rowCount), allowOthers: Boolean(row.rows[0]?.allowOthers), allowed, available }
+  return { personal: false, shared: Boolean(row.rowCount), allowOthers: Boolean(row.rows[0]?.allowOthers), allowed, available, own: own.rows.map(r => r.provider) }
 }
 
 export async function setOwnSubscriptionShare(actorId: string, workspaceId: string, input: unknown): Promise<SubscriptionShareView> {
