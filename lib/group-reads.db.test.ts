@@ -1,6 +1,7 @@
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { assertE2eTarget } from '../tests/helpers/e2e-target.mjs'
@@ -21,6 +22,12 @@ mock.module(new URL('./auth.ts', import.meta.url).href, { namedExports: { auth: 
 
 test('group read routes advance actual group history without opening private DMs', { skip: !target }, async t => {
   const pool = new Pool({ connectionString: target })
+  if (!(await pool.query(`SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='conversations' AND column_name='leadBotId'`)).rowCount) {
+    const client = await pool.connect()
+    try { await client.query('BEGIN'); await client.query(await readFile(new URL('../drizzle/20261031153511_group_bot_members.sql', import.meta.url), 'utf8')); await client.query('COMMIT') }
+    catch (error) { await client.query('ROLLBACK'); throw error }
+    finally { client.release() }
+  }
   const { pool: appPool } = await import('./db')
   const { workspacePool } = await import('./workspace-db')
   t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
@@ -237,5 +244,140 @@ test('group read routes advance actual group history without opening private DMs
     caller = member
     await pool.query(`UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2`, [source, member])
     assert.equal((await linked(initial[0].id)).status, 404)
+  })
+  await t.test('real Bot identities keep owner/workspace, avatars, activity and frozen group execution distinct from coding agents', async () => {
+    const { processGroupTurn } = await import('./coordinator/group-turns')
+    const { groupRuntime } = await import('./coordinator/group-runtime')
+    const { handleGroup } = await import('./group-conversations-store')
+    const { groupDirectory } = await import('./group-conversations-directory')
+    const roster = await import('../app/api/conversations/[id]/members/route')
+    const configure = await import('../app/api/conversations/[id]/route')
+    const w = randomUUID(), foreignWorkspace = randomUUID(), a = randomUUID(), b = randomUUID(), c = randomUUID(), foreignOwner = randomUUID(), wrongWorkspace = randomUUID()
+    for (const id of [w, foreignWorkspace]) await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Bot group fixture')`, [id, owner])
+    for (const user of [owner, member]) await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,'admin','active')`, [w, user, `${user}@example.invalid`])
+    for (const [id, workspaceId, ownerId] of [[a,w,owner],[b,w,owner],[c,w,owner],[foreignOwner,w,outsider],[wrongWorkspace,foreignWorkspace,owner]])
+      await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name,color,shape) VALUES($1,$2,$3,$4,'bleu','cercle')`, [id, ownerId, workspaceId, `Bot ${id}`])
+    const request = (method: string, path: string, body?: unknown) => new Request(`http://127.0.0.1${path}`, { method, headers: { host: '127.0.0.1', origin: 'http://127.0.0.1', 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+    const create = (ids: string[], extra: object = {}) => list.POST(request('POST', '/api/conversations', { workspaceId: w, title: 'Bot group', members: ids.map(memberId => ({ memberType: 'bot', memberId })), ...extra }))
+    caller = owner
+    for (const bot of [foreignOwner, wrongWorkspace]) assert.equal((await create([bot])).status, 404)
+    assert.equal((await create([a], { leadBotId: b })).status, 422)
+    assert.equal((await create([a], { leadBotId: a, leadAgentId: b })).status, 422)
+    const created = await create([a,b,c], { leadBotId: a })
+    assert.equal(created.status, 201)
+    const source = (await created.json()).id as string
+    const context = { params: Promise.resolve({ id: source }) }
+    const directory = groupDirectory({
+      async activeUsers(workspaceId, users) { return (await pool.query(`SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[]) AND status='active'`, [workspaceId, users])).rows.map(row => row.userId) },
+      async ownedAgents(userId, agents) { return (await pool.query(`SELECT id FROM agents WHERE "userId"=$1 AND id=ANY($2::uuid[])`, [userId, agents])).rows.map(row => row.id) },
+      async ownedBots(workspaceId, userId, bots) { return (await pool.query(`SELECT id FROM bots WHERE "ownerId"=$1 AND "workspaceId"=$2 AND id=ANY($3::uuid[])`, [userId, workspaceId, bots])).rows.map(row => row.id) },
+    })
+    assert.equal((await roster.POST(request('POST', `/api/conversations/${source}/members`, { memberType: 'user', memberId: member }), context)).status, 200)
+    caller = member
+    assert.equal((await configure.PATCH(request('PATCH', `/api/conversations/${source}`, { leadBotId: b }), context)).status, 403)
+    const membersView = await (await roster.GET(request('GET', `/api/conversations/${source}/members`), context)).json()
+    assert.deepEqual(membersView.members.filter((p: { memberType: string }) => p.memberType === 'bot').map((p: { id: string }) => p.id).sort(), [a,b,c].sort())
+    assert.ok(membersView.members.every((p: { memberType: string; color: string; shape: string }) => p.memberType !== 'bot' || p.color === 'bleu' && p.shape === 'cercle'))
+    const send = async (text: string, selected: string[]) => {
+      const response = await handleGroup(pool, directory, { userId: member, method: 'POST', resource: 'messages', id: source, origin: null, host: '127.0.0.1',
+        body: JSON.stringify({ body: text, mentions: selected.map(memberId => ({ memberType: 'bot', memberId })) }) }, true)
+      assert.equal(response.status, 201)
+      return (response.body as { id: string }).id
+    }
+    const prepared = new Map<string, number>(), initialModels = new Map<string, string>()
+    let version = 1, entered!: () => void, release!: () => void
+    const waiting = new Promise<void>(resolve => { entered = resolve }), blocked = new Promise<void>(resolve => { release = resolve })
+    const runtime: import('./coordinator/group-turns').GroupRuntime = {
+      ...groupRuntime,
+      async correction() { return { kind: 'not_correction' } },
+      async prepareBot(actor, scope, client) {
+        assert.deepEqual(scope, { ownerId: owner, workspaceId: w })
+        assert.ok(client)
+        prepared.set(actor.id, (prepared.get(actor.id) ?? 0) + 1)
+        const model = `fixture-selected-${actor.id}-${version}`
+        initialModels.set(actor.id, model)
+        return { harness: 'ai_sdk', model, fixtureSecret: 'must-not-enter-modelSelections' }
+      },
+      async generate(actor, input) {
+        assert.equal(actor.memberType, 'bot')
+        assert.equal(input.modelRuntime?.model, initialModels.get(actor.id))
+        if (actor.id === c) { assert.deepEqual(input.earlier, []); return { text: 'public Bot reply', mentions: [] } }
+        if (!input.privatePeer) { entered(); await blocked; return { text: 'private Bot question', mentions: [], privateTo: b } }
+        version = 2
+        return { text: actor.id === b ? 'private Bot answer' : '[nothing to add]', mentions: [] }
+      },
+    }
+    const rootId = await send('consult a peer', [a,c])
+    const working = processGroupTurn(pool, source, runtime)
+    try {
+      await Promise.race([waiting, working.then(() => { throw Error('Expected a pending Bot generation') })])
+      const active = await (await history('', source)).json()
+      assert.equal(active.agentStatus.botId, a)
+      assert.equal(active.agentStatus.agentId, null)
+      assert.equal((await pool.query(`SELECT count(*)::int n FROM agents WHERE id=ANY($1::uuid[])`, [[a,b,c]])).rows[0].n, 0)
+      assert.equal((await pool.query(`SELECT count(*)::int n FROM agent_runs WHERE "agentId"=ANY($1::uuid[])`, [[a,b,c]])).rows[0].n, 0, 'a Bot group response is not a synthetic coding thread')
+      const activeRoute = await import('../app/api/agent/sessions/active/route')
+      caller = owner
+      const ownActivity = (await (await activeRoute.GET(request('GET', '/api/agent/sessions/active'))).json()).agents.find((p: { id: string }) => p.id === a)
+      assert.deepEqual({ kind: ownActivity.kind, name: ownActivity.name, color: ownActivity.color, shape: ownActivity.shape, runId: ownActivity.runId }, { kind: 'bot', name: `Bot ${a}`, color: 'bleu', shape: 'cercle', runId: null })
+      assert.equal(JSON.stringify(ownActivity).includes('conversationId'), false)
+      tokenWorkspaceId = foreignWorkspace
+      assert.equal((await (await activeRoute.GET(request('GET', '/api/agent/sessions/active'))).json()).agents.some((p: { id: string }) => p.id === a), false)
+      tokenWorkspaceId = undefined; caller = member
+      assert.equal((await (await activeRoute.GET(request('GET', '/api/agent/sessions/active'))).json()).agents.some((p: { id: string }) => p.id === a), false)
+      const { listActiveAgents } = await import('./active-agents')
+      const { db } = await import('./db')
+      assert.equal((await listActiveAgents(db, owner, new Date(Date.now() + 61_000))).some(p => p.id === a), false, 'a crashed group Bot does not remain active indefinitely')
+    } finally { release() }
+    await working
+    assert.deepEqual([...prepared.values()], [1,1,1], 'each Bot freezes once even when it replies again privately')
+    const saved = (await pool.query(`SELECT "modelSelections" FROM group_turns WHERE "messageId"=$1`, [rootId])).rows[0].modelSelections
+    assert.equal(Object.keys(saved).length, 3)
+    assert.equal(JSON.stringify(saved).includes('fixtureSecret'), false)
+    assert.equal(saved[a].model, `fixture-selected-${a}-1`)
+    const publicMessages = (await pool.query(`SELECT "authorType","authorId",body FROM conversation_messages WHERE "conversationId"=$1 ORDER BY position`, [source])).rows
+    assert.equal(publicMessages[1].authorType, 'bot')
+    assert.equal(publicMessages[1].authorId, c)
+    assert.equal(JSON.stringify(publicMessages).includes('private Bot'), false)
+    const exchange = (await pool.query(`SELECT id,"linkedConversationId","messageCount"::text FROM conversation_links WHERE "sourceConversationId"=$1`, [source])).rows[0]
+    assert.equal(exchange.messageCount, '2')
+    const detail = await (await linked(exchange.id)).json()
+    assert.ok(detail.participants.every((p: { memberType: string; color: string; shape: string }) => p.memberType === 'bot' && p.color === 'bleu' && p.shape === 'cercle'))
+    assert.deepEqual(detail.messages.map((p: { body: string }) => p.body), ['private Bot answer','private Bot question'])
+    assert.equal((await history('', exchange.linkedConversationId)).status, 404)
+    assert.equal((await (await call('GET', source)).json()).unreadCount, 1)
+    await send('let the designated Bot answer', [])
+    await processGroupTurn(pool, source, { ...runtime,
+      async route(_, actors, leadId) {
+        assert.equal(leadId, a)
+        assert.ok(actors.every(actor => actor.memberType === 'bot'))
+        return { by: 'lead', responders: [a] }
+      },
+      async generate(actor, input) { assert.equal(actor.id, a); assert.ok(input.modelRuntime); return { text: 'designated Bot response', mentions: [] } },
+    })
+    assert.deepEqual((await pool.query(`SELECT "authorType","authorId",body FROM conversation_messages WHERE "conversationId"=$1 ORDER BY position DESC LIMIT 1`, [source])).rows[0], { authorType: 'bot', authorId: a, body: 'designated Bot response' })
+    const refusedRoot = await send('missing binding', [c])
+    await assert.rejects(processGroupTurn(pool, source, { ...runtime,
+      async prepareBot() { throw Object.assign(Error('binding required'), { code: 'binding_required' }) },
+      async generate() { assert.fail('a refused Bot never reaches a default generation') },
+    }), { code: 'binding_required' })
+    assert.deepEqual((await pool.query(`SELECT status,"botId","modelSelections" FROM group_turns WHERE "messageId"=$1`, [refusedRoot])).rows[0], { status: 'failed', botId: null, modelSelections: {} })
+    caller = owner
+    assert.equal((await roster.DELETE(request('DELETE', `/api/conversations/${source}/members`, { memberType: 'bot', memberId: a }), context)).status, 200)
+    assert.equal((await pool.query(`SELECT "leadBotId" FROM conversations WHERE id=$1`, [source])).rows[0].leadBotId, null)
+    assert.equal((await roster.POST(request('POST', `/api/conversations/${source}/members`, { memberType: 'bot', memberId: foreignOwner }), context)).status, 404)
+    assert.equal((await roster.DELETE(request('DELETE', `/api/conversations/${source}/members`, { memberType: 'user', memberId: member }), context)).status, 200)
+    caller = member
+    assert.equal((await linked(exchange.id)).status, 404)
+    assert.equal((await roster.GET(request('GET', `/api/conversations/${source}/members`), context)).status, 404)
+    caller = owner
+    for (const [memberType, memberId] of [['user',member],['bot',a]]) assert.equal((await roster.POST(request('POST', `/api/conversations/${source}/members`, { memberType, memberId }), context)).status, 200)
+    await send('peer deleted during generation', [a])
+    await processGroupTurn(pool, source, { ...runtime, async generate(actor, input) {
+      const result = await runtime.generate(actor, input)
+      await pool.query(`DELETE FROM bots WHERE id=$1 AND "ownerId"=$2`, [b, owner])
+      return result
+    } })
+    assert.equal((await pool.query(`SELECT count(*)::int n FROM conversation_messages WHERE "conversationId"=$1`, [exchange.linkedConversationId])).rows[0].n, 2, 'deleting the Bot peer while inference is in flight prevents the new private effect')
   })
 })

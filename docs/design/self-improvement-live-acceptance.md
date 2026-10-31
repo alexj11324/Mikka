@@ -34,6 +34,30 @@ from its exact committed repository source, registered immutably and bound to th
 existing proposal/Factory candidate. Evaluation selection is separate from an
 approved active selection; historical provenance remains readable after withdrawal.
 
+## Host cost configuration
+
+`MIKKA_SKILL_MODEL_EVALUATION=1` explicitly enables the existing paid semantic
+comparison in the production evaluator. With the variable absent or any value
+other than `1`, a valid comparison remains pending with
+`decision_model_disabled`; no semantic-judgment model is called. This replaces
+the earlier hardcoded false, which made the real assessment path unreachable
+regardless of host configuration.
+
+This is the AGENTS.md exception for real model spend, not an approval or a new
+automatic activation path. It controls the semantic comparison only: benchmark
+run dispatch still uses its existing explicit commands and admission checks.
+A comparison is requested through the existing explicit `compare_evaluation`
+action; reading status does not request paid judgment. The comparison still
+requires the frozen task set, both observed arms, exact
+mount/source/evidence bindings and current authorization. Existing billing and
+model-admission scope is unchanged. Independent review/verification and the
+candidate-bound human activation approval remain required. The unrelated
+Agent Kit live-evaluation flag does not enable this feature.
+
+No live paid model invocation or Skill activation was performed to verify this
+configuration change; focused tests exercise the production constructor and
+collector with an explicitly synthetic judgment transport.
+
 ## Ordered work
 
 - [x] Compose #238/#247 and main, preserve native authorization/reconciliation,

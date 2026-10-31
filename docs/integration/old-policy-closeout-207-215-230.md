@@ -172,3 +172,104 @@ check and refuses the mismatch. Failure/retest logs are retained separately in
 `/tmp/mikka-policy-live-hierarchy-before-corrected.log` and
 `/tmp/mikka-policy-live-hierarchy-after.log`. The initial precondition typo log is
 also retained and is not the reproduction evidence.
+
+## Signed connected policy distribution, 2026-10-31
+
+The earlier missing distribution capability is now implemented on the existing
+claim/HTTP daemon path. A worker advertises `x-mikka-policy-snapshot: 1`; claims
+with configured workspace/team/project ceilings reject incapable workers before
+publication preparation, lease changes or worker credentials. Ordinary older
+workers without managed organization ceilings retain the existing path. New
+workers receive an Ed25519 snapshot of the **final** composed policy, including
+publication, computer and frozen Factory/benchmark restrictions. Its explicit
+SHA256 policy hash uses the existing canonical `runPolicyDigestInput`; the CLI
+source revision remains a separate binding.
+
+The signing seed is derived with domain-separated HKDF from the already required
+server `BETTER_AUTH_SECRET` and issuer. There is no new persistent credential,
+private-key distribution, key registry or IAM service. The daemon independently
+fetches the public verification context over its existing authenticated server
+connection; the issuer must exactly equal that connection's HTTPS base URL
+(including its base path), with the established loopback HTTP test exception.
+A public key inside a cached claim cannot establish trust. The signature also
+binds owner, device, run, source revision, trusted workspace/team/project scope,
+issued time and expiry. Unknown envelope fields/versions, changed identity,
+policy tampering or an unavailable initial context prevent execution.
+
+Snapshots last five minutes and renew online during their final thirty seconds.
+The existing run journal stores the signed assignment; it is revalidated on
+start/resume **before repository preparation, worktree creation, checkpoint
+application, approved setup commands or a harness starts**. Normal startup first
+registers its saved device session, including when resume precedes the first
+heartbeat. The trusted hash follows the same policy through the existing adapter
+options and RunContext; RunContext recomputes it before creating its files, and
+the real child receives the non-secret `MIKKA_POLICY_HASH` in its clean environment.
+The existing sandbox still derives enforcement from those exact policy values.
+
+An expired cached snapshot is never authority to continue. Renewal must pass
+current device credential, active run/lease/STOP, workspace membership, trusted
+hierarchy and CLI revision checks, and verify the prior genuine signature. It
+re-signs the prior **final policy**, preserving Factory/computer reductions;
+it cannot recreate a wider policy from current CLI defaults. No sensitive action
+uses cache validity as offline permission: the original per-tool online check,
+policy revision, approvals and computer authorization remain mandatory. The
+existing one-second liveness monitor uses bounded five-second requests; STOP,
+current policy changes and unavailable live authorization revoke its gate.
+Changes and content rollback keep the existing monotonic revision behavior; old
+approvals never automatically cross revisions. A changed revision requires a
+new admitted run rather than a wider refresh.
+
+Verification on the retained PG17 loopback55599 database
+`mikka_policy_closeout_e2e` uses the actual HTTP routes and auth/store/policy
+transactions. It covers trusted context retrieval, signed final-policy renewal,
+unchanged final hash/read-only/computer restrictions, tampering and foreign
+identity refusal, revision changes/STOP refusal, and the existing cloud-scoped
+token's exact own-run GET/POST routes. No migration or database/resource creation
+is required for distribution. Claim tests exercise the real response builder;
+daemon tests exercise actual startup with a persisted active signed assignment,
+renewal/expiry and offline refusal, effect ordering, and a real Node child digest
+readback. These use isolated fixtures; they do not claim real model inference,
+production rollout, UI/video acceptance or unsupported offline execution.
+The earlier paragraph saying the signed cache package was unimplemented is
+superseded by this increment. Broader product-default/UI choices and applicable
+real-user/harness acceptance remain separately tracked rather than silently
+classified as completed.
+
+
+## Overridable organization defaults, subsequent #230 completion
+
+The earlier missing defaults capability is implemented in the existing
+`cli_run_policy` JSON. Workspace/team/project layers accept optional `defaults`
+containing the existing CLI permissions, network allow list and approval mode.
+Top-level fields retain their forced-ceiling meaning. Computer authority is
+excluded from both CLI values and defaults; its broker remains authoritative.
+
+Inheritance follows Bot workspace → task workspace → task team → shared project,
+then explicit Agent settings override inherited choices. Permission defaults
+inherit per action; an explicit network list replaces the inherited list,
+including an empty list. A more specific `ask` approval mode can override an
+inherited default `read_only`. Worker limits and every organization top-level
+ceiling are applied afterward with the existing most-restrictive intersection,
+including both workspaces when different. Default precedence is independent of
+the UUID order used for database locks. Missing defaults preserve the existing
+local/cloud behavior and explicit Agent/worker settings.
+
+The existing run-bound settings API accepts the JSON through its same current
+admin check, optimistic revision and transaction. Agent/worker writes reject the
+organization-only defaults object. Reads expose `defaults`, ordered
+`defaultSources`, raw existing layers and the final policy/revision. The same
+JSON version triggers invalidate old run approvals and signed snapshot renewals
+on defaults changes or rollback. Workspace publishes now join team/project
+publishes in the existing transaction-bound `agent.policy_changed` audit, with
+only scope/revision metadata. The pre-run workspace settings write uses the same
+audit path. No production table, credential, protocol or UI is added.
+
+The retained PG/actual settings-route HTTP test passes precedence, explicit
+Agent override, cross-workspace forced denial, admin rejection, malformed
+computer/Agent/worker defaults rejection, signed hash changes, old approval and
+renewal rejection, monotonic rollback, defaults readback and minimal audit
+metadata. Only the browser session identity is a synthetic test boundary;
+the route parser, store, guards and PostgreSQL operations are actual code.
+Evidence: `/tmp/mikka-policy-defaults-db-initial.log`. This supersedes the earlier
+statement that separate organization defaults remained unimplemented. The
+already documented real-user/model/UI acceptance limits remain unchanged.

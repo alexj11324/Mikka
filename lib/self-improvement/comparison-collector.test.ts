@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
 import { createSkillComparisonCollector } from './comparison-collector'
-import { createRegisteredSkillEvaluator } from './registered-evaluation'
+import { createConfiguredSkillEvaluator, createRegisteredSkillEvaluator } from './registered-evaluation'
 import { createSkillCandidate,BASELINE } from './regression'
 import { digest } from './contract'
 import { REPORT_BENCHMARK } from './report-benchmark'
@@ -93,4 +93,29 @@ test('injected semantic judgment uses the unchanged real case definitions, prese
     const response=await syntheticDecision()(...args);f.revoke();return response}})
   const denied=await revoke(f.request.userId,p)
   assert.equal(denied.reason,'comparison_changed');assert.equal(denied.improved,null)
+})
+
+test('production evaluator defaults to no paid judgment; explicit host configuration reaches the real assessment chain',async()=>{
+  const f=registeredComparisonFixture(),loadComparison=createSkillComparisonCollector(f.pool,f.authorize,f.readObject)
+  let calls=0
+  const dependencies={loadComparison,invokeDecision:async(...args:Parameters<ReturnType<typeof syntheticDecision>>)=>{calls++;return syntheticDecision()(...args)}}
+  const proposal={id:f.request.proposalId,issueId:f.request.issueId,evaluationId:f.request.evaluationId}
+  for(const env of [{},{MIKKA_SKILL_MODEL_EVALUATION:'0'},{MIKKA_SKILL_MODEL_EVALUATION:'true'}]){
+    const pending=await createConfiguredSkillEvaluator(dependencies,env)(f.request.userId,proposal)
+    assert.equal(pending.reason,'decision_model_disabled');assert.equal(pending.status,'pending')
+  }
+  assert.equal(calls,0)
+  const assessed=await createConfiguredSkillEvaluator(dependencies,{MIKKA_SKILL_MODEL_EVALUATION:'1'})(f.request.userId,proposal)
+  assert.equal(calls,1);assert.equal(assessed.status,'assessed');assert.equal(assessed.outcome,'improved')
+  assert.equal(assessed.registeredBinding?.evaluationId,f.request.evaluationId)
+  assert.equal(assessed.productionEligible,false);assert.equal(assessed.independentVerification,false)
+})
+
+test('the enabled production cost switch cannot bypass unavailable current comparison authority',async()=>{
+  const f=registeredComparisonFixture(),loadComparison=createSkillComparisonCollector(f.pool,f.authorize,f.readObject)
+  let calls=0
+  f.revoke()
+  const result=await createConfiguredSkillEvaluator({loadComparison,invokeDecision:async(...args)=>{calls++;return syntheticDecision()(...args)}},
+    {MIKKA_SKILL_MODEL_EVALUATION:'1'})(f.request.userId,{id:f.request.proposalId,issueId:f.request.issueId})
+  assert.equal(calls,0);assert.equal(result.reason,'trusted_comparison_unavailable');assert.equal(result.status,'pending')
 })
