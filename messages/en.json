@@ -1824,7 +1824,7 @@
       "connected": "Connected",
       "notConnected": "Not connected",
       "connect": "Connect",
-      "connectAnother": "Connect another",
+      "connecting": "Connecting",
       "reconnect": "Reconnect",
       "disconnect": "Disconnect",
       "deviceInstructions": "Open the provider page and enter this code. Keep this page open while Mikka checks the connection.",
