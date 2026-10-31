@@ -5,6 +5,12 @@ Claude Code or Codex. Node.js 24 or newer and Git are required. Sign in to the
 coding CLI and make sure your local Git credentials can read the repositories
 you want to use.
 
+On Linux the agent sandbox also needs `bwrap`, `socat` and `rg`. No root is
+required: on Debian and Ubuntu the daemon fetches any that are missing from the
+machine's signed apt sources into its data directory. On other distributions,
+install them with the system package manager and the daemon picks them up by
+itself. Settings > Devices names anything it could not resolve.
+
 The release candidate is a single `@aspectlylabs/mikka` package containing the
 `mikka` command and its daemon subcommands. The source workspace stays private;
 `pnpm --filter @mikka/daemon build` produces the package with the private

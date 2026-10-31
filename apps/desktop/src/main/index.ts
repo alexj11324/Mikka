@@ -2,7 +2,7 @@
 // the UI reads through `window.mikka`. The renderer is treated as untrusted;
 // every privileged call goes through the validated IPC surface in `./bridge`.
 
-import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, session, shell } from 'electron'
+import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, session, shell, webContents } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'node:path'
 
@@ -13,7 +13,8 @@ import { localDeviceStatus, localQuota } from './daemon'
 import { AppLoadState, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { NotificationCenter } from './notification-center'
-import { appExternalUrl, desktopAuthState, externalUrl, navigationDecision } from './security'
+import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision } from './security'
+import { UPDATE_CHECK_INTERVAL_MS, Updates } from './updates'
 import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
 
 const APP_URL = __MIKKA_APP_URL__
@@ -252,71 +253,28 @@ function messageBox(options: Electron.MessageBoxOptions): Promise<Electron.Messa
     : dialog.showMessageBox(options)
 }
 
-let manualUpdateCheck = false
-let updatePromptOpen = false
-
-function reportUpdateError(error: Error): void {
-  if (!manualUpdateCheck) return
-  manualUpdateCheck = false
-  void messageBox({
-    type: 'error',
-    message: 'Could not check for updates.',
-    detail: error.message,
-    buttons: ['OK'],
-  })
-}
-
-function setupUpdates(): void {
-  autoUpdater.autoDownload = false
-  autoUpdater.autoInstallOnAppQuit = true
-
-  autoUpdater.on('update-available', info => {
-    if (updatePromptOpen) return
-    updatePromptOpen = true
-    void messageBox({
-      type: 'info',
-      message: `Mikka ${info.version} is available.`,
-      buttons: ['Download', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    }).then(({ response }) => {
-      updatePromptOpen = false
-      if (response === 0) void autoUpdater.downloadUpdate().catch(reportUpdateError)
-    })
-  })
-  autoUpdater.on('update-not-available', () => {
-    if (!manualUpdateCheck) return
-    manualUpdateCheck = false
-    void messageBox({ type: 'info', message: `Mikka ${APP_VERSION} is up to date.`, buttons: ['OK'] })
-  })
-  autoUpdater.on('update-downloaded', info => {
-    updatePromptOpen = true
-    void messageBox({
-      type: 'info',
-      message: `Mikka ${info.version} is ready.`,
-      buttons: ['Restart', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    }).then(({ response }) => {
-      updatePromptOpen = false
-      if (response === 0) autoUpdater.quitAndInstall()
-    })
-  })
-  autoUpdater.on('error', reportUpdateError)
-}
-
 /**
  * The updater reads the signed ZIP and latest-mac.yml from the published
  * GitHub Release. Draft releases are invisible to it, so a release becomes
- * available only after the draft is published.
+ * available only after the draft is published. A downloaded update is
+ * offered by the rail's restart button and installs on the next quit anyway.
  */
+const updates = new Updates(autoUpdater, {
+  available: version => { void messageBox({ type: 'info', message: `Mikka ${version} installs when you restart.`, buttons: ['OK'] }) },
+  upToDate: () => { void messageBox({ type: 'info', message: `Mikka ${APP_VERSION} is up to date.`, buttons: ['OK'] }) },
+  failed: error => { void messageBox({ type: 'error', message: 'Could not check for updates.', detail: error.message, buttons: ['OK'] }) },
+}, version => {
+  for (const contents of webContents.getAllWebContents()) {
+    if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), APP_URL)) contents.send(IPC.appUpdateReady, version)
+  }
+})
+
 async function checkForUpdates(interactive: boolean): Promise<void> {
   if (!app.isPackaged) {
     if (interactive) await messageBox({ type: 'info', message: 'Updates are checked in the installed app.', buttons: ['OK'] })
     return
   }
-  manualUpdateCheck = interactive
-  await autoUpdater.checkForUpdates().catch(reportUpdateError)
+  await updates.check(interactive)
 }
 
 /**
@@ -411,11 +369,14 @@ function start(): void {
       pendingClick = null
       return href
     },
+    updates,
   })
   createMainWindow()
   installMenu()
-  setupUpdates()
-  if (app.isPackaged) setTimeout(() => { void checkForUpdates(false) }, 15_000)
+  if (app.isPackaged) {
+    setTimeout(() => { void checkForUpdates(false) }, 15_000)
+    setInterval(() => { void checkForUpdates(false) }, UPDATE_CHECK_INTERVAL_MS)
+  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
   })

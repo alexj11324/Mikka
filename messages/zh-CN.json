@@ -136,6 +136,7 @@
     "toggleTeam": "展开或收起 {name} 团队",
     "sidebarRail": "展开或收起侧栏边轨",
     "rail": "主导航",
+    "restartToUpdate": "重启以更新到 v{version}",
     "conversations": "对话",
     "board": "看板",
     "collapseList": "收起 Bot 列表",
@@ -820,6 +821,10 @@
     "setup": "设置仓库和 Agent",
     "offlineSince": "离线 · {time}",
     "noAgent": "未检测到 Agent",
+    "sandboxBlocked": "已检测到 {agents}，但沙箱不可用",
+    "sandboxMissing": "daemon 没能自动装好 {packages}。用系统包管理器安装后，daemon 会自动恢复。",
+    "sandboxRefused": "这台机器的系统设置不允许普通用户创建沙箱，需要管理员开启 user namespace。",
+    "sandboxFix": "修复方法",
     "installAgent": "安装方法",
     "copyInstall": "复制 {command}",
     "commands": {

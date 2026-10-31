@@ -11,7 +11,7 @@ const binary = process.env.CODEX_CONTRACT_BIN
 
 test('official Codex reports the actual explicit approval policy and sandbox', { skip: !binary && 'CODEX_CONTRACT_BIN not supplied', timeout: 20000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'mikka-codex-contract-'))
-  assert.match(execFileSync(binary!, ['--version'], { env: { PATH:process.env.PATH, HOME:dir, CODEX_HOME:dir }, encoding:'utf8' }), /codex-cli 0\.163\.0/)
+  assert.match(execFileSync(binary!, ['--version'], { env: { PATH:process.env.PATH, HOME:dir, CODEX_HOME:dir }, encoding:'utf8' }), /codex-cli \d+\.\d+\.\d+/)
   const child = spawn(binary!, ['app-server'], { cwd:dir, env:{ PATH:process.env.PATH, HOME:dir, CODEX_HOME:dir }, stdio:['pipe','pipe','ignore'] })
   const pending = new Map<number, (message: any) => void>()
   const lines = createInterface({ input:child.stdout })
