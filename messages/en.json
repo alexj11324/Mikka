@@ -774,7 +774,7 @@
     "footer": "A passing check means the latest availability check succeeded; it does not mean the tool is running. Wait for a new result after a check expires.",
     "connect": {
       "trigger": "Connect device",
-      "title": "Connect a computer",
+      "title": "Add device",
       "description": "A machine you can reach over SSH. Mikka installs and starts the daemon there, then brings back the harnesses it detected.",
       "host": "Host",
       "hostPlaceholder": "SSH host, hostname, or IP[:port]",
@@ -828,7 +828,68 @@
       "requirements": "Node.js 24+ · Git",
       "configurationFailed": "Installation commands are unavailable"
     },
-    "setup": "Set up repository and agent"
+    "setup": "Set up repository and agent",
+    "offlineSince": "Offline · {time}",
+    "noAgent": "No agent found",
+    "installAgent": "How to install",
+    "installAgentHint": "After installing on that machine, choose “Re-detect agents” in ⋯.",
+    "copyInstall": "Copy {command}",
+    "commands": {
+      "sent": {
+        "redetect": "Asked {name} to re-detect agents",
+        "restart": "Asked {name} to restart the daemon",
+        "update": "Asked {name} to update the daemon"
+      },
+      "queued": "{name} is offline; it runs when it reconnects"
+    },
+    "actions": {
+      "rename": "Rename",
+      "restart": "Restart daemon",
+      "update": "Update daemon",
+      "redetect": "Re-detect agents",
+      "remove": "Remove device"
+    },
+    "rename": {
+      "title": "Rename device",
+      "label": "Device name",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "remove": {
+      "title": "Remove “{name}”?",
+      "description": "Its daemon credentials stop working at once and it gets no more work. The daemon is not uninstalled from the machine.",
+      "cancel": "Cancel",
+      "confirm": "Remove"
+    },
+    "ssh": {
+      "title": "Add device",
+      "sshConfig": "SSH config",
+      "otherHost": "Other host",
+      "host": "Host",
+      "added": "Added",
+      "cancel": "Cancel",
+      "add": "Add",
+      "startFailed": "Couldn't start the install. Try again.",
+      "trust": "Trust “{host}”?",
+      "trustContinue": "Trust and continue",
+      "adding": "Adding “{host}”",
+      "progress": "Install progress",
+      "steps": {
+        "connect": "Connect",
+        "install": "Install daemon",
+        "start": "Start",
+        "online": "Online"
+      },
+      "stepState": {
+        "done": "done",
+        "running": "in progress",
+        "failed": "failed",
+        "pending": "waiting"
+      },
+      "hide": "Close",
+      "retry": "Retry",
+      "done": "Done"
+    }
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",

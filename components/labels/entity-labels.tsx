@@ -44,6 +44,12 @@ export function harnessName(harness: string): string {
   return HARNESS_NAMES[harness] ?? harness
 }
 
+/** A coding agent's mark alone, named for screen readers, where a row lists several (R-74). */
+export function HarnessMark({ harness }: { harness: string }) {
+  const Icon = HARNESS_MARKS[harness] ?? Box
+  return <span role="img" aria-label={harnessName(harness)} className="inline-flex"><Icon aria-hidden="true" className="size-3.5 shrink-0" /></span>
+}
+
 /** A coding agent: its own coloured brand mark, then its product name. */
 export function HarnessLabel({ harness }: { harness: string }) {
   return <EntityLabel icon={HARNESS_MARKS[harness] ?? Box}><span className="truncate">{harnessName(harness)}</span></EntityLabel>

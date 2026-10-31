@@ -774,7 +774,7 @@
     "footer": "检查通过表示最近一次可用性检查成功，不代表工具正在运行。检查过期后需等待新的检查结果。",
     "connect": {
       "trigger": "连接设备",
-      "title": "连接电脑",
+      "title": "添加设备",
       "description": "一台你能 ssh 进去的机器。Mikka 会在上面安装并启动 daemon，然后把它检测到的 harness 带回来。",
       "host": "主机",
       "hostPlaceholder": "ssh 主机、主机名或 IP[:端口]",
@@ -828,7 +828,68 @@
       "requirements": "Node.js 24+ · Git",
       "configurationFailed": "安装命令暂不可用"
     },
-    "setup": "设置仓库和 Agent"
+    "setup": "设置仓库和 Agent",
+    "offlineSince": "离线 · {time}",
+    "noAgent": "未检测到 Agent",
+    "installAgent": "安装方法",
+    "installAgentHint": "在那台机器上装好后，点 ⋯ 里的「重新检测 Agent」。",
+    "copyInstall": "复制 {command}",
+    "commands": {
+      "sent": {
+        "redetect": "已让 {name} 重新检测 Agent",
+        "restart": "已让 {name} 重启 daemon",
+        "update": "已让 {name} 更新 daemon"
+      },
+      "queued": "{name} 离线，上线后执行"
+    },
+    "actions": {
+      "rename": "重命名",
+      "restart": "重启 daemon",
+      "update": "更新 daemon",
+      "redetect": "重新检测 Agent",
+      "remove": "移除设备"
+    },
+    "rename": {
+      "title": "重命名设备",
+      "label": "设备名称",
+      "cancel": "取消",
+      "save": "保存"
+    },
+    "remove": {
+      "title": "移除「{name}」？",
+      "description": "它的 daemon 凭证会立即失效，不能再接任务。机器上的 daemon 不会被卸载。",
+      "cancel": "取消",
+      "confirm": "移除"
+    },
+    "ssh": {
+      "title": "添加设备",
+      "sshConfig": "SSH 配置",
+      "otherHost": "其他主机",
+      "host": "主机",
+      "added": "已添加",
+      "cancel": "取消",
+      "add": "添加",
+      "startFailed": "安装未开始，请重试。",
+      "trust": "信任「{host}」？",
+      "trustContinue": "信任并继续",
+      "adding": "添加「{host}」",
+      "progress": "安装进度",
+      "steps": {
+        "connect": "连接",
+        "install": "安装 daemon",
+        "start": "启动",
+        "online": "已上线"
+      },
+      "stepState": {
+        "done": "完成",
+        "running": "进行中",
+        "failed": "失败",
+        "pending": "等待"
+      },
+      "hide": "关闭",
+      "retry": "重试",
+      "done": "完成"
+    }
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
