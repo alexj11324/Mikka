@@ -6,11 +6,11 @@ import { bots } from '@/lib/db/schema'
 import { recordAudit } from '@/lib/audit/record'
 import { requireWorkspace } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
-import { POLICY_APPS, setAppPolicyInput, type AppAccess, type PolicyApp } from './apps'
+import { POLICY_APPS, setAppPolicyInput, type AppAccess, type PolicyApp, type PolicyToolkitId } from './apps'
 
 export interface AppPolicyView { apps: Array<{ app: PolicyApp; access: AppAccess }>; canEdit: boolean }
 
-async function readAccess(workspaceId: string): Promise<Map<PolicyApp, AppAccess>> {
+async function readAccess(workspaceId: string): Promise<Map<PolicyToolkitId, AppAccess>> {
   const rows = await db.select({ app: workspaceAppPolicies.app, access: workspaceAppPolicies.access }).from(workspaceAppPolicies).where(eq(workspaceAppPolicies.workspaceId, workspaceId))
   return new Map(rows.map(row => [row.app, row.access]))
 }
@@ -43,7 +43,7 @@ export async function setAppPolicy(actor: { id: string; name: string }, workspac
  * (botId null) belongs to no workspace and is not governed here. A bot whose
  * row is gone is refused.
  */
-export async function botMayUseApp(botId: string | null | undefined, app: PolicyApp): Promise<boolean> {
+export async function botMayUseApp(botId: string | null | undefined, app: PolicyToolkitId): Promise<boolean> {
   if (!botId) return true
   const [row] = await db.select({ access: workspaceAppPolicies.access, workspaceId: bots.workspaceId }).from(bots)
     .leftJoin(workspaceAppPolicies, and(eq(workspaceAppPolicies.workspaceId, bots.workspaceId), eq(workspaceAppPolicies.app, app)))

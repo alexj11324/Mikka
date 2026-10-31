@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
   { marker: 'lib/schedules/store.ts', file: 'lib/schedules/store.db.test.ts', script: 'test:schedules-db' },
   { marker: 'lib/run-leases.ts', file: 'tests/run-recovery.db.test.ts', script: 'test:run-recovery-db' },
   { marker: 'app/v1/runs/[runId]/checkpoint/route.ts', file: 'tests/checkpoint-recovery.db.test.ts', script: 'test:run-recovery-db' },
