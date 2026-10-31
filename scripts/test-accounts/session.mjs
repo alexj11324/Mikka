@@ -257,6 +257,8 @@ export async function acquireTestAccounts({ database, environment, runId, worker
         await writePrivate(auditFile, { values: [session.session.token] }, { append: true })
       }
       await pool.recordResource(lease, { type: 'session', id: session.session.id, ownerId: userId })
+      // Test identities land straight in the app; the first-run guide has its own tests.
+      await database.query('insert into user_onboarding ("userId") values ($1) on conflict do nothing', [userId])
       const initialized = await request('/api/workspace')
       if (!initialized.ok) { await initialized.body?.cancel(); fail('ACCOUNT_INITIALIZATION_FAILED') }
       await initialized.body?.cancel()

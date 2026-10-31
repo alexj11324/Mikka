@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { deleteE2BKey, saveE2BKey, type getE2BKey } from '@/app/actions/workspace-secrets'
+import { deleteE2BKey, saveE2BKey, type getE2BKeyCapability } from '@/app/actions/workspace-secrets'
 import { settingsRead } from '@/lib/settings-read'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -17,10 +17,11 @@ import type { PresenceProps } from '@/lib/use-presence'
  * cache entry, so saving or removing the key in either place updates both.
  */
 export function useE2BKeyStatus(workspaceId: string | null | undefined) {
-  return useSWR(workspaceId ? ['settings:e2b-key', workspaceId] : null, () => settingsRead<Awaited<ReturnType<typeof getE2BKey>>>('e2b-key'))
+  // The read names the workspace and says whether this person may set the key (canEdit).
+  return useSWR(workspaceId ? ['settings:e2b-key', workspaceId] : null, () => settingsRead<Awaited<ReturnType<typeof getE2BKeyCapability>>>('e2b-key', { workspace: workspaceId }))
 }
 
-export function E2BKeyDialog({ configured, onClose, open = true, onOpenChangeComplete }: { configured: boolean; onClose: (changed: boolean) => void } & PresenceProps) {
+export function E2BKeyDialog({ workspaceId, configured, onClose, open = true, onOpenChangeComplete }: { workspaceId?: string; configured: boolean; onClose: (changed: boolean) => void } & PresenceProps) {
   const t = useTranslations('Settings.secrets.e2b')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
@@ -32,7 +33,7 @@ export function E2BKeyDialog({ configured, onClose, open = true, onOpenChangeCom
     setPending(kind)
     setError(null)
     try {
-      const result = kind === 'save' ? await saveE2BKey({ apiKey: apiKey.trim() }) : await deleteE2BKey()
+      const result = kind === 'save' ? await saveE2BKey({ apiKey: apiKey.trim() }, workspaceId) : await deleteE2BKey(workspaceId)
       if (result.error) { setError(actionError(result.error)); return }
       onClose(true)
     } catch {

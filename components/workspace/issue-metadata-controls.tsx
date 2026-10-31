@@ -11,7 +11,7 @@ import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldError } from '@/components/ui/field'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
@@ -124,7 +124,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
     {error && !target && <FieldError className="w-full text-xs">{error}</FieldError>}
     <Dialog open={target !== null} onOpenChange={value => { if (!value && !pending) { setTarget(null); setError('') } }}>
       <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-md">
-        <DialogHeader><DialogTitle>{target ? titles[target] : tProperty('taskProperties')}</DialogTitle><DialogDescription>{target === 'invite' ? tProperty('inviteDescription') : target === 'pullRequests' ? tProperty('pullRequestsDescription') : target === 'labels' ? tProperty('labelsDescription') : tProperty('defaultDescription')}</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{target ? titles[target] : tProperty('taskProperties')}</DialogTitle></DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-4">
           {target === 'project' && <Command shouldFilter={false}><CommandInput placeholder={tProperty('projectPlaceholder')} aria-label={tProperty('projectNameAria')} value={name} onValueChange={setName} maxLength={100} /><CommandList><CommandEmpty>{tProperty('noProjectFound')}</CommandEmpty><CommandGroup heading={tProperty('projectGroup')}><CommandItem disabled={busy} onSelect={() => { void project(null) }}><Box /><span className="flex-1">{tProperty('noProject')}</span>{!metadata.project && <Check />}</CommandItem>{(options?.projects ?? []).filter(item => item.toLowerCase().includes(name.toLowerCase())).map(item => <CommandItem key={item} disabled={busy} onSelect={() => { void project(item) }}><Box /><span className="flex-1 truncate">{item}</span>{metadata.project === item && <Check />}</CommandItem>)}</CommandGroup></CommandList></Command>}
           {target === 'labels' && <>

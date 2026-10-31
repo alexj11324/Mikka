@@ -55,12 +55,10 @@ export function CreateWorkspaceForm() {
       </Field>
       <Field>
         <FieldLabel htmlFor="workspace-region">{i18nText("FeatureCopy.c_4ba7a058")}</FieldLabel>
-        <Input id="workspace-region" value={i18nText("FeatureCopy.c_a55213ee")} readOnly aria-describedby="workspace-region-help" />
-        <FieldDescription id="workspace-region-help">{i18nText("FeatureCopy.c_5de26dc0")}</FieldDescription>
+        <Input id="workspace-region" value={i18nText("FeatureCopy.c_a55213ee")} readOnly />
       </Field>
     </FieldGroup>
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
     <Button type="submit" size="lg" disabled={pending || !name.trim() || !slug.trim()}>{pending && <Loader2 className="animate-spin" data-icon="inline-start" />}{pending ? i18nText("Invite.creating") : i18nText("FeatureCopy.c_d92d1b8d")}</Button>
-    <p className="text-center text-xs text-muted-foreground">{i18nText("FeatureCopy.c_66371b24")}</p>
   </form>
 }

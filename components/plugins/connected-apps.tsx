@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type ConnectedAccountView } from '@/lib/composio-accounts'
@@ -211,12 +212,15 @@ function WhyDisabled({ reason, fill = false, children }: { reason?: string; fill
   return <span title={reason} className={cn('inline-flex', fill && 'w-full')}>{children}</span>
 }
 
-/** Loading, setup and result lines under the list or the detail page. */
+/**
+ * Setup and result lines above the list or the detail page. Loading is read out only:
+ * a visible line would push the list down and then let it jump up when the accounts arrive.
+ */
 export function ConnectedAppsStatus({ apps }: { apps: ConnectedApps }) {
   const t = useTranslations('Settings.integrations')
   const { state, error, notice } = apps
   return <>
-    {!state && !error && <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>}
+    {!state && !error && <span role="status" className="sr-only">{t('loading')}</span>}
     {error && <FieldError>{error}</FieldError>}
     {notice && <p role={notice.tone} className={cn('text-sm', notice.tone === 'alert' ? 'text-destructive' : 'text-muted-foreground')}>{notice.text}</p>}
   </>
@@ -270,7 +274,9 @@ export function ConnectedAppRow({ apps, app, href, onOpen }: { apps: ConnectedAp
     {expired && (accounts.length === 1
       ? <Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.reconnect(accounts[0].id)}>{apps.pending === accounts[0].id ? t('working') : t('reconnect')}</Button>
       : <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={href} onClick={event => openInPlace(event, onOpen)} />}>{t('reconnect')}</Button>)}
-    {accounts.length
+    {/* Until the accounts arrive the trailing slot holds the 连接 button's size, so the row does not shift. */}
+    {!apps.state && !apps.error ? <Skeleton data-slot="app-row-pending" aria-hidden="true" className="h-7 w-12 rounded-[min(var(--radius-md),12px)]" />
+      : accounts.length
       ? <Switch aria-label={t('enableApp', { name })} checked={on} disabled={expired} onCheckedChange={checked => {
         void apps.setEnabled(usable.filter(account => account.enabled !== checked).map(account => account.id), checked).then(ok => {
           if (ok && !checked) toast.success(t('turnedOff', { name }), { description: t('takeoverNone', { name }) })

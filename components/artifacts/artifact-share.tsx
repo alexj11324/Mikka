@@ -114,7 +114,7 @@ export function ArtifactShare({ artifactId, shared, onChange }: { artifactId: st
     : mode === 'copy-failed' ? t('copyFailed')
     : mode === 'stop-unconfirmed' ? t('stopUnconfirmed')
     : mode === 'stopped' ? t('shareStopped')
-    : link || !shared ? t('shareHint') : t('sharingOn')
+    : link || !shared ? '' : t('sharingOn')
 
   const showLink = Boolean(link) && mode !== 'stop-unconfirmed' && mode !== 'stopped' && mode !== 'create-failed'
 
@@ -123,7 +123,7 @@ export function ArtifactShare({ artifactId, shared, onChange }: { artifactId: st
     <PopoverContent align="end" className="w-80 gap-3 p-3">
       <div className="flex flex-col gap-1">
         <PopoverTitle>{t('share')}</PopoverTitle>
-        <PopoverDescription className="text-xs">{description}</PopoverDescription>
+        {description && <PopoverDescription className="text-xs">{description}</PopoverDescription>}
       </div>
       {mode === 'stop-unconfirmed' && <p className="text-xs text-muted-foreground">{t('shareStateUnknown')}</p>}
       {showLink && <InputGroup>

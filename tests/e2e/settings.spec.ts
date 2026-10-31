@@ -82,6 +82,23 @@ test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', as
 })
 })
 
+test('默认工作区解析后改用带 workspace 的读取时，管理员分区不闪掉', async ({ page }) => {
+  // Settings first read the default workspace, then name it once the team directory resolves it.
+  // Slow both, so the unnamed read lands first and the named one stays pending for a while:
+  // the admin-only rows must not drop out meanwhile, or the sidebar jumps.
+  await page.route('**/api/teams/directory*', async route => { await new Promise(resolve => setTimeout(resolve, 1500)); await route.fallback() })
+  await page.route('**/api/workspace?workspace=*', async route => { await new Promise(resolve => setTimeout(resolve, 2000)); await route.fallback() })
+  await register(page, '/settings/members')
+  const admin = page.locator('[data-slot="settings-list"]').getByRole('link', { name: '团队权限', exact: true })
+  await expect(admin).toBeVisible()
+  const gaps: number[] = []
+  for (const started = Date.now(); Date.now() - started < 4000;) {
+    if (await admin.count() === 0) gaps.push(Date.now() - started)
+    await page.waitForTimeout(50)
+  }
+  expect(gaps, '管理员分区在读取期间消失').toEqual([])
+})
+
 test('设置页打开并空闲后，每个分区首次打开都不显示骨架屏', async ({ page }) => {
   test.setTimeout(120000)
   await register(page, '/settings?section=preferences')
@@ -345,7 +362,7 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(sidebar.getByRole('link', { name: '设置回归团队', exact: true })).toHaveAttribute('aria-current', 'page')
   await expectItems(sidebar.locator('[data-slot="sidebar-group-label"]'), ['个人', '工作区', '你的团队'])
   const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^工作区$/ }) })
-  await expectItems(administration.locator('[data-slot="sidebar-menu-button"]'), ['常规', '成员', '团队', '团队权限', '密钥与环境', '审计日志', '用量', '计费'])
+  await expectItems(administration.locator('[data-slot="sidebar-menu-button"]'), ['常规', '成员', '团队', 'Bot 与 Agents', '团队权限', '密钥与环境', '审计日志', '用量', '计费'])
   await expect(sidebar.locator('[data-slot="sidebar-menu-sub"]')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '团队常规设置', exact: true })).toHaveCount(0)
   const settings = page.getByRole('region', { name: '团队设置选项', exact: true })
