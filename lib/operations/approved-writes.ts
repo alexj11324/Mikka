@@ -102,7 +102,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
       if (readbackOnly && row.status === 'reserved') throw new OperationError('operationReadbackOnly')
       if (row.status !== 'reserved') {
         if (row.status === 'succeeded') return project(row)
-        return project(await ledger.reconcile(identity(p), record => bounded(() => provider.lookup({ ownerId: p.userId, accountId: p.operationBinding.accountId, idempotencyKey: record.idempotencyKey }), context.signal)))
+        return project(await ledger.reconcile(identity(p), record => bounded(signal => provider.lookup({ ownerId: p.userId, accountId: p.operationBinding.accountId, version: p.operationBinding.version, payload: p.input, idempotencyKey: record.idempotencyKey, signal }), context.signal)))
       }
       let claimed: OperationRecord
       try { claimed = await ledger.claim(identity(p), run?.runId ?? randomUUID()) }

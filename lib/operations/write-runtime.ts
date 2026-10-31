@@ -6,6 +6,7 @@ import { createApprovedWrites } from './approved-writes'
 import { composioWriteProvider } from './write-provider'
 import { composioConditionalCalendarDelete } from './calendar-conditional'
 import { composioSlackConversationReader } from './slack-conversation-read'
+import { composioSlackDelivery } from './slack-delivery'
 import type { WriteRequestContext } from './write-transaction'
 import type { WriteActionName } from './write-contract'
 import { createApprovedWriteDiscovery } from './write-discovery'
@@ -53,7 +54,7 @@ export function personalWriteRuntime() {
     discovery: createApprovedWriteDiscovery(pool),
     operations: (action: WriteActionName, context?: WriteRequestContext) => {
       const client = getComposio()
-      return createApprovedWrites(pool, composioWriteProvider(client, action, composioConditionalCalendarDelete(client), undefined, composioSlackConversationReader(client)), action, { ...context, guardForRun })
+      return createApprovedWrites(pool, composioWriteProvider(client, action, composioConditionalCalendarDelete(client), undefined, composioSlackConversationReader(client), composioSlackDelivery(client)), action, { ...context, guardForRun })
     },
   }
 }
