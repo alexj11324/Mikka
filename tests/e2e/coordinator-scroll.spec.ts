@@ -146,3 +146,30 @@ test('two messages back to back: nothing reorders, no jump while replies arrive,
   await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 600)))
   expect(Math.abs(await viewport(page).evaluate(element => element.scrollTop) - reading)).toBeLessThanOrEqual(2)
 })
+
+test('the composer keeps its 1px rule empty, focused and typing; focus only deepens the shadow', async ({ page }) => {
+  await register(page)
+  const input = page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })
+  await expect(input).toBeVisible()
+  const card = input.locator('xpath=ancestor::*[@data-slot="input-group"][1]')
+  const look = () => card.evaluate(element => {
+    const style = getComputedStyle(element)
+    return { border: style.borderTopColor, width: style.borderTopWidth, outline: style.outlineStyle, shadow: style.boxShadow }
+  })
+  const empty = await look()
+  expect(empty.width).toBe('1px')
+  await input.focus()
+  await expect.poll(async () => (await look()).shadow).not.toBe(empty.shadow)
+  // Let the shadow's transition settle before reading it.
+  await page.waitForTimeout(300)
+  const focused = await look()
+  await input.pressSequentially('你好')
+  await page.waitForTimeout(300)
+  const typing = await look()
+  for (const state of [focused, typing]) {
+    expect(state.border).toBe(empty.border)
+    expect(state.width).toBe('1px')
+    expect(state.outline).toBe('none')
+  }
+  expect(typing.shadow).toBe(focused.shadow)
+})
