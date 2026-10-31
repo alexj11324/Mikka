@@ -21,7 +21,7 @@ it.each([
 })
 it('persists failed attempts before I/O and retries only after a day, including across restarts', async () => {
   const file = stateFile(), now = 1_800_000_000_000
-  const runtime = { latest: vi.fn(async () => { expect(JSON.parse(readFileSync(file, 'utf8')).lastAttemptAt).toBe(now); throw new Error('registry unavailable') }), install: vi.fn() }
+  const runtime = { latest: vi.fn(async (): Promise<string> => { expect(JSON.parse(readFileSync(file, 'utf8')).lastAttemptAt).toBe(now); throw new Error('registry unavailable') }), install: vi.fn() }
   await expect(checkLatestVersion(file, '1.0.0', runtime, now)).rejects.toThrow('unavailable')
   runtime.latest.mockImplementation(async () => '1.0.1')
   expect(await checkLatestVersion(file, '1.0.0', runtime, now + 1)).toBeUndefined()
