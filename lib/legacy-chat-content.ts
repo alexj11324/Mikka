@@ -2,8 +2,22 @@ import { createParser } from '@openuidev/lang-core'
 import spec from './agent-ui.spec.json'
 import { normalizeAgentUISource } from './agent-ui-source'
 
+/** Components older replies used before they were replaced by OpenUI's own or beUI ones; their props, in order, are read as text only. */
+const RETIRED: Record<string, string[]> = {
+  ShadcnCard: ['title', 'children', 'description'], ShadcnBadge: ['text', 'variant'], ShadcnAlert: ['title', 'description', 'variant'],
+  ShadcnAccordion: ['items', 'multiple'], ShadcnTabs: ['items'], ShadcnTable: ['columns', 'rows'], ShadcnButton: ['label', 'prompt', 'variant'],
+  ReuiBadge: ['text', 'variant'], ReuiAlert: ['title', 'description', 'variant'], ReuiFrame: ['title', 'children', 'description'],
+  BeBadge: ['text', 'status'], BeTimeline: ['events'],
+}
+const retired = Object.entries(RETIRED)
+const schema = {
+  ...spec.library.schema,
+  properties: { ...spec.library.schema.properties, ...Object.fromEntries(retired.map(([name]) => [name, { $ref: `#/$defs/${name}` }])) },
+  $defs: { ...spec.library.schema.$defs, ...Object.fromEntries(retired.map(([name, props]) => [name, { type: 'object', properties: Object.fromEntries(props.map(prop => [prop, {}])), required: [props[0]], additionalProperties: false }])) },
+}
+
 // Schema only: do not import a live renderer, action handler, device client or library functions.
-const parser = createParser(spec.library.schema, spec.library.root)
+const parser = createParser(schema, spec.library.root)
 const omitted = new Set(['action', 'prompt', 'context', 'variant', 'className', 'size', 'botId', 'runId', 'id', 'precision'])
 type RecordValue = Record<string, unknown>
 const record = (value: unknown): value is RecordValue => typeof value === 'object' && value !== null && !Array.isArray(value)

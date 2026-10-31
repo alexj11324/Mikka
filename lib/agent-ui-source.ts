@@ -1,10 +1,10 @@
-/** Component names a reply may open with as its whole program, the library's catalog plus its root (lib/agent-ui-catalog.ts). */
+/** Component names a reply may open with as its whole program: the library's catalog, its root and the OpenUI built-ins the Coordinator prompt lists. */
 const TOP_LEVEL_COMPONENTS = [
   'Stack', 'TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'BeButton',
-  'BeFollowUps', 'BeBadge', 'BeStat', 'BeResponse', 'BeApproval', 'BeQuestions', 'BeTodoList', 'AgentIcon',
-  'InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'ComputerCard', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert',
-  'ShadcnProgress', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame',
-  'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BeTimeline', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'BeFileTree', 'BeCitations', 'BeFileDiff',
+  'BeFollowUps', 'BeStat', 'BeResponse', 'BeApproval', 'BeQuestions', 'BeTodoList', 'AgentIcon',
+  'InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'ComputerCard', 'ShadcnProgress',
+  'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'BeFileTree', 'BeCitations', 'BeFileDiff',
+  'Tag', 'Steps', 'Form',
 ]
 
 /**

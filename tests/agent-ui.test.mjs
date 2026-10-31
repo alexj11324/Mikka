@@ -272,7 +272,7 @@ test('真实缺少段落与组件格式错误分别说明原因', () => {
   const missing = getAgentUIIssue(parser.parse('root = Stack([TextContent("已有正文"), missing])'))
   assert.match(missing.message, /没有返回这些段落/)
   assert.match(missing.message, /已收到的内容会保留/)
-  const invalid = getAgentUIIssue(parser.parse('root = ShadcnTable("错误类型", [])'))
+  const invalid = getAgentUIIssue(parser.parse('root = BeTable("错误类型", [])'))
   assert.match(invalid.message, /表格数据格式不正确/)
   assert.match(getAgentUIIssue(null).message, /内容格式有误/)
   assert.equal(getAgentUIIssue(parser.parse('root = TextContent("正文")'), [{ source: 'parser', code: 'no-root', severity: 'warning', message: 'recoverable' }]), null)
@@ -298,7 +298,7 @@ test('紧凑推荐卡片可解析且模型规范优先小卡片', async () => {
 })
 
 const beuiResponse = `root = Stack([badge, statistic, button])
-badge = BeBadge("用户提供的状态", "info")
+badge = Tag("用户提供的状态", null, "sm", "info")
 statistic = BeStat("本周完成任务", 12, "项", 0)
 button = BeButton("继续细化", "请根据本周完成12项任务的数据给出改进建议", "outline")`
 
@@ -321,15 +321,19 @@ test('beUI 组件包含在运行时和可序列化规范中', async () => {
   assert.match(prompt, /每次模型请求不会自动包含历史/)
 })
 
-test('beUI OpenUI Lang 输出可解析且保留旧组件兼容', () => {
+test('beUI 与 OpenUI 内置组件的输出可解析', () => {
   const parser = createParser(library.toJSONSchema(), library.root)
   const result = parser.parse(beuiResponse)
   assert.ok(result.root)
   assert.equal(result.meta.incomplete, false)
   assert.deepEqual(result.meta.unresolved, [])
   assert.deepEqual(result.meta.errors, [])
-  for (const name of ['ShadcnCard', 'ShadcnButton', 'ReuiFrame', 'Tabs', 'Form', 'Table']) {
+  for (const name of ['Tag', 'Steps', 'Form', 'EditableTable', 'Tabs', 'Table']) {
     assert.ok(library.components[name])
+  }
+  // Duplicates of OpenUI or beUI components are gone; old saved replies stay readable in the archive (tests/legacy-chat-content.test.tsx).
+  for (const name of ['ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame', 'BeBadge', 'BeTimeline']) {
+    assert.equal(name in agentComponentCatalog, false, name)
   }
 })
 
@@ -410,10 +414,9 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
 })
 
 test('beUI 限制按钮语义、状态、数字和小数位', () => {
-  const { BeButton, BeBadge, BeStat } = agentComponentCatalog
+  const { BeButton, BeStat } = agentComponentCatalog
   assert.equal(BeButton.props.safeParse({ label: '继续细化', action: '请根据用户数据给出建议' }).success, true)
   assert.equal(BeButton.props.safeParse({ label: '已保存', action: 'save' }).success, false)
-  assert.equal(BeBadge.props.safeParse({ text: '建议', status: 'arbitrary' }).success, false)
   for (const value of [Infinity, NaN, 1e13]) {
     assert.equal(BeStat.props.safeParse({ label: '用户输入', value }).success, false)
   }
