@@ -4,7 +4,7 @@ name: Browser tests
 # - pull requests: the @smoke set plus the complete specs of the areas the change
 #   touches, in one job (install, build, start, run). Performance runs when a
 #   change touches what the budgets measure.
-# - push to main: the functional spec files on two shards. A red run opens or
+# - push to main: the functional spec files on four shards. A red run opens or
 #   updates one issue that names the merged pull request's author.
 # - nightly and manual runs: every spec, including visual, crawler and slower
 #   specs, plus performance, on four shards. integrate/* pull requests run this
@@ -196,6 +196,13 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Restore the Next.js build cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .next/cache
+          key: next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - name: Build the application (lint runs once, in the CI workflow's UI policy job)
         run: |
           node scripts/build-subscription-worker.mjs
@@ -338,12 +345,16 @@ jobs:
 
   browser-selection:
     # Selection-policy pull requests also run the union of every scoped spec
-    # (plus the smoke tag) as a real subset, on its own runner.
-    name: Browser selection validation
+    # (plus the smoke tag) as four isolated whole-file subsets.
+    name: Browser selection validation (${{ matrix.shard }}/4)
     needs: changes
     if: github.event_name == 'pull_request' && !github.event.pull_request.draft && needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.verify_selection == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     services:
       postgres:
         image: postgres:17
@@ -404,6 +415,13 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Restore the Next.js build cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .next/cache
+          key: next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - name: Build the application
         run: |
           node scripts/build-subscription-worker.mjs
@@ -422,7 +440,7 @@ jobs:
           : > "$log_file"
           chmod 600 "$log_file"
           test_status=0
-          node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted > "$log_file" 2>&1 || test_status=$?
+          node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted --shard=${{ matrix.shard }}/4 > "$log_file" 2>&1 || test_status=$?
           if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
             if [ "$test_status" -eq 0 ]; then test_status=1; fi
             exit "$test_status"
@@ -437,7 +455,7 @@ jobs:
         if: ${{ !cancelled() && steps.account-evidence-audit.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: browser-test-report-selection-targeted-${{ github.sha }}
+          name: browser-test-report-selection-targeted-${{ github.sha }}-${{ matrix.shard }}
           path: |
             playwright-selection-targeted-report/
             selection-targeted-results/
@@ -510,20 +528,36 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      # Only compiler cache crosses revisions. Every run still builds its own
+      # application; the source commit hash gives each main build a fresh entry.
+      - name: Restore the Next.js build cache
+        id: next-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .next/cache
+          key: next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - name: Build the application (lint runs once, in the CI workflow's UI policy job)
         run: |
           node scripts/build-subscription-worker.mjs
           pnpm generate:agent-ui
           pnpm exec next build
+      - name: Save the Next.js build cache (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.next-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .next/cache
+          key: ${{ steps.next-cache.outputs.cache-primary-key }}
       - name: Package the build for the parallel test jobs
-        run: tar -czf browser-build.tar.gz .next
+        run: tar --exclude='.next/cache' -czf browser-build.tar.gz .next
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: browser-build-${{ github.sha }}
           path: browser-build.tar.gz
           if-no-files-found: error
           retention-days: 1
-          compression-level: 1
+          compression-level: 0
 
   browser-runtime:
     name: Browser runtime gates
@@ -687,13 +721,13 @@ jobs:
     needs: [changes, browser-build]
     if: needs.changes.result == 'success' && needs.browser-build.result == 'success' && (needs.changes.outputs.browser_tier == 'main' || needs.changes.outputs.browser_tier == 'full')
     runs-on: ubuntu-latest
-    # Independent shards (two for main, four for full): each matrix job gets its
+    # Four independent shards for main and full: each matrix job gets its
     # own PostgreSQL service and test-account directory, so no fixture or lease
     # is shared across shards.
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.changes.outputs.browser_tier == 'main' && '[1, 2]' || '[1, 2, 3, 4]') }}
+        shard: [1, 2, 3, 4]
     timeout-minutes: 45
     services:
       postgres:
@@ -725,7 +759,7 @@ jobs:
       SLACK_BOT_USER_ID: U123
       SLACK_USER_BINDINGS: '{"U456":"ci-only-mikka-user"}'
       NEXT_TELEMETRY_DISABLED: '1'
-      BROWSER_SHARDS: ${{ needs.changes.outputs.browser_tier == 'main' && '2' || '4' }}
+      BROWSER_SHARDS: '4'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
