@@ -49,10 +49,26 @@ index for inspection. The test daemon still performs its normal lifecycle
 cleanup inside the new dedicated fixture; previously retained resources are
 not part of that fixture.
 
-No global `tsx` or separate `@mikka/protocol` package is needed. The proposed
-release workflow uses npm trusted publishing from GitHub Actions, with npm
-provenance. It is manual and must be configured for the approved package before
-it can publish. Running tests or building a package does not publish it.
+No global `tsx` or separate `@mikka/protocol` package is needed. Every push to
+`main` publishes through `.github/workflows/publish-daemon.yml` after daemon
+checks and the installed-package runtime test pass. The workflow uses npm
+trusted publishing and provenance; its npm trust configuration must authorize
+this exact repository and workflow filename.
+
+CI stamps `0.0.<workflow run number + 1>` into the source manifest before the
+build, so the npm package and runtime report the same version. Source commits
+keep their development version. Re-running a workflow keeps its version and
+skips publication if npm already records that version from the same commit.
+CI writes the commit SHA into the published manifest as `gitHead`; an existing
+version with absent or different commit metadata stops the release. After
+publication, CI reads npm metadata back and checks the commit SHA. If npm
+serves 404 while the published version becomes available, CI checks up to 31
+times with 10-second waits. Exhausting that wait reports registry verification
+as incomplete; it does not claim that npm rejected publication.
+Releases queue without cancellation (up to GitHub's 100 pending-run limit).
+An older run can publish under its own `build-<version>` tag, preserving the
+newer `latest` version. Manual dispatch remains available on `main` and gets
+a new run version. Running local tests or builds does not publish anything.
 
 `test:package` installs the actual tarball into a new directory with public
 registry dependencies, without workspace symlinks or install scripts. Plain

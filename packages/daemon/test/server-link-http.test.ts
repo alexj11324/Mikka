@@ -84,6 +84,57 @@ const assignment = (runId: string) => ({
 })
 
 describe("HttpServerLink", () => {
+  it('holds every pending tool callback during human control and continues the same gate on release', async () => {
+    vi.useFakeTimers()
+    let paused = true, live = true, executed = 0
+    const { fetch } = scripted(() => json({ live, paused }))
+    const gate = await new HttpServerLink('http://server.test', fetch).prepareRunToolApproval({ ...assignment('run-1'), harness:'codex', policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,computer_use:'allow'}}, policyRevision:'a'.repeat(64) }, new AbortController().signal, () => {}, '/tmp')
+    try {
+      const pending = gate.request({runId:'run-1',harness:'codex',requestId:'paused-computer-call',method:'cli/mcp__mikka_computer__click',input:{}}).then(decision => { if (decision === 'allow') executed++ })
+      await vi.advanceTimersByTimeAsync(3000)
+      expect(executed).toBe(0)
+      expect(gate.revoked).toBe(false)
+      paused = false
+      await vi.advanceTimersByTimeAsync(1000)
+      await pending
+      expect(executed).toBe(1)
+      expect(gate.runId).toBe('run-1')
+      paused = true
+      const ending = gate.checkLive().then(allowed => { if (allowed) executed++ })
+      await vi.advanceTimersByTimeAsync(1000)
+      live = false
+      await vi.advanceTimersByTimeAsync(1000)
+      await ending
+      expect(executed).toBe(1)
+    } finally { gate.revoke(); vi.useRealTimers() }
+  })
+
+  it('holds an already pending approval across takeover instead of denying the same tool call', async () => {
+    vi.useFakeTimers()
+    let paused=false, proposed=false, approved=false, consumed=0
+    const { fetch } = scripted(call => {
+      const body=call.body as {operation:string}
+      if (body.operation === 'check') return json({live:true,paused})
+      if (body.operation === 'propose') { proposed=true; paused=true; return json({id:'10000000-0000-4000-8000-000000000001',digest:'b'.repeat(64),status:'pending'}) }
+      if (body.operation === 'take') { if (approved) consumed++; return json({decision:approved?'allow':'pending'}) }
+      return json({cancelled:true})
+    })
+    const policy=defaultRunPolicy(); policy.permissions.network='ask'
+    const gate=await new HttpServerLink('http://server.test',fetch).prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy,policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
+    try {
+      let decision: string|undefined
+      const pending=gate.request({runId:'run-1',harness:'codex',requestId:'pending-before-takeover',method:'sandbox/network',input:{host:'example.test',port:443}}).then(value=>{decision=value})
+      await vi.advanceTimersByTimeAsync(3000)
+      expect(proposed).toBe(true)
+      expect(decision).toBeUndefined()
+      expect(consumed).toBe(0)
+      paused=false; approved=true
+      await vi.advanceTimersByTimeAsync(1000)
+      await pending
+      expect(decision).toBe('allow')
+      expect(consumed).toBe(1)
+    } finally { gate.revoke(); vi.useRealTimers() }
+  })
   it.each([403,500])('revokes an idle run when its liveness endpoint returns %s', async status => {
     vi.useFakeTimers()
     let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined

@@ -20,19 +20,30 @@ const validate = (value: ApprovalInput) => {
 export class AgentToolApprovalStore {
   constructor(private readonly pool: Pick<Pool, 'connect' | 'query'>, private readonly membership: CliMembershipGuard = realCliMembershipGuard) {}
   /** Locks the run before every state mutation so stop, lease and ownership are checked. */
-  private async transaction<T>(runId: string, userId: string, work: (client: PoolClient) => Promise<T>): Promise<T> {
+  private async transaction<T>(runId: string, userId: string, work: (client: PoolClient) => Promise<T>, allowPaused = false): Promise<T> {
     return writeTransaction(this.pool, async client => {
-      const run = await client.query(`SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 AND status IN ('preparing','running','waiting_input') AND "stopRequestedAt" IS NULL AND "leaseExpiresAt">now() FOR UPDATE`, [runId, userId])
+      const run = await client.query(`SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 AND status=ANY($3::text[]) AND "stopRequestedAt" IS NULL AND "leaseExpiresAt">now() FOR UPDATE`, [runId, userId, ['preparing','running','waiting_input', ...(allowPaused ? ['paused'] : [])]])
       if (!run.rowCount) throw new ApprovalUnavailable()
       return work(client)
     }, { guard: cliPolicyGuard(runId,userId,this.membership) })
   }
   async check(actor: DeviceActor, runId: string, revision: string) {
+    const state = await this.checkState(actor, runId, revision)
+    return state.live && !state.paused
+  }
+  async checkState(actor: DeviceActor, runId: string, revision: string) {
     return this.transaction(runId, actor.userId, async client => {
-      const row = await client.query('SELECT 1 FROM agent_runs WHERE id=$1 AND "deviceId"=$2', [runId, actor.deviceId])
+      // The existing desktop control lease expires without a new timer. A
+      // liveness poll restores the held session once that lease has expired.
+      const current = await client.query('SELECT status FROM agent_runs WHERE id=$1 AND "deviceId"=$2', [runId, actor.deviceId])
+      if (current.rows[0]?.status === 'paused') await client.query(`UPDATE agent_runs r SET status=COALESCE(r."resumeStatus",'running'),"resumeStatus"=NULL,"pauseReason"=NULL,"updatedAt"=now()
+        FROM computer_run_bindings b JOIN bot_desktops d ON d."botId"=b."botId" AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
+        WHERE r.id=$1 AND b."runId"=r.id AND b."ownerId"=r."userId" AND r.status='paused' AND r."pauseReason"='human_control'
+          AND (d.control<>'user' OR d."controlUntil" IS NULL OR d."controlUntil"<=now())`, [runId])
+      const row = await client.query('SELECT status FROM agent_runs WHERE id=$1 AND "deviceId"=$2', [runId, actor.deviceId])
       if (!row.rowCount) throw new ApprovalUnavailable()
-      return (await lockCliRunPolicy(client, runId, actor.userId)).revision === revision
-    })
+      return { live: (await lockCliRunPolicy(client, runId, actor.userId)).revision === revision, paused: row.rows[0].status === 'paused' }
+    }, true)
   }
   async propose(actor: DeviceActor, value: ApprovalInput) {
     const { serialized, digest, inputDigest } = validate(value)
@@ -46,7 +57,7 @@ export class AgentToolApprovalStore {
       const { rows } = await client.query(`INSERT INTO agent_tool_approvals (id,"runId","userId","deviceId","requestId",harness,method,input,digest,status,"expiresAt","policyRevision","inputDigest") VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,'pending',now()+interval '5 minutes',$10,$11) ON CONFLICT ("runId","requestId") DO UPDATE SET "requestId"=EXCLUDED."requestId" WHERE agent_tool_approvals.digest=EXCLUDED.digest AND agent_tool_approvals."inputDigest"=EXCLUDED."inputDigest" AND agent_tool_approvals."userId"=EXCLUDED."userId" AND agent_tool_approvals."deviceId"=EXCLUDED."deviceId" RETURNING id,digest,status`, [id,value.runId,actor.userId,actor.deviceId,value.requestId,value.harness,value.method,serialized,digest,value.policyRevision,inputDigest])
       if (!rows[0]) throw new ApprovalUnavailable()
       return rows[0] as { id: string; digest: string; status: string }
-    })
+    }, true)
   }
   async decide(userId: string, runId: string, id: string, digest: string, decision: 'approve' | 'deny') {
     return this.transaction(runId, userId, async client => {
@@ -59,13 +70,16 @@ export class AgentToolApprovalStore {
   /** Consume before returning approval; retry can never issue a second permit. */
   async take(actor: DeviceActor, runId: string, id: string, digest: string) {
     return this.transaction(runId, actor.userId, async client => {
+      const state = await client.query('SELECT status FROM agent_runs WHERE id=$1 AND "deviceId"=$2', [runId,actor.deviceId])
+      if (!state.rowCount) throw new ApprovalUnavailable()
+      if (state.rows[0].status === 'paused') return 'pending' as const
       const policy = await lockCliRunPolicy(client, runId, actor.userId)
       const { rows } = await client.query(`UPDATE agent_tool_approvals SET status='consumed' WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND "deviceId"=$4 AND digest=$5 AND "policyRevision"=$6 AND status='approved' AND "expiresAt">now() RETURNING status`, [id,runId,actor.userId,actor.deviceId,digest,policy.revision])
       if (rows[0]) return 'allow' as const
       const found = await client.query(`SELECT status FROM agent_tool_approvals WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND "deviceId"=$4 AND digest=$5 AND "policyRevision"=$6 AND "expiresAt">now()`, [id,runId,actor.userId,actor.deviceId,digest,policy.revision])
       if (!found.rows[0]) throw new ApprovalUnavailable()
       return found.rows[0].status === 'pending' ? 'pending' as const : 'deny' as const
-    })
+    }, true)
   }
   async cancel(actor: DeviceActor, runId: string, id: string, digest: string) {
     const { rowCount } = await this.pool.query(`UPDATE agent_tool_approvals SET status='cancelled',"decidedAt"=now() WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND "deviceId"=$4 AND digest=$5 AND status IN ('pending','approved')`, [id,runId,actor.userId,actor.deviceId,digest])
