@@ -39,6 +39,8 @@ export async function openCreateIssue(page: Page) {
   await dialog.getByRole('option', { name: '新建任务', exact: true }).click()
   const create = page.getByRole('dialog', { name: '新建任务', exact: true })
   await expect(create).toBeVisible()
+  // ⌘K search plays its close animation before unmounting; wait until it has gone.
+  await expect(page.getByRole('dialog')).toHaveCount(1)
   return create
 }
 

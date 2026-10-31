@@ -22,10 +22,12 @@ import { ProjectTextEditor } from './project-text-editor'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useShortcutLabel } from '@/components/shortcut-keys'
+import { usePresence } from '@/lib/use-presence'
 
 export function ProjectDetail({ project, projects, issues, userName, onBack, onOpenIssue, onCreateIssue, onUpdated }: { project: Project; projects: Project[]; issues: Awaited<ReturnType<typeof listIssues>>; userName: string; onBack: () => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void }) {
   const i18nText = useTranslations();
   const [editing, setEditing] = useState(false)
+  const editDialog = usePresence(editing)
   const [linking, setLinking] = useState(false)
   const [showDetails, setShowDetails] = useState(true)
   const detailsShortcut = useShortcutLabel(['mod', 'I'])
@@ -78,7 +80,7 @@ export function ProjectDetail({ project, projects, issues, userName, onBack, onO
         </aside>}
       </div>
     </Tabs>
-    {editing && <ProjectForm project={project} projects={projects} userName={userName} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onUpdated() }} />}
+    {editDialog.value && <ProjectForm open={editDialog.open} onOpenChangeComplete={editDialog.onOpenChangeComplete} project={project} projects={projects} userName={userName} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onUpdated() }} />}
     {linking && <ProjectIssuePicker project={project} projects={projects} issues={issues} onClose={() => setLinking(false)} onSaved={() => { setLinking(false); onUpdated() }} />}
   </div>
 }

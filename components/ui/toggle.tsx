@@ -12,8 +12,8 @@ const toggleVariants = cva(
         default: "bg-transparent",
         // R-31: grey fill, no stroke; the pressed item is a step darker.
         outline: "border border-transparent bg-control text-muted-foreground hover:bg-control-hover hover:text-foreground aria-pressed:bg-control-hover aria-pressed:text-foreground data-[state=on]:bg-control-hover",
-        // Item of a segmented control: sits on the group's `--control` track; the pressed item is raised.
-        segment: "bg-transparent font-normal text-muted-foreground hover:bg-transparent hover:text-foreground aria-pressed:bg-background aria-pressed:font-medium aria-pressed:text-foreground aria-pressed:shadow-xs dark:aria-pressed:bg-control-hover",
+        // Item of a segmented control: sits on the group's `--control` track; ToggleGroup draws the raised pill under the pressed item.
+        segment: "bg-transparent font-normal text-muted-foreground hover:bg-transparent hover:text-foreground aria-pressed:bg-transparent aria-pressed:font-medium aria-pressed:text-foreground data-[state=on]:bg-transparent",
       },
       size: {
         default:

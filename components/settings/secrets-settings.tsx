@@ -16,6 +16,7 @@ import { SettingRow, SettingsLoading, SettingsSection, settingsSectionAction } f
 import type { WorkspaceSecretView } from '@/lib/secrets/store'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
+import { usePresence, type PresenceProps } from '@/lib/use-presence'
 
 /** Rows grouped as N5 shows them: 工作区 first, then one group per repository. */
 function groupByScope(secrets: WorkspaceSecretView[]) {
@@ -33,6 +34,7 @@ export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
   const actionError = useActionError()
   const list = useSWR(['settings:secrets', workspaceId], () => listSecrets(workspaceId))
   const [editing, setEditing] = useState<WorkspaceSecretView | 'new' | null>(null)
+  const secretDialog = usePresence(editing)
   const [warning, setWarning] = useState<string | null>(null)
   const secrets = list.data && !list.data.error ? list.data.secrets : null
 
@@ -49,7 +51,7 @@ export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
       </div>)}
     </SettingsSection>
     {warning && <p role="status" className="px-1 text-sm text-muted-foreground">{warning}</p>}
-    {editing && <SecretDialog workspaceId={workspaceId} secret={editing === 'new' ? null : editing} onClose={saved => {
+    {secretDialog.value && <SecretDialog open={secretDialog.open} onOpenChangeComplete={secretDialog.onOpenChangeComplete} workspaceId={workspaceId} secret={secretDialog.value === 'new' ? null : secretDialog.value} onClose={saved => {
       setEditing(null)
       if (saved?.warning === 'shortValueNotMasked') setWarning(t('shortValueNotMasked', { name: saved.name }))
       if (saved) void list.mutate()
@@ -64,6 +66,7 @@ function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
   const actionError = useActionError()
   const status = useSWR(['settings:e2b-key', workspaceId], () => getE2BKey())
   const [open, setOpen] = useState(false)
+  const keyDialog = usePresence(open)
   const data = status.data && !status.data.error ? status.data : null
   const state = !data ? null : !data.configured ? 'missing' : data.lastErrorCode ? `errors.${data.lastErrorCode}` : 'configured'
 
@@ -78,11 +81,11 @@ function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
         </div>
       </SettingRow>}
     </SettingsSection>
-    {open && data && <E2BKeyDialog configured={data.configured} onClose={changed => { setOpen(false); if (changed) void status.mutate() }} />}
+    {keyDialog.value && data && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={data.configured} onClose={changed => { setOpen(false); if (changed) void status.mutate() }} />}
   </>
 }
 
-function E2BKeyDialog({ configured, onClose }: { configured: boolean; onClose: (changed: boolean) => void }) {
+function E2BKeyDialog({ configured, onClose, open = true, onOpenChangeComplete }: { configured: boolean; onClose: (changed: boolean) => void } & PresenceProps) {
   const t = useTranslations('Settings.secrets.e2b')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
@@ -104,7 +107,7 @@ function E2BKeyDialog({ configured, onClose }: { configured: boolean; onClose: (
     }
   }
 
-  return <Dialog open onOpenChange={next => { if (!next && !pending) onClose(false) }}>
+  return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={next => { if (!next && !pending) onClose(false) }}>
     <DialogContent>
       <DialogHeader><DialogTitle>E2B API Key</DialogTitle></DialogHeader>
       <form onSubmit={event => { event.preventDefault(); if (apiKey.trim() && !pending) void run('save') }}>
@@ -138,7 +141,7 @@ function SecretRow({ secret, onEdit }: { secret: WorkspaceSecretView; onEdit: ()
 
 type Saved = { name: string; warning: 'shortValueNotMasked' | null } | null
 
-function SecretDialog({ workspaceId, secret, onClose }: { workspaceId: string; secret: WorkspaceSecretView | null; onClose: (saved: Saved) => void }) {
+function SecretDialog({ workspaceId, secret, onClose, open = true, onOpenChangeComplete }: { workspaceId: string; secret: WorkspaceSecretView | null; onClose: (saved: Saved) => void } & PresenceProps) {
   const t = useTranslations('Settings.secrets')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
@@ -185,7 +188,7 @@ function SecretDialog({ workspaceId, secret, onClose }: { workspaceId: string; s
     }
   }
 
-  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose(null) }}>
+  return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={open => { if (!open && !pending) onClose(null) }}>
     <DialogContent>
       <DialogHeader><DialogTitle>{secret ? secret.name : t('addTitle')}</DialogTitle></DialogHeader>
       <div className="flex flex-col gap-3">
