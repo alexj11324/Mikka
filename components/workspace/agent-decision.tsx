@@ -18,6 +18,9 @@ import { useAgentInteraction } from './agent-interaction'
 import { CitationChip } from './agent-citations'
 import { ReplyBubbles } from './agent-text-bubble'
 import { type AgentComponentRenderers } from '@/lib/agent-ui-catalog'
+import { ConnectDeviceDialog } from '@/components/devices/connect-device-dialog'
+import { E2BKeyDialog } from '@/components/settings/e2b-key-dialog'
+import { usePresence } from '@/lib/use-presence'
 
 export function useAgentDecision() {
   const agentCopy = useAgentCopy()
@@ -177,16 +180,25 @@ export const ReplyAnswer = createContext<string | null>(null)
 /** Where the user stores their own E2B key (the cloud computer runs on it). */
 export const CLOUD_KEY_SETTINGS = '/settings?section=secrets'
 
-function ChoiceCard({ title, options, task }: { title: string; options: { value: string; label: string; action?: 'cloudKeySettings' }[]; task?: string }) {
+/** Where the person connects a server: Settings › 电脑 (one-click SSH in the desktop app). */
+export const CONNECT_SERVER_SETTINGS = '/settings?section=computers'
+
+type ChoiceAction = 'cloudKeySettings' | 'enableThisMac' | 'connectServer' | 'e2bKey'
+
+function ChoiceCard({ title, options, task }: { title: string; options: { value: string; label: string; action?: ChoiceAction }[]; task?: string }) {
   const agentCopy = useAgentCopy()
   const bubbles = use(ReplyBubbles)
   const answer = use(ReplyAnswer)
   const { send, sent, pending, error, status } = useAgentDecision()
   const [picked, setPicked] = useState<string | null>(null)
+  // 这个任务需要一台电脑来跑 (waiting_machine): rows open the setup they name instead of answering.
+  const [dialog, setDialog] = useState<'mac' | 'e2b' | null>(null)
+  const e2bDialog = usePresence(dialog === 'e2b')
   const chosen = picked ?? options.find(option => [option.label, option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : null].includes(answer?.trim() ?? ''))?.value ?? null
   const answered = sent || answer !== null
   // Dispatch options are localized by value (BE-13 sends English labels); anything else shows as written.
-  const copy = (option: { value: string; label: string; action?: 'cloudKeySettings' }) => option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup
+  const copy = (option: { value: string; label: string; action?: ChoiceAction }) => option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup
+    : option.action === 'enableThisMac' ? agentCopy.needsMachineMac : option.action === 'connectServer' ? agentCopy.needsMachineServer : option.action === 'e2bKey' ? agentCopy.needsMachineE2B
     : option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : option.label
   return <div role="group" aria-label={title} data-slot="choice-card" className="flex w-full max-w-sm min-w-0 flex-col gap-2">
     <p className={cn('w-fit max-w-full min-w-0', bubbles ? 'rounded-2xl bg-muted px-4 py-2.5' : 'font-medium')}>
@@ -199,11 +211,16 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
         const letter = String.fromCharCode(65 + index)
         // No E2B key yet: this row opens the settings where the key is set instead of answering. It stays an Item
         // once answered (dimmed, not a link) so the row never swaps component and jumps.
-        if (option.action === 'cloudKeySettings') return <Item key={option.value} size="sm" variant="muted" aria-disabled={answered || undefined} className={cn(answered && 'pointer-events-none opacity-50')} render={answered ? <div /> : <Link href={CLOUD_KEY_SETTINGS} />}>
+        if (option.action === 'cloudKeySettings' || option.action === 'connectServer') return <Item key={option.value} size="sm" variant="muted" aria-disabled={answered || undefined} className={cn(answered && 'pointer-events-none opacity-50')} render={answered ? <div /> : <Link href={option.action === 'connectServer' ? CONNECT_SERVER_SETTINGS : CLOUD_KEY_SETTINGS} />}>
           <ItemMedia><Kbd>{letter}</Kbd></ItemMedia>
           <ItemContent><ItemTitle>{label}</ItemTitle></ItemContent>
           <ItemActions><ChevronRight aria-hidden="true" /></ItemActions>
         </Item>
+        // These open their setup in a dialog here; like the links above they never answer.
+        if (option.action === 'enableThisMac' || option.action === 'e2bKey') return <Button key={option.value} type="button" variant="secondary" disabled={answered}
+          onClick={() => setDialog(option.action === 'e2bKey' ? 'e2b' : 'mac')}>
+          <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ChevronRight data-icon="inline-end" aria-hidden="true" />
+        </Button>
         // Answered rows stay the same Button, disabled, so nothing changes height or colour.
         return <Button key={option.value} type="button" variant={selected ? 'default' : 'secondary'} aria-pressed={selected}
           disabled={answered || status !== 'pending'} onClick={() => { setPicked(option.value); void send(label) }}>
@@ -213,5 +230,7 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
       })}
     </div>
     {error && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert></div>}
+    <ConnectDeviceDialog open={dialog === 'mac'} onOpenChange={open => setDialog(open ? 'mac' : null)} hideTrigger />
+    {e2bDialog.value && <E2BKeyDialog open={e2bDialog.open} onOpenChangeComplete={e2bDialog.onOpenChangeComplete} configured={false} onClose={() => setDialog(null)} />}
   </div>
 }

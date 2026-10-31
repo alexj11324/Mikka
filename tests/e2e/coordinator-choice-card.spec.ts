@@ -23,6 +23,9 @@ async function shoot(page: import('@playwright/test').Page, testInfo: import('@p
 const clarify = 'root = Stack([intro, q])\nintro = TextContent("好的。")\nq = BeQuestions("官网首页在手机上太慢了，压到 2 秒以内", [{id:"net", title:"先确认一件事：2 秒按哪种网络来算？", options:[{value:"4g", label:"手机 4G（Lighthouse 移动端）"}, {value:"wifi", label:"桌面宽带"}, {value:"both", label:"两种都要到 2 秒"}, {value:"none", label:"不设线，越快越好"}]}])'
 const dispatchFailed = (task: string, noKey = false) => `root = Stack([q])\nq = BeQuestions("派发失败：设备不在线", [{id:"route", title:"派不出去：Alex 的 MacBook 不在线。等它上线，还是在 Mikka Cloud 上运行？", options:[{value:"wait", label:"Wait for it"}, {value:"cloud", label:"Run on Mikka Cloud"${noKey ? ', action:"cloudKeySettings"' : ''}}]}], "${task}")`
 
+// What the bot draws from dispatch_run's waiting_machine result (lib/machine-waits.ts MACHINE_NEEDED_CARD).
+const needsMachine = 'root = Stack([q])\nq = BeQuestions("任务在等一台电脑", [{id:"machine", title:"这个任务需要一台电脑来跑", options:[{value:"mac", label:"在这台电脑上启用", action:"enableThisMac"}, {value:"server", label:"连接我的服务器", action:"connectServer"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}]}])'
+
 // Dispatch option labels are English on purpose: the card localizes them by value.
 // Visual and interaction coverage of stored replies; the Factory clarify answer itself is the person's next message.
 async function seed(email: string, messages: object[]) {
@@ -109,5 +112,27 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await expect(card.getByRole('button', { name: /等它上线/ })).toHaveAttribute('aria-pressed', 'true')
     await expect(card.getByRole('link', { name: /去设置 E2B 密钥/ })).toHaveCount(0)
     await expect(card.getByText('去设置 E2B 密钥', { exact: true }).locator('xpath=ancestor::*[@data-slot="item"][1]')).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  test(`no machine: the card opens this Mac's setup, the server settings and the E2B key dialog (${viewport.name})`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport)
+    const { email } = await register(page)
+    await seed(email, [{ role: 'user', content: '把首页压到 2 秒以内' }, { role: 'assistant', content: needsMachine }])
+    await page.goto(app('/?section=coordinator'))
+    const card = page.getByRole('region', { name: 'Coordinator', exact: true }).getByRole('group', { name: '这个任务需要一台电脑来跑' })
+    await expect(card.getByRole('link', { name: /连接我的服务器/ })).toHaveAttribute('href', /\/settings\?section=computers$/)
+    await shoot(page, testInfo, `machine-${viewport.name}-open`)
+    // Rows open setup, they never answer: nothing is sent to the bot.
+    await card.getByRole('button', { name: /在这台电脑上启用/ }).click()
+    const mac = page.getByRole('dialog', { name: '添加设备' })
+    await expect(mac).toBeVisible()
+    await mac.getByRole('button', { name: '完成' }).click()
+    await expect(mac).toHaveCount(0)
+    await card.getByRole('button', { name: /填入 E2B Key/ }).click()
+    await expect(page.getByRole('dialog', { name: 'E2B API Key' })).toBeVisible()
+    await shoot(page, testInfo, `machine-${viewport.name}-e2b`)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'E2B API Key' })).toHaveCount(0)
+    await expect(page.getByText('填入 E2B Key', { exact: true })).toHaveCount(1)
   })
 }

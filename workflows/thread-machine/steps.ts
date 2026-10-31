@@ -8,6 +8,8 @@ export async function maintainThreadMachine(actor: { userId: string; workspaceId
   if (!row || row.state === 'ended') return false
   if (['succeeded', 'failed', 'stopped', 'cancelled'].includes(row.status)) {
     await threadMachineAction(pool, actor, runId, 'end')
+    // A cloud slot is free again: tasks in this workspace that waited for a machine try again.
+    await (await import('@/lib/machine-waits')).wakeMachineWaits(pool, null, { workspaceId: actor.workspaceId }).catch(() => undefined)
     await pool.query('UPDATE suggestion_executions SET status=$2,"endedAt"=now() WHERE "runId"=$1', [runId, row.status === 'succeeded' ? 'done' : row.status === 'cancelled' ? 'stopped' : row.status])
     return false
   }

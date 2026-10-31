@@ -135,6 +135,16 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
       ].filter(Boolean).join('\n')
     case 'run_redispatched':
       return [`[Event] Device ${payload.deviceId} is back online; queued Factory run ${event.runId} for task ${payload.taskId} will start there.`, note].filter(Boolean).join('\n')
+    case 'machine_needed':
+      return [`[Event] Task ${event.issueId} is waiting for a computer: no cloud sandbox and no online device.`, note].filter(Boolean).join('\n')
+    case 'machine_available': {
+      const request = payload.request && typeof payload.request === 'object' ? payload.request as Record<string, unknown> : {}
+      return [
+        `[Event] ${payload.deviceId ? `Device ${payload.deviceId} is online` : 'The cloud sandbox is available'}. Task ${event.issueId} was waiting for a computer.`,
+        `Dispatch it again now with dispatch_run (issueId ${event.issueId}${typeof request.repo === 'string' ? `, repo ${JSON.stringify(request.repo)}` : ''}${typeof request.note === 'string' ? `, note ${JSON.stringify(request.note)}` : ''}). Do not ask the person first.`,
+        note,
+      ].filter(Boolean).join('\n')
+    }
     case 'issue_done':
       return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to done.`, note].filter(Boolean).join('\n')
     case 'run_report':

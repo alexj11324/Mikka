@@ -403,7 +403,11 @@ Today a blocked request returns `429` (`Thread machine limit reached`, `Workspac
 machine limit reached`, or `Thread machine budget exhausted`); it never
 provisions or bills. Under [orchestration](orchestration.md) § 5 there are no
 Mikka caps when the person's own E2B key pays; removing them is pending in code
-(conflict C15). Invalid, zero or negative settings fall back to the
+(conflict C15). A bot's `dispatch_run` checks the same limits before it
+queues a cloud thread and treats a refusal, or any E2B refusal while the
+machine starts, as no cloud: the queued cloud run is ended and the thread goes
+to the person's own device, or waits for a machine
+([decision 2026-10-31-2200](decisions/2026-10-31-2200-run-machine-fallback.md)). Invalid, zero or negative settings fall back to the
 defaults, so there is no "unlimited" configuration.
 
 Compute hours are tracked, not assumed: the migration adds `runningSince` and

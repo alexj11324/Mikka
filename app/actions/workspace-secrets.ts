@@ -33,7 +33,13 @@ export async function getE2BKey(workspaceId?: string): Promise<SettingsActionRes
   return withActor((u, w) => getE2BKeyStatus(u, w), workspaceId)
 }
 export async function saveE2BKey(input: { apiKey: string }, workspaceId?: string): Promise<SettingsActionResult<E2BKeyStatus>> {
-  return withActor((u, w, audit) => setE2BKey(u, w, input, { audit }), workspaceId)
+  return withActor(async (u, w, audit) => {
+    const status = await setE2BKey(u, w, input, { audit })
+    // Tasks in this workspace that waited for a machine try the cloud again.
+    const [{ pool }, { wakeMachineWaits }] = await Promise.all([import('@/lib/db'), import('@/lib/machine-waits')])
+    await wakeMachineWaits(pool, null, { workspaceId: w }).catch(() => undefined)
+    return status
+  }, workspaceId)
 }
 export async function deleteE2BKey(workspaceId?: string): Promise<SettingsActionResult<{ removed: boolean }>> {
   return withActor((u, w, audit) => removeE2BKey(u, w, audit), workspaceId)

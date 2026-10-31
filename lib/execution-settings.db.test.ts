@@ -27,7 +27,8 @@ test(
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb);
-      CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
+      CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now());
+      CREATE TABLE workspace_e2b_keys ("workspaceId" uuid PRIMARY KEY)`);
       await pool.query(
         await readFile(
           new URL(
@@ -224,6 +225,10 @@ test(
       await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",epoch,state,provider) VALUES ($1,'alice',$2,1,'connected','claude')`,[claudeConnection,alice.workspaceId]);
       await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision","modelId",route) VALUES ($1,'alice',$2,$3,$4,1,'reported-opus','claude_cpa')`,[claudeBinding,alice.workspaceId,bot,claudeConnection]);
       assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:server,harness:'claude_code',model:'opus',position:2147483647});
+      // The workspace's own E2B key puts the cloud ahead of the online device.
+      await pool.query('INSERT INTO workspace_e2b_keys ("workspaceId") VALUES ($1)',[alice.workspaceId]);
+      assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:'cloud',harness:'claude_code',model:'reported-opus',position:2147483647});
+      await pool.query('DELETE FROM workspace_e2b_keys');
       await pool.query(`UPDATE byos_connections SET state='disconnected' WHERE id=$1`,[claudeConnection]);
       assert.equal((await settings.suggested(alice)).harness,'codex');
       assert.equal((await settings.suggested(alice)).model,'default');

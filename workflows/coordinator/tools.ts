@@ -157,7 +157,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       }),
     } : {}),
     dispatch_run: tool({
-      description: 'Queue a thread for an issue using the saved label execution rules. The rules select the place, coding harness and model. Returns the run id and queued or waiting-device state; an [Event] message arrives when the run ends.',
+      description: 'Queue a thread for an issue using the saved label execution rules. The rules select the place, coding harness and model. Returns the run id and queued or waiting-device state; an [Event] message arrives when the run ends. Machine order: the workspace\'s own E2B cloud, else the person\'s online device, else status waiting_machine: nothing failed, the task waits and an [Event] arrives when a computer is available. On waiting_machine draw result.card as one BeQuestions choice question (title and options as given, each option keeps its action) and add no explanation.',
       inputSchema: z.object({
         issueId: id, agentId: id.optional(),
         repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),
