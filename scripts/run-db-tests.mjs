@@ -67,6 +67,13 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
   { marker: 'lib/audit/record.ts', file: 'tests/audit-record.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/account/delete.ts', file: 'lib/account/store.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/agent-tool-approval/task-policy.db.test.ts', file: 'lib/agent-tool-approval/task-policy.db.test.ts', script: 'test:worker-authorization-db' },
+  { marker: 'lib/abuse/store.ts', file: 'lib/abuse/model-postpay.db.test.ts', script: 'test:abuse-db' },
+  { marker: 'lib/model-admission/store.ts', file: 'lib/model-admission/store.db.test.ts', script: 'test:model-admission-db' },
+  { marker: 'lib/model-admission/runtime.ts', file: 'lib/model-admission/revocation-postpay.db.test.ts', script: 'test:model-admission-db' },
+  { marker: 'lib/audit/export.ts', file: 'lib/audit/export.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-jobs.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-restore.db.test.ts', script: 'test:account-db' },
 ]
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.
