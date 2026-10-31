@@ -25,6 +25,7 @@ test('revocation, absent principal and unproved regions refuse rather than falli
 })
 test('policy input cannot declare another transport, proxy URL or undocumented fields', () => {
   for (const changed of [{ endpoint: 'https://proxy.example' }, { provider: 'arbitrary' }, { model: 'Auto' },
-    { servingProviders: [] }, { credentials: 'never accepted' }])
+    { servingProviders: [] }, { servingProviders: ['deepseek','another-provider'] }, { credentials: 'never accepted' }])
     assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...rule, ...changed }] }), denied('modelPolicyInvalid'))
+  assert.throws(() => parseModelAdmissionPolicy({schemaVersion:1,routes:[rule,rule]}),denied('modelPolicyInvalid'))
 })

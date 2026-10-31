@@ -12,12 +12,16 @@ export const modelAdmissionPolicySchema = z.strictObject({
     provider: z.literal('vercel-gateway'),
     endpoint: z.literal(GATEWAY_MODEL_ENDPOINT),
     model: modelId,
-    servingProviders: z.array(providerId).min(1).max(20),
+    // One physical serving route: no hidden provider fallback inside Gateway.
+    servingProviders: z.array(providerId).length(1),
     /** Omission means any currently active member, never an anonymous caller. */
     principalIds: z.array(z.string().min(1).max(200)).min(1).max(100).optional(),
     /** No current Gateway response proves a data region. Unknown is explicit. */
     dataRegions: z.array(z.enum(['unknown', 'us', 'eu'])).min(1).max(3),
   })).max(100),
+}).superRefine((policy, context) => {
+  if (new Set(policy.routes.map(route => route.model)).size !== policy.routes.length)
+    context.addIssue({ code: 'custom', path: ['routes'], message: 'One serving route per model' })
 })
 export type ModelAdmissionPolicy = z.infer<typeof modelAdmissionPolicySchema>
 export type ModelAdmissionCode = 'modelRouteDenied' | 'modelPolicyRevoked' | 'modelRegionUnverified' | 'modelPrincipalUnavailable' | 'modelPolicyChanged' | 'modelPolicyInvalid' | 'modelTransportActive'

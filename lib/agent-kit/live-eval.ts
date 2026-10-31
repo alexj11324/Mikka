@@ -48,7 +48,12 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
       const reply = await completedEvaluationReply(result,signal,()=>failed)
       return { ...reply,tools:observations }
     }
-    const common = { cases,mode,model:job.evaluation.model ?? undefined,hostInstructions:job.execution ? executionHostInstructions(job.execution.snapshot) : hostInstructions,run,judge:mode === 'live' ? judgeLiveTrace : undefined,caseTimeoutMs:15_000 }
+    const judge: typeof judgeLiveTrace = async (input, signal) => {
+      const [{ hostedBillingScope }, { executionWorkspace }] = await Promise.all([import('../abuse/context'), import('../execution-settings')])
+      const workspaceId = scope.workspaceId ?? await executionWorkspace(scope.ownerId, scope.botId)
+      return hostedBillingScope.run({ workspaceId, ownerId: scope.ownerId }, () => judgeLiveTrace(input, signal))
+    }
+    const common = { cases,mode,model:job.evaluation.model ?? undefined,hostInstructions:job.execution ? executionHostInstructions(job.execution.snapshot) : hostInstructions,run,judge:mode === 'live' ? judge : undefined,caseTimeoutMs:15_000 }
     const baseline = await runEvalSuite({ ...common,definition:job.baseline.definition })
     const candidate = await runEvalSuite({ ...common,definition:job.candidate.definition })
     const completed = await store.finishEvaluation(scope,job.evaluation.id,{ baseline,candidate })

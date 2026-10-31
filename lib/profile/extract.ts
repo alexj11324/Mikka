@@ -35,7 +35,7 @@ export async function extractFacts(notification: ExternalNotification, suggestio
     if (!await claimExtractionCall(notification.userId, day)) return 0
     const { instructions, prompt } = extractionPrompt(notification)
     const started = Date.now()
-    const { text, usage } = await generateText({ model: await hostedModel(await executionWorkspace(notification.userId,null),FACT_MODEL,createGateway({ apiKey: key })(FACT_MODEL)), instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(FACT_TIMEOUT_MS) })
+    const { text, usage } = await generateText({ model: await hostedModel(await executionWorkspace(notification.userId,null),FACT_MODEL,createGateway({ apiKey: key })(FACT_MODEL),notification.userId), instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(FACT_TIMEOUT_MS) })
     const inputTokens = usage.inputTokens ?? 0
     const outputTokens = usage.outputTokens ?? 0
     captureGeneration(notification.userId, { model: FACT_MODEL, inputTokens, outputTokens, latencyMs: Date.now() - started, span: 'profile_extraction' })

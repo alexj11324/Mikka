@@ -39,7 +39,7 @@ export async function writeActionTitles(userId: string, items: readonly ActionTi
     for (let start = 0; start < items.length; start += ACTION_BATCH) {
       const batch = items.slice(start, start + ACTION_BATCH)
       const { instructions, prompt } = actionTitlePrompt(batch, locale)
-      const { text } = await generateText({ model: await hostedModel(await executionWorkspace(userId,null),ACTION_TITLE_MODEL,gateway(ACTION_TITLE_MODEL)), instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(ACTION_TITLE_TIMEOUT_MS) })
+      const { text } = await generateText({ model: await hostedModel(await executionWorkspace(userId,null),ACTION_TITLE_MODEL,gateway(ACTION_TITLE_MODEL),userId), instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(ACTION_TITLE_TIMEOUT_MS) })
       for (const [id, actionTitle] of parseActionTitles(text, batch.map(item => item.id), locale)) {
         await db.update(suggestions).set({ actionTitle }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId)))
       }

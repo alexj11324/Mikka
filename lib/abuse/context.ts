@@ -3,4 +3,5 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 export const hostedBillingScope = new AsyncLocalStorage<{
   workspaceId: string
   ownerId?: string
+  workspaceIds?: string[]
 }>()
