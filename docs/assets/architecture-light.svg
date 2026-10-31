@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1220" height="820" viewBox="0 0 1220 820" font-family="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, &quot;PingFang SC&quot;, &quot;Noto Sans CJK SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" role="img" aria-label="Mikka architecture">
   <title>Mikka architecture</title>
+  <rect width="1220" height="820" fill="#ffffff"/>
   <path d="M200 170 L370 170 L370 240" fill="none" stroke="#111111" stroke-width="2.5"/>
   <path d="M362 202 L370 210 L378 202" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M200 320 L370 320 L370 240" fill="none" stroke="#111111" stroke-width="2.5"/>

@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1240" height="670" viewBox="0 0 1240 670" font-family="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial, &quot;PingFang SC&quot;, &quot;Noto Sans CJK SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif" role="img" aria-label="How a task moves through Mikka">
   <title>How a task moves through Mikka</title>
+  <rect width="1240" height="670" fill="#ffffff"/>
   <path d="M200 230 L250 230" fill="none" stroke="#111111" stroke-width="2.5"/>
   <path d="M234 222 L242 230 L234 238" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>
   <path d="M430 230 L470 230" fill="none" stroke="#111111" stroke-width="2.5"/>

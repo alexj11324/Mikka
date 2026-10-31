@@ -123,7 +123,7 @@ function drawArchitecture(lang, p) {
     ...archFlows(t, p),
     ...Object.entries(ARCH_BOXES).flatMap(([id, [[x0, x1], yc, h, planned]]) => rectBox(x0, x1, yc, h, t[id], p, planned)),
     ...legend(776, LEGEND_TEXT[lang], p),
-  ])
+  ], p)
 }
 
 // ---- Task flow ----------------------------------------------------------
@@ -208,7 +208,7 @@ function drawTaskFlow(lang, p) {
     ...diamond(530, 230, 60, t.clear, p),
     ...diamond(770, 520, 56, t.passes, p),
     ...legend(630, LEGEND_TEXT[lang], p),
-  ])
+  ], p)
 }
 
 writeDiagram(ROOT, 'architecture', drawArchitecture)
