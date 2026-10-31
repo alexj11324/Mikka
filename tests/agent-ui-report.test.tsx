@@ -15,6 +15,8 @@ const parser = createParser(library.toJSONSchema(), library.root)
 const samples = {
   BarChart: 'root = BarChart(["Q1", "Q2", "Q3"], [{name: "Revenue", values: [12, 18, 9]}, {name: "Cost", values: [8, 9, 7]}], true, "k")',
   LineChart: 'root = LineChart(["Mon", "Tue", "Wed"], [{name: "Visits", values: [120, 180, 150]}], "%")',
+  AreaChart: 'root = AreaChart(["Mon", "Tue", "Wed"], [{name: "Organic", values: [12, 14, 18]}, {name: "Paid", values: [5, 6, 7]}])',
+  DonutChart: 'root = DonutChart([{name: "Direct", value: 42}, {name: "Search", value: 36}], "", "Total")',
   Separator: 'root = Stack([TextContent("Above"), Separator(), TextContent("Below")])',
   BeAlert: 'root = BeAlert("Sample data", "Figures below are illustrative.", "warning")',
   BeTable: 'root = BeTable(["Team", "Done"], [["Design", 3], ["Build", 5]])',
@@ -45,7 +47,10 @@ test('Report components parse, are detected as OpenUI and render through the rea
   }
   assert.match(render(samples.BarChart), /data-slot="chart"/)
   assert.match(render(samples.BarChart), /var\(--chart-2\)/)
-  assert.doesNotMatch(render(samples.BarChart) + render(samples.LineChart), /#[0-9a-f]{6}\b|rgb\(/i)
+  assert.doesNotMatch(render(samples.BarChart) + render(samples.LineChart) + render(samples.AreaChart) + render(samples.DonutChart), /#[0-9a-f]{6}\b|rgb\(/i)
+  // ReUI area and donut charts render through the shared chart container.
+  assert.match(render(samples.AreaChart), /data-slot="chart"/)
+  assert.match(render(samples.DonutChart), /data-slot="chart"/)
   assert.match(render(samples.Separator), /role="separator"/)
   assert.match(render(samples.BeAlert), /Figures below are illustrative/)
   assert.match(render(samples.BeTable), /Design|Team/)
@@ -58,6 +63,10 @@ test('Report components parse, are detected as OpenUI and render through the rea
 })
 
 test('Report components reject invalid props', () => {
+  const { DonutChart } = agentComponentCatalog
+  assert.equal(DonutChart.props.safeParse({ slices: [{ name: 'A', value: 1 }, { name: 'B', value: 2 }] }).success, true)
+  assert.equal(DonutChart.props.safeParse({ slices: [{ name: 'A', value: 1 }] }).success, false)
+  assert.equal(DonutChart.props.safeParse({ slices: [{ name: 'A', value: -1 }, { name: 'B', value: 2 }] }).success, false)
   const { BarChart, LineChart, BeTable, BeTimeline, BeAlert, BeCitations, BeFileTree, BeTabs } = agentComponentCatalog
   const chart = { labels: ['A', 'B'], series: [{ name: 'S', values: [1, 2] }] }
   assert.equal(BarChart.props.safeParse(chart).success, true)

@@ -86,12 +86,14 @@ computer = ComputerCard("demo-done", "${DEMO_RUN}", "打开 #66 的预览部署�
   },
   {
     id: 'report', title: 'beUI 报告与图表', description: '提示、可排序表格、柱状图、折线图、时间线、折叠区、标签页、文件树、来源与建议修改，均使用固定演示数据。',
-    response: `root = Stack([alert, stats, table, bars, trend, divider, timeline, more, tabs, tree, sources, diff])
+    response: `root = Stack([alert, stats, table, bars, trend, stack, share, divider, timeline, more, tabs, tree, sources, diff])
 alert = BeAlert("示例数据", "以下数字均为演示数据，不代表真实项目。", "info")
 stats = BeCardGrid([BeStat("本周完成", 12, "项"), BeStat("平均耗时", 3.4, "天", 1)])
 table = BeTable(["阶段", "完成", "负责人"], [["需求", 5, "Alex"], ["设计", 3, "Sam"], ["检查", 4, "Lee"]])
 bars = BarChart(["需求", "设计", "检查"], [{name: "本周", values: [5, 3, 4]}, {name: "上周", values: [4, 4, 2]}], false, "项")
 trend = LineChart(["周一", "周二", "周三", "周四", "周五"], [{name: "完成数", values: [1, 3, 2, 4, 2]}], "项")
+stack = AreaChart(["周一", "周二", "周三", "周四", "周五"], [{name: "完成", values: [1, 3, 2, 4, 2]}, {name: "新增", values: [2, 1, 3, 1, 2]}], "项")
+share = DonutChart([{name: "需求", value: 5}, {name: "设计", value: 3}, {name: "检查", value: 4}], "项", "合计")
 divider = Separator()
 timeline = BeTimeline([{date: "2026-11-02", title: "需求确认", description: "整理范围与验收标准。"}, {date: "2026-11-09", title: "设计评审", meta: "建议日期"}, {date: "2026-11-16", title: "交付检查"}])
 more = BeCollapsible("补充说明", [TextContent("折叠区只放补充内容。")])

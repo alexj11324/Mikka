@@ -61,10 +61,10 @@ export const AgentApproval: AgentComponentRenderers['BeApproval'] = ({ props }) 
     void send((agentCopy.taskContext + (props.context) + agentCopy.proposal + (props.title) + agentCopy.description + (props.description) + agentCopy.myDecision + (value) + agentCopy.ContinueAdvisingBasedOnThisWithout))
   }
 
-  return <div className="flex min-w-0 flex-col gap-2">
+  return <div className="flex w-full max-w-xl min-w-0 flex-col gap-2">
     <ApprovalCard
       title={props.title}
-      description={<>{props.description}<span className="mt-2 block">{agentCopy.chooseHereToContinueThisDoesNot}</span></>}
+      description={props.description}
       status={sent ? 'answered' : status}
       approveLabel={agentCopy.approveAndContinue}
       onApprove={() => choose(agentCopy.iApproveThisProposal)}
@@ -87,8 +87,8 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
   const [only] = questions
   if (questions.length === 1 && !only.multiple && !only.input && only.options?.length) return <ChoiceCard title={only.title} options={only.options} task={props.task} />
 
-  return <div className="flex min-w-0 flex-col gap-2">
-    <p className="text-xs text-muted-foreground">{agentCopy.answerHereAgentWillContinueBasedOn}</p>
+  // Same width cap as ChoiceCard: a question card never stretches across the chat column.
+  return <div className="flex w-full max-w-xl min-w-0 flex-col gap-2">
     <ApprovalCard
       questions={questions}
       // A switch or slider always has a value, so it can be submitted untouched.

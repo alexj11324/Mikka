@@ -30,7 +30,7 @@ import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '@/
 import { Alert as BeAlert, AlertContent as BeAlertContent, AlertDescription as BeAlertDescription, AlertIcon as BeAlertIcon, AlertTitle as BeAlertTitle } from '@/components/motion/alert'
 import { Collapsible as BeCollapsible, CollapsibleContent as BeCollapsibleContent, CollapsibleIndicator as BeCollapsibleIndicator, CollapsibleTrigger as BeCollapsibleTrigger } from '@/components/motion/collapsible'
 import { Tabs as BeTabs, TabsContent as BeTabsContent, TabsList as BeTabsList, TabsTrigger as BeTabsTrigger } from '@/components/motion/tabs'
-import { AgentBarChart, AgentLineChart } from './agent-chart'
+import { AgentAreaChart, AgentBarChart, AgentDonutChart, AgentLineChart } from './agent-chart'
 import { AgentCitations, AgentFileDiff, AgentFileTree, AgentTable, AgentTimeline } from './agent-report'
 
 const renderers = {
@@ -87,6 +87,8 @@ const renderers = {
   BeTimeline: ({ props }) => <AgentTimeline events={props.events} />,
   BarChart: ({ props }) => <AgentBarChart labels={props.labels} series={props.series} horizontal={props.horizontal} unit={props.unit} />,
   LineChart: ({ props }) => <AgentLineChart labels={props.labels} series={props.series} unit={props.unit} />,
+  AreaChart: ({ props }) => <AgentAreaChart labels={props.labels} series={props.series} unit={props.unit} />,
+  DonutChart: ({ props }) => <AgentDonutChart slices={props.slices} unit={props.unit} total={props.total} />,
   // UI policy draws no horizontal rules: a section break is space, still announced as a separator.
   Separator: () => <div role="separator" className="h-2" />,
   BeFileTree: ({ props }) => <AgentFileTree paths={props.paths} />,

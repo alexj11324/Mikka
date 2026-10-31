@@ -149,6 +149,14 @@ export const agentComponentCatalog = {
     description: '折线图（shadcn chart），用于随时间变化的趋势。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。',
     props: z.object({ ...chart, unit: z.string().max(12).optional() }).refine(seriesMatchLabels, 'values 必须与 labels 等长'),
   },
+  AreaChart: {
+    description: '堆叠面积图（ReUI c-chart-14），用于累计或构成随时间的变化。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；第一组画在最上层；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。',
+    props: z.object({ ...chart, unit: z.string().max(12).optional() }).refine(seriesMatchLabels, 'values 必须与 labels 等长'),
+  },
+  DonutChart: {
+    description: '环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。',
+    props: z.object({ slices: z.array(z.object({ name: z.string().min(1).max(40), value: z.number().min(0).max(1e12) })).min(2).max(5), unit: z.string().max(12).optional(), total: z.string().max(20).optional() }),
+  },
   Separator: {
     description: '段落分隔，用于分开报告中的部分。按界面规范显示为留白而不是横线。不带参数。',
     props: z.object({}),
@@ -222,7 +230,7 @@ export const agentComponentGroups: { name: string; components: AgentComponentNam
   { name: '任务与进度', components: ['BeTodoList', 'BeStat', 'ShadcnProgress'], notes: ['Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。'] },
   { name: '图标状态与操作', components: ['AgentIcon', 'BeBadge', 'BeButton', 'BeFollowUps'], notes: ['Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。'] },
   { name: '任务与来源引用', components: ['InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'BeCitations', 'ComputerCard'], notes: ['BeCitations 列出本次真正读取过的网页，不编造来源。', '引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。', 'Agent 用自己的电脑做事时放一张 ComputerCard，画面、状态和审批都在卡片里，正文不再复述操作过程。'] },
-  { name: '本地内容与兼容组件', components: ['TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BeTimeline', 'BarChart', 'LineChart', 'Separator', 'BeFileTree', 'BeFileDiff', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；BeFileDiff 只展示建议修改；ToolResult、AgentActivity、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不开放给模型，不自动生成虚构工具记录。', '报告优先使用 beUI：提示用 BeAlert，表格用 BeTable，标签页用 BeTabs；趋势用 LineChart，分类对比用 BarChart，图表颜色来自主题图表色，只用用户或工具提供的数字。'] },
+  { name: '本地内容与兼容组件', components: ['TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BeTimeline', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'Separator', 'BeFileTree', 'BeFileDiff', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；BeFileDiff 只展示建议修改；ToolResult、AgentActivity、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不开放给模型，不自动生成虚构工具记录。', '报告优先使用 beUI：提示用 BeAlert，表格用 BeTable，标签页用 BeTabs；趋势用 LineChart，分类对比用 BarChart，图表颜色来自主题图表色，只用用户或工具提供的数字。'] },
 ]
 
 export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> = {}) {

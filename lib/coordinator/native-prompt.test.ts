@@ -16,6 +16,8 @@ test('personal instructions retain host approval and existing OpenUI vocabulary'
   // Reports can chart numbers and call out a takeaway.
   assert.match(instructions,/BarChart\(/)
   assert.match(instructions,/LineChart\(/)
+  assert.match(instructions,/AreaChart\(/)
+  assert.match(instructions,/DonutChart\(/)
   assert.match(instructions,/BeAlert\(/)
   assert.match(instructions,/Separator\(/)
   assert.match(instructions,/Never draw an interface as ASCII art/)

@@ -54,10 +54,6 @@
         "signature": "EditableTable(name?: string, columns?: {type: \"text\" | \"number\" | \"date-single\" | \"select\" | \"url\", key?: string, header?: string, width?: number, options?: {value: string, label: string}[]}[], data?: {id: string, values: (string | number)[]}[])",
         "description": "Spreadsheet-like table whose cells the user can edit inline (text, number, url, date, select columns); edits are saved back as a form field"
       },
-      "AreaChart": {
-        "signature": "AreaChart(labels: string[], series: Series[], variant?: \"linear\" | \"natural\" | \"step\", xLabel?: string, yLabel?: string, height?: number)",
-        "description": "Filled area under lines; use for cumulative totals or volume trends over time"
-      },
       "RadarChart": {
         "signature": "RadarChart(labels: string[], series: Series[])",
         "description": "Spider/web chart; use for comparing multiple variables across one or more entities"
@@ -422,6 +418,14 @@
         "signature": "LineChart(labels: string[], series: {name: string, values: number[]}[], unit?: string)",
         "description": "折线图（shadcn chart），用于随时间变化的趋势。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
       },
+      "AreaChart": {
+        "signature": "AreaChart(labels: string[], series: {name: string, values: number[]}[], unit?: string)",
+        "description": "堆叠面积图（ReUI c-chart-14），用于累计或构成随时间的变化。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；第一组画在最上层；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
+      },
+      "DonutChart": {
+        "signature": "DonutChart(slices: {name: string, value: number}[], unit?: string, total?: string)",
+        "description": "环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。"
+      },
       "Separator": {
         "signature": "Separator()",
         "description": "段落分隔，用于分开报告中的部分。按界面规范显示为留白而不是横线。不带参数。"
@@ -558,6 +562,8 @@
           "BeTimeline",
           "BarChart",
           "LineChart",
+          "AreaChart",
+          "DonutChart",
           "Separator",
           "BeFileTree",
           "BeFileDiff",
@@ -620,9 +626,6 @@
         },
         "EditableTable": {
           "$ref": "#/$defs/EditableTable"
-        },
-        "AreaChart": {
-          "$ref": "#/$defs/AreaChart"
         },
         "RadarChart": {
           "$ref": "#/$defs/RadarChart"
@@ -897,6 +900,12 @@
         "LineChart": {
           "$ref": "#/$defs/LineChart"
         },
+        "AreaChart": {
+          "$ref": "#/$defs/AreaChart"
+        },
+        "DonutChart": {
+          "$ref": "#/$defs/DonutChart"
+        },
         "Separator": {
           "$ref": "#/$defs/Separator"
         },
@@ -957,7 +966,6 @@
         "Table",
         "Col",
         "EditableTable",
-        "AreaChart",
         "RadarChart",
         "HorizontalBarChart",
         "Series",
@@ -1049,6 +1057,8 @@
         "BeTimeline",
         "BarChart",
         "LineChart",
+        "AreaChart",
+        "DonutChart",
         "Separator",
         "BeFileTree",
         "BeCitations",
@@ -1155,7 +1165,43 @@
                     "$ref": "#/$defs/ScatterChart"
                   },
                   {
-                    "$ref": "#/$defs/AreaChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "type": "object",
@@ -1737,46 +1783,6 @@
           ],
           "additionalProperties": false,
           "description": "Data point with numeric coordinates"
-        },
-        "AreaChart": {
-          "type": "object",
-          "properties": {
-            "labels": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "series": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/Series"
-              }
-            },
-            "variant": {
-              "type": "string",
-              "enum": [
-                "linear",
-                "natural",
-                "step"
-              ]
-            },
-            "xLabel": {
-              "type": "string"
-            },
-            "yLabel": {
-              "type": "string"
-            },
-            "height": {
-              "type": "number"
-            }
-          },
-          "required": [
-            "labels",
-            "series"
-          ],
-          "additionalProperties": false,
-          "description": "Filled area under lines; use for cumulative totals or volume trends over time"
         },
         "Table": {
           "type": "object",
@@ -3609,7 +3615,43 @@
                     "$ref": "#/$defs/Image"
                   },
                   {
-                    "$ref": "#/$defs/AreaChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "type": "object",
@@ -4036,7 +4078,43 @@
                     "$ref": "#/$defs/ScatterChart"
                   },
                   {
-                    "$ref": "#/$defs/AreaChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "type": "object",
@@ -4259,7 +4337,43 @@
                       "$ref": "#/$defs/ScatterChart"
                     },
                     {
-                      "$ref": "#/$defs/AreaChart"
+                      "type": "object",
+                      "properties": {
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "series": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/Series"
+                          }
+                        },
+                        "variant": {
+                          "type": "string",
+                          "enum": [
+                            "linear",
+                            "natural",
+                            "step"
+                          ]
+                        },
+                        "xLabel": {
+                          "type": "string"
+                        },
+                        "yLabel": {
+                          "type": "string"
+                        },
+                        "height": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "labels",
+                        "series"
+                      ],
+                      "additionalProperties": false
                     },
                     {
                       "type": "object",
@@ -4654,7 +4768,43 @@
                     "$ref": "#/$defs/ScatterChart"
                   },
                   {
-                    "$ref": "#/$defs/AreaChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "type": "object",
@@ -4881,7 +5031,43 @@
                     "$ref": "#/$defs/ScatterChart"
                   },
                   {
-                    "$ref": "#/$defs/AreaChart"
+                    "type": "object",
+                    "properties": {
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "series": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/Series"
+                        }
+                      },
+                      "variant": {
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "natural",
+                          "step"
+                        ]
+                      },
+                      "xLabel": {
+                        "type": "string"
+                      },
+                      "yLabel": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "labels",
+                      "series"
+                    ],
+                    "additionalProperties": false
                   },
                   {
                     "type": "object",
@@ -5959,6 +6145,103 @@
           "additionalProperties": false,
           "description": "折线图（shadcn chart），用于随时间变化的趋势。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
         },
+        "AreaChart": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "minItems": 1,
+              "maxItems": 24,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              }
+            },
+            "series": {
+              "minItems": 1,
+              "maxItems": 5,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "values": {
+                    "maxItems": 24,
+                    "type": "array",
+                    "items": {
+                      "type": "number",
+                      "minimum": -1000000000000,
+                      "maximum": 1000000000000
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "values"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "unit": {
+              "type": "string",
+              "maxLength": 12
+            }
+          },
+          "required": [
+            "labels",
+            "series"
+          ],
+          "additionalProperties": false,
+          "description": "堆叠面积图（ReUI c-chart-14），用于累计或构成随时间的变化。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；第一组画在最上层；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
+        },
+        "DonutChart": {
+          "type": "object",
+          "properties": {
+            "slices": {
+              "minItems": 2,
+              "maxItems": 5,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  },
+                  "value": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000000
+                  }
+                },
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "unit": {
+              "type": "string",
+              "maxLength": 12
+            },
+            "total": {
+              "type": "string",
+              "maxLength": 20
+            }
+          },
+          "required": [
+            "slices"
+          ],
+          "additionalProperties": false,
+          "description": "环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。"
+        },
         "Separator": {
           "type": "object",
           "properties": {},
@@ -6420,6 +6703,8 @@
     "BeTimeline",
     "BarChart",
     "LineChart",
+    "AreaChart",
+    "DonutChart",
     "Separator",
     "BeFileTree",
     "BeCitations",
