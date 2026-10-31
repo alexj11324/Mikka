@@ -51,7 +51,7 @@ const ARCH_TEXT = {
     agents: ['Coding agent CLI', 'a worktree per run'], vault: ['Credential vault', 'KMS, login broker'],
     tWebhook: 'webhook', tNotify: 'webhooks, triggers', tMcp: 'MCP', tDb: 'reads, writes',
     tEvents: 'events', tDispatch: 'runs', tTools: 'report, ask, blocked', tLinear: 'webhooks, API',
-    pActions: 'approved writes', tWake: 'wake', tBilling: 'checkout', tCloudRun: 'hosted run', tCloudWake: 'wake',
+    pActions: 'approved writes', tWake: 'wake', tBilling: 'checkout', tCloudRun: 'Mikka-managed harness', tCloudWake: 'wake',
     title: 'Mikka architecture',
   },
   zh: {
@@ -66,7 +66,7 @@ const ARCH_TEXT = {
     agents: ['Coding agent CLI', '每次运行独立 worktree'], vault: ['凭据保管库', 'KMS、登录 broker'],
     tWebhook: 'webhook', tNotify: 'webhook、触发器', tMcp: 'MCP', tDb: '读写',
     tEvents: '事件', tDispatch: '派发运行', tTools: '汇报、提问、阻塞', tLinear: 'webhook、API',
-    pActions: '审批后写入', tWake: '唤醒', tBilling: '支付', tCloudRun: '托管运行', tCloudWake: '唤醒',
+    pActions: '审批后写入', tWake: '唤醒', tBilling: '支付', tCloudRun: 'Mikka 托管的 harness', tCloudWake: '唤醒',
     title: 'Mikka 架构',
   },
 }
@@ -106,7 +106,7 @@ function archFlows(t, p) {
     ...line([[C3[1], 380], [C4[0], 380]], p), ...chevron(988, 380, 'right', p), ...tag(960, 380, t.tCloudWake, p),
     ...line([[830, 410], [830, 490]], p), ...chevron(830, 482, 'down', p), ...tag(830, 446, t.tDispatch, p),
     ...line([[C3[1], 520], [C4[0], 520]], p), ...chevron(988, 520, 'right', p),
-    // Hosted coding runs need real subscription-backed inference acceptance.
+    // The Mikka-managed harness needs real subscription-backed inference acceptance.
     ...line([[1080, 410], [1080, 490]], p, true), ...chevron(1080, 422, 'up', p), ...chevron(1080, 478, 'down', p),
     ...tag(1080, 450, t.tCloudRun, p, true),
     // Web sub-agents on the cloud computer log in through the vault's broker; live acceptance is pending.
