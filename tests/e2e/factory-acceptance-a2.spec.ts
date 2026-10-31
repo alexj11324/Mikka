@@ -100,7 +100,7 @@ test('failed publication returned to approval requires a new approval request', 
   const { dialog, calls } = await setup(page, { stage: 'approval', ledger: ({ candidateId }) => ({ approvals: [approval(candidateId, id)], publications: [{ id: randomUUID(), approvalId: id, status: 'failed', request: {}, receipt: null }] }) })
   await expect(dialog.getByText('待你确认', { exact: true }).first()).toBeVisible()
   await expect(dialog.getByRole('button', { name: '发布', exact: true })).toHaveCount(0)
-  await dialog.getByRole('button', { name: '批准发布', exact: true }).click()
+  await dialog.getByRole('button', { name: '批准并发布', exact: true }).click()
   await expect.poll(() => calls.map(call => call.operation)).toEqual(['approve'])
   expect(calls[0].input).not.toHaveProperty('approvalId')
 })

@@ -2,7 +2,8 @@ import { test, expect, register, conversationPill } from './fixtures'
 
 // The first-run guide (docs/design/onboarding.md): a new account names its
 // first Bot in one conversation, lands in that Bot's chat, and never sees the
-// guide again. Composio is not configured in e2e, so the apps step is skipped.
+// guide again. The workspace has no E2B key yet, so the Bot asks about the
+// cloud computer; Composio is not configured in e2e, so the apps step is skipped.
 test('新账号走完引导：起名、选外观，进入这个 Bot 的对话，之后不再出现', async ({ page }) => {
   await register(page, '/', undefined, { onboarding: true })
   const guide = page.getByRole('dialog', { name: '创建你的第一个 Bot', exact: true })
@@ -16,6 +17,9 @@ test('新账号走完引导：起名、选外观，进入这个 Bot 的对话，
   await guide.getByRole('button', { name: '确定', exact: true }).click()
   await expect(guide.getByText('就叫小满')).toBeVisible()
   await expect(guide.getByText('好的，以后我叫小满。')).toBeVisible({ timeout: 15000 })
+  await expect(guide.getByText('我可以用一台云电脑来浏览网页、运行代码。现在开通吗？')).toBeVisible({ timeout: 15000 })
+  await guide.getByRole('button', { name: '暂不开通', exact: true }).click()
+  await expect(guide.getByText('好的。之后可以在设置中填写 E2B API Key 开通。')).toBeVisible({ timeout: 15000 })
 
   await guide.getByRole('button', { name: '进入 Mikka', exact: true }).click({ timeout: 20000 })
   await expect(guide).toHaveCount(0)
