@@ -37,6 +37,7 @@ export async function startMvpServices(port = 3191) {
   let observations = []
   let errors = []
   let pullRequests = []
+  const streams = new Map()
   const observe = item => observations.push({ at: new Date().toISOString(), ...item })
   const server = createServer(async (request, response) => {
     const requestId = `mvp-${randomUUID()}`
@@ -45,6 +46,23 @@ export async function startMvpServices(port = 3191) {
     try {
       if (url.pathname === '/health') return reply({ ready: true })
       if (url.pathname === '/observations') return reply({ observations, errors, pullRequests: pullRequests.map(pr => ({ number: pr.number, url: pr.html_url, branch: pr.head.ref, draft: pr.draft })) })
+      if (url.pathname === '/streaming/scenario' && request.method === 'POST') {
+        const input = await readBody(request)
+        assert.match(input.marker, /^mvp-stream-[a-f0-9-]{36}$/)
+        for (const text of [input.first, input.last]) assert.ok(typeof text === 'string' && text.length > 0 && text.length <= 256)
+        assert.ok(!streams.has(input.marker))
+        let release
+        const held = new Promise(resolve => { release = resolve })
+        streams.set(input.marker, { ...input, held, release, started: 0, released: false })
+        return reply({ configured: true })
+      }
+      if (['/streaming/state', '/streaming/release'].includes(url.pathname) && request.method === 'POST') {
+        const { marker } = await readBody(request)
+        const stream = streams.get(marker)
+        assert.ok(stream)
+        if (url.pathname === '/streaming/release') { stream.released = true; stream.release() }
+        return reply({ started: stream.started, released: stream.released })
+      }
       if (url.pathname === '/scenario' && request.method === 'POST') {
         const input = await readBody(request)
         assert.match(input.marker, /^mvp-[a-f0-9-]{36}$/)
@@ -75,8 +93,17 @@ export async function startMvpServices(port = 3191) {
         const payload=await readBody(request)
         assert.equal(payload.model,MVP_SUBSCRIPTION_MODEL)
         observe({kind:'subscription-model-request',requestId})
-        const answer=answerModel(subscriptionPrompt(payload),scenario,observe)
+        const prompt=subscriptionPrompt(payload)
+        const stream=[...streams.values()].find(value=>prompt.prompt.some(message=>message.role==='user' && message.content.some(part=>part.type==='text' && part.text.includes(value.marker))))
+        const answer=stream ? null : answerModel(prompt,scenario,observe)
         response.writeHead(200,{'content-type':'text/event-stream'})
+        if(stream) {
+          stream.started++
+          const first=subscriptionChunks({content:[{type:'text',text:stream.first}]},payload.model).split('\n\n')[0]
+          response.write(first+'\n\n')
+          await stream.held
+          return response.end(subscriptionChunks({content:[{type:'text',text:stream.last}]},payload.model))
+        }
         return response.end(subscriptionChunks(answer,payload.model))
       }
       if (url.pathname === '/v1/language-model' && request.method === 'POST') {
@@ -189,6 +216,7 @@ export async function startMvpServices(port = 3191) {
   return {
     origin: `http://127.0.0.1:${server.address().port}`,
     async close() {
+      for (const stream of streams.values()) stream.release()
       server.closeAllConnections()
       await new Promise(resolve => server.close(resolve))
       await finishMvpResources()

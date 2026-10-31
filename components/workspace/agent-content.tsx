@@ -35,7 +35,7 @@ export const AgentTasks: AgentComponentRenderers['BeTodoList'] = ({ props }) => 
   const suggested = props.source !== 'user'
   const items = (props.items ?? []).map(item => suggested ? { id: item.id, title: item.title, status: 'pending' as const, detail: item.detail } : item)
   return <div className="flex min-w-0 flex-col gap-2">
-    <p className="text-xs text-muted-foreground">{suggested ? agentCopy.suggestedPlanNotExecutedOrSaved : agentCopy.onlyShowsTaskStatusProvidedByThe}</p>
+    {suggested && <p className="text-xs text-muted-foreground">{agentCopy.suggestedPlanNotExecutedOrSaved}</p>}
     <TodoList title={props.title} items={items} collapseOnComplete={false} />
   </div>
 }

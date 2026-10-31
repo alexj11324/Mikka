@@ -1,12 +1,13 @@
 import 'server-only'
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
-import { isApprovalAction, parseActionInput } from '@/lib/composio-actions'
+import { COMPOSIO_ACTIONS, isApprovalAction, parseActionInput } from '@/lib/composio-actions'
+import { serverWriteJudge, type WriteJudge } from '@/lib/operations/write-judgment'
 import { resolveActionAccount, runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
 import { coordinatorEvents, pendingActions, repositorySettings } from '@/lib/db/schema'
 import { taskDestinationSchema } from './task-destination'
 import { repositoryPushApproved } from '@/lib/run-publication-policy'
-import { calendarEventSummary, PENDING_ACTION_TTL_MS, type PendingActionView } from '@/lib/pending-action-view'
+import { actionOutcome, calendarEventSummary, PENDING_ACTION_TTL_MS, type PendingActionView } from '@/lib/pending-action-view'
 import { prepareRepositoryApproval, validateRepositoryApproval } from '@/lib/repository-approval-proposal'
 
 /** Most proposals one person can have waiting at once. */
@@ -45,6 +46,40 @@ export async function proposeRepositoryPush(userId: string, input: unknown, task
     await tx.insert(pendingActions).values({ id, userId, action: 'approve_repository_push', input: parsed, context: task ? { taskEventIds: [task.eventId] } : null })
     return { status: 'awaiting_approval' as const, actionId: id }
   })
+}
+
+/**
+ * Sends mail or writes the calendar in the person's connected account, with
+ * no card (decision 2026-10-31): the connection's grant is the permission and
+ * only a destructive call asks. The Decisions API judges this exact call, with
+ * the tool's MCP annotations as input; a destructive, unjudged or refused call
+ * goes to `proposeAction` instead. The row is written before dispatch and kept
+ * as the record; like other writes the policy allows, it has no `decidedAt`
+ * and never shows as a card.
+ */
+export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId)) {
+  if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
+  const parsed = parseActionInput(action, input)
+  if (!parsed) return { error: 'invalidIntegrationInput' }
+  const id = crypto.randomUUID()
+  let recorded = false as boolean
+  const result = await runComposioAction(userId, action, parsed, selectedAccountId, async (accountId, tool) => {
+    if (await judge({ action, tool: COMPOSIO_ACTIONS[action].slug, annotations: tool.tags, input: parsed }) === 'ask') return { error: 'integrationApprovalRequired' }
+    await db.insert(pendingActions).values({ id, userId, action, input: parsed, connectedAccountId: accountId, status: 'running' })
+    recorded = true
+    return null
+  })
+  if ('error' in result && result.error === 'integrationApprovalRequired') return proposeAction(userId, action, parsed, selectedAccountId)
+  // The gate runs before every dispatch, so an unrecorded result never sent anything.
+  if (!recorded) return 'error' in result ? result : { error: 'integrationActionFailed' }
+  if ('error' in result) {
+    // operationUncertain stays running: it may have been sent, so never invite a resend.
+    await db.update(pendingActions).set({ status: result.error === 'operationUncertain' ? 'running' : 'failed', error: result.error }).where(eq(pendingActions.id, id))
+    return result
+  }
+  const outcome = actionOutcome(result.data)
+  await db.update(pendingActions).set({ status: 'done', result: outcome }).where(eq(pendingActions.id, id))
+  return { status: 'done' as const, actionId: id, outcome }
 }
 
 /**

@@ -38,7 +38,7 @@ const writeOutcome = (receipt: NonNullable<OperationRecord['receipt']>): Approve
 // scope avoids inventing a workspace DB relationship or using a browser cookie.
 const scope = (owner: string) => `personal:${owner}`
 const identity = (p: Proposal) => ({ operationId: p.id, ownerId: p.userId, workspaceId: scope(p.userId) })
-const intent = (p: Proposal): OperationIntent => ({ ...identity(p), provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, action: p.action, target: writeTarget(p.action as WriteActionName, p.input), approvalId: p.id, proposalDigest: digest([p.action, p.operationBinding]), payloadDigest: p.operationBinding.payloadDigest, ...(p.operationBinding.run ? { executionRunId: p.operationBinding.run.runId, policyScope: { botId: p.operationBinding.run.botId, workspaceId: p.operationBinding.run.workspaceId, version: p.operationBinding.run.policyVersion } } : {}) })
+const intent = (p: Proposal): OperationIntent => ({ ...identity(p), provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, action: p.action, target: writeTarget(p.action as WriteActionName, p.input), approvalId: p.id, proposalDigest: digest([p.action, p.operationBinding]), payloadDigest: p.operationBinding.payloadDigest, ...(p.operationBinding.run ? { executionRunId: p.operationBinding.run.runId, policyScope: { botId: p.operationBinding.run.botId, workspaceId: p.operationBinding.run.workspaceId, version: p.operationBinding.run.policyVersion, ...(p.operationBinding.run.approvalDefault ? { approvalDefault: p.operationBinding.run.approvalDefault } : {}) } } : {}) })
 
 /** Pure projection only; callers must authenticate/authorize the read separately.
  * Shared by by-ID and discovery so status never depends on which endpoint is used. */
@@ -194,21 +194,24 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
       let proposal = await locked(prior)
       if (!proposal) {
         // Check authorization before provider metadata and recheck under the insert lock.
+        // Explicit settings win first. Only when none names the action does the
+        // Decisions API judge whether this exact call is destructive (R-77).
         const first = await transaction(tx => lockWritePolicy(tx, { ...run, action }))
         if (first.decision === 'deny') throw new OperationError('writeDenied')
         const selected = await bounded(() => provider.prepare(run.ownerId, input), context.signal)
+        const approvalDefault = first.defaulted && context.judgeWrite && selected.tool ? await context.judgeWrite({ action, tool: selected.tool, annotations: selected.annotations, input }) : 'ask'
         proposal = await locked(async tx => {
           const existing = await prior(tx)
           if (existing) return existing
-          const policy = await lockWritePolicy(tx, { ...run, action })
-          if (policy.version !== first.version || policy.decision !== first.decision) throw new OperationError('writePolicyChanged')
+          const policy = await lockWritePolicy(tx, { ...run, action }, { fallback: approvalDefault })
+          if (policy.version !== first.version) throw new OperationError('writePolicyChanged')
           if (policy.decision === 'deny') throw new OperationError('writeDenied')
           if (policy.decision === 'ask') {
             await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['approved-write-pending-owner', run.ownerId])])
             const count = await tx.query(`SELECT count(*) FROM pending_actions WHERE "userId"=$1 AND status='pending' AND "createdAt">clock_timestamp()-interval '7 days'`, [run.ownerId])
             if (Number(count.rows[0].count) >= 20) throw new OperationError('tooManyPendingActions')
           }
-          const binding = bindingSchema.parse({ ...prepareWriteBinding(provider.name, selected, input), run: { runId:run.runId, botId:run.botId, workspaceId:run.workspaceId, policyVersion:policy.version, decision:policy.decision } })
+          const binding = bindingSchema.parse({ ...prepareWriteBinding(provider.name, selected, input), run: { runId:run.runId, botId:run.botId, workspaceId:run.workspaceId, policyVersion:policy.version, decision:policy.decision, approvalDefault } })
           const id = randomUUID(), status = policy.decision === 'allow' ? 'running' : 'pending'
           const inserted = await tx.query<Proposal>('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding",context,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [id, run.ownerId, action, input, key, binding, selected.context ?? null, status])
           return inserted.rows[0]
@@ -242,7 +245,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         const readbackOnly = Boolean(execution.rows[0]?.invokedAt)
         if (row.operationBinding.run) {
           const r = row.operationBinding.run
-          const policy = await lockWritePolicy(tx, { ownerId:actor.userId, botId:r.botId, workspaceId:r.workspaceId, runId:r.runId, action }, { allowCompleted:true, readbackOnly })
+          const policy = await lockWritePolicy(tx, { ownerId:actor.userId, botId:r.botId, workspaceId:r.workspaceId, runId:r.runId, action }, { allowCompleted:true, readbackOnly, fallback:r.approvalDefault ?? 'ask' })
           if (policy.decision === 'deny') throw new OperationError('writeDenied')
           if (policy.version !== r.policyVersion || policy.decision !== r.decision) throw new OperationError('writePolicyChanged')
         }

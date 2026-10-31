@@ -17,7 +17,7 @@ import { Turnstile, type TurnstileHandle } from './turnstile'
 // One email field that asks the backend to send a link: the reset link on
 // /forgot-password, the verification link on /verify-email. Only the person's
 // click sends; the response never says whether an email went out.
-export function EmailRequestForm({ title, description, submitLabel, send, turnstile = false }: { title: string; description: string; submitLabel: string; send: (email: string, turnstileToken: string | null) => Promise<AuthRecoveryResult>; turnstile?: boolean }) {
+export function EmailRequestForm({ title, description, submitLabel, send, turnstile = false }: { title: string; description?: string; submitLabel: string; send: (email: string, turnstileToken: string | null) => Promise<AuthRecoveryResult>; turnstile?: boolean }) {
   const t = useTranslations('Auth')
   const pendingRef = useRef(false)
   const [pending, setPending] = useState(false)

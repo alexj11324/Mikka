@@ -7,7 +7,7 @@ import { BuiltinActionType, createParser, Renderer, type ActionEvent, type OpenU
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { getAgentUIIssue, type AgentUIIssue } from '@/lib/agent-ui-status'
-import { detectAgentUISource } from '@/lib/agent-ui-source'
+import { detectAgentUISource, isAgentUISourcePrefix } from '@/lib/agent-ui-source'
 import { agentUILibrary } from './agent-ui-library'
 import { useAgentInteraction } from './agent-interaction'
 import { AgentMarkdown } from './agent-markdown'
@@ -89,7 +89,7 @@ export function AgentGenerativeUI({ response, isStreaming, onAction, showErrors 
     }
   }, [response, normalizedResponse, isStreaming, isOpenUI, reportedErrors])
 
-  if (!isOpenUI) return isStreaming ? null : <AgentTextBubble><AgentMarkdown text={response} /></AgentTextBubble>
+  if (!isOpenUI) return isStreaming && isAgentUISourcePrefix(response) ? null : <AgentTextBubble><AgentMarkdown text={response} isStreaming={isStreaming} /></AgentTextBubble>
 
   // A detected card that cannot be read must never show its source as text: say
   // so quietly where errors are hidden (the Coordinator chat), never blank.

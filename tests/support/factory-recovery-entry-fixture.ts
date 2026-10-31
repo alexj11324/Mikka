@@ -101,7 +101,7 @@ export async function exerciseFactoryRecoveryEntry(
     stub("../../lib/composio.ts", { runComposioAction: unused });
     // Recovery exercises its real entry/runtime, never unrelated GitHub issue reads.
     stub("../../lib/github/user-access.ts", { readAuthorizedIssue: unused });
-    stub("../../lib/pending-action-store.ts", { proposeAction: unused, proposeRepositoryPush: unused });
+    stub("../../lib/pending-action-store.ts", { proposeAction: unused, writeAccountAction: unused, proposeRepositoryPush: unused });
     stub("../../lib/telegram/client.ts", { postTelegramText: unused });
     stub("../../lib/attention/store.ts", {
       recordDecision: unused,

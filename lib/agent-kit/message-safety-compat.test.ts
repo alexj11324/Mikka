@@ -28,7 +28,7 @@ stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synth
 stub('../composio.ts', { runComposioAction: () => {} })
 // Factory issue-link registration is imported by the tool graph; prompt tests never authorize GitHub reads.
 stub('../github/user-access.ts', { readAuthorizedIssue: () => { throw Error('No GitHub authorization or provider I/O in prompt fixture') } })
-stub('../pending-action-store.ts', { proposeAction: () => {}, proposeRepositoryPush: () => {} })
+stub('../pending-action-store.ts', { proposeAction: () => {}, writeAccountAction: () => {}, proposeRepositoryPush: () => {} })
 stub('../issue-access.ts', { issueForUser: () => {} })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })

@@ -29,6 +29,16 @@ function withoutFences(source: string): string {
  */
 const TOP_LEVEL_CALL = new RegExp(`^\\s*(?:${TOP_LEVEL_COMPONENTS.join('|')})\\s*\\(\\s*[^\\s)]`)
 
+/** Hold ambiguous program prefixes until they become a card or ordinary prose. */
+export function isAgentUISourcePrefix(source: string): boolean {
+  const text = source.trimStart()
+  if (!text || 'root'.startsWith(text)) return true
+  if (/^root\s*$/.test(text)) return true
+  const assignment = /^root\s*=\s*/.exec(text)
+  const component = assignment ? text.slice(assignment[0].length) : text
+  return TOP_LEVEL_COMPONENTS.some(name => name.startsWith(component) || new RegExp(`^${name}\\s*(?:\\(\\s*)?$`).test(component))
+}
+
 /**
  * Whether a reply is OpenUI and the source to render. The prompt asks for
  * `root = Stack([…])`, but models sometimes drop `root =`; a reply that opens

@@ -12,7 +12,7 @@ export function withWritePolicy(checkBinding: OperationAuthorize, checkApproval:
     const executionRunId = binding.executionRunId
     if (!scope || !executionRunId || (runId !== null && runId !== executionRunId)) throw new OperationError('writePolicyUnavailable')
     await checkBinding(tx, binding, runId, phase)
-    const current = await lockWritePolicy(tx, { ownerId: binding.ownerId, botId: scope.botId, workspaceId: scope.workspaceId, runId: executionRunId, action: binding.action }, options)
+    const current = await lockWritePolicy(tx, { ownerId: binding.ownerId, botId: scope.botId, workspaceId: scope.workspaceId, runId: executionRunId, action: binding.action }, { ...options, fallback: scope.approvalDefault ?? 'ask' })
     if (current.version !== scope.version) throw new OperationError('writePolicyChanged')
     if (current.decision === 'deny') throw new OperationError('writeDenied')
     if (current.decision === 'ask') await checkApproval(tx, binding, runId, phase)
