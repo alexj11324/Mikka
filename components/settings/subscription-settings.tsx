@@ -127,7 +127,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   if (!state) return <p role="status" className="px-1 text-sm text-muted-foreground">{t('loading')}</p>
   if (!state.enabled) return <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p>
   return <div className="flex flex-col gap-3">
-    <SettingsSection id="subscriptions-heading" title={t('heading')} description={t('description')}>
+    <SettingsSection id="subscriptions-heading" title={t('heading')}>
       {(['codex', 'claude'] as const).map(provider => {
         const available = state.providers.some(item => item.provider === provider && item.available)
         const connections = state.connections.filter(item => item.provider === provider)
@@ -187,7 +187,6 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
         </div>
       })}
     </SettingsSection>
-    {state.connections.some(item => item.state === 'connected') && <p className="px-1 text-xs text-muted-foreground">{t('whenExhausted')}</p>}
     {attempt && <div className="flex flex-col gap-2 px-1 text-sm">
       <p>{attempt.flow === 'device' ? t('deviceInstructions') : t('callbackInstructions')}</p>
       {attempt.userCode && <p className="font-mono font-semibold select-all">{attempt.userCode}</p>}

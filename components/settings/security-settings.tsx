@@ -7,7 +7,7 @@ import { changePassword, getPasswordStatus, listSessions, revokeOtherSessions, r
 import type { SignedInDevice } from '@/lib/account/sessions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -92,22 +92,22 @@ export function SecuritySettings() {
 
   return <>
     <SettingsSection id="password-heading" title={t('signInMethods')}>
-      <SettingRow title={t('password')} description={passwordError ?? (hasPassword ? t('passwordSet') : t('passwordNotSet'))}>
+      <SettingRow title={t('password')} description={passwordError ?? (hasPassword ? undefined : t('passwordNotSet'))}>
         <Button type="button" variant="secondary" size="sm" disabled={password.isLoading} onClick={open}>
           {hasPassword ? t('changePassword') : t('setPassword')}
         </Button>
       </SettingRow>
     </SettingsSection>
 
-    <SettingsSection id="devices-heading" title={t('devices')} description={t('devicesDescription')}>
+    <SettingsSection id="devices-heading" title={t('devices')}>
       {(sessions.error || (sessions.data && 'error' in sessions.data)) && <p role="alert" className="px-5 py-3 text-sm text-destructive">{sessions.data && 'error' in sessions.data ? actionError(sessions.data.error) : t('devicesError')}</p>}
-      {!sessions.data && !sessions.error && <SettingsLoading label={t('devicesLoading')} rows={3} />}
+      {!sessions.data && !sessions.error && <SettingsLoading label={t('devicesLoading')} rows={3} bare />}
       {devices.map(device => <SettingRow key={device.id} title={device.label ?? t('unknownDevice')} description={t('lastActive', { when: relativeTime(device.lastActiveAt, locale) })}>
         {device.current
           ? <Badge variant="secondary">{t('currentDevice')}</Badge>
           : <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void signOut(device.id) }}>{pendingSession === device.id ? t('signingOut') : t('signOut')}</Button>}
       </SettingRow>)}
-      {devices.length > 1 && <SettingRow title={t('signOutOthers')} description={t('signOutOthersDescription')}>
+      {devices.length > 1 && <SettingRow title={t('signOutOthers')}>
         <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void signOutEverywhere() }}>{t('signOutOthers')}</Button>
       </SettingRow>}
       {signOutError && <p role="alert" className="px-5 py-3 text-sm text-destructive">{signOutError}</p>}
@@ -117,7 +117,6 @@ export function SecuritySettings() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{hasPassword ? t('changePassword') : t('setPassword')}</DialogTitle>
-          <DialogDescription>{hasPassword ? t('changePasswordDescription') : t('setPasswordDescription')}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
           {hasPassword && <Label className="flex flex-col items-start gap-1.5">{t('currentPassword')}

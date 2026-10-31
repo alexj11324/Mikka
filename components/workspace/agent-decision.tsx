@@ -64,7 +64,7 @@ export const AgentApproval: AgentComponentRenderers['BeApproval'] = ({ props }) 
   return <div className="flex min-w-0 flex-col gap-2">
     <ApprovalCard
       title={props.title}
-      description={<>{props.description}<span className="mt-2 block">{agentCopy.chooseHereToContinueThisDoesNot}</span></>}
+      description={props.description}
       status={sent ? 'answered' : status}
       approveLabel={agentCopy.approveAndContinue}
       onApprove={() => choose(agentCopy.iApproveThisProposal)}
@@ -88,7 +88,6 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
   if (questions.length === 1 && !only.multiple && only.options?.length) return <ChoiceCard title={only.title} options={only.options} task={props.task} />
 
   return <div className="flex min-w-0 flex-col gap-2">
-    <p className="text-xs text-muted-foreground">{agentCopy.answerHereAgentWillContinueBasedOn}</p>
     <ApprovalCard
       questions={questions}
       status={sent ? 'answered' : status}

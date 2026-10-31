@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from './settings-link'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { ArrowLeft, Bell, Blocks, Bot, Brain, Building2, ChartColumn, CircleCheck, CreditCard, FileText, Gauge, HardDrive, History, KeyRound, Lock, Monitor, Plus, Search, Shield, SlidersHorizontal, SquareTerminal, SquareUserRound, UserRound, Users, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, Bell, Blocks, Bot, Brain, Building2, ChartColumn, CircleCheck, CreditCard, FileText, Gauge, HardDrive, History, KeyRound, Lock, Monitor, Plus, Shield, SlidersHorizontal, SquareTerminal, SquareUserRound, UserRound, Users, type LucideIcon } from 'lucide-react'
 import { listTeams } from '@/app/actions/teams'
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
+import { SearchInput } from '@/components/ui/search-input'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 import { settingsItemVisible } from '@/lib/settings-sidebar-search'
@@ -59,7 +60,7 @@ export function SettingsSidebar({ user, section, activeSection, admin, selectedT
     <SidebarHeader className="px-4 pt-3 pb-2">
       <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} onSettings={openSettings} onSignOut={onSignOut} signingOut={signingOut} /></SidebarMenuItem></SidebarMenu>
       <SidebarMenu><SidebarMenuItem><SidebarMenuButton aria-label={i18nText("Invite.backToWorkspace")} render={activeSection ? <Link href={selectedTeamId ? `/?team=${encodeURIComponent(selectedTeamId)}` : '/'} /> : undefined} onClick={() => { setOpenMobile(false); if (!activeSection) onBack() }}><ArrowLeft /><span>{i18nText("Settings.backToApp")}</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
-      <div className="relative mt-3"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label={i18nText("Settings.searchLabel")} placeholder={i18nText("Settings.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} /></div>
+      <SearchInput className="mt-3" aria-label={i18nText("Settings.searchLabel")} placeholder={i18nText("Settings.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} />
     </SidebarHeader>
     <SidebarContent ref={contentRef} className="px-2 pb-6">
       {(['personal', 'workspace'] as const).map(group => {

@@ -50,7 +50,7 @@ const retryButtonKeys = new Set([
   'Members.addFailed',
   'Members.removeFailed',
   'Plugins.loadFailedDescription',
-  'Projects.loadErrorDescription',
+  'Projects.loadErrorTitle',
   'DeviceAuthorization.failed',
   'Shell.newTaskDialog.failed',
   'FeatureCopy.c_85f5c4d3',

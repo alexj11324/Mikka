@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import { listSharedLinks, requestDataExport } from '@/app/actions/account'
 import { stopSharingArtifact } from '@/app/actions/artifacts'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { useActionError } from '@/lib/use-action-error'
 
@@ -67,7 +67,7 @@ export function PrivacySettings() {
 
   return <>
     <SettingsSection id="export-heading" title={t('data')}>
-      <SettingRow title={t('export')} description={t('exportDescription')}>
+      <SettingRow title={t('export')}>
         <Button type="button" variant="secondary" size="sm" disabled={exporting} onClick={() => { void exportData() }}>{exporting ? t('exporting') : t('exportButton')}</Button>
       </SettingRow>
       {exportMessage && <p role="status" className="px-5 pb-3 text-sm text-muted-foreground">
@@ -89,9 +89,8 @@ export function PrivacySettings() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('sharedLinks')}</DialogTitle>
-          <DialogDescription>{t('sharedLinksDescription')}</DialogDescription>
         </DialogHeader>
-        {links.isLoading && <SettingsLoading label={t('linksLoading')} rows={2} />}
+        {links.isLoading && <SettingsLoading label={t('linksLoading')} rows={2} bare />}
         {!links.isLoading && shared.length === 0 && <p className="text-sm text-muted-foreground">{t('sharedLinksNone')}</p>}
         <div className="flex flex-col divide-y divide-border">
           {shared.map(link => <div key={link.artifactId} className="flex items-center justify-between gap-3 py-3">

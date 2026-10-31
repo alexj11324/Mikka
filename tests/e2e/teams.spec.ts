@@ -90,7 +90,6 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await expect(page.getByRole('option', { name: 'PRODUCT · 产品团队', exact: true })).toHaveAttribute('aria-selected', 'true')
   await page.keyboard.press('Escape')
   await expect(page.getByRole('listbox')).toHaveCount(0)
-  await expect(page.getByText('对该工作区启用成员公开，可协作编辑。', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
   // Nav v3 keeps projects out of the left column; they stay reachable by link.
   await page.goto(app('/?section=projects'))

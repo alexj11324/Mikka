@@ -20,6 +20,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | GitHub PR state icons | `components/workspace/pull-request-icon.tsx` | Shared open/draft/merged/closed icons and Primer semantic colors; used in task properties, board and thread outputs |
 | Thread state icon | `components/workspace/thread-status-icon.tsx` | Shared by thread card, thread list and open-thread header; Bot avatars remain for actual Bot actors only (R-62/R-66) |
 | New task | `components/coordinator/new-task-dialog.tsx` | R-22, R-23 |
+| Search field on a page (filter a list) | `SearchInput` in `components/ui/search-input.tsx` | Borderless grey fill, icon left (R-31). Never an outlined `Input` with a magnifier |
 | Search | reUI `CommandDialog` (⌘K), centred | Local rows first, then `GET /api/search` hits per source (`hooks/use-site-search.ts`) |
 | Group chat (opened from search) | `components/workspace/group-chat-view.tsx` | Read-only until group sending opens: no composer (R-10). Runs per R-13; bot colour not available yet |
 | Board | reUI `Kanban` (`components/reui/kanban.tsx`) | R-25 |

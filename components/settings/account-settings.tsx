@@ -85,7 +85,7 @@ export function AccountSettings({ user, onSignOut, signingOut }: {
 
   return <>
     <SettingsSection id="account-heading" title={t('heading')}>
-      <SettingRow title={t('avatar')} description={t('avatarDescription')}>
+      <SettingRow title={t('avatar')}>
         <div className="flex items-center gap-3">
           <Avatar className="size-10">
             {shownImage && <AvatarImage src={shownImage} alt="" />}
@@ -103,10 +103,10 @@ export function AccountSettings({ user, onSignOut, signingOut }: {
     </SettingsSection>
 
     <SettingsSection id="session-heading" title={t('sessionHeading')}>
-      <SettingRow title={t('signOut')} description={t('signOutDescription')}>
+      <SettingRow title={t('signOut')}>
         <Button type="button" variant="secondary" size="sm" disabled={signingOut} onClick={onSignOut}>{signingOut ? t('signingOut') : t('signOut')}</Button>
       </SettingRow>
-      <SettingRow title={t('deleteAccount')} description={t('deleteAccountDescription')}>
+      <SettingRow title={t('deleteAccount')}>
         <Button type="button" variant="destructive" size="sm" onClick={() => { setTyped(''); setDeleteError(null); setConfirming(true) }}>{t('deleteAccount')}</Button>
       </SettingRow>
     </SettingsSection>
