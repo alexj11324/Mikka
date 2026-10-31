@@ -25,8 +25,9 @@ export async function freezeBotModel(
     ? await settings.botBinding(settingsScope, selected)
     : available[0];
   if (!binding) {
-    if (scope.botId === null && !selected)
-      return { harness: "ai_sdk", model: COORDINATOR_MODEL };
+    // Nothing chosen and no subscription: every bot, the Coordinator included, runs on the hosted default
+    // through the same admission (verified card, allowance) and workspace billing. A missing chosen binding refuses.
+    if (!selected) return { harness: "ai_sdk", model: COORDINATOR_MODEL };
     throw new SubscriptionRefusal("binding_required");
   }
   return freezeHostedModelSelection(

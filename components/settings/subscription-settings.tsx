@@ -12,7 +12,7 @@ import { OpenAI } from '@/components/ui/svgs/openai'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
-import { parseSubscriptionStart, subscriptionListSchema, subscriptionUsageSchema, type SubscriptionUsageView } from '@/lib/subscription-ui'
+import { InvalidAuthorization, parseSubscriptionStart, subscriptionListSchema, subscriptionUsageSchema, type SubscriptionUsageView } from '@/lib/subscription-ui'
 import { cn } from '@/lib/utils'
 
 type Provider = 'codex' | 'claude'
@@ -60,8 +60,15 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   }, [workspaceId])
 
   useEffect(() => { void refresh().catch(() => { setState(null); setLoadFailed(true) }) }, [refresh])
-  const failureMessage = useCallback((failure: unknown, key: 'startFailed' | 'finishFailed', provider: Provider) =>
-    failure instanceof RequestError && failure.code === 'auth_required' ? t('signedOut') : t(key, { provider: t(provider) }), [t])
+  const failureMessage = useCallback((failure: unknown, key: 'startFailed' | 'finishFailed', provider: Provider) => {
+    if (failure instanceof InvalidAuthorization) return t('refusedPage', { provider: t(provider) })
+    const code = failure instanceof RequestError ? failure.code : ''
+    if (code === 'auth_required') return t('signedOut')
+    if (code === 'backend_unavailable') return t('refusedOff')
+    if (code === 'account_unavailable') return t('refusedAccount', { provider: t(provider) })
+    if (code === 'provider_operation_failed') return t('refusedProvider', { provider: t(provider) })
+    return t(key, { provider: t(provider) })
+  }, [t])
   const loadUsage = useCallback(async (force = false) => {
     usageAbort.current?.abort()
     const abort = new AbortController()

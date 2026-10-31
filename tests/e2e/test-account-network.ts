@@ -6,8 +6,6 @@ type PausedRequest = {
   request: { url: string; method: string }
   resourceType: string
   responseErrorReason?: string
-  networkId?: string
-  frameId?: string
 }
 export type LocalImageFixture = Readonly<{ url: string; body: Uint8Array }>
 type FailurePhase = 'lease' | 'cdp-continue' | 'cdp-fulfill' | 'cdp-abort' | 'route-continue' | 'route-fulfill' | 'route-abort' | 'detach' | 'setup'
@@ -84,42 +82,6 @@ export async function installAccountOriginFence(
       // The first adapter's configured/locked browser is Chromium. Unsupported
       // engines fail before the route releases a request; no weaker fallback.
       const session = await context.newCDPSession(page)
-      type RequestDocument = { frameId: string; loaderId: string }
-      const documents = new Map<string, RequestDocument>()
-      type PendingRequest = { networkId?: string; frameId?: string; eligible: boolean; document?: RequestDocument; navigatedLoaderId?: string; canceled: boolean; documentReplaced: boolean }
-      const paused = new Set<PendingRequest>()
-      const bindDocument = (pending: PendingRequest, document: RequestDocument) => {
-        if (!pending.eligible || pending.frameId !== document.frameId) return false
-        pending.document = document
-        if (pending.navigatedLoaderId && pending.navigatedLoaderId !== document.loaderId) pending.documentReplaced = true
-        return true
-      }
-      session.on('Network.requestWillBeSent', (event: { requestId: string; frameId?: string; loaderId: string; type?: string; request: { url: string } }) => {
-        documents.delete(event.requestId)
-        if (event.type !== 'Document' && event.frameId && event.loaderId && sameOrigin(event.request.url, origin)) {
-          const document = { frameId: event.frameId, loaderId: event.loaderId }
-          let bound = false
-          // Chromium may emit this metadata before or after requestPaused.
-          for (const pending of paused) if (pending.networkId === event.requestId && bindDocument(pending, document)) bound = true
-          if (!bound) documents.set(event.requestId, document)
-        }
-      })
-      session.on('Network.loadingFinished', (event: { requestId: string }) => { documents.delete(event.requestId) })
-      session.on('Network.loadingFailed', (event: { requestId: string; canceled?: boolean }) => {
-        documents.delete(event.requestId)
-        if (event.canceled === true) for (const pending of paused) {
-          if (pending.networkId === event.requestId) pending.canceled = true
-        }
-      })
-      session.on('Page.frameNavigated', (event: { frame: { id: string; loaderId: string } }) => {
-        if (!event.frame.loaderId) return
-        for (const pending of paused) if (pending.eligible && pending.frameId === event.frame.id) {
-          pending.navigatedLoaderId = event.frame.loaderId
-          if (pending.document && pending.document.loaderId !== event.frame.loaderId) pending.documentReplaced = true
-        }
-        for (const [id, document] of documents) if (document.frameId === event.frame.id && document.loaderId !== event.frame.loaderId)
-          documents.delete(id)
-      })
       const originalPageClose = page.close.bind(page)
       Object.defineProperty(page, 'close', {
         configurable: true,
@@ -131,30 +93,24 @@ export async function installAccountOriginFence(
       })
       session.on('close', () => {
         entry.active = false
-        paused.clear()
-        documents.clear()
         if (!closing && !closingPages.has(page) && !page.isClosed() && !context.isClosed()) {
           reportFailure('detach')
           void context.close().catch(() => {})
         }
       })
       session.on('Fetch.requestPaused', (event: PausedRequest) => {
-        const document = event.networkId ? documents.get(event.networkId) : undefined
-        if (event.networkId) documents.delete(event.networkId)
-        const pending: PendingRequest = { networkId: event.networkId, frameId: event.frameId, canceled: false, documentReplaced: false,
-          eligible: event.resourceType !== 'Document' && sameOrigin(event.request.url, origin) }
-        if (document) bindDocument(pending, document)
-        paused.add(pending)
         void (async () => {
           let phase: FailurePhase = 'lease'
           const continueRequest = async () => {
             phase = 'cdp-continue'
             try { await session.send('Fetch.continueRequest', { requestId: event.requestId }) }
             catch (error) {
-              // Reload can invalidate an old document's paused subrequest
-              // without emitting loadingFailed in this CDP session. Require
-              // its exact network/frame/loader evidence, never just the error.
-              if ((!pending.canceled && !pending.documentReplaced) || failureCategory(error) !== 'invalid-interception') throw error
+              // Chromium drops the interception of a request canceled while its
+              // lease check awaits: by script, page close or a navigation such as
+              // reload. Navigation cancels often emit no Network event, so none
+              // can confirm them. Nothing was released and nothing left the
+              // browser, so this one outcome is not a fence failure.
+              if (failureCategory(error) !== 'invalid-interception') throw error
             }
           }
           try {
@@ -180,11 +136,9 @@ export async function installAccountOriginFence(
             // Lease loss already closes contexts through the runner callback;
             // an interception failure must also make the fixture fail closed.
             if (!context.isClosed()) { reportFailure(phase, error); await context.close().catch(() => {}) }
-          } finally { paused.delete(pending) }
+          }
         })()
       })
-      await session.send('Network.enable')
-      await session.send('Page.enable')
       await session.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] })
       entry.active = true
     })()

@@ -29,9 +29,14 @@ test('personal instructions keep host-reported approval and existing OpenUI voca
     assert.ok(presentation.includes(component.signature), component.signature)
     assert.ok(presentation.includes(component.description), component.signature)
   }
+  // OpenUI's generator writes each group as a "### name" section holding its components' signatures and notes.
+  const sections = presentation.split('\n### ').slice(1)
   for (const group of spec.library.componentGroups) {
-    assert.ok(presentation.includes(`${group.name}: ${group.components.join(', ')}`), group.name)
-    for (const note of group.notes) assert.ok(presentation.includes(note), note)
+    const section = sections.find(item => item.startsWith(`${group.name}\n`))
+    assert.ok(section, group.name)
+    const library = spec.library.components as Record<string, { signature: string }>
+    for (const name of group.components) assert.ok(section.includes(library[name].signature), `${group.name}: ${name}`)
+    for (const note of group.notes) assert.ok(section.includes(note), note)
   }
   assert.match(presentation,/each FormControl separately/)
   assert.match(presentation,/never directly in Stack or BeCard/)

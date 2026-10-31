@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { CreditCard, Info, Pause } from 'lucide-react'
@@ -19,7 +20,7 @@ import { settingsHref } from '@/lib/settings-sections'
  * Claude / ChatGPT subscription (设置 › 模型与额度); 验证银行卡 (计费) is the
  * secondary link while the workspace has no verified card.
  */
-export function HostedRefusalNotice({ code }: { code: HostedRefusal }) {
+export function HostedRefusalNotice({ code, retry }: { code: HostedRefusal; retry?: ReactNode }) {
   const t = useTranslations('Billing.refusal')
   const usage = useSWR(['hosted-usage'], () => getHostedUsage())
   const unverified = usage.data && !usage.data.error && !usage.data.balance.verified
@@ -34,6 +35,7 @@ export function HostedRefusalNotice({ code }: { code: HostedRefusal }) {
     <Icon aria-hidden="true" className="shrink-0" />
     <AlertTitle className="min-w-0 flex-1 basis-48 font-normal">{title}</AlertTitle>
     <span className="ml-auto flex shrink-0 items-center gap-1">
+      {retry}
       {offersCard && <Button size="sm" variant="link" className="text-muted-foreground" nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('verifyCard')}</Button>}
       {!transient && <Button size="sm" nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>
         {t.rich('connect', { claude: () => <Claude aria-hidden="true" />, openai: () => <OpenAI aria-hidden="true" /> })}

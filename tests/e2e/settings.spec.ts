@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { BrowserContext } from '@playwright/test'
+import type { BrowserContext, Page } from '@playwright/test'
 import { test, expect, register, rail, app, expectItems, browserClientHeaders, BASE_PATH } from './fixtures'
 
 test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立即切走', async ({ page }) => {
@@ -440,4 +440,46 @@ test('移动端页内创建不横向溢出，返回和侧栏切换保护未保�
   await expect(navigation).not.toBeVisible()
   await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+})
+
+/** The page's painted colour at a point, from a screenshot, so translucent fills are measured as seen. */
+async function paintedAt(page: Page, x: number, y: number) {
+  const png = (await page.screenshot()).toString('base64')
+  return page.evaluate(async ({ png, x, y }) => {
+    const image = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob())
+    const context = new OffscreenCanvas(image.width, image.height).getContext('2d')!
+    context.drawImage(image, 0, 0)
+    const scale = image.width / window.innerWidth
+    return Array.from(context.getImageData(Math.round(x * scale), Math.round(y * scale), 1, 1).data.slice(0, 3))
+  }, { png, x, y })
+}
+
+test('设置侧栏的搜索框在浅色、深色和半透明窗口里都与侧栏底色区分开', async ({ page }) => {
+  await register(page, '/settings?section=preferences')
+  const field = page.locator('[data-slot="settings-list"] [data-slot="search-input"]')
+  await expect(field.getByRole('textbox', { name: '搜索设置', exact: true })).toBeVisible()
+  const cases = [
+    { name: 'light', scheme: 'light' as const, translucent: false },
+    { name: 'dark', scheme: 'dark' as const, translucent: false },
+    { name: 'translucent light', scheme: 'light' as const, translucent: true },
+    { name: 'translucent dark', scheme: 'dark' as const, translucent: true },
+  ]
+  for (const { name, scheme, translucent } of cases) {
+    await page.emulateMedia({ colorScheme: scheme })
+    // A solid colour stands in for the window material: light behind a light window, dark behind a dark one.
+    const material = scheme === 'dark' ? 'rgb(40 40 40)' : 'rgb(200 200 200)'
+    await page.evaluate(({ on, material }) => {
+      const root = document.documentElement
+      if (on) { root.dataset.desktopPlatform = 'darwin'; root.dataset.desktopTranslucent = ''; document.body.style.background = material }
+      else { delete root.dataset.desktopTranslucent; document.body.style.background = '' }
+    }, { on: translucent, material })
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    const box = (await field.boundingBox())!
+    // Inside the field at its right end (no icon or text there) against the sidebar just below it.
+    const inside = await paintedAt(page, box.x + box.width - 6, box.y + box.height / 2)
+    const outside = await paintedAt(page, box.x + box.width - 6, box.y + box.height + 3)
+    const difference = inside.reduce((sum, value, index) => sum + Math.abs(value - outside[index]), 0)
+    expect(difference, `${name}: 搜索框 ${inside} 与侧栏 ${outside} 几乎同色`).toBeGreaterThanOrEqual(24)
+    expect(await field.evaluate(element => getComputedStyle(element).borderTopWidth), name).toBe('0px')
+  }
 })

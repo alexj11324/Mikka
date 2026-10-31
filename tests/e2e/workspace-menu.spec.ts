@@ -132,3 +132,22 @@ test('仅从专属邀请页面加入工作区，菜单不再提供手动加入',
   } finally { await memberContext.close() }
   expect(failures).toEqual([])
 })
+
+test('菜单里每个操作项都有图标，所有行的文字在同一列', async ({ page }) => {
+  await register(page)
+  const menu = await openSwitcher(page)
+  const actions = ['创建工作区', '设置', '添加账户', '退出登录']
+  for (const name of actions) await expect(menu.getByRole('menuitem', { name, exact: true }).locator('svg').first()).toBeVisible()
+  // The text column: where each row's first visible label starts, workspace rows included
+  // (a workspace avatar's initial is aria-hidden and is not the label).
+  const starts = await menu.getByRole('menuitem').evaluateAll(items => items.map(item => {
+    const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT, { acceptNode: node => node.textContent?.trim() && !node.parentElement?.closest('[aria-hidden="true"]') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT })
+    const text = walker.nextNode()
+    if (!text) return null
+    const range = document.createRange()
+    range.selectNodeContents(text)
+    return Math.round(range.getBoundingClientRect().left)
+  }))
+  expect(starts.length).toBeGreaterThanOrEqual(actions.length + 1)
+  expect(new Set(starts)).toEqual(new Set([starts[0]]))
+})

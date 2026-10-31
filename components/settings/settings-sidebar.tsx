@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from './settings-link'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { Bell, Blocks, Bot, Brain, Building2, ChartColumn, CircleCheck, CreditCard, FileText, Gauge, HardDrive, KeyRound, Lock, Monitor, Plus, Search, Shield, SlidersHorizontal, SquareTerminal, SquareUserRound, UserRound, Users, type LucideIcon } from 'lucide-react'
+import { Bell, Blocks, Bot, Brain, Building2, ChartColumn, CircleCheck, CreditCard, FileText, Gauge, HardDrive, KeyRound, Lock, Monitor, Plus, Shield, SlidersHorizontal, SquareTerminal, SquareUserRound, UserRound, Users, type LucideIcon } from 'lucide-react'
 import { listTeams } from '@/app/actions/teams'
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
+import { SearchInput } from '@/components/ui/search-input'
 import { RAIL_ITEMS, type RailDestination } from '@/components/nav/icon-rail'
 import { settingsItemVisible } from '@/lib/settings-sidebar-search'
 import { settingsHref, visibleSettingsSections, type SettingsSectionId } from '@/lib/settings-sections'
@@ -47,7 +48,7 @@ export function SettingsSidebar({ section, activeSection, admin, selectedTeamId,
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-2">
       <h2 className="flex h-8 items-center px-2 text-sm font-semibold">{i18nText("Settings.title")}</h2>
-      <div className="relative mt-1"><Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" aria-hidden="true" /><SidebarInput className="pl-8" aria-label={i18nText("Settings.searchLabel")} placeholder={i18nText("Settings.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} /></div>
+      <SearchInput className="mt-1" aria-label={i18nText("Settings.searchLabel")} placeholder={i18nText("Settings.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} />
     </SidebarHeader>
     <SidebarContent ref={contentRef} className="px-2 pb-6">
       {(['personal', 'workspace'] as const).map(group => {

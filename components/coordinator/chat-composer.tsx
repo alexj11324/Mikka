@@ -20,7 +20,9 @@ const MAX_LENGTH = MESSAGE_MAX
  * that stays dark grey in dark mode, a soft shadow, and a darker line on focus,
  * as Codex and Linear draw their composers. The text sits above a button row.
  */
-const COMPOSER = 'rounded-2xl border border-rule bg-card shadow-sm transition-[border-color,box-shadow] has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-0'
+// Empty, focused and typing look the same: the 1px rule and a soft shadow. Focus only deepens the
+// shadow (Codex); it never draws a dark outline (Alex 2026-10-31).
+const COMPOSER = 'rounded-2xl border border-rule bg-card shadow-sm transition-shadow has-[[data-slot=input-group-control]:focus-visible]:shadow-md has-[[data-slot=input-group-control]:focus-visible]:ring-0'
 
 /** A send arrow with nothing to send is a solid grey control, not a faded black one. */
 const SEND_DISABLED = 'disabled:bg-control disabled:text-muted-foreground disabled:opacity-100'

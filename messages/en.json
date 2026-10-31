@@ -1858,6 +1858,10 @@
       "startFailed": "{provider} sign-in could not start",
       "finishFailed": "{provider} sign-in did not finish",
       "signedOut": "Your session expired. Sign in again, then connect.",
+      "refusedOff": "Model subscriptions are off for this deployment",
+      "refusedAccount": "{provider} account unavailable",
+      "refusedProvider": "{provider} refused the sign-in request",
+      "refusedPage": "{provider} sent an unrecognized sign-in page",
       "restart": "Start over"
     },
     "integrations": {
@@ -2721,6 +2725,13 @@
     "working": "Coordinator is working…",
     "loadError": "Could not load the conversation. Retrying.",
     "failedTitle": "Reply failed",
+    "subscriptionRefusal": {
+      "unavailable": "Chosen subscription unavailable",
+      "reconnect": "Subscription needs reconnecting",
+      "quotaUsed": "Subscription quota used up",
+      "retry": "Subscription temporarily unavailable",
+      "open": "Models and quota"
+    },
     "wakeErrors": {
       "wake_failed": "Reply pending retry",
       "wake_start_unconfirmed": "Reply start unconfirmed",
