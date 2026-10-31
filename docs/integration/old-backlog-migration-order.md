@@ -22,6 +22,8 @@ The unmerged follow-up and workspace-audit migrations were likewise renamed with
 
 | Earlier filename | Current filename | SQL SHA-256 |
 | --- | --- | --- |
-| `20261031045310_monitor_followup_issues.sql` | `20261031053430_monitor_followup_issues.sql` | `6c77aa85ad7b303220368f408c1d29ee148cdf3afadafec3a544e09d97db3282` |
-| `20261031045910_monitor_github_issue_links.sql` | `20261031053431_monitor_github_issue_links.sql` | `6f903b61355e4221aa2d9c2f2a7cbc785e100bad4f830e670162efd35af11469` |
-| `20261031052204_workspace_audit_outbox.sql` | `20261031053432_workspace_audit_outbox.sql` | `e7c71f4ad884a47d1ef9ec43a0159f9ffd5f494abafda5e4fc6702b231dd0895` |
+| `20261031045310_monitor_followup_issues.sql` | `20261031060510_monitor_followup_issues.sql` | `6c77aa85ad7b303220368f408c1d29ee148cdf3afadafec3a544e09d97db3282` |
+| `20261031045910_monitor_github_issue_links.sql` | `20261031060511_monitor_github_issue_links.sql` | `6f903b61355e4221aa2d9c2f2a7cbc785e100bad4f830e670162efd35af11469` |
+| `20261031052204_workspace_audit_outbox.sql` | `20261031060512_workspace_audit_outbox.sql` | `e7c71f4ad884a47d1ef9ec43a0159f9ffd5f494abafda5e4fc6702b231dd0895` |
+
+Before PR #607 merged, main advanced to `d1716a88` with migrations through `20261031054017`. The three nightly files were reordered again to `20261031060510`–`20261031060512` (UTC), retaining the SQL hashes above. A read-only production ledger check confirmed that none of their previous `20261031053430`–`20261031053432` filenames had been applied. No applied migration or ledger was changed.

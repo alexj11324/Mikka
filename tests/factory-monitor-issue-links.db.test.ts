@@ -20,7 +20,7 @@ mock.module(new URL('../lib/auth.ts',import.meta.url).href,{namedExports:{auth:{
 
 test('monitor mappings use actual owner/scope authorization, GitHub readback and durable local references',{skip:!target},async t=>{
   const pool=new Pool({connectionString:target,max:12})
-  for(const name of ['20261031053430_monitor_followup_issues.sql','20261031053431_monitor_github_issue_links.sql'])await pool.query(await readFile(new URL(`../drizzle/${name}`,import.meta.url),'utf8'))
+  for(const name of ['20261031060510_monitor_followup_issues.sql','20261031060511_monitor_github_issue_links.sql'])await pool.query(await readFile(new URL(`../drizzle/${name}`,import.meta.url),'utf8'))
   const owner=`monitor-map-${randomUUID()}`,peer=`monitor-peer-${randomUUID()}`
   actor=owner
   for(const id of [owner,peer])await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())',[id,`${id}@example.invalid`])
