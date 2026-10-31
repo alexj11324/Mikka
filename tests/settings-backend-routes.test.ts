@@ -4,8 +4,10 @@ import { before, mock, test } from 'node:test'
 import { verifyStripeSignature } from '../lib/billing/stripe'
 
 class WorkspaceError extends Error {}
+class AuditExportError extends Error { constructor(readonly code: string, readonly status: number) { super(code) } }
 let user: { id: string } | null = { id: 'admin' }
 let denied = false
+let auditError: AuditExportError | null = null
 let webhookError: Error | null = null
 let webhookCalls = 0
 const workspaceId = '11111111-1111-4111-8111-111111111111'
@@ -17,10 +19,15 @@ let stripeRoute: typeof import('../app/api/billing/stripe/route')
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => user ? { user } : null } } } })
   mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError } })
-  mock.module('@/lib/audit/query', { namedExports: { exportWorkspaceAudit: async (...args: unknown[]) => {
+  mock.module('@/lib/audit/export', { namedExports: { AuditExportError, readAuditExportPage: async (...args: unknown[]) => {
     calls.push(args)
+    if (auditError) throw auditError
+    return { manifest: { id: workspaceId, count: 3 }, events: [{ id: 'second' }], nextOffset: 2 }
+  }, createAuditExport: async (...args: unknown[]) => {
+    calls.push(args)
+    if (auditError) throw auditError
     if (denied) throw new WorkspaceError('workspaceAccessDenied')
-    return [{ createdAt: '2026-10-30T00:00:00.000Z', actorName: '=SUM(1,2)', actorType: 'user', action: 'token.created', category: 'security', targetLabel: 'Token', ip: null, geoCity: null }]
+    return { manifest: { id: workspaceId, count: 1, digest: '0'.repeat(64) }, events: [{ createdAt: '2026-10-30T00:00:00.000Z', actorName: '=SUM(1,2)', actorType: 'user', action: 'token.created', category: 'security', targetLabel: 'Token', ip: null, geoCity: null }] }
   } } })
   mock.module('@/lib/billing/service', { namedExports: { applyStripeEvent: async () => {
     webhookCalls++
@@ -29,6 +36,22 @@ before(async () => {
   mock.module('@/lib/billing/stripe', { namedExports: { stripeConfig: () => ({ webhookSecret: secret }), verifyStripeSignature } })
   auditRoute = await import('../app/api/workspaces/[workspaceId]/audit-log/route')
   stripeRoute = await import('../app/api/billing/stripe/route')
+})
+
+test('audit JSON resumes the same snapshot and preserves explicit export failures', async () => {
+  user = { id: 'admin' }; denied = false; auditError = null
+  const params = { params: Promise.resolve({ workspaceId }) }
+  const response = await auditRoute.GET(new Request(`https://mikka.example/export?format=json&exportId=${workspaceId}&offset=1&limit=1`), params)
+  assert.equal(response.status, 200)
+  assert.deepEqual(calls.at(-1), ['admin', workspaceId, workspaceId, 1, 1])
+  assert.deepEqual(await response.json(), { manifest: { id: workspaceId, count: 3 }, events: [{ id: 'second' }], nextOffset: 2 })
+  assert.equal((await auditRoute.GET(new Request('https://mikka.example/export?format=json&offset=1'), params)).status, 400)
+  assert.equal((await auditRoute.GET(new Request('https://mikka.example/export?format=json&limit=1001'), params)).status, 400)
+  auditError = new AuditExportError('auditExportLimitExceeded', 413)
+  const failed = await auditRoute.GET(new Request('https://mikka.example/export'), params)
+  assert.equal(failed.status, 413)
+  assert.deepEqual(await failed.json(), { error: 'auditExportLimitExceeded' })
+  auditError = null
 })
 
 test('audit CSV requires a session and service authorization, preserves the workspace/filter, and escapes formulas', async () => {

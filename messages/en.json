@@ -2215,6 +2215,9 @@
           "credits_purchased": "bought points",
           "auto_recharge_changed": "changed auto recharge",
           "limits_changed": "changed usage limits"
+        },
+        "audit": {
+          "exported": "exported audit log"
         }
       },
       "roles": {

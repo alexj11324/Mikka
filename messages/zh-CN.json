@@ -2215,6 +2215,9 @@
           "credits_purchased": "购买了点数",
           "auto_recharge_changed": "修改了自动充值",
           "limits_changed": "修改了用量上限"
+        },
+        "audit": {
+          "exported": "导出审计日志"
         }
       },
       "roles": {
