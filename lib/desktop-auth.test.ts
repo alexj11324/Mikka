@@ -22,13 +22,20 @@ test('the loopback callback is carried through the return path', () => {
 
 test('only an unadorned loopback callback is accepted', () => {
   assert.equal(desktopLoopbackCallback('http://127.0.0.1:49152/auth/callback'), 'http://127.0.0.1:49152/auth/callback')
+  assert.equal(desktopLoopbackCallback('http://localhost:49152/auth/callback'), 'http://127.0.0.1:49152/auth/callback')
   for (const value of [
     'https://127.0.0.1:49152/auth/callback',
-    'http://localhost:49152/auth/callback',
+    'https://localhost:49152/auth/callback',
+    'http://localhost.evil.test:49152/auth/callback',
+    'http://[::1]:49152/auth/callback',
     'http://127.0.0.1/auth/callback',
+    'http://localhost/auth/callback',
     'http://127.0.0.1:49152/other',
     'http://127.0.0.1:49152/auth/callback?x=1',
+    'http://localhost:49152/auth/callback?target=127.0.0.1',
+    'http://localhost:49152/auth/callback#fragment',
     'http://user:pass@127.0.0.1:49152/auth/callback',
+    'http://user:pass@localhost:49152/auth/callback',
     'not a url',
   ]) assert.equal(desktopLoopbackCallback(value), null, value)
 })

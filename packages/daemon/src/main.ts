@@ -836,6 +836,7 @@ export class Daemon {
   }
 
   private async register(credential: string) {
+    const { workspaceId, deviceId: knownDeviceId } = this.device
     const { deviceId } = await this.options.link.registerDevice(
       credential,
       {
@@ -848,12 +849,14 @@ export class Daemon {
         deviceType: process.env.MIKKA_DEVICE_TYPE === "server" ? "server" : process.env.MIKKA_DEVICE_TYPE === "laptop" ? "laptop" : await detectDeviceType(),
         harnesses: this.harnesses,
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
-        ...(this.device.workspaceId
-          ? { workspaceId: this.device.workspaceId }
+        ...(workspaceId
+          ? { workspaceId }
           : {}),
       },
-      this.device.deviceId
+      knownDeviceId
     )
+    // A late registration must not restore the session replaced over RPC.
+    if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) throw new Error('Device session changed during registration')
     if (deviceId !== this.device.deviceId) {
       this.saveDevice({ deviceId })
       this.log.info({ device_id: deviceId }, "device registered")
@@ -883,7 +886,7 @@ export class Daemon {
 
   private async syncPass() {
     const { link } = this.options
-    const credential = this.device.credential
+    const { credential, workspaceId } = this.device
     if (!credential) {
       this.server = "unregistered"
       return
@@ -984,6 +987,7 @@ export class Daemon {
       await this.pruneWorktrees()
       await this.sweepEmptyRuns()
     } catch (error) {
+      if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) return
       this.server = "offline"
       if (error instanceof SessionRejectedError) {
         this.rejectDeviceSession(credential)
