@@ -1069,8 +1069,13 @@ export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
   points: integer('points').notNull(),
   reason: text('reason').notNull(),
   externalId: text('externalId').notNull().unique(),
+  stripePaymentIntentId: text('stripePaymentIntentId'),
+  amountCents: integer('amountCents'),
+  currency: text('currency'),
+  receiptUrl: text('receiptUrl'),
+  stripeFeeCents: integer('stripeFeeCents'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('workspace_credit_grants_workspace_idx').on(table.workspaceId, table.createdAt)])
+}, table => [index('workspace_credit_grants_workspace_idx').on(table.workspaceId, table.createdAt), index('workspace_credit_grants_payment_intent_idx').on(table.stripePaymentIntentId)])
 
 export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   id: text('id').primaryKey(),
