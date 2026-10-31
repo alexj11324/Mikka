@@ -56,7 +56,7 @@ export function isSchemaOnly(files) {
 // - targeted: smoke plus the complete specs of each area whose paths changed,
 //   and any existing spec the pull request edits;
 // - main: every code-bearing push to main runs the functional spec files below
-//   (whole files, including the smoke files) on two shards;
+//   (whole files, including the smoke files) on four shards;
 // - full: nightly, manual runs and integrate/* pull requests run every spec plus
 //   performance on four shards. Unsafe modes and unknown ranges also take full.
 // Every spec file belongs to main or to the nightly-only list, so a new spec has
@@ -90,7 +90,7 @@ export const BROWSER_MAIN_SPECS = Object.freeze([
  * slower edge cases, mocked-UI and harness specs waiting to be converted. */
 export const BROWSER_NIGHTLY_SPECS = Object.freeze([
   'agent-performance.spec.ts', 'navigation-performance.spec.ts',
-  'board-layout.spec.ts', 'browser-pane.spec.ts', 'issue-header-breadcrumb.spec.ts',
+  'board-layout.spec.ts', 'browser-pane.spec.ts', 'desktop-translucent.spec.ts', 'issue-header-breadcrumb.spec.ts',
   'issue-menu-collision.spec.ts', 'offline-layout.spec.ts', 'settings-surface.spec.ts',
   'workspace-shortcuts.spec.ts', 'controls.spec.ts',
   'artifact-share.spec.ts', 'avatar.spec.ts', 'detail-return.spec.ts', 'github-integration.spec.ts',

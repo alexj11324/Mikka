@@ -3,13 +3,16 @@ import assert from 'node:assert/strict'
 
 import { windowAppearance } from './window-appearance'
 
-test('macOS uses the sidebar material behind a transparent page', () => {
-  const { options, translucent } = windowAppearance('darwin', { dark: false, reduceTransparency: false })
-  assert.equal(translucent, true)
-  assert.equal(options.vibrancy, 'sidebar')
-  assert.equal(options.visualEffectState, 'followWindow')
-  assert.equal(options.backgroundColor, '#00000000')
-  assert.equal(options.titleBarStyle, 'hiddenInset')
+test('macOS uses the sidebar material behind a transparent page in both themes', () => {
+  for (const dark of [false, true]) {
+    const { options, translucent } = windowAppearance('darwin', { dark, reduceTransparency: false })
+    assert.equal(translucent, true)
+    assert.equal(options.vibrancy, 'sidebar')
+    assert.equal(options.visualEffectState, 'followWindow')
+    // Fully transparent: any alpha here would tint the material before the page draws.
+    assert.equal(options.backgroundColor, '#00000000')
+    assert.equal(options.titleBarStyle, 'hiddenInset')
+  }
 })
 
 test('Reduce transparency keeps the opaque macOS window', () => {
