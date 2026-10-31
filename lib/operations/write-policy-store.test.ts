@@ -25,15 +25,17 @@ function fixture() {
 
 test('policy is scoped to the host run and locks its head and execution', async () => {
  const f = fixture()
- assert.deepEqual(await lockWritePolicy(f.tx, f.scope), { decision: 'ask', version: '0:0' })
+ assert.deepEqual(await lockWritePolicy(f.tx, f.scope), { decision: 'ask', defaulted: true, version: '0:0' })
+ // No setting names the action: the judged fallback applies (R-77).
+ assert.deepEqual(await lockWritePolicy(f.tx, f.scope, { fallback: 'allow' }), { decision: 'allow', defaulted: true, version: '0:0' })
  assert.ok(f.state.queries.filter(sql => !sql.includes('agent_kit_versions') && !sql.includes('pg_advisory_xact_lock')).every(sql => sql.endsWith('for share')))
  f.state.permissions = { send_slack_message: 'allow' }; f.state.version = '1'
- assert.deepEqual(await lockWritePolicy(f.tx, f.scope), { decision: 'allow', version: '1:0' })
+ assert.deepEqual(await lockWritePolicy(f.tx, f.scope), { decision: 'allow', defaulted: false, version: '1:0' })
  f.state.workspacePermissions = { send_slack_message:'deny' }; f.state.workspaceVersion='1'
- assert.deepEqual(await lockWritePolicy(f.tx,f.scope), {decision:'deny',version:'1:1'})
+ assert.deepEqual(await lockWritePolicy(f.tx,f.scope), {decision:'deny',defaulted:false,version:'1:1'})
  f.state.workspacePermissions = {}; f.state.workspaceVersion='0'
  f.state.permissions = { send_slack_message: 'deny' }; f.state.version = '2'
- assert.deepEqual(await lockWritePolicy(f.tx, f.scope), { decision: 'deny', version: '2:0' })
+ assert.deepEqual(await lockWritePolicy(f.tx, f.scope), { decision: 'deny', defaulted: false, version: '2:0' })
 })
 test('foreign scope, inactive run, revoked tool and corrupt policy fail closed', async () => {
  const f = fixture()

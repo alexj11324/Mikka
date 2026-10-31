@@ -1,6 +1,7 @@
 import 'server-only'
 import { eq } from 'drizzle-orm'
-import { callAppTool, destructiveEvidence, destructiveQuestion, explicitSetting, listAppTools, type AppTool, type AppToolCall, type AppToolDeps, type AppToolExecution } from '@/lib/app-tools'
+import { callAppTool, explicitSetting, listAppTools, type AppTool, type AppToolCall, type AppToolDeps, type AppToolExecution } from '@/lib/app-tools'
+import { serverWriteJudge } from '@/lib/operations/write-judgment'
 import { resolveComposioAccount } from '@/lib/composio-actions'
 import { chosenComposioDefault } from '@/lib/composio-account-store'
 import { getComposio } from '@/lib/composio'
@@ -24,13 +25,6 @@ async function readSettingLayers(userId: string, botId: string | null) {
   return rows[0] ?? null
 }
 
-async function judge(userId: string, botId: string | null, call: AppToolCall, tool: AppTool) {
-  const [{ hostedBillingScope }, { executionWorkspace }, { invokeDecision }] = await Promise.all([import('@/lib/abuse/context'), import('@/lib/execution-settings'), import('@/lib/coordinator/decide')])
-  const result = await hostedBillingScope.run({ workspaceId: await executionWorkspace(userId, botId), ownerId: userId }, () => invokeDecision('app-tool-destructive', destructiveEvidence(call, tool), destructiveQuestion()))
-  const answer = result?.answers.get('destructive')
-  return answer?.type === 'predicate' ? answer.probability >= 0.5 : null
-}
-
 export function appToolDeps(userId: string, botId: string | null, client: Client): AppToolDeps {
   return {
     appAllowed: async toolkit => (await import('@/lib/app-policy/store')).botMayUseApp(botId, toolkit),
@@ -41,7 +35,7 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
     setting: async (tool, toolkit) => {
       try { return explicitSetting(await readSettingLayers(userId, botId), [tool, toolkit]) } catch { return 'ask' }
     },
-    judgeDestructive: (call, tool) => judge(userId, botId, call, tool).catch(() => null),
+    judge: serverWriteJudge(userId, botId),
     recordStart: async (call, accountId) => {
       const id = crypto.randomUUID()
       await db.insert(pendingActions).values({ id, userId, action: 'app_tool_call', input: call, connectedAccountId: accountId, status: 'running' })

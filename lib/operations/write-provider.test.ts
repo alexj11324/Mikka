@@ -5,7 +5,7 @@ import type { ComposioActionClient } from '../composio-actions'
 import { composioWriteProvider, writeArguments } from './write-provider'
 import { snapshotDigest } from './write-target'
 import { WRITE_ACTIONS } from './write-contract'
-// The write tools' tags as Composio returned them on 2026-10-31; only the calendar delete is destructive.
+// The write tools' tags as Composio returned them on 2026-10-31; prepare passes them to the destructive judgment.
 const hints:Record<string,string[]>={NOTION_APPEND_BLOCK_CHILDREN:['openWorldHint'],SLACK_SEND_MESSAGE:['chat','important','openWorldHint'],GOOGLECALENDAR_DELETE_EVENT:['destructiveHint','idempotentHint','openWorldHint','important','Events Management']}
 for (const action of WRITE_ACTIONS) test(action+' pins owner/account/target/version and rechecks before write',async()=>{
  const page=randomUUID(),input=action==='append_notion_paragraph'?{page_id:page,text:'One paragraph'}:action==='send_slack_message'?{channel:'C12345678',text:'<!channel> & literal'}:{event_id:'event-one',send_updates:'none'}
@@ -18,7 +18,7 @@ for (const action of WRITE_ACTIONS) test(action+' pins owner/account/target/vers
  return {successful:true,data:action==='append_notion_paragraph'?{results:[{id:'new-block'}]}:action==='send_slack_message'?{channel:input.channel,ts:'1234567890.123456'}:{}}
  }}} as unknown as ComposioActionClient
  const provider=composioWriteProvider(client,action,async p=>{await p.beforeSend();assert.equal(p.ifMatch,'"v1"');writes++;return {status:204}},{version:'pinned-v1',metadataDigest:snapshotDigest({version:'pinned-v1'})}),selected=await provider.prepare('owner',input);assert.equal(writes,0)
- assert.equal(selected.approvalDefault,action==='cancel_calendar_event'?'ask':'allow')
+ assert.deepEqual([selected.tool,selected.annotations],[{append_notion_paragraph:'NOTION_APPEND_BLOCK_CHILDREN',send_slack_message:'SLACK_SEND_MESSAGE',cancel_calendar_event:'GOOGLECALENDAR_DELETE_EVENT'}[action],hints[{append_notion_paragraph:'NOTION_APPEND_BLOCK_CHILDREN',send_slack_message:'SLACK_SEND_MESSAGE',cancel_calendar_event:'GOOGLECALENDAR_DELETE_EVENT'}[action]]])
  const args={ownerId:'owner',...selected,payload:input,approvalContext:selected.context??null,idempotencyKey:'stable',signal:new AbortController().signal,beforeSend:async()=>{checks++;if(revoked)throw Error('revoked')}}
  assert.ok((await provider.execute(args)).providerObjectId);assert.equal(checks,4);assert.equal(writes,1)
  revoked=true;await assert.rejects(provider.execute(args),/revoked/);assert.equal(writes,1)

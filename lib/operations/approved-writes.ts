@@ -194,11 +194,12 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
       let proposal = await locked(prior)
       if (!proposal) {
         // Check authorization before provider metadata and recheck under the insert lock.
-        // Only an explicit deny can stop it here; the tool's default is known after prepare.
+        // Explicit settings win first. Only when none names the action does the
+        // Decisions API judge whether this exact call is destructive (R-77).
         const first = await transaction(tx => lockWritePolicy(tx, { ...run, action }))
         if (first.decision === 'deny') throw new OperationError('writeDenied')
         const selected = await bounded(() => provider.prepare(run.ownerId, input), context.signal)
-        const approvalDefault = selected.approvalDefault ?? 'ask'
+        const approvalDefault = first.defaulted && context.judgeWrite && selected.tool ? await context.judgeWrite({ action, tool: selected.tool, annotations: selected.annotations, input }) : 'ask'
         proposal = await locked(async tx => {
           const existing = await prior(tx)
           if (existing) return existing

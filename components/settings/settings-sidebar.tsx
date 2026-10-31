@@ -20,8 +20,6 @@ const icons: Record<SettingsSectionId, LucideIcon> = {
 }
 
 export function SettingsSidebar({ section, activeSection, admin, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: {
-  /** Unused: the account menu (and workspace switching) lives only behind the rail's avatar. */
-  user?: unknown
   section: SettingsSectionId
   activeSection?: SettingsSectionId
   /** Viewer is a workspace admin. Admin-only sections stay hidden until this is known (S-P). */
@@ -32,9 +30,6 @@ export function SettingsSidebar({ section, activeSection, admin, selectedTeamId,
   /** A pointer or focus on an item: time to fetch its section. */
   onIntent?: (section: SettingsSectionId) => void
   onRail: (destination: RailDestination) => void
-  /** Unused, as `user`. */
-  onSignOut?: unknown
-  signingOut?: unknown
 }) {
   const i18nText = useTranslations();
   const [query, setQuery] = useState('')

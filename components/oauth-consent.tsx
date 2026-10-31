@@ -48,7 +48,6 @@ export function OAuthConsent({ clientName, clientUri, account }: { clientName: s
               <li>{t('scopeRead')}</li>
             </ul>
             {clientUri && <p className="text-muted-foreground text-xs break-all">{clientUri}</p>}
-            <p className="text-muted-foreground text-xs leading-5">{t('note')}</p>
             {error && <FieldError>{error}</FieldError>}
           </CardContent>
           <CardFooter className="flex gap-3 px-7 pt-5 pb-7 sm:px-9 sm:pb-8">

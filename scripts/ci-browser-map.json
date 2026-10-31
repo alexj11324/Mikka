@@ -60,7 +60,11 @@
     "factory-execution-claim.spec.ts",
     "self-improvement-api.spec.ts",
     "site-search.spec.ts",
-    "slack-webhook.spec.ts"
+    "slack-webhook.spec.ts",
+    "bot-agents-settings.spec.ts",
+    "devices-settings.spec.ts",
+    "factory-evidence-viewer.spec.ts",
+    "onboarding.spec.ts"
   ],
   "nightly": [
     "agent-performance.spec.ts",
@@ -135,7 +139,8 @@
         "settings-team-permissions.spec.ts",
         "settings-tokens.spec.ts",
         "settings-usage.spec.ts",
-        "bot-computer-tab.spec.ts"
+        "bot-computer-tab.spec.ts",
+        "bot-agents-settings.spec.ts"
       ]
     },
     {
@@ -189,7 +194,8 @@
         "factory-api.spec.ts",
         "factory-check-api.spec.ts",
         "factory-execution-claim.spec.ts",
-        "self-improvement-api.spec.ts"
+        "self-improvement-api.spec.ts",
+        "factory-evidence-viewer.spec.ts"
       ]
     },
     {
@@ -234,7 +240,8 @@
       ],
       "specs": [
         "device-authorization.spec.ts",
-        "mobile-handoff.spec.ts"
+        "mobile-handoff.spec.ts",
+        "devices-settings.spec.ts"
       ]
     },
     {

@@ -4,9 +4,9 @@ import { OperationError } from './write-error'
 const decision = z.enum(['allow', 'ask', 'deny'])
 const settings = z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), decision)
 
-/** The default for an action no layer names: the tool's own approval default
- * from its provider metadata (decision 2026-10-31). A caller without that
- * metadata gets ask. */
+/** The default for an action no layer names: allow unless the Decisions API
+ * judged the exact call destructive (decision 2026-10-31, R-77). A caller
+ * without a judgment gets ask. */
 export type WriteFallback = 'allow' | 'ask'
 
 /** Resolve only host-owned permission configuration. Absence means the tool's

@@ -85,7 +85,7 @@ test('the product provider pins its proxy contract and checks the current owner 
   const provider = composioWriteProvider(client, 'send_slack_message', undefined, undefined, composioSlackConversationReader(client), composioSlackDelivery(client))
   const prepared = await provider.prepare('owner', payload)
   assert.equal(prepared.version, SLACK_DELIVERY_CONTRACT)
-  assert.equal(prepared.approvalDefault, 'allow')
+  assert.deepEqual([prepared.tool, prepared.annotations], ['SLACK_SEND_MESSAGE', ['chat', 'important', 'openWorldHint']])
   assert.equal((await provider.lookup(input))?.providerObjectId, '123.456')
   active = false
   await assert.rejects(provider.lookup(input), /integrationAccountUnavailable/)

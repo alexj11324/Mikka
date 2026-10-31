@@ -1,8 +1,8 @@
 import 'server-only'
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
 import { appToolCallSchema, APP_TOOL_ACTION, type AppToolCall } from '@/lib/app-tools'
-import { isApprovalAction, parseActionInput } from '@/lib/composio-actions'
-import { toolApprovalDefault } from '@/lib/composio-tool-hints'
+import { COMPOSIO_ACTIONS, isApprovalAction, parseActionInput } from '@/lib/composio-actions'
+import { serverWriteJudge, type WriteJudge } from '@/lib/operations/write-judgment'
 import { resolveActionAccount, runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
 import { coordinatorEvents, pendingActions, repositorySettings } from '@/lib/db/schema'
@@ -51,19 +51,21 @@ export async function proposeRepositoryPush(userId: string, input: unknown, task
 
 /**
  * Sends mail or writes the calendar in the person's connected account, with
- * no card (decision 2026-10-31): the connection's grant is the permission.
- * Only a tool Composio marks destructive goes to `proposeAction` instead. The
- * row is written before dispatch and kept as the record; like other writes the
- * policy allows, it has no `decidedAt` and never shows as a card.
+ * no card (decision 2026-10-31): the connection's grant is the permission and
+ * only a destructive call asks. The Decisions API judges this exact call, with
+ * the tool's MCP annotations as input; a destructive, unjudged or refused call
+ * goes to `proposeAction` instead. The row is written before dispatch and kept
+ * as the record; like other writes the policy allows, it has no `decidedAt`
+ * and never shows as a card.
  */
-export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string) {
+export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId)) {
   if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
   const parsed = parseActionInput(action, input)
   if (!parsed) return { error: 'invalidIntegrationInput' }
   const id = crypto.randomUUID()
   let recorded = false as boolean
   const result = await runComposioAction(userId, action, parsed, selectedAccountId, async (accountId, tool) => {
-    if (toolApprovalDefault(tool.tags) === 'ask') return { error: 'integrationApprovalRequired' }
+    if (await judge({ action, tool: COMPOSIO_ACTIONS[action].slug, annotations: tool.tags, input: parsed }) === 'ask') return { error: 'integrationApprovalRequired' }
     await db.insert(pendingActions).values({ id, userId, action, input: parsed, connectedAccountId: accountId, status: 'running' })
     recorded = true
     return null

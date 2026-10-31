@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, browserClientHeaders, watchRuntime, app, fillSecretPassword, captureAuthenticationCookies } from './fixtures'
+import { test, expect, register, browserClientHeaders, watchRuntime, app, fillSecretPassword, captureAuthenticationCookies, skipOnboarding } from './fixtures'
 
 /** The avatar menu is one flat list: workspaces, 创建工作区, 设置, 添加账户, 退出登录; no submenu. */
 async function openSwitcher(page: Page) {
@@ -83,6 +83,7 @@ test('添加账户保留旧会话，可切回两个账户，退出后撤销全�
   await fillSecretPassword(page, randomBytes(32).toString('base64url'))
   await page.getByRole('button', { name: '创建账号并进入', exact: true }).click()
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText('第二个验证账户的工作区')
+  await skipOnboarding(page, email)
   await captureAuthenticationCookies(context)
   await page.reload()
   const accounts = await openSwitcher(page)

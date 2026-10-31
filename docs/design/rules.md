@@ -68,8 +68,9 @@ source wins in a conflict is in [`README.md`](README.md).
   Artifact waiting for acceptance is a bordered card under the reply (icon,
   name, state such as 待你确认); clicking it opens the Artifact window (R-56).
 - **R-16** The computer card in chat shows a title, a status, one sentence
-  about the task and a big screen. Approval is part of that card. It never
-  shows an operation log, a step checklist, or OS and spec lines.
+  about the task and a big screen. It has no approval step: the bot operates
+  until the person takes control (decisions 2026-10-30). It never shows an
+  operation log, a step checklist, or OS and spec lines.
 - **R-17** The 概览 header does not show 「<Bot 名> 的屏幕」. The 电脑 tab
   holds the bot's screen, the existing `AgentComputer` view (R-50).
 
@@ -242,6 +243,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   has an 「Artifact · N」 entry. Opening an Artifact shows a window with the
   acceptance content on the left (PR, checks, screenshots and recordings),
   the thread's chat on the right, and 打回 / 通过 at the top.
+  Factory acceptance is different: it is the 「验收」 tab of the thread that
+  produced the candidate (header 对话 | 验收; Figma `358:8511`), with the
+  decision bar pinned at its bottom (`decisions.md`, 2026-10-30).
 - **R-57** The local 浏览器 is an icon-only globe toggle at the right of the
   top bar, with no 「浏览器」 label. Turned on, it opens a right column with
   the browser (URL bar and page). Selecting an element and annotating it puts
@@ -275,13 +279,16 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   incident kill switch or a recorded Alex decision (`decisions.md`). Safety
   and money defaults (approval requirements, auto-recharge) are not features;
   they change only with Alex's decision. Source: Alex, 2026-10-31.
-- **R-77** An app write has the permission its connection grants. If the
-  Gmail, Calendar, Notion or Slack connection allows the write, the agent
-  writes without a card. A card appears only when the tool's own metadata
-  says it needs approval (Composio `destructiveHint`, MCP
-  `destructiveHint: true`), or when the person or a workspace admin set that
-  action to ask or deny. Explicit settings still narrow; a tool with no
-  metadata asks. Source: Alex, 2026-10-31.
+- **R-77** An app write has the permission its connection grants, and only
+  a destructive call asks. If the Gmail, Calendar, Notion or Slack
+  connection allows the write, the agent writes without a card. Explicit
+  person or admin allow/ask/deny win first. Otherwise the Decisions API
+  answers one predicate, `destructive`: does this exact call delete,
+  overwrite or remove existing data? The tool's MCP annotations
+  (`destructiveHint`, `readOnlyHint`) are input; a `readOnlyHint` tool is not
+  asked about. Creating, sending, appending and adding never ask. An
+  unavailable or refused judgment shows a card, never a silent write.
+  Source: Alex, 2026-10-31.
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
@@ -290,7 +297,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   agents use their own brand mark (Claude Code, Codex, Cursor…); models use
   their provider's mark (Claude, OpenAI…); apps use the R-70 brand tile.
   Brand marks are the colored logo on its own, never set in a white disc or
-  a bordered circle. 自动 uses one neutral icon so lists line up. Name-only
+  a bordered circle. There is no 自动 choice (decision 2026-10-30). Name-only
   text for these things fails review. Build them with the shared label
   components, not by hand.
 - **R-72** Two kinds of work. A real task, such as coding, is a thread: a full
@@ -362,6 +369,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   to white; ui-policy fails both as `style/secondary-button-fill`. Status
   tones (`statusTones`, used by status and priority pickers and status
   badges) are a tinted fill with no stroke; neutral uses `--control`.
+  Search fields use `SearchInput` (`components/ui/search-input.tsx`): the
+  `--control` fill, no stroke, the magnifier on the left and a light focus ring.
+  ui-policy fails an outlined `Input`, `InputGroup` or `SidebarInput` used for
+  search as `style/search-input`.
 - **R-32** Font Geist, self-hosted from `app/fonts/Geist-Variable.woff2` through
   `next/font/local` (no runtime font CDN). A local font is only allowed after
   its file and CSS variable are registered in `ui-policy.json` →
@@ -403,6 +414,13 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-38** Light-theme hover and column backgrounds use `rgba(0,0,0,a)`
   overlays, not a tinted overlay (an `rgba(16,24,40,…)` overlay read as mint
   green).
+
+- **R-39** One container per surface. A bordered or rounded card never wraps
+  another bordered card, outline item or loading card (a loading card inside a
+  settings section is `SettingsLoading bare`); a dialog is the only surface for
+  what it holds. A list row's hover and selected fill cover the whole row edge
+  to edge; buttons and switches inside it stay separately clickable.
+  `pnpm lint:ui` fails a frame inside a frame as `style/nested-frame`.
 
 ## Copy
 

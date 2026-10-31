@@ -4,7 +4,7 @@ import { before, mock, test } from 'node:test'
 let row: Record<string, unknown> = {}
 let selected = 'account-a'
 let actionError: string | null = null
-// The tool tags the provider reports for the action; see lib/composio-tool-hints.ts.
+// The tool tags the provider reports for the action; they go to the destructive judgment.
 let toolTags: string[] | undefined = ['important', 'openWorldHint']
 const calls: unknown[][] = []
 const reviews: unknown[][] = []
@@ -86,7 +86,9 @@ test('computer and credential reviews retain their own approval authority withou
 
 test('a mail send or calendar write runs at once in the connected account and stays as a record, not a card', async () => {
   selected = 'account-a'; calls.length = 0; row = {}
-  const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' })
+  const judged: unknown[] = []
+  const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, undefined, null, async call => { judged.push(call); return 'allow' })
+  assert.deepEqual(judged, [{ action: 'send_email', tool: 'GMAIL_SEND_EMAIL', annotations: ['important', 'openWorldHint'], input: { to: ['recipient@example.invalid'], subject: 's', body: 'b' } }])
   assert.equal(calls.length, 1)
   assert.equal(calls[0][1], 'send_email')
   assert.equal('status' in result && result.status, 'done')
@@ -98,17 +100,17 @@ test('a mail send or calendar write runs at once in the connected account and st
 test('a direct write with an unknown outcome stays running and is reported uncertain', async () => {
   calls.length = 0; row = {}; actionError = 'operationUncertain'
   try {
-    const result = await store.writeAccountAction('u', 'create_calendar_event', { summary: 'Review', start: '2027-01-01T10:00:00Z', end: '2027-01-01T11:00:00Z' })
+    const result = await store.writeAccountAction('u', 'create_calendar_event', { summary: 'Review', start: '2027-01-01T10:00:00Z', end: '2027-01-01T11:00:00Z' }, undefined, null, async () => 'allow')
     assert.deepEqual(result, { error: 'operationUncertain' })
     assert.equal(row.status, 'running')
     assert.equal(row.error, 'operationUncertain')
   } finally { actionError = null }
 })
 
-test('a write whose tool is marked destructive becomes an approval card instead of running', async () => {
+test('a call judged destructive, or not judged at all, becomes an approval card instead of running', async () => {
   calls.length = 0; row = {}; toolTags = ['destructiveHint', 'openWorldHint']
   try {
-    const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, 'selected-account')
+    const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, 'selected-account', null, async call => call.annotations?.includes('destructiveHint') ? 'ask' : 'allow')
     assert.equal('status' in result && result.status, 'awaiting_approval')
     assert.equal(row.status, 'pending')
     assert.equal(row.connectedAccountId, 'selected-account')

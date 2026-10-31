@@ -46,7 +46,7 @@ export function SavedLoginsSettings() {
 
   return <>
     <SettingsSection id="saved-logins-heading" title={t('heading')}>
-      {isLoading && <SettingsLoading label={t('loading')} rows={3} />}
+      {isLoading && <SettingsLoading label={t('loading')} rows={3} bare />}
       {error && <FieldError className="px-5 py-3">{t('loadError')}</FieldError>}
       {!isLoading && !error && logins.length === 0 && <div className="flex flex-col items-start gap-3 px-5 py-6">
         <p className="text-sm text-muted-foreground">{t('emptyHow')}</p>
@@ -78,7 +78,6 @@ export function SavedLoginsSettings() {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('usageTitle', { site: usageOf ? withoutScheme(usageOf.site) : '' })}</DialogTitle>
-          <DialogDescription>{t('usageDescription')}</DialogDescription>
         </DialogHeader>
         {usageOf && <UsageList id={usageOf.id} />}
       </DialogContent>
@@ -91,7 +90,7 @@ function UsageList({ id }: { id: string }) {
   const locale = useLocale()
   const { data, error, isLoading } = useSWR(['account:saved-login-usage', id], () => listSavedLoginUsage(id))
   const uses: SavedLoginUse[] = data && !('error' in data) ? data.uses : []
-  if (isLoading) return <SettingsLoading label={t('usageLoading')} rows={2} />
+  if (isLoading) return <SettingsLoading label={t('usageLoading')} rows={2} bare />
   if (error) return <FieldError>{t('usageError')}</FieldError>
   if (uses.length === 0) return <p className="text-sm text-muted-foreground">{t('usageEmpty')}</p>
   return <div className="flex max-h-80 flex-col divide-y divide-border overflow-auto">

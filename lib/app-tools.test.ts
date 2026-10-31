@@ -19,7 +19,7 @@ function deps(overrides: Partial<AppToolDeps> = {}) {
     getTool: async slug => { const tool = tools[slug]; if (!tool) throw new Error('missing'); return tool },
     execute: async call => { calls.push(`execute:${call.tool}:${call.version}`); return { successful: true, data: { id: 'c1' } } },
     setting: async () => null,
-    judgeDestructive: async () => false,
+    judge: async () => 'allow',
     recordStart: async call => { calls.push(`record:${call.tool}`); return 'rec_1' },
     recordEnd: async (_id, outcome) => { calls.push(`end:${outcome.status}`) },
     propose: async call => { calls.push(`card:${call.tool}`); return { status: 'awaiting_approval', actionId: 'card_1' } },
@@ -30,24 +30,25 @@ function deps(overrides: Partial<AppToolDeps> = {}) {
 const call = (tool: string, toolkit = 'hubspot') => ({ toolkit, tool, arguments: { email: 'a@acme.dev' } })
 
 test('a read-only tool runs at once, with the pinned version and no record', async () => {
-  const { deps: d, calls } = deps({ judgeDestructive: async () => { throw new Error('reads are not judged') } })
+  const { deps: d, calls } = deps({ judge: async () => { throw new Error('reads are not judged') } })
   assert.deepEqual(await callAppTool(d, call('HUBSPOT_LIST_CONTACTS')), { data: { id: 'c1' } })
   assert.deepEqual(calls, ['execute:HUBSPOT_LIST_CONTACTS:20261030_00'])
 })
 
-test('a write the Decisions API judges not destructive runs directly and leaves a record', async () => {
-  const { deps: d, calls } = deps()
+test('a write the shared judge allows runs directly and leaves a record', async () => {
+  const judged: unknown[] = []
+  const { deps: d, calls } = deps({ judge: async call => { judged.push(call); return 'allow' } })
   const result = await callAppTool(d, call('HUBSPOT_CREATE_CONTACT'))
   assert.equal((result as { status: string }).status, 'done')
   assert.deepEqual(calls, ['record:HUBSPOT_CREATE_CONTACT', 'execute:HUBSPOT_CREATE_CONTACT:20261030_00', 'end:done'])
+  // The judge sees the exact call: tool, its MCP hints and the concrete arguments.
+  assert.deepEqual(judged, [{ action: 'hubspot_create_contact', tool: 'HUBSPOT_CREATE_CONTACT', annotations: ['openWorldHint'], input: { email: 'a@acme.dev' } }])
 })
 
-test('a destructive call, a destructiveHint tool, or an unavailable judgment becomes a card', async () => {
-  for (const [tool, judgment] of [['HUBSPOT_CREATE_CONTACT', true], ['HUBSPOT_CREATE_CONTACT', null], ['HUBSPOT_DELETE_CONTACT', false]] as const) {
-    const { deps: d, calls } = deps({ judgeDestructive: async () => judgment })
-    assert.deepEqual(await callAppTool(d, call(tool)), { status: 'awaiting_approval', actionId: 'card_1' })
-    assert.deepEqual(calls, [`card:${tool}`], `${tool} ${judgment}`)
-  }
+test('a call the judge asks for (destructive, unjudged or refused) becomes a card', async () => {
+  const { deps: d, calls } = deps({ judge: async () => 'ask' })
+  assert.deepEqual(await callAppTool(d, call('HUBSPOT_DELETE_CONTACT')), { status: 'awaiting_approval', actionId: 'card_1' })
+  assert.deepEqual(calls, ['card:HUBSPOT_DELETE_CONTACT'])
 })
 
 test('explicit settings win over the judgment', async () => {
@@ -57,7 +58,7 @@ test('explicit settings win over the judgment', async () => {
   const asked = deps({ setting: async () => 'ask' })
   await callAppTool(asked.deps, call('HUBSPOT_CREATE_CONTACT'))
   assert.deepEqual(asked.calls, ['card:HUBSPOT_CREATE_CONTACT'])
-  const allowed = deps({ setting: async () => 'allow', judgeDestructive: async () => true })
+  const allowed = deps({ setting: async () => 'allow', judge: async () => 'ask' })
   await callAppTool(allowed.deps, call('HUBSPOT_DELETE_CONTACT'))
   assert.deepEqual(allowed.calls, ['record:HUBSPOT_DELETE_CONTACT', 'execute:HUBSPOT_DELETE_CONTACT:20261030_00', 'end:done'])
 })

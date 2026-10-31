@@ -11,8 +11,8 @@ export interface WriteProvider {
   name: string
   /** Must resolve exactly one active owner account, pin version, and read/check target
    * access with that account. A connection or target string is never authority.
-   * approvalDefault comes from the write tool's own metadata; absent means ask. */
-  prepare(ownerId: string, payload: Record<string, unknown>): Promise<{ accountId: string; version: string; context?: Record<string, unknown> | null; approvalDefault?: 'allow' | 'ask' }>
+   * tool and annotations are the write tool's slug and own provider tags, for the destructive judgment. */
+  prepare(ownerId: string, payload: Record<string, unknown>): Promise<{ accountId: string; version: string; context?: Record<string, unknown> | null; tool?: string; annotations?: readonly string[] }>
   execute(input: { ownerId: string; accountId: string; version: string; payload: Record<string, unknown>; approvalContext: Record<string, unknown> | null; idempotencyKey: string; signal: AbortSignal; beforeSend: () => Promise<void> }): Promise<OperationReceipt>
   lookup(input: { ownerId: string; accountId: string; version: string; payload: Record<string, unknown>; idempotencyKey: string; signal?: AbortSignal }): Promise<OperationReceipt | null>
 }

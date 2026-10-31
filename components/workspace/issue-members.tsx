@@ -7,17 +7,17 @@ import { CheckCircle2, Mail, Search, ShieldCheck, UserPlus, Users } from 'lucide
 import { inviteMember, listMembers, removeMember } from '@/app/actions/collaboration'
 import { useActionError } from '@/lib/use-action-error'
 import { Badge } from '@/components/reui/badge'
-import { Frame, FrameHeader, FrameTitle, FrameDescription, FramePanel, FrameFooter } from '@/components/reui/frame'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { UserAvatar } from '@/components/user-avatar'
 import { Button } from '@/components/ui/button'
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
+import { SearchInput } from '@/components/ui/search-input'
 
 type Member = Awaited<ReturnType<typeof listMembers>>['owner']
 
@@ -74,34 +74,29 @@ export function IssueMembers({ id, onChanged }: { id: string; onChanged?: () => 
   const visible = data ? [data.owner, ...data.members].filter(member => `${member.name} ${member.email}`.toLowerCase().includes(normalizedQuery)) : []
 
   return <>
-    <Frame spacing="sm">
-      <FrameHeader>
-        <FrameTitle className="flex items-center justify-between gap-2">{t('accessTitle')}{data && <Badge variant="secondary">{t('membersCount', { count: data.members.length + 1 })}</Badge>}</FrameTitle>
-        <FrameDescription>{t('accessDescription')}</FrameDescription>
-      </FrameHeader>
-      {error && <FramePanel><Alert variant="destructive"><AlertTitle>{t('listUpdateFailed')}</AlertTitle><AlertDescription>{data ? t('keptPrevious') : t('readFailed')}<Button size="sm" variant="outline" disabled={isValidating} onClick={() => { void mutate().catch(() => {}) }}>{t('reload')}</Button></AlertDescription></Alert></FramePanel>}
-      {!data && !error && <FramePanel role="status" aria-label={t('loading')}><Skeleton className="h-10 w-full" /><Skeleton className="mt-3 h-16 w-full" /></FramePanel>}
-      {data?.isOwner && <FramePanel>
-        <form onSubmit={invite}>
+    {/* The dialog is the only surface: sections and rows inside it carry no frame of their own. */}
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-2 text-sm font-medium">{t('accessTitle')}{data && <Badge variant="secondary">{t('membersCount', { count: data.members.length + 1 })}</Badge>}</div>
+      {error && <Alert variant="destructive"><AlertTitle>{t('listUpdateFailed')}</AlertTitle><AlertDescription>{data ? t('keptPrevious') : t('readFailed')}<Button size="sm" variant="outline" disabled={isValidating} onClick={() => { void mutate().catch(() => {}) }}>{t('reload')}</Button></AlertDescription></Alert>}
+      {!data && !error && <div role="status" aria-label={t('loading')}><Skeleton className="h-10 w-full" /><Skeleton className="mt-3 h-16 w-full" /></div>}
+      {data?.isOwner && <form onSubmit={invite}>
           <FieldGroup>
             <Field data-invalid={!!inviteError}>
               <FieldLabel htmlFor="member-email">{t('addMember')}</FieldLabel>
               <InputGroup>
-                <InputGroupInput ref={emailInput} id="member-email" type="email" autoComplete="email" value={email} onChange={event => { setEmail(event.target.value); setInviteError('') }} onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault() }} placeholder={t('emailPlaceholder')} required maxLength={254} disabled={pending} aria-invalid={!!inviteError} aria-describedby={inviteError ? 'member-email-error' : 'member-email-help'} />
+                <InputGroupInput ref={emailInput} id="member-email" type="email" autoComplete="email" value={email} onChange={event => { setEmail(event.target.value); setInviteError('') }} onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault() }} placeholder={t('emailPlaceholder')} required maxLength={254} disabled={pending} aria-invalid={!!inviteError} aria-describedby={inviteError ? 'member-email-error' : undefined} />
                 <InputGroupAddon><Mail /></InputGroupAddon>
               </InputGroup>
-              <FieldDescription id="member-email-help">{t('emailHint')}</FieldDescription>
               {inviteError && <FieldError id="member-email-error">{inviteError}</FieldError>}
             </Field>
             <Button type="submit" disabled={pending || !email.trim()}>{pending && !removing ? <Spinner data-icon="inline-start" /> : <UserPlus data-icon="inline-start" />}{pending && !removing ? t('adding') : t('addMember')}</Button>
           </FieldGroup>
-        </form>
-      </FramePanel>}
-      {message && <FramePanel><Alert role="status"><CheckCircle2 /><AlertTitle>{t('successTitle')}</AlertTitle><AlertDescription>{message}</AlertDescription></Alert></FramePanel>}
-      {data && <FramePanel className="flex flex-col gap-4">
-        <FieldGroup><Field><FieldLabel htmlFor="member-search" className="sr-only">{t('searchMembers')}</FieldLabel><InputGroup><InputGroupInput id="member-search" placeholder={t('searchPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /><InputGroupAddon><Search /></InputGroupAddon></InputGroup></Field></FieldGroup>
+        </form>}
+      {message && <Alert role="status"><CheckCircle2 /><AlertTitle>{t('successTitle')}</AlertTitle><AlertDescription>{message}</AlertDescription></Alert>}
+      {data && <div className="flex flex-col gap-4">
+        <FieldGroup><Field><FieldLabel htmlFor="member-search" className="sr-only">{t('searchMembers')}</FieldLabel><SearchInput id="member-search" placeholder={t('searchPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></Field></FieldGroup>
         <ItemGroup aria-label={t('memberList')}>
-          {visible.map(member => <Item key={member.id} role="listitem" size="sm" variant="outline">
+          {visible.map(member => <Item key={member.id} role="listitem" size="sm">
             <ItemMedia><UserAvatar user={member} /></ItemMedia>
             <ItemContent className="min-w-0"><ItemTitle>{member.name || member.email}{member.id === data.currentUserId && <Badge variant="outline">{t('you')}</Badge>}</ItemTitle><ItemDescription className="break-all">{member.email}</ItemDescription></ItemContent>
             <ItemActions>
@@ -110,10 +105,9 @@ export function IssueMembers({ id, onChanged }: { id: string; onChanged?: () => 
             </ItemActions>
           </Item>)}
         </ItemGroup>
-        {visible.length === 0 ? <Empty><EmptyHeader><EmptyMedia variant="icon"><Search /></EmptyMedia><EmptyTitle>{t('noMatchTitle')}</EmptyTitle><EmptyDescription>{t('noMatchHint')}</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" variant="outline" onClick={() => setQuery('')}>{t('clearSearch')}</Button></EmptyContent></Empty> : data.members.length === 0 && !normalizedQuery && <Empty><EmptyHeader><EmptyMedia variant="icon"><Users /></EmptyMedia><EmptyTitle>{t('inviteTitle')}</EmptyTitle><EmptyDescription>{t('inviteHint')}</EmptyDescription></EmptyHeader>{data.isOwner && <EmptyContent><Button size="sm" variant="outline" onClick={() => emailInput.current?.focus()}><UserPlus data-icon="inline-start" />{t('addFirst')}</Button></EmptyContent>}</Empty>}
-      </FramePanel>}
-      <FrameFooter><FrameDescription>{data && !data.isOwner ? t('footerCollaborator') : t('footerOwner')}</FrameDescription></FrameFooter>
-    </Frame>
+        {visible.length === 0 ? <Empty><EmptyHeader><EmptyMedia variant="icon"><Search /></EmptyMedia><EmptyTitle>{t('noMatchTitle')}</EmptyTitle></EmptyHeader><EmptyContent><Button size="sm" variant="outline" onClick={() => setQuery('')}>{t('clearSearch')}</Button></EmptyContent></Empty> : data.members.length === 0 && !normalizedQuery && <Empty><EmptyHeader><EmptyMedia variant="icon"><Users /></EmptyMedia><EmptyTitle>{t('inviteTitle')}</EmptyTitle></EmptyHeader>{data.isOwner && <EmptyContent><Button size="sm" variant="outline" onClick={() => emailInput.current?.focus()}><UserPlus data-icon="inline-start" />{t('addFirst')}</Button></EmptyContent>}</Empty>}
+      </div>}
+    </div>
     <AlertDialog open={!!removing} onOpenChange={open => { if (!open && !busy.current) { setRemoving(null); setRemoveError('') } }}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>{t('removeDialogTitle')}</AlertDialogTitle><AlertDialogDescription>{t('removeDialogDescription', { name: removing?.name || removing?.email || '' })}</AlertDialogDescription></AlertDialogHeader>
