@@ -293,6 +293,11 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
     assert(source.includes(path), path)
     assert(scanned.includes(path), path)
   }
+  // A red main run is tracked in one issue that names the merged PR's author.
+  const issue = source.split('\n  main-red-issue:\n')[1]
+  assert(issue.includes('issues: write'))
+  assert(issue.includes('listPullRequestsAssociatedWithCommit'))
+  assert(issue.includes("github.event_name == 'push' && github.ref == 'refs/heads/main'"))
 })
 
 test('real subset entrypoint retains search receipts and rejects missing evidence or failed subsets', () => {

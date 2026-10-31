@@ -4,7 +4,8 @@ name: Browser tests
 # - pull requests: the @smoke set plus the complete specs of the areas the change
 #   touches, in one job (install, build, start, run). Performance runs when a
 #   change touches what the budgets measure.
-# - push to main: the functional spec files on two shards.
+# - push to main: the functional spec files on two shards. A red run opens or
+#   updates one issue that names the merged pull request's author.
 # - nightly and manual runs: every spec, including visual, crawler and slower
 #   specs, plus performance, on four shards. integrate/* pull requests run this
 #   tier before merge. Docs-only changes keep only the small gate jobs.
@@ -819,3 +820,54 @@ jobs:
             [ "$FULL_RESULT" = "success" ] || fail "The selected browser layer did not succeed: $FULL_RESULT"
           fi
 
+  main-red-issue:
+    # A red main run opens one issue (or comments on the open one) that names
+    # the merged pull request's author, who fixes forward or reverts. The issue
+    # closes itself on the next green main run.
+    name: Track red browser runs on main
+    needs: [changes, browser-e2e]
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.browser-e2e.result == 'failure' || (needs.browser-e2e.result == 'success' && needs.changes.outputs.docs_only != 'true')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          GATE_RESULT: ${{ needs.browser-e2e.result }}
+        with:
+          script: |
+            const marker = '<!-- browser-tests-red-main -->'
+            const { owner, repo } = context.repo
+            const sha = context.sha
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`
+            const issues = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 })
+            const open = issues.find(issue => !issue.pull_request && issue.user?.login === 'github-actions[bot]' && issue.body?.includes(marker))
+            if (process.env.GATE_RESULT === 'success') {
+              if (!open) return
+              await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `Green again on \`${sha.slice(0, 7)}\`: ${runUrl}` })
+              await github.rest.issues.update({ owner, repo, issue_number: open.number, state: 'closed', state_reason: 'completed' })
+              return
+            }
+            const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({ owner, repo, commit_sha: sha })
+            const pull = pulls.find(candidate => candidate.merged_at && candidate.base.ref === 'main') ?? pulls[0]
+            const author = pull?.user?.login ?? context.payload.head_commit?.author?.username ?? context.actor
+            const source = pull ? `#${pull.number}` : `commit \`${sha.slice(0, 7)}\``
+            const line = `[Run](${runUrl}) on \`${sha.slice(0, 7)}\`, merged from ${source} by @${author}.`
+            const ask = `@${author}, please fix forward or revert within one working day (CONTRIBUTING.md, "How changes are tested").`
+            const assign = async number => {
+              try { await github.rest.issues.addAssignees({ owner, repo, issue_number: number, assignees: [author] }) }
+              catch (error) { core.warning(`Could not assign ${author}: ${error.message}`) }
+            }
+            if (open) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `Still red. ${line}\n\n${ask}` })
+              await assign(open.number)
+              core.notice(`Updated #${open.number}`)
+              return
+            }
+            const body = `${marker}\nThe browser tests after a merge to main failed.\n\n${line}\n\n${ask}\n\nThis issue gets a comment on every red main run and closes on the next green one.`
+            const { data: created } = await github.rest.issues.create({ owner, repo, title: 'Browser tests are red on main', body })
+            await assign(created.number)
+            core.notice(`Opened #${created.number}`)

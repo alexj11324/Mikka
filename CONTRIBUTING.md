@@ -68,7 +68,9 @@ cannot.
    skipped/failed selected job fails the required gate.
 4. **After merge** (CI, every code-bearing push to main): the functional spec
    files (the main list) on two shards, plus the runtime gates and both MVP
-   tests.
+   tests. A red run opens one issue (or comments on the open one) that names the
+   merged pull request's author, who fixes forward or reverts within one working
+   day; the issue closes on the next green main run.
 5. **Nightly** (19:17 UTC) and manual Actions → Browser tests → Run workflow:
    every spec, including visual/layout, the click crawler, slower edge cases
    and specs waiting to move to component or HTTP tests, plus the
