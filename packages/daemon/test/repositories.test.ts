@@ -143,7 +143,7 @@ describe('daemon-owned clone cache', () => {
       out: message => messages.push(message), err: message => messages.push(message),
     })).toBe(0)
     expect(messages.join('\n')).not.toContain('isolated-test-token')
-    const daemon = await new Daemon({ dataDir, flavor: 'dev', link: server.link(),
+    const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link: server.link(),
       harnesses: [{ harness: 'mock', installed: true, version: 'test' }], mockSpeed: Infinity, heartbeatMs: 25, quotaSource: null }).start()
     daemons.push(daemon)
     await daemon.syncWithServer()

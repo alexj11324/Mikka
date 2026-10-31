@@ -27,6 +27,7 @@ async function setup(
   const daemon = await new Daemon({
     dataDir: tempDir(),
     flavor: "dev",
+    agentSandbox: null,
     link: { ...link, heartbeat: (...args) => rejection?.value ? Promise.reject(new SessionRejectedError()) : link.heartbeat(...args) },
     credential: "cred-1",
     harnesses: [{ harness: "mock", installed: true, version: "test" }],
@@ -222,6 +223,7 @@ describe("run commands", () => {
     const daemon = await new Daemon({
       dataDir: tempDir(),
       flavor: "dev",
+      agentSandbox: null,
       link: {
         ...link,
         registerDevice: (...args) => {

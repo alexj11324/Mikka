@@ -283,7 +283,7 @@ describe("a run's captures", () => {
         return {} as never
       },
     }
-    const daemon = await new Daemon({ dataDir, flavor: "dev", link, credential: "cred-1", harnesses: [{ harness: "mock", installed: true, version: "test" }], mockSpeed: Number.POSITIVE_INFINITY, heartbeatMs: 50, quotaSource: null }).start()
+    const daemon = await new Daemon({ dataDir, flavor: "dev", agentSandbox: null, link, credential: "cred-1", harnesses: [{ harness: "mock", installed: true, version: "test" }], mockSpeed: Number.POSITIVE_INFINITY, heartbeatMs: 50, quotaSource: null }).start()
     daemons.push(daemon)
     await daemon.syncWithServer()
     await waitFor(() => daemon.supervisor.list().find((run) => run.runId === runId))
