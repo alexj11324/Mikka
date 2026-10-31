@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
+import { AnimatePresence, motion } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { useTranslations } from 'next-intl'
 import { getCoordinatorChat, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
@@ -249,11 +250,15 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 <CoordinatorReply text={reply.text} citations={citations} isStreaming={reply.committedThrough === undefined} />
               </MessageContent></Message>
             </MessageScrollerItem>)}
-            {data?.working && items.length > 0 && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />{t('working')}</p>}
+            {/* The working line fades in and out (R-37: opacity on a duration); a chat that opens mid-run shows it at once. */}
+            <AnimatePresence initial={false}>{data?.working && items.length > 0 && <motion.p key="working" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner />{t('working')}</motion.p>}</AnimatePresence>
           </MessageScrollerContent>
         </MessageScrollerViewport>
-        {unread.showTop && <UnreadPill direction="up" count={unread.topCount} onJump={unread.jumpToDivider} onDismiss={unread.dismissTop} />}
-        {unread.showBottom ? <UnreadPill direction="down" count={unread.bottomCount} onJump={unread.jumpToLatest} onDismiss={unread.dismissBottom} /> : <MessageScrollerButton />}
+        <AnimatePresence initial={false}>
+          {unread.showTop && <UnreadPill key="up" direction="up" count={unread.topCount} onJump={unread.jumpToDivider} onDismiss={unread.dismissTop} />}
+          {unread.showBottom && <UnreadPill key="down" direction="down" count={unread.bottomCount} onJump={unread.jumpToLatest} onDismiss={unread.dismissBottom} />}
+        </AnimatePresence>
+        {!unread.showBottom && <MessageScrollerButton />}
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
