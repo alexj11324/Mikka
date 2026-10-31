@@ -2,6 +2,12 @@
 
 Backend only. The settings UI is maintained separately in #529 and its dependent PRs.
 
+> This describes the code at 2026-10-31. Model resolution, machine fallback and
+> Agent discovery follow [`design/orchestration.md`](design/orchestration.md),
+> which wins where they differ; the pending code changes are listed in
+> [orchestration conflicts](design/research/2026-10-31-orchestration-conflicts.md)
+> (C7, C11–C13, C16).
+
 ## Frontend contract
 
 `app/actions/execution-settings.ts` derives owner/workspace from the authenticated
@@ -27,7 +33,8 @@ session. The existing action names remain:
 - `listBotModels()`, `getBotModel(botId)`, `setBotModel(botId, bindingId)`:
   null Bot means Coordinator. A binding must be explicit; null/`auto` choices
   are refused. First access persists the first connected binding when none is
-  saved. A saved unavailable binding is retained and execution refuses it.
+  saved. A saved unavailable binding is retained; execution resolves the next
+  model in order instead of refusing ([orchestration](design/orchestration.md) § 2).
 
 `auto` in any execution field, or clearing a Bot model, returns the stable
 `executionAutoNotAllowed` action error. Existing field errors remain
@@ -46,7 +53,10 @@ Otherwise a connected Codex subscription prefers Codex's reported default slot.
 Without a matching local install, a connected cloud binding supplies an explicit
 cloud choice. No server model-name constants or guessed model names are used.
 When no usable report/binding exists, return `executionModelUnknown` rather than
-inventing an automatic choice; redetect/connect an account first.
+inventing an automatic choice; redetect/connect an account first. Target: the
+place is Mikka Cloud when the workspace has an E2B key, otherwise an online
+device, and the model resolves separately, falling back to Mikka 默认
+([orchestration](design/orchestration.md) § 2, § 4).
 
 `20261031054017_explicit_execution.sql` is idempotent: it makes the label nullable,
 adds a single-default unique index, removes auto column defaults, guards new
@@ -79,7 +89,8 @@ and offline expiry do not reroute them. `cloud` explicitly routes to cloud using
 the last reported resolved model, retaining runtime and account authorization.
 Device-specific source-event authorization still cannot be redirected to cloud.
 
-Bot quota `stop` propagates the exhaustion error. `switchAccount` only tries
+Bot quota `stop` propagates the exhaustion error. Target: no switch inside a
+running run ([orchestration](design/orchestration.md) § 2). Today `switchAccount` only tries
 another connected account of the same owner/workspace, route and model. Each
 candidate is independently bound to the consumer and reauthorized for epoch,
 workspace, connection and quota. No paid provider fallback, model substitution,
