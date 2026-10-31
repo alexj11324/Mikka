@@ -11,6 +11,7 @@ import { promisify } from 'node:util'
 import { Pool } from 'pg'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
+import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { remoteKey } from '@mikka/protocol/repository'
 import type { AgentEvent, AgentSession } from '../../packages/daemon/src/adapters/types'
 import type { ToolApprovalGate } from '../../packages/daemon/src/agents/tool-approval'
@@ -70,19 +71,22 @@ before(async () => {
   await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id,cli_run_policy) VALUES ($1,'coordinator',NULL,'{"permissions":{"install_dependency":"allow"}}'::jsonb)`, [owner])
   await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId","issueId","deviceRepoId",status,"agentId",kind,prompt) VALUES ($1,$2,$3,$4,$5,'queued',$6,'implement','APPROVAL_TEST')`, [runId,owner,deviceId,issueId,repoId,agentId])
   const device = await import('../../app/v1/runs/[runId]/tool-approval/route')
+  const policy = await import('../../app/v1/runs/[runId]/policy-snapshot/route')
   const claim = await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   const browser = await import('../../app/api/agent-tool-approvals/route')
   const settings = await import('../../app/api/agent-cli-policy/route')
   server = createServer(async (req,res) => {
     try {
       const chunks: Buffer[]=[]; for await (const part of req) chunks.push(Buffer.from(part))
-      const request = new Request(`${origin}${req.url}`, { method: req.method, headers: req.headers as HeadersInit, body: Buffer.concat(chunks) })
-      const routeRunId = /^\/v1\/runs\/([^/]+)\/tool-approval$/.exec(req.url ?? '')?.[1] ?? runId
+      const pathname = new URL(req.url!, origin).pathname
+      const request = new Request(`${origin}${req.url}`, { method: req.method, headers: req.headers as HeadersInit, ...(req.method==='GET' || req.method==='HEAD' ? {} : {body:Buffer.concat(chunks)}) })
+      const runRoute = /^\/v1\/runs\/([^/]+)\/(tool-approval|policy-snapshot)$/.exec(pathname)
+      const routeRunId = runRoute?.[1] ?? runId
       if (req.url?.endsWith('/tool-approval')) {
         const body = JSON.parse(Buffer.concat(chunks).toString())
         if (body.operation === 'propose') proposals.push(body)
       }
-      const response = req.url === '/api/agent-tool-approvals' ? await browser.POST(request) : req.url === '/api/agent-cli-policy' ? await settings.POST(request) : req.url?.endsWith('/claim') ? await claim.POST(request, { params: Promise.resolve({ runId,deviceId }) }) : await device.POST(request, { params: Promise.resolve({ runId: routeRunId }) })
+      const response = req.url === '/api/agent-tool-approvals' ? await browser.POST(request) : req.url === '/api/agent-cli-policy' ? await settings.POST(request) : req.url?.endsWith('/claim') ? await claim.POST(request, { params: Promise.resolve({ runId,deviceId }) }) : runRoute?.[2] === 'policy-snapshot' ? await (req.method==='GET' ? policy.GET : policy.POST)(request, {params:Promise.resolve({runId:routeRunId})}) : await device.POST(request, { params: Promise.resolve({ runId: routeRunId }) })
       res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()))
     } catch(error) {
       // HTTP failures may include a Drizzle query or response object. Keep the
@@ -134,7 +138,7 @@ test('real HTTP claim carries policy and unavailable CLI callbacks do not create
   assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'queued')
   assert.equal((await pool.query('SELECT count(*)::int n FROM run_tokens WHERE "runId"=$1',[runId])).rows[0].n,0)
   await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[deviceId,harnesses(true)])
-  const claim = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1' } })
+  const claim = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1',[POLICY_SNAPSHOT_HEADER]:POLICY_SNAPSHOT_VERSION } })
   assert.equal(claim.status,200,'the real authenticated claim must pass its scope and lease fences')
   assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'preparing')
   const assignment = await claim.json() as import('@mikka/protocol/device').RunAssignment
@@ -147,6 +151,8 @@ test('real HTTP claim carries policy and unavailable CLI callbacks do not create
   assert.ok(await verifyRunToken(new Request(origin),assignment.mcp?.token),'claim issues a real run-scoped token after its lease commits')
   assert.equal(assignment.policy?.permissions.install_dependency, 'allow')
   assert.match(assignment.policyRevision ?? '', /^[a-f0-9]{64}$/)
+  assert.equal(assignment.policySnapshot?.algorithm,'Ed25519')
+  assert.deepEqual(assignment.policySnapshot?.payload.policy,assignment.policy)
   const gate = await link.prepareRunToolApproval(assignment, new AbortController().signal, () => {})
   const browser = async (cookie: string, payload: object) => fetch(`${origin}/api/agent-tool-approvals`, { method: 'POST', headers: { cookie, origin, 'content-type': 'application/json' }, body: JSON.stringify(payload) })
   const request = {runId,requestId:'synthetic',harness:'codex' as const,method:'item/commandExecution/requestApproval',input:{command:'npm install synthetic'}}
