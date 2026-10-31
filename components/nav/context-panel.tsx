@@ -18,6 +18,8 @@ import { LetterAvatar } from './letter-avatar'
 import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
 import { BotAvatar, COORDINATOR_AVATAR } from './bot-avatar'
+import { BotLookEditor } from './bot-look-editor'
+import { BotNameEditor } from './bot-name-editor'
 import { GroupHeader } from './group-header'
 import { ThreadList, TWO_LINE_ROW } from './thread-list'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
@@ -148,8 +150,10 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
       <TabsContent value="overview" className="flex min-h-0 flex-col">
         <Tabs value={shown} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
           <div className="flex shrink-0 flex-col items-center gap-3 px-4 pt-9 pb-4">
-            {coordinator || conversation.kind === 'bot' ? <BotAvatar {...(coordinator ? COORDINATOR_AVATAR : { color: conversation.color, shape: conversation.shape })} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
-            <h2 className="max-w-full truncate text-xl font-semibold">{conversation.name}</h2>
+            {/* A bot's name and look are edited in place; the Coordinator is not a bot row, so it stays as it is. */}
+            {botId ? <BotLookEditor botId={botId} name={conversation.name} color={conversation.color} shape={conversation.shape} />
+              : coordinator ? <BotAvatar {...COORDINATOR_AVATAR} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
+            {botId ? <BotNameEditor key={botId} botId={botId} name={conversation.name} /> : <h2 className="max-w-full truncate text-xl font-semibold">{conversation.name}</h2>}
             <TabsList aria-label={t('tabs')} className="mt-2 gap-1 bg-transparent p-0">
               {tabs.map(item => <TabsTrigger key={item} value={item} className={pill}>{t(item)}</TabsTrigger>)}
             </TabsList>
