@@ -112,8 +112,19 @@ export async function hostedModel(
             requestStarted = true
             const result = await selected.doStream(prepared)
             let finished = false
+            let consumerCancelled = false
             let generationId: string | undefined
             const reader = result.stream.getReader()
+            const interrupt = async (reason: unknown) => {
+              // Stop provider work immediately, even when accounting is waiting
+              // for a database connection or row lock. Still await both outcomes.
+              const [upstream, settlement] = await Promise.allSettled([
+                reader.cancel(reason),
+                finished ? Promise.resolve() : hostedUsage.settle(id, null, 0, 0, generationId),
+              ])
+              if (settlement.status === 'rejected') throw settlement.reason
+              if (upstream.status === 'rejected') throw upstream.reason
+            }
             return {
               ...result,
               stream: new ReadableStream({
@@ -121,8 +132,8 @@ export async function hostedModel(
                   try {
                     const { value: chunk, done } = await reader.read()
                     if (done) {
-                      if (!finished) await hostedUsage.settle(id, null, 0, 0, generationId)
-                      controller.close()
+                      if (!finished && !consumerCancelled) await hostedUsage.settle(id, null, 0, 0, generationId)
+                      if (!consumerCancelled) controller.close()
                       return
                     }
                     // Gateway exposes its lookup ID on the first content chunk,
@@ -148,18 +159,16 @@ export async function hostedModel(
                       if (cost === null)
                         throw new PaidResourceError('usage_cost_unavailable')
                     }
-                    controller.enqueue(chunk)
+                    if (!consumerCancelled) controller.enqueue(chunk)
                   } catch (error) {
-                    try { if (!finished) await hostedUsage.settle(id, null, 0, 0, generationId) }
-                    finally {
-                      controller.error(error)
-                      await reader.cancel(error).catch(() => {})
-                    }
+                    let failure = error
+                    try { await interrupt(error) } catch (cleanupError) { failure = cleanupError }
+                    if (!consumerCancelled) controller.error(failure)
                   }
                 },
                 async cancel(reason) {
-                  try { if (!finished) await hostedUsage.settle(id, null, 0, 0, generationId) }
-                  finally { await reader.cancel(reason) }
+                  consumerCancelled = true
+                  await interrupt(reason)
                 },
               }),
             }

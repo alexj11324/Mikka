@@ -9,6 +9,7 @@ let generated = 0,
   streamed = 0,
   cost: unknown = '0.002'
 let managed = false, denyAt: 'prepare' | 'send' | null = null
+let beforeSettlement: ((cost: number | null) => Promise<void>) | undefined, generationFailure: Error | undefined
 const modelOptions: unknown[] = []
 let gatewayConfig: { baseURL?: string; fetch?: typeof fetch; apiKey?: string } | undefined
 const usage = { inputTokens: { total: 12 }, outputTokens: { total: 3 } }
@@ -74,8 +75,9 @@ mock.module(new URL('./runtime.ts', import.meta.url).href, {
         if (!allow) throw Error('points_exhausted')
         reservations.push(id)
       },
-      recordGeneration: async (_id: string, generationId: string) => { generations.push(generationId) },
+      recordGeneration: async (_id: string, generationId: string) => { if (generationFailure) throw generationFailure; generations.push(generationId) },
       settle: async (id: string, cost: number | null, _input?: number, _output?: number, generationId?: string) => {
+        await beforeSettlement?.(cost)
         settlements.push({ id, cost, ...(generationId ? { generationId } : {}) })
       },
     },
@@ -101,6 +103,8 @@ beforeEach(() => {
   managed = false
   denyAt = null
   gatewayConfig = undefined
+  beforeSettlement = undefined
+  generationFailure = undefined
 })
 test('verification and zero balance prevent provider I/O, including another tool step', async () => {
   verified = false
@@ -220,4 +224,55 @@ for (const ending of ['error', 'cancel', 'finish'] as const) test(`early Gateway
   assert.ok(settlements.length)
   assert.ok(settlements.every(row => row.generationId === 'synthetic-generation'))
   assert.equal(settlements.at(-1)?.cost, ending === 'finish' ? 2000 : null)
+})
+
+
+test('consumer cancellation stops upstream before blocked settlement and safely completes a pending read', async () => {
+  let release!: () => void, entered!: () => void
+  const blocked = new Promise<void>(resolve => { release = resolve })
+  const settling = new Promise<void>(resolve => { entered = resolve })
+  beforeSettlement = async () => { entered(); await blocked }
+  let cancelled = false
+  const source = new ReadableStream({ cancel() { cancelled = true } })
+  const wrapped = await hostedModel('workspace', 'fixture-model', { ...model, doStream: async () => ({ stream: source }) } as never)
+  const reader = (await wrapped.doStream({ prompt: [] })).stream.getReader()
+  const reading = reader.read(), stopping = reader.cancel('Browser disconnected')
+  try {
+    await settling
+    assert.equal(cancelled, true, 'accounting latency cannot leave the provider generating after cancellation')
+    assert.equal((await reading).done, true)
+    assert.equal(settlements.length, 0)
+  } finally { release(); await stopping }
+  assert.equal(settlements.length, 1, 'the cancelled pending pull must not settle a second time')
+  assert.equal(settlements[0].cost, null)
+})
+
+test('cancel still stops upstream when unknown-cost settlement fails, and rejects the accounting failure', async () => {
+  beforeSettlement = async () => { throw Error('Synthetic accounting database unavailable') }
+  let cancelled = false
+  const source = new ReadableStream({ cancel() { cancelled = true } })
+  const wrapped = await hostedModel('workspace', 'fixture-model', { ...model, doStream: async () => ({ stream: source }) } as never)
+  const stream = (await wrapped.doStream({ prompt: [] })).stream
+  await assert.rejects(stream.cancel('Browser disconnected'), /accounting database unavailable/)
+  assert.equal(cancelled, true)
+  assert.equal(settlements.length, 0, 'a failed accounting write is not a successful or zero-cost settlement')
+})
+
+test('a stream processing error stops upstream before waiting for its unknown-cost settlement', async () => {
+  generationFailure = new Error('Synthetic generation identity persistence failed')
+  let release!: () => void, entered!: () => void
+  const blocked = new Promise<void>(resolve => { release = resolve })
+  const settling = new Promise<void>(resolve => { entered = resolve })
+  beforeSettlement = async () => { entered(); await blocked }
+  let cancelled = false
+  const source = new ReadableStream({
+    start(controller) { controller.enqueue({ type: 'text-delta', id: 't', delta: 'Partial', providerMetadata: { gateway: { generationId: 'synthetic-generation' } } }) },
+    cancel() { cancelled = true },
+  })
+  const wrapped = await hostedModel('workspace', 'fixture-model', { ...model, doStream: async () => ({ stream: source }) } as never)
+  const reader = (await wrapped.doStream({ prompt: [] })).stream.getReader()
+  const reading = assert.rejects(reader.read(), /generation identity persistence failed/)
+  try { await settling; assert.equal(cancelled, true) }
+  finally { release(); await reading }
+  assert.equal(settlements.at(-1)?.cost, null)
 })
