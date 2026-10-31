@@ -115,6 +115,7 @@ const SCOPED_BROWSER = [
   { area: 'board', paths: [/^components\/blocks\/kanban-board-1\//, /^components\/reui\/kanban\.tsx$/, /^components\/workspace\/(?:board-page|issue-board|issue-property-menu|issue-pull-request-link)\.tsx$/], specs: ['board-layout.spec.ts', 'offline-layout.spec.ts'] },
   { area: 'relations', paths: [/^lib\/issue-relation/, /^components\/workspace\/issue-relations\.tsx$/], specs: ['relations.spec.ts'] },
   { area: 'active agents', paths: [/^lib\/active-agents\./], specs: ['active-agents.spec.ts'] },
+  { area: 'account menu', paths: [/^components\/workspace-menu\.tsx$/, /^components\/nav\/icon-rail\.tsx$/], specs: ['workspace-menu.spec.ts', 'workspace.spec.ts', 'sign-out.spec.ts', 'workspace-shortcuts.spec.ts'] },
   { area: 'agent ui', paths: [/^lib\/agent-ui[-.]/, /^lib\/legacy-chat-content\.ts$/, /^components\/workspace\/agent-(?:ui-library|generative-ui|theme|chart|report|editable-table|text-bubble|decision|citations)\.tsx$/], specs: ['agent.spec.ts', 'coordinator-choice-card.spec.ts', 'bot-image-read.spec.ts', 'e2b-machine-name.spec.ts'] },
 ]
 export const BROWSER_SCOPED_SPECS = Object.freeze([...new Set(SCOPED_BROWSER.flatMap(rule => rule.specs))].sort())
