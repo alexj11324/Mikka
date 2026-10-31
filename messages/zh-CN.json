@@ -1801,15 +1801,14 @@
     },
     "computerPolicy": {
       "heading": "电脑操作",
-      "description": "控制工作区内的 Bot 是否可以操作电脑。",
       "label": "Bot 操作电脑",
-      "help": "禁止后，电脑任务会停止，已有授权也会失效。你仍然可以接管电脑。",
+      "help": "你没有接管时，Bot 直接操作电脑。禁止后电脑任务停止。",
       "adminOnly": "只有工作区管理员可以修改此设置。",
-      "ask": "操作前审批",
       "deny": "禁止",
       "error": "无法读取或更新电脑设置。",
-      "loading": "正在读取审批设置…",
-      "unavailable": "这个部署还没有开启云电脑任务，暂时没有需要审批的操作。"
+      "loading": "正在读取电脑设置…",
+      "unavailable": "云电脑未开启",
+      "allow": "允许"
     },
     "issuePrefix": {
       "title": "个人任务编号",
