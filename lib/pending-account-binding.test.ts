@@ -4,12 +4,14 @@ import { before, mock, test } from 'node:test'
 let row: Record<string, unknown> = {}
 let selected = 'account-a'
 let actionError: string | null = null
+// The tool tags the provider reports for the action; they go to the destructive judgment.
+let toolTags: string[] | undefined = ['important', 'openWorldHint']
 const calls: unknown[][] = []
 const reviews: unknown[][] = []
 const db = {
   $count: async () => 0,
   select: () => ({ from: () => ({ where: () => ({ limit: async () => [row] }) }) }),
-  insert: () => ({ values: async (value: Record<string, unknown>) => { row = { ...value, status: 'pending' } } }),
+  insert: () => ({ values: async (value: Record<string, unknown>) => { row = { status: 'pending', ...value } } }),
   update: () => ({ set: (value: Record<string, unknown>) => ({ where: () => {
     row = { ...row, ...value }
     return Object.assign(Promise.resolve(), { returning: async () => [row] })
@@ -19,7 +21,12 @@ const stub = (path: string, exports: Record<string, unknown>) => mock.module(new
 stub('./db/index.ts', { db, pool: {} })
 stub('./composio.ts', {
   resolveActionAccount: async (_userId: string, _action: string, requested?: string) => ({ accountId: requested ?? selected, accounts: [] }),
-  runComposioAction: async (...args: unknown[]) => { calls.push(args); return actionError ? { error: actionError } : { data: { summary: 'event' }, accountId: args[3] } },
+  runComposioAction: async (...args: unknown[]) => {
+    calls.push(args)
+    const gate = args[4] as ((accountId: string, tool: { tags?: string[] }) => Promise<{ error: string } | null>) | undefined
+    const stopped = gate ? await gate(String(args[3] ?? selected), { tags: toolTags }) : null
+    if (stopped) return stopped
+    return actionError ? { error: actionError } : { data: { summary: 'event' }, accountId: args[3] } },
 })
 stub('./coordinator-event-store.ts', { recordCoordinatorEvent: async () => {} })
 stub('./coordinator/wake.ts', { wakeCoordinator: async () => {} })
@@ -75,4 +82,38 @@ test('computer and credential reviews retain their own approval authority withou
     }
   }
   assert.deepEqual(calls, [])
+})
+
+test('a mail send or calendar write runs at once in the connected account and stays as a record, not a card', async () => {
+  selected = 'account-a'; calls.length = 0; row = {}
+  const judged: unknown[] = []
+  const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, undefined, null, async call => { judged.push(call); return 'allow' })
+  assert.deepEqual(judged, [{ action: 'send_email', tool: 'GMAIL_SEND_EMAIL', annotations: ['important', 'openWorldHint'], input: { to: ['recipient@example.invalid'], subject: 's', body: 'b' } }])
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0][1], 'send_email')
+  assert.equal('status' in result && result.status, 'done')
+  assert.equal(row.status, 'done')
+  assert.equal(row.connectedAccountId, 'account-a')
+  assert.equal(row.decidedAt, undefined, 'no person decided it, so it never reads as an approval')
+})
+
+test('a direct write with an unknown outcome stays running and is reported uncertain', async () => {
+  calls.length = 0; row = {}; actionError = 'operationUncertain'
+  try {
+    const result = await store.writeAccountAction('u', 'create_calendar_event', { summary: 'Review', start: '2027-01-01T10:00:00Z', end: '2027-01-01T11:00:00Z' }, undefined, null, async () => 'allow')
+    assert.deepEqual(result, { error: 'operationUncertain' })
+    assert.equal(row.status, 'running')
+    assert.equal(row.error, 'operationUncertain')
+  } finally { actionError = null }
+})
+
+test('a call judged destructive, or not judged at all, becomes an approval card instead of running', async () => {
+  calls.length = 0; row = {}; toolTags = ['destructiveHint', 'openWorldHint']
+  try {
+    const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, 'selected-account', null, async call => call.annotations?.includes('destructiveHint') ? 'ask' : 'allow')
+    assert.equal('status' in result && result.status, 'awaiting_approval')
+    assert.equal(row.status, 'pending')
+    assert.equal(row.connectedAccountId, 'selected-account')
+    assert.equal(calls.length, 1, 'stopped at the gate: no dispatch')
+  } finally { toolTags = ['important', 'openWorldHint'] }
 })

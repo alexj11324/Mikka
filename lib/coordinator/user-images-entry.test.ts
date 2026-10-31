@@ -52,7 +52,7 @@ stub('./personal-instructions.ts',{withPersonalInstructions:async(_owner:string,
 stub('../search/index.ts',{webSearch:forbidden})
 stub('../device-link.ts',{DEVICE_ONLINE_WINDOW_MS:60000,WORKSPACE_ID:'synthetic'})
 stub('../composio.ts',{runComposioAction:forbidden})
-stub('../pending-action-store.ts',{proposeAction:forbidden,proposeRepositoryPush:forbidden})
+stub('../pending-action-store.ts',{proposeAction: forbidden, writeAccountAction: forbidden, proposeRepositoryPush:forbidden})
 stub('../preferences.ts',{readPreferences:async()=>({memoryEnabled:false})})
 stub('../telegram/client.ts',{postTelegramText:forbidden})
 stub('../attention/store.ts',{recordDecision:forbidden,settleTurn:forbidden})

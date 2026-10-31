@@ -13,7 +13,7 @@ const capture = (name: string) => async (...args: unknown[]) => { calls.push({na
 const forbidden = () => { throw Error('No DB, provider or device in catalogue tests') }
 stub('../db/index.ts', {db: {select: forbidden}, pool: {connect: forbidden}})
 stub('../workspace-db.ts', {workspaceDb: {select: forbidden}})
-stub('../../workflows/coordinator/steps.ts', {composioAction: capture('read'), proposeAccountAction: capture('propose'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy')})
+stub('../../workflows/coordinator/steps.ts', {composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy')})
 stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }) })
 let registry: typeof import('../../workflows/coordinator/tools')
 let service: typeof import('./service')
@@ -89,7 +89,7 @@ test('all four existing flag combinations preserve the actual pre-kit catalogue 
   }
 })
 
-test('Gmail reads retain the real input schema, host owner and native scope; account mutations still propose', async () => {
+test('Gmail reads retain the real input schema, host owner and native scope; account writes go through the host write step', async () => {
   calls.length = 0
   const tools = registry.coordinatorTools(owner, bot, scope, {execution: execution()})
   const checked = await asSchema(tools.read_gmail_message.inputSchema).validate!({message_id: 'message-1', ownerId: 'forged'})
@@ -100,7 +100,7 @@ test('Gmail reads retain the real input schema, host owner and native scope; acc
   await invoke(tools, 'send_email', {to: 'synthetic@example.invalid', subject: 'fixture', body: 'fixture'})
   assert.deepEqual(calls, [
     {name: 'read', args: [owner, 'read_gmail_message', {message_id: 'message-1'}, scope, undefined, bot]},
-    {name: 'propose', args: [owner, 'send_email', {to: 'synthetic@example.invalid', subject: 'fixture', body: 'fixture'}, scope, undefined, bot]},
+    {name: 'write', args: [owner, 'send_email', {to: 'synthetic@example.invalid', subject: 'fixture', body: 'fixture'}, scope, undefined, bot]},
   ])
   assert.equal((await asSchema(tools.read_gmail_message.inputSchema).validate!({message_id: ''})).success, false)
 })

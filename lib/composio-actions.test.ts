@@ -170,7 +170,7 @@ test('an event change must change something and cannot cancel the event', () => 
   assert.deepEqual(parseActionInput('update_calendar_event', { event_id: 'abc', start: '2026-10-27T11:00:00Z' }), { event_id: 'abc', start: '2026-10-27T11:00:00Z' })
 })
 
-test('only sending mail and writing the calendar need approval', () => {
+test('only sending mail and writing the calendar are account writes', () => {
   assert.equal(isApprovalAction('send_email'), true)
   assert.equal(isApprovalAction('create_calendar_event'), true)
   assert.equal(isApprovalAction('update_calendar_event'), true)
@@ -203,4 +203,18 @@ test('model tools pass explicit account choices separately from provider input',
   await notion.search_notion_pages.execute!({ query: 'roadmap', account_id: 'account-a' }, options)
   await google.send_email.execute!({ to: ['test@example.invalid'], subject: 's', body: 'b', account_id: 'account-b' }, options)
   assert.deepEqual(calls, [['search_notion_pages', { query: 'roadmap' }, 'account-a'], ['send_email', { to: ['test@example.invalid'], subject: 's', body: 'b' }, 'account-b']])
+})
+
+test('the dispatch gate sees the account and tool tags before anything is sent, and can stop it', async () => {
+  const calls: Record<string, unknown> = {}
+  const transport = client([activeNotion], calls)
+  transport.tools.getRawComposioToolBySlug = async () => ({ version: '20261018_00', tags: ['destructiveHint'] }) as never
+  const seen: unknown[] = []
+  const stopped = await executeComposioAction('user-1', 'search_notion_pages', { query: 'x' }, transport, undefined, undefined, async (accountId, tool) => { seen.push([accountId, tool.tags]); return { error: 'integrationApprovalRequired' } })
+  assert.deepEqual(stopped, { error: 'integrationApprovalRequired' })
+  assert.deepEqual(seen, [['notion-account', ['destructiveHint']]])
+  assert.equal(calls.execution, undefined)
+  const passed = await executeComposioAction('user-1', 'search_notion_pages', { query: 'x' }, transport, undefined, undefined, async () => null)
+  assert.ok('data' in passed)
+  assert.ok(calls.execution)
 })
