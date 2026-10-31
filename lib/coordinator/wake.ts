@@ -68,7 +68,10 @@ async function wakeChat(scope: WakeScope) {
   const result = await deliverWake(claim, {
     triage: value => triageInbox(value.userId, value.botId),
     hasWaking: value => hasWakingEvents(value.userId, value.botId),
-    start: async value => { await start(coordinatorTurn, [value.userId, value.botId]) },
+    start: async value => {
+      const run = await start(coordinatorTurn, [value.userId, value.botId])
+      console.info('Coordinator wake accepted', { workflowRunId: run.runId, eventIds: claim.ids, attempt: claim.attempt })
+    },
     failed: recovery.failed,
   })
   if (result === 'failed') console.error('Coordinator wake delivery failed', { eventIds: claim.ids, attempt: claim.attempt })
