@@ -6,7 +6,7 @@ import { DAEMON_CLIENT_ID } from '@mikka/protocol/auth'
 import { AuthLogo } from '@/components/blocks/auth-19/components/auth-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Link } from '@/i18n/navigation'
@@ -94,7 +94,7 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         {state === 'approved' && <p className="text-sm">{t('returnToTerminal')}</p>}
         {(state === 'approved' || state === 'denied') && <Button size="sm" className={primary + ' self-start'} render={<Link href="/settings?section=computers" />}>{t('done')}</Button>}
         {(state === 'invalid' || state === 'error') && <>
-          <p role="alert" className="text-sm text-destructive">{state === 'invalid' ? t('invalid') : t('failed')}</p>
+          <FieldError>{state === 'invalid' ? t('invalid') : t('failed')}</FieldError>
           <Button size="sm" variant="outline" className="self-start" onClick={() => {
             if (state === 'invalid') { setCode(''); setState('entry') }
             else void review(code)

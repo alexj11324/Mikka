@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { FieldLabel } from '@/components/ui/field'
+import { FieldLabel, FieldError } from '@/components/ui/field'
 import { compareDescriptions, descriptionKey } from '@/lib/issue-relations'
 import { createEditorExtensions } from './issue-editor'
 import { issueIdentifier } from './issue-properties'
@@ -82,7 +82,7 @@ export function IssueDescriptionHistory({ open, onOpenChange, identifier, title,
               <Button size="icon-xs" variant="ghost" aria-label={t('previousChange')} disabled={!highlight || !compared.changes} onClick={() => jump(-1)}><ArrowUp data-icon="inline-start" /></Button><Button size="icon-xs" variant="ghost" aria-label={t('nextChange')} disabled={!highlight || !compared.changes} onClick={() => jump(1)}><ArrowDown data-icon="inline-start" /></Button>
               <Button size="sm" disabled={!selected || isCurrent || pending} onClick={() => setConfirm(true)}>{pending ? t('restoring') : t('restore')}</Button>
             </div>
-            {error && <p role="alert" className="px-4 pb-3 text-xs text-destructive">{error}</p>}
+            {error && <FieldError className="px-4 pb-3 text-xs">{error}</FieldError>}
           </div>
           <aside aria-label={t('timeline')} className="order-first flex w-full shrink-0 gap-2 overflow-x-auto p-1 pb-3 md:order-last md:w-56 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pl-4 md:pr-0">
             {descriptions.length === 0 && <p className="text-sm text-muted-foreground">{t('empty')}</p>}

@@ -9,6 +9,7 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { openSettingsInBrowser } from '@/lib/platform/open-settings'
 import { Google } from '@/components/ui/svgs/google'
+import { FieldError } from '@/components/ui/field'
 
 // Signing in with Google: links a verified Google account to this Mikka
 // account. Connected apps that use Google (Gmail, Calendar) stay under
@@ -89,6 +90,6 @@ export function GoogleSignInSettings({ googleEnabled }: { googleEnabled: boolean
     </SettingRow>
     {!googleEnabled && <p role="status" className="px-5 py-3 text-sm text-muted-foreground">{t('googleNotConfigured')}</p>}
     {googleSuccess && <p role="status" className="px-5 py-3 text-sm text-muted-foreground">{googleSuccess}</p>}
-    {googleError && <p role="alert" className="px-5 py-3 text-sm text-destructive">{googleError}</p>}
+    {googleError && <FieldError className="px-5 py-3">{googleError}</FieldError>}
   </SettingsSection>
 }

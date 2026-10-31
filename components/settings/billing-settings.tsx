@@ -10,6 +10,7 @@ import { BalanceSection, creditBillingKey } from '@/components/billing/balance-s
 import { FreeAllowanceSection } from '@/components/billing/free-allowance-section'
 import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { useActionError } from '@/lib/use-action-error'
+import { FieldError } from '@/components/ui/field'
 
 /**
  * V15 计费. No embedded card or tax forms (WS-20~22 dropped): the plan goes
@@ -49,7 +50,7 @@ export function BillingSettings({ workspaceId }: { workspaceId: string }) {
   }
 
   if (!billing.data && !billing.error) return <SettingsLoading label={t('loading')} rows={3} />
-  if (!data) return <p role="alert" className="text-sm text-destructive">{actionError(billing.data?.error)}</p>
+  if (!data) return <FieldError>{actionError(billing.data?.error)}</FieldError>
   if (!data.configured) return <>
     {credits}
     <p role="status" className="text-sm text-muted-foreground">{actionError('billingNotConfigured')}</p>
@@ -83,6 +84,6 @@ export function BillingSettings({ workspaceId }: { workspaceId: string }) {
         <Button type="button" variant="secondary" size="sm" disabled={pending !== null} onClick={() => void redirect('portal')}>{t('viewInvoices')}</Button>
       </SettingRow>
     </SettingsSection>}
-    {error && <p role="alert" className="px-1 text-sm text-destructive">{error}</p>}
+    {error && <FieldError className="px-1">{error}</FieldError>}
   </>
 }

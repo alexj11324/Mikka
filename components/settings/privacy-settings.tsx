@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { useActionError } from '@/lib/use-action-error'
+import { FieldError } from '@/components/ui/field'
 
 /** N2: the data export, and every link that currently opens one of my artifacts. */
 export function PrivacySettings() {
@@ -74,7 +75,7 @@ export function PrivacySettings() {
         {exportMessage}
         {downloadPath && <> <a href={downloadPath} download className="font-medium text-foreground underline underline-offset-4">{t('exportDownload')}</a></>}
       </p>}
-      {exportError && <p role="alert" className="px-5 pb-3 text-sm text-destructive">{exportError}</p>}
+      {exportError && <FieldError className="px-5 pb-3">{exportError}</FieldError>}
     </SettingsSection>
 
     <SettingsSection id="shared-heading" title={t('sharing')}>
@@ -104,7 +105,7 @@ export function PrivacySettings() {
             </Button>
           </div>)}
         </div>
-        {stopError && <p role="alert" className="text-sm text-destructive">{stopError}</p>}
+        {stopError && <FieldError>{stopError}</FieldError>}
       </DialogContent>
     </Dialog>
   </>
