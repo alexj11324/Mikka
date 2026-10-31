@@ -248,7 +248,7 @@ export async function accountWrite(userId: string, action: ApprovalActionName, i
   'use step'
   await assertNativeToolScope(userId,scope)
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
-  return accountId ? writeAccountAction(userId, action, input, accountId) : writeAccountAction(userId, action, input)
+  return writeAccountAction(userId, action, input, accountId, botId ?? null)
 }
 // A send has no idempotency key: a replayed step could send it twice.
 accountWrite.maxRetries = 0

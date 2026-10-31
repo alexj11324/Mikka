@@ -49,16 +49,22 @@ const run={ownerId:owner,botId:null,workspaceId:null,runId}
  const repeated=await service.proposeFromRun(input,allowKey)
  assert.equal(repeated.status,'done');assert.equal(writes,1)
  assert.equal(Number((await scopedPool.query("select count(*) from pending_actions where status='pending'")).rows[0].count),0)
- // No setting names the action: the tool's own default decides (decision 2026-10-31).
+ // No setting names the action: the destructive judgment decides (decision 2026-10-31).
  await scopedPool.query('update agent_kit_heads set external_write_permissions=$1 where owner_id=$2',[{},owner])
  let direct=0
- const toolDefault=(approvalDefault:'allow'|'ask'):WriteProvider=>({...provider,prepare:async()=>({accountId:'account',version:'v1',approvalDefault}),execute:async ({beforeSend})=>{await beforeSend();direct++;return {providerObjectId:'tool-default',evidenceDigest:'c'.repeat(64)}}})
- const granted=await createApprovedWrites(scopedPool,toolDefault('allow'),action,{modelRun:run}).proposeFromRun(input,randomUUID())
+ const judged:WriteProvider={...provider,prepare:async()=>({accountId:'account',version:'v1',tool:'NOTION_APPEND_BLOCK_CHILDREN',annotations:['openWorldHint']}),execute:async ({beforeSend})=>{await beforeSend();direct++;return {providerObjectId:'judged',evidenceDigest:'c'.repeat(64)}}}
+ const judgedCalls:unknown[]=[]
+ const judge=(answer:'allow'|'ask')=>async (call:unknown)=>{judgedCalls.push(call);return answer}
+ const granted=await createApprovedWrites(scopedPool,judged,action,{modelRun:run,judgeWrite:judge('allow')}).proposeFromRun(input,randomUUID())
  assert.equal(granted.status,'done');assert.equal(direct,1)
- const destructiveService=createApprovedWrites(scopedPool,toolDefault('ask'),action,{modelRun:run}), destructive=await destructiveService.proposeFromRun(input,randomUUID())
+ assert.deepEqual(judgedCalls[0],{action,tool:'NOTION_APPEND_BLOCK_CHILDREN',annotations:['openWorldHint'],input})
+ const destructiveService=createApprovedWrites(scopedPool,judged,action,{modelRun:run,judgeWrite:judge('ask')}), destructive=await destructiveService.proposeFromRun(input,randomUUID())
  assert.equal(destructive.status,'awaiting_approval');assert.equal(direct,1)
  assert.equal((await destructiveService.decide(actor,destructive.actionId,true)).status,'done');assert.equal(direct,2)
- assert.equal((await createApprovedWrites(scopedPool,provider,action,{modelRun:run}).proposeFromRun(input,randomUUID())).status,'awaiting_approval','a provider without tool metadata still asks')
+ assert.equal((await createApprovedWrites(scopedPool,judged,action,{modelRun:run}).proposeFromRun(input,randomUUID())).status,'awaiting_approval','without a judge it asks')
+ await set('allow')
+ const explicit=await createApprovedWrites(scopedPool,judged,action,{modelRun:run,judgeWrite:judge('ask')}).proposeFromRun(input,randomUUID())
+ assert.equal(explicit.status,'done');assert.equal(judgedCalls.length,2,'an explicit setting wins without asking the model')
  await set('ask')
  const askKey=randomUUID(), asked=await service.proposeFromRun(input,askKey)
  assert.equal(asked.status,'awaiting_approval');assert.equal(writes,1)

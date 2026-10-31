@@ -116,8 +116,8 @@ export const COMPOSIO_ACTIONS = {
     toArguments: (input: { event_id: string }) => ({ calendar_id: 'primary', event_id: input.event_id }),
   },
   // The three below change the person's mail or calendar. They run at once
-  // when the connection grants it; only a tool Composio marks destructive
-  // becomes an approval card (lib/pending-action-store.ts writeAccountAction).
+  // when the connection grants it; only a call the Decisions API judges
+  // destructive becomes an approval card (lib/pending-action-store.ts writeAccountAction).
   send_email: {
     title: 'Send an email',
     description: 'Send a new plain-text email from the person\'s Gmail.',
@@ -166,7 +166,7 @@ export const COMPOSIO_ACTIONS = {
 } as const
 
 export type ComposioActionName = keyof typeof COMPOSIO_ACTIONS
-/** Actions that change the person's mail or calendar. Each runs directly unless its tool needs approval; the card path stays for those. */
+/** Actions that change the person's mail or calendar. Each runs directly unless the call is judged destructive; the card path stays for those. */
 export const APPROVAL_ACTIONS = ['send_email', 'create_calendar_event', 'update_calendar_event'] as const
 export type ApprovalActionName = (typeof APPROVAL_ACTIONS)[number]
 

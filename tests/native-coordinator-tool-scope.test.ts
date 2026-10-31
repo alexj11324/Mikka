@@ -221,7 +221,7 @@ test('unscoped AI SDK calls keep the existing business callbacks and account wri
   await steps.accountWrite(user,'send_email',{subject:'proposal'})
   assert.equal(checks.mock.callCount(),0)
   assert.equal(effect.mock.callCount(),2)
-  assert.deepEqual(effect.mock.calls[1].arguments,[user,'send_email',{subject:'proposal'}])
+  assert.deepEqual(effect.mock.calls[1].arguments,[user,'send_email',{subject:'proposal'},undefined,null])
 })
 
 test('candidate registration rechecks native authorization after source fetching before persistence',async()=>{

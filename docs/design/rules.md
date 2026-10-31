@@ -275,13 +275,16 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   incident kill switch or a recorded Alex decision (`decisions.md`). Safety
   and money defaults (approval requirements, auto-recharge) are not features;
   they change only with Alex's decision. Source: Alex, 2026-10-31.
-- **R-77** An app write has the permission its connection grants. If the
-  Gmail, Calendar, Notion or Slack connection allows the write, the agent
-  writes without a card. A card appears only when the tool's own metadata
-  says it needs approval (Composio `destructiveHint`, MCP
-  `destructiveHint: true`), or when the person or a workspace admin set that
-  action to ask or deny. Explicit settings still narrow; a tool with no
-  metadata asks. Source: Alex, 2026-10-31.
+- **R-77** An app write has the permission its connection grants, and only
+  a destructive call asks. If the Gmail, Calendar, Notion or Slack
+  connection allows the write, the agent writes without a card. Explicit
+  person or admin allow/ask/deny win first. Otherwise the Decisions API
+  answers one predicate, `destructive`: does this exact call delete,
+  overwrite or remove existing data? The tool's MCP annotations
+  (`destructiveHint`, `readOnlyHint`) are input; a `readOnlyHint` tool is not
+  asked about. Creating, sending, appending and adding never ask. An
+  unavailable or refused judgment shows a card, never a silent write.
+  Source: Alex, 2026-10-31.
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
