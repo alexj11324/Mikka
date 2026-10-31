@@ -1108,6 +1108,7 @@
     "workspaceAccessDenied": "You do not have permission to manage this workspace, or your membership is suspended.",
     "workspaceNotFound": "No accessible workspace.",
     "workspacePaymentTaken": "Another member's card already pays for this team.",
+    "workspacePersonal": "A personal workspace has only you. To invite people, create a workspace.",
     "workspaceMemberExists": "One of these emails is already a workspace member. Manage or restore them in the member list.",
     "workspaceMemberNotFound": "This member does not exist.",
     "workspaceLastAdmin": "A workspace must keep at least one active admin.",
@@ -1619,7 +1620,7 @@
     "searchPlaceholder": "Search settings…",
     "noResults": "No matching settings",
     "groups": {
-      "personal": "Personal",
+      "personal": "Account",
       "workspace": "Workspace",
       "administration": "Administration",
       "yourTeams": "Your teams"
@@ -2373,6 +2374,7 @@
       },
       "hostedDefault": "Mikka Default",
       "defaults": "Task defaults",
+      "fallbacks": "When something goes wrong",
       "whenQuotaExhausted": "When quota runs out",
       "quotaStop": "Stop and wait for me",
       "quotaSwitch": "Switch to another account",

@@ -95,7 +95,9 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; em
     const emails = [...new Set(z.array(z.email().max(254)).min(1).max(20).parse(input.emails.map(email => email.trim().toLowerCase())))]
     const request = auditRequestContext(await headers())
     return workspaceDb.transaction(async tx => {
-      await requireWorkspace(tx, input.workspaceId, user.id, true)
+      const { workspace } = await requireWorkspace(tx, input.workspaceId, user.id, true)
+      // A personal workspace has exactly one member (decision 2026-10-31-2130).
+      if (workspace.kind === 'personal') throw new WorkspaceError('workspacePersonal')
       const members = await tx.select({ email: workspaceMembers.email }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, input.workspaceId))
       if (emails.some(email => members.some(member => member.email.toLowerCase() === email))) throw new WorkspaceError('workspaceMemberExists')
       const links: { email: string; path: string }[] = []
@@ -167,7 +169,8 @@ export async function acceptWorkspaceInvitation(token: string) {
     const workspaceId = await workspaceDb.transaction(async tx => {
       const [candidate] = await tx.select({ workspaceId: workspaceInvitations.workspaceId }).from(workspaceInvitations).where(and(eq(workspaceInvitations.tokenHash, hashToken(token)), eq(workspaceInvitations.email, user.email.toLowerCase()), eq(workspaceInvitations.status, 'pending'), gt(workspaceInvitations.expiresAt, new Date()))).limit(1)
       if (!candidate) throw new WorkspaceError('inviteInvalid')
-      await tx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, candidate.workspaceId)).for('update')
+      const [target] = await tx.select({ kind: workspaces.kind }).from(workspaces).where(eq(workspaces.id, candidate.workspaceId)).for('update')
+      if (target?.kind === 'personal') throw new WorkspaceError('inviteInvalid')
       const [invitation] = await tx.select({ id: workspaceInvitations.id, role: workspaceInvitations.role }).from(workspaceInvitations).where(and(eq(workspaceInvitations.workspaceId, candidate.workspaceId), eq(workspaceInvitations.tokenHash, hashToken(token)), eq(workspaceInvitations.email, user.email.toLowerCase()), eq(workspaceInvitations.status, 'pending'), gt(workspaceInvitations.expiresAt, new Date()))).for('update').limit(1)
       if (!invitation) throw new WorkspaceError('inviteExpired')
       const [existing] = await tx.select({ status: workspaceMembers.status }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, candidate.workspaceId), eq(workspaceMembers.userId, user.id))).limit(1)

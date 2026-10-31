@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { BrowserContext, Page } from '@playwright/test'
-import { test, expect, register, rail, app, expectItems, browserClientHeaders, BASE_PATH } from './fixtures'
+import { test, expect, register, registerInTeam, rail, app, expectItems, browserClientHeaders, BASE_PATH } from './fixtures'
 
 test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立即切走', async ({ page }) => {
   const navigations: string[] = []
@@ -12,7 +12,7 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
     await waitingForData
     await route.continue()
   })
-  await register(page)
+  await registerInTeam(page)
   // The conversation list is an in-flow sidebar (collapsible="none"), not the offcanvas container.
   const workspaceSidebar = page.locator('[data-slot="sidebar"]')
   await expect(workspaceSidebar.getByRole('button', { name: '新建 Bot', exact: true })).toBeVisible()
@@ -291,7 +291,7 @@ test('成员首屏使用服务端结果，不立即重复读取成员 API', asyn
 })
 
 test('团队创建、常规设置与成员管理都在同一设置页内完成', async ({ page }, testInfo) => {
-  await register(page, '/settings/teams')
+  await registerInTeam(page, '/settings/teams')
   const sidebar = page.locator('[data-slot="settings-list"]')
   await expect(sidebar).toHaveCount(1)
   await expect(page.getByRole('main')).toHaveCount(1)
@@ -360,8 +360,9 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(form).not.toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '设置回归团队', exact: true })).toHaveAttribute('aria-current', 'page')
-  await expectItems(sidebar.locator('[data-slot="sidebar-group-label"]'), ['个人', '工作区', '你的团队'])
-  const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^工作区$/ }) })
+  // Two groups: 账号, and the current workspace by name (decision 2026-10-31-2130).
+  await expectItems(sidebar.locator('[data-slot="sidebar-group-label"]'), ['账号', 'E2E 团队', '你的团队'])
+  const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^E2E 团队$/ }) })
   await expectItems(administration.locator('[data-slot="sidebar-menu-button"]'), ['常规', '成员', '团队', 'Bot 与 Agents', '团队权限', '密钥与环境', '审计日志', '用量', '计费'])
   await expect(sidebar.locator('[data-slot="sidebar-menu-sub"]')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '团队常规设置', exact: true })).toHaveCount(0)
@@ -481,5 +482,19 @@ test('设置侧栏的搜索框在浅色、深色和半透明窗口里都与侧�
     const difference = inside.reduce((sum, value, index) => sum + Math.abs(value - outside[index]), 0)
     expect(difference, `${name}: 搜索框 ${inside} 与侧栏 ${outside} 几乎同色`).toBeGreaterThanOrEqual(24)
     expect(await field.evaluate(element => getComputedStyle(element).borderTopWidth), name).toBe('0px')
+  }
+})
+
+test('个人工作区的设置没有成员、团队权限和审计日志，旧链接打开常规', async ({ page }) => {
+  // Decision 2026-10-31-2130: a new account's own workspace is personal, with only that person in it.
+  await register(page, '/settings?section=general')
+  const sidebar = page.locator('[data-slot="settings-list"]')
+  await expect(sidebar.locator('[data-slot="sidebar-group-label"]').first()).toHaveText('账号')
+  await expect(sidebar.getByRole('link', { name: '常规', exact: true })).toBeVisible()
+  for (const name of ['成员', '团队权限', '审计日志']) await expect(sidebar.getByRole('link', { name, exact: true })).toHaveCount(0)
+  for (const path of ['/settings/members', '/settings?section=permissions', '/settings?section=audit']) {
+    await page.goto(app(path))
+    await expect(page).toHaveURL(url => url.pathname === app('/settings') && url.searchParams.get('section') === 'general')
+    await expect(page.getByRole('heading', { level: 1, name: '常规', exact: true })).toBeVisible()
   }
 })

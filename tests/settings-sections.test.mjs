@@ -56,3 +56,12 @@ test('a current id wins over a legacy alias with the same name', () => {
   assert.equal(resolveSettingsSection('/settings', 'account'), 'account')
   assert.equal(resolveSettingsSection('/settings', 'profile'), 'account')
 })
+
+test('a personal workspace hides 成员, 团队权限 and 审计日志; a team workspace keeps them', () => {
+  // Decision 2026-10-31-2130: a personal workspace has exactly one member.
+  const personal = visibleSettingsSections({ admin: true, personal: true }).map(s => s.id)
+  for (const id of ['members', 'permissions', 'audit']) assert.equal(personal.includes(id), false, id)
+  for (const id of ['account', 'models', 'general', 'bots', 'usage', 'billing']) assert.ok(personal.includes(id), id)
+  const team = visibleSettingsSections({ admin: true }).map(s => s.id)
+  for (const id of ['members', 'permissions', 'audit']) assert.ok(team.includes(id), id)
+})

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { test, expect, register, rail, watchRuntime, browserClientHeaders, app, BASE_PATH } from "./fixtures";
+import { test, expect, register, registerInTeam, rail, watchRuntime, browserClientHeaders, app, BASE_PATH } from "./fixtures";
 
 test("旧设置预览地址跳转到真实成员设置并保留参数", async ({ page, request }) => {
   const workspace = randomUUID();
@@ -10,7 +10,7 @@ test("旧设置预览地址跳转到真实成员设置并保留参数", async ({
   expect(destination.searchParams.get('workspace')).toBe(workspace);
   expect(destination.searchParams.get('invite')).toBe('1');
 
-  await register(page, '/settings/members');
+  await registerInTeam(page, '/settings/members');
   await page.goto(app('/preview/settings?invite=1'));
   await expect(page).toHaveURL(url => url.pathname === app('/settings/members') && url.searchParams.get('invite') === '1');
   await expect(page.getByRole('dialog', { name: '邀请成员', exact: true })).toBeVisible();
@@ -27,7 +27,7 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
     await gate;
     await route.continue();
   });
-  await register(page);
+  await registerInTeam(page);
   const workspaceSidebar = page.locator('[data-slot="settings-list"]');
   await expect(workspaceSidebar.getByRole("link", { name: "成员", exact: true })).toHaveCount(0);
   await expect(workspaceSidebar.getByRole("link", { name: "团队", exact: true })).toHaveCount(0);
@@ -100,7 +100,7 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
 });
 
 test("CSV 拖拽去重、导入错误保护、批量邀请和导出", async ({ page }) => {
-  await register(page, "/settings/members");
+  await registerInTeam(page, "/settings/members");
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "邀请成员", exact: true });
   const first = `csv-${randomUUID()}@example.com`;
@@ -174,7 +174,7 @@ test("受邀邮箱加入后，管理员可停用并恢复成员", async ({
   browser,
   baseURL,
 }) => {
-  await register(page, "/settings/members");
+  await registerInTeam(page, "/settings/members");
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "邀请成员", exact: true });
   const email = `member-${randomUUID()}@example.com`;

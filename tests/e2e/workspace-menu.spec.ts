@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, browserClientHeaders, watchRuntime, app, fillSecretPassword, captureAuthenticationCookies, skipOnboarding } from './fixtures'
+import { test, expect, register, registerInTeam, browserClientHeaders, watchRuntime, app, fillSecretPassword, captureAuthenticationCookies, skipOnboarding } from './fixtures'
 
 /** The avatar menu is one flat list: workspaces, 创建工作区, 设置, 添加账户, 退出登录; no submenu. */
 async function openSwitcher(page: Page) {
@@ -104,7 +104,7 @@ test('添加账户保留旧会话，可切回两个账户，退出后撤销全�
 })
 
 test('仅从专属邀请页面加入工作区，菜单不再提供手动加入', async ({ page, browser, baseURL }) => {
-  await register(page, '/settings/members')
+  await registerInTeam(page, '/settings/members')
   const original = await selectedWorkspace(page)
   await page.getByRole('button', { name: '邀请成员', exact: true }).click()
   const invitation = page.getByRole('dialog', { name: '邀请成员', exact: true })

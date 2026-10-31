@@ -243,6 +243,18 @@ export async function skipOnboarding(page: Page, email: string) {
   await expect(guide).toHaveCount(0)
 }
 
+/**
+ * register(), then a team workspace the new person administers, selected as the current one.
+ * A new account's own workspace is personal and has no members, 团队权限 or 审计日志 (decision 2026-10-31-2130).
+ */
+export async function registerInTeam(page: Page, next = '/', email?: string, options: { onboarding?: boolean } = {}) {
+  const account = await register(page, '/', email, options)
+  const workspaceId = await seedTeamWorkspace(page)
+  await page.context().addCookies([{ name: 'mikka-workspace', value: workspaceId, url: new URL(page.url()).origin }])
+  await page.goto(app(next))
+  return { ...account, workspaceId }
+}
+
 export async function register(page: Page, next = '/', email = `e2e-${randomUUID()}@example.com`, { onboarding = false } = {}) {
   const password = randomBytes(32).toString('base64url')
   try {

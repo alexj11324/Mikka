@@ -1,4 +1,4 @@
-import { test, expect, register, rail, watchRuntime, browserClientHeaders, app, openCreateIssue } from './fixtures'
+import { test, expect, registerInTeam, rail, watchRuntime, browserClientHeaders, app, openCreateIssue } from './fixtures'
 import { controlsSelector, clickWithEffect, inspectControl } from './control-audit'
 import type { Page } from '@playwright/test'
 
@@ -43,7 +43,7 @@ const surfaces: { name: string; scope?: 'dialog' | 'menu'; prepare: (page: Page)
 for (const surface of surfaces) {
   test(`自动发现可见控件并验证点击效果：${surface.name}`, async ({ page, browser, baseURL }, testInfo) => {
     test.setTimeout(180000)
-    await register(page)
+    await registerInTeam(page)
     const storageState = await page.context().storageState()
     await surface.prepare(page)
     const root = surface.scope ? page.getByRole(surface.scope) : page

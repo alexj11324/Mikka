@@ -45,10 +45,11 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
   await expect(fallback.getByRole('button', { name: '默认 运行位置：E2E MacBook', exact: true })).toBeVisible()
   await expect(fallback.getByRole('button', { name: '默认 Agent：Claude Code', exact: true })).toBeVisible()
   await expect(fallback.getByRole('button', { name: '默认 模型：E2E Opus Resolved', exact: true })).toBeVisible()
-  await expect(fallback.getByRole('button', { name: '默认 设备离线时：等它上线', exact: true })).toBeVisible()
+  // 设备离线时 and 额度用完时 are account settings in 模型与额度 (decision 2026-10-31-2130).
+  await expect(page.getByRole('button', { name: /设备离线时/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /额度用完时/ })).toHaveCount(0)
   await expect(fallback.getByRole('button', { name: /更多操作/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Coordinator 模型：claude-e2e-model', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '额度用完时：停下等我', exact: true })).toBeVisible()
   await expect(page.getByRole('main').getByText('自动')).toHaveCount(0)
   await expect(page.getByRole('main').getByText(/^opus$/)).toHaveCount(0)
 
@@ -96,16 +97,20 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
   await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
   await testInfo.attach('bot-agents', { body: await page.screenshot(), contentType: 'image/png' })
 
-  // The fallbacks save too: a reload keeps the choice.
-  await fallback.getByRole('button', { name: '默认 设备离线时：等它上线', exact: true }).click()
+  // The fallbacks live in 模型与额度 and save too: a reload keeps the choice.
+  const botsURL = page.url()
+  await page.goto(botsURL.replace('section=bots', 'section=models'))
+  await expect(page.getByRole('button', { name: '额度用完时：停下等我', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '设备离线时：等它上线', exact: true }).click()
   // The choice is one save (a server action); wait for it before reloading.
   const saved = page.waitForResponse(response => response.request().method() === 'POST' && Boolean(response.request().headers()['next-action']))
   await page.getByRole('option', { name: '改到云端运行' }).click()
   expect((await saved).ok()).toBe(true)
-  await expect(fallback.getByRole('button', { name: '默认 设备离线时：改到云端运行', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '设备离线时：改到云端运行', exact: true })).toBeVisible()
   await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
   await page.reload()
-  await expect(fallback.getByRole('button', { name: '默认 设备离线时：改到云端运行', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '设备离线时：改到云端运行', exact: true })).toBeVisible()
+  await page.goto(botsURL)
 
   await row.getByRole('button', { name: '前端 的更多操作', exact: true }).click()
   await page.getByRole('menuitem', { name: '删除', exact: true }).click()

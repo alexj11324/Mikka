@@ -1,9 +1,9 @@
-import { test, expect, register, seedTeamWorkspace, app } from './fixtures'
+import { test, expect, register, registerInTeam, seedTeamWorkspace, app } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
 // N4 团队权限 (Figma 554:8760) › 允许使用的应用 against the real policy table.
 test('管理员可以禁止某个应用，刷新后保持', async ({ page }, testInfo) => {
-  await register(page, '/settings?section=permissions')
+  await registerInTeam(page, '/settings?section=permissions')
   await expect(page.getByRole('heading', { level: 1, name: '团队权限' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: '允许使用的应用' })).toBeVisible()
   const slack = page.getByRole('combobox', { name: 'Slack', exact: true })

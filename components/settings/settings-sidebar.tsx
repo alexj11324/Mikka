@@ -20,11 +20,15 @@ const icons: Record<SettingsSectionId, LucideIcon> = {
   audit: FileText, usage: ChartColumn, billing: CreditCard,
 }
 
-export function SettingsSidebar({ section, activeSection, admin, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: {
+export function SettingsSidebar({ section, activeSection, admin, personal = false, workspaceName, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: {
   section: SettingsSectionId
   activeSection?: SettingsSectionId
   /** Viewer is a workspace admin. Admin-only sections stay hidden until this is known (S-P). */
   admin: boolean
+  /** The current workspace is the viewer's personal one: no member pages. */
+  personal?: boolean
+  /** The second group is named after the current workspace. */
+  workspaceName?: string
   selectedTeamId?: string
   workspaceId?: string
   onSectionChange: (section: SettingsSectionId) => void
@@ -52,9 +56,9 @@ export function SettingsSidebar({ section, activeSection, admin, selectedTeamId,
     </SidebarHeader>
     <SidebarContent ref={contentRef} className="px-2 pb-6">
       {(['personal', 'workspace'] as const).map(group => {
-        const groupLabel = i18nText(`Settings.groups.${group}`)
-        const items = visibleSettingsSections({ admin }).filter(item => item.group === group && settingsItemVisible({
-          query, groupTitle: group === 'personal' ? 'Personal' : 'Workspace', groupLabel, itemTitle: item.title,
+        const groupLabel = group === 'workspace' && workspaceName ? workspaceName : i18nText(`Settings.groups.${group}`)
+        const items = visibleSettingsSections({ admin, personal }).filter(item => item.group === group && settingsItemVisible({
+          query, groupTitle: group === 'personal' ? 'Account' : 'Workspace', groupLabel, itemTitle: item.title,
           label: i18nText(`Settings.sections.${item.id}.title` as never),
           keywords: i18nText.has(`Settings.sections.${item.id}.keywords` as never) ? i18nText(`Settings.sections.${item.id}.keywords` as never) : '',
           section: item.id, routed: Boolean(activeSection),

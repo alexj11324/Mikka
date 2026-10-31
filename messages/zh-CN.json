@@ -1108,6 +1108,7 @@
     "workspaceAccessDenied": "没有管理此工作区的权限，或成员资格已被停用。",
     "workspaceNotFound": "没有可访问的工作区。",
     "workspacePaymentTaken": "这个团队已经由另一位成员的卡支付。",
+    "workspacePersonal": "个人工作区只有你一人。要邀请成员，请新建工作区。",
     "workspaceMemberExists": "其中一个邮箱已经是工作区成员，请在成员列表中管理或恢复。",
     "workspaceMemberNotFound": "成员不存在。",
     "workspaceLastAdmin": "工作区必须保留至少一位启用中的管理员。",
@@ -1619,7 +1620,7 @@
     "searchPlaceholder": "搜索设置…",
     "noResults": "没有匹配的设置",
     "groups": {
-      "personal": "个人",
+      "personal": "账号",
       "workspace": "工作区",
       "administration": "管理",
       "yourTeams": "你的团队"
@@ -2373,6 +2374,7 @@
       },
       "hostedDefault": "Mikka 默认",
       "defaults": "任务默认",
+      "fallbacks": "出问题时",
       "whenQuotaExhausted": "额度用完时",
       "quotaStop": "停下等我",
       "quotaSwitch": "换用另一个账号",
