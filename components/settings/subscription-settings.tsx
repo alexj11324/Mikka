@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Progress } from '@/components/ui/progress'
+import { Spinner } from '@/components/ui/spinner'
 import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { BotAvatar } from '@/components/nav/bot-avatar'
@@ -49,6 +50,8 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   /** The desktop app is catching the browser's return, so there is nothing to paste. */
   const [catching, setCatching] = useState(false)
   const [pending, setPending] = useState(false)
+  /** The sign-in being started, until its attempt exists. */
+  const [starting, setStarting] = useState<{ provider: Provider; id?: string } | null>(null)
   const [error, setError] = useState<Failure | null>(null)
   const [notice, setNotice] = useState('')
   const [usage, setUsage] = useState<Usage>(null)
@@ -132,14 +135,17 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   }, [attempt, t])
 
   async function connect(provider: Provider, existing?: { id: string; revision: number }) {
-    setPending(true); setError(null); setNotice(''); setCallback('')
+    setPending(true); setStarting({ provider, id: existing?.id }); setError(null); setNotice(''); setCallback('')
+    // A tab opened after the request would be blocked, so hold it now. The desktop app opens the system browser instead.
+    const tab = bridgeFromWindow(window as MikkaWindow) ? null : window.open('', '_blank')
     try {
       const result = await post(existing ? { action: 'reconnect', connectionId: existing.id, revision: existing.revision } : { action: 'connect', workspaceId, provider })
       const value = existing && result && typeof result === 'object' ? { ...result, connectionId: existing.id } : result
       const next = parseSubscriptionStart(value, provider)
       if (Date.parse(next.expiresAt) <= Date.now()) throw new Error('Authorization expired')
+      if (tab) { tab.opener = null; tab.location.href = next.authorizationUrl }
       setAttempt({ ...next, provider })
-    } catch (failure) { setError({ provider, message: failureMessage(failure, 'startFailed', provider), again: existing ? { connectionId: existing.id } : {} }) } finally { setPending(false) }
+    } catch (failure) { tab?.close(); setError({ provider, message: failureMessage(failure, 'startFailed', provider), again: existing ? { connectionId: existing.id } : {} }) } finally { setPending(false); setStarting(null) }
     // The started attempt stands even if the list cannot be re-read right now.
     void refresh().catch(() => undefined)
   }
@@ -182,9 +188,8 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
         const Logo = logos[provider]
         const failure = error?.provider === provider ? error : null
         return <div key={provider} className="divide-y divide-border">
-          {/* An account that needs signing in again has its own 重新连接; a second 连接 is offered only beside a working one. */}
-          {(connections.length === 0 || connections.some(item => item.state === 'connected')) && <SettingRow icon={<Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />} title={t(provider)} description={available ? undefined : t('unavailable')}>
-            <Button type="button" variant="secondary" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider) }}>{connections.length > 0 ? t('connectAnother') : t('connect')}</Button>
+          {connections.length === 0 && <SettingRow icon={<Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />} title={t(provider)} description={available ? undefined : t('unavailable')}>
+            <SignInButton busy={(starting?.provider === provider && !starting.id) || attempt?.provider === provider} disabled={!available || pending || !!attempt} label={t('connect')} busyLabel={t('connecting')} onClick={() => { void connect(provider) }} />
           </SettingRow>}
           {connections.map(connection => {
             const live = connection.state === 'connected'
@@ -214,7 +219,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
                     {reauth ? t('reauth') : refused ? t('notInUse') : live ? t('connected') : t('notConnected')}
                   </span>
                   <span className="flex items-center gap-2">
-                    {(reauth || !live) && <Button type="button" variant="secondary" size="sm" disabled={!available || pending || !!attempt} onClick={() => { void connect(provider, connection) }}>{t('reconnect')}</Button>}
+                    {(reauth || !live) && <SignInButton busy={starting?.id === connection.id || attempt?.connectionId === connection.id} disabled={!available || pending || !!attempt} label={t('reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection) }} />}
                     {live
                       ? <Button type="button" variant={reauth ? 'ghost' : 'secondary'} size="sm" disabled={pending || !!attempt} onClick={() => { void disconnect(connection) }}>{t('disconnect')}</Button>
                       : <Button type="button" variant="ghost" size="sm" disabled={pending || !!attempt} onClick={() => { void remove(connection) }}>{t('remove')}</Button>}
@@ -257,6 +262,10 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     </div>}
     {notice && <p role="status" className="px-1 text-sm">{notice}</p>}
   </div>
+}
+
+function SignInButton({ busy, disabled, label, busyLabel, onClick }: { busy: boolean; disabled: boolean; label: string; busyLabel: string; onClick: () => void }) {
+  return <Button type="button" variant="secondary" size="sm" disabled={disabled} aria-busy={busy} onClick={onClick}>{busy ? <><Spinner className="size-3.5" aria-hidden="true" />{busyLabel}</> : label}</Button>
 }
 
 /** What is left of each window the provider returned, with when it resets. */
