@@ -40,6 +40,9 @@ test('mapped paths add whole area specs next to the smoke set', () => {
     ['lib/auth.ts', ['sign-out.spec.ts', 'workspace.spec.ts']],
     ['lib/suggestions/card.ts', ['suggestions-rail.spec.ts', 'suggestion-entry-contract.spec.ts']],
     ['lib/issue-relations.ts', ['relations.spec.ts']],
+    // The OpenUI catalog parses saved replies: the archive spec must run when it changes.
+    ['lib/agent-ui-catalog.ts', ['agent.spec.ts', 'coordinator-choice-card.spec.ts']],
+    ['components/workspace/agent-ui-library.tsx', ['agent.spec.ts']],
   ]) {
     const plan = browserPlan([file])
     assert.equal(plan.tier, 'targeted', file)

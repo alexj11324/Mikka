@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { openuiPromptOptions } from '@openuidev/react-ui/genui-lib'
 import { generateSystemPrompt } from '@openuidev/lang-core'
-import { agentComponentCatalog, createAgentLibrary } from '../lib/agent-ui-catalog.ts'
+import { agentComponentCatalog, agentPromptSpec, createAgentLibrary } from '../lib/agent-ui-catalog.ts'
 
 const openuiLibrary = createAgentLibrary()
 
@@ -31,7 +31,7 @@ const promptOptions = {
     '一般正文使用纵向 Stack；推荐卡片放入 BeCardGrid，宿主按内容区宽度自动调整 1–3 列。先写 intro 正文，再定义 cards = BeCardGrid([card1, card2, ...])，随后逐张定义卡片，不先输出长数组或所有图片数据后才定义正文；图片不替代按需展开的详细解释。不要伪造预订、收藏、评分、实时价格或无实际行为的操作按钮。每次生成控制在 30 个数据行、10 个表单字段以内。',
   ],
 }
-const content = `${JSON.stringify({ library: openuiLibrary.toSpec(), promptOptions, localComponents: Object.keys(agentComponentCatalog) }, null, 2)}\n`
+const content = `${JSON.stringify({ library: agentPromptSpec(openuiLibrary.toSpec()), promptOptions, localComponents: Object.keys(agentComponentCatalog) }, null, 2)}\n`
 
 const promptOutput = new URL('../lib/agent-system-prompt.json', import.meta.url)
 const promptContent = `${JSON.stringify(generateSystemPrompt(JSON.parse(content)))}\n`
