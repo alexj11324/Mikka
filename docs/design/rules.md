@@ -382,9 +382,12 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and
   `messages/en.json`; `pnpm i18n:check` must pass. Write Chinese first.
-- **R-43** Use the glossary's words: Bot, 对话, 线程, 资料库, 浏览器, 电脑.
+- **R-43** Use the glossary's words: Bot, 对话, 线程, Agent, 资料库, 浏览器, 电脑.
   Never 会话 for a left row or a run, and never 任务 for the panel's thread
-  tab. 「Artifact」 is never translated. Built-in role names stay English
+  tab. The right-side worker that does a thread's work (Claude Code, Codex) is
+  an **Agent**, never harness or 执行器 in the UI; it runs on a 电脑 (your
+  computer, an SSH server or E2B). `scripts/check-copy.mjs` rejects harness and
+  执行器 in `messages/`. 「Artifact」 is never translated. Built-in role names stay English
   (Coordinator).
 - **R-44** The home greeting stays 「早上好，Alex」 (time of day + name).
 

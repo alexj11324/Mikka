@@ -775,7 +775,7 @@
     "connect": {
       "trigger": "Connect device",
       "title": "Connect a computer",
-      "description": "A machine you can reach over SSH. Mikka installs and starts the daemon there, then brings back the harnesses it detected.",
+      "description": "A machine you can reach over SSH. Mikka installs and starts the daemon there, then brings back the Agents it detected.",
       "host": "Host",
       "hostPlaceholder": "SSH host, hostname, or IP[:port]",
       "actAs": "Connect as",
@@ -807,7 +807,7 @@
       },
       "manual": {
         "loginComment": "# 1. Sign in on this machine (the token is shown only once)",
-        "startComment": "# 2. Start the daemon; it reports the harnesses installed here"
+        "startComment": "# 2. Start the daemon; it reports the Agents installed here"
       },
       "sshExitCode": "ssh exited with code {code}",
       "noNode": "node is not installed on this machine",
@@ -951,7 +951,7 @@
   "Errors": {
     "botNotFound": "This bot does not exist in this workspace.",
     "executionPlaceInvalid": "Choose an available device or cloud.",
-    "executionHarnessUnavailable": "This harness is unavailable on the selected device.",
+    "executionHarnessUnavailable": "This Agent is unavailable on the selected device.",
     "executionAutoNotAllowed": "Choose an explicit execution value.",
     "executionModelUnknown": "This model is unavailable.",
     "executionRuleNotFound": "This execution rule was not found.",
@@ -978,14 +978,14 @@
     "memberAlreadyAdded": "This member already has access to the task.",
     "deviceNameTooLong": "The name is too long.",
     "deviceNotFound": "This device does not exist.",
-    "agentHarnessMissing": "The selected tool is not installed on this computer.",
+    "agentHarnessMissing": "The selected Agent is not installed on this computer.",
     "agentDuplicateName": "This name is already in use. Choose another name.",
     "botDuplicateName": "A bot with this name already exists. Choose another name.",
     "agentInvalidInput": "Please check the information you entered.",
     "agentAddFailed": "Could not add this item.",
     "agentSaveFailed": "Could not save this item.",
-    "agentNotFound": "The selected tool is unavailable.",
-    "agentNoDevice": "The selected tool has no connected computer.",
+    "agentNotFound": "The selected Agent is unavailable.",
+    "agentNoDevice": "The selected Agent has no connected computer.",
     "agentRepoMissing": "This repository is not available on the device.",
     "repoPathInvalid": "The repository path must be absolute.",
     "repoNotFound": "This repository does not exist.",
@@ -3477,8 +3477,8 @@
     "repoSaved": "Repository added",
     "repoError": "Could not add the repository. Check the path, public GitHub remote, and device connection.",
     "agentName": "Agent name",
-    "harness": "Installed harness",
-    "chooseHarness": "Choose a harness",
+    "harness": "Installed Agent",
+    "chooseHarness": "Choose an Agent",
     "addAgent": "Add agent",
     "agentSaved": "Agent added",
     "agentError": "Could not add the agent. Check its name and device connection."

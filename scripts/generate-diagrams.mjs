@@ -48,10 +48,10 @@ const ARCH_TEXT = {
     coord: ['Coordinator', 'workflow, triage'], daemon: ['Mikka daemon', 'Mac, Linux, SSH host'],
     worker: ['Linear sync Worker', 'off by default'], linear: ['Linear'],
     monitor: ['Monitoring', 'incidents to issues'], cloud: ['Cloud computer', 'E2B, a desktop per bot'],
-    agents: ['Coding agent CLI', 'a worktree per run'], vault: ['Credential vault', 'KMS, login broker'],
+    agents: ['Agent CLI', 'a worktree per run'], vault: ['Credential vault', 'KMS, login broker'],
     tWebhook: 'webhook', tNotify: 'webhooks, triggers', tMcp: 'MCP', tDb: 'reads, writes',
     tEvents: 'events', tDispatch: 'runs', tTools: 'report, ask, blocked', tLinear: 'webhooks, API',
-    pActions: 'approved writes', tWake: 'wake', tBilling: 'checkout', tCloudRun: 'Mikka-managed harness', tCloudWake: 'wake',
+    pActions: 'approved writes', tWake: 'wake', tBilling: 'checkout', tCloudRun: 'Agents on E2B', tCloudWake: 'wake',
     title: 'Mikka architecture',
   },
   zh: {
@@ -63,10 +63,10 @@ const ARCH_TEXT = {
     coord: ['Coordinator', 'workflow、分诊'], daemon: ['Mikka daemon', 'Mac、Linux、SSH 主机'],
     worker: ['Linear 同步 Worker', '默认关闭'], linear: ['Linear'],
     monitor: ['监控', '故障回流为 issue'], cloud: ['云端电脑', 'E2B，每个 bot 一个桌面'],
-    agents: ['Coding agent CLI', '每次运行独立 worktree'], vault: ['凭据保管库', 'KMS、登录 broker'],
+    agents: ['Agent CLI', '每次运行独立 worktree'], vault: ['凭据保管库', 'KMS、登录 broker'],
     tWebhook: 'webhook', tNotify: 'webhook、触发器', tMcp: 'MCP', tDb: '读写',
     tEvents: '事件', tDispatch: '派发运行', tTools: '汇报、提问、阻塞', tLinear: 'webhook、API',
-    pActions: '审批后写入', tWake: '唤醒', tBilling: '支付', tCloudRun: 'Mikka 托管的 harness', tCloudWake: '唤醒',
+    pActions: '审批后写入', tWake: '唤醒', tBilling: '支付', tCloudRun: '在 E2B 上运行的 Agent', tCloudWake: '唤醒',
     title: 'Mikka 架构',
   },
 }
@@ -106,7 +106,7 @@ function archFlows(t, p) {
     ...line([[C3[1], 380], [C4[0], 380]], p), ...chevron(988, 380, 'right', p), ...tag(960, 380, t.tCloudWake, p),
     ...line([[830, 410], [830, 490]], p), ...chevron(830, 482, 'down', p), ...tag(830, 446, t.tDispatch, p),
     ...line([[C3[1], 520], [C4[0], 520]], p), ...chevron(988, 520, 'right', p),
-    // The Mikka-managed harness needs real subscription-backed inference acceptance.
+    // Agents on E2B need real subscription-backed inference acceptance.
     ...line([[1080, 410], [1080, 490]], p, true), ...chevron(1080, 422, 'up', p), ...chevron(1080, 478, 'down', p),
     ...tag(1080, 450, t.tCloudRun, p, true),
     // Web sub-agents on the cloud computer log in through the vault's broker; live acceptance is pending.
@@ -152,9 +152,9 @@ const FLOW_BOXES = {
 const FLOW_TEXT = {
   en: {
     request: ['New request', 'chat, Telegram,', 'Slack, MCP'], triage: ['Coordinator triages'],
-    dispatch: ['Dispatch run'], agent: ['Coding agent runs'],
+    dispatch: ['Dispatch run'], agent: ['Agent runs'],
     asks: ['Coordinator asks', 'for clarification'], answer: ['Human provides input'],
-    details: ['Human adds details'], review: ['Review and verification', 'agents run'],
+    details: ['Human adds details'], review: ['Review and verification', 'Agents run'],
     approve: ['Acceptance', 'and release'], ship: ['Ship and monitor'],
     clear: ['Clear?'], passes: ['Ready', 'to ship?'],
     tClear: 'Clear', tUnclear: 'Needs clarification', tAsks: 'Asks, blocked', tAnswer: 'Answer to the run',
@@ -163,9 +163,9 @@ const FLOW_TEXT = {
   },
   zh: {
     request: ['新请求', '对话、Telegram、', 'Slack、MCP'], triage: ['Coordinator 分诊'],
-    dispatch: ['派发运行'], agent: ['编码 agent 运行'],
+    dispatch: ['派发运行'], agent: ['Agent 运行'],
     asks: ['Coordinator', '请求澄清'], answer: ['人工提供输入'],
-    details: ['人工补充细节'], review: ['审查与验证', 'agent 运行'],
+    details: ['人工补充细节'], review: ['审查与验证', 'Agent 运行'],
     approve: ['验收与发布'], ship: ['上线并监控'],
     clear: ['是否清楚？'], passes: ['是否可以', '上线？'],
     tClear: '清楚', tUnclear: '需要澄清', tAsks: '提问、阻塞', tAnswer: '答案送回运行',

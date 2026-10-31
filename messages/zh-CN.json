@@ -775,7 +775,7 @@
     "connect": {
       "trigger": "连接设备",
       "title": "连接电脑",
-      "description": "一台你能 ssh 进去的机器。Mikka 会在上面安装并启动 daemon，然后把它检测到的 harness 带回来。",
+      "description": "一台你能 ssh 进去的机器。Mikka 会在上面安装并启动 daemon，然后把它检测到的 Agent 带回来。",
       "host": "主机",
       "hostPlaceholder": "ssh 主机、主机名或 IP[:端口]",
       "actAs": "以谁的身份",
@@ -807,7 +807,7 @@
       },
       "manual": {
         "loginComment": "# 1. 在这台机器上登录（token 只显示这一次）",
-        "startComment": "# 2. 启动 daemon：它会上报本机装好的 harness"
+        "startComment": "# 2. 启动 daemon：它会上报本机装好的 Agent"
       },
       "sshExitCode": "ssh 退出码 {code}",
       "noNode": "这台机器上没有 node",
@@ -978,14 +978,14 @@
     "memberAlreadyAdded": "该成员已拥有此任务的访问权限，无需重复添加。",
     "deviceNameTooLong": "设备名称过长。",
     "deviceNotFound": "设备不存在。",
-    "agentHarnessMissing": "这台电脑尚未安装所选工具。",
+    "agentHarnessMissing": "这台电脑尚未安装所选 Agent。",
     "agentDuplicateName": "名称重复，请换一个名称。",
     "botDuplicateName": "已有同名 Bot，请换一个名字。",
     "agentInvalidInput": "请检查填写内容。",
     "agentAddFailed": "添加失败，请重试。",
     "agentSaveFailed": "保存失败，请重试。",
-    "agentNotFound": "所选工具不可用。",
-    "agentNoDevice": "所选工具还没有可用电脑。",
+    "agentNotFound": "所选 Agent 不可用。",
+    "agentNoDevice": "所选 Agent 还没有可用电脑。",
     "agentRepoMissing": "这台设备上没有该仓库。",
     "repoPathInvalid": "仓库路径需要是绝对路径。",
     "repoNotFound": "仓库不存在。",
@@ -3477,8 +3477,8 @@
     "repoSaved": "已添加仓库",
     "repoError": "无法添加仓库，请检查路径、公开 GitHub 地址和设备连接。",
     "agentName": "Agent 名称",
-    "harness": "已安装的执行器",
-    "chooseHarness": "选择执行器",
+    "harness": "已安装的 Agent",
+    "chooseHarness": "选择 Agent",
     "addAgent": "添加 Agent",
     "agentSaved": "已添加 Agent",
     "agentError": "无法添加 Agent，请检查名称和设备连接。"
