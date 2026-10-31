@@ -129,9 +129,10 @@ const renderers = {
   </Frame>,
 } satisfies AgentComponentRenderers
 
-// Replies flow through these; every other component is a block, and text inside it gets no bubble.
-const FLOW = new Set<string>(['TextContent', 'InlineText', 'BeResponse', 'TaskChip', 'RunChip', 'SourceChip'])
-const blocks = Object.fromEntries(Object.entries(renderers).map(([name, Render]) => [name, FLOW.has(name) ? Render
-  : (input: object) => { const Block = Render as (props: object) => React.ReactNode; return <InsideBlock value><Block {...input} /></InsideBlock> }])) as typeof renderers
+// Replies flow through these; every other component, ours or OpenUI's, is a block, and text inside it gets no bubble.
+const FLOW = new Set<string>(['Stack', 'TextContent', 'InlineText', 'BeResponse', 'TaskChip', 'RunChip', 'SourceChip'])
+const block = <Render,>(name: string, render: Render): Render => FLOW.has(name) ? render
+  : ((input: object) => { const Block = render as (props: object) => React.ReactNode; return <InsideBlock value><Block {...input} /></InsideBlock> }) as Render
+const blocks = Object.fromEntries(Object.entries(renderers).map(([name, render]) => [name, block(name, render)])) as typeof renderers
 
-export const agentUILibrary = createAgentLibrary(blocks)
+export const agentUILibrary = createAgentLibrary(blocks, block)
