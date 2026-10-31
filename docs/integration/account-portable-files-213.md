@@ -52,3 +52,15 @@ This supplies the missing portable file bytes without a new export platform,
 bucket, queue or secret. #213 still requires the broader fixed-application
 asset/deletion/restore acceptance and explicit external retention/backup policy;
 this component alone does not establish those or justify closing the whole issue.
+
+### Fixed-application browser gate
+
+The pooled-browser case appended to `tests/e2e/profile.spec.ts` uses the existing
+automatic owner/peer allocator and the actual settings action/download route.
+Only its file bytes and run are disposable PostgreSQL fixtures. It checks both
+artifact versions, a binary capture and gzip checkpoint, denies the peer's
+browser, and expires only this test's export grant before checking refusal.
+It never sends provider mail or resets the account/export rate guard. The grant
+is registered with the existing private evidence scanner. Typecheck and lint
+passed; local Next/browser build was intentionally not run under the workspace
+disk constraint, so its actual execution remains a pending CI gate.
