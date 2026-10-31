@@ -219,7 +219,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
   header's search, widen and close, and a list group's collapse chevron), the only
-  control is 「展开」 to expand a list. 详情 holds two lists, 例行 (routines)
+  controls are 「展开」 to expand a list and, in a bot's 概览 header, its own name
+  and avatar: clicking the name renames it in place (Enter or leaving saves, Esc
+  cancels) and clicking the avatar opens the 新建 Bot shape and colour picker
+  (2026-10-31). The Coordinator's header stays read-only. 详情 holds two lists, 例行 (routines)
   and 资料库 (library). The bot creates routines when asked in chat; files are
   uploaded with the composer's 「+」.
 - **R-52** Every thread list groups its rows in this order: 等待回复（N）,

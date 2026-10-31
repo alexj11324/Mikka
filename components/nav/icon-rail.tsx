@@ -51,7 +51,7 @@ export function IconRail({ active, onNavigate, ...menu }: RailProps) {
       const label = i18nText(item.label)
       return <Tooltip key={item.id}>
         <TooltipTrigger render={<Button variant="ghost" size="icon" className="group/rail-item size-9 rounded-sm text-muted-foreground/80 shadow-none hover:bg-transparent hover:text-muted-foreground/80 aria-[current=page]:text-foreground dark:hover:bg-transparent" aria-label={label} aria-current={selected ? 'page' : undefined} onClick={() => onNavigate(item.id)} />}>
-          <span className={cn('flex rounded-sm p-2 group-hover/rail-item:bg-sidebar-item', selected && 'bg-sidebar-item')}><Icon className="size-5" /></span>
+          <span className={cn('flex rounded-sm p-2 group-hover/rail-item:bg-sidebar-item in-data-desktop-translucent:group-hover/rail-item:bg-control', selected && 'bg-sidebar-item in-data-desktop-translucent:bg-control-hover')}><Icon className="size-5" /></span>
         </TooltipTrigger>
         <TooltipContent side="right">{label}</TooltipContent>
       </Tooltip>
