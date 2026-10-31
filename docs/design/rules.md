@@ -264,7 +264,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   Mikka's own stacked-cards icon (R-56), never lucide Copy or Library.
   No sparkle for AI (unslop): thinking is Brain, a bot is Bot (ui-policy
   `icons/no-sparkle`).
-- **R-75** Every workspace feature is on by default. Only a workspace admin
+- **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
   value read-only. A stored off is an admin's choice, never a leftover
   default: a migration that turns a default on also rewrites rows that hold
