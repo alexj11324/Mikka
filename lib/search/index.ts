@@ -11,9 +11,15 @@ export type AuthorizeSearch = (ctx: SearchContext) => boolean | Promise<boolean>
 export const allowAllSearch: AuthorizeSearch = () => true
 export function normalizeQuery(query: string) { return query.trim().replace(/\s+/g, ' ').toLowerCase() }
 
-/** Shared search/scrape throttle; per-instance only, not a distributed quota. */
-export function createWebService({ provider = createFirecrawlProvider(), authorize = allowAllSearch, now = Date.now, timeoutMs = 15000 }: {
-  provider?: SearchProvider; authorize?: AuthorizeSearch; now?: () => number; timeoutMs?: number
+type ConsumeWebRate = (userId: string, now: number, signal: AbortSignal) => Promise<boolean>
+const persistentWebRate: ConsumeWebRate = async (userId, now, signal) => {
+  const [{ pool }, { consumeWebRate }] = await Promise.all([import('../db'), import('./rate-limit')])
+  return consumeWebRate(pool, userId, now, USER_LIMIT_PER_MINUTE, signal)
+}
+
+/** Shared search/scrape limit: persistent admission plus a local fast rejection. */
+export function createWebService({ provider = createFirecrawlProvider(), authorize = allowAllSearch, now = Date.now, timeoutMs = 15000, consumeRate = persistentWebRate }: {
+  provider?: SearchProvider; authorize?: AuthorizeSearch; now?: () => number; timeoutMs?: number; consumeRate?: ConsumeWebRate
 } = {}) {
   const cache = new Map<string, { at: number; response: Extract<SearchResponse, { ok: true }> }>()
   const calls = new Map<string, number[]>()
@@ -41,7 +47,7 @@ export function createWebService({ provider = createFirecrawlProvider(), authori
         return structuredClone({ ...hit.response, cached: true, cacheAgeMs: Math.max(0, cacheReadAt - hit.at) })
       }
       const recent = (calls.get(ctx.userId) ?? []).filter(at => started - at < 60_000)
-      if (recent.length >= USER_LIMIT_PER_MINUTE) {
+      if (recent.length >= USER_LIMIT_PER_MINUTE || !await abortable(() => consumeRate(ctx.userId, started, signal), signal)) {
         log('throttled')
         return { ok: false as const, error: 'searchUnavailable' as const, outcome: 'rate_limited' as const }
       }

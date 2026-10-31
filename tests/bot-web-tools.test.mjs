@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createBotWebTools } from '../lib/bot-web-tools.ts'
-import { createWebService } from '../lib/search/index.ts'
+import { createWebService as meteredWebService } from '../lib/search/index.ts'
 import { createFirecrawlProvider } from '../lib/search/firecrawl.ts'
+const createWebService = options => meteredWebService({ ...options, consumeRate: async () => true })
 const context = { toolCallId: 'synthetic', messages: [], context: {} }
 const url = 'https://www.iana.org/help/example-domains'
 
