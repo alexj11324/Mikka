@@ -198,7 +198,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const mcp = await (factoryToken ? Promise.resolve(factoryToken) : issueRunToken(run))
       .then(async ({ token }) => {
         const tools = personalMailboxEnabled() ? await (await import('@/lib/personal-mailbox-runtime')).personalWorkerMailboxAdvertised(caller.userId, run.id) : []
-        return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token, ...(tools.length ? { mailbox: true as const } : {}) }
+        // Connected apps, one MCP entry each on the device; best effort, never blocking the run.
+        const apps = harness === 'claude_code' || harness === 'codex'
+          ? await (await import('@/lib/app-tools-server')).runAppToolkits(caller.userId, run.botId ?? null).catch(() => [])
+          : []
+        return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token, ...(tools.length ? { mailbox: true as const } : {}), ...(apps.length ? { apps } : {}) }
       })
       .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
   // A retry after a lost lease works on in the lost attempt's worktree and,

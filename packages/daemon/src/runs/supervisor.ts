@@ -28,6 +28,7 @@
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. An explicitly approved, pushed submission can finish unverified;
 // its report keeps `not_run`, and the server may open only a draft PR.
+import { runApps } from '../agents/run-apps'
 import { fixedCheckSnapshot } from "./check"
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
 import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
@@ -1238,6 +1239,7 @@ export class RunSupervisor {
     const options = {
       github: assignment.github && assignment.mcp && (assignment.kind === 'implement' || assignment.kind === 'fix') && !runPolicy(assignment.policy).readOnly
         ? { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId } : undefined,
+      apps: runApps(assignment.mcp),
       toolApproval,
       runId,
       requireSessionResume: assignment.requireSessionResume,

@@ -18,6 +18,7 @@ import { ToolApprovalGate } from "./agents/tool-approval"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { toolApprovalDecision } from "./agents/tool-approval-policy"
+import { runApps } from "./agents/run-apps"
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
@@ -145,7 +146,7 @@ export class HttpServerLink implements ServerLink {
     const response = z.object({ decision: z.enum(['pending', 'allow', 'deny']) })
     const liveness = new AbortController()
     const gate = new ToolApprovalGate(assignment.runId, {
-      permission: request => toolApprovalDecision(request, assignment.policy, worktree),
+      permission: request => toolApprovalDecision(request, assignment.policy, worktree, runApps(assignment.mcp)?.apps.map(app => app.name)),
       // Keep the callback pending at the tool boundary. The adapter's current
       // session and checkpoint remain intact; handback resolves this same call.
       isLive: async () => {

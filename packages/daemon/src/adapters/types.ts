@@ -5,6 +5,7 @@
 // onto start -> events -> send / cancel, plus `resume(sessionId)`. A
 // follow-up run starts by continuing the earlier run's conversation
 // (`StartOptions.continueSession`), so a run never ends the chat.
+import type { RunApps } from '../agents/run-apps'
 import type {
   HandoffReport,
   Harness,
@@ -59,6 +60,8 @@ export interface AgentCapabilities {
 export interface SessionOptions {
   /** Trusted server-issued delivery binding, never model-selected. */
   github?: { endpoint: string; repository: string; branch: string; runToken: string; issueId: string }
+  /** Trusted server-issued app entries (one MCP server each), never model-selected. */
+  apps?: RunApps
   /** Fixed container paths supplied by the hosted runner, never by the assignment. */
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Trusted, run-bound host gate. Never populated from model input. */
