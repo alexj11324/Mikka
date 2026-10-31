@@ -811,7 +811,6 @@
     "offlineSince": "Offline · {time}",
     "noAgent": "No agent found",
     "installAgent": "How to install",
-    "installAgentHint": "After installing on that machine, choose “Re-detect agents” in ⋯.",
     "copyInstall": "Copy {command}",
     "commands": {
       "sent": {
@@ -850,7 +849,7 @@
       "added": "Added",
       "cancel": "Cancel",
       "add": "Add",
-      "startFailed": "Couldn't start the install. Try again.",
+      "startFailed": "Install didn't start",
       "trust": "Trust “{host}”?",
       "trustContinue": "Trust and continue",
       "adding": "Adding “{host}”",
@@ -1759,8 +1758,6 @@
     "computerPolicy": {
       "heading": "Computer use",
       "label": "Bot computer use",
-      "help": "Bots operate computers whenever you haven't taken control. Deny stops computer tasks.",
-      "adminOnly": "Only workspace admins can change this setting.",
       "allow": "Allow",
       "deny": "Deny",
       "error": "Could not update or load the computer setting.",
@@ -2302,24 +2299,16 @@
         "model": "Model",
         "actions": "Actions"
       },
-      "botHint": "Talks with you and hands out tasks",
       "defaults": "Task defaults",
       "noAccount": "No account connected",
       "whenQuotaExhausted": "When quota runs out",
-      "whenQuotaExhaustedHint": "After the Bot's account runs out of quota",
       "quotaStop": "Stop and wait for me",
       "quotaSwitch": "Switch to another account",
       "setting": "{name}: {value}",
-      "defaultsNote": "Tasks whose labels match no rule use these",
-      "placeHint": "Where a task runs",
-      "harnessHint": "The coding agent that runs the task",
-      "modelHint": "The model the harness uses",
       "whenDeviceOffline": "When the device is offline",
-      "whenDeviceOfflineHint": "When the chosen device is not online",
       "offlineWait": "Wait for it",
       "offlineCloud": "Run in the cloud",
-      "labels": "By label",
-      "labelsNote": "Matched against task labels from top to bottom"
+      "labels": "By label"
     }
   },
   "TelegramBot": {

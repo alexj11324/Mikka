@@ -61,7 +61,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
     if (!open || !ssh) return
     let live = true
     setStartError(false)
-    void ssh.hosts().then(list => { if (live) setHosts((list as (string | SshHost)[]).map(sshHost)) }, () => { if (live) setHosts([]) })
+    void ssh.hosts().then(list => { if (live) setHosts((list as Parameters<typeof sshHost>[0][]).map(sshHost)) }, () => { if (live) setHosts([]) })
     void ssh.state().then(state => { if (live && state && state.status !== 'online') setInstall(state) }, () => {})
     const unsubscribe = ssh.onChange(state => {
       if (!live) return

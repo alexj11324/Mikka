@@ -5,13 +5,11 @@ export const RULE_HARNESSES = ['claude_code', 'codex', 'cursor'] as const
 export type RuleHarness = (typeof RULE_HARNESSES)[number]
 
 /**
- * A model slot the harness reports with what it resolves to on that device,
+ * A harness as a device reports it. A model slot carries what it resolves to on that device,
  * e.g. Claude Code's `opus` → whatever `ANTHROPIC_DEFAULT_OPUS_MODEL` maps it to.
- * Rules store the slot; the screen shows only the resolved model.
+ * Rules store the slot; the screen shows only the resolved model's name.
  */
-export interface ModelSlot { slot: string; model: string; default?: boolean }
-// #537: `modelSlots` is the field #537 adds to HarnessInfo; drop this alias once the protocol has it.
-export type HarnessReport = HarnessInfo & { modelSlots?: ModelSlot[] }
+export type HarnessReport = HarnessInfo
 
 /** One entry of `listExecutionPlaces()`: an owner device, or the cloud option. */
 export interface ExecutionPlace {
@@ -61,7 +59,7 @@ export function modelOptions(places: readonly ExecutionPlace[], place: string, h
   const options = new Map<string, ModelOption>()
   for (const info of devices.flatMap(device => device.harnesses.filter(item => item.harness === harness && item.installed))) {
     const reported = info.modelSlots?.length
-      ? info.modelSlots.map(slot => ({ value: slot.slot, name: slot.model, isDefault: slot.default }))
+      ? info.modelSlots.map(slot => ({ value: slot.slot, name: slot.name, isDefault: slot.slot === info.defaultModelSlot }))
       : (info.models ?? []).map(model => ({ value: model, name: model }))
     for (const option of reported) if (!options.has(option.value)) options.set(option.value, option)
   }

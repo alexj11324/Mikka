@@ -41,8 +41,8 @@ test('models are only what the harness reported there, never a built-in list', (
 const slotted = (id: string, deviceType: 'laptop' | 'server', online: boolean, opus: string): ExecutionPlace => ({
   id, name: id, deviceType, enabled: true, online,
   harnesses: [
-    { harness: 'claude_code', installed: true, version: '1', modelSlots: [{ slot: 'sonnet', model: 'Sonnet X' }, { slot: 'opus', model: opus }] },
-    { harness: 'codex', installed: true, version: '1', modelSlots: [{ slot: 'mini', model: 'Mini Y' }, { slot: 'main', model: 'Codex Default Z', default: true }] },
+    { harness: 'claude_code', installed: true, version: '1', modelSlots: [{ slot: 'sonnet', model: 'Sonnet X', name: 'Sonnet X' }, { slot: 'opus', model: opus, name: opus }] },
+    { harness: 'codex', installed: true, version: '1', modelSlots: [{ slot: 'mini', model: 'Mini Y', name: 'Mini Y' }, { slot: 'main', model: 'Codex Default Z', name: 'Codex Default Z' }], defaultModelSlot: 'main' },
   ],
 })
 

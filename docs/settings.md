@@ -1,6 +1,6 @@
 # Settings surface
 
-Each section is a small grey heading over one bordered card of rows, as in
+Each section is a small heading over one card of rows, as in
 Comma's 「模型与 API」 (decision 2026-10-30).
 `components/settings/primitives.tsx` owns the shapes; product code only
 supplies content.
@@ -15,8 +15,9 @@ supplies content.
 3. **One card per section.** `SettingsSection` renders the heading and one
    bordered card of hairline-separated rows. Do not nest more cards or tinted
    boxes inside it.
-4. **Selects are bordered.** A choice on the right is a bordered, fixed-width
-   select button: icon (R-74) and value, then a chevron.
+4. **Selects are filled.** A choice on the right is a fixed-width select
+   button with the grey `--control` fill and no stroke (R-31): icon (R-74)
+   and value, then a chevron.
 5. **Cards only at the "repeated subject" level.** When a category repeats a
    subject — one device, one member — one card per subject is
    allowed. The card contains rows, not a grid of tinted boxes, and the card

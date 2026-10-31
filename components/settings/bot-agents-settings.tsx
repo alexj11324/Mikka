@@ -29,8 +29,8 @@ type T = ReturnType<typeof useTranslations<'Settings.botAgents'>>
 const KEYS = { settings: 'execution-settings', places: 'execution-places', bots: 'bot-agents-bots', accounts: 'bot-models' } as const
 
 /*
- * 设置 › Bot 与 Agents, laid out like Comma's 模型与 API: one bordered card per
- * section, one setting per row, a bordered select on the right. Every place,
+ * 设置 › Bot 与 Agents, laid out like Comma's 模型与 API: one card per
+ * section, one setting per row, a filled select on the right. Every place,
  * harness and model is a concrete value the person can see (no 自动, #537).
  */
 export function BotAgentsSettings() {
@@ -102,21 +102,21 @@ export function BotAgentsSettings() {
     <Group id="bot-agents-bots" title={t('bots')}>
       <BotRow t={t} botId={null} bot={null} rows={accountRows} onSave={save} onRefresh={refreshAccounts} />
       {bots.data.map(bot => <BotRow key={bot.id} t={t} botId={bot.id} bot={bot} rows={accountRows} onSave={save} onRefresh={refreshAccounts} />)}
-      <Line title={t('whenQuotaExhausted')} hint={t('whenQuotaExhaustedHint')}>
+      <Line title={t('whenQuotaExhausted')}>
         <ChoicePicker ariaLabel={t('setting', { name: t('whenQuotaExhausted'), value: quotaNames[quota] })} value={quota} names={quotaNames} onChange={changeQuota} />
       </Line>
     </Group>
 
-    <Group id="bot-agents-defaults" title={t('defaults')} footnote={t('defaultsNote')} data-rule="default">
-      <Line title={t('columns.place')} hint={t('placeHint')}>{defaultPickers.place}</Line>
-      <Line title={t('columns.harness')} hint={t('harnessHint')}>{defaultPickers.harness}</Line>
-      <Line title={t('columns.model')} hint={t('modelHint')}>{defaultPickers.model}</Line>
-      <Line title={t('whenDeviceOffline')} hint={t('whenDeviceOfflineHint')}>
+    <Group id="bot-agents-defaults" title={t('defaults')} data-rule="default">
+      <Line title={t('columns.place')}>{defaultPickers.place}</Line>
+      <Line title={t('columns.harness')}>{defaultPickers.harness}</Line>
+      <Line title={t('columns.model')}>{defaultPickers.model}</Line>
+      <Line title={t('whenDeviceOffline')}>
         <ChoicePicker ariaLabel={t('cell', { row: t('default'), column: t('whenDeviceOffline'), value: offline[defaults.whenDeviceOffline] })} value={defaults.whenDeviceOffline} names={offline} onChange={whenDeviceOffline => changeDefaults({ ...defaults, whenDeviceOffline })} />
       </Line>
     </Group>
 
-    <Group id="bot-agents-labels" title={t('labels')} footnote={t('labelsNote')}>
+    <Group id="bot-agents-labels" title={t('labels')}>
       {view.rules.length > 0 && <div className="overflow-x-auto">
         <Table className="min-w-[40rem] table-fixed">
           <colgroup>
@@ -145,24 +145,20 @@ export function BotAgentsSettings() {
   </div>
 }
 
-/** A section: a small grey heading, one bordered card of rows, an optional footnote. */
-function Group({ id, title, footnote, children, ...props }: { id: string; title: string; footnote?: string; children: ReactNode; 'data-rule'?: string }) {
+/** A section: a small grey heading and one card of rows. */
+function Group({ id, title, children, ...props }: { id: string; title: string; children: ReactNode; 'data-rule'?: string }) {
   return <section aria-labelledby={id} className="flex flex-col gap-2">
     <h2 id={id} className="px-1 text-xs text-muted-foreground">{title}</h2>
     <div data-settings-card className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border bg-card" {...props}>{children}</div>
-    {footnote && <p className="px-1 text-xs text-muted-foreground">{footnote}</p>}
   </section>
 }
 
-/** One setting per row: its name and a one-line description on the left, a bordered select on the right. */
-function Line({ title, hint, leading, children, ...props }: { title: ReactNode; hint: ReactNode; leading?: ReactNode; children: ReactNode; 'data-bot'?: string }) {
+/** One setting per row: its name on the left, a select on the right. */
+function Line({ title, leading, children, ...props }: { title: ReactNode; leading?: ReactNode; children: ReactNode; 'data-bot'?: string }) {
   return <div className="flex flex-col gap-2.5 px-4 py-3.5 sm:min-h-16 sm:flex-row sm:items-center sm:gap-4" {...props}>
     <span className="flex min-w-0 flex-1 items-center gap-3">
       {leading}
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate text-sm">{title}</span>
-        <span className="truncate text-xs text-muted-foreground">{hint}</span>
-      </span>
+      <span className="truncate text-sm">{title}</span>
     </span>
     <span className="flex w-full shrink-0 sm:w-60">{children}</span>
   </div>
@@ -272,7 +268,7 @@ function BotRow({ t, botId, bot, rows, onSave, onRefresh }: {
     // Choosing another Bot's model copies its binding to this Bot; list the copy too.
     await mutateKey(KEYS.accounts)
   })
-  return <Line data-bot={title} title={title} hint={t('botHint')}
+  return <Line data-bot={title} title={title}
     leading={bot ? <BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} /> : <CoordinatorAvatar size="row" />}>
     <Picker t={t} wide ariaLabel={t('cell', { row: title, column: t('columns.model'), value: selected?.modelId ?? t('noAccount') })} disabled={choice.data === undefined || rows.length === 0}
       value={selected ? <ModelLabel model={selected.modelId} source={selected.provider} /> : <span className="truncate text-muted-foreground">{t('noAccount')}</span>}>
@@ -287,7 +283,7 @@ function BotRow({ t, botId, bot, rows, onSave, onRefresh }: {
  * Bordered like the select field (Comma's 模型与 API), not R-31's grey fill:
  * as wide as its slot, icon and value on the left, chevron on the right.
  */
-const TRIGGER = 'h-9 w-full min-w-0 justify-between gap-2 border-input bg-transparent px-3 font-normal hover:bg-muted/60 aria-expanded:bg-muted/60'
+const TRIGGER = 'h-9 w-full min-w-0 justify-between gap-2 bg-control px-3 font-normal hover:bg-control-hover aria-expanded:bg-control-hover'
 
 /** A fallback: a fixed list of named choices. They are not devices, harnesses or models, so no icons. */
 function ChoicePicker<V extends string>({ ariaLabel, value, names, onChange }: { ariaLabel: string; value: V; names: Record<V, string>; onChange: (value: V) => void }) {

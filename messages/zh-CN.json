@@ -811,7 +811,6 @@
     "offlineSince": "离线 · {time}",
     "noAgent": "未检测到 Agent",
     "installAgent": "安装方法",
-    "installAgentHint": "在那台机器上装好后，点 ⋯ 里的「重新检测 Agent」。",
     "copyInstall": "复制 {command}",
     "commands": {
       "sent": {
@@ -850,7 +849,7 @@
       "added": "已添加",
       "cancel": "取消",
       "add": "添加",
-      "startFailed": "安装未开始，请重试。",
+      "startFailed": "安装未开始",
       "trust": "信任「{host}」？",
       "trustContinue": "信任并继续",
       "adding": "添加「{host}」",
@@ -1759,8 +1758,6 @@
     "computerPolicy": {
       "heading": "电脑操作",
       "label": "Bot 操作电脑",
-      "help": "你没有接管时，Bot 直接操作电脑。禁止后电脑任务停止。",
-      "adminOnly": "只有工作区管理员可以修改此设置。",
       "deny": "禁止",
       "error": "无法读取或更新电脑设置。",
       "loading": "正在读取电脑设置…",
@@ -2302,24 +2299,16 @@
         "model": "模型",
         "actions": "操作"
       },
-      "botHint": "和你对话，分派任务",
       "defaults": "任务默认",
       "noAccount": "未连接账号",
       "whenQuotaExhausted": "额度用完时",
-      "whenQuotaExhaustedHint": "Bot 所用账号的额度用完后",
       "quotaStop": "停下等我",
       "quotaSwitch": "换用另一个账号",
       "setting": "{name}：{value}",
-      "defaultsNote": "标签没匹配到规则的任务用这里的设置",
-      "placeHint": "任务在哪里运行",
-      "harnessHint": "运行任务的编程 Agent",
-      "modelHint": "Harness 使用的模型",
       "whenDeviceOffline": "设备离线时",
-      "whenDeviceOfflineHint": "选定的设备不在线时",
       "offlineWait": "等它上线",
       "offlineCloud": "改到云端运行",
-      "labels": "按标签",
-      "labelsNote": "从上往下匹配任务标签"
+      "labels": "按标签"
     }
   },
   "TelegramBot": {

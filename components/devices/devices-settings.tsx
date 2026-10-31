@@ -51,7 +51,6 @@ function InstallAgents() {
           <Button variant="ghost" size="icon-sm" aria-label={t('copyInstall', { command })} onClick={() => copy(command)}>{copied === command ? <Check /> : <Copy />}</Button>
         </span>
       </div>)}
-      <p className="text-xs text-muted-foreground">{t('installAgentHint')}</p>
     </PopoverContent>
   </Popover>
 }

@@ -1,13 +1,10 @@
 /*
- * The settings screen's only door to the execution settings on the server,
- * typed with the names #537 implies: task `defaults` (place, harness, model,
+ * The settings screen's only door to the execution settings on the server
+ * (app/actions/execution-settings.ts): task `defaults` (the label-less rule plus
  * whenDeviceOffline), label rules, and each Bot's model plus whenQuotaExhausted.
- *
- * Today it shims the actions in app/actions/execution-settings.ts. Every shim
- * is marked `// #537:` with what to delete when the backend lands.
  */
 import {
-  createExecutionRule, deleteExecutionRule, getBotModel, listBotModels, listExecutionPlaces, listExecutionRules, redetectDevice, setBotModel, updateExecutionRule,
+  createExecutionRule, deleteExecutionRule, getBotModel, getExecutionFallbacks, listBotModels, listExecutionPlaces, listExecutionRules, redetectDevice, setBotModel, updateExecutionFallbacks, updateExecutionRule,
 } from '@/app/actions/execution-settings'
 import type { ExecutionRule } from '@/lib/execution-rules'
 import { initialExecution, retarget, type BotModelRow, type ExecutionChoice, type ExecutionPlace, type RuleHarness } from '@/lib/execution-settings-view'
@@ -25,27 +22,25 @@ export interface StoredExecutionSettings {
   whenQuotaExhausted: WhenQuotaExhausted
 }
 
+/** The server's id for the label-less default rule. */
 const DEFAULT_ID = 'default'
 const concrete = (value: string) => value === 'auto' ? undefined : value
 
 export async function readExecutionSettings(): Promise<StoredExecutionSettings> {
-  const rows = await listExecutionRules()
-  const fallback = rows.find(rule => rule.id === DEFAULT_ID)
+  const [rows, fallbacks] = await Promise.all([listExecutionRules(), getExecutionFallbacks()])
+  const fallback = rows.find(rule => rule.label === null)
   return {
-    // #537: the server still returns its fixed 自动 default row; read the saved default from `defaults` once it exists.
-    defaults: { place: concrete(fallback?.place ?? 'auto'), harness: concrete(fallback?.harness ?? 'auto') as RuleHarness | undefined, model: concrete(fallback?.model ?? 'auto'), whenDeviceOffline: 'wait' },
-    rules: rows.filter(rule => rule.id !== DEFAULT_ID),
-    // #537: no stored fallback yet; read `whenQuotaExhausted` from the server.
-    whenQuotaExhausted: 'stop',
+    defaults: { place: concrete(fallback?.place ?? 'auto'), harness: concrete(fallback?.harness ?? 'auto') as RuleHarness | undefined, model: concrete(fallback?.model ?? 'auto'), whenDeviceOffline: fallbacks.whenDeviceOffline },
+    rules: rows.filter(rule => rule.label !== null),
+    whenQuotaExhausted: fallbacks.whenQuotaExhausted,
   }
 }
 
 /**
- * Concrete values for the screen. #537 makes the server return them;
- * until then a missing default, or a rule saved as 自动, takes the initial value.
+ * Concrete values for the screen. The server saves a suggested default; a value it
+ * could not suggest yet (no device or account), or an older 自动 row, takes the initial value.
  */
 export function executionSettingsView(stored: StoredExecutionSettings, places: readonly ExecutionPlace[], accounts: readonly BotModelRow[]): ExecutionSettingsData {
-  // #537: delete this derivation once the server returns and saves the suggested default.
   const initial = initialExecution(places, accounts)
   const fill = <V extends { place?: string; harness?: string; model?: string }>(value: V) => {
     const place = concrete(value.place ?? 'auto') ?? initial.place
@@ -63,15 +58,13 @@ export function executionSettingsView(stored: StoredExecutionSettings, places: r
 const ruleValue = (label: string, value: ExecutionChoice) => ({ label, place: value.place, harness: value.harness, model: value.model })
 
 export async function saveDefaults(value: TaskDefaults): Promise<void> {
-  void value
-  // #537: no action saves the default or whenDeviceOffline yet; call updateExecutionDefaults(value) here.
-  throw new Error('validationGeneric')
+  await updateExecutionRule(DEFAULT_ID, { label: null, place: value.place, harness: value.harness as RuleHarness, model: value.model })
+  const fallbacks = await getExecutionFallbacks()
+  if (fallbacks.whenDeviceOffline !== value.whenDeviceOffline) await updateExecutionFallbacks({ ...fallbacks, whenDeviceOffline: value.whenDeviceOffline })
 }
 
 export async function saveWhenQuotaExhausted(value: WhenQuotaExhausted): Promise<void> {
-  void value
-  // #537: no action saves whenQuotaExhausted yet; call its action here.
-  throw new Error('validationGeneric')
+  await updateExecutionFallbacks({ ...await getExecutionFallbacks(), whenQuotaExhausted: value })
 }
 
 export async function addRule(label: string, value: ExecutionChoice) {
