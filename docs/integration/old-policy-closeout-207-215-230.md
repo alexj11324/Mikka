@@ -119,10 +119,12 @@ A project label in issue Markdown/metadata and an owner's private project view
 are not organizational policy authority. Personal tasks keep their existing
 Agent/worker policies.
 
-The server freezes that admitted team/project context on the run's first policy
-resolution. Moving a task later does not remove the ceiling from an existing run;
-a new run resolves current authoritative relations. Moving the task into another
-workspace makes its old binding unavailable. The actual ceiling content remains
+The server records admitted team/project context on the run's first policy
+resolution and resolves the current trusted relations again on each check. A
+workspace/team/project mismatch rejects the old run with `agentPolicyChanged`;
+its old approval cannot authorize an effect under the changed scope. A new run
+resolves the current hierarchy. This applies to project membership changes even
+when issue.scopeVersion did not change. The actual ceiling content remains
 live: every claim, protected tool decision and online resume uses the same
 `lockCliRunPolicy` path, reads the current scoped policy versions, and hashes them
 with the existing workspace/Agent/worker/task provenance. A lower layer can only
@@ -149,8 +151,8 @@ match. The new tracked migration was applied only to that existing local databas
 No database/container was created or historical evidence removed. The extended
 actual PG/loopback HTTP task-policy test covers workspace/Bot intersection,
 scoped ceilings, current-admin rejection/rollback, old approval refusal after
-change/reversion, non-widening task movement, fresh-run relations, workspace
-movement and membership revocation. Raw evidence remains local in
+change/reversion, joining a stricter project, changing team in the same workspace,
+leaving a project, fresh-run relations, workspace movement and membership revocation. Raw evidence remains local in
 `/tmp/mikka-policy-team-project-db-final.log`.
 
 This increment does not implement #230's usable signed offline-cache package,
@@ -159,3 +161,14 @@ acceptance. It does not expand #231's supported managed native transports or
 claim provider-region proof. #232 retains its reviewed single-MD format and real
 harness/UI acceptance boundary. Those are explicit remaining capabilities or
 skipped acceptance, not claims that the whole issues are complete.
+
+
+The first version of this increment incorrectly returned a stored hierarchy after
+checking only the workspace. Real PG regressions reproduced an approved operation
+remaining usable after its task joined a stricter project or team. That version's
+passing test documented an unapproved "moves apply only to later runs" choice;
+it is superseded. Current code re-derives the actual source on every policy/tool
+check and refuses the mismatch. Failure/retest logs are retained separately in
+`/tmp/mikka-policy-live-hierarchy-before-corrected.log` and
+`/tmp/mikka-policy-live-hierarchy-after.log`. The initial precondition typo log is
+also retained and is not the reproduction evidence.

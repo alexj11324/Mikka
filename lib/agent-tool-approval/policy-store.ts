@@ -18,17 +18,19 @@ async function lockCliHierarchy(tx: PoolClient, userId: string, runId: string, t
   if (!task.workspaceId) return undefined
   const { rows: [run] } = await tx.query<{ hierarchy: unknown }>('SELECT cli_policy_hierarchy AS hierarchy FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId,userId])
   if (!run) throw new Error('agentPolicyUnavailable')
-  if (run.hierarchy != null) {
-    const frozen = hierarchySchema.parse(run.hierarchy)
-    if (frozen.workspaceId !== task.workspaceId) throw new Error('agentPolicyUnavailable')
-    return frozen
-  }
   const { workspacePool } = await import('@/lib/workspace-db')
   const { rows: [team] } = await workspacePool.query<{ teamId: string }>(`SELECT l."teamId" FROM mikka_team_issues l JOIN mikka_teams t ON t.id=l."teamId" AND t."workspaceId"=l."workspaceId" WHERE l."issueId"=$1 AND l."workspaceId"=$2`,[task.issueId,task.workspaceId])
   if (!team) throw new Error('agentPolicyUnavailable')
   const { rows: projects } = await workspacePool.query<{ id: string }>(`SELECT DISTINCT p.id FROM workspace_projects p JOIN mikka_team_projects l ON l."projectId"=p.id WHERE p."issueIds" ? $1 AND l."teamId"=$2 AND l."workspaceId"=$3`,[task.issueId,team.teamId,task.workspaceId])
   if (projects.length > 1) throw new Error('agentPolicyUnavailable')
   const hierarchy = hierarchySchema.parse({ workspaceId: task.workspaceId,teamId:team.teamId,projectId:projects[0]?.id ?? null })
+  if (run.hierarchy != null) {
+    const frozen = hierarchySchema.parse(run.hierarchy)
+    // Membership in a stricter team/project may change without issue.scopeVersion.
+    // Never keep authorizing with an older, wider admitted hierarchy.
+    if (frozen.workspaceId !== hierarchy.workspaceId || frozen.teamId !== hierarchy.teamId || frozen.projectId !== hierarchy.projectId) throw new Error('agentPolicyChanged')
+    return frozen
+  }
   await tx.query('UPDATE agent_runs SET cli_policy_hierarchy=$3 WHERE id=$1 AND "userId"=$2', [runId,userId,hierarchy])
   return hierarchy
 }
