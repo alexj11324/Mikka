@@ -44,7 +44,9 @@ jobs:
       - name: Publish to pr-${{ github.event.number }}
         if: env.EXPO_TOKEN != '' && github.event_name == 'pull_request'
         working-directory: apps/mobile
-        run: npx -y eas-cli@27.2.0 update --branch pr-${{ github.event.number }} --platform ios --message "${{ github.event.pull_request.title }}" --non-interactive
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: npx -y eas-cli@27.2.0 update --branch "pr-${{ github.event.number }}" --platform ios --message "$PR_TITLE" --non-interactive
       - name: No EXPO_TOKEN
         if: env.EXPO_TOKEN == ''
         run: echo "::notice::EXPO_TOKEN is not set; nothing was published."
