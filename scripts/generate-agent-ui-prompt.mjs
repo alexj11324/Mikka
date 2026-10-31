@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { openuiPromptOptions } from '@openuidev/react-ui/genui-lib'
 import { generateSystemPrompt } from '@openuidev/lang-core'
 import { agentComponentCatalog, agentPromptSpec, createAgentLibrary } from '../lib/agent-ui-catalog.ts'
+import { COORDINATOR_PRESENTATION_EXAMPLES, COORDINATOR_PRESENTATION_PREAMBLE, COORDINATOR_PRESENTATION_RULES } from '../lib/coordinator/presentation-options.ts'
 
 const openuiLibrary = createAgentLibrary()
 
@@ -36,13 +37,17 @@ const content = `${JSON.stringify({ library: agentPromptSpec(openuiLibrary.toSpe
 
 const promptOutput = new URL('../lib/agent-system-prompt.json', import.meta.url)
 const promptContent = `${JSON.stringify(generateSystemPrompt(JSON.parse(content)))}\n`
+// The Coordinator's presentation block: the same library through OpenUI's generator, with its own preamble, rules and examples.
+const coordinatorOutput = new URL('../lib/coordinator-ui-prompt.json', import.meta.url)
+const coordinatorContent = `${JSON.stringify(generateSystemPrompt({ library: JSON.parse(content).library, promptOptions: { preamble: COORDINATOR_PRESENTATION_PREAMBLE, examples: COORDINATOR_PRESENTATION_EXAMPLES, additionalRules: COORDINATOR_PRESENTATION_RULES } }))}\n`
 
 if (process.argv.includes('--check')) {
-  if (await readFile(output, 'utf8') !== content || await readFile(promptOutput, 'utf8') !== promptContent) {
+  const current = await Promise.all([output, promptOutput, coordinatorOutput].map(file => readFile(file, 'utf8').catch(() => '')))
+  if (current[0] !== content || current[1] !== promptContent || current[2] !== coordinatorContent) {
     throw new Error('OpenUI 规范与组件目录不一致，请运行 pnpm generate:agent-ui。')
   }
 } else {
-  // Compile the prompt here so the request route does not load the OpenUI compiler.
-  await Promise.all([writeFile(output, content), writeFile(promptOutput, promptContent)])
+  // Compile the prompts here so request routes and Coordinator steps do not load the OpenUI compiler (or its prompt telemetry).
+  await Promise.all([writeFile(output, content), writeFile(promptOutput, promptContent), writeFile(coordinatorOutput, coordinatorContent)])
 }
 console.log(`OpenUI 组件目录与提示词已${process.argv.includes('--check') ? '校验' : '生成'}：${Object.keys(openuiLibrary.components).length} 个组件定义。`)
