@@ -82,7 +82,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           const value = byId ? input.messageId : decimal(input.messageId, '')
           const { rows: messages } = await q(`SELECT id,position FROM conversation_messages WHERE "conversationId"=$1 AND ${byId ? 'id=$2::uuid' : 'position=$2::bigint'}`, [req.id, value])
           const selected = messages[0]
-          if (!selected || BigInt(selected.position) > 2147483647n) return fail(422)
+          if (!selected || BigInt(selected.position) > BigInt(2147483647)) return fail(422)
           await q(`INSERT INTO conversation_reads AS r ("userId","conversationId","lastReadPosition","lastReadMessageId","updatedAt") VALUES ($1,$2,$3,$4,now())
             ON CONFLICT ("userId","conversationId") DO UPDATE SET
               "lastReadPosition"=GREATEST(r."lastReadPosition",EXCLUDED."lastReadPosition"),
