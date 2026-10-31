@@ -107,3 +107,68 @@ duplicate row. Test: 1 pass, zero skips, zero external email calls; logs
 `/tmp/mikka-postpay-alerts-{before,after}.log`. No existing ledger or alert rows
 are changed. These are candidate source/isolated-DB results, not confirmation
 of a production rollout.
+
+## Team and shared-project ceilings, subsequent old-issue continuation
+
+The original #230 hierarchy requirement includes team and project ceilings;
+those were real missing implementation, not merely missing demonstrations.
+The existing `/api/agent-cli-policy` run-bound `set` operation now also accepts
+`team` and `project`. It derives their UUIDs from the stored task's team link
+and a shared project's stored `issueIds` plus matching team/workspace link.
+A project label in issue Markdown/metadata and an owner's private project view
+are not organizational policy authority. Personal tasks keep their existing
+Agent/worker policies.
+
+The server records admitted team/project context on the run's first policy
+resolution and resolves the current trusted relations again on each check. A
+workspace/team/project mismatch rejects the old run with `agentPolicyChanged`;
+its old approval cannot authorize an effect under the changed scope. A new run
+resolves the current hierarchy. This applies to project membership changes even
+when issue.scopeVersion did not change. The actual ceiling content remains
+live: every claim, protected tool decision and online resume uses the same
+`lockCliRunPolicy` path, reads the current scoped policy versions, and hashes them
+with the existing workspace/Agent/worker/task provenance. A lower layer can only
+narrow permissions/network, never relax another layer's denial. Reverting content
+increments the existing automatic version and cannot revive an old approval.
+
+Only a current admin of the task workspace can change these shared ceilings.
+The existing membership lease remains held through the application transaction.
+A setting change and its `agent.policy_changed` audit row commit together; failed
+or unauthorized changes commit neither. Audit metadata contains only the scope
+kind and effective revision, not policy text, domain rules or instructions.
+The same workspace policy lock orders the scoped changes. No new role, credential,
+provider route, offline cache, scheduler or permission service was added.
+
+Risk: a task assigned to a shared project could previously use only workspace,
+Agent and worker choices, with no project/team ceiling to enforce the explicitly
+requested organization restrictions (occurrence 5 × impact 8 = 40, authorization
+boundary). This adds the missing layers to the existing enforcement path and is
+enabled whenever a workspace task has the corresponding trusted relation.
+
+Local verification uses the retained isolated PostgreSQL17 database
+`mikka_policy_closeout_e2e` at loopback55599; all three database URL selectors
+match. The new tracked migration was applied only to that existing local database.
+No database/container was created or historical evidence removed. The extended
+actual PG/loopback HTTP task-policy test covers workspace/Bot intersection,
+scoped ceilings, current-admin rejection/rollback, old approval refusal after
+change/reversion, joining a stricter project, changing team in the same workspace,
+leaving a project, fresh-run relations, workspace movement and membership revocation. Raw evidence remains local in
+`/tmp/mikka-policy-team-project-db-final.log`.
+
+This increment does not implement #230's usable signed offline-cache package,
+all overridable-default hierarchy choices, or its full real-user/harness/video
+acceptance. It does not expand #231's supported managed native transports or
+claim provider-region proof. #232 retains its reviewed single-MD format and real
+harness/UI acceptance boundary. Those are explicit remaining capabilities or
+skipped acceptance, not claims that the whole issues are complete.
+
+
+The first version of this increment incorrectly returned a stored hierarchy after
+checking only the workspace. Real PG regressions reproduced an approved operation
+remaining usable after its task joined a stricter project or team. That version's
+passing test documented an unapproved "moves apply only to later runs" choice;
+it is superseded. Current code re-derives the actual source on every policy/tool
+check and refuses the mismatch. Failure/retest logs are retained separately in
+`/tmp/mikka-policy-live-hierarchy-before-corrected.log` and
+`/tmp/mikka-policy-live-hierarchy-after.log`. The initial precondition typo log is
+also retained and is not the reproduction evidence.

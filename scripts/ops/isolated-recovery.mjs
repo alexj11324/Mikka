@@ -21,13 +21,35 @@ export async function isolatedTarget(raw, container) {
   return { database, url: raw, container }
 }
 
-async function validateTargets(targets) {
-  if (!Array.isArray(targets) || targets.length !== 2 || targets[0].database === targets[1].database ||
-      targets[0].container !== targets[1].container || new URL(targets[0].url).host !== new URL(targets[1].url).host) throw Error('recoveryDistinctDatabasesRequired')
+async function validateBoundPair(targets) {
+  if (!Array.isArray(targets) || targets.length !== 2 || !targets[0] || !targets[1] ||
+      targets[0].container !== targets[1].container || new URL(targets[0].url).host !== new URL(targets[1].url).host) throw Error('recoverySourceRolesRequired')
   for (const target of targets) {
     const checked = await isolatedTarget(target.url, target.container)
     if (checked.database !== target.database) throw Error('recoveryIsolatedTargetRequired')
   }
+}
+
+async function validateBackupSources(sources) {
+  // The two existing logical roles may share a single authorized database.
+  // Both aliases still undergo the same loopback/container/database binding.
+  await validateBoundPair(sources)
+  return { kind: sources[0].database === sources[1].database ? 'co-located' : 'separate', databases: sources.map(source => source.database) }
+}
+
+async function validateRestoreTargets(targets) {
+  if (!Array.isArray(targets) || targets.length !== 2 || targets[0]?.database === targets[1]?.database) throw Error('recoveryDistinctDatabasesRequired')
+  await validateBoundPair(targets)
+}
+
+function manifestTopology(manifest) {
+  // Earlier version-1 backups could only have separate physical sources.
+  if (manifest.sourceTopology === undefined) return { kind: 'separate', databases: [] }
+  const topology = manifest.sourceTopology
+  if (!topology || !['co-located', 'separate'].includes(topology.kind) || !Array.isArray(topology.databases) || topology.databases.length !== 2 ||
+      !topology.databases.every(name => typeof name === 'string' && /^[a-z][a-z0-9_]{0,54}_e2e$/.test(name)) ||
+      (topology.databases[0] === topology.databases[1]) !== (topology.kind === 'co-located')) throw Error('recoveryManifestInvalid')
+  return topology
 }
 
 async function pgTool(target, command, args, input) {
@@ -85,7 +107,7 @@ function decrypt(bytes, key) {
 
 async function backupIsolatedVerified({ targets, objectsDirectory, outputDirectory, key, sourceSha, migrationsDirectory, vaultProbe, quiesced }) {
   if (quiesced?.writersStopped !== true || quiesced?.workersStopped !== true || !/^[a-f0-9]{40}$/.test(sourceSha)) throw Error('recoveryQuiescenceRequired')
-  await validateTargets(targets)
+  const sourceTopology = await validateBackupSources(targets)
   if (!await vaultProbe()) throw Error('recoveryVaultUnavailable')
   await mkdir(outputDirectory, { mode: 0o700 })
   const pools = targets.map(target => new Pool({ connectionString: target.url, max: 1 })), clients = []
@@ -111,10 +133,12 @@ async function backupIsolatedVerified({ targets, objectsDirectory, outputDirecto
       await writeFile(join(outputDirectory, payload.name), encrypted, { mode: 0o600, flag: 'wx' })
       files.push({ name: payload.name, size: encrypted.length, sha256: hash(encrypted) })
     }
-    const manifest = { format: 'mikka-isolated-recovery', version: 1, sourceSha, startedAt, capturedAt, completedAt: new Date().toISOString(),
+    const manifest = { format: 'mikka-isolated-recovery', version: 1, sourceSha, sourceTopology, startedAt, capturedAt, completedAt: new Date().toISOString(),
       migrationSha256: await migrationDigest(migrationsDirectory), databases, files,
       objects: objects.map(file => ({ key: file.key, size: file.bytes.length, sha256: hash(file.bytes) })),
-      consistency: 'quiesced-dual-database; no distributed snapshot or cloud PITR claim' }
+      consistency: sourceTopology.kind === 'co-located'
+        ? 'quiesced-co-located-data-domains; two isolated restore copies; no cloud PITR claim'
+        : 'quiesced-dual-database; no distributed snapshot or cloud PITR claim' }
     const bytes = JSON.stringify(manifest, null, 2) + '\n'
     await writeFile(join(outputDirectory, 'manifest.json'), bytes, { mode: 0o600, flag: 'wx' })
     return { manifest, manifestSha256: hash(bytes) }
@@ -129,10 +153,12 @@ async function restoreIsolatedVerified({ targets, backupDirectory, objectsDirect
   const started = performance.now(), manifestBytes = await readFile(join(backupDirectory, 'manifest.json'))
   if (!/^[a-f0-9]{64}$/.test(expectedManifestSha256 ?? '') || hash(manifestBytes) !== expectedManifestSha256) throw Error('recoveryManifestMismatch')
   const manifest = JSON.parse(String(manifestBytes))
-  if (manifest.format !== 'mikka-isolated-recovery' || manifest.version !== 1 || manifest.databases?.length !== 2 ||
+  if (manifest.format !== 'mikka-isolated-recovery' || manifest.version !== 1 || !Array.isArray(manifest.databases) || JSON.stringify(manifest.databases.map(database => database?.role)) !== JSON.stringify(['main', 'workspace']) ||
       JSON.stringify(manifest.files?.map(file => file.name)) !== JSON.stringify(['database-0.enc', 'database-1.enc', 'objects.enc'])) throw Error('recoveryManifestInvalid')
+  const sourceTopology = manifestTopology(manifest)
   if (manifest.migrationSha256 !== await migrationDigest(migrationsDirectory)) throw Error('recoverySchemaMismatch')
-  await validateTargets(targets)
+  await validateRestoreTargets(targets)
+  if (targets.some(target => sourceTopology.databases.includes(target.database))) throw Error('recoveryTargetIsSource')
   const observed = Date.parse(deletionObservedAt), created = Date.parse(deletionManifest?.createdAt)
   if (!Number.isFinite(observed) || !Number.isFinite(created) || now.getTime() - observed > 5 * 60_000 || observed > now.getTime() ||
       Math.abs(observed - created) > 5 * 60_000 || hash(Buffer.from(JSON.stringify(deletionManifest))) !== deletionManifestSha256) throw Error('recoveryCurrentDeletionJournalRequired')
@@ -166,14 +192,16 @@ async function restoreIsolatedVerified({ targets, backupDirectory, objectsDirect
       if (parts.length) await mkdir(join(objectsDirectory, ...parts), { recursive: true, mode: 0o700 })
       await writeFile(join(objectsDirectory, object.key), Buffer.from(object.data, 'base64'), { mode: 0o600, flag: 'wx' })
     }
-    await applyDeletions(deletionManifest, { mainPool: pools[0], workspacePool: pools[1],
-      deleteObject: async key => {
-        if (typeof key !== 'string' || !/^[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*$/.test(key) || key.split('/').some(part => part === '.' || part === '..')) throw Error('recoveryObjectPathInvalid')
-        try { await unlink(join(objectsDirectory, key)) } catch (error) { if (error.code !== 'ENOENT') throw Error('recoveryObjectCleanupFailed') }
-      } })
+    const deleteObject = async key => {
+      if (typeof key !== 'string' || !/^[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*$/.test(key) || key.split('/').some(part => part === '.' || part === '..')) throw Error('recoveryObjectPathInvalid')
+      try { await unlink(join(objectsDirectory, key)) } catch (error) { if (error.code !== 'ENOENT') throw Error('recoveryObjectCleanupFailed') }
+    }
+    await applyDeletions(deletionManifest, { mainPool: pools[0], workspacePool: pools[1], deleteObject })
+    // A co-located source is copied into both isolated role targets. Reconcile
+    // both domains in both copies; a shadow copy must not resurrect deleted data.
+    if (sourceTopology.kind === 'co-located') await applyDeletions(deletionManifest, { mainPool: pools[1], workspacePool: pools[0], deleteObject })
     // Explicit quarantine: no restored credential, lease or approval authorizes an external replay.
-    const main = pools[0]
-    await main.query(`BEGIN;
+    for (const main of sourceTopology.kind === 'co-located' ? pools : [pools[0]]) await main.query(`BEGIN;
       DELETE FROM session; DELETE FROM verification; DELETE FROM "deviceCode"; DELETE FROM desktop_auth_requests;
       DELETE FROM "oauthAccessToken"; DELETE FROM "oauthRefreshToken"; DELETE FROM "oauthConsent";
       UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()),"revokedBy"=COALESCE("revokedBy",'isolated-recovery');
@@ -186,7 +214,7 @@ async function restoreIsolatedVerified({ targets, backupDirectory, objectsDirect
       UPDATE user_schedules SET status='paused',updated_at=now() WHERE status='active';
       UPDATE operation_ledger SET status='uncertain',"updatedAt"=now() WHERE status='executing';
       COMMIT`)
-    return { sourceSha: manifest.sourceSha, backupCapturedAt: manifest.capturedAt, restoredAt: new Date().toISOString(),
+    return { sourceSha: manifest.sourceSha, sourceTopology: sourceTopology.kind, backupCapturedAt: manifest.capturedAt, restoredAt: new Date().toISOString(),
       restoreDurationMs: Math.round(performance.now() - started), databasesVerified: 2, objectsVerified: objects.length,
       state: 'quarantined', releaseConditions: ['application and workers remain stopped', 'reconcile durable outboxes and uncertain effects', 'freshly authenticate and reauthorize', 'check current deletion/revocation journal again before exposure'] }
   } finally { await Promise.all(pools.map(pool => pool.end())); await admin.end() }
@@ -197,7 +225,7 @@ const failureCodes = new Set([
   'recoveryCurrentDeletionJournalRequired', 'recoveryPayloadMismatch', 'recoveryPayloadAuthenticationFailed',
   'recoveryObjectMismatch', 'recoveryObjectPathInvalid', 'recoveryObjectCleanupFailed', 'recoveryTargetExists',
   'recoveryDatabaseMismatch', 'recoveryPostgresToolFailed', 'recoveryIsolatedTargetRequired',
-  'recoveryContainerBindingMismatch', 'recoveryQuiescenceRequired', 'recoveryDistinctDatabasesRequired',
+  'recoveryContainerBindingMismatch', 'recoveryQuiescenceRequired', 'recoveryDistinctDatabasesRequired', 'recoverySourceRolesRequired', 'recoveryTargetIsSource',
   'accountDeletionManifestInvalid', 'accountDeletionManifestHasPendingJobs', 'accountDeletionRestoreCleanupPending',
 ])
 /** A blocked recovery always remains a failure. Notification cannot authorize exposure or hide that failure. */

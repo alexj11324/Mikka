@@ -43,18 +43,18 @@ test('group read routes advance actual group history without opening private DMs
   const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
   const { createRequestStoreForAPI } = await import('next/dist/server/async-storage/request-store')
   const { NextRequest } = await import('next/server')
-  const history = async (query = '') => {
-    const request = new NextRequest(`http://127.0.0.1/api/conversations/${group}/messages${query}`)
+  const history = async (query = '', conversationId: string = group) => {
+    const request = new NextRequest(`http://127.0.0.1/api/conversations/${conversationId}/messages${query}`)
     const waits: Promise<unknown>[] = [], errors: unknown[] = [], closes: Array<() => void> = []
     const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: callback => { closes.push(callback) }, onTaskError: error => { errors.push(error) } })
     const requestStore: ReturnType<typeof createRequestStoreForAPI> = Reflect.apply(createRequestStoreForAPI, undefined, [request, new URL(request.url), { tags: [], expirationsByCacheKind: new Map() }, undefined, undefined, undefined])
     return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, () => workUnitAsyncStorage.run(requestStore, async () => {
-      try { return await messages.GET(request, { params: Promise.resolve({ id: group }) }) }
+      try { return await messages.GET(request, { params: Promise.resolve({ id: conversationId }) }) }
       finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
     }))
   }
-  const linked = (id = exchangeLink, query = '') => links.GET(new Request(`http://127.0.0.1/api/conversation-links/${id}/messages${query}`), { params: Promise.resolve({ id }) })
-  const call = (method: 'GET' | 'POST', id = group, messageId?: string, origin?: string) => route[method](new Request(`http://127.0.0.1/api/conversations/${id}/read`, {
+  const linked = (id: string = exchangeLink, query = '') => links.GET(new Request(`http://127.0.0.1/api/conversation-links/${id}/messages${query}`), { params: Promise.resolve({ id }) })
+  const call = (method: 'GET' | 'POST', id: string = group, messageId?: string, origin?: string) => route[method](new Request(`http://127.0.0.1/api/conversations/${id}/read`, {
     method, headers: { host: '127.0.0.1', ...(origin ? { origin } : {}), 'content-type': 'text/plain' },
     ...(method === 'POST' ? { body: JSON.stringify({ messageId }) } : {}),
   }), { params: Promise.resolve({ id }) })
@@ -156,5 +156,86 @@ test('group read routes advance actual group history without opening private DMs
     assert.equal((await linked()).status, 404)
     assert.equal((await history()).status, 404)
     assert.equal((await call('POST', group, ids[1])).status, 404)
+  })
+  await t.test('the actual group-turn host produces bounded private links without publishing private context', async () => {
+    const { processGroupTurn } = await import('./coordinator/group-turns')
+    const { handleGroup } = await import('./group-conversations-store')
+    const { groupDirectory } = await import('./group-conversations-directory')
+    const w = randomUUID(), a = randomUUID(), b = randomUUID(), c = randomUUID()
+    await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Exchange producer fixture')`, [w, owner])
+    for (const user of [owner, member]) await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,'admin','active')`, [w, user, `${user}@example.invalid`])
+    for (const id of [a,b,c]) await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,$3,'codex')`, [id, owner, `exchange-${id}`])
+    const directory = groupDirectory({
+      async activeUsers(workspaceId, users) { return (await pool.query(`SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[]) AND status='active'`, [workspaceId, users])).rows.map(row => row.userId) },
+      async ownedAgents(userId, agents) { return (await pool.query(`SELECT id FROM agents WHERE "userId"=$1 AND id=ANY($2::uuid[])`, [userId, agents])).rows.map(row => row.id) },
+    })
+    const base = { userId: owner, origin: null, host: '127.0.0.1' }
+    const created = await handleGroup(pool, directory, { ...base, method: 'POST', resource: 'conversations', body: JSON.stringify({ workspaceId: w, title: 'Exchange source', members: [a,b,c].map(memberId => ({ memberType: 'agent', memberId })) }) }, true)
+    assert.equal(created.status, 201)
+    const source = (created.body as { id: string }).id
+    await pool.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role) VALUES($1,'user',$2,'member')`, [source, member])
+    assert.equal((await handleGroup(pool, directory, { ...base, method: 'POST', resource: 'messages', id: source,
+      body: JSON.stringify({ body: 'forged source', privateTo: b, linkedConversationId: dm }) }, true)).status, 422)
+    const send = async (text: string, selected = [a]) => {
+      const response = await handleGroup(pool, directory, { ...base, method: 'POST', resource: 'messages', id: source,
+        body: JSON.stringify({ body: text, mentions: selected.map(memberId => ({ memberType: 'agent', memberId })) }) }, true)
+      assert.equal(response.status, 201)
+    }
+    const runtime = {
+      async agents(userId: string, ids: string[], client: import('pg').PoolClient) { return (await client.query(`SELECT id,name,description FROM agents WHERE "userId"=$1 AND id=ANY($2::uuid[])`, [userId, ids])).rows },
+      async authorized(workspaceId: string, userId: string) { return Boolean((await pool.query(`SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active'`, [workspaceId, userId])).rowCount) },
+      async route(): Promise<never> { throw Error('An explicit mention must not call a decision fixture') },
+      async correction(): Promise<never> { throw Error('Explicit mention roots need no correction fixture') },
+      async generate(agent: { id: string }, input: { message: { text: string }; earlier: { text: string }[]; privatePeer?: { id: string } }) {
+        if (agent.id === c) { assert.deepEqual(input.earlier, []); return { text: 'public response', mentions: [] } }
+        if (!input.privatePeer) return { text: `private question ${input.message.text}`, mentions: [], privateTo: b,
+          sourceConversationId: group, linkedConversationId: dm, linkId: exchangeLink, anchorPosition: '4' }
+        return { text: agent.id === b ? `private answer ${input.message.text}` : '[nothing to add]', mentions: [] }
+      },
+    }
+    await send('first', [a,c]); await processGroupTurn(pool, source, runtime)
+    const initial = (await pool.query(`SELECT id,"linkedConversationId","anchorPosition"::text,"firstPosition"::text,"lastPosition"::text,"messageCount"::text FROM conversation_links WHERE "sourceConversationId"=$1`, [source])).rows
+    assert.equal(initial.length, 1)
+    assert.notEqual(initial[0].linkedConversationId, dm, 'model output cannot bind an existing arbitrary DM or source')
+    assert.deepEqual([initial[0].anchorPosition, initial[0].firstPosition, initial[0].lastPosition, initial[0].messageCount], ['1','1','2','2'])
+    const dmMembers = (await pool.query(`SELECT "memberType","memberId" FROM conversation_members WHERE "conversationId"=$1 ORDER BY "memberId"`, [initial[0].linkedConversationId])).rows
+    assert.deepEqual(dmMembers, [a,b].sort().map(memberId => ({ memberType: 'agent', memberId })))
+    caller = member
+    const shown = await (await history('', source)).json()
+    assert.equal(shown.messages.length, 2)
+    assert.equal(shown.timeline.filter((item: { type: string }) => item.type === 'agent_exchange').length, 1)
+    assert.equal(JSON.stringify(shown).includes('private question'), false)
+    assert.equal((await (await call('GET', source)).json()).unreadCount, 2)
+    const firstView = await (await linked(initial[0].id)).json()
+    assert.deepEqual(firstView.messages.map((entry: { body: string }) => entry.body), ['private answer first','private question first'])
+    assert.equal((await history('', initial[0].linkedConversationId)).status, 404)
+    await send('second'); await processGroupTurn(pool, source, runtime)
+    const segments = (await pool.query(`SELECT id,"linkedConversationId","firstPosition"::text,"lastPosition"::text,"messageCount"::text FROM conversation_links WHERE "sourceConversationId"=$1 ORDER BY "anchorPosition"`, [source])).rows
+    assert.equal(segments.length, 2)
+    assert.equal(segments[0].linkedConversationId, segments[1].linkedConversationId)
+    assert.deepEqual([segments[1].firstPosition, segments[1].lastPosition, segments[1].messageCount], ['3','4','2'])
+    assert.equal(JSON.stringify(await (await linked(segments[0].id, '?before=999')).json()).includes('second'), false)
+    assert.equal((await (await call('GET', source)).json()).unreadCount, 3, 'private message positions do not add source unread messages')
+    // Remove a source peer while its initial model response is in flight.
+    await send('peer revoked')
+    await processGroupTurn(pool, source, { ...runtime, async generate(agent, input) {
+      const reply = await runtime.generate(agent, input)
+      assert.equal((await handleGroup(pool, directory, { ...base, method: 'DELETE', resource: 'members', id: source, body: JSON.stringify({ memberType: 'agent', memberId: b }) }, true)).status, 200)
+      return reply
+    } })
+    assert.equal((await pool.query(`SELECT count(*)::int n FROM conversation_messages WHERE "conversationId"=$1`, [initial[0].linkedConversationId])).rows[0].n, 4)
+    assert.equal((await handleGroup(pool, directory, { ...base, method: 'POST', resource: 'members', id: source, body: JSON.stringify({ memberType: 'agent', memberId: b }) }, true)).status, 200)
+    await send('owner revoked')
+    await processGroupTurn(pool, source, { ...runtime, async generate(agent, input) {
+      const reply = await runtime.generate(agent, input)
+      await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [w, owner])
+      return reply
+    } })
+    assert.equal((await pool.query(`SELECT count(*)::int n FROM conversation_messages WHERE "conversationId"=$1`, [initial[0].linkedConversationId])).rows[0].n, 4)
+    caller = outsider
+    assert.equal((await linked(initial[0].id)).status, 404)
+    caller = member
+    await pool.query(`UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2`, [source, member])
+    assert.equal((await linked(initial[0].id)).status, 404)
   })
 })

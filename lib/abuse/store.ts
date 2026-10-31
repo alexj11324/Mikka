@@ -150,6 +150,17 @@ export class HostedUsageStore {
       return { id, workspaceId }
     })
   }
+  /** Persist the upstream lookup identity before exposing its first content. */
+  async recordGeneration(id: string, generationId: string) {
+    if (!generationId || generationId.length > 200) throw new Error('invalid_usage_generation')
+    const result = await this.pool.query(
+      `UPDATE hosted_usage SET "generationId"=COALESCE("generationId",$2)
+       WHERE id=$1 AND state IN ('pending','unknown')
+         AND ("generationId" IS NULL OR "generationId"=$2) RETURNING id`,
+      [id, generationId],
+    )
+    if (!result.rowCount) throw new PaidResourceError('usage_cost_unavailable')
+  }
   async settle(
     id: string,
     cost: number | null,
@@ -168,6 +179,8 @@ export class HostedUsageStore {
       ).rows[0]
       if (!row || row.state === 'settled' || row.state === 'failed') return
       await this.lock(tx, row.workspaceId)
+      if (generationId && row.generationId && generationId !== row.generationId)
+        throw new Error('usage_generation_mismatch')
       // Unknown cost never means free. Retain the receipt record and block further
       // workspace calls until the receipt is reconciled using this same method.
       if (cost === null) {
@@ -203,7 +216,7 @@ export class HostedUsageStore {
         [row.workspaceId, Number(row.reservedFree), free],
       )
       await tx.query(
-        `UPDATE hosted_usage SET state='settled',"costMicroUsd"=$2,"freeMicroUsd"=$3,"purchasedMicroUsd"=$4,"inputTokens"=$5,"outputTokens"=$6,"generationId"=$7,"unpaidMicroUsd"=$8,"settledAt"=now() WHERE id=$1`,
+        `UPDATE hosted_usage SET state='settled',"costMicroUsd"=$2,"freeMicroUsd"=$3,"purchasedMicroUsd"=$4,"inputTokens"=$5,"outputTokens"=$6,"generationId"=COALESCE($7,"generationId"),"unpaidMicroUsd"=$8,"settledAt"=now() WHERE id=$1`,
         [
           id,
           cost,

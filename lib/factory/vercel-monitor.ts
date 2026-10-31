@@ -324,9 +324,14 @@ export function createVercelMonitorProbe(
 export function configuredVercelMonitorProbes(
   env: Record<string, string | undefined>,
 ): MonitorProbeAdapter[] {
-  if (env.FACTORY_VERCEL_MONITOR !== "1") return [];
-  if (env.FACTORY_VERCEL_PUBLICATION !== "1")
-    throw new FactoryError("factoryMonitorTargetInvalid");
+  // Publication remains an explicit resource/cost choice. Its finished GET-only
+  // observer follows that configuration, unless the operator explicitly stops it.
+  if (env.FACTORY_VERCEL_MONITOR === "0") return [];
+  if (env.FACTORY_VERCEL_PUBLICATION !== "1") {
+    if (env.FACTORY_VERCEL_MONITOR === "1")
+      throw new FactoryError("factoryMonitorTargetInvalid");
+    return [];
+  }
   if (!env.VERCEL_TOKEN)
     throw new FactoryError("factoryVercelCredentialUnavailable");
   return [

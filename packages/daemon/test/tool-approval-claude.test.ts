@@ -62,11 +62,12 @@ it.each(['ask', 'absent-policy', 'absent-computer-policy', 'deny', 'readOnly', '
 )
 
 it.each([
+  ['REQUEST_HELP_APPROVAL_TEST', 'mcp__mikka__request_help'],
   ['CAPTURE_SCREENSHOT_APPROVAL_TEST', 'mcp__mikka_computer__capture_screenshot'],
   ['START_RECORDING_APPROVAL_TEST', 'mcp__mikka_computer__start_screen_recording'],
   ['STOP_RECORDING_APPROVAL_TEST', 'mcp__mikka_computer__stop_screen_recording'],
   ['SUBMIT_CAPTURE_APPROVAL_TEST', 'mcp__mikka__submit_capture'],
-] as const)('routes registered evidence callbacks through the real SDK: %s', async (prompt, toolName) => {
+] as const)('routes registered hand-in and evidence callbacks through the real SDK: %s', async (prompt, toolName) => {
   const cwd = await makeRepo(), runId = `capture-${prompt}`
   const policy = defaultRunPolicy()
   const permission = vi.fn((request: Readonly<ToolApprovalRequest>) => toolApprovalDecision(request, policy, cwd))

@@ -9,16 +9,18 @@ must be retained through the existing configuration system; database backups
 do not contain a usable vault key or replace provider/KMS access.
 
 `scripts/ops/isolated-recovery.mjs` is deliberately a small loopback PostgreSQL
-17 drill tool. It verifies an existing Docker container's actual loopback port
-and requires distinct `*_e2e` databases, postgres fixture identity and no URL
-password or query. It never targets production or allocates cloud resources.
-The drill creates its own source databases, migrates through the existing
-migration runner and retains every database and evidence directory.
+17 drill tool. It verifies an existing Docker container's actual loopback port,
+`*_e2e` database names, postgres fixture identity and no URL password or query.
+The two source roles may refer to the same verified physical database; restore
+targets must still be distinct, brand-new and different from every recorded
+source name. It never targets production or allocates cloud resources. The
+standard drill creates its own separate source databases, migrates through the
+existing runner and retains every database and evidence directory.
 
-Writers and workers must be stopped for both source databases and the object
-copy. The backup holds share locks while exporting PostgreSQL snapshots and
-copying data. Two database snapshots are **not** a distributed transaction;
-the consistency claim depends on that explicit quiescence. A live-production
+Writers and workers must be stopped for both logical data domains and the
+object copy. The backup holds share locks while exporting PostgreSQL snapshots
+and copying data. For separate sources, two database snapshots are **not** a
+distributed transaction; consistency depends on explicit quiescence. A live-production
 snapshot/PITR and object-store version boundary require an approved provider
 procedure. Do not infer one from a local successful dump.
 
@@ -29,6 +31,15 @@ encrypted file hash. Retain its expected digest and encryption key outside the
 bundle in an existing protected store. Its self-declared hash alone cannot
 prove integrity. Local source/evidence remain private; report no row content,
 credentials, URLs or secret material.
+
+Source topology is derived from the verified pair and bound into that same
+manifest; there is no caller flag that loosens restore isolation. Source
+aliases retain the existing main/workspace order and unique `database-0.enc`
+and `database-1.enc` names. Both isolated restore copies then contain both data
+domains, so current deletion replay and credential/approval/effect quarantine
+run over both copies. A shadow copy must not retain a deleted user or usable
+credential. Older manifests without topology retain their original separate-
+source interpretation.
 
 Before restore, obtain a fresh **current** account deletion journal separately
 from the old backup, with an independently protected digest and observation
@@ -99,6 +110,13 @@ fault records and a fresh `databaseSignals` query; it does not manufacture
 recovery by supplying an empty alert list. The injected operation never called
 a provider, so that fixture alone has definitive no-effect evidence. Do not
 copy its SQL cleanup into handling of a real uncertain external operation.
-The earlier timing report retains its original source SHA. The updated full
-restore drill still needs its next associated controlled run; source/HTTP
-failure-notice tests do not replace that positive end-to-end result.
+Stopping an abandoned run must preserve its original start/completion history.
+The live lease can recover while the missed dispatch still counts against the
+15-minute SLO window. The report keeps those windowed alerts separate; it never
+backdates a successful start to make the recovery notification green.
+
+Each timing report retains its original source SHA. The latest isolated
+restore measurements, the historical backdating defect and the corrected
+real PostgreSQL fault matrix are recorded in
+[old-ops-completion-211-214.md](old-ops-completion-211-214.md). Component evidence
+does not replace the original authenticated application end-to-end acceptance.

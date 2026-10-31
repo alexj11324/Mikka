@@ -5,10 +5,15 @@ observation and gate validation. The old V1 reader remains unchanged and rejects
 production. No stages, migrations, publication ledger or orchestration workers
 are added. #193's two frozen question-ancestry fixes are included unchanged.
 
-Runtime registration requires `FACTORY_VERCEL_MONITOR=1`,
-`FACTORY_VERCEL_PUBLICATION=1` and the existing secret-managed `VERCEL_TOKEN`.
-`FACTORY_VERCEL_PRODUCTION=1` additionally enables production. Missing delivery
-fails closed; registration creates no token, IAM grant, deployment or resource.
+The finished GET-only monitor registers by default when
+`FACTORY_VERCEL_PUBLICATION=1` and the existing secret-managed `VERCEL_TOKEN`
+configure publication. There is no second required rollout opt-in. The existing
+explicit `FACTORY_VERCEL_MONITOR=0` operator stop remains effective;
+`FACTORY_VERCEL_PRODUCTION=1` additionally selects production. Publication's
+resource/cost choice remains explicit, and monitoring never enables publication.
+An explicit monitor opt-in without publication or a configured publication
+without credential delivery fails closed. Registration creates no token, IAM
+grant, deployment or resource.
 
 The registered Mikka scope is the same team/project/repository as #194. The
 production alias is `https://app.aspectlylabs.com`. Probe reads use only GET:
@@ -46,3 +51,11 @@ monitor dispatch/claim, health failure, ten replays, alias movement and recovery
 These use synthetic provider/OAuth/Harness identities and do not constitute real
 Vercel deployment or production-user acceptance. Parent coordinates one immutable
 release; no worker independently overwrites the current main-site recovery.
+
+The default-registration regression is covered with publication configured but
+no monitor rollout flag: the old registry returned no adapter, so a subsequent
+monitor could not find its trusted target probe. The same test retains explicit
+stop, missing publication, missing credential and production-selection checks.
+The focused monitor/proof/fingerprint suite passes 40/40 with actual loopback
+HTTP receivers and zero skips; this does not establish live Vercel or model
+recovery acceptance.
