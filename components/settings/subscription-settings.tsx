@@ -12,6 +12,7 @@ import { OpenAI } from '@/components/ui/svgs/openai'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
+import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { InvalidAuthorization, parseSubscriptionStart, subscriptionListSchema, subscriptionUsageSchema, type SubscriptionUsageView } from '@/lib/subscription-ui'
 import { cn } from '@/lib/utils'
 
@@ -45,6 +46,8 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   const [loadFailed, setLoadFailed] = useState(false)
   const [attempt, setAttempt] = useState<Attempt | null>(null)
   const [callback, setCallback] = useState('')
+  /** The desktop app is catching the browser's return, so there is nothing to paste. */
+  const [catching, setCatching] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<Failure | null>(null)
   const [notice, setNotice] = useState('')
@@ -66,6 +69,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     if (code === 'auth_required') return t('signedOut')
     if (code === 'backend_unavailable') return t('refusedOff')
     if (code === 'account_unavailable') return t('refusedAccount', { provider: t(provider) })
+    if (code === 'secret_store_unavailable' || code === 'secret_create_outcome_unknown' || code === 'metadata_unavailable') return t('refusedStore', { provider: t(provider) })
     if (code === 'provider_operation_failed') return t('refusedProvider', { provider: t(provider) })
     return t(key, { provider: t(provider) })
   }, [t])
@@ -111,6 +115,22 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     return () => { stopped = true; clearTimeout(timer); abort.abort() }
   }, [attempt, failureMessage, refresh, t])
 
+  const submitLatest = useRef(submitCallback)
+  useEffect(() => { submitLatest.current = submitCallback })
+  useEffect(() => {
+    const catcher = bridgeFromWindow(window as MikkaWindow)?.app.claudeCallback
+    if (attempt?.flow !== 'callback_handoff' || !catcher) return
+    let stopped = false
+    setCatching(true)
+    catcher(attempt.authorizationUrl).then(callbackUrl => {
+      if (stopped) return
+      setCatching(false)
+      if (callbackUrl) void submitLatest.current(attempt, callbackUrl)
+      else { setAttempt(null); setError({ provider: attempt.provider, message: t('expired', { provider: t(attempt.provider) }), again: { connectionId: attempt.connectionId } }) }
+    }, () => { if (!stopped) setCatching(false) }) // The port is taken: the paste below still works.
+    return () => { stopped = true; setCatching(false) }
+  }, [attempt, t])
+
   async function connect(provider: Provider, existing?: { id: string; revision: number }) {
     setPending(true); setError(null); setNotice(''); setCallback('')
     try {
@@ -125,9 +145,12 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   }
   async function finishCallback() {
     if (!attempt || attempt.flow !== 'callback_handoff' || !callback.trim()) return
+    await submitCallback(attempt, callback.trim())
+  }
+  async function submitCallback(attempt: Attempt, callbackUrl: string) {
     setPending(true); setError(null)
     try {
-      const result = await post({ action: 'callback', connectionId: attempt.connectionId, state: attempt.state, callbackUrl: callback.trim() }) as { state?: unknown }
+      const result = await post({ action: 'callback', connectionId: attempt.connectionId, state: attempt.state, callbackUrl }) as { state?: unknown }
       if (result.state !== 'connected') throw new Error('Subscription connection failed')
       setAttempt(null); setNotice(t('connectedNotice')); await refresh()
     } catch (failure) { setAttempt(null); setError({ provider: attempt.provider, message: failureMessage(failure, 'finishFailed', attempt.provider), again: { connectionId: attempt.connectionId } }); void refresh().catch(() => undefined) } finally { setCallback(''); setPending(false) }
@@ -220,10 +243,10 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
       })}
     </SettingsSection>
     {attempt && <div className="flex flex-col gap-2 px-1 text-sm">
-      <p>{attempt.flow === 'device' ? t('deviceInstructions') : t('callbackInstructions')}</p>
+      <p role="status">{attempt.flow === 'device' ? t('deviceInstructions') : catching ? t('browserInstructions') : t('callbackInstructions')}</p>
       {attempt.userCode && <p className="font-mono font-semibold select-all">{attempt.userCode}</p>}
       <a className="w-fit text-sidebar-primary underline underline-offset-4" href={attempt.authorizationUrl} target="_blank" rel="noopener noreferrer">{t('openProvider')}</a>
-      {attempt.flow === 'callback_handoff' && <form className="flex flex-col gap-2" onSubmit={event => { event.preventDefault(); void finishCallback() }}>
+      {attempt.flow === 'callback_handoff' && !catching && <form className="flex flex-col gap-2" onSubmit={event => { event.preventDefault(); void finishCallback() }}>
         <FieldGroup><Field><FieldLabel htmlFor="subscription-callback">{t('callbackLabel')}</FieldLabel>
           <Input id="subscription-callback" value={callback} autoComplete="off" spellCheck={false} maxLength={8192} onChange={event => setCallback(event.target.value)} />
         </Field></FieldGroup>

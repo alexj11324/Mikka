@@ -40,6 +40,7 @@ export interface NativeLease { accessToken: string; accountId?: string; chatgptA
 export class WorkerRefusal extends Error {
   constructor(readonly code: string = "subscription_worker_unavailable") { super(code); this.name = "WorkerRefusal" }
 }
+const STORE_FAILURE = /^secret_store_failure (GET|POST|DELETE) (no_token|network|http_\d{3})$/
 const safeCode = (value: unknown) => typeof value === "string" && /^[a-z_]{1,64}$/.test(value) ? value : "subscription_worker_unavailable"
 
 export class SubscriptionWorkerClient {
@@ -56,7 +57,10 @@ export class SubscriptionWorkerClient {
       env: { PATH: process.env.PATH, LANG: "C.UTF-8", NODE_ENV: "production", ...this.launch.env },
       stdio: ["pipe", "pipe", "pipe"]
     })
-    child.stderr.resume() // Never log raw CPA/provider errors or configuration.
+    // Never log raw CPA/provider errors or configuration: only the worker's fixed-shape line passes.
+    createInterface({ input: child.stderr }).on("line", line => {
+      if (STORE_FAILURE.test(line)) console.warn(JSON.stringify({ level: "warn", msg: "subscription_worker", detail: line }))
+    })
     const lines = createInterface({ input: child.stdout })
     let settled = false
     let rejectPending: (error: Error) => void = () => undefined

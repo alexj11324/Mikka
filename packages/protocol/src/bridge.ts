@@ -226,6 +226,8 @@ export interface MikkaBridge {
     openExternal(url: string): Promise<void>
     /** Start a one-shot loopback listener and return its callback URL. */
     prepareAuth(state: string): Promise<string>
+    /** Absent on older desktop builds. Opens the sign-in page and returns its callback URL. */
+    claudeCallback?(authorizationUrl: string): Promise<string | null>
     /**
      * The version of an update already downloaded in the background, or null.
      * Only a downloaded update is surfaced. Absent on older desktop builds.

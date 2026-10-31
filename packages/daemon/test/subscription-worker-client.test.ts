@@ -1,6 +1,6 @@
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { SubscriptionWorkerClient } from '../src/subscription-worker-client'
 import { cleanupTempDirs, tempDir } from './helpers'
 
@@ -83,4 +83,21 @@ it('does not start a worker request if identity resolution fails or is cancelled
   const aborted = new AbortController()
   aborted.abort()
   await expect(client.call('status', {}, aborted.signal)).rejects.toThrow('subscription_cancelled')
+})
+
+it('logs only the worker\'s fixed-shape store failure line from stderr', async () => {
+  const directory = tempDir('mikka-worker-stderr-')
+  const binary = join(directory, 'worker.mjs')
+  writeFileSync(binary, `#!/usr/bin/env node
+import {createInterface} from 'node:readline'
+let config;createInterface({input:process.stdin}).on('line',line=>{const value=JSON.parse(line);if(!config){config=value;return}
+console.error('secret_store_failure POST http_403');console.error('raw provider body token=secret');setTimeout(()=>console.log(JSON.stringify({id:value.id,error:'secret_store_unavailable'})),50)})
+`)
+  chmodSync(binary, 0o700)
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+  try {
+    const client = new SubscriptionWorkerClient({ binary }, { scope: { ownerId: 'o', workspaceId: 'w', connectionId: '20000000-0000-4000-8000-000000000001', provider: 'codex' }, databaseUrl: 'synthetic', infisicalOrigin: 'https://fixture.invalid', project: 'fixture', environment: 'test', path: '/grants', workloadToken: 'w' } as never)
+    await expect(client.call('oauthStart', { revision: 1 })).rejects.toThrow('secret_store_unavailable')
+    expect(warn.mock.calls.map(call => String(call[0]))).toEqual([JSON.stringify({ level: 'warn', msg: 'subscription_worker', detail: 'secret_store_failure POST http_403' })])
+  } finally { warn.mockRestore() }
 })
