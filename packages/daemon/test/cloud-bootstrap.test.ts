@@ -36,7 +36,7 @@ it('seeds the bound device and rotates a running daemon through its private sock
   const device = join(dataDir, 'device.json')
   expect(statSync(device).mode & 0o077).toBe(0)
   expect(JSON.parse(readFileSync(device, 'utf8'))).toEqual({ deviceId: input.deviceId, workspaceId: input.workspaceId, credential: input.credential })
-  const daemon = await new Daemon({ dataDir, flavor: 'dev', link: new MemoryServer(input.deviceId).link(), harnesses: [], quotaSource: null }).start()
+  const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link: new MemoryServer(input.deviceId).link(), harnesses: [], quotaSource: null }).start()
   try {
     await daemon.syncWithServer()
     const rotated = { ...input, credential: `orv_${'b'.repeat(43)}` }
