@@ -981,6 +981,7 @@
     "agentHarnessMissing": "The selected Agent is not installed on this computer.",
     "agentDuplicateName": "This name is already in use. Choose another name.",
     "botDuplicateName": "A bot with this name already exists. Choose another name.",
+    "botNameTooLong": "A bot name can be at most 60 characters.",
     "agentInvalidInput": "Please check the information you entered.",
     "agentAddFailed": "Could not add this item.",
     "agentSaveFailed": "Could not save this item.",
@@ -3119,6 +3120,10 @@
       "search": "Search",
       "widen": "Widen panel",
       "narrow": "Restore panel width",
+      "rename": "Rename",
+      "nameRequired": "Name is required",
+      "nameTooLong": "Name can be at most {max} characters",
+      "changeAvatar": "Change {name}’s avatar",
       "close": "Close panel",
       "open": "Open panel"
     },
