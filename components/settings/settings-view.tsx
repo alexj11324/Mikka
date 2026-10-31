@@ -34,6 +34,7 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
 import type { RailDestination } from '@/components/nav/icon-rail'
+import { prefetchSettingsSection } from '@/lib/settings-prefetch'
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
 
@@ -68,7 +69,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const routedBody = section === 'members' || section === 'teams'
 
   return <>
-    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} />
+    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId) }} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent className="gap-6">

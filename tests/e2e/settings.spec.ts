@@ -78,6 +78,33 @@ test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', as
 })
 })
 
+test('悬停预取后首次打开与再次打开设置分区都不显示骨架屏', async ({ page }) => {
+  await register(page, '/settings?section=preferences')
+  const sidebar = page.locator('[data-slot="settings-list"]')
+  const skeleton = page.locator('main [data-slot="skeleton"]')
+  let sawSkeleton = false
+  const watch = async (name: string) => {
+    await expect.poll(async () => {
+      if (await skeleton.count()) sawSkeleton = true
+      return await page.getByRole('heading', { level: 1, name, exact: true }).count() > 0 && await skeleton.count() === 0
+    }, { intervals: [10] }).toBe(true)
+  }
+  for (const name of ['安全', '通知', '常规', '密钥与环境']) {
+    const link = sidebar.getByRole('link', { name, exact: true })
+    await link.hover()
+    // The hover starts the section's reads; once they return, the click has nothing to wait for.
+    await page.waitForLoadState('networkidle')
+    await link.click()
+    await watch(name)
+  }
+  expect(sawSkeleton, '悬停后首次打开不应出现骨架屏').toBe(false)
+  for (const name of ['安全', '通知', '常规', '密钥与环境']) {
+    await sidebar.getByRole('link', { name, exact: true }).click()
+    await watch(name)
+  }
+  expect(sawSkeleton, '再次打开不应出现骨架屏').toBe(false)
+})
+
 test('个人设置切换不请求服务端，并保持 URL、历史记录与跨页导航一致', async ({ page }) => {
   await register(page, '/settings?section=preferences')
   const sidebar = page.locator('[data-slot="settings-list"]')

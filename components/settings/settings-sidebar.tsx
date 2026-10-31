@@ -21,7 +21,7 @@ const icons: Record<SettingsSectionId, LucideIcon> = {
   audit: FileText, usage: ChartColumn, billing: CreditCard,
 }
 
-export function SettingsSidebar({ user, section, activeSection, admin, selectedTeamId, workspaceId, onSectionChange, onRail, onSignOut, signingOut }: {
+export function SettingsSidebar({ user, section, activeSection, admin, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail, onSignOut, signingOut }: {
   user: { name: string; email: string; image?: string | null }
   section: SettingsSectionId
   activeSection?: SettingsSectionId
@@ -30,6 +30,8 @@ export function SettingsSidebar({ user, section, activeSection, admin, selectedT
   selectedTeamId?: string
   workspaceId?: string
   onSectionChange: (section: SettingsSectionId) => void
+  /** A pointer or focus on an item: time to fetch its section. */
+  onIntent?: (section: SettingsSectionId) => void
   onRail: (destination: RailDestination) => void
   onSignOut: () => void
   signingOut: boolean
@@ -75,7 +77,7 @@ export function SettingsSidebar({ user, section, activeSection, admin, selectedT
           const Icon = icons[item.id]
           const label = i18nText(`Settings.sections.${item.id}.title` as never)
           const selected = item.id === section && !selectedTeamId && !creating
-          return <SidebarMenuItem key={item.id}><SidebarMenuButton aria-label={label} render={activeSection ? <Link href={href(item.id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onClick={() => { if (!activeSection) onSectionChange(item.id); setOpenMobile(false) }}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
+          return <SidebarMenuItem key={item.id}><SidebarMenuButton aria-label={label} render={activeSection ? <Link href={href(item.id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onPointerEnter={() => onIntent?.(item.id)} onFocus={() => onIntent?.(item.id)} onClick={() => { if (!activeSection) onSectionChange(item.id); setOpenMobile(false) }}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>
       })}
       {activeSection && <SidebarGroup className="py-2"><SidebarGroupLabel>{i18nText("Settings.groups.yourTeams")}</SidebarGroupLabel><SidebarMenu>{joinedTeams.map(team => {
