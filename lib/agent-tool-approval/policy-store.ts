@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import type { JSONContent } from '@tiptap/core'
 import { z } from 'zod'
 import { approvalModeSchema, intersectNetworkDomains, CONFIGURABLE_ACTIONS, networkAllowSchema, storedPermissionsSchema } from '@mikka/protocol/agent-policy'
 import { resolveTrustedRunPolicy } from './policy-snapshot'
@@ -10,7 +11,7 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 /** Derived from the stored task and its trusted workspace relation, never a tool argument. */
 export interface CliTaskScope { issueId: string; scopeVersion: number; workspaceId: string | null }
 export async function lockCliTaskScope(tx: PoolClient, userId: string, issueId: string): Promise<CliTaskScope> {
-  const { rows: [task] } = await tx.query<{ userId: string; scope: string; scopeVersion: number; content: string }>('SELECT "userId",scope,"scopeVersion",content FROM issues WHERE id=$1', [issueId])
+  const { rows: [task] } = await tx.query<{ userId: string; scope: string; scopeVersion: number; content: JSONContent }>('SELECT "userId",scope,"scopeVersion",content FROM issues WHERE id=$1', [issueId])
   if (!task || readIssueMetadata(task.content).deletedAt) throw new Error('agentPolicyUnavailable')
   if (task.scope === 'personal') {
     if (task.userId !== userId) throw new Error('agentPolicyUnavailable')
