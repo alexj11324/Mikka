@@ -29,7 +29,7 @@ async function fixture(browser: Browser, use: (value: {
   allowedCookieSeen: () => boolean; failures: string[]
   initialPopupHits: () => number
   detachProtection: () => Promise<void>
-}) => Promise<void>, options: { failProtocolAbort?: boolean; expectFailure?: boolean; failClose?: 'page' | 'context'; localImage?: boolean } = {}) {
+}) => Promise<void>, options: { failProtocolAbort?: boolean; expectFailure?: boolean; failClose?: 'page' | 'context'; localImage?: boolean; pausedLease?: { entered: () => void; released: Promise<void>; canceled: () => void } } = {}) {
   let foreignRequests = 0, websocketRequests = 0, allowedCookie = false, initialPopupRequests = 0
   const foreign = createServer((_request, response) => {
     foreignRequests++
@@ -98,10 +98,25 @@ async function fixture(browser: Browser, use: (value: {
       } })
     }
     const protectionSessions: CDPSession[] = []
+    const pausedLease = options.pausedLease
+    let holdLease = false
     const createSession = context.newCDPSession.bind(context)
     Object.defineProperty(context, 'newCDPSession', { value: async (page: Parameters<typeof createSession>[0]) => {
       const session = await createSession(page)
       protectionSessions.push(session)
+      if (pausedLease) {
+        let pendingNetworkId: string | undefined
+        session.on('Fetch.requestPaused', event => {
+          if (new URL(event.request.url).pathname === '/pending-cancel') {
+            pendingNetworkId = event.networkId
+            holdLease = true
+          }
+        })
+        session.on('Network.loadingFailed', event => {
+          if (pendingNetworkId && event.requestId === pendingNetworkId && event.canceled === true) pausedLease.canceled()
+        })
+        await session.send('Network.enable')
+      }
       if (options.failClose === 'page') {
         Object.defineProperty(page, 'close', { configurable: true, value: async () => { throw new Error('SYNTHETIC_CLOSE_FAILURE') } })
       }
@@ -114,7 +129,9 @@ async function fixture(browser: Browser, use: (value: {
       }
       return session
     } })
-    await installAccountOriginFence(context, { assertActive: async () => {} }, origin,
+    await installAccountOriginFence(context, { assertActive: async () => {
+      if (holdLease && pausedLease) { holdLease = false; pausedLease.entered(); await pausedLease.released }
+    } }, origin,
       () => { blocked++ }, () => { failures.push('ORIGIN_FENCE_FAILED') },
       options.localImage ? [{ url: `${foreignOrigin}/fixture.png`, body: SYNTHETIC_PNG }] : [])
     await use({ context, origin, foreignOrigin, blocked: () => blocked,
@@ -190,6 +207,34 @@ test('origin fence preserves same-origin redirect cookies and streaming browser 
     await nextPage.goto(`${f.origin}/final`)
     await expect(nextPage.locator('p')).toHaveText('controlled allowed response')
   })
+})
+
+test('origin fence survives an exact canceled request during its lease check and still fences after reload', async ({ browser }) => {
+  let releaseLease!: () => void
+  const released = new Promise<void>(resolve => { releaseLease = resolve })
+  let entered = false, canceled = false
+  try {
+    await fixture(browser, async f => {
+      const page = await f.context.newPage()
+      await page.goto(`${f.origin}/final`)
+      const controller = await page.evaluateHandle(() => new AbortController())
+      await page.evaluate(abort => { void fetch('/pending-cancel', { signal: abort.signal }).catch(() => {}) }, controller)
+      await expect.poll(() => entered).toBe(true)
+      await controller.evaluate(abort => abort.abort())
+      await expect.poll(() => canceled).toBe(true)
+      releaseLease()
+      await controller.dispose()
+      await page.reload()
+      await expect(page.locator('p')).toHaveText('controlled allowed response')
+      expect(f.context.isClosed()).toBe(false)
+      expect(f.failures).toEqual([])
+      expect(await page.evaluate(async () => {
+        try { await fetch('/foreign-via'); return false } catch { return true }
+      })).toBe(true)
+      await expect.poll(f.blocked).toBe(1)
+      expect(f.foreignHits()).toBe(0)
+    }, { pausedLease: { entered: () => { entered = true }, released, canceled: () => { canceled = true } } })
+  } finally { releaseLease() }
 })
 
 test('origin fence blocks direct and same-origin-then-cross-port redirect hops before the sink receives a request', async ({ browser }) => {
