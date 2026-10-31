@@ -288,3 +288,13 @@ and bot chats. Show the reply as it is generated using the existing OpenUI
 components; save the final messages through the current history and authorization
 path. Refreshing or reconnecting resumes the active reply without duplicating
 it. No new layout or copy. See [the streaming contract](../architecture/coordinator-streaming.md).
+
+## 2026-10-31 — Publish the usable Coordinator component catalog
+
+Alex requested photo cards for ordinary sightseeing recommendations and an audit
+of every component available to the Coordinator. The Coordinator uses the shared
+published catalog, including form controls and content primitives, instead of a
+second hand-maintained list. Visual recommendations default to the existing
+BeCardGrid and BeImageCard with real asynchronous image lookup. Replaced names
+keep their selected equivalents; computer execution state and approval stay
+host-controlled.
