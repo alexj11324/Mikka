@@ -19,7 +19,7 @@ import { HostedUsageStore } from '../../lib/abuse/store'
 
 const execute = promisify(execFile)
 type Device = { id: string; name: string; protocolVersion: number }
-type Run = { id: string; issueId: string; deviceId: string; deviceRepoId: string; baseBranch: string | null; status: string; stopReason: string | null; report: { summary: string; verify: { status: string }; publish?: { pushed: boolean; commit: string; branch: string } } | null; worktreePath: string | null; stopRequestedAt: string | null }
+type Run = { id: string; issueId: string; deviceId: string; deviceRepoId: string; baseBranch: string | null; status: string; stopReason: string | null; error: string | null; report: { summary: string; verify: { status: string }; publish?: { pushed: boolean; commit: string; branch: string } } | null; worktreePath: string | null; stopRequestedAt: string | null }
 type Observation = { kind: string; toolName?: string; deviceId?: string; runId?: string; issueId?: string; url?: string; commit?: string; branch?: string; requestId?: string }
 type ServiceEvidence = { observations: Observation[]; errors: unknown[]; pullRequests: { number: number; url: string; branch: string; draft: boolean }[] }
 type MvpCheckpoint = 'accounts-active' | 'home-open' | 'fixture-ready' | 'push-proposal-created' | 'push-approved' | 'daemon-started' | 'daemon-registered' | 'task-submitted' | 'event-bound' | 'run-dispatched' | 'worktree-ready' | 'reply-delivered' | 'published' | 'favicon-decoded' | 'chat-result-verified' | 'stop-completed'
@@ -119,7 +119,7 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     })
     const services = await service<ServiceEvidence>('/observations').catch(() => ({ observations: [], errors: ['Fixture service unavailable'], pullRequests: [] }))
     const sha = (await execute('git', ['rev-parse', 'HEAD'])).stdout.trim()
-    const runs = (await pool.query('SELECT id, "issueId", "deviceId", status, "stopReason" FROM agent_runs WHERE "userId" = $1', [user.id])).rows
+    const runs = (await pool.query('SELECT id, "issueId", "deviceId", status, "stopReason", error, CASE WHEN status IN (\'failed\', \'cancelled\') THEN report->>\'summary\' END AS "failureSummary" FROM agent_runs WHERE "userId" = $1', [user.id])).rows.map(row => ({ ...row, error: row.error?.replaceAll(token, '[redacted]').slice(0, 2000) ?? null, failureSummary: row.failureSummary?.replaceAll(token, '[redacted]').slice(0, 2000) ?? null }))
     const publications = (await pool.query('SELECT "runId", status, "workflowRunId", "errorCode", "pullRequest" FROM run_publications WHERE "userId" = $1', [user.id])).rows
     const evidence = { subscription, sha, githubSha: process.env.GITHUB_SHA ?? null, environment: 'disposable GitHub Actions Postgres / Next production build', authentication: { mode: 'automatic-account-pool', environmentId: accounts.lease.environmentId, leaseId: accounts.lease.id, generation: accounts.lease.generation, ownerId: user.id, oauthProviderVerified: false }, startedAt, finishedAt: new Date().toISOString(), scenarioAssertions: assertionsCompleted ? 'completed' : 'incomplete or failed', overallResult: 'See the Playwright report; runtime guard and teardown run after this attachment', marker, deviceId: device?.id ?? null, runId: runId ?? null, checkpoints, runs, publications, requestIds: { browser: browserRequests, fixture: services.observations.flatMap(row => row.requestId ? [row.requestId] : []) }, services,
       boundaries: ['Scripted subscription worker/model boundary; real binding/workspace authorization, Mikka WorkflowAgent and durable tools', 'GitHub API stub; real daemon clone/worktree/verify/commit/push', 'Synthetic GitHub repository identity; daemon-only file:// transport rewrite', 'Synthetic proposal through real store and authenticated browser decision; GitHub identity is seeded', 'No production or Preview acceptance performed by this suite'] }
@@ -183,7 +183,20 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     await expect(card).toBeVisible()
     await card.click()
     const thread = page.getByRole('region', { name: threadTitle, exact: true })
-    await expect(thread.getByRole('list', { name: '线程对话' })).toContainText('正在检查仓库', { timeout: 60_000 })
+    const beforeProgress = await run()
+    if (['failed', 'cancelled'].includes(beforeProgress.status)) {
+      throw new Error(`MVP daemon ${beforeProgress.status}: ${(beforeProgress.error ?? beforeProgress.report?.summary ?? beforeProgress.stopReason ?? 'No error recorded').replaceAll(token, '[redacted]').slice(0, 2000)}`)
+    }
+    try {
+      await expect(thread.getByRole('list', { name: '线程对话' })).toContainText('正在检查仓库', { timeout: 60_000 })
+    } catch (error) {
+      // The daemon runs in foreground release mode: stdout is not its log.
+      // Retain the server-masked failure instead of an empty-thread timeout alone.
+      const current = await run()
+      const failure = current?.error ?? (['failed', 'cancelled'].includes(current?.status) ? current.report?.summary : null)
+      if (failure) throw new Error(`MVP daemon ${current.status}: ${failure.replaceAll(token, '[redacted]').slice(0, 2000)}`, { cause: error })
+      throw error
+    }
     expect((await run()).status).toBe('running')
     const cachePath = new RepositoryCache(join(dataDir, 'repos')).pathFor(REPOSITORY)
     const worktreePath = (await run()).worktreePath

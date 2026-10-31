@@ -773,17 +773,18 @@ export const conversations = pgTable('conversations', {
   createdBy: text('createdBy').notNull(), lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull().default(sql`0`),
   // Optional owner-designated current group agent; never inferred or backfilled.
   leadAgentId: uuid('leadAgentId'),
+  leadBotId: uuid('leadBotId'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 export const conversationMembers = pgTable('conversation_members', {
   conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
-  memberType: text('memberType').$type<'user' | 'agent'>().notNull(), memberId: text('memberId').notNull(),
+  memberType: text('memberType').$type<'user' | 'agent' | 'bot'>().notNull(), memberId: text('memberId').notNull(),
   role: text('role').$type<'owner' | 'member'>().notNull(),
   joinedAt: timestamp('joinedAt', { withTimezone: true }).notNull().defaultNow(), leftAt: timestamp('leftAt', { withTimezone: true }),
 }, t => [primaryKey({ columns: [t.conversationId, t.memberType, t.memberId] }), index('conversation_members_identity_idx').on(t.memberType, t.memberId)])
 export const conversationMessages = pgTable('conversation_messages', {
   id: uuid('id').primaryKey(), conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
-  position: bigint('position', { mode: 'bigint' }).notNull(), authorType: text('authorType').$type<'user' | 'agent'>().notNull(),
+  position: bigint('position', { mode: 'bigint' }).notNull(), authorType: text('authorType').$type<'user' | 'agent' | 'bot'>().notNull(),
   authorId: text('authorId').notNull(), body: text('body').notNull(), mentions: jsonb('mentions').notNull().default([]),
   replyToId: uuid('replyToId'), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('conversation_messages_position_key').on(t.conversationId, t.position), index('conversation_messages_timeline_idx').on(t.conversationId, t.position.desc())])
@@ -807,6 +808,7 @@ export const groupTurns = pgTable('group_turns', {
   userId: text('userId').notNull(),
   status: text('status').$type<'queued' | 'running' | 'complete' | 'failed'>().notNull().default('queued'),
   agentId: uuid('agentId'), activeRunId: uuid('activeRunId'), route: jsonb('route'), error: text('error'),
+  botId: uuid('botId'), modelSelections: jsonb('modelSelections').notNull().default({}),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [index('group_turns_queue_idx').on(t.conversationId, t.status, t.createdAt)])
@@ -1008,7 +1010,7 @@ export const userPreferences = pgTable('user_preferences', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   pushDecide: boolean('pushDecide').notNull().default(true),
   pushReview: boolean('pushReview').notNull().default(true),
-  pushFinished: boolean('pushFinished').notNull().default(false),
+  pushFinished: boolean('pushFinished').notNull().default(true),
   pushBriefing: boolean('pushBriefing').notNull().default(true),
   pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
   memoryEnabled: boolean('memoryEnabled').notNull().default(true),

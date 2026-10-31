@@ -38,6 +38,8 @@ test('mapped paths add whole area specs next to the smoke set', () => {
     ['lib/device-enrollment.ts', ['device-authorization.spec.ts', 'mobile-handoff.spec.ts']],
     ['components/device-authorization.tsx', ['device-authorization.spec.ts']],
     ['lib/auth.ts', ['sign-out.spec.ts', 'workspace.spec.ts']],
+    // The avatar menu is the only place to switch workspaces and sign out.
+    ['components/workspace-menu.tsx', ['workspace-menu.spec.ts', 'workspace.spec.ts', 'sign-out.spec.ts', 'workspace-shortcuts.spec.ts']],
     ['lib/suggestions/card.ts', ['suggestions-rail.spec.ts', 'suggestion-entry-contract.spec.ts']],
     ['lib/issue-relations.ts', ['relations.spec.ts']],
     // The OpenUI catalog parses saved replies: the archive spec must run when it changes.
@@ -260,8 +262,8 @@ test('protected browser gate requires exactly the jobs of the selected tier', ()
         CHANGES_RESULT: options.changes ?? 'success',
         PR_RESULT: options.pr ?? (sharded ? 'skipped' : 'success'),
         SELECTION_RESULT: options.selection ?? (options.verify === 'true' ? 'success' : 'skipped'),
-        BUILD_RESULT: options.build ?? (sharded ? 'success' : 'skipped'),
-        RUNTIME_RESULT: options.runtime ?? (sharded ? 'success' : 'skipped'),
+        BUILD_RESULT: options.build ?? 'success',
+        RUNTIME_RESULT: options.runtime ?? 'success',
         FULL_RESULT: options.full ?? (sharded ? 'success' : 'skipped'),
         DOCS_ONLY: options.docs ?? 'false',
         BROWSER_TIER: tier,
@@ -271,12 +273,13 @@ test('protected browser gate requires exactly the jobs of the selected tier', ()
       },
     }).status === 0
   }
-  // Pull request tiers: the single job, nothing sharded.
+  // Pull request tiers: the shared build and both independent acceptance lanes.
   for (const tier of ['smoke', 'targeted']) {
     assert(result({ tier }))
     assert(result({ tier, performance: 'true' }))
     for (const value of ['failure', 'cancelled', 'skipped', '']) assert(!result({ tier, pr: value }), `${tier} pr ${value}`)
-    for (const job of ['build', 'runtime', 'full']) assert(!result({ tier, [job]: 'success' }), `${tier} ${job} must not run`)
+    for (const job of ['build', 'runtime']) for (const value of ['failure', 'cancelled', 'skipped', '']) assert(!result({ tier, [job]: value }), `${tier} ${job} ${value}`)
+    assert(!result({ tier, full: 'success' }), `${tier} full must not run`)
     assert(result({ tier, verify: 'true', selection: 'success' }))
     assert(!result({ tier, verify: 'true', selection: 'failure' }))
     assert(!result({ tier, verify: 'true', selection: 'skipped' }))
@@ -312,12 +315,25 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   const source = workflow()
   assert(source.includes('    name: Browser tests (before merge)\n'))
   assert(source.includes('needs: [changes, browser-pr, browser-selection, browser-build, browser-runtime, browser-e2e-full]'))
-  // One pull request runner: build, runtime gates, MVP smoke, smoke/targeted, Turnstile, performance.
-  const pr = source.split('\n  browser-pr:\n')[1].split('\n  browser-selection:\n')[0]
-  for (const step of ['pnpm exec next build', 'pnpm test:test-accounts-db', 'pnpm test:factory-http', 'node scripts/test-accounts/run-http.mjs',
-    'pnpm test:e2e:mvp --grep @smoke', 'node scripts/ci-browser-tests.mjs >', 'node scripts/ci-browser-tests.mjs --turnstile', 'pnpm test:performance',
-    'node scripts/test-accounts/evidence.mjs', 'NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA']) assert(pr.includes(step), step)
-  assert(!pr.includes('name: browser-build-'), 'no build artifact round trip on pull requests')
+  const job = name => source.split(`\n  ${name}:\n`)[1].split(/\n  [\w-]+:\n/)[0]
+  const pr = job('browser-pr'), runtime = job('browser-runtime'), build = job('browser-build')
+  // One exact build feeds independently isolated browser and runtime acceptance.
+  for (const lane of [pr, runtime, job('browser-selection')]) {
+    assert(lane.includes('needs: [changes, browser-build]'))
+    assert(lane.includes('name: browser-build-${{ github.sha }}'))
+    assert(lane.includes('services:\n      postgres:\n        image: postgres:17'))
+    assert(!lane.includes('pnpm exec next build'))
+  }
+  assert(build.includes('pnpm exec next build'))
+  assert(!build.includes("browser_tier == 'main'"), 'smoke and targeted also build once')
+  for (const step of ['node scripts/ci-browser-tests.mjs >', 'node scripts/ci-browser-tests.mjs --turnstile', 'node scripts/test-accounts/evidence.mjs']) assert(pr.includes(step), step)
+  for (const step of ['pnpm test:test-accounts-db', 'pnpm test:factory-http', 'node scripts/test-accounts/run-http.mjs', 'pnpm test:e2e:mvp', 'pnpm test:performance']) {
+    assert(runtime.includes(step), step)
+    assert(!pr.includes(step), `${step} must not serialize the browser lane`)
+  }
+  assert(runtime.includes('case "$BROWSER_TIER" in smoke|targeted) mvp_args=(--grep @smoke) ;; esac'))
+  assert(runtime.includes('pnpm test:e2e:mvp "${mvp_args[@]}"'))
+  assert(source.split('\njobs:')[0].includes('NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA'), 'the build and all consumers use the same public key')
   assert(!pr.includes('pnpm lint') && !pr.includes('pnpm build'), 'lint runs once, in ui-policy.yml')
   assert(!pr.includes('TURNSTILE_SECRET_KEY'), 'the secret reaches only the keyed run')
   assert(source.includes('shard: [1, 2, 3, 4]'))
@@ -362,20 +378,17 @@ test('each browser build restores only compiler cache; only a successful main bu
   const job = name => source.split(`\n  ${name}:\n`)[1].split(/\n  [\w-]+:\n/)[0]
   const key = "next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}"
   const pin = '0057852bfaa89a56745cba8c7296529d2fc39830'
-  assert.equal(source.match(/uses: actions\/cache\/restore@/g).length, 3)
+  assert.equal(source.match(/uses: actions\/cache\/restore@/g).length, 1)
   assert.equal(source.match(/uses: actions\/cache\/save@/g).length, 1)
-  for (const name of ['browser-pr', 'browser-selection', 'browser-build']) {
-    const steps = job(name).split('\n      - ')
-    const restore = steps.find(step => step.startsWith('name: Restore the Next.js build cache\n'))
-    const build = steps.find(step => step.startsWith('name: Build the application'))
-    assert(restore?.includes(`uses: actions/cache/restore@${pin}`), name)
-    assert.match(restore, /\n          path: \.next\/cache\n/)
-    assert(restore.includes(`key: ${key}\n`), name)
-    assert(restore.includes(`restore-keys: |\n            ${key.slice(0, -'${{ github.sha }}'.length)}`), name)
-    assert(steps.indexOf(restore) < steps.indexOf(build), name)
-    assert(build.includes('pnpm exec next build') && !build.includes('if:'), 'cache hits must still build this checkout')
-    if (name !== 'browser-build') assert(!job(name).includes('actions/cache/save@'), 'pull requests never write build caches')
-  }
+  const steps = job('browser-build').split('\n      - ')
+  const restore = steps.find(step => step.startsWith('name: Restore the Next.js build cache\n'))
+  const build = steps.find(step => step.startsWith('name: Build the application'))
+  assert(restore?.includes(`uses: actions/cache/restore@${pin}`))
+  assert.match(restore, /\n          path: \.next\/cache\n/)
+  assert(restore.includes(`key: ${key}\n`))
+  assert(restore.includes(`restore-keys: |\n            ${key.slice(0, -'${{ github.sha }}'.length)}`))
+  assert(steps.indexOf(restore) < steps.indexOf(build))
+  assert(build.includes('pnpm exec next build') && !build.includes('if:'), 'cache hits must still build this checkout')
   const save = job('browser-build').split('\n      - ').find(step => step.startsWith('name: Save the Next.js build cache (main only)\n'))
   assert(save.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.next-cache.outputs.cache-hit != 'true'\n"))
   assert(save.includes(`uses: actions/cache/save@${pin}`))
@@ -473,6 +486,7 @@ test('actual workflow bootstrap cannot let an edited classifier narrow app chang
   console.log(`Retained workflow bootstrap evidence: ${dir}`)
   const trusted = join(dir, 'trusted-main.mjs')
   writeFileSync(trusted, readFileSync('scripts/ci-docs-only.mjs'))
+  writeFileSync(join(dir, 'ci-browser-map.json'), readFileSync('scripts/ci-browser-map.json'))
   const env = { PATH:process.env.PATH, GIT_CONFIG_NOSYSTEM:'1', GIT_CONFIG_GLOBAL:'/dev/null', GIT_AUTHOR_NAME:'Test', GIT_AUTHOR_EMAIL:'test@example.invalid', GIT_COMMITTER_NAME:'Test', GIT_COMMITTER_EMAIL:'test@example.invalid' }
   const git = (args, input) => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', ...args], {cwd:dir, env, input, encoding:'utf8'}).trim()
   git(['init', '--bare', '--template=', '.'])

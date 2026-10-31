@@ -192,9 +192,103 @@ message cap and foreign/self/third-peer refusal. Typecheck and focused lint
 pass. No local Next build, new database/container, real model inference,
 OAuth flow or external SaaS write was performed or claimed.
 
-The modern Bot-to-legacy-Agent identity bridge, stored avatars and frontend
-marker/read-only panel remain outside this backend slice. The existing
-group APIs still identify creator-owned legacy agents, not arbitrary Bot IDs;
-no identity alias or private Bot-session sharing was invented. This closes
-the trusted producer/contiguous-range gap while leaving #110/#105's remaining
-product/frontend scope explicit.
+That producer revision still accepted only legacy Agent members. The next
+section completes explicit Bot membership and public identity data without
+turning Bots into coding agents or borrowing their private chat sessions.
+
+
+## Explicit Bot members and private exchange identities
+
+Based on main `3e2135e3`, the remaining normal path was concrete: passing a real
+Bot ID as a Bot group member failed the old user/agent-only parser; sender and
+participant readers queried only `agents`. Occurrence 10 × impact 4 = 40.
+The backend now supports explicit `memberType: bot` and `authorType: bot`,
+with a separate nullable `leadBotId`. It retains legacy Agent compatibility,
+but never guesses a global alias from an internal coding-runner identity.
+
+Migration `20261031153511_group_bot_members.sql` widens the existing two type
+constraints and adds `conversations.leadBotId`, `group_turns.botId` and a
+non-secret `group_turns.modelSelections` object. No existing history, creator,
+member, read position or link is rewritten. An owner explicitly selects a lead;
+choosing one type clears the other type, and removing that lead clears it.
+
+The earlier isolated PG evidence used the original unmerged filename
+`20261031132700_group_bot_members.sql`. Its SQL is byte-for-byte unchanged;
+the premerge rename keeps this migration later than intervening main migrations.
+Those retained databases and their original migration ledgers are preserved.
+
+Production directory and runtime queries require the real Bot's creator-owner
+and exact source workspace. Another workspace's Bot, or another person's Bot
+in the same workspace, is rejected; ordinary source members may address the
+creator's explicitly included Bots without becoming the billing identity.
+The source creator remains the authenticated model owner, and both creator and
+requesting member must still be authorized when execution proceeds.
+
+`GET /api/conversations/:id/members` now supplies public user/Agent/Bot roster
+data. Bot participants in source timeline markers and bounded private-message
+views return the actual Bot ID, name, color and shape from `bots`, alongside
+`memberType: bot`; private instructions, memory, bindings and credentials are
+not exposed. Each DM member and message author retains its actual Bot or
+legacy Agent type. A source member can inspect only the linked range, while
+raw DM history remains denied. The same host-bound producer handles both
+identity types and continues to exclude private text from public context and
+unread counts.
+
+Bot group generation reuses `freezeBotModel` and `resolveFrozenHostedModel`.
+The first choice per Bot/root is persisted before invocation as the existing
+safe runtime/model/subscription reference fields; later public/private replies
+reuse it, and existing resolver checks run again on each call. No bearer or
+private provider state is stored in that object or sent as group prompt data.
+Missing bindings/refusals never switch a Bot to the legacy Coordinator's paid
+model. Bot transport uses the existing streaming adapter and structured output.
+The already-held group connection is reused for the composed model/settings
+queries, preserving the existing application-pool boundary.
+
+Running Bots use `group_turns.botId` and are exposed in group status plus the
+existing owner-filtered active-status API as `kind: bot`, real public appearance,
+and null coding run/task IDs. No synthetic `agents` or `agent_runs` rows and no
+private Coordinator session leases are created for a Bot chat response.
+Activity is bounded by the existing 20-second generation and a 60-second recent
+status window; PAT workspace scope is retained for these new Bot entries.
+
+### Verification and remaining frontend work
+
+Real PG17 and exported application routes pass 9/9 with no skips on the existing
+validated `scope184_ca4f5c0154df48d6ba451ba6882b1103_e2e` loopback target at
+55599. No new database/container was created and the older frozen native
+acceptance service/database was untouched. Only this isolated fixture database
+received the tracked additive migration when its new columns were absent.
+Session identity, model text/choice and binding-preparation results are explicit
+fixtures; the group store, Bot directory/runtime SQL, private producer, status,
+roster, history/link readers and workspace authorization adapters are real.
+
+The actual API cases cover foreign-owner/cross-workspace Bot denial, source
+membership, designated Bot routing, current names/colors/shapes, private-range
+readback, absence of coding-agent aliases, pending activity, owner/PAT isolation,
+stale activity expiry, per-root frozen selection reuse, failed binding cleanup,
+peer deletion during generation and source-member removal. The model-consumer
+suite separately exercises real AI SDK structured streaming, saved reference
+shape, binding refusal and rejection of extra credential-shaped snapshot data.
+It does not establish live inference or external provider acceptance.
+
+Evidence:
+
+- `/tmp/mikka-group-bot-db-final.log`: PG/API 9/9, zero skips.
+- `/tmp/mikka-group-bot-unit-final.log`: 11 source tests and 3 model consumers
+  pass; the existing Actions-only group DB case remains locally skipped.
+- `/tmp/mikka-group-bot-activity-source.log`: 8 source tests pass, original
+  Actions-only DB case locally skipped; the new activity API is exercised by
+  the required real PG/API suite above.
+- `/tmp/mikka-group-bot-groups-source.log`: 7 source tests pass, original
+  Actions-only migration case locally skipped with its guard unchanged.
+- Typecheck, deny-warnings lint, migration checks and diff checks pass.
+
+No local Next build, new IAM/resource, OAuth flow, live model call or SaaS write
+was performed. The only frontend-file change widens an existing helper's type
+union for the new wire author type; it changes no layout, copy, appearance or
+runtime lookup. The CC-owned view still fetches legacy `listAgents` at
+`components/workspace/group-chat-view.tsx:31`, resolves non-user names from that
+old dataset at `:43`, and renders `messages` rather than `timeline` at `:58`.
+Actual Bot names/appearance and exchange ranges are now available from the
+backend; connecting that view's roster, marker and read-only panel remains
+frontend delivery, not missing backend identity/producer wiring.

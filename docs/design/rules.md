@@ -316,6 +316,16 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   profile and the background research sit behind deployment flags (off by
   default when self-hosted), a per-person entitlement, the person's own
   toggles and a daily budget.
+- **R-75** Workspaces are switched in one place: the account menu behind the
+  avatar at the bottom of the rail (the bot list's footer on phones).
+  Settings shows the current workspace's settings and has no switcher; its
+  column starts with the 设置 title and search. The account menu is one flat
+  `DropdownMenu`, no submenu, as Linear's and Notion's: each signed-in
+  account's email (small, muted) with its workspaces under it (avatar, name,
+  a check on the current one; about five show, more scroll), 创建工作区;
+  then 设置 with its shortcut as one quiet text hint (⌘, not keycaps); then
+  添加账户 and 退出登录. Menu text and item height are the defaults; the
+  menu is 240px wide and opens above the rail avatar, never over it.
 
 ## Look
 

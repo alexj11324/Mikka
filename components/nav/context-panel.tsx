@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
@@ -23,12 +23,15 @@ import { BotNameEditor } from './bot-name-editor'
 import { GroupHeader } from './group-header'
 import { ThreadList, TWO_LINE_ROW } from './thread-list'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
-import { useCloudComputer } from '@/hooks/use-feature-availability'
+import { useCloudComputer, useComputerTab } from '@/hooks/use-feature-availability'
+import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type PanelView = 'overview' | 'all'
 export type PanelTab = 'details' | 'threads' | 'prs' | 'computer'
 const TABS: readonly PanelTab[] = ['details', 'threads', 'prs', 'computer']
+const PANEL_WIDTH = { storageKey: 'mikka:context-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } as const
+const WIDE = 520
 
 /** A read-only row in 详情: a routine or a library file. */
 type DetailItem = { id: string; label: string }
@@ -86,10 +89,12 @@ export type PanelConversation = { id?: string | null; name: string; color?: stri
  * 详情 / 线程 / PR / 电脑; 全部线程 lists every bot's threads. ⤢ widens just
  * this column. Picking another bot switches its threads, PRs and computer.
  */
-export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSearch, onClose, sheet = false }: {
+export function ContextPanel({ issues, threads, conversation, workspaceId, onOpenIssue, onSearch, onClose, sheet = false }: {
   issues: Issue[]
   threads: Thread[]
   conversation: PanelConversation
+  /** The current workspace; its E2B key decides whether the 电脑 tab shows the screen or 添加 E2B API Key. */
+  workspaceId?: string
   onOpenIssue: (id: string) => void
   onSearch: () => void
   onClose: () => void
@@ -99,7 +104,18 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   const t = useTranslations('Shell.panel')
   const [view, setView] = useState<PanelView>('overview')
   const [tab, setTab] = useState<PanelTab>('threads')
-  const [wide, setWide] = useState(false)
+  const { width, max, dragging, resizeTo, reset, handleProps } = useResizableWidth(PANEL_WIDTH)
+  // 加宽 remembers the width it replaced, and the button puts it back.
+  const [beforeWide, setBeforeWide] = useState<number | null>(null)
+  const wide = beforeWide !== null
+  function toggleWide() {
+    if (wide) { resizeTo(beforeWide); setBeforeWide(null); return }
+    setBeforeWide(width)
+    resizeTo(width >= WIDE ? max : WIDE)
+  }
+  const asideRef = useRef<HTMLElement>(null)
+  // The content keeps the panel's full width while it opens or closes, so it is clipped, not squeezed.
+  useLayoutEffect(() => { asideRef.current?.style.setProperty('--context-panel-width', `${width}px`) }, [width])
   const { data: bots = [] } = useSWR('bots', listBots)
   const botId = conversation.kind === 'bot' ? conversation.id ?? null : null
   const coordinator = conversation.kind === 'coordinator'
@@ -108,18 +124,22 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   // An older chat without a bot learns its thread from the 电脑 cards in it.
   const cloudComputer = useCloudComputer()
   const registered = useConversationThread(cloudComputer && conversation.kind === 'agent' ? conversation.id : null)
-  const computer = cloudComputer ? botId ?? registered?.botId : undefined
+  // Every bot has the 电脑 tab (Alex, 2026-10-31); without a key it offers 添加 E2B API Key.
+  const computerTab = useComputerTab()
+  const computer = (computerTab ? botId : null) ?? (cloudComputer ? registered?.botId : undefined)
   // A conversation whose bot works on its computer opens on its screen (Figma 103:64).
   useEffect(() => { if (registered?.runId) { setView('overview'); setTab('computer') } }, [registered?.runId])
-  // No computer here (cloud computers off, or the Coordinator): no 电脑 tab.
+  // No computer here (the kill switch is on, or the Coordinator): no 电脑 tab.
   const tabs = computer ? TABS : TABS.filter(item => item !== 'computer')
   const shown = tabs.includes(tab) ? tab : 'threads'
 
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
-  // R-37: opening, closing and widening move the width on a spring; the content keeps its
-  // narrow width so it is clipped, not squeezed, while the panel opens or closes.
-  return <motion.aside aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width: wide ? 520 : 360 }} exit={sheet ? undefined : { width: 0 }} transition={SPRING_SIDEBAR} className={cn('min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l bg-background xl:flex')}>
-    <Tabs value={view} onValueChange={value => setView(value as PanelView)} className={cn('min-h-0 flex-1 gap-0', !sheet && 'min-w-90')}>
+  // R-37: opening, closing and widening move the width on a spring; while the edge is dragged
+  // the width follows the pointer with no spring.
+  return <motion.aside ref={asideRef} aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width }} exit={sheet ? undefined : { width: 0 }} transition={dragging ? { duration: 0 } : SPRING_SIDEBAR} className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l bg-background xl:flex', dragging && 'select-none')}>
+    {/* Drag the inner edge or use the arrow keys on it to resize the panel; double-click it to reset. */}
+    {!sheet && <div {...handleProps} aria-label={t('resize')} onDoubleClick={() => { setBeforeWide(null); reset() }} className={cn(RESIZE_EDGE, 'absolute inset-y-0 start-0 after:start-0')} />}
+    <Tabs value={view} onValueChange={value => setView(value as PanelView)} className={cn('min-h-0 flex-1 gap-0', !sheet && 'min-w-[var(--context-panel-width,22.5rem)]')}>
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
         <TabsList aria-label={t('views')} className="gap-1 bg-transparent p-0">
           <TabsTrigger value="overview" className={pill}>{t('overview')}</TabsTrigger>
@@ -127,7 +147,7 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
         </TabsList>
         <div className="ml-auto flex items-center">
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('search')} onClick={onSearch} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('search')}</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={wide ? t('narrow') : t('widen')} aria-pressed={wide} className={cn(sheet && 'hidden')} onClick={() => setWide(value => !value)} />}>{wide ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</TooltipTrigger><TooltipContent>{wide ? t('narrow') : t('widen')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={wide ? t('narrow') : t('widen')} aria-pressed={wide} className={cn(sheet && 'hidden')} onClick={toggleWide} />}>{wide ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</TooltipTrigger><TooltipContent>{wide ? t('narrow') : t('widen')}</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
         </div>
       </div>
@@ -153,7 +173,7 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
             <PullRequests threads={ownThreads} issues={issues} />
           </TabsContent>
           {computer && <TabsContent value="computer" className="min-h-0 overflow-y-auto px-4 pb-4">
-            {botId ? <AgentComputer botId={botId} name={conversation.name} header={false} /> : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} header={false} />}
+            {botId ? <AgentComputer botId={botId} name={conversation.name} header={false} workspaceId={workspaceId} /> : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} header={false} workspaceId={workspaceId} />}
           </TabsContent>}
         </Tabs>
       </TabsContent>

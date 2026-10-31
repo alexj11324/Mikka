@@ -21,7 +21,7 @@ test('MVP subscription boundary retains real service authorization, private work
  const worker=new SubscriptionWorkerClient({binary:fileURLToPath(new URL('./subscription-worker.mjs',import.meta.url))},config)
  const repository={binding:async(user:string,id:string)=>{assert.equal(user,owner);assert.equal(id,bindingId);return binding},connection:async(user:string,id:string)=>{assert.equal(user,owner);assert.equal(id,connectionId);return row},scope:()=>config.scope,saveQuota:async()=>undefined} as unknown as SubscriptionRepository
  let scopeChecks=0
- const service=new SubscriptionService(repository,()=>worker,{ready:()=>true,nativeIsolation:'none'},undefined,async(user,id)=>{assert.equal(user,owner);assert.equal(id,workspaceId);scopeChecks++})
+ const service=new SubscriptionService(repository,()=>worker,{ready:()=>true,nativeIsolation:'none'},undefined,async(user,id)=>{assert.equal(user,owner);assert.equal(id,workspaceId);scopeChecks++},async(scope,model,route)=>{assert.deepEqual(scope,{ownerId:owner,workspaceId});assert.equal(model,binding.modelId);assert.equal(route,binding.route)})
  try {
   const marker=`mvp-${randomUUID()}`,deviceId=randomUUID(),issueId=randomUUID(),agentId=randomUUID(),runId=randomUUID()
   await fetch(`${services.origin}/scenario`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({marker,title:'Subscription MVP'})})

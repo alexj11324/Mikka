@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
-import { agentRuns, agents, coordinatorSessions, devices } from '@/lib/db/schema'
+import { agentRuns, agents, coordinatorSessions, devices, bots, conversations, groupTurns } from '@/lib/db/schema'
 import type * as schema from '@/lib/db/schema'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
@@ -14,13 +14,15 @@ import { runBotName } from '@/lib/run-bot-name'
 
 export type ActiveAgent = {
   id: string
-  kind: 'agent' | 'coordinator'
+  kind: 'agent' | 'coordinator' | 'bot'
   name: string
   avatarUrl: null
   startedAt: string
   state: 'working' | 'waiting_input'
   runId: string | null
   issueId: string | null
+  color?: string
+  shape?: string
 }
 
 export const COORDINATOR_ID = 'coordinator'
@@ -54,10 +56,10 @@ export function sortActiveAgents(list: ActiveAgent[]): ActiveAgent[] {
   return [...list].sort((a, b) => a.startedAt.localeCompare(b.startedAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
 }
 
-export async function listActiveAgents(database: Database, userId: string, now = new Date()): Promise<ActiveAgent[]> {
+export async function listActiveAgents(database: Database, userId: string, now = new Date(), workspaceId?: string): Promise<ActiveAgent[]> {
   const onlineSince = new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS)
   const startedAt = sql<Date>`coalesce(${agentRuns.startedAt}, ${agentRuns.createdAt})`.mapWith(agentRuns.createdAt)
-  const [rows, [session]] = await Promise.all([
+  const [rows, [session], workingBots] = await Promise.all([
     database.select({ agentId: agents.id, name: runBotName, runId: agentRuns.id, issueId: agentRuns.issueId, status: agentRuns.status, startedAt })
       .from(agentRuns)
       .innerJoin(agents, and(eq(agents.id, agentRuns.agentId), eq(agents.userId, userId)))
@@ -69,8 +71,16 @@ export async function listActiveAgents(database: Database, userId: string, now =
       )),
     database.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, updatedAt: coordinatorSessions.updatedAt })
       .from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNull(coordinatorSessions.botId))).limit(1),
+    database.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, startedAt: groupTurns.updatedAt })
+      .from(groupTurns)
+      .innerJoin(conversations, and(eq(conversations.id, groupTurns.conversationId), eq(conversations.createdBy, userId)))
+      .innerJoin(bots, and(eq(bots.id, groupTurns.botId), eq(bots.ownerId, userId), eq(bots.workspaceId, conversations.workspaceId)))
+      .where(and(eq(groupTurns.status, 'running'), gt(groupTurns.updatedAt, new Date(now.getTime() - 60_000)), workspaceId ? eq(bots.workspaceId, workspaceId) : undefined)),
   ])
   const list = mergeAgentRuns(rows)
+  const byBot = new Map<string, typeof workingBots[number]>()
+  for (const row of workingBots) if (!byBot.has(row.id) || row.startedAt < byBot.get(row.id)!.startedAt) byBot.set(row.id, row)
+  for (const row of byBot.values()) list.push({ ...row, kind: 'bot', avatarUrl: null, startedAt: row.startedAt.toISOString(), state: 'working', runId: null, issueId: null })
   if (coordinatorLeaseActive(session, now)) {
     // coordinator_sessions has no turn start column yet, so startedAt uses updatedAt for now
     // (bumped when a turn takes or renews the lease). Replace once a real start time is stored.

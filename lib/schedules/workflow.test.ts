@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
+import { turnWarning } from '../coordinator/model'
 import type { NativeToolScope } from '../../workflows/coordinator/tool-scope'
 
 const calls:Array<{name:string;args:unknown[]}>=[]
@@ -10,7 +11,7 @@ const result={text:'Actual task status is todo',finishReason:'stop',responseMess
 const stub=(path:string,exports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports:exports})
 const writable=new WritableStream()
 mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'existing-workflow'}),getWritable:()=>writable}})
-stub('../coordinator/model.ts',{coordinatorStep:()=>({}),turnWarning:()=>null})
+stub('../coordinator/model.ts',{coordinatorStep:()=>({}),turnWarning})
 stub('../attention/handoff.ts',{QUIET_REPLY:'__quiet__'})
 stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unknown[])=>{record('hosted')(...args);return result}})
 stub('../../workflows/coordinator/native-steps.ts',{runtime:async()=>({harness:native?'codex':'ai_sdk'})})
@@ -36,7 +37,7 @@ stub('../../workflows/coordinator/steps.ts',{
 })
 let coordinatorTurn:typeof import('../../workflows/coordinator/workflow').coordinatorTurn
 before(async()=>{({coordinatorTurn}=await import('../../workflows/coordinator/workflow'))})
-beforeEach(()=>{calls.length=0;taken=false;denied=false;native=false})
+beforeEach(()=>{calls.length=0;taken=false;denied=false;native=false;result.finishReason='stop'})
 test('scheduled SDK turn uses the existing runtime with host-only scope and read catalog',async()=>{
  await coordinatorTurn('owner',null)
  const toolCall=calls.find(c=>c.name==='tools')!
@@ -63,4 +64,15 @@ test('a cancelled or stale scheduled turn starts no model and records bounded fa
  denied=true;await assert.rejects(coordinatorTurn('owner',null),/scheduleReadAuthorityLost/)
  assert.equal(calls.some(c=>c.name==='hosted'||c.name==='native'||c.name==='complete'),false)
  assert.deepEqual(calls.find(c=>c.name==='scheduleFailed')?.args,[scheduledRead,true])
+})
+
+test('a truncated scheduled reply uses bounded failure and a later complete reply can publish',async()=>{
+ result.finishReason='length'
+ await assert.rejects(coordinatorTurn('owner',null),/scheduledReadFailed/)
+ assert.equal(calls.filter(c=>c.name==='complete').length,0)
+ assert.deepEqual(calls.find(c=>c.name==='scheduleFailed')?.args,[scheduledRead,false])
+ calls.length=0;taken=false;result.finishReason='stop'
+ await coordinatorTurn('owner',null)
+ assert.deepEqual(calls.find(c=>c.name==='complete')?.args,['owner',null,scheduledRead,result.text,'existing-workflow:0'])
+ assert.equal(calls.some(c=>c.name==='scheduleFailed'),false)
 })

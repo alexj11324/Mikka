@@ -50,7 +50,7 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       let through: number
       if(inbox.scheduledRead){
-        if(!result.text.trim() || result.finishReason==='error') throw new Error('scheduledReadFailed')
+        if(turnWarning(result.finishReason,result.text)) throw new Error('scheduledReadFailed')
         through = await steps.completeScheduleRead(userId,botId,inbox.scheduledRead,result.text,streamId)
       } else through = await steps.appendMessages(userId,holder,result.responseMessages,quiet ? null : turnWarning(result.finishReason,result.text),botId,streamId)
       if (inbox.handoffMatterIds.length) await steps.settleAttention(userId,inbox.handoffMatterIds,inbox.handoffOnly && !quiet)

@@ -29,7 +29,7 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  proactive: true, pushDecide: true, pushReview: true, pushFinished: false, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
+  proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
   sendKey: 'enter', personalInstructions: '', dailySuggestions: true,
 }
 

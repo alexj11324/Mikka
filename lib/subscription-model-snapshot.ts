@@ -65,8 +65,8 @@ export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime:
   const service = dependencies.service()
   const verify = async () => {
     cancelled(signal)
-    const { assertUnmanagedModelTransport } = await import('./model-admission/runtime')
-    await assertUnmanagedModelTransport({ workspaceId: frozen.workspaceId, ownerId: scope.ownerId }, frozen.modelId, signal)
+    const { assertSubscriptionModelTransport } = await import('./model-admission/runtime')
+    await assertSubscriptionModelTransport({ workspaceId: frozen.workspaceId, ownerId: scope.ownerId }, frozen.modelId, frozen.route, signal, false)
     const binding = await service.repository.binding(scope.ownerId, frozen.bindingId)
     for (const [key, expected] of Object.entries({ id: frozen.bindingId, ownerId: frozen.ownerId, consumerId: frozen.consumerId, workspaceId: frozen.workspaceId, connectionId: frozen.connectionId, connectionRevision: frozen.connectionRevision, modelId: frozen.modelId, route: frozen.route })) {
       if (binding[key as keyof typeof binding] !== expected) throw refuse()

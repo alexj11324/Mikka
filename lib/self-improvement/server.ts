@@ -6,7 +6,7 @@ import { runPolicyDigestInput, type RunPolicy } from '@mikka/protocol/agent-poli
 import { invokeDecision } from '../coordinator/decide'
 import { getArtifactObject } from '../artifacts/storage'
 import { createSkillComparisonCollector } from './comparison-collector'
-import { createRegisteredSkillEvaluator } from './registered-evaluation'
+import { createConfiguredSkillEvaluator } from './registered-evaluation'
 import { pool } from '@/lib/db'
 import { issueForUser } from '@/lib/issue-access'
 import { queueFactoryRun } from '@/lib/agent-runs'
@@ -29,9 +29,7 @@ export const benchmarkPolicy:RunPolicy = {
 }
 export const loadSkillComparison=createSkillComparisonCollector(pool,
   async(userId,issueId)=>Boolean(await issueForUser(userId,issueId,false,drizzle(pool))),getArtifactObject)
-const evaluateSkillEffect=createRegisteredSkillEvaluator({loadComparison:loadSkillComparison,invokeDecision,
-  // Real benchmark/model evaluation is explicitly OFF for this delivery.
-  modelEvaluationEnabled:false})
+const evaluateSkillEffect=createConfiguredSkillEvaluator({loadComparison:loadSkillComparison,invokeDecision})
 export const skillEffectEvaluator: typeof evaluateSkillEffect = async (userId, proposal) => {
   const tx = await pool.connect()
   let taskScope: Awaited<ReturnType<typeof lockCliTaskScope>>

@@ -34,10 +34,11 @@ mock.module(new URL("./execution-settings.ts", import.meta.url).href, {
 
 mock.module(new URL("./model-admission/runtime.ts", import.meta.url).href, {
   namedExports: {
-    assertUnmanagedModelTransport: async (scope: { ownerId: string; workspaceId: string }, model: string) => {
+    assertSubscriptionModelTransport: async (scope: { ownerId: string; workspaceId: string }, model: string, route: string) => {
       assert.equal(scope.ownerId, "alice");
       assert.equal(scope.workspaceId, id(2));
       assert.equal(model, "chosen-model");
+      assert.equal(route, "claude_cpa");
     },
   },
 });

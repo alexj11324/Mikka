@@ -5,7 +5,7 @@ import type { SubscriptionService } from './subscription-service'
 import type { HostedRuntimeSnapshot } from './subscription-model-snapshot'
 const defaults:Array<{scope:unknown;model:string}>=[]
 let managedSubscriptionDenied = false
-mock.module(new URL('./model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertUnmanagedModelTransport:async()=>{if(managedSubscriptionDenied)throw new Error('modelRouteDenied')}}})
+mock.module(new URL('./model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertSubscriptionModelTransport:async()=>{if(managedSubscriptionDenied)throw new Error('modelRouteDenied')}}})
 mock.module(new URL('./abuse/resolve.ts',import.meta.url).href,{namedExports:{resolveDefaultHostedModel:async(scope:unknown,model:string)=>{defaults.push({scope,model});return {modelId:model}}}})
 let freezeHostedModelSelection:typeof import('./subscription-model-snapshot')['freezeHostedModelSelection'],resolveFrozenHostedModel:typeof import('./subscription-model-snapshot')['resolveFrozenHostedModel']
 before(async()=>{({freezeHostedModelSelection,resolveFrozenHostedModel}=await import('./subscription-model-snapshot'))})

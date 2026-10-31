@@ -4,7 +4,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 import { useTranslations } from 'next-intl'
 import posthog from 'posthog-js'
 import { computerMock } from '@/lib/computer/client'
-import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, upcomingFeatures, type GatedFeature, type UpcomingFeature } from '@/lib/feature-flags'
+import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, upcomingFeatures, type GatedFeature, type UpcomingFeature } from '@/lib/feature-flags'
 
 const subscribe = (notify: () => void) => posthog.onFeatureFlags(() => notify())
 const serverSnapshot = () => undefined
@@ -27,4 +27,10 @@ export function useGatedFeature(feature: GatedFeature) {
 /** The cloud computer UI uses the rollout flag or an explicit environment opt-in. */
 export function useCloudComputer() {
   return useGatedFeature('cloudComputer') || computerMock || computerAcceptancePreview(process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT, process.env.NEXT_PUBLIC_COMPUTER_ACCEPTANCE) || computerProductionEnabled(process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT, process.env.NEXT_PUBLIC_COMPUTER_ENABLED)
+}
+
+/** A bot's 电脑 tab: always there unless the deployment's kill switch says exactly true. */
+export function useComputerTab() {
+  const snapshot = useCallback(() => posthog.getFeatureFlag(killSwitches.computerTab, { send_event: false }), [])
+  return useSyncExternalStore(subscribe, snapshot, serverSnapshot) !== true
 }

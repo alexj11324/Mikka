@@ -473,6 +473,7 @@ export class ClaudeAdapter implements AgentAdapter {
       gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,
       policy: options.policy,
+      policyHash: options.policyHash,
       skills: options.skills,
       skillReceipt: options.skillReceipt,
       runDir,
