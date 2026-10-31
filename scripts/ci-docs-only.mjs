@@ -71,11 +71,11 @@ export const BROWSER_SMOKE_FILES = Object.freeze([
 /** Whole files run after every code-bearing merge to main (with the smoke files). */
 export const BROWSER_MAIN_SPECS = Object.freeze([
   ...BROWSER_SMOKE_FILES,
-  'agent.spec.ts', 'bot-image-read.spec.ts', 'bots.spec.ts', 'computer-policy-settings.spec.ts',
+  'agent.spec.ts', 'bot-computer-tab.spec.ts', 'bot-image-read.spec.ts', 'bots.spec.ts', 'computer-policy-settings.spec.ts',
   'coordinator-choice-card.spec.ts', 'coordinator-scroll.spec.ts', 'global-search-scope.spec.ts', 'invalid-issue-content.spec.ts',
   'issue-threads.spec.ts', 'linear-sync-disabled.spec.ts', 'members.spec.ts', 'mobile-handoff.spec.ts',
   'plugins-page.spec.ts',
-  'settings.spec.ts', 'sign-out.spec.ts', 'suggestion-entry-contract.spec.ts', 'suggestions-rail.spec.ts',
+  'settings.spec.ts', 'settings-background-polling.spec.ts', 'sign-out.spec.ts', 'suggestion-entry-contract.spec.ts', 'suggestions-rail.spec.ts',
   'teams.spec.ts', 'thread-cards.spec.ts', 'thread-projection.spec.ts', 'thread-stop.spec.ts',
   'workspace-menu.spec.ts',
   'abuse-ui.spec.ts', 'settings-audit.spec.ts', 'settings-billing.spec.ts', 'settings-general.spec.ts',
@@ -104,7 +104,8 @@ const SELECTION_POLICY_FILES = new Set([".github/workflows/browser-tests.yml", "
 export const needsSelectionValidation = files => files.some(file => SELECTION_POLICY_FILES.has(file))
 const SCOPED_BROWSER = [
   { area: 'search', paths: [/^lib\/(?:search|federated-search)\//, /^lib\/(?:issue|site)-search(?:\.|-)/, /^app\/api\/(?:search|issues\/search)\//, /^components\/workspace\/issue-search\.tsx$/], specs: ['site-search.spec.ts', 'global-search-scope.spec.ts'] },
-  { area: 'settings', paths: [/^components\/settings\//, /^app\/\[locale\]\/settings\//, /^lib\/settings[-/.]/, /^lib\/profile\//, /^lib\/workspace-admin\//, /^components\/teams\//, /^components\/workspace-menu\.tsx$/, /^components\/workspace\/members-settings\.tsx$/], specs: ['settings.spec.ts', 'settings-surface.spec.ts', 'members.spec.ts', 'teams.spec.ts', 'workspace-menu.spec.ts', 'profile.spec.ts', 'computer-policy-settings.spec.ts', 'linear-sync-disabled.spec.ts', 'bots.spec.ts', 'abuse-ui.spec.ts', 'settings-audit.spec.ts', 'settings-billing.spec.ts', 'settings-general.spec.ts', 'settings-secrets.spec.ts', 'settings-team-permissions.spec.ts', 'settings-tokens.spec.ts', 'settings-usage.spec.ts'] },
+  { area: 'settings', paths: [/^components\/settings\//, /^app\/\[locale\]\/settings\//, /^lib\/settings[-/.]/, /^lib\/profile\//, /^lib\/workspace-admin\//, /^components\/teams\//, /^components\/workspace-menu\.tsx$/, /^components\/workspace\/members-settings\.tsx$/], specs: ['settings.spec.ts', 'settings-surface.spec.ts', 'members.spec.ts', 'teams.spec.ts', 'workspace-menu.spec.ts', 'profile.spec.ts', 'computer-policy-settings.spec.ts', 'linear-sync-disabled.spec.ts', 'bots.spec.ts', 'abuse-ui.spec.ts', 'settings-audit.spec.ts', 'settings-billing.spec.ts', 'settings-general.spec.ts', 'settings-secrets.spec.ts', 'settings-team-permissions.spec.ts', 'settings-tokens.spec.ts', 'settings-usage.spec.ts', 'bot-computer-tab.spec.ts'] },
+  { area: 'computer', paths: [/^components\/computer\//, /^components\/nav\/context-panel\.tsx$/, /^hooks\/use-(?:computer|feature-availability)\.ts$/], specs: ['bot-computer-tab.spec.ts', 'e2b-machine-name.spec.ts'] },
   { area: 'plugins', paths: [/^components\/plugins\//, /^app\/api\/integrations\//], specs: ['plugins-page.spec.ts', 'linear-sync-disabled.spec.ts', 'github-integration.spec.ts'] },
   { area: 'slack', paths: [/^lib\/slack\//, /^app\/api\/webhooks\/slack\//], specs: ['slack-webhook.spec.ts'] },
   { area: 'factory', paths: [/^lib\/factory\//, /^app\/api\/factory\//, /^components\/(?:factory|workspace\/factory-)/, /^lib\/self-improvement\//, /^app\/api\/self-improvement\//, /^components\/workspace\/self-improvement\.tsx$/], specs: ['factory-acceptance-ui.spec.ts', 'factory-acceptance-a2.spec.ts', 'thread-question.spec.ts', 'factory-api.spec.ts', 'factory-check-api.spec.ts', 'factory-execution-claim.spec.ts', 'self-improvement-api.spec.ts'] },

@@ -235,10 +235,10 @@ export interface GitHubRecipient { userId: string; githubId: string }
 export function githubCandidateIds(event: string, payload: Json): string[] {
   const ids = new Set<string>()
   const add = (value: unknown) => { const id = str(record(value).id); if (id) ids.add(id) }
-  if (event === 'pull_request') { add(payload.requested_reviewer); add(payload.assignee) }
-  if (event === 'issues') add(payload.assignee)
-  if (event === 'issue_comment') add(record(payload.issue).user)
-  if (event === 'pull_request_review' || event === 'pull_request_review_comment') add(record(payload.pull_request).user)
+  if (event === 'pull_request' && payload.action === 'review_requested') add(payload.requested_reviewer)
+  if ((event === 'pull_request' || event === 'issues') && payload.action === 'assigned') add(payload.assignee)
+  if (event === 'issue_comment' && payload.action === 'created') add(record(payload.issue).user)
+  if ((event === 'pull_request_review' && payload.action === 'submitted') || (event === 'pull_request_review_comment' && payload.action === 'created')) add(record(payload.pull_request).user)
   return [...ids]
 }
 

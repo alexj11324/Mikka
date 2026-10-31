@@ -1,5 +1,6 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
+import { setTimeout as delay } from 'node:timers/promises'
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
@@ -123,8 +124,11 @@ export async function linkDeviceToken(caller: Pick<DeviceCaller, 'userId' | 'tok
   return rows.length > 0
 }
 
-export function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => { setTimeout(resolve, ms) })
+export async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  try { await delay(ms, undefined, { signal }) }
+  catch (error) {
+    if (!(signal?.aborted && error instanceof Error && error.name === 'AbortError')) throw error
+  }
 }
 
 /** `?wait=<seconds>`, clamped to the protocol's maximum. */

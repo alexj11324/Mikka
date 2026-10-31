@@ -4,6 +4,9 @@ These are internal objectives, not a contractual SLA. Repository maintainers
 own the alerts and response. Use the existing runtime JSON logs and durable
 PostgreSQL queues rather than adding a second monitoring platform.
 
+[Runtime request and CPU budgets](runtime-budgets.md) defines executable idle
+budgets, native Vercel monitors, outcome coverage and deployment comparisons.
+
 `lib/request-log.ts` writes a privacy-safe start and completion with one random
 invocation ID and UTC timestamps. Only route templates, method, status,
 duration, hashed user ID and error class are emitted. No body, URL parameters,
