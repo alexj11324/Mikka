@@ -82,6 +82,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       assert.ok(x.github.calls.every((c) => c.token === TOKEN), "every GitHub call is the person's");
       assert.deepEqual(await x.taskState(), { stage: "publish", status: "passed" });
       assert.deepEqual(await x.rows(), [{ status: "merged", source: "mikka", code: null, sha: x.candidate.sha, headSha: x.candidate.sha, mergeCommitSha: "m".repeat(40) }]);
+      const { rows: [publication] } = await pool.query('SELECT "pullRequest"->>\'state\' AS state FROM run_publications WHERE "pullRequest"->>\'url\'=$1', [x.pr]);
+      assert.equal(publication.state, "merged", "the candidate card reads merged before the webhook");
       const ledger = await f.service([]).ledger(actor, x.task.id);
       assert.equal(ledger.merges.length, 1);
       assert.equal(ledger.merges[0].status, "merged");

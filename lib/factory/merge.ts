@@ -230,6 +230,11 @@ export function createFactoryMerges(
         `UPDATE factory_merges SET status='merged',"headSha"=$2,"mergeCommitSha"=$3,"finishedAt"=clock_timestamp() WHERE id=$1 AND status='merging'`,
         [mergeId, outcome.headSha, outcome.mergeCommitSha],
       );
+      // The candidate card's PR reads merged at once, not only after the webhook.
+      await tx.query(
+        `UPDATE run_publications SET "pullRequest"=jsonb_set("pullRequest",'{state}','"merged"') WHERE lower("pullRequest"->>'url')=lower($1)`,
+        [pullRequestUrl],
+      );
       const done = await finalize(tx, task, mergeId);
       return { status: "merged", mergeId, pullRequestUrl, binding: bindingOf(done) };
     });

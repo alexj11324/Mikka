@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Spinner } from '@/components/ui/spinner'
 import { ShortSha } from './short-sha'
+import { PullRequestIcon } from './pull-request-icon'
 import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
 
 export type ApprovalBarProps = {
@@ -37,7 +38,9 @@ export type ApprovalBarProps = {
 
 function StateIcon({ state }: { state: AcceptanceState }) {
   if (state === 'publishing' || state === 'checking' || state === 'merging') return <Spinner />
-  if (state === 'approved' || state === 'live' || state === 'merged') return <CircleCheck aria-hidden="true" />
+  // A merged PR reads as GitHub draws it, the same mark as the candidate card's PR.
+  if (state === 'merged') return <PullRequestIcon state="merged" />
+  if (state === 'approved' || state === 'live') return <CircleCheck aria-hidden="true" />
   if (state === 'failed') return <CircleX aria-hidden="true" />
   if (state === 'expired') return <Clock aria-hidden="true" />
   if (state === 'revoked' || state === 'invalidated' || state === 'unavailable') return <Ban aria-hidden="true" />
