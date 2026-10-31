@@ -26,6 +26,8 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false) {
     // This VM owns frozen benchmark composition, not credential admission;
     // the actual route/fence and token revocation have real PostgreSQL tests.
     '@/lib/device-route':{withDeviceRoute:<T>(handler:T)=>handler},
+    // Visibility is a boundary here; real access denials have source/PG coverage.
+    '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>userId===run.userId&&id===run.issueId?{id:run.issueId,userId:run.userId,scope:'personal',content:{type:'doc'}}:null},
     'next/server':{NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
     '@mikka/protocol/device':deviceProtocol,
