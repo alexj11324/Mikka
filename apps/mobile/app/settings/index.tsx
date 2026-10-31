@@ -1,5 +1,4 @@
 import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native'
-import Constants from 'expo-constants'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Info, LogOut } from 'lucide-react-native'
@@ -12,6 +11,7 @@ import { Text } from '@/components/Text'
 import { CloseButton, Group } from '@/components/ui'
 import { authClient } from '@/lib/auth'
 import { useSettings } from '@/lib/settings'
+import { versionLabel } from '@/lib/updates'
 import { colors } from '@/lib/theme'
 
 const icon = (Icon: typeof Bell, color: string = colors.ink) => <Icon size={21} color={color} strokeWidth={1.8} />
@@ -57,7 +57,7 @@ export default function SettingsScreen() {
           <Group label="App">
             <Row icon={icon(Globe)} label="语言" value="简体中文" trailing={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />}
               onPress={() => { if (Platform.OS !== 'web') void Linking.openSettings() }} />
-            <Row icon={icon(Info)} label="版本" value={Constants.expoConfig?.version ?? ''} trailing={null} />
+            <Row icon={icon(Info)} label="版本" value={versionLabel()} trailing={null} />
           </Group>
           <Group>
             <Row icon={icon(LogOut, colors.danger)} label="退出登录" destructive onPress={() => void signOut()} />
