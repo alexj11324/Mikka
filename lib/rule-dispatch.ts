@@ -15,7 +15,9 @@ export async function resolveIssueExecution(
   const issue = await issueForUser(ownerId, issueId);
   if (!issue) throw new ActionFailureError("issueNotFound");
   const workspaceId = await executionWorkspace(ownerId, botId);
-  const rules = await new ExecutionSettings(pool).list({
+  const settings = new ExecutionSettings(pool);
+  const fallbacks = await settings.fallbacks(ownerId);
+  const rules = await settings.list({
     ownerId,
     workspaceId,
   });
@@ -30,7 +32,7 @@ export async function resolveIssueExecution(
   const labels = readIssueMetadata(issue.content).labels.map(
     (label) => label.name,
   );
-  const resolution = resolveExecution(labels, rules, devices);
+  const resolution = resolveExecution(labels, rules, devices, fallbacks);
   // Queue on the same device while offline; the normal daemon poll claims it
   // when it returns. Do not hand this run to a different device.
   const selected =
@@ -39,8 +41,11 @@ export async function resolveIssueExecution(
           labels,
           rules,
           devices.map((d) =>
-            d.id === resolution.waitFor ? { ...d, online: true } : d,
+            d.id === resolution.waitFor
+              ? { ...d, online: true, enabled: true }
+              : d,
           ),
+          fallbacks,
         )
       : resolution;
   if ("waitFor" in selected) throw new ActionFailureError("agentNoDevice");
@@ -52,16 +57,18 @@ export async function resolveIssueExecution(
     )
   ).rows[0];
   if (!agent) throw new ActionFailureError("agentHarnessMissing");
-  const matched = [...rules]
-    .filter((r) => r.label !== null)
-    .sort((a, b) => a.position - b.position)
-    .find((r) => labels.includes(r.label!));
+  const matched =
+    [...rules]
+      .filter((r) => r.label !== null)
+      .sort((a, b) => a.position - b.position)
+      .find((r) => labels.includes(r.label!)) ??
+    rules.find((r) => r.label === null);
   return {
     ...selected,
     agentId: agent.id,
     workspaceId,
     issue,
-    ...(matched && !["auto", "cloud"].includes(matched.place)
+    ...(matched && selected.place !== "cloud"
       ? { pinnedDeviceId: matched.place }
       : {}),
     ...("waitFor" in resolution ? { waitFor: resolution.waitFor } : {}),

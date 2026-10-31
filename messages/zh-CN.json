@@ -950,6 +950,7 @@
     "botNotFound": "这个 Bot 不在当前工作区。",
     "executionPlaceInvalid": "请选择可用设备或云端。",
     "executionHarnessUnavailable": "所选设备上没有这个 Agent。",
+    "executionAutoNotAllowed": "请选择具体的执行选项。",
     "executionModelUnknown": "此模型不可用。",
     "executionRuleNotFound": "找不到这条执行规则。",
     "executionRuleOrderInvalid": "执行规则顺序已更改，请刷新后重试。",
