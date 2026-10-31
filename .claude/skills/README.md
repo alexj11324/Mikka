@@ -12,11 +12,23 @@ Vendored on 2026-10-29, unmodified, from these pinned commits:
 | --- | --- | --- | --- |
 | [AllThingsSmitty/proven-skills](https://github.com/AllThingsSmitty/proven-skills) | `5b74885f7e0568565c04534831cb73eaffd4c0e4` | MIT, (c) 2026 Matt Smith | `debug`, `incident`, `perf`, `node-ops`, `security`, `db-review` |
 | [param087/saas-ui-skills](https://github.com/param087/saas-ui-skills) | `4017eaf1e1167a56a5271839053d888faeb1f44a` | MIT, (c) 2026 Param Bhavsar | `settings-pages` |
+| [Dammyjay93/interface-design](https://github.com/Dammyjay93/interface-design) | `2f9be3206855bcb2d1d0af262c8bae25cba6658d` | MIT, (c) 2026 Damola Akinleye | `interface-design`, commands `interface-design:design-review` and `interface-design:design-deslop` (vendored 2026-10-31) |
 
 Full license texts are in [`../skill-licenses/`](../skill-licenses/).
 
 ## Which skill to use
 
+- **UI craft review**: `interface-design` and `/interface-design:design-review`
+  for hierarchy, states, surfaces and reuse; `/interface-design:design-deslop`
+  for a diff-scoped pass. Three limits apply:
+  - Mikka's design source is `docs/design/`, not `.interface-design/system.md`.
+    Do not create that file; record decisions in `docs/design/decisions.md`.
+  - Type and palette are the theme tokens in `app/globals.css` and the
+    component library; the mark is `docs/design/brand.md`. The skill's "swap
+    test", per-screen signature and "avoid Inter/system fonts" advice applies
+    to those tokens as a product-wide decision, not to one screen.
+  - Use it when designing or reviewing UI, not as a mandatory preamble on
+    every UI edit. Run `docs/review-checklist.md` as well before showing UI.
 - **Bug or failing test**: `debug` (root cause before a fix).
 - **Production incident**: `incident`, then `debug`.
 - **Performance / production readiness**: `perf`, `node-ops`; `db-review` for
