@@ -397,11 +397,12 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   Never 会话 for a left row or a run, and never 任务 for the panel's thread
   tab. 「Artifact」 is never translated. Built-in role names stay English
   (Coordinator).
-- **R-44** No greeting headlines: a title names the place or the period,
-  never 「欢迎回来」 or 「早上好，Alex」 (unslop). The sign-in title is
-  「登录 Mikka」. The Coordinator's daily briefing may still open with
-  「早上好，Alex。」 inside its message (R-46); that is speech, not a title.
-  `check-copy` rejects greeting titles and exclamation marks.
+- **R-44** The 建议 panel header greets by time of day and name
+  (「早上好，Alex。」, `Shell.suggestions.morning` / `afternoon` / `evening`);
+  it is a briefing, not a page headline. Every other title names the place or
+  the period and never greets (unslop): the sign-in title is 「登录 Mikka」,
+  not 「欢迎回来」. `check-copy` rejects greeting titles and exclamation
+  marks.
 
 - **R-45** A 建议 item, briefing item or follow-up item makes clear what to
   do and who or what it is about; never a bare report such as 「CI 挂了」 or
