@@ -13,15 +13,17 @@ import { readIssueMetadata } from '../lib/issue-metadata'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { REPO_ORIGIN_HEADER, RUN_LEASE_MS } from '@mikka/protocol/device'
 import { remoteKey } from '@mikka/protocol/repository'
+import { assertE2eTarget } from './helpers/e2e-target.mjs'
 
 // Only the dedicated cloud-Linux test DB or Actions' ephemeral service. Never
 // fall back to business credentials. Fixtures are intentionally retained.
 const url = process.env.E2E_DATABASE_URL
 if (url) {
-  const target = new URL(url)
+  const target = assertE2eTarget(url)
   const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.port === '5432' && target.pathname === '/mikka_e2e'
   const cloud = process.env.ISSUE184_LOCAL_TEST === '1' && target.port === '55484' && target.pathname === '/issue184_e2e'
-  if (target.hostname !== '127.0.0.1' || (!ci && !cloud) || target.search || target.hash) throw new Error('Scope tests require the isolated issue184_e2e or Actions ephemeral service')
+  const local = process.env.GITHUB_ACTIONS !== 'true' && process.env.ISSUE184_LOCAL_TEST !== '1' && process.env.REQUIRE_DB === '1'
+  if ((!ci && !cloud && !local) || process.env.GITHUB_ACTIONS === 'true' && !ci || process.env.ISSUE184_LOCAL_TEST === '1' && !cloud) throw new Error('Scope tests require an isolated E2E target or the retained scope service')
   if (process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) throw new Error('Scope tests must use the same isolated application/workspace target')
 }
 if (!url && process.env.REQUIRE_DB === '1') throw new Error('Scope DB tests cannot skip in required CI')
@@ -37,7 +39,10 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const resumed=await scopeResumeBootstrap(database)
   if(!resumed){
     const admin = new Pool({ connectionString: url, max: 1 })
-    try { await admin.query(`create database "${database}"`) } finally { await admin.end() }
+    try {
+      assert.equal(String((await admin.query('show server_version_num')).rows[0].server_version_num).slice(0,2),'17')
+      await admin.query(`create database "${database}"`)
+    } finally { await admin.end() }
   }
   const target = new URL(url!)
   target.pathname = `/${database}`
@@ -130,6 +135,10 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   // Recreate the pre-verification migration state in this fresh synthetic DB
   // so an unlinked terminal job can exist exactly as it could before 2242.
   // Later replays restore 2242 and 2243 before any application assertions.
+  // Restore the old index contract too: 2241's ON CONFLICT predicate predates
+  // the archive operation column. This is the newly created fixture DB only.
+  await pool.query(`drop index linear_sync_outbox_open_issue_key;
+    create unique index linear_sync_outbox_open_issue_key on linear_sync_outbox("issueId") where status in ('queued','processing')`)
   await pool.query(await readFile(new URL('../drizzle/20261029043641_team_issue_creation_gate.sql',import.meta.url),'utf8'))
   const legacyFailed=randomUUID()
   await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Legacy failed-only task\',$3,\'todo\',\'normal\',\'workspace\')',[legacyFailed,owner,doc])

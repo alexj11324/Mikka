@@ -8,13 +8,15 @@ import { execFile } from 'node:child_process'
 import { createServer } from 'node:http'
 import { promisify } from 'node:util'
 import test from 'node:test'
+import { assertE2eTarget } from './helpers/e2e-target.mjs'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) {
-  const target = new URL(url)
+  const target = assertE2eTarget(url)
   const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.port === '5432' && target.pathname === '/mikka_e2e'
   const cloud = process.env.ISSUE184_LOCAL_TEST === '1' && target.port === '55484' && target.pathname === '/issue184_e2e'
-  if (target.hostname !== '127.0.0.1' || (!ci && !cloud) || target.search || target.hash || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) throw new Error('Team task tests require the isolated PG17 service')
+  const local = process.env.GITHUB_ACTIONS !== 'true' && process.env.ISSUE184_LOCAL_TEST !== '1' && process.env.REQUIRE_DB === '1'
+  if ((!ci && !cloud && !local) || process.env.GITHUB_ACTIONS === 'true' && !ci || process.env.ISSUE184_LOCAL_TEST === '1' && !cloud || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) throw new Error('Team task tests require the isolated PG17 service')
 }
 if (!url && process.env.REQUIRE_DB === '1') throw new Error('Team task DB tests cannot skip in required CI')
 
@@ -26,7 +28,10 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   const resumed=await teamResumeBootstrap(appName,workspaceName)
   if(!resumed){
   const admin=new Pool({connectionString:url,max:1})
-  try { await admin.query(`create database "${appName}"`);await admin.query(`create database "${workspaceName}"`) } finally {await admin.end()}
+  try {
+    assert.equal(String((await admin.query('show server_version_num')).rows[0].server_version_num).slice(0,2),'17')
+    await admin.query(`create database "${appName}"`);await admin.query(`create database "${workspaceName}"`)
+  } finally {await admin.end()}
   }
   const appUrl=new URL(url!), workspaceUrl=new URL(url!);appUrl.pathname=`/${appName}`;workspaceUrl.pathname=`/${workspaceName}`
   process.env.MIKKA_DATABASE_URL=appUrl.toString();process.env.DATABASE_URL=workspaceUrl.toString()
