@@ -54,6 +54,7 @@ import type { AgentSandbox, SandboxPolicy } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
 import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
 import { runNetworkApproval } from "../agents/run-network"
+import { runAppsHost, type RunApps } from "../agents/run-apps"
 import { ownDir } from "../agents/harness-home"
 import { buildChildEnv } from "../env"
 import { mailboxInputs } from '@mikka/protocol/mailbox'
@@ -111,6 +112,11 @@ const SUBSCRIPTION_ERROR = "Claude subscription authentication unavailable"
 
 /** In-process SDK MCP travels over the existing query control stream. No
  * socket, endpoint, platform bearer or extra filesystem permission in child. */
+/** One HTTP MCP entry per connected app, each pointing at the Mikka server. */
+export function claudeAppServers(apps?: RunApps) {
+  return Object.fromEntries((apps?.apps ?? []).map(app => [app.name, { type: 'http' as const, url: app.url, headers: { Authorization: `Bearer ${apps!.token}` } }]))
+}
+
 function claudeMailboxServer(mailbox: RunMailbox) {
   const server = createSdkMcpServer({ name: 'mikka_mailbox', version: '1' })
   for (const [name, schema] of Object.entries(mailboxInputs).filter(([name]) => mailbox.tools.some(tool => tool.name === name))) server.instance.registerTool(name, {
@@ -464,6 +470,7 @@ export class ClaudeAdapter implements AgentAdapter {
     if (nativeHome) ownDir(configDir)
     const ctx = new RunContext({
       github: options.github,
+      apps: options.apps,
       githubRuntime: options.githubRuntime,
       childPath: options.env.PATH,
       mailboxEnabled: Boolean(options.mailbox),
@@ -530,7 +537,7 @@ export class ClaudeAdapter implements AgentAdapter {
         : policy.allowDomains.includes('*') ? [...requested]
         : requested.includes('*') ? policy.allowDomains
         : requested.filter(domain => policy.allowDomains.includes(domain))
-      const child = spawnRunSandbox({ command:this.options.binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum,computerDomain(computerMcp)), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
+      const child = spawnRunSandbox({ command:this.options.binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps)), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
       const off = options.toolApproval!.onRevoke(() => { void child.revoke().catch(() => undefined) })
       void child.exited.finally(off)
       return child.process
@@ -564,6 +571,7 @@ export class ClaudeAdapter implements AgentAdapter {
           ...(options.mailbox ? { mikka_mailbox: claudeMailboxServer(options.mailbox) } : {}),
           [MCP_SERVER_NAME]: { type: "stdio", ...ctx.mcpServer() },
           ...(computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...computerMcp } } : {}),
+          ...claudeAppServers(options.apps),
         },
         strictMcpConfig: true,
         systemPrompt: {

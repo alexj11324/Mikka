@@ -1,6 +1,7 @@
 import { policySnapshotHash } from '@mikka/protocol/node-policy-snapshot'
 import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../../../../lib/personal-agent-message'
 import { prepareGitHubEnvironment, type RunGitHub } from './github-runtime'
+import { runAppsHost, type RunApps } from './run-apps'
 // What every real harness adapter needs about one run: the sandbox policy,
 // the Mikka MCP server (hand-in tools) and the handoff file it writes, and
 // the instructions that tell the agent how a run ends.
@@ -85,6 +86,8 @@ export type ComputerSpecProvider = (runId: string, policy?: RunPolicy) => McpSer
 
 export interface RunContextOptions {
   github?: RunGitHub
+  /** The run's app entries; their Mikka server host joins the sandbox's reachable hosts. */
+  apps?: RunApps
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Clean caller PATH, before adding a run-local gh wrapper. */
   childPath?: string
@@ -313,6 +316,7 @@ export class RunContext {
       ],
       allowDomains: [
         ...HARNESS_DOMAINS[this.options.harness],
+        ...(runAppsHost(this.options.apps) ? [runAppsHost(this.options.apps)!] : []),
         ...runDomains(
           runPolicy(this.options.policy),
           [...(this.options.networkAllow ?? []), ...(this.options.github ? ['github.com', 'api.github.com', new URL(this.options.github.endpoint).host] : [])],

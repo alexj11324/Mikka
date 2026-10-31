@@ -329,7 +329,11 @@ export const runAssignmentSchema = z.object({
    * it stops working when the run ends. Absent: the server could not issue
    * one, and the run goes ahead without it.
    */
-  mcp: z.object({ url: z.url(), token: z.string().min(1).max(200), mailbox: z.literal(true).optional() }).optional(),
+  mcp: z.object({
+    url: z.url(), token: z.string().min(1).max(200), mailbox: z.literal(true).optional(),
+    /** Apps (Composio toolkits) this run may use through the Mikka server, one MCP entry each. */
+    apps: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional(),
+  }).optional(),
   /** Agent-owned GitHub delivery; the same run token exchanges short-lived credentials. */
   github: z.object({
     endpoint: z.url(), repository: z.string().regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
