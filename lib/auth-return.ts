@@ -4,7 +4,8 @@ export const COMPOSIO_AUTH_CALLBACK_PATH = '/api/integrations/composio/callback'
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const internalOrigin = 'https://mikka.invalid'
-const PLUGIN_APPS: readonly string[] = ['gmail', 'googlecalendar', 'notion', 'slack']
+/** Apps with a page on 插件 and 设置 › 连接 (`&app=`). */
+const PLUGIN_APPS: readonly string[] = ['gmail', 'googlecalendar', 'notion', 'slack', 'github', 'linear', 'telegram']
 
 function hasOnlyQueryKeys(url: URL, allowed: readonly string[]) {
   const entries = [...url.searchParams.entries()]
@@ -44,8 +45,11 @@ export function safeAuthReturn(value?: string) {
 
   if (url.pathname === '/settings') {
     const section = url.searchParams.get('section')
-    return hasOnlyQueryKeys(url, ['section', 'workspace']) &&
-      (section === null || isSettingsSectionParam(section)) &&
+    // 设置 › 连接 also opens one app's page (&app=github), like the plugins page.
+    const app = url.searchParams.get('app')
+    const appOk = app === null || ((section === 'connections' || section === 'integrations') && PLUGIN_APPS.includes(app))
+    return hasOnlyQueryKeys(url, ['section', 'workspace', 'app']) &&
+      (section === null || isSettingsSectionParam(section)) && appOk &&
       optionalUuid(url, 'workspace') ? `${url.pathname}${url.search}` : '/'
   }
 

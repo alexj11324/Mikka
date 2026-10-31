@@ -1,13 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from 'react'
-import { useFormatter, useLocale, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowUpRight, ChevronRight, Ellipsis, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { APP_ICONS } from '@/components/plugins/app-icons'
+import { APP_ICONS, type PluginAppId } from '@/components/plugins/app-icons'
 import { SettingsSection } from '@/components/settings/primitives'
-import { IconTile } from '@/components/reui/icon-tile'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
@@ -17,7 +16,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { routing } from '@/i18n/routing'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type ConnectedAccountView } from '@/lib/composio-accounts'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
@@ -39,12 +37,6 @@ export function isComposioAppId(value: string | null): value is ComposioAppId {
   return value !== null && (COMPOSIO_APP_IDS as readonly string[]).includes(value)
 }
 
-/** The plugins page URL for one app (`/?section=plugins&app=gmail`), with locale and base path. */
-export function usePluginHref() {
-  const locale = useLocale()
-  const prefix = locale === routing.defaultLocale ? '' : `/${locale}`
-  return (app: ComposioAppId | null) => withBasePath(`${prefix}/?section=plugins${app ? `&app=${app}` : ''}`)
-}
 
 /** Where the callback should bring the person back: this page, without the base path. */
 function currentReturnPath() {
@@ -53,10 +45,12 @@ function currentReturnPath() {
   return `${path}${search}`
 }
 
-export function AppTile({ app, size = 'default', dim = false }: { app: ComposioAppId; size?: 'default' | 'xl'; dim?: boolean }) {
+export function AppTile({ app, size = 'default', dim = false }: { app: PluginAppId; size?: 'default' | 'xl'; dim?: boolean }) {
   const Icon = APP_ICONS[app]
-  // An explicit size keeps a parent Button's svg sizing off the mark.
-  return <IconTile size={size} variant="elevated" aria-hidden="true" className={cn(dim && 'opacity-50 grayscale')}><Icon className="size-(--icon-tile-icon-size)" /></IconTile>
+  // The brand mark on its own (R-74): no tile behind it, in the same slot and size as before so rows stay aligned.
+  return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center', size === 'xl' ? 'size-14' : 'size-10', dim && 'opacity-50 grayscale')}>
+    <Icon className={cn(size === 'xl' ? 'size-7' : 'size-4.5')} />
+  </span>
 }
 
 /** The account's name as the page shows it: its alias, else its email, else "Gmail 账户". */
@@ -223,8 +217,6 @@ export function ConnectedAppsStatus({ apps }: { apps: ConnectedApps }) {
   const { state, error, notice } = apps
   return <>
     {!state && !error && <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>}
-    {state && !state.configured && <p role="status" className="text-sm text-muted-foreground">{t('composioNotConfigured')}</p>}
-    {state?.configured && !state.callbackVerifierConfigured && <p role="status" className="text-sm text-muted-foreground">{t('callbackVerifierNotConfigured')}</p>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role={notice.tone} className={cn('text-sm', notice.tone === 'alert' ? 'text-destructive' : 'text-muted-foreground')}>{notice.text}</p>}
   </>
@@ -238,52 +230,65 @@ function appState(accounts: ConnectedAccountView[]) {
   return { usable, expired, on, off: accounts.length > 0 && !expired && !on }
 }
 
+/** A plain click opens the app's page in place; a modified click keeps the link's own behaviour. */
+function openInPlace(event: MouseEvent<HTMLAnchorElement>, onOpen: (() => void) | undefined) {
+  if (!onOpen || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+  event.preventDefault()
+  onOpen()
+}
+
 /**
- * The plugins list: icon, name, one line, then 连接 or the on/off switch and a
- * way into the app's page. `onOpen` handles a plain click in place; the row is
- * still a real link (`appHref`) for a new tab or another page.
+ * One row of the 插件 list: icon, name, then the row's control and a chevron.
+ * The whole row is the link into the app's page (its hover covers the row edge
+ * to edge); the control sits above the link and stays separately clickable.
  */
-export function ConnectedAppsList({ apps, title, appHref, onOpen, action }: { apps: ConnectedApps; title: string; appHref: (app: ComposioAppId) => string; onOpen?: (app: ComposioAppId) => void; action?: ReactNode }) {
+export function PluginRow({ app, name, href, onOpen, dim = false, badge, children }: { app: PluginAppId; name: string; href: string; onOpen?: () => void; dim?: boolean; badge?: ReactNode; children?: ReactNode }) {
   const t = useTranslations('Settings.integrations')
-  // A plain click opens the page in place; a modified click keeps the link's own behaviour.
-  function openInPlace(event: MouseEvent<HTMLAnchorElement>, app: ComposioAppId) {
-    if (!onOpen || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-    event.preventDefault()
-    onOpen(app)
-  }
-  return <SettingsSection id="connected-apps-heading" title={title} action={action}>
-    {COMPOSIO_APP_IDS.map(app => {
-      const accounts = apps.accountsFor(app)
-      const name = t(app)
-      const { usable, expired, on, off } = appState(accounts)
-      return <div key={app} className="flex items-center gap-3 py-3 pr-3 pl-5">
-        <Button variant="ghost" nativeButton={false} role="link" render={<a href={appHref(app)} onClick={event => openInPlace(event, app)} />} className="h-auto min-w-0 flex-1 justify-start gap-3 p-0 text-left font-normal whitespace-normal hover:bg-transparent active:not-aria-[haspopup]:translate-y-0">
-          <AppTile app={app} dim={off || expired} />
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <span className={cn('text-sm font-medium', (off || expired) && 'text-muted-foreground')}>{name}</span>
-              {off && <Badge variant="secondary">{t('statusDisabled')}</Badge>}
-              {/* On a phone the 重新连接 button beside the row says it. */}
-              {expired && <Badge tone="destructive" className="hidden sm:inline-flex">{t('needsReconnect')}</Badge>}
-            </span>
-            <span className="line-clamp-2 text-xs text-muted-foreground">{t(`${app}Description`)}</span>
-          </span>
-        </Button>
-        {/* One account to reconnect: right here. Several: the app's page, where each has its own. */}
-        {expired && (accounts.length === 1
-          ? <Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.reconnect(accounts[0].id)}>{apps.pending === accounts[0].id ? t('working') : t('reconnect')}</Button>
-          : <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={appHref(app)} onClick={event => openInPlace(event, app)} />}>{t('reconnect')}</Button>)}
-        {accounts.length
-          ? <Switch aria-label={t('enableApp', { name })} checked={on} disabled={expired} onCheckedChange={checked => {
-            void apps.setEnabled(usable.filter(account => account.enabled !== checked).map(account => account.id), checked).then(ok => {
-              if (ok && !checked) toast.success(t('turnedOff', { name }), { description: t('takeoverNone', { name }) })
-            })
-          }} />
-          : <WhyDisabled reason={apps.unavailable}><Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
-        <Button variant="ghost" size="icon-sm" nativeButton={false} role="link" aria-label={t('openApp', { name })} render={<a href={appHref(app)} onClick={event => openInPlace(event, app)} />}><ChevronRight data-icon="inline-start" /></Button>
-      </div>
-    })}
-  </SettingsSection>
+  return <div className="relative flex items-center gap-3 py-3 pr-4 pl-5 transition-colors hover:bg-muted/50">
+    <a href={href} aria-label={t('openApp', { name })} onClick={event => openInPlace(event, onOpen)} className="flex min-w-0 flex-1 items-center gap-3 outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring/40 focus-visible:after:ring-inset">
+      <AppTile app={app} dim={dim} />
+      <span className={cn('truncate text-sm font-medium', dim && 'text-muted-foreground')}>{name}</span>
+      {badge}
+    </a>
+    {children && <div className="relative z-10 flex shrink-0 items-center gap-2">{children}</div>}
+    <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+  </div>
+}
+
+/** A Composio app's row: 连接 until an account exists, then the on/off switch. */
+export function ConnectedAppRow({ apps, app, href, onOpen }: { apps: ConnectedApps; app: ComposioAppId; href: string; onOpen?: () => void }) {
+  const t = useTranslations('Settings.integrations')
+  const accounts = apps.accountsFor(app)
+  const name = t(app)
+  const { usable, expired, on, off } = appState(accounts)
+  return <PluginRow app={app} name={name} href={href} onOpen={onOpen} dim={off || expired} badge={<>
+    {off && <Badge variant="secondary">{t('statusDisabled')}</Badge>}
+    {/* On a phone the 重新连接 button beside the row says it. */}
+    {expired && <Badge tone="destructive" className="hidden sm:inline-flex">{t('needsReconnect')}</Badge>}
+  </>}>
+    {/* One account to reconnect: right here. Several: the app's page, where each has its own. */}
+    {expired && (accounts.length === 1
+      ? <Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.reconnect(accounts[0].id)}>{apps.pending === accounts[0].id ? t('working') : t('reconnect')}</Button>
+      : <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={href} onClick={event => openInPlace(event, onOpen)} />}>{t('reconnect')}</Button>)}
+    {accounts.length
+      ? <Switch aria-label={t('enableApp', { name })} checked={on} disabled={expired} onCheckedChange={checked => {
+        void apps.setEnabled(usable.filter(account => account.enabled !== checked).map(account => account.id), checked).then(ok => {
+          if (ok && !checked) toast.success(t('turnedOff', { name }), { description: t('takeoverNone', { name }) })
+        })
+      }} />
+      : <WhyDisabled reason={apps.unavailable}><Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
+  </PluginRow>
+}
+
+/** The way back from an app's page to the list. */
+export function PluginBreadcrumb({ rootLabel, rootHref, onBack, name }: { rootLabel: string; rootHref: string; onBack: () => void; name: string }) {
+  return <Breadcrumb>
+    <BreadcrumbList>
+      <BreadcrumbItem><BreadcrumbLink href={rootHref} onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey) return; event.preventDefault(); onBack() }}>{rootLabel}</BreadcrumbLink></BreadcrumbItem>
+      <BreadcrumbSeparator />
+      <BreadcrumbItem><BreadcrumbPage>{name}</BreadcrumbPage></BreadcrumbItem>
+    </BreadcrumbList>
+  </Breadcrumb>
 }
 
 /** One app: header, its connected accounts with their actions, and 关于. */
@@ -309,19 +314,12 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
   const closeConfirm = () => { setConfirming(null); setDialogError('') }
 
   return <div className="flex flex-col gap-8">
-    <Breadcrumb>
-      <BreadcrumbList>
-        <BreadcrumbItem><BreadcrumbLink href={rootHref} onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey) return; event.preventDefault(); onBack() }}>{rootLabel}</BreadcrumbLink></BreadcrumbItem>
-        <BreadcrumbSeparator />
-        <BreadcrumbItem><BreadcrumbPage>{name}</BreadcrumbPage></BreadcrumbItem>
-      </BreadcrumbList>
-    </Breadcrumb>
+    <PluginBreadcrumb rootLabel={rootLabel} rootHref={rootHref} onBack={onBack} name={name} />
 
     <header className="flex flex-wrap items-center gap-4">
       <AppTile app={app} size="xl" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <h2 className="text-xl font-semibold">{name}</h2>
-        <p className="text-sm text-muted-foreground">{t(`${app}Description`)}</p>
       </div>
       {!accounts.length && <WhyDisabled reason={apps.unavailable}><Button type="button" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
     </header>

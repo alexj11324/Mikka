@@ -8,7 +8,7 @@ import { createTelegramConnectLink, disconnectTelegram, getTelegramIntegrationSt
 
 type TelegramStatus = Awaited<ReturnType<typeof getTelegramIntegrationStatus>>
 
-export function TelegramSettings({ preview = false }: { preview?: boolean }) {
+export function TelegramSettings() {
   const t = useTranslations('Settings.telegram')
   const [status, setStatus] = useState<TelegramStatus | null>(null)
   const [connectLink, setConnectLink] = useState('')
@@ -29,7 +29,6 @@ export function TelegramSettings({ preview = false }: { preview?: boolean }) {
   }
 
   useEffect(() => {
-    if (preview) return
     let active = true
     setBusy(true)
     void getTelegramIntegrationStatus().then(value => {
@@ -39,8 +38,11 @@ export function TelegramSettings({ preview = false }: { preview?: boolean }) {
     }).finally(() => {
       if (active) setBusy(false)
     })
-    return () => { active = false }
-  }, [preview])
+    // Coming back from Telegram after Start re-reads the state.
+    const onFocus = () => { void getTelegramIntegrationStatus().then(value => { if (active) setStatus(value) }).catch(() => {}) }
+    window.addEventListener('focus', onFocus)
+    return () => { active = false; window.removeEventListener('focus', onFocus) }
+  }, [])
 
   async function connect() {
     setBusy(true)
@@ -74,30 +76,25 @@ export function TelegramSettings({ preview = false }: { preview?: boolean }) {
     }
   }
 
-  return <SettingsSection id="telegram-heading" title={t('heading')} description={t('description')}>
-    {preview ? <SettingRow title={t('title')} description={t('previewDescription')} /> : <>
-      <SettingRow title={t('title')} description={t('statusDescription')}>
-        {status === null
-          ? <span className="text-muted-foreground">{t('loading')}</span>
-          : status.connected
-            ? <span role="status" className="text-success-foreground">{t('connected')}{status.telegramUserName ? ' · @' + status.telegramUserName.replace(/^@/, '') : ''}</span>
-            : <span role="status" className="text-muted-foreground">{t('notConnected')}</span>}
-      </SettingRow>
-      {connectLink && <SettingRow title={t('linkTitle')} description={t('linkDescription')}>
-        <Button render={<a href={connectLink} target="_blank" rel="noreferrer" />}>{t('openTelegram')}</Button>
-      </SettingRow>}
-      {error && <p role="alert" className="px-5 py-3 text-sm text-destructive">{t(error)}</p>}
-      <SettingRow title={status?.connected ? t('connected') : t('connectTitle')} description={status?.connected ? t('disconnectDescription') : t('connectDescription')}>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" disabled={busy || status === null || !status.configured || status.connected} onClick={() => void connect()}>
-            {connectLink ? t('newLink') : t('connect')}
-          </Button>
-          {status?.connected
-            ? <Button variant="ghost" size="sm" disabled={busy} onClick={() => void disconnect()}>{t('disconnect')}</Button>
-            : <Button variant="ghost" size="sm" disabled={busy} onClick={() => void refresh()}>{t('refresh')}</Button>}
-        </div>
-      </SettingRow>
-      {status && !status.configured && <p role="status" className="px-5 py-3 text-xs text-muted-foreground">{t('notConfigured')}</p>}
-    </>}
+  return <SettingsSection id="telegram-heading">
+    <SettingRow title={t('title')}>
+      {status === null
+        ? <span className="text-muted-foreground">{t('loading')}</span>
+        : status.connected
+          ? <span role="status" className="text-success-foreground">{t('connected')}{status.telegramUserName ? ' · @' + status.telegramUserName.replace(/^@/, '') : ''}</span>
+          : <span role="status" className="text-muted-foreground">{status.configured ? t('notConnected') : t('notConfigured')}</span>}
+    </SettingRow>
+    {connectLink && <SettingRow title={t('linkTitle')}>
+      <Button render={<a href={connectLink} target="_blank" rel="noreferrer" />}>{t('openTelegram')}</Button>
+    </SettingRow>}
+    {error && <p role="alert" className="px-5 py-3 text-sm text-destructive">{t(error)}</p>}
+    {status?.configured && <SettingRow title={status.connected ? t('connected') : t('connectTitle')}>
+      <div className="flex flex-wrap items-center gap-2">
+        {!status.connected && <Button variant="outline" size="sm" disabled={busy} onClick={() => void connect()}>
+          {connectLink ? t('newLink') : t('connect')}
+        </Button>}
+        {status.connected && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void disconnect()}>{t('disconnect')}</Button>}
+      </div>
+    </SettingRow>}
   </SettingsSection>
 }

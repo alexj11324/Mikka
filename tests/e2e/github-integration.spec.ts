@@ -15,7 +15,7 @@ async function viewerId(page: import('@playwright/test').Page) {
 for (const width of [1280, 402]) {
   test(`GitHub settings controlled-response acceptance at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 })
-    await register(page, '/settings?section=integrations')
+    await register(page, '/settings?section=connections&app=github')
     const id = await viewerId(page)
     let connected = true
     let mismatchedViewer = false
@@ -24,22 +24,22 @@ for (const width of [1280, 402]) {
       configured: true, connected, installed: connected,
       repositories: connected ? [{ id: '31', installationId: '21', fullName: 'fixture-owner/non-production-repo', htmlUrl: 'https://github.com/fixture-owner/non-production-repo', private: true }] : [],
     } }))
-    const refresh = page.getByRole('button', { name: '刷新 GitHub 状态', exact: true })
-    await expect(refresh).toBeEnabled()
-    await refresh.click()
+    // The page re-reads GitHub when the window regains focus.
+    const refocus = () => page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await refocus()
     const repositories = page.getByRole('list', { name: '你已授权的 GitHub 仓库', exact: true })
     await expect(repositories).toContainText('fixture-owner/non-production-repo')
     await expect(page.getByRole('link', { name: '管理授权', exact: true })).toHaveAttribute('href', 'https://github.com/apps/mikka-github/installations/new')
     await testInfo.attach(`github-settings-authorized-fixture-${width}`, { body: await page.screenshot(), contentType: 'image/png' })
     connected = false
-    await refresh.click()
+    await refocus()
     await expect(repositories).toHaveCount(0)
-    await expect(page.getByText('先关联你的 GitHub 账号。', { exact: true })).toBeVisible()
+    await expect(page.getByText('未关联', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '关联 GitHub', exact: true })).toBeVisible()
     await testInfo.attach(`github-settings-revoked-fixture-${width}`, { body: await page.screenshot(), contentType: 'image/png' })
     connected = true
     mismatchedViewer = true
-    await refresh.click()
+    await refocus()
     await expect(repositories).toHaveCount(0)
     await expect(page.getByRole('alert').filter({ hasText: '无法读取 GitHub 授权，请刷新重试。' })).toBeVisible()
     await expect(page.getByRole('link', { name: '管理授权', exact: true })).toHaveCount(0)

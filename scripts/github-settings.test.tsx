@@ -21,14 +21,14 @@ let composioRequests = 0
 let container: HTMLDivElement
 let root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
-let IntegrationsSettings: typeof import('../components/settings/integrations-settings')['IntegrationsSettings']
+let GitHubSettings: typeof import('../components/plugins/github-settings')['GitHubSettings']
 
 before(async () => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
   Object.defineProperty(globalThis, 'document', { configurable: true, value: browser.document })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
-  ;({ IntegrationsSettings } = await import('../components/settings/integrations-settings'))
+  ;({ GitHubSettings } = await import('../components/plugins/github-settings'))
 })
 
 beforeEach(() => {
@@ -49,7 +49,7 @@ afterEach(async () => {
 })
 after(() => { browser.close() })
 
-const render = async () => { await act(async () => { root.render(<IntegrationsSettings showWebhookDetails={false} />) }) }
+const render = async () => { await act(async () => { root.render(<GitHubSettings />) }) }
 const respond = async (index: number, viewerId: string, fullName: string) => {
   await act(async () => { requests[index].resolve(Response.json({ viewerId, configured: true, connected: true, installed: true, repositories: [{ id: fullName, fullName }] })) })
 }
@@ -66,7 +66,6 @@ test('unconfirmed and signed-out sessions neither request nor display GitHub rep
   assert.equal(requests.length, 0)
   assert.equal(composioRequests, 0)
   assert.ok(container.textContent?.includes('githubSignInRequired'))
-  assert.ok([...container.querySelectorAll('button')].find(button => button.textContent === 'githubRefresh')?.disabled)
 })
 
 test('GitHub installation management is exposed as a link with the exact destination', async () => {
@@ -76,14 +75,6 @@ test('GitHub installation management is exposed as a link with the exact destina
   assert.ok(link)
   assert.equal(link?.textContent, 'githubManage')
   assert.equal(link?.getAttribute('href'), 'https://github.com/apps/mikka-github/installations/new')
-})
-
-test('sign-out does not start another Composio request', async () => {
-  await render()
-  assert.equal(composioRequests, 1)
-  userId = null
-  await render()
-  assert.equal(composioRequests, 1)
 })
 
 test('a switched cookie cannot expose B repositories while the session hook still identifies A', async () => {
@@ -140,15 +131,12 @@ test('mismatched and unauthenticated 401 errors cannot offer another viewer a re
 })
 
 test('OAuth callback errors survive initial session confirmation and the keyed remount', async () => {
-  browser.history.replaceState({}, '', '?settings=integrations&github=link-failed&composio=callback-failed')
+  browser.history.replaceState({}, '', '?settings=integrations&github=link-failed')
   pending = true
   await render()
   assert.equal(new URL(browser.location.href).searchParams.get('github'), 'link-failed')
-  assert.equal(new URL(browser.location.href).searchParams.get('composio'), 'callback-failed')
   pending = false
   await render()
   assert.ok(container.textContent?.includes('githubLinkFailed'))
-  assert.ok(container.textContent?.includes('callbackVerificationFailed'))
   assert.equal(new URL(browser.location.href).searchParams.get('github'), null)
-  assert.equal(new URL(browser.location.href).searchParams.get('composio'), null)
 })
