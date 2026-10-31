@@ -2,8 +2,8 @@ name: Browser tests
 
 # Three tiers (CONTRIBUTING.md, "How changes are tested"):
 # - pull requests: the @smoke set plus the complete specs of the areas the change
-#   touches, in one job (install, build, start, run). Performance runs when a
-#   change touches what the budgets measure.
+#   touches, with browser and runtime jobs in parallel after one build.
+#   Performance runs when a change touches what the budgets measure.
 # - push to main: the functional spec files on four shards. A red run opens or
 #   updates one issue that names the merged pull request's author.
 # - nightly and manual runs: every spec, including visual, crawler and slower
