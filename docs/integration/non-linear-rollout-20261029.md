@@ -1,5 +1,9 @@
 # Non-Linear feature rollout · 2026-10-29
 
+Historical deployment evidence: default-off availability described below was
+replaced on 2026-10-31 by the [connected-provider closeout](connected-provider-closeout-177-180-208.md).
+The old runtime observations remain scoped to their recorded commits and origins.
+
 Alex requested opening the already implemented features except Linear bidirectional sync. This does not authorize a new Scheduler, desktop work, new provider grants, publication authority, credential access or production SQL. Tracking: [#408](https://github.com/alexj11324/Mikka/issues/408).
 
 The separately approved `deviceCode` migration was applied at 2026-10-29 15:27:55 UTC, creating its table/indexes and one migration-history record. No other production migration, environment variable, existing business row, credential, identity, provider grant, resource or Linear setting was changed. Other rollout dependencies remain; source changes below do not establish a production feature release.
