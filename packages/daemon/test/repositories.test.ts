@@ -68,6 +68,27 @@ describe('repository URL boundary', () => {
 })
 
 describe('daemon-owned clone cache', () => {
+  it('prepares and adds worktrees for concurrent runs of one cache without a config lock failure', async () => {
+    const origin = await makeRepo()
+    const remote = pathToFileURL(origin).href
+    const cache = new RepositoryCache(tempDir(), true)
+    const worktrees = new WorktreeManager(tempDir())
+    const path = await cache.prepare(remote)
+    // Runs of one repository start together: the cache is refreshed while
+    // each adds its worktree (recording its upstream) and some are discarded.
+    const runs = Array.from({ length: 12 }, (_, index) => `concurrent-${index}`)
+    await Promise.all([
+      cache.prepare(remote),
+      ...runs.map(async (runId, index) => {
+        await worktrees.create(runId, path, 'origin/main')
+        if (index % 3 === 0) expect(await worktrees.discardIfEmpty([runId], worktrees.pathFor(runId), path)).toBe(true)
+      }),
+      cache.prepare(remote),
+    ])
+    for (const [index, runId] of runs.entries())
+      expect(existsSync(join(worktrees.pathFor(runId), 'README.md'))).toBe(index % 3 !== 0)
+  })
+
   it('serializes concurrent clones, follows origin default branch, and only fetches its cache', async () => {
     const checkout = await makeRepo()
     git(checkout, 'branch', '-m', 'trunk')
