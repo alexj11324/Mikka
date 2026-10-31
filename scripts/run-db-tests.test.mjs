@@ -182,10 +182,10 @@ test('self-managed suites are excluded only with a reason and a live dedicated r
 })
 test('dedicated browser inventory requires its spec, config and script, without exempting adjacent DB tests', () => {
   const suite = BROWSER_SUITES[0]
-  const tree = { ...files, [suite.file]: "import { Pool } from 'pg'", [suite.config]: 'export default {}' }
+  const tree = { ...files, ...Object.fromEntries(BROWSER_SUITES.flatMap(suite => [[suite.file, "import { Pool } from 'pg'"], [suite.config, 'export default {}']])) }
   const commands = { ...scripts, [suite.script]: `playwright test --config=${suite.config}` }
   const plan = inventory(tree, commands)
-  assert.deepEqual(plan.browser, [suite.file])
+  assert.deepEqual(plan.browser, BROWSER_SUITES.map(suite => suite.file).sort())
   assert.deepEqual(plan.scripts, [sample.script], 'Playwright is not sent to the node:test summary checker')
   assert.throws(() => inventory(tree, scripts), /Browser script .* missing/)
   assert.throws(() => inventory(tree, { ...commands, [suite.script]: 'playwright test' }), /no longer runs/)
@@ -292,7 +292,7 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.match(browser, /^\s*pnpm test:e2e:mvp > "\$log_file" 2>&1 \|\| test_status=\$\?/m, 'the dedicated MVP browser gate remains required')
   assert.match(browser, /log_file=\.cache\/e2e\/playwright-mvp\.log[\s\S]*?audit-evidence --evidence "\$log_file"[\s\S]*?exit "\$test_status"/, 'MVP output is audited before display and the test result is preserved')
   assert.equal(pkg['test:e2e:mvp'], 'playwright test --config=playwright.mvp.config.ts')
-  assert.deepEqual(plan.browser, ['tests/mvp/core-loop.spec.ts'])
+  assert.deepEqual(plan.browser, ['tests/mvp/coordinator-streaming.spec.ts', 'tests/mvp/core-loop.spec.ts'])
   const mvpConfig = readFileSync('playwright.mvp.config.ts', 'utf8')
   assert.match(mvpConfig, /testDir:\s*['"]\.\/tests\/mvp['"]/)
   assert.match(mvpConfig, /testMatch:\s*['"]\*\*\/\*\.spec\.ts['"]/)
