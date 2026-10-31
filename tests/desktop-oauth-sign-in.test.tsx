@@ -31,11 +31,11 @@ after(() => {
   else Reflect.deleteProperty(globalThis, 'window')
 })
 
-test('Next URL normalization preserves the desktop flow through the sign-in page and Google callback', async () => {
+test('the desktop callback survives the sign-in page and Google callback', async () => {
   const query = new URLSearchParams({ desktop: '1', desktop_state: state, desktop_next: '/', desktop_callback: callback })
   const request = new NextRequest(`${origin}/mikka/en/sign-in?${query}`, { nextConfig: { basePath: '/mikka' } })
-  // NextURL rewrites numeric loopback hosts even inside query values.
-  assert.equal(request.nextUrl.searchParams.get('desktop_callback'), 'http://localhost:49152/auth/callback')
+  // Next versions differ in loopback normalization. The application must
+  // preserve the canonical callback through the complete OAuth handoff.
   const { default: proxy } = await import('../proxy')
   const response = proxy(request)
   assert.equal(response.status, 200)
