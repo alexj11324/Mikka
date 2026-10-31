@@ -99,6 +99,13 @@ fault records and a fresh `databaseSignals` query; it does not manufacture
 recovery by supplying an empty alert list. The injected operation never called
 a provider, so that fixture alone has definitive no-effect evidence. Do not
 copy its SQL cleanup into handling of a real uncertain external operation.
-The earlier timing report retains its original source SHA. The updated full
-restore drill still needs its next associated controlled run; source/HTTP
-failure-notice tests do not replace that positive end-to-end result.
+Stopping an abandoned run must preserve its original start/completion history.
+The live lease can recover while the missed dispatch still counts against the
+15-minute SLO window. The report keeps those windowed alerts separate; it never
+backdates a successful start to make the recovery notification green.
+
+Each timing report retains its original source SHA. The latest isolated
+restore measurements, the historical backdating defect and the corrected
+real PostgreSQL fault matrix are recorded in
+[old-ops-completion-211-214.md](old-ops-completion-211-214.md). Component evidence
+does not replace the original authenticated application end-to-end acceptance.
