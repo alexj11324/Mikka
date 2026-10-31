@@ -69,7 +69,8 @@ capsule, which opens the bot's page; 「…」 (top right) opens 资料 and that
 bot's 线程. Dragging a message from left to right quotes it in the composer
 (a reply arrow follows the finger; letting go past the mark quotes it, with a
 tick); only a swipe from the screen's edge goes back. A bot's reply has 复制
-under it, and all message text can be selected by long press. The bot's replies sit in the grey bubble and the person's
+under it. A long press on any message opens a system sheet: 回复 (quote it),
+复制, and 选择文本 (the words, to select any part). The bot's replies sit in the grey bubble and the person's
 in the blue one, as on the web (R-14). The
 thread card is a status icon and the thread name, with outputs as chips
 (R-66); no step line.
@@ -222,8 +223,7 @@ mobile tabs.
   the skill on skills.sh.
 - **Workspace:** switching it in 设置 reloads every screen's data at once.
 - **任务:** a row opens the task on the web, signed in (`/?issue=<id>`).
-- **Lists:** 线程, 任务 and 建议 pull to refresh; message text can be selected
-  and copied by long press.
+- **Lists:** 线程, 任务 and 建议 pull to refresh.
 - **Lost session:** a 401 signs the app out locally and shows sign-in with
   「登录已失效，请重新登录。」.
 - **Sending:** a message that fails stays as its bubble with

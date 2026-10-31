@@ -38,6 +38,9 @@ function SessionGate() {
       <Stack screenOptions={screenOptions(colors.page)}>
         {/* 对话 and 线程; chats, threads and the rest are pushed over them. */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* A long press on a message: its actions as a system sheet, and 选择文本 over the chat. */}
+        <Stack.Screen name="message" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.32], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
+        <Stack.Screen name="message-text" options={{ presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false, ...(Platform.OS === 'ios' ? {} : { animation: 'slide_from_bottom' }) }} />
       </Stack>
     </HomeProvider>

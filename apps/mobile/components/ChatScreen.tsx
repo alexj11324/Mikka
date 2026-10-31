@@ -18,6 +18,7 @@ import { api } from '@/lib/api'
 import { outgoing, type Attachment } from '@/lib/attachments'
 import { clockTime } from '@/lib/clock'
 import { isOpenUI } from '@/lib/openui'
+import { holdMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
 import { delivered, inFlight, marked, outgoingKey, queued, type Outgoing, type OutgoingImage } from '@/lib/outbox'
 import { askForPush, usePushState } from '@/lib/push-state'
@@ -118,6 +119,12 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
 
   const answer = async (message: string) => send(message)
 
+  // A long press: 回复 · 复制 · 选择文本 in a system sheet (app/message.tsx).
+  const actions = (words: string) => {
+    holdMessage({ text: plainText(words), onQuote: () => setQuote(quotable(words)) })
+    router.push('/message')
+  }
+
   return (
     <View style={styles.screen}>
       {/* Back is the system's (and its edge swipe); the bot's name opens the bot's page. */}
@@ -144,9 +151,9 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
             return (
               <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
                 {item.from === 'event' ? <EventLine text={eventText(item.text, sources)} /> : null}
-                {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} /></TimedRow> : null}
+                {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} /></TimedRow> : null}
                 {item.from === 'coordinator' && item.text ? (
-                  <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))}>
+                  <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text)}>
                     {isOpenUI(item.text)
                       ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} webPath={webChatPath(botId)} sources={sources} onOpen={open} />
                       : <BotBubble><Markdown text={item.text} sources={sources} onOpen={open} /></BotBubble>}

@@ -8,7 +8,7 @@ import { Check, CircleAlert, Copy, Reply } from 'lucide-react-native'
 import { StatusIcon } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
-import { tap } from '@/lib/haptics'
+import { press, tap } from '@/lib/haptics'
 import { splitQuoted } from '@/lib/quote'
 import { authHeaders } from '@/lib/api'
 import { API_URL } from '@/lib/config'
@@ -28,8 +28,8 @@ export function MyBubble({ text, photos }: { text: string; photos?: ImageURISour
       {photos?.length ? <Photos photos={photos} /> : null}
       {text ? (
         <View style={[styles.myBubble, { maxWidth: '100%' }]}>
-          {quoted ? <Text selectable numberOfLines={3} style={styles.quoted}>{quoted}</Text> : null}
-          {words ? <Text selectable style={[styles.body, { color: '#fff' }]}>{words}</Text> : null}
+          {quoted ? <Text numberOfLines={3} style={styles.quoted}>{quoted}</Text> : null}
+          {words ? <Text style={[styles.body, { color: '#fff' }]}>{words}</Text> : null}
         </View>
       ) : null}
     </View>
@@ -133,7 +133,7 @@ const QUOTE_AT = 56
  * arrow behind it; letting go past the mark quotes it in the composer, with a
  * tick, as in iMessage and Claude. A spring takes it back on the UI thread.
  */
-export function TimedRow({ time, offset, children, align = 'left', onQuote }: { time?: string; offset: Animated.Value; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void }) {
+export function TimedRow({ time, offset, children, align = 'left', onQuote, onLongPress }: { time?: string; offset: Animated.Value; children: ReactNode; align?: 'left' | 'right'; onQuote?: () => void; onLongPress?: () => void }) {
   const drag = useSharedValue(0)
   const quote = useCallback(() => { tap(); onQuote?.() }, [onQuote])
   const pan = Gesture.Pan()
@@ -147,10 +147,13 @@ export function TimedRow({ time, offset, children, align = 'left', onQuote }: { 
       if (drag.value >= QUOTE_AT) scheduleOnRN(quote)
       drag.value = withSpring(0, { damping: 22, stiffness: 260 })
     })
+  const held = useCallback(() => { press(); onLongPress?.() }, [onLongPress])
+  // A long press opens the message's actions (app/message.tsx).
+  const long = Gesture.LongPress().enabled(Boolean(onLongPress)).minDuration(380).onStart(() => { scheduleOnRN(held) })
   const moved = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }] }))
   const arrow = useAnimatedStyle(() => ({ opacity: Math.min(1, drag.value / QUOTE_AT), transform: [{ scale: 0.6 + 0.4 * Math.min(1, drag.value / QUOTE_AT) }] }))
   return (
-    <GestureDetector gesture={pan}>
+    <GestureDetector gesture={Gesture.Race(pan, long)}>
       <Reanimated.View>
         <Reanimated.View style={[styles.quoteArrow, arrow]} pointerEvents="none">
           <Symbol name="arrowshape.turn.up.left" size={16} color={colors.secondary} web={<Reply size={16} color={colors.secondary} />} />

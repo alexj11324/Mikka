@@ -24,7 +24,9 @@
 - In a chat, dragging a message from left to right quotes it in the composer;
   only a swipe from the screen's edge goes back. The composer is one field as
   in the Claude app: the quote, the words, then 「+」 and send.
-- A bot's reply has 复制 under it, and every message's text can be selected.
+- A bot's reply has 复制 under it. A long press on a message opens a system
+  sheet (Alex, with a screenshot: 「长按应该是可以弹出这个东西才对」): 回复,
+  复制, 选择文本. Reactions wait for the server to keep them.
 
 Defaults Alex left standing when asked: two tabs (对话, 线程); the
 Coordinator pinned first. 新建 Bot and 新建群聊 from 「+」 come next, with
