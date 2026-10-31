@@ -33,6 +33,8 @@ env:
   # otherwise hang for actions/cache's 10-minute default before falling back
   # to a normal install, which outlasts the short jobs' own timeouts.
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+  # Keep the built sign-up widget and every consumer on Cloudflare's public test key.
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
   # Ephemeral CI registration fixtures share one loopback IP. Keep finite
   # limits while leaving the production defaults at 5 signups/IP/hour.
   MIKKA_SIGNUP_IP_HOURLY: '1000'
@@ -65,7 +67,12 @@ jobs:
         # required checks.
         run: |
           git fetch origin main --no-tags
-          trusted="$(mktemp --suffix=.mjs)"
+          trusted_dir="$(mktemp -d)"
+          trusted="$trusted_dir/ci-docs-only.mjs"
+          # Older trusted classifiers predate the data file; updated ones require it.
+          if git cat-file -e origin/main:scripts/ci-browser-map.json 2>/dev/null; then
+            git show origin/main:scripts/ci-browser-map.json > "$trusted_dir/ci-browser-map.json"
+          fi
           echo "Retained trusted classifier: $trusted"
           if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
             echo "docs_only=false (classifier is not on main yet)"
@@ -88,7 +95,7 @@ jobs:
           import { appendFileSync, readFileSync } from 'node:fs'
           import { pathToFileURL } from 'node:url'
           const { isDocsOnly, hasUnsafeModes } = await import(pathToFileURL(process.argv[2]).href)
-          const infra = new Set([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/actions/pnpm-install/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
+          const infra = new Set([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/workflows/analytics-ssr.yml", ".github/actions/pnpm-install/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-browser-map.json", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
           const pullRequest = process.env.GITHUB_EVENT_NAME === 'pull_request'
           const integration = !pullRequest || process.env.INTEGRATION_ACCEPTANCE === 'true'
           let ciOnly = false, performance = integration
@@ -122,11 +129,10 @@ jobs:
           fi
 
   browser-pr:
-    # Pull request tier: one runner installs, builds, starts and runs the smoke
-    # set, the targeted specs and the runtime gates. No artifact round trip.
+    # Browser and HTTP/daemon acceptance use independent databases after one build.
     name: Browser tests (pull request)
-    needs: changes
-    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.browser_tier == 'smoke' || needs.changes.outputs.browser_tier == 'targeted')
+    needs: [changes, browser-build]
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && needs.changes.result == 'success' && needs.browser-build.result == 'success' && needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.browser_tier == 'smoke' || needs.changes.outputs.browser_tier == 'targeted')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -159,13 +165,13 @@ jobs:
       SLACK_BOT_USER_ID: U123
       SLACK_USER_BINDINGS: '{"U456":"ci-only-mikka-user"}'
       NEXT_TELEMETRY_DISABLED: '1'
-      # Cloudflare's documented public test site key (always passes). Baked into
-      # the build so the sign-up form renders the widget and sends a token; the
-      # matching test secret is given only to the keyed sign-up run below.
-      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: browser-build-${{ github.sha }}
+      - run: tar -xzf browser-build.tar.gz
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'
@@ -196,63 +202,6 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
-      - name: Restore the Next.js build cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: .next/cache
-          key: next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
-      - name: Build the application (lint runs once, in the CI workflow's UI policy job)
-        run: |
-          node scripts/build-subscription-worker.mjs
-          pnpm generate:agent-ui
-          pnpm exec next build
-      - name: Test account allocation across independent PostgreSQL clients
-        run: pnpm test:test-accounts-db
-      - name: Factory HTTP regressions against the built application (no skips)
-        run: pnpm test:factory-http
-      - name: Real HTTP authentication, account reuse and isolation
-        run: node scripts/test-accounts/run-http.mjs
-      - name: MVP real-daemon core loop (smoke)
-        if: ${{ !cancelled() }}
-        run: |
-          umask 077
-          mkdir -p .cache/e2e
-          log_file=.cache/e2e/playwright-mvp.log
-          : > "$log_file"
-          chmod 600 "$log_file"
-          test_status=0
-          pnpm test:e2e:mvp --grep @smoke > "$log_file" 2>&1 || test_status=$?
-          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
-            if [ "$test_status" -eq 0 ]; then test_status=1; fi
-            exit "$test_status"
-          fi
-          cat "$log_file"
-          exit "$test_status"
-        env:
-          MIKKA_TEST_MODE: '1'
-          MIKKA_MVP_E2E: '1'
-          MIKKA_ISSUE_TOOLS_ENABLED: '1'
-      - name: Audit MVP evidence before the remaining browser suite
-        id: mvp-evidence-audit
-        if: ${{ !cancelled() }}
-        run: |
-          node scripts/test-accounts/cli.mjs audit-evidence --evidence playwright-mvp-report
-          node scripts/test-accounts/cli.mjs audit-evidence --evidence mvp-test-results
-          node scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/e2e/playwright-mvp.log
-      - name: Preserve audited MVP evidence
-        if: ${{ !cancelled() && steps.mvp-evidence-audit.outcome == 'success' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: mvp-test-report-${{ github.sha }}-pull-request
-          path: |
-            playwright-mvp-report/
-            mvp-test-results/
-            .cache/e2e/playwright-mvp.log
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 7
       - name: Browser smoke and targeted specs
         if: ${{ !cancelled() }}
         env:
@@ -299,24 +248,6 @@ jobs:
           fi
           cat "$log_file"
           exit "$test_status"
-      - name: Navigation and Agent content ready within 1000ms (desktop + mobile, no retries)
-        if: ${{ !cancelled() && needs.changes.outputs.browser_performance == 'true' }}
-        run: |
-          umask 077
-          mkdir -p .cache/e2e
-          log_file=.cache/e2e/playwright-performance.log
-          : > "$log_file"
-          chmod 600 "$log_file"
-          test_status=0
-          pnpm test:performance --output=performance-results > "$log_file" 2>&1 || test_status=$?
-          if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
-            if [ "$test_status" -eq 0 ]; then test_status=1; fi
-            exit "$test_status"
-          fi
-          cat "$log_file"
-          exit "$test_status"
-        env:
-          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-performance-report
       - name: Scan account evidence before artifact upload
         id: account-evidence-audit
         if: ${{ !cancelled() }}
@@ -331,13 +262,8 @@ jobs:
             test-results/
             playwright-turnstile-report/
             turnstile-results/
-            playwright-performance-report/
-            performance-results/
-            .cache/e2e/http-acceptance-summary.json
-            .cache/e2e/account-http-evidence.json
             .cache/e2e/playwright-browser.log
             .cache/e2e/playwright-turnstile.log
-            .cache/e2e/playwright-performance.log
           # Only the explicit scanned paths above; never the private account directory.
           include-hidden-files: true
           if-no-files-found: ignore
@@ -347,8 +273,8 @@ jobs:
     # Selection-policy pull requests also run the union of every scoped spec
     # (plus the smoke tag) as four isolated whole-file subsets.
     name: Browser selection validation (${{ matrix.shard }}/4)
-    needs: changes
-    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.verify_selection == 'true'
+    needs: [changes, browser-build]
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && needs.changes.result == 'success' && needs.browser-build.result == 'success' && needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.verify_selection == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -387,6 +313,10 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: browser-build-${{ github.sha }}
+      - run: tar -xzf browser-build.tar.gz
       - name: Generate ephemeral test-only auth secret
         run: |
           node --input-type=commonjs - <<'NODE'
@@ -415,18 +345,6 @@ jobs:
       - run: pnpm test:e2e:setup
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
-      - name: Restore the Next.js build cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: .next/cache
-          key: next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
-      - name: Build the application
-        run: |
-          node scripts/build-subscription-worker.mjs
-          pnpm generate:agent-ui
-          pnpm exec next build
       - name: Test account allocation across independent PostgreSQL clients
         run: pnpm test:test-accounts-db
       - name: Validate the targeted browser subset
@@ -468,7 +386,7 @@ jobs:
     # Main and full tiers: build once, reuse the .next artifact on every shard.
     name: Browser build
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.browser_tier == 'main' || needs.changes.outputs.browser_tier == 'full') && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -562,7 +480,7 @@ jobs:
   browser-runtime:
     name: Browser runtime gates
     needs: [changes, browser-build]
-    if: needs.changes.result == 'success' && needs.browser-build.result == 'success' && (needs.changes.outputs.browser_tier == 'main' || needs.changes.outputs.browser_tier == 'full')
+    if: needs.changes.result == 'success' && needs.browser-build.result == 'success' && needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -581,6 +499,7 @@ jobs:
           --health-retries 10
     env:
       CI: 'true'
+      BROWSER_TIER: ${{ needs.changes.outputs.browser_tier }}
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
@@ -662,7 +581,9 @@ jobs:
           : > "$log_file"
           chmod 600 "$log_file"
           test_status=0
-          pnpm test:e2e:mvp > "$log_file" 2>&1 || test_status=$?
+          mvp_args=()
+          case "$BROWSER_TIER" in smoke|targeted) mvp_args=(--grep @smoke) ;; esac
+          pnpm test:e2e:mvp "${mvp_args[@]}" > "$log_file" 2>&1 || test_status=$?
           if ! node scripts/test-accounts/cli.mjs audit-evidence --evidence "$log_file"; then
             if [ "$test_status" -eq 0 ]; then test_status=1; fi
             exit "$test_status"
@@ -880,15 +801,13 @@ jobs:
           else
             [ "$SELECTION_RESULT" = "skipped" ] || fail "Selection validation ran without a policy change: $SELECTION_RESULT"
           fi
+          [ "$BUILD_RESULT" = "success" ] || fail "The build job did not succeed: $BUILD_RESULT"
+          [ "$RUNTIME_RESULT" = "success" ] || fail "The runtime gates did not succeed: $RUNTIME_RESULT"
           if [ "$layer" = "pull-request" ]; then
             [ "$PR_RESULT" = "success" ] || fail "The pull request browser job did not succeed: $PR_RESULT"
-            for result in "$BUILD_RESULT" "$RUNTIME_RESULT" "$FULL_RESULT"; do
-              [ "$result" = "skipped" ] || fail "A sharded job ran for a pull request tier: $result"
-            done
+            [ "$FULL_RESULT" = "skipped" ] || fail "Full browser tests ran for a pull request tier: $FULL_RESULT"
           else
             [ "$PR_RESULT" = "skipped" ] || fail "The pull request job ran for a sharded tier: $PR_RESULT"
-            [ "$BUILD_RESULT" = "success" ] || fail "The build job did not succeed: $BUILD_RESULT"
-            [ "$RUNTIME_RESULT" = "success" ] || fail "The runtime gates did not succeed: $RUNTIME_RESULT"
             [ "$FULL_RESULT" = "success" ] || fail "The selected browser layer did not succeed: $FULL_RESULT"
           fi
 
