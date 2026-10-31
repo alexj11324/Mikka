@@ -19,7 +19,7 @@ test('workspace idle reads stay within budget across settings, return and page d
   try {
     await scope.pool.transaction(async (client: PoolClient) => {
       await scope.pool.current(client, scope.lease)
-      await client.query('INSERT INTO issues (id, "userId", title, content, status, priority) VALUES ($1, $2, $3, $4, \'todo\', \'normal\')', [issue.id, issue.ownerId, originalTitle, { type: 'doc', content: [{ type: 'paragraph' }], attrs: { mikka: { number: 1 } } }])
+      await client.query('INSERT INTO issues (id, "userId", title, content, status, priority) VALUES ($1, $2, $3, $4, \'todo\', \'normal\')', [issue.id, issue.ownerId, originalTitle, { type: 'doc', content: [{ type: 'paragraph' }] }])
     })
     await page.bringToFront()
     await page.clock.install()
