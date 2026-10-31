@@ -71,6 +71,7 @@ export const BROWSER_MAIN_SPECS = Object.freeze([
   'agent.spec.ts', 'bot-image-read.spec.ts', 'bots.spec.ts', 'computer-policy-settings.spec.ts',
   'coordinator-choice-card.spec.ts', 'global-search-scope.spec.ts', 'invalid-issue-content.spec.ts',
   'issue-threads.spec.ts', 'linear-sync-disabled.spec.ts', 'members.spec.ts', 'mobile-handoff.spec.ts',
+  'plugins-page.spec.ts',
   'settings.spec.ts', 'sign-out.spec.ts', 'suggestion-entry-contract.spec.ts', 'suggestions-rail.spec.ts',
   'teams.spec.ts', 'thread-cards.spec.ts', 'thread-projection.spec.ts', 'thread-stop.spec.ts',
   'workspace-menu.spec.ts',
@@ -101,6 +102,7 @@ export const needsSelectionValidation = files => files.some(file => SELECTION_PO
 const SCOPED_BROWSER = [
   { area: 'search', paths: [/^lib\/(?:search|federated-search)\//, /^lib\/(?:issue|site)-search(?:\.|-)/, /^app\/api\/(?:search|issues\/search)\//, /^components\/workspace\/issue-search\.tsx$/], specs: ['site-search.spec.ts', 'global-search-scope.spec.ts'] },
   { area: 'settings', paths: [/^components\/settings\//, /^app\/\[locale\]\/settings\//, /^lib\/settings[-/.]/, /^lib\/profile\//, /^lib\/workspace-admin\//, /^components\/teams\//, /^components\/workspace-menu\.tsx$/, /^components\/workspace\/members-settings\.tsx$/], specs: ['settings.spec.ts', 'settings-surface.spec.ts', 'members.spec.ts', 'teams.spec.ts', 'workspace-menu.spec.ts', 'profile.spec.ts', 'computer-policy-settings.spec.ts', 'linear-sync-disabled.spec.ts', 'bots.spec.ts', 'abuse-ui.spec.ts', 'settings-audit.spec.ts', 'settings-billing.spec.ts', 'settings-general.spec.ts', 'settings-secrets.spec.ts', 'settings-team-permissions.spec.ts', 'settings-tokens.spec.ts', 'settings-usage.spec.ts'] },
+  { area: 'plugins', paths: [/^components\/plugins\//, /^app\/api\/integrations\//], specs: ['plugins-page.spec.ts', 'linear-sync-disabled.spec.ts', 'github-integration.spec.ts'] },
   { area: 'slack', paths: [/^lib\/slack\//, /^app\/api\/webhooks\/slack\//], specs: ['slack-webhook.spec.ts'] },
   { area: 'factory', paths: [/^lib\/factory\//, /^app\/api\/factory\//, /^components\/(?:factory|workspace\/factory-)/, /^lib\/self-improvement\//, /^app\/api\/self-improvement\//, /^components\/workspace\/self-improvement\.tsx$/], specs: ['factory-acceptance-ui.spec.ts', 'factory-acceptance-a2.spec.ts', 'thread-question.spec.ts', 'factory-api.spec.ts', 'factory-check-api.spec.ts', 'factory-execution-claim.spec.ts', 'self-improvement-api.spec.ts'] },
   { area: 'threads', paths: [/^components\/coordinator\//, /^lib\/coordinator[-/.]/, /^lib\/(?:issue-threads|thread-groups|issue-thread-questions|run-control)\./, /^components\/workspace\/issue-thread/, /^app\/api\/(?:threads|coordinator)\//], specs: ['thread-cards.spec.ts', 'thread-projection.spec.ts', 'thread-stop.spec.ts', 'issue-threads.spec.ts', 'thread-question.spec.ts', 'coordinator-choice-card.spec.ts'] },
