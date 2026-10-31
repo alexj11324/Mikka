@@ -96,6 +96,7 @@ pooledTest('account export downloads owned file versions, captures and checkpoin
   const database = new Pool({ connectionString: dbUrl, max: 2 })
   const owner = testAccounts.scope.owner.userId, peer = testAccounts.scope.peer.userId
   await testAccounts.scope.assertActive()
+  const priorExportIds = (await database.query<{ id: string }>('SELECT id FROM account_data_exports WHERE "userId"=$1', [owner])).rows.map(row => row.id)
   const agentId = await seedAgent(database, owner), runId = await seedRun(database, { userId: owner, agentId })
   const ownArtifact = randomUUID(), peerArtifact = randomUUID(), firstVersion = randomUUID(), secondVersion = randomUUID(), captureId = randomUUID()
   const first = Buffer.from('first owned version — 原文'), second = Buffer.from('second owned version 😀'), capture = Buffer.from([137, 80, 78, 71, 0, 255, 17])
@@ -134,9 +135,15 @@ pooledTest('account export downloads owned file versions, captures and checkpoin
     const expired = await page.request.get(new URL(href!, page.url()).href)
     expect(expired.status()).toBe(404)
   } finally {
-    await database.query('DELETE FROM artifacts WHERE id=ANY($1::uuid[])', [[ownArtifact, peerArtifact]])
-    await database.query('DELETE FROM agent_runs WHERE id=$1', [runId])
-    await database.query('DELETE FROM agents WHERE id=$1', [agentId])
-    await database.end()
+    try {
+      await testAccounts.scope.assertActive()
+      // The exclusive lease identifies grants created by this case, including a
+      // failed UI request before its token is captured. Preserve all prior grants.
+      const createdExportIds = (await database.query<{ id: string }>('SELECT id FROM account_data_exports WHERE "userId"=$1 AND NOT (id=ANY($2::uuid[]))', [owner, priorExportIds])).rows.map(row => row.id)
+      await database.query('DELETE FROM account_data_exports WHERE "userId"=$1 AND id=ANY($2::uuid[])', [owner, createdExportIds])
+      await database.query('DELETE FROM artifacts WHERE id=ANY($1::uuid[])', [[ownArtifact, peerArtifact]])
+      await database.query('DELETE FROM agent_runs WHERE id=$1', [runId])
+      await database.query('DELETE FROM agents WHERE id=$1', [agentId])
+    } finally { await database.end() }
   }
 })
