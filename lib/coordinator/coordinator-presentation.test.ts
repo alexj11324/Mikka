@@ -1,6 +1,6 @@
 // i18n-ignore-file: model prompt fixtures, not UI copy.
 /**
- * Offline presentation fixture (docs/design/decisions.md, 2026-10-31): every
+ * Offline presentation fixture (docs/design/decisions/2026-10-31-1803-coordinator-openui-prompt.md): every
  * Coordinator path carries the generated OpenUI block exactly once, the block
  * routes each content shape below to its component with a valid example, and
  * the expected component reply for each case renders. It checks what the
