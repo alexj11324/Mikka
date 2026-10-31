@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { getAppPolicy, updateAppPolicy } from '@/app/actions/app-policy'
+import { updateAppPolicy, type getAppPolicy } from '@/app/actions/app-policy'
+import { settingsRead } from '@/lib/settings-read'
 import { AppTile } from '@/components/plugins/connected-apps'
 import { ComputerPolicySettings } from '@/components/settings/computer-policy-settings'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
@@ -24,7 +25,7 @@ function AppPolicySettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.appPolicy')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const policy = useSWR(['settings:app-policy', workspaceId], () => getAppPolicy(workspaceId))
+  const policy = useSWR(['settings:app-policy', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getAppPolicy>>>('app-policy', { workspace: workspaceId }))
   const [pending, setPending] = useState<PolicyApp | null>(null)
   const [failed, setFailed] = useState<{ app: PolicyApp; access: AppAccess; message: string } | null>(null)
   const data = policy.data && !policy.data.error ? policy.data : null
