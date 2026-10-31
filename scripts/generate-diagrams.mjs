@@ -27,12 +27,12 @@ const ARCH_BOXES = {
   api: [C2, 240, 60, false],
   mcp: [C2, 520, 60, false],
   db: [C3, 70, 60, false],
-  factory: [C3, 250, 76, true],
+  factory: [C3, 250, 76, false],
   coord: [C3, 380, 60, false],
   daemon: [C3, 520, 60, false],
   worker: [C4, 70, 60, true],
   linear: [C4, 190, 48, false],
-  monitor: [C4, 270, 60, true],
+  monitor: [C4, 270, 60, false],
   cloud: [C4, 380, 60, false],
   agents: [[1000, 1165], 520, 60, false],
   vault: [C4, 680, 60, true],
@@ -78,9 +78,9 @@ function archFlows(t, p) {
     ...line([[C1[1], 320], [BUS1, 320], [BUS1, 240]], p), ...chevron(BUS1, 272, 'up', p),
     ...line([[C1[1], 240], [C2[0], 240]], p), ...chevron(388, 240, 'right', p),
     ...tag(285, 240, t.tWebhook, p), ...tag(285, 320, t.tNotify, p),
-    // Connected-app writes run after approval; live provider acceptance is pending.
-    ...line([[420, 270], [420, 368], [110, 368], [110, 350]], p, true), ...chevron(110, 358, 'up', p),
-    ...tag(290, 368, t.pActions, p, true),
+    // Connected-app writes run after approval (on in production).
+    ...line([[420, 270], [420, 368], [110, 368], [110, 350]], p), ...chevron(110, 358, 'up', p),
+    ...tag(290, 368, t.pActions, p),
     // Card checks and top-ups go through Stripe Checkout; Stripe answers with webhooks.
     ...line([[535, 144], [535, 210]], p), ...chevron(535, 202, 'down', p), ...chevron(535, 152, 'up', p),
     ...tag(535, 177, t.tBilling, p),
@@ -99,9 +99,9 @@ function archFlows(t, p) {
     // The minute Worker wakes the Coordinator, runs schedules and sends briefings.
     ...line([[C1[1], 432], [BUS2, 432]], p), ...chevron(BUS2 - 14, 432, 'right', p),
     ...tag(300, 432, t.tWake, p),
-    // Factory stages on top of the Coordinator, fed by monitoring: behind switches, not accepted.
-    ...line([[830, 288], [830, 350]], p, true), ...chevron(830, 300, 'up', p), ...chevron(830, 340, 'down', p),
-    ...line([[C4[0], 270], [C3[1], 270]], p, true), ...chevron(932, 270, 'left', p),
+    // Factory stages on top of the Coordinator, fed by monitoring: switched on in production.
+    ...line([[830, 288], [830, 350]], p), ...chevron(830, 300, 'up', p), ...chevron(830, 340, 'down', p),
+    ...line([[C4[0], 270], [C3[1], 270]], p), ...chevron(932, 270, 'left', p),
     // Coordinator wake of a bot's cloud computer was verified in production.
     ...line([[C3[1], 380], [C4[0], 380]], p), ...chevron(988, 380, 'right', p), ...tag(960, 380, t.tCloudWake, p),
     ...line([[830, 410], [830, 490]], p), ...chevron(830, 482, 'down', p), ...tag(830, 446, t.tDispatch, p),
@@ -143,10 +143,10 @@ const FLOW_BOXES = {
   agent: [X4, 230, 60, false],
   asks: [X4, 70, 60, false],
   answer: [X3, 70, 60, false],
-  details: [[440, 620], 390, 48, true],
-  review: [X4, 520, 60, true],
-  approve: [[430, 610], 520, 60, true],
-  ship: [X1, 520, 60, true],
+  details: [[440, 620], 390, 48, false],
+  review: [X4, 520, 60, false],
+  approve: [[430, 610], 520, 60, false],
+  ship: [X1, 520, 60, false],
 }
 
 const FLOW_TEXT = {
@@ -181,22 +181,22 @@ function flowEdges(t, p) {
     ...line([[X2[1], 230], [470, 230]], p), ...chevron(462, 230, 'right', p),
     ...line([[590, 230], [X3[0], 230]], p), ...chevron(672, 230, 'right', p), ...tag(628, 230, t.tClear, p),
     ...line([[X3[1], 230], [X4[0], 230]], p), ...chevron(922, 230, 'right', p),
-    // Clarification before dispatch: an unclear request goes back to the person.
-    ...line([[530, 290], [530, 366]], p, true), ...chevron(530, 358, 'down', p), ...tag(530, 328, t.tUnclear, p, true),
-    ...line([[440, 390], [340, 390], [340, 254]], p, true), ...chevron(340, 264, 'up', p),
+    // Clarification before dispatch: an unclear request goes back to the person (Factory routing, on in production).
+    ...line([[530, 290], [530, 366]], p), ...chevron(530, 358, 'down', p), ...tag(530, 328, t.tUnclear, p),
+    ...line([[440, 390], [340, 390], [340, 254]], p), ...chevron(340, 264, 'up', p),
     // Clarification during a run: the agent asks, the person answers, the answer goes back.
     ...line([[1060, 200], [1060, 100]], p), ...chevron(1060, 110, 'up', p), ...tag(1060, 150, t.tAsks, p),
     ...line([[X4[0], 70], [X3[1], 70]], p), ...chevron(868, 70, 'left', p),
-    ...line([[770, 100], [770, 150], [970, 150], [970, 200]], p, true), ...chevron(970, 192, 'down', p),
-    ...tag(870, 150, t.tAnswer, p, true),
-    // Factory loop (behind switches, not accepted): review, a fix when it fails, acceptance and release, monitoring.
-    ...line([[X4[1], 230], [RAIL, 230], [RAIL, 520], [X4[1], 520]], p, true),
-    ...chevron(RAIL, 300, 'down', p), ...chevron(1140, 520, 'left', p), ...tag(RAIL, 375, t.pFinished, p, true),
-    ...line([[X4[0], 520], [826, 520]], p, true), ...chevron(834, 520, 'left', p),
-    ...line([[770, 464], [770, 254]], p, true), ...chevron(770, 262, 'up', p), ...tag(770, 360, t.pFix, p, true),
-    ...line([[714, 520], [610, 520]], p, true), ...chevron(618, 520, 'left', p), ...tag(662, 520, t.pPasses, p, true),
-    ...line([[430, 520], [X1[1], 520]], p, true), ...chevron(208, 520, 'left', p),
-    ...line([[110, 490], [110, 254]], p, true), ...chevron(110, 262, 'up', p), ...tag(110, 380, t.pIncident, p, true),
+    ...line([[770, 100], [770, 150], [970, 150], [970, 200]], p), ...chevron(970, 192, 'down', p),
+    ...tag(870, 150, t.tAnswer, p),
+    // Factory loop, on in production: review, a fix when it fails, acceptance and release, monitoring.
+    ...line([[X4[1], 230], [RAIL, 230], [RAIL, 520], [X4[1], 520]], p),
+    ...chevron(RAIL, 300, 'down', p), ...chevron(1140, 520, 'left', p), ...tag(RAIL, 375, t.pFinished, p),
+    ...line([[X4[0], 520], [826, 520]], p), ...chevron(834, 520, 'left', p),
+    ...line([[770, 464], [770, 254]], p), ...chevron(770, 262, 'up', p), ...tag(770, 360, t.pFix, p),
+    ...line([[714, 520], [610, 520]], p), ...chevron(618, 520, 'left', p), ...tag(662, 520, t.pPasses, p),
+    ...line([[430, 520], [X1[1], 520]], p), ...chevron(208, 520, 'left', p),
+    ...line([[110, 490], [110, 254]], p), ...chevron(110, 262, 'up', p), ...tag(110, 380, t.pIncident, p),
   ]
 }
 
@@ -206,7 +206,7 @@ function drawTaskFlow(lang, p) {
     ...flowEdges(t, p),
     ...Object.entries(FLOW_BOXES).flatMap(([id, [[x0, x1], yc, h, planned]]) => rectBox(x0, x1, yc, h, t[id], p, planned)),
     ...diamond(530, 230, 60, t.clear, p),
-    ...diamond(770, 520, 56, t.passes, p, true),
+    ...diamond(770, 520, 56, t.passes, p),
     ...legend(630, LEGEND_TEXT[lang], p),
   ])
 }

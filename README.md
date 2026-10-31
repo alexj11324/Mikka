@@ -51,12 +51,10 @@ or in the macOS desktop app.
     dispatched coding threads.
 
 - **Asks before it guesses.**
-  - The Coordinator can ask for missing details in chat, including as a choice
-    card before it dispatches. Systematic routing of ambiguous requests is built
-    behind the Factory switches and still needs acceptance.
-  - A worker can ask a question or report that it is blocked. A thread can wait
-    for your reply; resuming the same run with your answer is still being
-    verified.
+  - Before it dispatches, the Coordinator routes an unclear request back to
+    you, in chat or as a choice card.
+  - A worker can ask a question or report that it is blocked. The thread waits
+    for your reply, and your answer goes back to the run.
 
 - **Runs on your own machines.**
   - The Mikka daemon connects your Mac, Linux machine or server. The desktop
@@ -78,26 +76,25 @@ or in the macOS desktop app.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/task-flow-dark.svg">
-  <img src="docs/assets/task-flow-light.svg" alt="How a task moves through Mikka: a request from chat, Telegram, Slack or MCP is triaged and dispatched to a coding agent, which can ask the Coordinator for clarification. Pre-dispatch clarification, answers returned to a waiting run and the Factory loop of review, verification, acceptance and monitoring are dashed as pending.">
+  <img src="docs/assets/task-flow-light.svg" alt="How a task moves through Mikka: a request from chat, Telegram, Slack or MCP is triaged; an unclear one goes back to the person for details, a clear one is dispatched to a coding agent. The agent can ask for clarification and gets the answer back. A finished run goes to review and verification agents, back to a fix run when a check fails, then to acceptance and release, and monitoring turns incidents into new issues.">
 </picture>
 
-Solid lines show connected paths; dashed lines include planned work and paths
-that still need end-to-end acceptance. Returning an answer to a waiting run
-needs verification. The dashed Factory loop includes independent review and
-verification ([#193](https://github.com/alexj11324/Mikka/issues/193)), a fix
-run when a check fails, acceptance of the pull request
-([#528](https://github.com/alexj11324/Mikka/issues/528)), and monitoring that
-turns incidents into issues
-([#195](https://github.com/alexj11324/Mikka/issues/195)). Systematic routing of
-ambiguous requests is tracked in
-[#192](https://github.com/alexj11324/Mikka/issues/192).
+Every step runs in production. The Factory loop (intake and clarification,
+independent review and verification, a fix run when a check fails, acceptance
+and release, and monitoring) is switched on in production; its end-to-end
+acceptance is still tracked in
+[#192](https://github.com/alexj11324/Mikka/issues/192),
+[#193](https://github.com/alexj11324/Mikka/issues/193) and
+[#195](https://github.com/alexj11324/Mikka/issues/195). Acceptance by merging
+the pull request is planned in
+[#528](https://github.com/alexj11324/Mikka/issues/528).
 
 ## What Mikka does today
 
 - **Turns requests into runs.** The Coordinator dispatches runs for your tasks
   and decides whether each new task belongs to the workspace or to you. You can
-  change the assignment in one click. Letting the Coordinator create and update
-  tasks itself is built but behind a switch that is off by default.
+  change the assignment in one click. The Coordinator can also create and
+  update tasks itself.
 - **Lets you create bots.** The left column lists the Coordinator and the bots
   you create. Each bot has its own chat, with unread markers and an animated
   avatar.
@@ -116,6 +113,10 @@ ambiguous requests is tracked in
   information.
 - **Hands back Artifacts.** A bot can deliver a document or an HTML page as an
   Artifact, with versions and a share link.
+- **Delivers through Factory.** Task intake and clarification, independent
+  review and verification threads, a fix run when a check fails, run captures
+  as evidence, an acceptance view on the task, and monitoring that opens a
+  follow-up issue. End-to-end acceptance is still tracked in the issues above.
 - **Acts in your apps.** Bots propose email, Google Calendar, Notion and Slack
   actions, which run after your approval. Real external writes still need
   end-to-end acceptance.
@@ -171,9 +172,6 @@ In early access, behind a flag or switch, or awaiting acceptance:
 - **Scheduled tasks.** Bots can create reminders, task snapshots and read-only
   agent tasks that run at a set time or on a schedule. Acceptance is pending
   ([#179](https://github.com/alexj11324/Mikka/issues/179)).
-- **Factory.** Task intake, clarification, independent review and verification
-  threads, run captures as evidence, and an acceptance view on the task. Built
-  behind two switches that are off by default; acceptance is pending.
 - **Memory of you.** Mikka reads rated notifications for facts about you, merges
   them nightly, and shows them in Memory, where you can correct or delete each
   one.
@@ -198,7 +196,7 @@ Work in progress is tracked in
 | **Cloud computer** | The per-bot desktop above is in early access. Next: each cloud thread on a machine of its own (built behind a switch, with per-owner and per-workspace spend limits), and hosted coding threads turned on for everyone. | [#172](https://github.com/alexj11324/Mikka/issues/172) |
 | **Hybrid execution** | Local agents offload builds, tests and dev servers to E2B. | [#572](https://github.com/alexj11324/Mikka/issues/572) |
 | **Group chats** | Multiple bots and people in one chat, with turn-taking, @ mentions and a status bar showing who is working. The backend is on main; the interface is not. | [#105](https://github.com/alexj11324/Mikka/issues/105) |
-| **Factory** | An end-to-end delivery process: durable stage state, independent review and verification threads, acceptance by merging the pull request, and monitoring. Built behind switches; see above. | [#192](https://github.com/alexj11324/Mikka/issues/192), [#193](https://github.com/alexj11324/Mikka/issues/193), [#195](https://github.com/alexj11324/Mikka/issues/195), [#528](https://github.com/alexj11324/Mikka/issues/528) |
+| **Factory** | Running in production; next: end-to-end acceptance of each stage, and acceptance by merging the pull request in place of the separate approve-and-publish step. | [#192](https://github.com/alexj11324/Mikka/issues/192), [#193](https://github.com/alexj11324/Mikka/issues/193), [#195](https://github.com/alexj11324/Mikka/issues/195), [#528](https://github.com/alexj11324/Mikka/issues/528) |
 | **Connected apps** | Live acceptance of the approved email, calendar, Notion and Slack writes. | [#177](https://github.com/alexj11324/Mikka/issues/177) |
 | **Plugins** | Personal MCP servers and installed skills have a backend and Coordinator tools but no page yet; workspace admins switching single apps off. | [#595](https://github.com/alexj11324/Mikka/issues/595) |
 | **Your own model keys** | Bring-your-own model API keys routed through Vercel AI Gateway. | [#589](https://github.com/alexj11324/Mikka/issues/589) |
@@ -236,7 +234,7 @@ Each run uses its own git worktree, so parallel threads stay isolated.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web, desktop and iOS apps, Telegram, Slack, notification sources and MCP clients reach the Next.js app on Vercel, which keeps state in Postgres and takes payments through Stripe. A minute Worker and app events wake the Coordinator, which dispatches runs to the daemon on your Mac, Linux machine or SSH host and wakes each bot's E2B cloud computer. Coding agents report back through MCP. Linear sync, Factory stages, monitoring, hosted runs, approved writes and the credential vault are dashed as pending or switched off.">
+  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web, desktop and iOS apps, Telegram, Slack, notification sources and MCP clients reach the Next.js app on Vercel, which keeps state in Postgres and takes payments through Stripe. A minute Worker and app events wake the Coordinator, which dispatches runs to the daemon on your Mac, Linux machine or SSH host and wakes each bot's E2B cloud computer. Coding agents report back through MCP. Factory stages fed by monitoring sit on top of the Coordinator, and approved writes go back to connected apps. Linear sync (switched off), hosted runs and the credential vault are dashed.">
 </picture>
 
 The web app, the desktop and iOS apps, Telegram, Slack and MCP clients all reach
@@ -271,9 +269,8 @@ Coordinator wakes, schedules, run recovery and monitoring, briefings every
 second Worker that exchanges changes with Postgres through a durable inbox and
 outbox; it is switched off by a PostHog flag.
 
-Dashed boxes and lines are planned, awaiting end-to-end acceptance, or switched
-off: Linear sync, Factory stages and monitoring, hosted coding runs, approved
-writes to connected apps and the credential vault.
+Dashed boxes and lines are switched off or awaiting end-to-end acceptance:
+Linear sync, hosted coding runs and the credential vault.
 
 ## Built with
 
