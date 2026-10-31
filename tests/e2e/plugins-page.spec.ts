@@ -45,3 +45,21 @@ test('插件 is one list of apps, shared with 设置 › 连接', async ({ page 
   await expect(page.getByRole('button', { name: '刷新状态', exact: true })).toHaveCount(0)
   await testInfo.attach('settings-connections-telegram', { body: await page.screenshot(), contentType: 'image/png' })
 })
+
+test('插件 list stays put while the connected apps load', async ({ page }) => {
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/integrations/composio', async route => {
+    if (route.request().method() === 'GET') await held
+    await route.fallback()
+  })
+  await register(page, '/?section=plugins')
+  const gmail = page.getByRole('link', { name: '打开 Gmail', exact: true })
+  await expect(gmail).toBeVisible()
+  // Loading is announced, not drawn: no visible line above the list.
+  await expect(page.getByRole('status').filter({ hasText: '正在读取集成…' })).toHaveClass(/sr-only/)
+  const before = await gmail.boundingBox()
+  release()
+  await expect(page.locator('[data-slot="app-row-pending"]')).toHaveCount(0)
+  expect((await gmail.boundingBox())?.y).toBe(before?.y)
+})

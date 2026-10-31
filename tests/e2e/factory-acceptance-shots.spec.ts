@@ -34,6 +34,7 @@ for (const status of [...states, 'evidence' as const]) {
     const stage = status === 'evidence' ? 'approval' : 'publish'
     const ledger = { binding, approvals: status === 'evidence' ? [] : [approval], publications: publication ? [{ id: randomUUID(), approvalId, status: publication, request: {}, receipt: null }] : [] }
     await page.route('**/api/factory/tasks?issueId=*', route => route.fulfill({ json: { tasks: [{ id: taskId, issueId, stage, status: 'pending', reason: '独立检查通过', candidateId, candidateRunId: null, isSkillCandidate: false }] } }))
+    await page.route(`**/api/factory/tasks/${taskId}`, route => route.fulfill({ json: { checks: [], delivery: { candidateSha: candidate.sha, pullRequest: null, repository: candidate.repository, environment: null, previewUrl: null, databaseBranch: null, deploymentEnvironment: null } } }))
     await page.route(`**/api/factory/tasks/${taskId}/approval*`, route => {
       const url = new URL(route.request().url())
       if (url.searchParams.has('artifact')) return route.fulfill({ json: { raw: '{\n  "checks": "passed",\n  "lighthouse": 97,\n  "screenshots": 4\n}' } })
@@ -41,11 +42,11 @@ for (const status of [...states, 'evidence' as const]) {
       return route.fulfill({ json: { binding, evidenceReadId: randomUUID(), evidenceDigest: 'b'.repeat(64), manifest: { candidate, artifacts: [{ artifact: 'review-report.json', kind: 'report', stage: 'review' }, { artifact: 'home.png', kind: 'screenshot', stage: 'verify' }] } } })
     })
     await openIssueFromSearch(page, title)
-    await page.getByRole('button', { name: /Factory 验收/ }).click()
-    const dialog = page.getByRole('dialog')
+    await page.getByRole('button', { name: 'Factory 验收', exact: true }).click()
+    const dialog = page.getByRole('region', { name: 'Factory 验收', exact: true })
     await expect(dialog.getByRole('heading', { name: 'Factory 验收' })).toBeVisible()
     if (status === 'evidence') {
-      await dialog.getByRole('button', { name: 'review-report.json' }).click()
+      await dialog.getByRole('button', { name: '审查报告' }).click()
       await expect(page.getByText('"lighthouse": 97')).toBeVisible()
       await shoot(page, testInfo, 'evidence-viewer')
       return

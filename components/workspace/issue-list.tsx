@@ -5,7 +5,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import type { listIssues } from '@/app/actions/issues'
 import { Button } from '@/components/ui/button'
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { ISSUE_STATUSES, issueIdentifier } from './issue-properties'
 
 export function IssueList({ issues, searching, onOpen, onCreate }: {
@@ -23,7 +23,6 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
     <EmptyHeader>
       <EmptyMedia variant="icon"><ListTodo /></EmptyMedia>
       <EmptyTitle>{searching ? t('noResults') : t('emptyTitle')}</EmptyTitle>
-      <EmptyDescription>{searching ? t('noResultsHint') : t('emptyHint')}</EmptyDescription>
     </EmptyHeader>
     {!searching && <EmptyContent><Button size="sm" onClick={onCreate}><Plus data-icon="inline-start" />{t('newTask')}</Button></EmptyContent>}
   </Empty>
