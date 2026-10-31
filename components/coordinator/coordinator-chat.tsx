@@ -129,12 +129,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const items = useMemo(() => data?.items ?? [], [data])
   // A turn the hosted model (Mikka 默认) refused: verification, allowance or pause (#523, #525, #526).
   const refusal = data?.working ? null : hostedRefusal(data?.error)
+  const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
   const unanswered = data?.enabled === false && items.findLast(item => item.from !== 'event')?.from === 'person'
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
   const welcomed = useRef(false)
   useEffect(() => {
-    if (!data?.enabled || items.length || data.working || welcomed.current) return
+    if (!data?.enabled || items.length || data.working || data.error || welcomed.current) return
     welcomed.current = true
     void (botId ? welcomeCoordinator(botId) : welcomeCoordinator()).then(() => mutate())
   })
@@ -211,7 +212,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       <MessageScroller className="min-h-0 flex-1">
         <MessageScrollerViewport aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')}>
           <MessageScrollerContent className={cn('flex w-full min-w-0 max-w-full flex-col gap-5 pb-6', compact ? 'px-3 pt-4' : 'px-4 pt-18 sm:px-6')}>
-            {data && !items.length && (data.enabled
+            {data && !items.length && !data.error && (data.enabled
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
               : <div className="flex flex-1 flex-col items-center justify-center gap-3">{avatar('profile')}<p className="text-sm font-medium">{name}</p></div>)}
             {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
@@ -248,7 +249,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {loadError && <FieldError className="text-xs">{t('loadError')}</FieldError>}
       {refusal && <HostedRefusalNotice code={refusal} />}
-      {data?.error && !data.working && !refusal && <Alert variant="destructive"><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></Alert>}
+      {data?.error && !data.working && !refusal && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription></>}</Alert>}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {sendError && <FieldError className="text-xs">{sendError}</FieldError>}
       {botId && <SubagentLoginNeeds botId={botId} />}

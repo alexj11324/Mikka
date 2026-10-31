@@ -1023,6 +1023,7 @@
     "agentHarnessMissing": "这台电脑尚未安装所选 Agent。",
     "agentDuplicateName": "名称重复，请换一个名称。",
     "botDuplicateName": "已有同名 Bot，请换一个名字。",
+    "botNameTooLong": "Bot 名字最多 60 个字。",
     "agentInvalidInput": "请检查填写内容。",
     "agentAddFailed": "添加失败，请重试。",
     "agentSaveFailed": "保存失败，请重试。",
@@ -2700,6 +2701,11 @@
     "working": "Coordinator 正在处理…",
     "loadError": "对话加载失败，正在重试。",
     "failedTitle": "回复失败",
+    "wakeErrors": {
+      "wake_failed": "回复等待重试",
+      "wake_start_unconfirmed": "回复启动未确认",
+      "wake_exhausted": "回复重试已停止"
+    },
     "unavailable": "{name} 暂时不可用",
     "input": "给 Coordinator 发消息",
     "inputTo": "给 {name} 发消息",
@@ -3153,6 +3159,10 @@
       "search": "搜索",
       "widen": "加宽右栏",
       "narrow": "恢复右栏宽度",
+      "rename": "重命名",
+      "nameRequired": "名字不能为空",
+      "nameTooLong": "名字最多 {max} 个字",
+      "changeAvatar": "更换 {name} 的头像",
       "close": "关闭右栏",
       "open": "打开右栏"
     },

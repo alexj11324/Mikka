@@ -6,13 +6,10 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 import { BOT_COLORS, BOT_SHAPES, BotAvatar, type BotColor, type BotShape } from './bot-avatar'
 
-/**
- * A bot's 16 shapes and 12 colours. Used by
- * 新建 Bot and the first-run guide.
- */
+/** A bot's 16 shapes and 12 colours (Figma 195:3226), shared by 新建 Bot, the right panel's avatar and the first-run guide. */
 export function BotLookPicker({ color, shape, disabled, onColor, onShape }: { color: BotColor; shape: BotShape; disabled?: boolean; onColor: (color: BotColor) => void; onShape: (shape: BotShape) => void }) {
   const t = useTranslations('Shell.newBot')
-  return <>
+  return <FieldGroup className="gap-5">
     {/* The picked shape gets a ring that follows its own outline, a small gap away. */}
     <svg aria-hidden="true" className="absolute size-0">
       <filter id="bot-shape-ring" x="-25%" y="-25%" width="150%" height="150%" colorInterpolationFilters="sRGB">
@@ -27,25 +24,23 @@ export function BotLookPicker({ color, shape, disabled, onColor, onShape }: { co
         <feMerge><feMergeNode in="line" /><feMergeNode in="SourceGraphic" /></feMerge>
       </filter>
     </svg>
-    <FieldGroup className="gap-5">
-      <Field>
-        <ToggleGroup aria-label={t('shape')} spacing={2} className="grid grid-cols-4 justify-items-center sm:grid-cols-8" value={[shape]} disabled={disabled} onValueChange={values => { const next = values[0] as BotShape | undefined; if (next) onShape(next) }}>
-          {BOT_SHAPES.map(id => <ToggleGroupItem key={id} value={id} aria-label={t(`shapes.${id}`)} className="size-14 min-w-0 rounded-2xl p-0 hover:bg-transparent data-pressed:bg-transparent data-pressed:[&_svg]:[filter:url(#bot-shape-ring)]">
-            <BotAvatar color={color} shape={id} size="cell" still />
-          </ToggleGroupItem>)}
-        </ToggleGroup>
-      </Field>
-      <Field>
-        <ToggleGroup aria-label={t('color')} spacing={2} className="grid grid-cols-6 justify-items-center gap-y-3 px-6" value={[color]} disabled={disabled} onValueChange={values => { const next = values[0] as BotColor | undefined; if (next) onColor(next) }}>
-          {BOT_COLORS.map(id => <ToggleGroupItem key={id} value={id} aria-label={t(`colors.${id}`)} className="size-10 min-w-0 rounded-full p-0 data-pressed:bg-transparent">
-            <span aria-hidden="true" className={cn('size-7.5 rounded-full',
-              id === 'encre' && 'bg-bot-encre', id === 'brun' && 'bg-bot-brun', id === 'rouge' && 'bg-bot-rouge', id === 'orange' && 'bg-bot-orange', id === 'ambre' && 'bg-bot-ambre', id === 'vert' && 'bg-bot-vert', id === 'turquoise' && 'bg-bot-turquoise', id === 'bleu' && 'bg-bot-bleu', id === 'violet' && 'bg-bot-violet', id === 'rose' && 'bg-bot-rose', id === 'gris' && 'bg-bot-gris', id === 'creme' && 'bg-bot-creme',
-              // Ink on the dark page and cream on the light one need an edge to be seen at all.
-              (id === 'encre' || id === 'creme') && 'ring-1 ring-foreground/15 ring-inset',
-              color === id && 'outline-2 outline-offset-3 outline-muted-foreground')} />
-          </ToggleGroupItem>)}
-        </ToggleGroup>
-      </Field>
-    </FieldGroup>
-  </>
+    <Field>
+      <ToggleGroup aria-label={t('shape')} spacing={2} className="grid grid-cols-4 justify-items-center sm:grid-cols-8" value={[shape]} disabled={disabled} onValueChange={values => { const next = values[0] as BotShape | undefined; if (next) onShape(next) }}>
+        {BOT_SHAPES.map(id => <ToggleGroupItem key={id} value={id} aria-label={t(`shapes.${id}`)} className="size-14 min-w-0 rounded-2xl p-0 hover:bg-transparent data-pressed:bg-transparent data-pressed:[&_svg]:[filter:url(#bot-shape-ring)]">
+          <BotAvatar color={color} shape={id} size="cell" still />
+        </ToggleGroupItem>)}
+      </ToggleGroup>
+    </Field>
+    <Field>
+      <ToggleGroup aria-label={t('color')} spacing={2} className="grid grid-cols-6 justify-items-center gap-y-3 px-6" value={[color]} disabled={disabled} onValueChange={values => { const next = values[0] as BotColor | undefined; if (next) onColor(next) }}>
+        {BOT_COLORS.map(id => <ToggleGroupItem key={id} value={id} aria-label={t(`colors.${id}`)} className="size-10 min-w-0 rounded-full p-0 data-pressed:bg-transparent">
+          <span aria-hidden="true" className={cn('size-7.5 rounded-full',
+            id === 'encre' && 'bg-bot-encre', id === 'brun' && 'bg-bot-brun', id === 'rouge' && 'bg-bot-rouge', id === 'orange' && 'bg-bot-orange', id === 'ambre' && 'bg-bot-ambre', id === 'vert' && 'bg-bot-vert', id === 'turquoise' && 'bg-bot-turquoise', id === 'bleu' && 'bg-bot-bleu', id === 'violet' && 'bg-bot-violet', id === 'rose' && 'bg-bot-rose', id === 'gris' && 'bg-bot-gris', id === 'creme' && 'bg-bot-creme',
+            // Ink on the dark page and cream on the light one need an edge to be seen at all.
+            (id === 'encre' || id === 'creme') && 'ring-1 ring-foreground/15 ring-inset',
+            color === id && 'outline-2 outline-offset-3 outline-muted-foreground')} />
+        </ToggleGroupItem>)}
+      </ToggleGroup>
+    </Field>
+  </FieldGroup>
 }

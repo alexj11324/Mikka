@@ -60,8 +60,8 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
             <Input id="new-bot-name" aria-label={t('name')} autoFocus value={name} maxLength={60} disabled={saving} placeholder={t('namePlaceholder')}
               className="h-11 rounded-xl border-transparent bg-muted text-center focus-visible:border-transparent focus-visible:ring-0" onChange={event => setName(event.target.value)} />
           </Field>
-          <BotLookPicker color={color} shape={shape} disabled={saving} onColor={setColor} onShape={setShape} />
         </FieldGroup>
+        <BotLookPicker color={color} shape={shape} disabled={saving} onColor={setColor} onShape={setShape} />
       </form>
       <DialogFooter className="m-0 rounded-b-2xl bg-transparent px-4 pt-1 pb-4">
         <Button variant="ghost" onClick={() => onOpenChange(false)}>{tCommon('cancel')}</Button>

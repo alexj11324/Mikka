@@ -5,6 +5,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { sweepFactoryMonitor } from './monitor-sweep';
+import { dropTestDatabase } from '../../tests/support/drop-test-database';
 
 const base = process.env.E2E_DATABASE_URL;
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true');
@@ -98,13 +99,7 @@ test('monitor sweep: finds unobserved monitor completions per (user, bot), is id
     assert.deepEqual(calls, [], 'nothing starts after the deadline');
     void a;
   } finally {
-    await pool.end();
-    for (let i = 0; i < 100; i++) {
-      const { rows: [r] } = await adminPool.query('SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname=$1', [name]);
-      if (r.n === 0) break;
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-    await adminPool.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+    await dropTestDatabase(adminPool, name, pool);
     await adminPool.end();
   }
 });

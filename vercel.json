@@ -1,5 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "build": {
+    "env": {
+      "NEXT_ENABLE_ADAPTER": "0"
+    }
+  },
   "git": {
     "deploymentEnabled": {
       "main": true,
