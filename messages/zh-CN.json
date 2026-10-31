@@ -2669,7 +2669,7 @@
     "failedTitle": "回复失败",
     "wakeErrors": {
       "wake_failed": "回复等待重试",
-      "wake_start_unconfirmed": "回复启动未确认 · 等待重试",
+      "wake_start_unconfirmed": "回复启动未确认",
       "wake_exhausted": "回复重试已停止"
     },
     "unavailable": "{name} 暂时不可用",

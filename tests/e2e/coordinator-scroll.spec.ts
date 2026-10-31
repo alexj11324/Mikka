@@ -63,7 +63,7 @@ test('an unacknowledged wake keeps the message, stops the spinner and recovers t
   await register(page)
   await page.getByRole('button', { name: 'Coordinator', exact: true }).first().click()
   await expect(conversation(page).getByText(FIRST, { exact: true })).toBeVisible()
-  await expect(page.getByRole('alert').filter({ hasText: '回复启动未确认 · 等待重试' })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: '回复启动未确认' })).toBeVisible()
   await expect(conversation(page).getByText('Coordinator 正在处理…')).toHaveCount(0)
   chat.error = 'wake_exhausted'
   await expect(page.getByRole('alert').filter({ hasText: '回复重试已停止' })).toBeVisible({ timeout: 15000 })

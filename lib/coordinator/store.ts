@@ -309,7 +309,7 @@ export async function editMemory<T>(userId: string, edit: (memory: string) => { 
 
 export interface ChatView {
   items: ChatItem[]
-  /** A turn is active, or pending input is new or holds a live delivery lease. */
+  /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
   /** Why the last turn failed, when no turn has answered since. */
   error: string | null
@@ -384,7 +384,7 @@ export interface BotChatSummary {
   /** The latest reply or message, as written; null before the first. */
   line: string | null
   at: string | null
-  /** A turn is active, or pending input is new or holds a live delivery lease. */
+  /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
 }
 

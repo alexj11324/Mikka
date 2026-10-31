@@ -23,8 +23,11 @@ not restore run authority or bypass the consumer's current policy checks.
 
 An accepted enqueue is logged with its workflow run ID, event IDs and attempt;
 it is not evidence that the workflow body loaded. If the inbox is still
-undelivered after the existing two-minute startup lease, the chat shows an
-unconfirmed start awaiting retry instead of an active-work spinner. Failed
+undelivered after the first two-minute startup lease, the chat shows an
+unconfirmed start instead of an active-work spinner. Later startup retries
+keep this state visible even while their wake lease is live; renewing the
+delivery lease cannot hide an unconfirmed start. The final live startup retry
+stays unconfirmed until it consumes the inbox or its lease expires. Failed
 wakes show pending retry; exhausted wakes show retries stopped. The original
 message remains visible. Chat polling continues every ten seconds while idle,
 so an independent retry can restore the reply without a reload. Bot-list

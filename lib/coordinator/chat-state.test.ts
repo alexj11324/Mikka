@@ -21,9 +21,19 @@ test('failed and unacknowledged starts stop the spinner while preserving pending
   assert.equal(coordinatorChatState(undefined, [{ ...pending[0], wakeLastError: 'private-provider-detail' }], now).error, 'wake_start_unconfirmed')
 })
 
-test('the last live delivery attempt can run; exhaustion remains visible afterwards', () => {
+test('back-to-back unconsumed wake claims cannot hide an unconfirmed start', () => {
+  const first = { ...event, wakeAttempts: 1, wakeLeaseUntil: future }
+  assert.deepEqual(coordinatorChatState(undefined, [first], now), { working: true, error: null })
+  const retryAt = new Date(future.getTime() + 1)
+  assert.deepEqual(coordinatorChatState(undefined, [first], retryAt), { working: false, error: 'wake_start_unconfirmed' })
+  const second = { ...first, wakeAttempts: 2, wakeLeaseUntil: new Date(retryAt.getTime() + 120_000) }
+  assert.deepEqual(coordinatorChatState(undefined, [second], retryAt), { working: false, error: 'wake_start_unconfirmed' })
+  assert.equal(coordinatorChatState({ leaseHolder: 'real-turn', leaseUntil: second.wakeLeaseUntil, lastError: null }, [second], retryAt).working, true)
+})
+
+test('the last live startup retry stays unconfirmed until consumption or exhaustion', () => {
   const last = { ...event, wakeAttempts: MAX_WAKE_ATTEMPTS, wakeLastError: 'wake_exhausted', wakeLeaseUntil: future }
-  assert.equal(coordinatorChatState(undefined, [last], now).working, true)
+  assert.deepEqual(coordinatorChatState(undefined, [last], now), { working: false, error: 'wake_start_unconfirmed' })
   assert.deepEqual(coordinatorChatState(undefined, [{ ...last, wakeLeaseUntil: expired }], now), { working: false, error: 'wake_exhausted' })
 })
 

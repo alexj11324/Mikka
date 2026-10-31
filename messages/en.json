@@ -2669,7 +2669,7 @@
     "failedTitle": "Reply failed",
     "wakeErrors": {
       "wake_failed": "Reply pending retry",
-      "wake_start_unconfirmed": "Reply start unconfirmed · retry pending",
+      "wake_start_unconfirmed": "Reply start unconfirmed",
       "wake_exhausted": "Reply retries stopped"
     },
     "unavailable": "{name} is unavailable",
