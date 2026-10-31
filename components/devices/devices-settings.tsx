@@ -14,6 +14,7 @@ import { IconTile } from '@/components/reui/icon-tile'
 import { useActionError } from '@/lib/use-action-error'
 import { ConnectDeviceDialog } from './connect-device-dialog'
 import { DeviceIcon } from './device-icon'
+import { FieldError } from '@/components/ui/field'
 
 function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onChanged: () => void; onReconnect: () => void }) {
   const t = useTranslations('Devices')
@@ -72,7 +73,7 @@ export function DevicesSettings() {
       <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
       <Button size="sm" aria-keyshortcuts="Meta+N Control+N" className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setAdding(true)}><Plus data-icon="inline-start" />{t('connect.trigger')}</Button>
     </div>
-    {error && <p role="alert" className="text-xs text-destructive">{t('listError')}</p>}
+    {error && <FieldError className="text-xs">{t('listError')}</FieldError>}
     {devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> :
       <DeviceGroup title={t('thisMachine')} devices={devices} onChanged={() => { void mutate() }} onReconnect={reconnect} />}
     <ConnectDeviceDialog open={adding} onOpenChange={setAdding} hideTrigger />

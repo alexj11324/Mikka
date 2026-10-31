@@ -16,6 +16,7 @@ import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { withBasePath } from '@/lib/base-path'
 import { useActionError } from '@/lib/use-action-error'
 import { usePresence, type PresenceProps } from '@/lib/use-presence'
+import { FieldError } from '@/components/ui/field'
 
 const ICON_MAX_BYTES = 200 * 1024
 const ICON_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
@@ -195,8 +196,8 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = tr
               </Select>
             </Label>
             : <p className="text-muted-foreground">{t('transferNoMembers')}</p>
-          : targets.data?.error ? <p role="alert" className="text-destructive">{actionError(targets.data.error)}</p> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
-        {error && <p role="alert" className="text-destructive">{error}</p>}
+          : targets.data?.error ? <FieldError>{actionError(targets.data.error)}</FieldError> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
+        {error && <FieldError>{error}</FieldError>}
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" disabled={pending} onClick={onClose}>{commonT('cancel')}</Button>
@@ -242,12 +243,12 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose, open = true, onOpen
             <li>{t('deleteTasks', { tasks: counts.tasks, teams: counts.teams })}</li>
             {computerBilling && counts.purchasedPoints > 0 && <li>{t('deletePoints', { points: counts.purchasedPoints })}</li>}
           </ul>
-          : impact.data?.error ? <p role="alert" className="text-destructive">{actionError(impact.data.error)}</p> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
+          : impact.data?.error ? <FieldError>{actionError(impact.data.error)}</FieldError> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
         <p className="text-muted-foreground">{t('deleteKept')}</p>
         <Label className="flex flex-col items-start gap-1.5 font-normal text-muted-foreground">{t('deleteConfirmLabel', { name })}
           <Input value={typed} placeholder={name} autoComplete="off" onChange={event => setTyped(event.target.value)} />
         </Label>
-        {error && <p role="alert" className="text-destructive">{error}</p>}
+        {error && <FieldError>{error}</FieldError>}
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" disabled={pending} onClick={onClose}>{commonT('cancel')}</Button>

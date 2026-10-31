@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
-import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldError } from '@/components/ui/field'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { IssueAssigneeMenu } from './issue-assignee-menu'
 import { IssuePropertyMenu } from './issue-property-menu'
@@ -121,7 +121,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
       <Button variant={metadata.pullRequests.length ? 'ghost' : 'outline'} size={metadata.pullRequests.length ? 'icon-xs' : 'xs'} type="button" className="rounded-full" disabled={busy} onClick={() => open('pullRequests')} aria-label={tProperty('managePullRequestsAria')}><Link2 data-icon="inline-start" />{!metadata.pullRequests.length && tProperty('pullRequests')}</Button>
       </>}
     </>}
-    {error && !target && <p role="alert" className="w-full text-xs text-destructive">{error}</p>}
+    {error && !target && <FieldError className="w-full text-xs">{error}</FieldError>}
     <Dialog open={target !== null} onOpenChange={value => { if (!value && !pending) { setTarget(null); setError('') } }}>
       <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-md">
         <DialogHeader><DialogTitle>{target ? titles[target] : tProperty('taskProperties')}</DialogTitle><DialogDescription>{target === 'invite' ? tProperty('inviteDescription') : target === 'pullRequests' ? tProperty('pullRequestsDescription') : target === 'labels' ? tProperty('labelsDescription') : tProperty('defaultDescription')}</DialogDescription></DialogHeader>
@@ -144,7 +144,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
             <FieldGroup><Field><FieldLabel htmlFor={fieldId}>{tProperty('newPrLink')}</FieldLabel><Input id={fieldId} type="url" value={name} onChange={event => setName(event.target.value)} placeholder="https://github.com/owner/repo/pull/81" maxLength={500} disabled={busy} /></Field><Field><FieldLabel>{tProperty('newPrState')}</FieldLabel><IssuePropertyMenu label={tProperty('newPrState')} value={prState} options={prStates} icon={GitPullRequest} disabled={busy} onChange={value => setPrState(value as IssuePullRequest['state'])} /></Field></FieldGroup>
           </>}
           {target === 'invite' && <FieldGroup><Field><FieldLabel htmlFor={fieldId}>{tProperty('memberEmail')}</FieldLabel><Input id={fieldId} type="email" value={name} onChange={event => setName(event.target.value)} placeholder={tProperty('memberEmailPlaceholder')} required maxLength={254} disabled={busy} /></Field></FieldGroup>}
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {error && <FieldError>{error}</FieldError>}
           <DialogFooter><Button type="button" variant="ghost" disabled={pending} onClick={() => setTarget(null)}>{tCommon('cancel')}</Button><Button type="submit" disabled={busy}>{pending ? tCommon('saving') : target === 'invite' ? tProperty('inviteAction') : tCommon('save')}</Button></DialogFooter>
         </form>
       </DialogContent>

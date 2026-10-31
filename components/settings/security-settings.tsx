@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { relativeTime } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
+import { FieldError } from '@/components/ui/field'
 
 /** N1: password, signed-in devices. Passkey and 2FA wait for their backend. */
 export function SecuritySettings() {
@@ -100,7 +101,7 @@ export function SecuritySettings() {
     </SettingsSection>
 
     <SettingsSection id="devices-heading" title={t('devices')} description={t('devicesDescription')}>
-      {(sessions.error || (sessions.data && 'error' in sessions.data)) && <p role="alert" className="px-5 py-3 text-sm text-destructive">{sessions.data && 'error' in sessions.data ? actionError(sessions.data.error) : t('devicesError')}</p>}
+      {(sessions.error || (sessions.data && 'error' in sessions.data)) && <FieldError className="px-5 py-3">{sessions.data && 'error' in sessions.data ? actionError(sessions.data.error) : t('devicesError')}</FieldError>}
       {!sessions.data && !sessions.error && <SettingsLoading label={t('devicesLoading')} rows={3} />}
       {devices.map(device => <SettingRow key={device.id} title={device.label ?? t('unknownDevice')} description={t('lastActive', { when: relativeTime(device.lastActiveAt, locale) })}>
         {device.current
@@ -110,7 +111,7 @@ export function SecuritySettings() {
       {devices.length > 1 && <SettingRow title={t('signOutOthers')} description={t('signOutOthersDescription')}>
         <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void signOutEverywhere() }}>{t('signOutOthers')}</Button>
       </SettingRow>}
-      {signOutError && <p role="alert" className="px-5 py-3 text-sm text-destructive">{signOutError}</p>}
+      {signOutError && <FieldError className="px-5 py-3">{signOutError}</FieldError>}
     </SettingsSection>
 
     <Dialog open={editing} onOpenChange={setEditing}>
@@ -129,12 +130,12 @@ export function SecuritySettings() {
           <Label className="flex flex-col items-start gap-1.5">{t('confirmPassword')}
             <Input type="password" autoComplete="new-password" value={again} onChange={event => setAgain(event.target.value)} />
           </Label>
-          {mismatch && <p role="alert" className="text-sm text-destructive">{t('passwordMismatch')}</p>}
+          {mismatch && <FieldError>{t('passwordMismatch')}</FieldError>}
           {hasPassword && <Label className="flex items-center gap-2">
             <Checkbox checked={revokeOthers} onCheckedChange={checked => setRevokeOthers(checked === true)} />
             {t('revokeOthers')}
           </Label>}
-          {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+          {saveError && <FieldError>{saveError}</FieldError>}
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setEditing(false)} disabled={saving}>{t('cancel')}</Button>

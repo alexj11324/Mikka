@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { getMemory, removeFact, setMemory, updateFact } from '@/app/actions/memory'
 import { USER_FACT_KINDS, type UserFactKind } from '@/lib/profile/kinds'
+import { FieldError } from '@/components/ui/field'
 
 type Memory = Awaited<ReturnType<typeof getMemory>>
 type Fact = Memory['facts'][number]
@@ -48,7 +49,7 @@ export function MemorySettings() {
         <Switch aria-label={t('learn')} checked={data?.enabled ?? true} disabled={!data} onCheckedChange={enabled => run(() => setMemory(enabled), current => ({ ...current, enabled }))} />
       </SettingRow>
     </SettingsSection>
-    {(error || failed) && <p role="alert" className="px-1 text-sm text-destructive">{t('error')}</p>}
+    {(error || failed) && <FieldError className="px-1">{t('error')}</FieldError>}
     {data && !groups.length && <p className="px-1 text-sm text-muted-foreground">{t('empty')}</p>}
     {groups.map(group => <section key={group.kind} aria-labelledby={`memory-${group.kind}`} className="flex flex-col gap-2 px-1">
       <h2 id={`memory-${group.kind}`} className="text-base font-semibold">{t(`kinds.${group.kind as UserFactKind}`)}</h2>

@@ -8,6 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { getPreferences, updatePreferences } from '@/app/actions/preferences'
 import type { Preferences } from '@/lib/preferences'
+import { FieldError } from '@/components/ui/field'
 
 type Flags = Pick<Preferences, 'proactive' | 'pushDecide' | 'pushReview' | 'pushFinished' | 'pushBriefing' | 'pushWhen'>
 
@@ -33,7 +34,7 @@ export function NotificationSettings() {
     }
   }
 
-  if (error) return <p role="alert" className="text-xs text-destructive">{t('loadError')}</p>
+  if (error) return <FieldError className="text-xs">{t('loadError')}</FieldError>
   if (!data) return <SettingsLoading label={t('loading')} rows={6} />
 
   const switches: { key: Exclude<keyof Flags, 'pushWhen'>; title: string }[] = [

@@ -10,6 +10,7 @@ import { SettingRow, SettingsSection, settingsSectionAction } from '@/components
 import { withBasePath } from '@/lib/base-path'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
 import { disconnectLinearAccount, disableLinearTeam, enableLinearTeam, getLinearIntegrationState, listLinearTeamOptions, retryLinearDelivery, retryLinearIssue, startLinearOAuth } from '@/app/actions/linear-sync'
+import { FieldError } from '@/components/ui/field'
 
 type IntegrationState = Awaited<ReturnType<typeof getLinearIntegrationState>>
 type TeamOption = Awaited<ReturnType<typeof listLinearTeamOptions>>[number]
@@ -148,15 +149,15 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
           </NativeSelect>
           {activeTeam && <div className="flex flex-wrap items-center gap-2">{enabled === true && <Badge variant="outline">{t('syncActive', { team: activeTeam.linearTeamName })}</Badge>}<Button variant="outline" size="sm" disabled={busy} onClick={() => void disableTeam()}>{t('pause')}</Button></div>}
           {!activeTeam && <Button size="sm" disabled={busy || enabled !== true || !selectedTeam} onClick={() => void enableTeam()}>{t('enable')}</Button>}
-          {activeTeam?.lastError && <p role="alert" className="text-xs text-destructive">{activeTeam.lastError}</p>}
+          {activeTeam?.lastError && <FieldError className="text-xs">{activeTeam.lastError}</FieldError>}
         </div>
       </SettingRow>}
     </SettingsSection>
 
     {enabled === true && state && !state.configured && <p className="text-xs text-muted-foreground">{t('notConfigured')}</p>}
     {notice === 'connected' && <p role="status" className="text-sm text-success-foreground">{t('oauthSuccess')}</p>}
-    {notice === 'error' && <p role="alert" className="text-sm text-destructive">{t('oauthError')}</p>}
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    {notice === 'error' && <FieldError>{t('oauthError')}</FieldError>}
+    {error && <FieldError>{error}</FieldError>}
 
     {!!state?.errors.length && <SettingsSection id="linear-failed-issues" title={t('failedIssues')}>
       {state.errors.map(item => <SettingRow key={item.id} title={`${item.identifier ? `${item.identifier} · ` : ''}${item.title}`} description={item.message ?? t('operationError')}><Button variant="outline" size="sm" disabled={busy || enabled !== true} onClick={() => void retry(item.issueId)}><RefreshCw data-icon="inline-start" />{t('retry')}</Button></SettingRow>)}
