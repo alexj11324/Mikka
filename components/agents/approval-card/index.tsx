@@ -104,7 +104,7 @@ function QuestionOptions({
   const custom = answer.custom ?? "";
 
   return (
-    <div className="mt-3">
+    <div className="mt-2">
       {question.input ? (
         <QuestionInput question={question} answer={answer} disabled={disabled} onChange={onChange} dateRangePicker={dateRangePicker} />
       ) : question.options?.length ? (
@@ -125,7 +125,7 @@ function QuestionOptions({
                       : answer.selected.filter((value) => value !== option.value),
                   })
                 }
-                className="min-h-9 rounded-lg px-1.5 py-1"
+                className="min-h-8 rounded-lg px-1.5 py-1"
               />
             ))}
           </div>
@@ -145,7 +145,7 @@ function QuestionOptions({
                 label={option.label}
                 description={option.description}
                 disabled={disabled || option.disabled}
-                className="min-h-9 rounded-lg px-1.5 py-1"
+                className="min-h-8 rounded-lg px-1.5 py-1"
               />
             ))}
           </RadioGroup>
@@ -167,8 +167,9 @@ function QuestionOptions({
           className={cn("p-0.5", question.options?.length && "mt-1.5")}
           classNames={{
             field:
-              "h-10 rounded-xl border-0 bg-background/70 focus-within:bg-background",
-            input: "px-3 text-sm",
+              // R-31: a filled field, no stroke. --control darkens the grey card instead of a pale near-white patch.
+              "h-10 rounded-lg border-0 bg-control hover:bg-control-hover data-[state=focused]:bg-control data-[state=focused]:ring-1 data-[state=focused]:ring-ring",
+            input: "px-3 text-sm placeholder:text-muted-foreground",
           }}
         />
       ) : null}
@@ -398,7 +399,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
       data-state={status}
       aria-busy={busy}
       className={cn(
-        "w-full overflow-hidden rounded-2xl bg-muted p-4 text-sm",
+        "w-full overflow-hidden rounded-2xl bg-muted p-3 text-sm",
         className,
       )}
     >
@@ -497,9 +498,14 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
             )}
 
             {questionMode ? (
-              <div className="mt-4 flex items-center gap-3">
+              // Back, progress and next sit together on the right, within one thumb's reach (Codex, Linear).
+              <div className="mt-3 flex items-center justify-end gap-2">
                 {multipleQuestions ? (
                   <>
+                    <ProgressDots
+                      current={currentStep}
+                      ids={questions.map((item) => item.id)}
+                    />
                     <Button
                       variant="ghost"
                       size="icon"
@@ -510,10 +516,6 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                     >
                       <ArrowLeft className="size-4" />
                     </Button>
-                    <ProgressDots
-                      current={currentStep}
-                      ids={questions.map((item) => item.id)}
-                    />
                   </>
                 ) : null}
                 <Button
@@ -525,7 +527,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                   }
                   disabled={busy || !isAnswered(currentAnswer) || (currentStep === questions.length - 1 && questions.some(item => !isAnswered(currentAnswers[item.id] ?? EMPTY_ANSWER)))}
                   onClick={continueQuestion}
-                  className="ml-auto rounded-full"
+                  className="rounded-full disabled:bg-control disabled:text-muted-foreground disabled:opacity-100"
                 >
                   {busy ? (
                     <LoaderCircle className={cn("size-4", !reduce && "animate-spin")} />
