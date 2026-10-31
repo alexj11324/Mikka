@@ -120,7 +120,7 @@
   <text x="1100" y="265.5" text-anchor="middle" font-size="15" fill="#111111">监控</text>
   <text x="1100" y="284.5" text-anchor="middle" font-size="15" fill="#111111">故障回流为 issue</text>
   <rect x="1000" y="350" width="200" height="60" fill="#ffffff" stroke="#111111" stroke-width="2.5"/>
-  <text x="1100" y="375.5" text-anchor="middle" font-size="15" fill="#111111">Mikka Cloud · 托管</text>
+  <text x="1100" y="375.5" text-anchor="middle" font-size="15" fill="#111111">托管的 Mikka Cloud</text>
   <text x="1100" y="394.5" text-anchor="middle" font-size="15" fill="#111111">E2B，每个 bot 一个桌面</text>
   <rect x="1000" y="490" width="165" height="60" fill="#ffffff" stroke="#111111" stroke-width="2.5"/>
   <text x="1082.5" y="515.5" text-anchor="middle" font-size="15" fill="#111111">Agent CLI</text>

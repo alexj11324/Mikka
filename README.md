@@ -216,12 +216,12 @@ Claude Code completes sign-in in your browser. Agents can then read and modify
 tasks, dispatch runs and update the Coordinator's memory. Other clients and the
 full tool list are in the [MCP docs](https://aspectlylabs.com/mikka/docs/mcp).
 
-### Where Agents run: Mikka Cloud, or your own
+### Where Agents run: Mikka managed cloud, or your own
 
 Like hosted and self-hosted CI runners, an Agent runs either on a machine Mikka
 manages or on one you bring.
 
-**Mikka Cloud (managed).** Mikka starts the machine, sleeps it when idle and
+**Mikka managed cloud.** On Mikka Cloud, Mikka starts the machine, sleeps it when idle and
 keeps its disk. Today it runs on the workspace's own E2B API key, set in
 Settings › Secrets and environment; Mikka-billed compute is built but hidden behind the
 `mikka-computer-billing` flag.
