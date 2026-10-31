@@ -159,60 +159,6 @@ jobs:
       - run: pnpm test:coordinator-native-relay
       - run: pnpm test:coordinator-native-scope
       - run: pnpm test:coordinator-issue-tools
-      - name: Prepare pinned hosted-runner test image
-        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
-      - name: Daemon unit and transport regression tests
-        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
-      - name: Existing mailbox CLI integration tests
-        run: pnpm --filter @mikka/daemon test:mailbox-cli
-      - name: Local computer authority through actual daemon and adapter protocol
-        run: pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs
-        env:
-          NODE_ENV: test
-          MIKKA_TEST_MODE: '1'
-      - name: Install sandbox runtime dependencies without changing host namespace policy
-        if: ${{ !cancelled() }}
-        run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
-      - name: Install pinned official CLI for offline protocol diagnostics
-        if: ${{ !cancelled() }}
-        run: |
-          npm install --prefix "$RUNNER_TEMP/pr13-codex-contract" --no-audit --no-fund --ignore-scripts @openai/codex@0.163.0
-          echo "CODEX_CONTRACT_BIN=$RUNNER_TEMP/pr13-codex-contract/node_modules/.bin/codex" >> "$GITHUB_ENV"
-      - name: Require real sandbox probe and daemon lifecycle acceptance (no skips)
-        if: ${{ !cancelled() }}
-        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-sandbox-results.json"
-        env:
-          MIKKA_SANDBOX_ACCEPTANCE: '1'
-      - name: Preserve offline CLI diagnostic evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: pr13-cli-diagnostics-${{ github.sha }}
-          path: |
-            ${{ runner.temp }}/pr13-sandbox-results.json
-            ${{ runner.temp }}/pr13-daemon-unit-results.json
-            /tmp/mikka-official-codex-synthetic-*/evidence.json
-            /tmp/mikka-official-codex-synthetic-*/runs/*/official-cli.stderr.log
-            /tmp/mikka-official-codex-computer-*/evidence.json
-            /tmp/mikka-official-codex-computer-*/runs/*/official-cli.stderr.log
-            /tmp/mikka-official-claude-synthetic-*/evidence.json
-            /tmp/mikka-official-claude-synthetic-*/adapters/runs/*/official-cli.stderr.log
-            /tmp/mikka-official-claude-computer-*/evidence.json
-            /tmp/mikka-official-claude-computer-*/adapters/runs/*/official-cli.stderr.log
-            /tmp/mikka-hosted-approval-*/evidence.json
-            /tmp/mikka-hosted-approval-*/docker.jsonl
-            /tmp/mikka-hosted-approval-*/created-id
-            /tmp/mikka-hosted-approval-*/adapters/native-resources/*.json
-            /tmp/mikka-launcher-computer-*/evidence.json
-          if-no-files-found: warn
-      - run: pnpm --filter @mikka/daemon typecheck
-      - run: pnpm --filter @mikka/daemon build
-        id: daemon-package
-      - run: pnpm --filter @mikka/daemon test:package
-        env:
-          MIKKA_DAEMON_DIST_DIR: ${{ steps.daemon-package.outputs.package-directory }}
-      - run: pnpm --filter @mikka/protocol typecheck
-      - run: pnpm --filter @mikka/mobile typecheck
       - run: pnpm test:active-agents
         env:
           # Database regressions run against ephemeral Postgres in browser-tests below.
@@ -265,18 +211,104 @@ jobs:
           name: ui-policy-audit
           path: ui-audit.json
           if-no-files-found: ignore
+
+  source-checks:
+    name: Source checks
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    # Fixed standard Linux image; host namespace/security policy stays unchanged.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
       - run: pnpm lint:code
         if: always()
       - run: pnpm exec next typegen
         if: always()
       - run: pnpm typecheck
         if: always()
+      - run: pnpm --filter @mikka/protocol typecheck
+      - run: pnpm --filter @mikka/mobile typecheck
+
+  daemon-checks:
+    name: Daemon checks
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    # Fixed standard Linux image; host namespace/security policy stays unchanged.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
+      - name: Prepare pinned hosted-runner test image
+        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
+      - name: Daemon unit and transport regression tests
+        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
+      - name: Existing mailbox CLI integration tests
+        run: pnpm --filter @mikka/daemon test:mailbox-cli
+      - name: Local computer authority through actual daemon and adapter protocol
+        run: pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs
+        env:
+          NODE_ENV: test
+          MIKKA_TEST_MODE: '1'
+      - name: Install sandbox runtime dependencies without changing host namespace policy
+        if: ${{ !cancelled() }}
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
+      - name: Install pinned official CLI for offline protocol diagnostics
+        if: ${{ !cancelled() }}
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pr13-codex-contract" --no-audit --no-fund --ignore-scripts @openai/codex@0.163.0
+          echo "CODEX_CONTRACT_BIN=$RUNNER_TEMP/pr13-codex-contract/node_modules/.bin/codex" >> "$GITHUB_ENV"
+      - name: Require real sandbox probe and daemon lifecycle acceptance (no skips)
+        if: ${{ !cancelled() }}
+        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-sandbox-results.json"
+        env:
+          MIKKA_SANDBOX_ACCEPTANCE: '1'
+      - name: Preserve offline CLI diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr13-cli-diagnostics-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/pr13-sandbox-results.json
+            ${{ runner.temp }}/pr13-daemon-unit-results.json
+            /tmp/mikka-official-codex-synthetic-*/evidence.json
+            /tmp/mikka-official-codex-synthetic-*/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-codex-computer-*/evidence.json
+            /tmp/mikka-official-codex-computer-*/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-claude-synthetic-*/evidence.json
+            /tmp/mikka-official-claude-synthetic-*/adapters/runs/*/official-cli.stderr.log
+            /tmp/mikka-official-claude-computer-*/evidence.json
+            /tmp/mikka-official-claude-computer-*/adapters/runs/*/official-cli.stderr.log
+            /tmp/mikka-hosted-approval-*/evidence.json
+            /tmp/mikka-hosted-approval-*/docker.jsonl
+            /tmp/mikka-hosted-approval-*/created-id
+            /tmp/mikka-hosted-approval-*/adapters/native-resources/*.json
+            /tmp/mikka-launcher-computer-*/evidence.json
+          if-no-files-found: warn
+      - run: pnpm --filter @mikka/daemon typecheck
+      - run: pnpm --filter @mikka/daemon build
+        id: daemon-package
+      - run: pnpm --filter @mikka/daemon test:package
+        env:
+          MIKKA_DAEMON_DIST_DIR: ${{ steps.daemon-package.outputs.package-directory }}
 
   ui-policy:
     # The required check name. It reports success when only documentation
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
-    needs: [changes, ui-policy-full]
+    needs: [changes, ui-policy-full, source-checks, daemon-checks]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -286,6 +318,8 @@ jobs:
           CHANGES_RESULT: ${{ needs.changes.result }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           FULL_RESULT: ${{ needs.ui-policy-full.result }}
+          SOURCE_RESULT: ${{ needs.source-checks.result }}
+          DAEMON_RESULT: ${{ needs.daemon-checks.result }}
         run: |
           if [ "$CHANGES_RESULT" != "success" ]; then
             echo "Changed files job did not succeed: $CHANGES_RESULT"
@@ -295,19 +329,25 @@ jobs:
             echo "Documentation-only change; the full UI policy suite is skipped."
             exit 0
           fi
-          if [ "$FULL_RESULT" != "success" ]; then
-            echo "The full UI policy suite did not succeed: $FULL_RESULT"
-            exit 1
-          fi
+          for result in "$FULL_RESULT" "$SOURCE_RESULT" "$DAEMON_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "A required source, unit or daemon job did not succeed: $result"
+              exit 1
+            fi
+          done
 
   browser-tests-full:
     # Browser tests moved to browser-tests.yml; this job keeps the build and
     # database suites that the required check names cover.
-    name: Production build and browser interactions (full)
+    name: Database checks (${{ matrix.shard }}/4)
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     services:
       postgres:
         image: postgres:17
@@ -325,6 +365,7 @@ jobs:
     env:
       CI: 'true'
       REQUIRE_DB: '1'
+      DB_TEST_SHARD: ${{ matrix.shard }}/4
       MIKKA_TEST_DB_PORT: '5432'
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
@@ -354,8 +395,10 @@ jobs:
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
       - name: Verify local execution identities and repository records (isolated Postgres)
+        if: matrix.shard == 1
         run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/local-runtime.integration.ts
       - name: Verify thread sharing, membership and privacy against isolated database
+        if: matrix.shard == 1
         run: node --experimental-test-module-mocks --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
       - name: Required DB suites (temporary Postgres 17, no skips)
         run: pnpm test:db
@@ -369,16 +412,15 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: pr13-http-cli-approval-${{ github.sha }}
+          name: pr13-http-cli-approval-${{ github.sha }}-${{ matrix.shard }}
           path: |
             /tmp/mikka-http-network-approval-*/evidence.json
             /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
             ${{ runner.temp }}/pr13-personal-mailbox-results.xml
           if-no-files-found: warn
-      # Browser tests (pull request) build the exact synthetic merge candidate.
-      # Avoid rebuilding that candidate here; main and merge-group still build.
+      # PR and main builds run in browser-tests.yml; merge-group has no browser workflow.
       - run: pnpm build
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'merge_group' && matrix.shard == 1
 
   browser-tests:
     # The required check name. Same docs-only behavior as UI policy above.

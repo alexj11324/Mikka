@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
@@ -328,6 +328,54 @@ test('pnpm store cache is restored everywhere and saved only on main', () => {
   assert(action.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'"))
   assert(!action.includes('cache: pnpm'))
   assert(!readFileSync('.github/workflows/ui-policy.yml', 'utf8').includes('cache: pnpm'))
+})
+
+test('each browser build restores only compiler cache; only a successful main build can save it', () => {
+  const source = workflow()
+  const job = name => source.split(`\n  ${name}:\n`)[1].split(/\n  [\w-]+:\n/)[0]
+  const key = "next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}"
+  const pin = '0057852bfaa89a56745cba8c7296529d2fc39830'
+  assert.equal(source.match(/uses: actions\/cache\/restore@/g).length, 3)
+  assert.equal(source.match(/uses: actions\/cache\/save@/g).length, 1)
+  for (const name of ['browser-pr', 'browser-selection', 'browser-build']) {
+    const steps = job(name).split('\n      - ')
+    const restore = steps.find(step => step.startsWith('name: Restore the Next.js build cache\n'))
+    const build = steps.find(step => step.startsWith('name: Build the application'))
+    assert(restore?.includes(`uses: actions/cache/restore@${pin}`), name)
+    assert.match(restore, /\n          path: \.next\/cache\n/)
+    assert(restore.includes(`key: ${key}\n`), name)
+    assert(restore.includes(`restore-keys: |\n            ${key.slice(0, -'${{ github.sha }}'.length)}`), name)
+    assert(steps.indexOf(restore) < steps.indexOf(build), name)
+    assert(build.includes('pnpm exec next build') && !build.includes('if:'), 'cache hits must still build this checkout')
+    if (name !== 'browser-build') assert(!job(name).includes('actions/cache/save@'), 'pull requests never write build caches')
+  }
+  const save = job('browser-build').split('\n      - ').find(step => step.startsWith('name: Save the Next.js build cache (main only)\n'))
+  assert(save.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.next-cache.outputs.cache-hit != 'true'\n"))
+  assert(save.includes(`uses: actions/cache/save@${pin}`))
+  assert(save.includes('path: .next/cache\n'))
+  assert(save.includes('key: ${{ steps.next-cache.outputs.cache-primary-key }}'))
+  assert(job('browser-build').indexOf('pnpm exec next build') < job('browser-build').indexOf(save))
+})
+
+test('the runtime archive excludes compiler cache and preserves runtime output for the exact revision', () => {
+  const build = workflow().split('\n  browser-build:\n')[1].split('\n  browser-runtime:\n')[0]
+  const command = build.match(/name: Package the build for the parallel test jobs\n        run: ([^\n]+)/)?.[1]
+  assert(command)
+  assert(build.includes('name: browser-build-${{ github.sha }}\n'))
+  assert(build.includes('compression-level: 0\n'), 'the gzip archive needs no second compression pass')
+  const dir = mkdtempSync(join(tmpdir(), 'browser-runtime-archive-'))
+  try {
+    for (const path of ['server/app', 'static/chunks', 'cache/turbopack', 'cache/fetch-cache']) mkdirSync(join(dir, '.next', path), { recursive: true })
+    const runtime = ['BUILD_ID', 'server/app/page.js', 'static/chunks/main.js']
+    for (const path of [...runtime, 'cache/turbopack/compiled', 'cache/fetch-cache/entry']) writeFileSync(join(dir, '.next', path), path)
+    const result = spawnSync('bash', ['-e', '-c', command], { cwd: dir, encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+    const entries = execFileSync('tar', ['-tzf', 'browser-build.tar.gz'], { cwd: dir, encoding: 'utf8' }).trim().split('\n')
+    for (const path of runtime) assert(entries.includes(`.next/${path}`), path)
+    assert(!entries.some(path => /^\.next\/cache(?:\/|$)/.test(path)), 'compiler and fetch caches stay out of runtime artifacts')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('real subset entrypoint retains search receipts and rejects missing evidence or failed subsets', () => {

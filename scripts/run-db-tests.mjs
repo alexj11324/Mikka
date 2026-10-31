@@ -210,14 +210,28 @@ export function readTree(root = '.') {
   return files
 }
 
+export function shardScripts(scripts, shard) {
+  if (shard === undefined) return scripts
+  const parts = typeof shard === 'string' && /^([1-9]\d*)\/([1-9]\d*)$/.exec(shard)
+  if (!parts || parts[0] !== shard) throw new Error('DB_TEST_SHARD must be i/n with 1 <= i <= n')
+  const [index, count] = parts.slice(1).map(Number)
+  if (!Number.isSafeInteger(index) || !Number.isSafeInteger(count) || index > count) throw new Error('DB_TEST_SHARD must be i/n with 1 <= i <= n')
+  const selected = [...scripts].sort().filter((_, position) => position % count === index - 1)
+  if (!selected.length) throw new Error(`DB_TEST_SHARD ${shard} selects no database suites`)
+  return selected
+}
+
 export function main({ root = '.', env = process.env, run = spawnSync } = {}) {
   try {
     validateTarget(env)
     const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).scripts ?? {}
     const plan = inventory(readTree(root), scripts, (env.DB_TEST_EXPECTED ?? '').split(',').filter(Boolean))
     console.log(`Required DB inventory: ${JSON.stringify(plan)}`)
+    const selected = shardScripts(plan.scripts, env.DB_TEST_SHARD)
+    console.log(`Required DB selection: ${JSON.stringify({ shard: env.DB_TEST_SHARD ?? 'all', total: plan.scripts.length, scripts: selected })}`)
     let failed = false
-    for (const script of plan.scripts) {
+    // Suites share destructive fixtures, so only isolated CI jobs run in parallel.
+    for (const script of selected) {
       console.log(`::group::pnpm ${script}`)
       const result = run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: { ...env, REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', MIKKA_TEST_DB_PORT: new URL(env.E2E_DATABASE_URL).port || '5432' }, maxBuffer: 64 << 20 })
       process.stdout.write(result.stdout ?? ''); process.stderr.write(result.stderr ?? '')
