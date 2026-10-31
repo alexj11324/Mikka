@@ -1574,7 +1574,6 @@
   },
   "Settings": {
     "title": "设置",
-    "backToApp": "返回应用",
     "searchLabel": "搜索设置",
     "searchPlaceholder": "搜索设置…",
     "noResults": "没有匹配的设置",
@@ -1621,9 +1620,6 @@
       },
       "privacy": {
         "title": "数据与隐私"
-      },
-      "activity": {
-        "title": "活动"
       },
       "computers": {
         "title": "设备"
@@ -2020,33 +2016,6 @@
       "exportReady": "邮件服务暂不可用，导出文件已准备好，可以直接下载（{hours} 小时内有效）。",
       "exportDownload": "下载导出文件",
       "manageNone": "目前没有共享中的链接"
-    },
-    "activity": {
-      "filtersLabel": "筛选活动",
-      "filters": {
-        "all": "全部",
-        "accounts": "用了我的账户",
-        "reminders": "提醒"
-      },
-      "loading": "正在读取活动…",
-      "empty": "还没有活动记录。",
-      "loadError": "活动记录没有读出来。",
-      "loadMore": "加载更早的活动",
-      "loadingMore": "正在加载…",
-      "view": "查看",
-      "credentialUse": "{bot} 用了 {site} 的登录",
-      "someBot": "某个 Bot",
-      "approved": "你批准了：{action}",
-      "declined": "你拒绝了：{action}",
-      "reminder": "提醒：{title}",
-      "result": {
-        "input_inserted_guarded": "已填入，未提交",
-        "password_submitted": "已提交密码",
-        "otp_submitted": "已提交验证码",
-        "session_applied": "恢复了登录会话",
-        "denied_or_failed": "被拒绝或失败"
-      },
-      "emptyScope": "还没有活动记录。这里只记录 Bot 用你的登录、你批准或拒绝的操作，以及协调员发给你的提醒；普通对话和任务不会出现在这里。"
     },
     "logins": {
       "heading": "网站登录",

@@ -19,7 +19,6 @@ import { GoogleSignInSettings } from '@/components/settings/google-sign-in-setti
 import { AccountSettings } from '@/components/settings/account-settings'
 import { SecuritySettings } from '@/components/settings/security-settings'
 import { PrivacySettings } from '@/components/settings/privacy-settings'
-import { ActivitySettings } from '@/components/settings/activity-settings'
 import { SavedLoginsSettings } from '@/components/settings/saved-logins-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
 import { DevicesSettings } from '@/components/devices/devices-settings'
@@ -34,6 +33,8 @@ import { BillingSettings } from '@/components/settings/billing-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
+import type { RailDestination } from '@/components/nav/icon-rail'
+import { prefetchSettingsSection } from '@/lib/settings-prefetch'
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
 
@@ -41,7 +42,8 @@ interface SettingsViewProps {
   user: { name: string; email: string; image?: string | null }
   userKey?: string
   googleEnabled?: boolean
-  onBack: () => void
+  /** Leaves Settings for a rail destination; phones, which have no rail, list them in the section sheet. */
+  onRail: (destination: RailDestination) => void
   onSignOut: () => void
   signingOut: boolean
   accountError: string
@@ -55,7 +57,7 @@ interface SettingsViewProps {
   preview?: boolean
 }
 
-export function SettingsView({ user, userKey, googleEnabled = false, onBack, onSignOut, signingOut, accountError, activeSection, initialSection, inviteInitially = false, workspaceId, selectedTeamId, children, linearNotice = null, preview = false }: SettingsViewProps) {
+export function SettingsView({ user, userKey, googleEnabled = false, onRail, onSignOut, signingOut, accountError, activeSection, initialSection, inviteInitially = false, workspaceId, selectedTeamId, children, linearNotice = null, preview = false }: SettingsViewProps) {
   const t = useTranslations('Settings')
   const [localSection, setSection] = useState<SettingsSectionId>(activeSection ?? initialSection ?? 'preferences')
   const section = activeSection ?? localSection
@@ -67,7 +69,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onBack, onS
   const routedBody = section === 'members' || section === 'teams'
 
   return <>
-    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onBack={onBack} onSignOut={onSignOut} signingOut={signingOut} />
+    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId) }} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <p role="alert" className="px-6 py-2 text-sm text-destructive">{accountError}</p>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent className="gap-6">
@@ -87,7 +89,6 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'account': return <AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />
     case 'security': return <><SecuritySettings /><GoogleSignInSettings googleEnabled={googleEnabled} /></>
     case 'privacy': return <PrivacySettings />
-    case 'activity': return <ActivitySettings />
     case 'logins': return <SavedLoginsSettings />
     case 'preferences': return <><AppearanceSection /><IssuePrefixSettings /></>
     case 'notifications': return <NotificationSettings />
