@@ -29,7 +29,7 @@ Full license texts are in [`../skill-licenses/`](../skill-licenses/).
 - **UI design and review**: `interface-design`, with
   `/interface-design:design-review` (craft review with a pass bar) and
   `/interface-design:design-deslop` (diff-scoped cleanup). Its design-system
-  file is `docs/design/`: record decisions in `docs/design/decisions.md`
+  file is `docs/design/`: record decisions in `docs/design/decisions/`
   instead of `.interface-design/system.md`.
 - **AI-looking UI**: `unslop` as an audit list (`references/signs.md`). Mikka
   already has a direction (`docs/design/`), so use its polish mode: fix the

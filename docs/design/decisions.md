@@ -1,5 +1,10 @@
 # Decision log
 
+**Frozen since 2026-10-31 17:30 UTC.** New decisions go in
+[`decisions/`](decisions/README.md), one file each, so parallel pull requests
+no longer conflict here. Everything below stays authoritative. To supersede a
+row, strike it and link the new file.
+
 One row per product or design decision Alex made. Add the row the day you
 hear it, quoting where it was said. If a decision replaces an older one,
 mark the older row ~~struck~~ and point to the new one; never delete rows.
