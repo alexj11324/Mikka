@@ -52,7 +52,7 @@ export function NotificationSettings() {
         <Switch checked={data[key]} aria-label={title} onCheckedChange={checked => { void set({ [key]: checked }) }} />
       </SettingRow>)}
       <SettingRow title={t('pushWhen')}>
-        <ToggleGroup aria-label={t('pushWhen')} variant="outline" spacing={0} value={[data.pushWhen]} onValueChange={values => {
+        <ToggleGroup aria-label={t('pushWhen')} variant="segment" spacing={0.5} value={[data.pushWhen]} onValueChange={values => {
           const next = values[0]
           if (next === 'always' || next === 'away') void set({ pushWhen: next })
         }}>

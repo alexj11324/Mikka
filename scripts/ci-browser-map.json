@@ -36,6 +36,7 @@
     "plugins-page.spec.ts",
     "question-card.spec.ts",
     "settings.spec.ts",
+    "segmented-control.spec.ts",
     "settings-background-polling.spec.ts",
     "sign-out.spec.ts",
     "suggestion-entry-contract.spec.ts",
@@ -139,6 +140,7 @@
         "settings-team-permissions.spec.ts",
         "settings-tokens.spec.ts",
         "settings-usage.spec.ts",
+        "segmented-control.spec.ts",
         "bot-computer-tab.spec.ts",
         "bot-agents-settings.spec.ts"
       ]
@@ -269,6 +271,16 @@
       "specs": [
         "board-layout.spec.ts",
         "offline-layout.spec.ts"
+      ]
+    },
+    {
+      "area": "motion",
+      "paths": [
+        "^components\\/ui\\/(?:toggle-group|toggle|tabs|segment-indicator)\\.tsx$",
+        "^lib\\/ease\\.ts$"
+      ],
+      "specs": [
+        "segmented-control.spec.ts"
       ]
     },
     {
