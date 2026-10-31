@@ -172,3 +172,17 @@ assertions remain unchanged. Claim-boundary source tests pass 14/14. These
 follow-ups change tests and this report only, preserving application source,
 runtime guards, timeouts and skip policy. Final Git-linked CI is recorded on
 the aggregate PR, rather than treating these earlier runs as final success.
+
+The fixture follow-up revision `d3ef96e8` passed the complete required DB step
+on real GitHub Actions/PostgreSQL 17 with no skips (run `41151903647`, job
+`124390141857`), including the original guarded scope suite and secrets
+suite. Full/strict source gates also passed. Its browser run is
+`41151909584`; exact final results remain associated with that revision.
+
+Main then advanced to `b5dc4fc6` with other owners' settings, billing and
+Turnstile changes. Compatibility merge `0f4316b0` retains those changes
+without implementing their newer issues. Only `package.json` conflicted:
+every main check command is retained, with this batch's schedules and run
+recovery checks added. The complete migration history now contains 154
+files; the four pending migrations still sort after main. The latest
+aggregate PR checks verify this final compatibility revision separately.
