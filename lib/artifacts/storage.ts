@@ -42,6 +42,15 @@ export async function getArtifactObject(key: string): Promise<string> {
   return response.text()
 }
 
+/** Stream an existing immutable object without buffering a recording in the server. */
+export async function getArtifactObjectStream(key: string, signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+  const config = r2Config()
+  if (!config) throw new Error('R2 is not configured')
+  const response = await config.client.fetch(objectUrl(config, key), { signal })
+  if (!response.ok || !response.body) throw new Error(`R2 get failed: ${response.status}`)
+  return response.body
+}
+
 /** The object's bytes, for binary files such as run captures. */
 export async function getArtifactObjectBytes(key: string): Promise<Uint8Array<ArrayBuffer>> {
   const config = r2Config()
