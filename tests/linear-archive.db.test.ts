@@ -93,12 +93,12 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   }
   async function retire(id: string, confirmed = false) {
     const effects: import('../lib/issue-effects').IssueEffect[] = []
-    const before = (await pool.query('select content from issues where id=$1', [id])).rows[0]
+    const before = (await pool.query('select content,revision from issues where id=$1', [id])).rows[0]
     const preview = confirmed ? await actAs(owner, () => actions.previewIssuePersonalScope(id)) : null
     if (confirmed) assert.ok(preview && 'preview' in preview && preview.preview)
     const result = await collectIssueEffects(effects, () => actAs(owner, () => confirmed && preview && 'preview' in preview && preview.preview
-      ? actions.confirmIssuePersonalScope({ id, revision: 1, confirmation: preview.preview.confirmation })
-      : actions.setIssueScope({ id, revision: 1, scope: 'personal' })))
+      ? actions.confirmIssuePersonalScope({ id, revision: before.revision, confirmation: preview.preview.confirmation })
+      : actions.setIssueScope({ id, revision: before.revision, scope: 'personal' })))
     assert.ok('issue' in result && result.issue)
     assert.equal(result.issue.scope, 'personal')
     assert.equal(result.issue.scopeSetBy, 'user')
@@ -146,5 +146,33 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   assert.equal(stateReads, calls)
   assert.equal(archiveRequests, 1)
   assert.equal((await pool.query('select status from linear_sync_outbox where "issueId"=$1 and operation=\'archive\'', [denied])).rows[0].status, 'failed')
+  // Same unresolved state as the browser acceptance: no verified link, an
+  // inactive sync and a committed reservation whose response was lost.
+  await pool.query('update linear_connections set "revokedAt"=null where "userId"=$1', [owner])
+  const created = await collectIssueEffects([], () => actAs(owner, () => actions.saveIssue({ title: 'Unknown Linear publication', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })))
+  assert.ok('issue' in created && created.issue)
+  const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')
+  const promoted = await promoteExistingIssueForUser(owner, { requestId: randomUUID(), issueId: created.issue.id, revision: created.issue.revision, teamId, expectedTeamId: null })
+  assert.ok('issue' in promoted && promoted.issue)
+  const pendingIssue = created.issue.id, pendingSync = randomUUID(), pendingPublication = randomUUID(), pendingRemote = randomUUID()
+  await pool.query('insert into linear_team_syncs(id,"ownerId","linearTeamId","linearTeamKey","linearTeamName",active) values($1,$2,$3,\'OLD\',\'Unresolved fixture\',false)', [pendingSync, owner, randomUUID()])
+  await pool.query('insert into linear_issue_publications(id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId","writePending") values($1,$2,$3,$4,$5,$6,true)', [pendingPublication, pendingIssue, owner, pendingSync, promoted.issue.scopeVersion, pendingRemote])
+  await retire(pendingIssue)
+  const beforeUnknownReads = stateReads, beforeUnknownWrites = archiveRequests
+  await processLinearIssueOutbox(pendingIssue)
+  assert.equal(stateReads, beforeUnknownReads)
+  assert.equal(archiveRequests, beforeUnknownWrites, 'an unknown target never receives another external write')
+  const pending = (await pool.query('select * from linear_sync_outbox where "issueId"=$1 and operation=\'archive\'', [pendingIssue])).rows[0]
+  assert.equal(pending.archiveTarget.targetVerified, false)
+  assert.equal(pending.status, 'failed')
+  assert.ok(pending.lastError)
+  const retained = (await pool.query('select * from linear_issue_publications where id=$1', [pendingPublication])).rows[0]
+  assert.equal(retained.linearIssueId, pendingRemote)
+  assert.equal(retained.writePending, true)
+  assert.ok(retained.retiredAt)
+  const detached = (await pool.query('select * from linear_issue_detachments where "linearIssueId"=$1', [pendingRemote])).rows[0]
+  assert.equal(detached.publicationId, pendingPublication)
+  assert.equal(detached.externalTargetVerified, false)
+  assert.equal(detached.archivedAt, null)
   assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where operation=\'sync\' and status<>\'done\'')).rows[0].n, 0)
 })

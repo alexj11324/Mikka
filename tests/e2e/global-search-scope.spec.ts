@@ -4,7 +4,7 @@ import { test, expect, register, watchRuntime, seedTask, openSearch, openIssueFr
 
 // Real app, real routes, real server actions: no request or action is mocked.
 // Scope promotion requires an explicitly saved team choice; returning to personal
-// scope is immediate unless a possibly published Linear copy needs reconciliation.
+// scope is immediate; possibly published Linear copies stay retained for reconciliation.
 // Group fixtures go through the real group API as the signed-in person.
 
 function isolatedPool() {
@@ -88,7 +88,7 @@ test('explicit local scope changes do not ask for a second confirmation', async 
   expect(errors).toEqual([])
 })
 
-test('an unresolved Linear publication keeps a shared task from becoming personal', async ({ page, context }) => {
+test('an unresolved Linear publication is retained without further writes when the owner makes the task personal', async ({ page, context }) => {
   const errors = watchRuntime(context)
   await prepareTeam(page)
   const title = `Scope blocked ${randomUUID().slice(0, 8)}`
@@ -118,11 +118,21 @@ test('an unresolved Linear publication keeps a shared task from becoming persona
     expect((await pool.query('SELECT id FROM linear_sync_outbox WHERE "issueId"=$1', [id])).rowCount).toBe(0)
 
     await choosePersonal(page)
-    await expect(page.getByText('请先确认如何处理 Linear 中的任务，再转为个人任务。', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '归属：个人', exact: true })).toBeVisible()
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
-    await expect(page.getByRole('button', { name: '归属：工作区', exact: true })).toBeVisible()
-    expect((await pool.query('SELECT scope, revision, "scopeVersion", "linearSyncBlocked" FROM issues WHERE id=$1', [id])).rows[0]).toEqual(before)
-    expect((await pool.query('SELECT * FROM linear_issue_publications WHERE id=$1', [publicationId])).rows).toEqual(publication.rows)
+    expect((await pool.query('SELECT scope, revision, "scopeVersion", "linearSyncBlocked", "scopeSetBy" FROM issues WHERE id=$1', [id])).rows[0]).toEqual({
+      scope: 'personal', revision: before.revision + 1, scopeVersion: before.scopeVersion + 1, linearSyncBlocked: true, scopeSetBy: 'user',
+    })
+    const retained = (await pool.query('SELECT * FROM linear_issue_publications WHERE id=$1', [publicationId])).rows[0]
+    expect(retained).toMatchObject({ ...publication.rows[0], retiredAt: expect.any(Date), writePending: true })
+    const detached = (await pool.query('SELECT * FROM linear_issue_detachments WHERE "linearIssueId"=$1', [remoteId])).rows[0]
+    expect(detached).toMatchObject({ issueId: id, publicationId, teamSyncId: syncId, externalTargetVerified: false, archivedAt: null })
+    const archive = (await pool.query('SELECT * FROM linear_sync_outbox WHERE "issueId"=$1 AND operation=\'archive\'', [id])).rows[0]
+    expect(archive.scopeVersion).toBe(before.scopeVersion)
+    expect(archive.archiveTarget.targetVerified).toBe(false)
+    expect(['queued', 'processing', 'failed']).toContain(archive.status)
+    expect((await pool.query('SELECT id FROM linear_issue_links WHERE "issueId"=$1', [id])).rowCount).toBe(0)
+    expect((await pool.query('SELECT id FROM linear_sync_outbox WHERE "issueId"=$1 AND operation=\'sync\' AND status<>\'done\'', [id])).rowCount).toBe(0)
   } finally { await pool.end() }
   expect(errors).toEqual([])
 })
