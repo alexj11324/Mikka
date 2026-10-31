@@ -149,8 +149,7 @@ test('Text inside an OpenUI card is part of the card, not a chat bubble', () => 
 })
 
 test('An OpenUI button or form submit continues the chat with its label and the edited rows', () => {
-  const prompt = actionPrompt({ type: 'continue_conversation', params: {}, humanFriendlyMessage: 'Create these tasks', formState: { tasks: [{ id: '1', values: ['Write brief', 'high'] }] } })
-  assert.match(prompt, /^Create these tasks/)
-  assert.match(prompt, /Write brief/)
+  const prompt = actionPrompt({ type: 'continue_conversation', params: {}, humanFriendlyMessage: 'Create these tasks', formState: { tasks: { tasks: { value: [{ id: '1', values: ['Write brief', 'high'] }, { id: '2', values: ['Review design', 'low'] }], componentType: 'EditableTable' } } } })
+  assert.equal(prompt, 'Create these tasks\n\ntasks\n- Write brief · high\n- Review design · low')
   assert.equal(actionPrompt({ type: 'continue_conversation', params: {}, humanFriendlyMessage: 'Next' }), 'Next')
 })
