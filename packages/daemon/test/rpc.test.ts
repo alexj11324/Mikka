@@ -25,6 +25,10 @@ describe("local RPC handshake", () => {
       link: new MemoryServer().link(),
       harnesses: [],
       quotaSource: null,
+      // The handshake needs no agent sandbox. Without this, start() fetches
+      // and probes the host's sandbox tools (apt downloads on a bare runner),
+      // which can outlast the 10 s hook timeout.
+      agentSandbox: null,
     }).start()
   })
 
@@ -130,6 +134,7 @@ describe("local RPC handshake", () => {
       link: new MemoryServer().link(),
       harnesses: [],
       quotaSource: null,
+      agentSandbox: null,
     })
     await expect(second.start()).rejects.toBeInstanceOf(
       DaemonAlreadyRunningError
