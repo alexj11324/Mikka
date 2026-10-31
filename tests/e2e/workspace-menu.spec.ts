@@ -2,13 +2,14 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import { test, expect, register, browserClientHeaders, watchRuntime, app, fillSecretPassword, captureAuthenticationCookies, skipOnboarding } from './fixtures'
 
+/** The avatar menu is one flat list: workspaces, 创建工作区, 设置, 添加账户, 退出登录; no submenu. */
 async function openSwitcher(page: Page) {
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-  await page.getByRole('menuitem', { name: '切换工作区', exact: true }).hover()
-  const switcher = page.getByRole('menu', { name: '切换工作区', exact: true })
-  await expect(switcher.getByRole('menuitem', { name: '创建工作区', exact: true })).toBeVisible()
-  await expect(switcher.getByRole('menuitem', { name: '创建或加入工作区', exact: true })).toHaveCount(0)
-  return switcher
+  const menu = page.getByRole('menu', { name: '工作区菜单', exact: true })
+  await expect(menu.getByRole('menuitem', { name: '创建工作区', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: '创建或加入工作区', exact: true })).toHaveCount(0)
+  await expect(menu.getByRole('menuitem', { name: '切换工作区', exact: true })).toHaveCount(0)
+  return menu
 }
 
 async function openWorkspacePage(page: Page) {
@@ -45,8 +46,8 @@ test('菜单与参考一致，创建持久工作区、切换并同步成员上�
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(name)
   const switcher = await openSwitcher(page)
   await expect(switcher).toContainText(account.email)
-  await expect(switcher.getByRole('group', { name: '账户', exact: true })).toBeVisible()
-  await expect(switcher.getByRole('menuitem', { name, exact: true })).toHaveAttribute('aria-current', 'true')
+  await expect(switcher.getByRole('group', { name: account.email, exact: true }).getByRole('menuitem', { name, exact: true })).toHaveAttribute('aria-current', 'true')
+  await expect(switcher.getByRole('menuitem', { name: '设置', exact: true })).toBeVisible()
   await expect(switcher.getByRole('menuitem', { name: '添加账户', exact: true })).toBeVisible()
   await expect(switcher.getByRole('menuitem', { name: /个人资料|偏好设置|切换明暗主题/ })).toHaveCount(0)
   await switcher.getByRole('menuitem', { name: original.name, exact: true }).click()
@@ -56,8 +57,7 @@ test('菜单与参考一致，创建持久工作区、切换并同步成员上�
   await expect(page).toHaveURL(url => url.pathname === app('/'))
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(name)
   expect((await selectedWorkspace(page)).id).toBe(created.id)
-  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-  await page.getByRole('menuitem', { name: '设置', exact: true }).click()
+  await (await openSwitcher(page)).getByRole('menuitem', { name: '设置', exact: true }).click()
   await page.getByRole('link', { name: '成员', exact: true }).click()
   const members = await page.request.get(app('/api/workspace'))
   expect((await members.json()).workspace.id).toBe(created.id)
@@ -96,8 +96,7 @@ test('添加账户保留旧会话，可切回两个账户，退出后撤销全�
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(original.name)
   await (await openSwitcher(page)).getByRole('menuitem', { name: '第二个验证账户的工作区', exact: true }).click()
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText('第二个验证账户的工作区')
-  await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
+  await (await openSwitcher(page)).getByRole('menuitem', { name: '退出登录', exact: true }).click()
   await expect(page).toHaveURL(/\/sign-in/)
   expect((await context.cookies()).filter(cookie => cookie.name.includes('_multi-'))).toHaveLength(0)
   await page.goto(app('/settings/members'))
