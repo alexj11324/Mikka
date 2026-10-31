@@ -3154,7 +3154,8 @@
         "running": "In progress ({count})",
         "idle": "Idle ({count})",
         "resolved": "Resolved ({count})"
-      }
+      },
+      "waitingFor": "Waiting for {device} to come online"
     },
     "newBot": {
       "title": "New bot",
