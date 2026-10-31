@@ -25,7 +25,11 @@ test('插件 is one list of apps, shared with 设置 › 连接', async ({ page 
   await page.getByRole('link', { name: '打开 GitHub', exact: true }).click()
   await expect(page).toHaveURL(url => url.searchParams.get('app') === 'github')
   await expect(page.getByRole('heading', { name: 'GitHub', exact: true })).toBeVisible()
+  // Back returns to the list as it was left: the search still filters it.
   await page.goBack()
+  await expect(page.getByRole('textbox', { name: '搜索应用', exact: true })).toHaveValue('git')
+  await expect(page.getByRole('link', { name: '打开 GitHub', exact: true })).toBeVisible()
+  await page.getByRole('textbox', { name: '搜索应用', exact: true }).fill('')
   await expect(page.getByRole('link', { name: '打开 Gmail', exact: true })).toBeVisible()
 
   await page.goto(app('/settings?section=connections'))

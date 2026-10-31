@@ -50,6 +50,13 @@ test('OAuth resume URLs omit app-only parameters while preserving the signed req
 test('returns to the plugins page and a known app page, nothing else', () => {
   assert.equal(safeAuthReturn('/?section=plugins'), '/?section=plugins')
   assert.equal(safeAuthReturn('/?section=plugins&app=gmail'), '/?section=plugins&app=gmail')
-  assert.equal(safeAuthReturn('/?section=plugins&app=github'), '/')
+  assert.equal(safeAuthReturn('/?section=plugins&app=github'), '/?section=plugins&app=github')
+  assert.equal(safeAuthReturn('/?section=plugins&app=unknown'), '/')
   assert.equal(safeAuthReturn('/?section=plugins&app=gmail&next=//evil.test'), '/')
+})
+
+test('returns to an app page under 设置 › 连接, and only there', () => {
+  assert.equal(safeAuthReturn('/settings?section=connections&app=github'), '/settings?section=connections&app=github')
+  assert.equal(safeAuthReturn('/settings?section=connections&app=unknown'), '/')
+  assert.equal(safeAuthReturn('/settings?section=account&app=github'), '/')
 })
