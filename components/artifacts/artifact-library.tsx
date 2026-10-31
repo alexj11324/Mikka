@@ -14,6 +14,7 @@ import type { ArtifactListItem } from '@/lib/artifacts/types'
 import { cn } from '@/lib/utils'
 import { ArtifactKindIcon } from './artifact-card'
 import { ArtifactWindow } from './artifact-window'
+import { InlineLoadError } from '@/components/load-error'
 
 /** The categories on the left: everything, then one per kind an artifact can be today. */
 type Category = 'all' | ArtifactKind
@@ -54,7 +55,7 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
     </aside>
     <section aria-labelledby="artifact-category-title" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-6 pb-6 md:px-12">
       <h2 id="artifact-category-title" className="pb-6 text-xl leading-7 font-semibold">{t(`category.${current.label}`)}</h2>
-      {error ? <div role="alert" className="flex items-center gap-2 text-xs"><span className="text-destructive">{t('loadError')}</span><Button variant="ghost" size="xs" onClick={() => { void mutate() }}>{t('retry')}</Button></div>
+      {error ? <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-2">{[0, 1, 2, 3].map(index => <Skeleton key={index} className="h-12 w-full" />)}</div>
         : !rows.length ? <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader></Empty>
         : <div className="flex flex-col">

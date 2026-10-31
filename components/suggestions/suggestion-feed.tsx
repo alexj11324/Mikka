@@ -20,6 +20,7 @@ import type { SuggestionCard } from '@/lib/suggestions/card'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
 import { CARD_FRAME, SuggestionCardBody } from './mobile-card'
+import { InlineLoadError } from '@/components/load-error'
 
 const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: WorkspaceContentLoading })
 
@@ -79,7 +80,7 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
         <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('refresh')} disabled={isValidating} onClick={() => { void mutate().then(() => toast.success(t('refreshed')), () => toast.error(t('refreshFailed'))) }} />}><RotateCw data-icon="inline-start" className={cn(isValidating && 'animate-spin')} /></TooltipTrigger><TooltipContent>{t('refresh')}</TooltipContent></Tooltip>
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-6 pb-6">
-        {error && <div role="alert" className="flex items-center gap-2 text-xs"><span className="text-destructive">{t('loadError')}</span><Button variant="ghost" size="xs" onClick={() => { void mutate() }}>{t('retry')}</Button></div>}
+        {error && <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />}
         {sendError && <p role="alert" className="text-xs text-destructive">{sendError}</p>}
         {!data && !error && <div role="status" aria-label={t('loading')} className="flex flex-col gap-2.5">{[0, 1, 2].map(index => <Skeleton key={index} className="h-14 w-full rounded-[16px]" />)}</div>}
         {items.map(item => <Button key={item.id} variant="ghost" data-slot="suggestion-card" disabled={sending !== null} aria-busy={sending === item.id || undefined} onClick={() => { void pick(item) }}

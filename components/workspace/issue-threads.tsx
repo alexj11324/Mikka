@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { RUN_BADGES } from './agent-citations'
 import { ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
+import { InlineLoadError } from '@/components/load-error'
 
 export function useIssueThreads(issueId: string) {
   return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: threads => runListRefreshInterval(threads?.map(threadQuestionView)), revalidateOnFocus: true, revalidateOnReconnect: true })
@@ -36,7 +37,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
   const { data, error, mutate } = useIssueThreads(issueId)
-  if (error) return <div role="alert" className="flex items-center gap-2 text-xs"><span className="text-destructive">{t('loadFailed')}</span><Button variant="ghost" size="xs" onClick={() => { void mutate() }}>{t('retry')}</Button></div>
+  if (error) return <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
   if (!data?.length) return null
   return <section aria-labelledby={`threads-${issueId}`} className="flex flex-col gap-2">
     <h2 id={`threads-${issueId}`} className="flex items-baseline gap-1.5 text-sm font-medium">{t('title')}<span className="text-xs font-normal text-muted-foreground tabular-nums">{data.length}</span></h2>
