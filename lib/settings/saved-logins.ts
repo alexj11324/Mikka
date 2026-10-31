@@ -4,6 +4,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { pool } from '@/lib/db'
 import { awsKms } from '@/lib/credentials/kms'
 import { CredentialStore } from '@/lib/credentials/store'
+import type { Actor } from '@/lib/credentials/contracts'
 
 /**
  * What the broker recorded for one use of a saved login
@@ -70,12 +71,13 @@ export async function savedLogins(userId: string): Promise<SavedLogin[]> {
  * longer be leased, open fill leases are consumed and saved sessions expire,
  * so the broker cannot fill it again.
  */
-export async function deleteSavedLoginFor(userId: string, id: unknown): Promise<{ id: string }> {
+export async function deleteSavedLoginFor(actor: Actor, id: unknown): Promise<{ id: string }> {
+  const userId = actor.userId
   const target = credentialId(id)
   const { rows: [row] } = await pool.query('SELECT origin, username FROM credentials WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL', [target, userId])
   if (!row) throw new ActionFailureError('savedLoginNotFound')
   // The KMS is never called by removal; the store needs one to be built.
-  await new CredentialStore(pool, awsKms('app')).remove({ userId, workspaceId: '' }, row.origin, row.username)
+  await new CredentialStore(pool, awsKms('app')).remove(actor, row.origin, row.username)
   return { id: target }
 }
 

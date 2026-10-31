@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
-import { gzipSync } from 'node:zlib'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { gunzipSync, gzipSync } from 'node:zlib'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedAgent, seedRun, seedUser } from '../../tests/support/workspace-admin-db'
@@ -54,31 +58,55 @@ test('portable account files preserve owned bytes/versions and abort missing, al
     }
     return { id, versionIds }
   }
-  const first = Buffer.from('first version — 原文'), second = Buffer.from('second version 😀\n'), patch = gzipSync('diff --git a/file b/file\n+owned source\n')
+  const repo = mkdtempSync(join(tmpdir(), 'mikka-export-checkpoint-'))
+  t.after(() => rmSync(repo, { recursive: true, force: true }))
+  const git = (...args: string[]) => execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-C', repo, ...args])
+  git('init', '--quiet', '--template=')
+  writeFileSync(join(repo, 'file'), 'original source\n')
+  git('add', 'file')
+  git('-c', 'user.name=Export fixture', '-c', 'user.email=export@example.invalid', 'commit', '--quiet', '-m', 'checkpoint base')
+  const baseCommit = git('rev-parse', 'HEAD').toString().trim()
+  const source = 'owned source — 原文\n'
+  writeFileSync(join(repo, 'file'), source)
+  const first = Buffer.from('first version — 原文'), second = Buffer.from('second version 😀\n'), patch = gzipSync(git('diff', '--binary', baseCommit))
+  const takenAt = new Date('2026-10-31T12:00:00.000Z'), updatedAt = new Date('2026-10-31T12:00:30.000Z')
   const own = await artifact(owner, [first, second], true)
   const foreign = await artifact(peer, [Buffer.from('peer private file')], true)
   const captureId = randomUUID(), capture = Buffer.from([0, 1, 2, 253, 254, 255, 7])
   const captureKey = `capture-object-${captureId}`; objects.set(captureKey, capture)
   await database.query(`INSERT INTO run_captures(id,"userId","runId",kind,"contentType",source,status,title,"storageKey",sha256,size) VALUES($1,$2,$3,'image','image/png','local','ready','Owned capture',$4,$5,$6)`, [captureId, owner, ownerRun, captureKey, hash(capture), capture.length])
-  await database.query('INSERT INTO run_checkpoints("runId","userId","baseCommit",patch,files,"takenAt") VALUES($1,$2,$3,$4,1,now())', [ownerRun, owner, 'a'.repeat(40), patch])
+  await database.query('INSERT INTO run_checkpoints("runId","userId","baseCommit",patch,files,"takenAt","updatedAt") VALUES($1,$2,$3,$4,1,$5,$6)', [ownerRun, owner, baseCommit, patch, takenAt, updatedAt])
+  await database.query('INSERT INTO run_checkpoints("runId","userId","baseCommit",patch,files,"takenAt") VALUES($1,$2,$3,$4,1,now())', [peerRun, peer, 'b'.repeat(40), gzipSync('peer private checkpoint')])
   const data = await buildAccountExport(owner)
   const options = { database, signal: new AbortController().signal, assertCurrent: async () => {} }
   await t.test('all owned versions, binary capture and masked checkpoint round-trip; peer object IDs never reach storage', async () => {
     const files = await accountExportFiles(owner, database)
     assert.equal(files.length, 4)
     assert.equal(files.some(file => foreign.versionIds.includes(file.id)), false)
+    assert.equal(files.some(file => file.id === peerRun), false)
     const result = await new Response(accountExportBody(data, files, owner, options)).json()
     assert.deepEqual(result.fileManifest, { complete: true, files: 4, exported: 4, unavailable: 0, bytes: first.length + second.length + capture.length + patch.length })
     const actual = (id: string) => Buffer.from(result.files.find((file: { id: string }) => file.id === id).content, 'base64')
     assert.deepEqual(actual(own.versionIds[0]), first); assert.deepEqual(actual(own.versionIds[1]), second)
     assert.deepEqual(actual(captureId), capture); assert.deepEqual(actual(ownerRun), patch)
+    const checkpoint = result.files.find((file: { id: string }) => file.id === ownerRun)
+    assert.equal(checkpoint.baseCommit, baseCommit)
+    assert.equal(checkpoint.files, 1)
+    assert.equal(checkpoint.takenAt, takenAt.toISOString())
+    assert.equal(checkpoint.updatedAt, updatedAt.toISOString())
+    assert.equal(checkpoint.size, patch.length); assert.equal(checkpoint.sha256, hash(patch))
+    // The exported commit identifies the real patch's base, without a new import/recovery subsystem.
+    git('reset', '--hard', checkpoint.baseCommit)
+    execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-C', repo, 'apply', '--binary', '-'], { input: gunzipSync(actual(ownerRun)) })
+    assert.equal(readFileSync(join(repo, 'file'), 'utf8'), source)
     assert.equal(result.files.find((file: { id: string }) => file.id === own.versionIds[1]).version, 2)
     assert.equal(JSON.stringify(result).includes('storageKey'), false)
     assert.ok(fetched.every(key => !foreign.versionIds.some(id => key.includes(id))))
   })
   await t.test('a foreign file descriptor still fails ownership when explicitly supplied to the stream', async () => {
-    const [file] = await accountExportFiles(peer, database), before = fetched.length
-    await assert.rejects(new Response(accountExportBody(data, [file], owner, options)).text(), /no longer available/)
+    const files = await accountExportFiles(peer, database), before = fetched.length
+    assert.equal(files.length, 2)
+    for (const file of files) await assert.rejects(new Response(accountExportBody(data, [file], owner, options)).text(), /no longer available/)
     assert.equal(fetched.length, before)
   })
   await t.test('missing or corrupt object bytes cannot become a complete valid JSON export', async () => {
@@ -119,6 +147,11 @@ test('portable account files preserve owned bytes/versions and abort missing, al
     const result = await new Response(accountExportBody(data, files, owner, options)).json()
     assert.deepEqual(result.fileManifest, { complete: false, files: 2, exported: 0, unavailable: 2, bytes: 0 })
     assert.ok(result.files.every((file: { content: unknown; unavailable: string }) => file.content === null && file.unavailable))
+    const checkpoint = result.files.find((file: { id: string }) => file.id === ownerRun)
+    assert.equal(checkpoint.baseCommit, baseCommit)
+    assert.equal(checkpoint.files, 1)
+    assert.equal(checkpoint.takenAt, takenAt.toISOString())
+    assert.equal(checkpoint.updatedAt, updatedAt.toISOString())
     await database.query('UPDATE run_captures SET "userId"=$1 WHERE id=$2', [peer, captureId])
     await assert.rejects(new Response(accountExportBody(data, files.filter(file => file.id === captureId), owner, options)).text(), /no longer available/)
   })
