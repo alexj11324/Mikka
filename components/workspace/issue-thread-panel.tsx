@@ -21,6 +21,9 @@ import { listRunArtifacts } from '@/app/actions/artifacts'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactKindIcon } from '@/components/artifacts/artifact-card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AcceptanceStateBadge, useThreadAcceptance } from './factory-acceptance'
+import { FactoryAcceptancePane } from './factory-acceptance-pane'
 
 // Loaded on demand: the window itself shows this panel, bare, on its right.
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
@@ -33,14 +36,15 @@ const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm whitespace-
  * On the issue page it sits on the right with a close button; opened from a chat's thread
  * card it fills the centre column and `back` names the chat it returns to (R-66).
  */
-type IssueThreadPanelProps = { issueId: string; runId: string; onClose: () => void; back?: string; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean }
+type ThreadTab = 'chat' | 'acceptance'
+type IssueThreadPanelProps = { issueId: string; runId: string; onClose: () => void; back?: string; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void }
 
 export function IssueThreadPanel(props: IssueThreadPanelProps) {
   // Drafts, in-flight callbacks and retry deadlines belong to exactly one run.
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThreadPanelProps) {
+function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab = 'chat', onOpenThread }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const { mutate: mutateCache } = useSWRConfig()
@@ -51,6 +55,10 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
     onSuccess: detail => { questionPolls.current = threadQuestionView(detail.thread).question ? questionPolls.current + 1 : 0 },
     revalidateOnFocus: true,
   })
+  // Frame 06: a thread whose candidate waits for acceptance has 对话 | 验收 in its header.
+  const acceptance = useThreadAcceptance(issueId, runId)
+  const [tab, setTab] = useState<ThreadTab>(initialTab)
+  const accepting = !bare && Boolean(acceptance) && tab === 'acceptance'
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [sendFailed, setSendFailed] = useState(false)
@@ -105,16 +113,21 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
     }
   }
   return <section aria-label={detail?.name ?? t('title')} className="flex h-full min-h-0 flex-col">
-    {!bare && <header className="flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4">
+    {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
       {back && <>
         <Button variant="ghost" size="sm" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
         <span aria-hidden="true" className="text-muted-foreground">/</span>
       </>}
       {detail && view && <ThreadStatusIcon status={view.status} waiting={view.waiting} />}
-      <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{detail?.name ?? t('title')}</h2>
+      <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{detail?.name ?? t('title')}</h2>
+      {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
+      {acceptance && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
+        <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
+      </Tabs>}
       {!back && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
     </header>}
+    {accepting && acceptance ? <div className={cn('flex min-h-0 flex-1 flex-col', back && 'mx-auto w-full max-w-3xl')}><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
     <div className={cn('flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4', back && 'mx-auto w-full max-w-3xl')}>
       {error ? <div role="alert" className="flex items-center gap-2 text-xs"><span className="text-destructive">{t('loadFailed')}</span><Button variant="ghost" size="xs" onClick={() => { void mutate() }}>{t('retry')}</Button></div>
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
@@ -150,6 +163,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false }: IssueThrea
       {sendFailed && <p role="alert" className="px-3 text-xs text-destructive">{t('sendFailed')}</p>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
+    </>}
   </section>
 }
 

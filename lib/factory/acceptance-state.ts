@@ -1,5 +1,5 @@
 /** Client view of a Factory acceptance (R-56). Pure so every state is testable without a server. */
-export type AcceptanceState = 'pending' | 'approved' | 'publishing' | 'checking' | 'failed' | 'live' | 'revoked' | 'expired' | 'invalidated' | 'unavailable'
+export type AcceptanceState = 'pending' | 'approved' | 'publishing' | 'checking' | 'failed' | 'live' | 'revoked' | 'expired' | 'invalidated' | 'unavailable' | 'merging' | 'merged'
 export type AcceptanceApproval = { id: string; candidateId: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 export type AcceptancePublication = { approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed' }
 
@@ -49,4 +49,21 @@ export function acceptanceState(input: {
                 : input.stage === 'approval' || superseded ? 'pending'
                   : 'unavailable'
   return { state, active, publication, superseded: latest ? undefined : superseded }
+}
+
+export type AcceptanceMerge = { candidateId: string; status: 'merging' | 'merged' | 'failed'; code: string | null; pullRequestUrl: string; createdAt: string }
+
+/**
+ * A code candidate (#528): acceptance is the person's merge of its PR. The latest merge on the
+ * current candidate decides; a refused one leaves it waiting (pending) with GitHub's reason.
+ */
+export function mergeAcceptance(input: { stage: string; status: string; candidateId: string | null; merges: AcceptanceMerge[] }): { state: AcceptanceState; refusal?: string } {
+  const time = (merge: AcceptanceMerge) => { const value = Date.parse(merge.createdAt); return Number.isNaN(value) ? -Infinity : value }
+  const latest = input.candidateId === null ? undefined : input.merges
+    .filter(merge => merge.candidateId === input.candidateId)
+    .reduce<AcceptanceMerge | undefined>((last, merge) => !last || time(merge) >= time(last) ? merge : last, undefined)
+  if (latest?.status === 'merged' || (input.stage === 'publish' && input.status === 'passed')) return { state: 'merged' }
+  if (latest?.status === 'merging') return { state: 'merging' }
+  if (input.stage !== 'approval' || input.candidateId === null) return { state: 'unavailable' }
+  return latest?.status === 'failed' && latest.code ? { state: 'pending', refusal: latest.code } : { state: 'pending' }
 }
