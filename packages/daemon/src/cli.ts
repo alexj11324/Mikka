@@ -8,6 +8,7 @@ import type { Flavor } from "@mikka/protocol"
 import { readJson, writeJsonAtomic } from "./fs-util"
 import { DaemonAlreadyRunningError, daemonProcessAlive, LOCK_TAKEOVER_MS } from "./lock"
 import { createLogger } from "./log"
+import { managedAutoUpdateRuntime } from "./auto-update"
 import { installService } from "./service"
 import { deviceLogin, registrationLogin } from "./login"
 import { startDaemon } from "./main"
@@ -17,7 +18,7 @@ import { MemoryServer, type DeviceRepo, type ServerLink } from "./server-link"
 import { HttpServerLink } from "./server-link-http"
 
 const USAGE = `Usage:
-  mikka daemon [--dev] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--hosted-subscriptions]
+  mikka daemon [--dev] [--no-auto-update] [--data-dir <dir>] [--server <url>|memory] [--mock-speed <n>] [--fixtures-dir <dir>] [--stall-minutes <n>] [--hosted-subscriptions]
   mikka daemon login [--server <url>] [--workspace <id>] [--token <device-token>] [--dev] [--data-dir <dir>]
   mikka daemon status [--dev] [--data-dir <dir>]`
 
@@ -76,6 +77,7 @@ export async function runCli(
     allowPositionals: true,
     options: {
       dev: { type: "boolean", default: false },
+      "no-auto-update": { type: "boolean", default: false },
       "data-dir": { type: "string" },
       server: { type: "string" },
       "mock-speed": { type: "string" },
@@ -101,7 +103,7 @@ export async function runCli(
   const dataDir = values["data-dir"] ?? defaultDataDir(flavor)
 
   if (sub === 'service' && positionals[2] === 'install') {
-    await installService(values.server ?? SERVER_URLS[flavor], values['device-type'])
+    await installService(values.server ?? SERVER_URLS[flavor], values['device-type'], { dataDir, dev: values.dev, autoUpdate: !values['no-auto-update'] })
     io.out('Service installed.')
     return 0
   }
@@ -219,6 +221,7 @@ export async function runCli(
     const daemon = await startDaemon({
       dataDir,
       flavor,
+      autoUpdate: await managedAutoUpdateRuntime(process.argv[1] ?? "", flavor, !values["no-auto-update"] && !values["hosted-subscriptions"] && !values["e2b-container-runtime"] && !values["e2b-computer"]),
       link,
       memoryServer,
       credential,
