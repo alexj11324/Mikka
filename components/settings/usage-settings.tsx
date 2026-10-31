@@ -20,6 +20,7 @@ import { currentMonth, recentMonths } from '@/lib/usage/month'
 import type { BotUsageRow, UsageRow } from '@/lib/usage/read'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
+import { FieldError } from '@/components/ui/field'
 
 type View = 'bots' | 'members'
 
@@ -74,7 +75,7 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
     </div>
 
     {!usage.data && !usage.error && <SettingsLoading label={t('loading')} rows={3} />}
-    {(usage.error || usage.data?.error) && <p role="alert" className="text-sm text-destructive">{actionError(usage.data?.error)}</p>}
+    {(usage.error || usage.data?.error) && <FieldError>{actionError(usage.data?.error)}</FieldError>}
     {data && <>
       {!admin && <h2 className="pl-1 text-sm font-medium">{t('yours')}</h2>}
       <dl className={cn('grid grid-cols-2 gap-4', balance !== null && 'sm:grid-cols-3')}>

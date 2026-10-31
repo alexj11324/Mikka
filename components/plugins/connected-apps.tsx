@@ -13,7 +13,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
@@ -217,7 +217,7 @@ export function ConnectedAppsStatus({ apps }: { apps: ConnectedApps }) {
   const { state, error, notice } = apps
   return <>
     {!state && !error && <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>}
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    {error && <FieldError>{error}</FieldError>}
     {notice && <p role={notice.tone} className={cn('text-sm', notice.tone === 'alert' ? 'text-destructive' : 'text-muted-foreground')}>{notice.text}</p>}
   </>
 }
@@ -423,7 +423,7 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
           <AlertDialogTitle>{t('disconnectTitle', { name: confirming ? accountName(confirming) : name })}</AlertDialogTitle>
           <AlertDialogDescription>{(confirming && takeoverText(accounts, confirming.id)) ?? t('disconnectConsequence', { name })}</AlertDialogDescription>
         </AlertDialogHeader>
-        {dialogError && <p role="alert" className="text-xs text-destructive">{dialogError}</p>}
+        {dialogError && <FieldError className="text-xs">{dialogError}</FieldError>}
         <AlertDialogFooter>
           <AlertDialogCancel variant="secondary" disabled={busy}>{common('cancel')}</AlertDialogCancel>
           <AlertDialogAction variant="destructive" disabled={busy} onClick={() => {

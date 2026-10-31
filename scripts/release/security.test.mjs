@@ -87,6 +87,25 @@ test('known high vulnerabilities, malformed audit results and expired exceptions
   assert.equal(assessAudit(pnpm, null, { ...policy, exceptions: [exception] }, now).allowed, true)
   assert.throws(() => assessAudit({ ...pnpm, muted: [{ id: 42 }] }, null, policy, now), /ReportUnavailable/)
   assert.throws(() => assessAudit({ ...pnpm, advisories: {} }, null, policy, now), /FindingMissing/)
+  const { expiresAt: _, ...openEnded } = exception
+  assert.equal(assessAudit(report, lock, { ...policy, exceptions: [openEnded] }, now).allowed, true)
+  assert.throws(() => assessAudit(report, lock, { ...policy, exceptions: [{ ...openEnded, reviewedAt: '2026-11-05T00:00:00Z' }] }, now), /ExceptionInvalidOrExpired/)
+})
+
+test('a transitive finding needs its own via:<package> exception', () => {
+  const now = Date.parse('2026-10-31T00:00:00Z')
+  const lock = { lockfileVersion: 3, packages: { 'node_modules/parent': { version: '2.0.0' }, 'node_modules/child': { version: '1.0.0' } } }
+  const report = { auditReportVersion: 2, metadata: { vulnerabilities: { info: 0, low: 0, moderate: 0, high: 2, critical: 0, total: 2 } }, vulnerabilities: {
+    child: { severity: 'high', nodes: ['node_modules/child'], via: [{ source: 7 }] },
+    parent: { severity: 'high', nodes: ['node_modules/parent'], via: ['child'] },
+  } }
+  const base = { owner: 'unit-fixture-owner', reason: 'Controlled review fixture; never a production exception.', reviewedAt: '2026-10-30T00:00:00Z' }
+  const child = { ...base, package: 'child', version: '1.0.0', advisory: '7' }
+  const policy = { version: 1, blockSeverities: ['critical', 'high'], exceptions: [child] }
+  const result = assessAudit(report, lock, policy, now)
+  assert.deepEqual(result.findings.map(x => [x.package, x.advisories]), [['parent', ['via:child']]])
+  const parent = { ...base, package: 'parent', version: '2.0.0', advisory: 'via:child' }
+  assert.equal(assessAudit(report, lock, { ...policy, exceptions: [child, parent] }, now).allowed, true)
 })
 
 test('desktop staging publishes only intended installers and the selected production SBOM graph', async () => {
@@ -105,6 +124,26 @@ test('desktop staging publishes only intended installers and the selected produc
     { sourceSha, bundledEntries: ['electron'], readManifest: async path => manifests[path] })
   assert.deepEqual(bom.components.map(value => value.name), ['electron', 'runtime'])
   assert.equal(bom.metadata.properties[0].value, sourceSha)
+})
+
+test('the release SBOM skips optional platform packages pnpm did not install, and still fails on any other missing package', async () => {
+  const sourceSha = 'a'.repeat(40)
+  const manifests = { root: { name: 'desktop', version: '1.0.0', dependencies: { vite: '8' } }, vite: { name: 'vite', version: '8.3.4', optionalDependencies: { fsevents: '2' } },
+    esbuild: { name: 'esbuild', version: '0.28.2', optionalDependencies: { '@esbuild/aix-ppc64': '0.28.2', '@esbuild/linux-x64': '0.28.2' } },
+    'esbuild-linux': { name: '@esbuild/linux-x64', version: '0.28.2' } }
+  const readManifest = async path => {
+    if (manifests[path]) return manifests[path]
+    throw Object.assign(Error(`ENOENT: ${path}`), { code: 'ENOENT' })
+  }
+  const vite = { path: 'vite', dependencies: { fsevents: { path: 'fsevents' }, esbuild: { path: 'esbuild', dependencies: { '@esbuild/aix-ppc64': { path: 'esbuild-aix' }, '@esbuild/linux-x64': { path: 'esbuild-linux' } } } } }
+  const bom = await workspaceSbom([{ path: 'root', dependencies: { vite } }], { sourceSha, readManifest })
+  assert.deepEqual(bom.components.map(value => value.name), ['@esbuild/linux-x64', 'esbuild', 'vite'])
+  assert.deepEqual(bom.dependencies.find(value => value.ref === 'pkg:npm/esbuild@0.28.2').dependsOn, ['pkg:npm/%40esbuild/linux-x64@0.28.2'])
+  await assert.rejects(workspaceSbom([{ path: 'root', dependencies: { vite: { path: 'missing' } } }], { sourceSha, readManifest }), /ENOENT/)
+  await assert.rejects(workspaceSbom([{ path: 'root', dependencies: { vite } }], { sourceSha, readManifest: async path => {
+    if (path === 'fsevents') throw Object.assign(Error('EACCES'), { code: 'EACCES' })
+    return readManifest(path)
+  } }), /EACCES/)
 })
 
 test('third-party actions in workflows and local composite actions use immutable SHA refs', async () => {

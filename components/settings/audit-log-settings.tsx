@@ -14,6 +14,7 @@ import type { AuditEventView } from '@/lib/audit/query'
 import { withBasePath } from '@/lib/base-path'
 import { dayLabel } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
+import { FieldError } from '@/components/ui/field'
 
 /** Scalar metadata only: the ICU templates take named string params. Roles and access levels are words, not codes. */
 function params(event: AuditEventView, word: (key: string) => string | null) {
@@ -71,7 +72,7 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
       </SettingRow>
     </SettingsSection>
     {pages.isLoading && <SettingsLoading label={t('loading')} rows={3} />}
-    {(pages.error || failure) && <p role="alert" className="px-1 text-sm text-destructive">{actionError(failure?.error)}</p>}
+    {(pages.error || failure) && <FieldError className="px-1">{actionError(failure?.error)}</FieldError>}
     {!pages.isLoading && !failure && !pages.error && events.length === 0 && <p className="px-1 text-sm text-muted-foreground">{t('empty')}</p>}
     {days.map(([label, rows]) => <SettingsSection key={label} id={`audit-${label}`} title={label}>
       {rows.map(event => <div key={event.id} className="flex items-center gap-3 px-5 py-3">

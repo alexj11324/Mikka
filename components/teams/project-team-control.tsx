@@ -9,7 +9,7 @@ import { listProjectTeams, setProjectTeams } from '@/app/actions/team-relations'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -23,7 +23,7 @@ export function ProjectTeamControl({ project, onUpdated, disabled }: { project: 
   const [open, setOpen] = useState(false)
   const teamDialog = usePresence(open)
   const current = links?.filter(link => link.projectId === project.id) ?? []
-  return <section className="flex flex-col gap-3"><h2 className="text-sm font-medium">{i18nText("FeatureCopy.c_8663016b")}</h2><div className="flex flex-wrap gap-2">{current.map(link => { const team = teams.find(team => team.id === link.teamId); return <Badge key={link.teamId} variant={link.isPrimary ? 'secondary' : 'outline'}>{team?.name ?? i18nText("Settings.sections.teams.title")}{link.isPrimary ? <> {i18nText("FeatureCopy.c_e99105b9")}</> : ''}</Badge> })}{links && !current.length && <p className="text-xs text-muted-foreground">{i18nText("FeatureCopy.c_46147716")}</p>}</div><Button size="sm" variant="outline" disabled={disabled || !links || !!teamsError || !!linksError} onClick={() => setOpen(true)}>{i18nText("FeatureCopy.c_1ddf3032")}</Button>{(teamsError || linksError) && <p role="alert" className="text-xs text-destructive">{i18nText("FeatureCopy.c_d50b2473")}</p>}
+  return <section className="flex flex-col gap-3"><h2 className="text-sm font-medium">{i18nText("FeatureCopy.c_8663016b")}</h2><div className="flex flex-wrap gap-2">{current.map(link => { const team = teams.find(team => team.id === link.teamId); return <Badge key={link.teamId} variant={link.isPrimary ? 'secondary' : 'outline'}>{team?.name ?? i18nText("Settings.sections.teams.title")}{link.isPrimary ? <> {i18nText("FeatureCopy.c_e99105b9")}</> : ''}</Badge> })}{links && !current.length && <p className="text-xs text-muted-foreground">{i18nText("FeatureCopy.c_46147716")}</p>}</div><Button size="sm" variant="outline" disabled={disabled || !links || !!teamsError || !!linksError} onClick={() => setOpen(true)}>{i18nText("FeatureCopy.c_1ddf3032")}</Button>{(teamsError || linksError) && <FieldError className="text-xs">{i18nText("FeatureCopy.c_d50b2473")}</FieldError>}
     {teamDialog.value && <ProjectTeamForm open={teamDialog.open} onOpenChangeComplete={teamDialog.onOpenChangeComplete} project={project} teams={teams} initialIds={current.map(link => link.teamId)} initialPrimary={current.find(link => link.isPrimary)?.teamId ?? ''} onClose={() => setOpen(false)} onSaved={() => { setOpen(false); void mutate(); onUpdated() }} />}
   </section>
 }

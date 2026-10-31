@@ -19,6 +19,7 @@ import { ApprovalBar } from './factory-approval-bar'
 import { RejectNote } from './factory-reject-note'
 import { ShortSha } from './short-sha'
 import { IssueThreadPanel } from './issue-thread-panel'
+import { FieldError } from '@/components/ui/field'
 
 type Candidate = { sha: string; repository: string; environment: string; scope: string }
 type Artifact = { artifact: string; kind: 'log' | 'report' | 'screenshot' | 'video' | 'request'; stage: 'execute' | 'review' | 'verify'; runId: string }
@@ -228,7 +229,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
       </header>
       <div className="flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-          {(ledgerError || evidenceError) ? <p role="alert" className="px-8 py-6 text-xs text-destructive">{t('loadError')}</p>
+          {(ledgerError || evidenceError) ? <FieldError className="px-8 py-6 text-xs">{t('loadError')}</FieldError>
             : !ledger || ((task.stage === 'approval' || superseded) && !evidence) ? <div className="flex flex-1 items-center justify-center"><Spinner /></div>
               : <div className="mx-auto flex w-full max-w-[40rem] flex-col gap-8 px-8 py-6">
                 <section className="flex flex-col gap-2">
@@ -257,7 +258,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                       </ItemActions>
                     </Item>)}
                   </div>
-                  {artifactError && <p role="alert" className="text-xs text-destructive">{t('artifactError')}</p>}
+                  {artifactError && <FieldError className="text-xs">{t('artifactError')}</FieldError>}
                 </section>}
                 {state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
                 {state !== 'unavailable' && <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={Boolean(evidence && environment)} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
@@ -272,7 +273,7 @@ function FactoryAcceptanceWindow({ task, identifier, onClose }: { task: FactoryT
                   onRevoke={() => { void revoke() }}
                   onReject={canReject(state, ledger?.capabilities?.reject === true) ? () => dispatchReject({ type: 'open' }) : undefined}
                   onReconcile={() => { void reconcile() }} />}
-                {error && <p role="alert" className="text-xs text-destructive">{t(ERROR_KEYS[error] ?? 'error')}</p>}
+                {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
               </div>}
         </main>
         {task.candidateRunId && <aside aria-label={t('thread')} className="hidden w-[25rem] shrink-0 flex-col bg-muted/50 md:flex">

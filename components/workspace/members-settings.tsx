@@ -76,6 +76,7 @@ import { withBasePath } from "@/lib/base-path";
 import { useActionError } from "@/lib/use-action-error";
 import { SettingsDataState } from "@/components/settings/settings-data-state";
 import { cn } from "@/lib/utils";
+import { FieldError } from '@/components/ui/field'
 
 async function fetchSettings(url: string): Promise<WorkspaceSettings> {
   const response = await fetch(url);
@@ -703,9 +704,9 @@ export function MembersSettings({
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error && (
-            <p role="alert" className="text-sm text-destructive">
+            <FieldError>
               {error}
-            </p>
+            </FieldError>
           )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>

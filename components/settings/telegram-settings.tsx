@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { createTelegramConnectLink, disconnectTelegram, getTelegramIntegrationStatus } from '@/app/actions/telegram'
+import { FieldError } from '@/components/ui/field'
 
 type TelegramStatus = Awaited<ReturnType<typeof getTelegramIntegrationStatus>>
 
@@ -87,7 +88,7 @@ export function TelegramSettings() {
     {connectLink && <SettingRow title={t('linkTitle')}>
       <Button render={<a href={connectLink} target="_blank" rel="noreferrer" />}>{t('openTelegram')}</Button>
     </SettingRow>}
-    {error && <p role="alert" className="px-5 py-3 text-sm text-destructive">{t(error)}</p>}
+    {error && <FieldError className="px-5 py-3">{t(error)}</FieldError>}
     {status?.configured && <SettingRow title={status.connected ? t('connected') : t('connectTitle')}>
       <div className="flex flex-wrap items-center gap-2">
         {!status.connected && <Button variant="outline" size="sm" disabled={busy} onClick={() => void connect()}>
