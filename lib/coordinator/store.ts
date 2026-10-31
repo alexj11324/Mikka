@@ -273,6 +273,26 @@ export async function appendMessages(userId: string, holder: string, messages: M
   })
 }
 
+/**
+ * 重试 on a failed reply: runs the same turn again over the conversation as it
+ * stands, so the person's message is not sent twice. The event never becomes a
+ * chat message, and one failure can be retried once; a new failure can be
+ * retried again. False when nothing failed or a turn is already running.
+ */
+export async function retryFailedTurn(userId: string, botId: string | null = null): Promise<boolean> {
+  return db.transaction(async tx => {
+    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId" IS NOT DISTINCT FROM ${botId}::uuid FOR UPDATE`)
+    const [session] = await tx.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+    if (!session?.lastError || !session.lastErrorAt || coordinatorLeaseActive(session)) return false
+    const inserted = await tx.insert(coordinatorEvents).values({
+      id: crypto.randomUUID(), userId, botId, kind: 'user_message', issueId: null, runId: null,
+      dedupeKey: `turn_retry:${userId}:${botId ?? 'coordinator'}:${session.lastErrorAt.toISOString()}`,
+      payload: { text: '', postedToChat: true, retry: true },
+    }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
+    return inserted.length === 1
+  })
+}
+
 /** Records why a turn failed and lets go of the lease. */
 export async function failTurn(userId: string, holder: string, error: string, botId: string | null = null): Promise<void> {
   await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: error.slice(0, 1000), lastErrorAt: new Date(), updatedAt: new Date() })

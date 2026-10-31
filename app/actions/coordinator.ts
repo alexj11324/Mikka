@@ -10,7 +10,7 @@ import { db } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatView, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatView, retryFailedTurn, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import { and, eq } from 'drizzle-orm'
 import { bots, devices } from '@/lib/db/schema'
 import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
@@ -129,6 +129,19 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot?.name), { botId: bot?.id ?? null }))
     after(() => wakeCoordinator(session.user.id))
     return { queued: true }
+  })
+}
+
+/** 重试 on a failed reply: the same turn again, once per click; the chat shows its normal working state. */
+export async function retryCoordinatorTurn(botId: string | null = null): Promise<ActionResult<{ queued: boolean }>> {
+  return runAction(async () => {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) throw new ActionFailureError('authRequired')
+    const bot = await ownBot(session.user.id, botId)
+    if (!coordinatorEnabled()) return { queued: false }
+    const queued = await retryFailedTurn(session.user.id, bot?.id ?? null)
+    if (queued) after(() => wakeCoordinator(session.user.id))
+    return { queued }
   })
 }
 

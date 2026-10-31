@@ -404,3 +404,39 @@ dbTest('a workspace Telegram reply reads authorization once without cross-databa
     assert.equal(sent, 2)
   })
 })
+
+dbTest('重试 re-runs a failed bot turn once, for the message already sent, in that chat only', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, isNull, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-turn-retry-${randomUUID()}`
+  const botId = randomUUID()
+  t.after(async () => {
+    t.diagnostic(JSON.stringify({ event: 'coordinator_db_fixture_retained', fixtureOwnerIds: [owner], database: 'mikka_e2e' }))
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Retry fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Retry bot' })
+    assert.equal(await store.retryFailedTurn(owner, botId), false, 'nothing failed, nothing to retry')
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'Plan my week', { botId }))
+    await store.takeInbox(owner, 'wrun_failed-turn', botId)
+    assert.equal(await store.retryFailedTurn(owner, botId), false, 'no retry while the turn is still running')
+    await store.failTurn(owner, 'wrun_failed-turn', 'binding_required', botId)
+    const failed = await store.chatView(owner, 200, botId)
+    assert.deepEqual([failed.working, failed.error], [false, 'binding_required'])
+    assert.equal(await store.retryFailedTurn(owner, null), false, 'the Coordinator chat has no failure of its own')
+    assert.equal(await store.retryFailedTurn(owner, botId), true)
+    assert.equal(await store.retryFailedTurn(owner, botId), false, 'a second click on the same failure queues nothing')
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the chat shows its normal working state')
+    const take = await store.takeInbox(owner, 'wrun_retried-turn', botId)
+    assert.equal(take.added, 1, 'the retry starts a turn')
+    const retried = await store.chatView(owner, 200, botId)
+    assert.deepEqual(retried.items.map(item => [item.from, item.text]), [['person', 'Plan my week']], 'the message is not sent twice')
+    const waiting = await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId, owner), isNull(schema.coordinatorEvents.deliveredAt)))
+    assert.equal(waiting.length, 0)
+    await store.failTurn(owner, 'wrun_retried-turn', 'binding_required', botId)
+    assert.equal(await store.retryFailedTurn(owner, botId), true, 'a new failure can be retried again')
+  })
+})

@@ -118,7 +118,10 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
   const [summary, setSummary] = useState('')
   // A question with nothing to answer with (no options, control or free text) is a blank step that can never be
   // answered, so it also kept the submit button disabled; the schema forbids it, but streamed replies are not validated.
-  const questions = (props.questions ?? []).filter(answerable).map(question => ({ ...question, customPlaceholder: agentCopy.addAnotherAnswer }))
+  // Neither are empty entries: the parser turns `,,` into null, which threw and failed the whole card.
+  const questions = (props.questions ?? []).filter(present)
+    .map(question => ({ ...question, ...(question.options ? { options: question.options.filter(present) } : {}), customPlaceholder: agentCopy.addAnotherAnswer }))
+    .filter(answerable)
 
   if (questions.length === 0) return null
   const [only] = questions
@@ -150,6 +153,10 @@ export const AgentQuestions: AgentComponentRenderers['BeQuestions'] = ({ props }
 }
 
 type AgentQuestion = NonNullable<Parameters<AgentComponentRenderers['BeQuestions']>[0]['props']['questions']>[number]
+
+function present<T>(value: T | null | undefined): value is T {
+  return value !== null && typeof value === 'object'
+}
 
 function answerable(question: AgentQuestion) {
   return Boolean(question.options?.length || question.allowCustom || question.input === 'switch' || question.input === 'slider' || question.input === 'dateRange')

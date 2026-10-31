@@ -2,7 +2,8 @@ import type { PoolClient } from 'pg'
 import type { HostedModelScope, HostedRuntimeSnapshot } from '@/lib/subscription-model-snapshot'
 
 /** Use the same Bot binding choice and frozen non-secret references as its
- * private chat. A missing binding refuses; group chat is not a paid fallback.
+ * private chat: no choice and no subscription runs the hosted default; a
+ * missing chosen binding refuses.
  */
 export async function freezeGroupBotModel(scope: HostedModelScope, client: PoolClient): Promise<HostedRuntimeSnapshot> {
   const [{ freezeBotModel }, { subscriptionRuntime, authorizeSubscriptionWorkspace }, { withDatabaseClient }, { hostedSubscriptionSnapshotSchema }] = await Promise.all([

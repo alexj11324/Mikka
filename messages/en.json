@@ -2725,6 +2725,13 @@
     "working": "Coordinator is working…",
     "loadError": "Could not load the conversation. Retrying.",
     "failedTitle": "Reply failed",
+    "subscriptionRefusal": {
+      "unavailable": "Chosen subscription unavailable",
+      "reconnect": "Subscription needs reconnecting",
+      "quotaUsed": "Subscription quota used up",
+      "retry": "Subscription temporarily unavailable",
+      "open": "Models and quota"
+    },
     "wakeErrors": {
       "wake_failed": "Reply pending retry",
       "wake_start_unconfirmed": "Reply start unconfirmed",
