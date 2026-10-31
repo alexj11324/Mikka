@@ -57,6 +57,8 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const fileRef = useRef<HTMLInputElement>(null)
   // One save at a time: Enter followed by the blur from disabling the field must not send it twice.
   const inFlight = useRef(false)
+  // A save asked for while another runs goes next; dropping it would leave a draft that looks saved.
+  const queued = useRef<{ field: Field; value: string | null } | null>(null)
   const host = typeof window === 'undefined' ? '' : `${window.location.host}${withBasePath('/w/')}`
 
   if (!general.data && !general.error) return <SettingsLoading label={t('loading')} rows={3} />
@@ -72,7 +74,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   }
 
   async function save(field: Field, value: string | null) {
-    if (inFlight.current) return
+    if (inFlight.current) { queued.current = { field, value }; return }
     inFlight.current = true
     setSaving(field)
     setFailed(null)
@@ -87,6 +89,9 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
       clearDraft(field)
       setSaving(null)
       inFlight.current = false
+      const next = queued.current
+      queued.current = null
+      if (next) void save(next.field, next.value)
     }
   }
 

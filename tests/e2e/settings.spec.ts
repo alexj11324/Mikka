@@ -104,7 +104,7 @@ test('设置页打开并空闲后，每个分区首次打开都不显示骨架�
   expect(flashed, '这些分区仍显示了骨架屏').toEqual([])
 })
 
-test('设置读取接口沿用原来的权限：管理员读得到，成员和外人只得到错误', async ({ page, browser, baseURL }) => {
+test('设置读取接口沿用原来的权限：仅管理员可读的只给管理员，外人只得到错误', async ({ page, browser, baseURL }) => {
   test.setTimeout(120000)
   await register(page, '/settings/members')
   await page.getByRole('button', { name: '邀请成员', exact: true }).click()
@@ -130,14 +130,21 @@ test('设置读取接口沿用原来的权限：管理员读得到，成员和�
     const read = async (context: BrowserContext, name: string) => {
       const response = await context.request.get(app(`/api/settings/${name}?workspace=${workspace}`))
       expect(response.headers()['cache-control']).toBe('private, no-store')
-      return { status: response.status(), body: await response.json() as { error?: string } | null }
+      return { status: response.status(), body: await response.json() as { error?: string; canEdit?: boolean; secrets?: Record<string, unknown>[] } | null }
     }
-    for (const name of ['audit', 'billing', 'secrets', 'app-policy']) {
+    // Admin-only, as the actions were: 审计日志 and 计费.
+    for (const name of ['audit', 'billing']) {
       const owner = await read(page.context(), name)
       expect(owner.status, name).toBe(200)
       expect(owner.body?.error, `管理员读取 ${name}`).toBeUndefined()
       expect((await read(memberContext, name)).body?.error, `成员读取 ${name}`).toBeTruthy()
     }
+    // Members read these, as before: secret names without values, and app policy without edit rights.
+    const memberSecrets = await read(memberContext, 'secrets')
+    expect(memberSecrets.body?.error).toBeUndefined()
+    expect(memberSecrets.body?.secrets?.every(secret => !('value' in secret))).toBe(true)
+    expect((await read(memberContext, 'app-policy')).body?.canEdit).toBe(false)
+    expect((await read(page.context(), 'app-policy')).body?.canEdit).toBe(true)
     for (const name of ['audit', 'billing', 'secrets', 'app-policy', 'workspace-general', 'usage']) {
       expect((await read(outsiderContext, name)).body?.error, `外人读取 ${name}`).toBeTruthy()
       const signedOut = await read(anonymous, name)
