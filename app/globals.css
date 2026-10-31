@@ -246,7 +246,7 @@
 --github-pr-draft: #9198a1;
 --github-pr-merged: #ab7df8;
 --github-pr-closed: #f85149;
---settings-background: oklch(0.17 0 0);
+--settings-background: rgb(24 24 24);
 --settings-foreground: oklch(0.94 0 0);
 --settings-card: var(--card);
 --settings-sidebar: var(--background);
@@ -266,11 +266,12 @@
 --avatar-4: var(--color-violet-500);
 --avatar-5: var(--color-orange-500);
 --avatar-foreground: oklch(0.985 0 0);
-  --background: oklch(0.145 0 0);
+  /* Codex's dark surfaces: page rgb(24 24 24), boxes and cards rgb(35 35 35). */
+  --background: rgb(24 24 24);
 --foreground: oklch(0.985 0 0);
---card: oklch(0.205 0 0);
+--card: rgb(35 35 35);
 --card-foreground: oklch(0.985 0 0);
---popover: oklch(0.205 0 0);
+--popover: rgb(35 35 35);
 --popover-foreground: oklch(0.985 0 0);
 --primary: oklch(0.922 0 0);
 --primary-foreground: oklch(0.205 0 0);
