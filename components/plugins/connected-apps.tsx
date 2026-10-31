@@ -7,7 +7,6 @@ import { toast } from 'sonner'
 
 import { APP_ICONS, type PluginAppId } from '@/components/plugins/app-icons'
 import { SettingsSection } from '@/components/settings/primitives'
-import { IconTile } from '@/components/reui/icon-tile'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
@@ -48,8 +47,10 @@ function currentReturnPath() {
 
 export function AppTile({ app, size = 'default', dim = false }: { app: PluginAppId; size?: 'default' | 'xl'; dim?: boolean }) {
   const Icon = APP_ICONS[app]
-  // An explicit size keeps a parent Button's svg sizing off the mark.
-  return <IconTile size={size} variant="elevated" aria-hidden="true" className={cn(dim && 'opacity-50 grayscale')}><Icon className="size-(--icon-tile-icon-size)" /></IconTile>
+  // The brand mark on its own (R-74): no tile behind it, in the same slot and size as before so rows stay aligned.
+  return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center', size === 'xl' ? 'size-14' : 'size-10', dim && 'opacity-50 grayscale')}>
+    <Icon className={size === 'xl' ? 'size-7' : 'size-4.5'} />
+  </span>
 }
 
 /** The account's name as the page shows it: its alias, else its email, else "Gmail 账户". */
