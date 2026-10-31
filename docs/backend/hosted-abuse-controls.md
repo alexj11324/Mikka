@@ -70,22 +70,21 @@ requests without that proof.
 
 ### Frontend integration (#563)
 
-`lib/billing/verification-client.ts` in frontend PR #563 currently uses
-fallbacks for `cardVerificationStatus`, `getCreditBilling`, and
-`startPointsPurchase`. Replace those fallbacks with their real actions from
-`app/actions/billing.ts` after #558 and #559 are integrated. The existing
-`startCardVerification` wrapper already accepts `{ url }`; it must no longer
-expect `clientSecret` or `paymentElementOptions`. Action successes are flat
-objects, and failures are `{ error }`.
+`lib/billing/verification-client.ts` connects `startCardVerification`,
+`cardVerificationStatus`, `getCreditBilling`, and `startPointsPurchase` to their
+real actions in `app/actions/billing.ts`. Checkout actions return `{ url }`;
+there is no Payment Element client secret. Action successes are flat objects,
+and failures are `{ error }`.
 
 The points action is `startPointsPurchase(workspaceId, amount)` for USD
 10 / 25 / 50. The #559 `CreditBillingView` and `CreditTransaction` field names
-match #563's types. Its real `balancePoints` can contain fractional points;
-#563's current fallback rounds down. The frontend session should decide its
-display precision and update its assertions when connecting the real action.
-Its existing no-Stripe-key test that seeds a verified row also needs to follow
-the real status contract: without Stripe configuration, the action returns
-`unavailable` even when that row exists.
+match #563's types. The backend's `balancePoints` can contain fractional
+points; the adapter rounds down for the existing whole-point display and
+preserves every transaction. The browser fixture uses no Stripe keys and
+checks the real status contract: a Checkout return remains `unavailable`
+even when a verified row exists, while the granted gift remains in the balance.
+Source tests verify action mapping, argument forwarding, authorization errors,
+and transaction preservation without Stripe calls.
 
 ## Scope and accounting
 
