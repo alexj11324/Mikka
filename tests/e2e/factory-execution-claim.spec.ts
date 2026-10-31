@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { test, expect, register, app } from "./fixtures";
+import { test, expect, register, app, leavePage } from "./fixtures";
 import { createFactoryStore, type FactoryTask } from "../../lib/factory/store";
 import { createFactoryDispatch } from "../../lib/factory/dispatch";
 import { factoryCheckGates } from "../../lib/factory/checks";
@@ -10,7 +10,7 @@ import { createSkillAssignments } from "../../lib/self-improvement/assignments";
 import { BASELINE_ARTIFACT } from "../../lib/self-improvement/builtin-skill";
 import { SKILL_ARTIFACT_HEADER, skillAssignmentReceiptSchema } from "@mikka/protocol/skill";
 import { DAEMON_PROTOCOL_VERSION } from "@mikka/protocol/daemon";
-import { REPO_ORIGIN_HEADER } from "@mikka/protocol/device";
+import { REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER } from "@mikka/protocol/device";
 import { remoteKey } from "@mikka/protocol/repository";
 
 // Real HTTP + PG, explicit synthetic daemon reports. Not real Harness acceptance.
@@ -31,6 +31,7 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
   // Claim policy materialization requires the real account's owner FK before
   // the request can reach the Factory task lock exercised below.
   const { email } = await register(page);
+  await leavePage(page);
   const pool = new Pool({ connectionString: target.toString(), max: 3 });
   const issueId = randomUUID(),
     agentId = randomUUID(),
@@ -182,7 +183,8 @@ test("Factory execution claims reject stopped tasks and unadopted retry children
         expect(live.attempts.find(attempt => attempt.id === live.task.attemptId)?.runId).toBe(queued.runId);
       }
       const path = app(`/v1/devices/${deviceId}/runs/${runId}/claim`);
-      const claimOptions = { headers: { [SKILL_ARTIFACT_HEADER]: "1" } };
+      // Reach the Factory fence using the current daemon's local recovery capability.
+      const claimOptions = { headers: { [SKILL_ARTIFACT_HEADER]: "1", [RECOVERY_WORKTREE_HEADER]: "1" } };
       let response;
       if (mode === "race") {
         const tx = await pool.connect();

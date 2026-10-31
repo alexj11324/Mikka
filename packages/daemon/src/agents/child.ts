@@ -27,6 +27,9 @@ export class EventQueue {
     this.push({ type: "chunk", chunk })
   }
 
+  /** Host-observed tool activity; never serialized as application UI data. */
+  progress() { this.push({ type: 'progress' }) }
+
   /** Only the first exit counts; later ones are dropped. */
   exit(event: Omit<ExitEvent, "type">) {
     if (this.ended) return

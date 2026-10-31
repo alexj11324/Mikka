@@ -15,7 +15,7 @@ const test = base.extend<{ networkFailureGrant: DeviceGrant }>({
   },
 })
 
-test('a device grant is reviewed in the browser and exchanged for a daemon credential', async ({ page, request, networkFailureGrant }, testInfo) => {
+test('a device grant is reviewed in the browser and exchanged for a daemon credential', { tag: '@smoke' }, async ({ page, request, networkFailureGrant }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   await register(page, '/settings?section=devices')
   await page.getByRole('button', { name: '连接设备', exact: true }).click()

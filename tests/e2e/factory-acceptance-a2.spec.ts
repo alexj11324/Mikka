@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import { test, expect, register, seedTask, openIssueFromSearch, app } from './fixtures'
 
-// Server responses are fixtures: send-back and a failed publish have no backend yet (reject operation; BE-3).
+// Server responses are fixtures; these tests verify client states and requests.
 type Call = { operation: string; input: Record<string, unknown> }
 const shot = async (page: Page, name: string) => {
   for (const scheme of ['light', 'dark'] as const) {
@@ -84,13 +84,23 @@ test.describe('send-back', () => {
   })
 })
 
-test('publish failed keeps the approval and offers publish again', async ({ page }) => {
+test('publish failed keeps the approval and offers publish again', { tag: '@smoke' }, async ({ page }) => {
   const id = randomUUID()
-  const { dialog } = await setup(page, { ledger: ({ candidateId }) => ({ approvals: [approval(candidateId, id)], publications: [{ id: randomUUID(), approvalId: id, status: 'failed', request: {}, receipt: null }] }) })
+  const { dialog } = await setup(page, { stage: 'publish', ledger: ({ candidateId }) => ({ approvals: [approval(candidateId, id)], publications: [{ id: randomUUID(), approvalId: id, status: 'failed', request: {}, receipt: null }] }) })
   await expect(dialog.getByText('发布失败，批准仍保留')).toBeVisible()
   await expect(dialog.getByRole('button', { name: '撤销批准' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: '发布', exact: true })).toBeVisible()
   await shot(page, `publish-failed-${test.info().project.name}`)
+})
+
+test('failed publication returned to approval requires a new approval request', async ({ page }) => {
+  const id = randomUUID()
+  const { dialog, calls } = await setup(page, { stage: 'approval', ledger: ({ candidateId }) => ({ approvals: [approval(candidateId, id)], publications: [{ id: randomUUID(), approvalId: id, status: 'failed', request: {}, receipt: null }] }) })
+  await expect(dialog.getByText('待你确认', { exact: true }).first()).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '发布', exact: true })).toHaveCount(0)
+  await dialog.getByRole('button', { name: '批准发布', exact: true }).click()
+  await expect.poll(() => calls.map(call => call.operation)).toEqual(['approve'])
+  expect(calls[0].input).not.toHaveProperty('approvalId')
 })
 
 // a1: an approval on an older candidate is shown as 「<sha> · 已失效」 and the new candidate waits for approval again.

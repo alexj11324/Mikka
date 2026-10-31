@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { test, expect, app, register } from "./fixtures";
+import { test, expect, app, register, leavePage } from "./fixtures";
 import { createFactoryStore, type FactoryTask } from "../../lib/factory/store";
 import { createFactoryDispatch } from "../../lib/factory/dispatch";
 import { createFactoryReconciler } from "../../lib/factory/reconcile";
@@ -28,6 +28,7 @@ test("Factory check claim pins SHA/read-only/command and preserves trusted recei
   expect(process.env.MIKKA_FACTORY_ROUTING_ENABLED).toBe("1");
   expect(process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED).toBe("1");
   const { email } = await register(page);
+  await leavePage(page);
   const pool = new Pool({ connectionString: target.toString(), max: 3 });
   const issueId = randomUUID(),
     agentId = randomUUID(),

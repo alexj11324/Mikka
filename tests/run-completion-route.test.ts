@@ -17,6 +17,9 @@ const dispatch = mock.fn(async (result: NonNullable<typeof persisted>, schedule:
   return true
 })
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
+// Completion scheduling is tested here with a substituted caller; the real
+// credential/transaction boundary is exercised by device-revocation.db.test.ts.
+stub('../lib/device-route.ts', { withDeviceRoute: <T>(handler: T) => handler })
 stub('../lib/device-link.ts', { authenticateDevice: async () => caller })
 stub('../lib/run-publications.ts', { persistRunCompletion: persist })
 stub('../lib/run-publication-workflow.ts', { startRunPublication: enqueue })

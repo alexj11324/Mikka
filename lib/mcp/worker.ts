@@ -1,7 +1,7 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { after } from 'next/server'
-import { and, eq, gt, inArray, isNull } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, notInArray, or } from 'drizzle-orm'
 import type { AuthInfo } from '@modelcontextprotocol/server'
 import { db } from '@/lib/db'
 import { agentRuns, runTokens } from '@/lib/db/schema'
@@ -9,6 +9,10 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runBlockedEvent, runQuestionEvent, runReportEvent, type CoordinatorEventInput } from '@/lib/coordinator-events'
 import { maskForRun } from '@/lib/secrets/runtime'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
+import { issueForUser } from '@/lib/issue-access'
+import { agentScope } from '@/lib/agent-kit/service'
+import { AgentKitError } from '@/lib/agent-kit/store'
+import { LEASED_RUN_STATUSES } from '@/lib/run-retry'
 
 // The worker side of the MCP server: the agent inside a run reports progress,
 // asks the person something or says it is blocked. Each call becomes an event
@@ -40,13 +44,7 @@ export async function revokeRunTokens(runId: string): Promise<void> {
   await db.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
 }
 
-/**
- * Checks a run token: unrevoked, unexpired, and its run still live. A run
- * that ended any way (completed, cancelled, failed at claim) shuts its token
- * out even before the revoke.
- */
-export async function verifyRunToken(_request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
-  if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
+async function currentRunToken(bearerToken: string) {
   const [row] = await db
     .select({ runId: runTokens.runId, userId: runTokens.userId, expiresAt: runTokens.expiresAt, issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId })
     .from(runTokens)
@@ -54,9 +52,27 @@ export async function verifyRunToken(_request: Request, bearerToken?: string): P
     .where(and(
       eq(runTokens.tokenHash, hashToken(bearerToken)), isNull(runTokens.revokedAt), gt(runTokens.expiresAt, new Date()),
       eq(agentRuns.userId, runTokens.userId), inArray(agentRuns.status, [...LIVE_STATUSES]),
+      isNull(agentRuns.stopRequestedAt),
+      or(isNull(agentRuns.deviceId), notInArray(agentRuns.status, [...LEASED_RUN_STATUSES]), gt(agentRuns.leaseExpiresAt, new Date())),
     ))
     .limit(1)
-  if (!row) return undefined
+  return row
+}
+
+/** A live token is scoped to the current task and Bot permissions. Removing
+ * workspace membership shuts a worker out on its next call, including tools
+ * whose ordinary result is only a report or artifact. */
+export async function verifyRunToken(_request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
+  if (!bearerToken?.startsWith(RUN_TOKEN_PREFIX)) return undefined
+  const row = await currentRunToken(bearerToken)
+  if (!row || (row.issueId && !await issueForUser(row.userId, row.issueId))) return undefined
+  if (row.botId) {
+    try { await agentScope(row.userId, row.botId) }
+    catch (error) { if (error instanceof AgentKitError) return undefined; throw error }
+  }
+  // Permission reads may wait on the workspace DB. STOP, token revocation and
+  // lease expiry must still take effect before authority is returned.
+  if ((row.issueId || row.botId) && !await currentRunToken(bearerToken)) return undefined
   return {
     token: bearerToken, clientId: `run:${row.runId}`, scopes: [],
     expiresAt: Math.floor(row.expiresAt.getTime() / 1000),

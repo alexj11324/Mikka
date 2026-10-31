@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { splitBrowserNotes } from '../../lib/browser/note'
-import { test, expect, register, app, browserClientHeaders } from './fixtures'
+import { test, expect, register, app, browserClientHeaders, expectItems } from './fixtures'
 
 // The app-wide browser (Figma 412:8066): the top bar's globe opens it in place
 // of the right panel, and a note pinned on a page waits in the chat composer
@@ -91,7 +91,8 @@ test('The globe opens the browser in place of the right panel; notes on a page g
   await expect(composer).toBeEnabled()
   await expect(chips).toHaveCount(1)
   await expect(chips).toHaveText('3 · example.com/pricing · 发送期间的新备注')
-  await expect(page.locator('[data-slot="browser-note"]')).toHaveText(['1 · 重置密码 · 发送重置链接 · 按钮文案改成发送', '2 · example.com/pricing · 价格不对'])
+  await expect(page.locator('[data-slot="browser-note"]')).toHaveCount(2)
+  await expectItems(page.locator('[data-slot="browser-note"]'), ['1 · 重置密码 · 发送重置链接 · 按钮文案改成发送', '2 · example.com/pricing · 价格不对'])
 
   // Real server action, authenticated session and PostgreSQL event. No model or provider call is required to persist a person's note.
   const connectionString = process.env.E2E_DATABASE_URL
@@ -111,7 +112,8 @@ test('The globe opens the browser in place of the right panel; notes on a page g
     expect(stored.notes[1]).toMatchObject({ n: 2, kind: 'region', url: 'https://example.com/pricing', note: '价格不对' })
   } finally { await pool.end() }
   await page.reload()
-  await expect(page.locator('[data-slot="browser-note"]')).toHaveText(['1 · 重置密码 · 发送重置链接 · 按钮文案改成发送', '2 · example.com/pricing · 价格不对'])
+  await expect(page.locator('[data-slot="browser-note"]')).toHaveCount(2)
+  await expectItems(page.locator('[data-slot="browser-note"]'), ['1 · 重置密码 · 发送重置链接 · 按钮文案改成发送', '2 · example.com/pricing · 价格不对'])
   await expect(page.locator('[data-slot="bubble-content"]').filter({ hasText: message })).toBeVisible()
 
   // An independently registered owner must not receive the first owner's note on the real chat read path.

@@ -46,7 +46,8 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   const token = 'dt_' + randomBytes(24).toString('hex')
   await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values (gen_random_uuid(),$1,$2,$3,$4,now()+interval '1 hour')`, [admin, hashDeviceToken(token), device, ws.id])
   const agent = (await pool.query(`insert into agents (id,"userId",harness,name) values (gen_random_uuid(),$1,'codex','a') returning id`, [admin])).rows[0].id as string
-  const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId",status) values (gen_random_uuid(),$1,$2,$3,'running') returning id`, [agent, admin, device])).rows[0].id as string
+  // Output writes belong to a claimed live run, including its active lease.
+  const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,'running',now()+interval '10 minutes') returning id`, [agent, admin, device])).rows[0].id as string
   const call = (method: string, path: string, body: unknown) => new Request(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) })
   /** The row is committed before Next's `after()` (the wake-up) runs; outside a request it throws. */
   const afterOnly = (error: unknown) => { if (!String((error as Error)?.message).includes('outside a request scope')) throw error }

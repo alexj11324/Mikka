@@ -463,6 +463,9 @@ export class ClaudeAdapter implements AgentAdapter {
       : (this.options.configDir ?? join(homedir(), ".claude"))
     if (nativeHome) ownDir(configDir)
     const ctx = new RunContext({
+      github: options.github,
+      githubRuntime: options.githubRuntime,
+      childPath: options.env.PATH,
       mailboxEnabled: Boolean(options.mailbox),
       harness: "claude_code",
       kind: options.kind,
@@ -646,6 +649,7 @@ export class ClaudeAdapter implements AgentAdapter {
           if (message.type === "assistant" || message.type === "user")
             clearTimeout(graceTimer)
           if (ending) continue
+          if (message.type === 'tool_progress' && message.session_id === sessionId) queue.progress()
           // Authentication errors can contain provider diagnostics. Do not
           // turn those diagnostics into model/UI text in external-auth mode.
           if (!(externalAuth && message.type === "assistant" && message.error))

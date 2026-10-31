@@ -6,6 +6,17 @@ const now = Date.parse('2026-10-29T12:00:00Z')
 const approval = (patch: Record<string, unknown> = {}) => ({ id: 'a1', candidateId: 'c1', expiresAt: '2026-10-29T13:00:00Z', revokedAt: null, createdAt: '2026-10-29T10:00:00Z', ...patch })
 const state = (input: Partial<Parameters<typeof acceptanceState>[0]>) => acceptanceState({ stage: 'publish', candidateId: 'c1', approvals: [], publications: [], now, ...input }).state
 
+test('a started publication is never hidden by the obsolete grant expiry', () => {
+  const expired = approval({ expiresAt: '2026-10-29T11:00:00Z' })
+  for (const [status, expected] of [['reserved', 'publishing'], ['uncertain', 'checking'], ['succeeded', 'live'], ['failed', 'failed']] as const) {
+    assert.equal(state({ approvals: [expired], publications: [{ approvalId: expired.id, status }] }), expected)
+  }
+})
+
+test('a confirmed failure returned to approval offers approval again', () => {
+  assert.equal(state({ stage: 'approval', approvals: [approval()], publications: [{ approvalId: 'a1', status: 'failed' }] }), 'pending')
+})
+
 test('derives every acceptance state from the ledger', () => {
   assert.equal(state({ stage: 'approval' }), 'pending')
   assert.equal(state({}), 'unavailable')

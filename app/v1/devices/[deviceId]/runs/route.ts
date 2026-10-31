@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
@@ -7,7 +8,7 @@ import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 export const dynamic = 'force-dynamic'
 
 /** `GET /v1/devices/:deviceId/runs?state=queued`: runs waiting for this device. */
-export async function GET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
+async function handleGET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
@@ -21,3 +22,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
     .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
   return NextResponse.json({ runIds: rows.map(row => row.id) })
 }
+
+export const GET = withDeviceRoute(handleGET)

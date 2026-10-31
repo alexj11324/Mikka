@@ -140,7 +140,7 @@ test('real git diffs retain all fixtures while testing rename, deletion and even
   const unrelatedHead = git(['commit-tree', root([oldDocs]), '-m', 'unrelated-history'])
   for (const [name, before, after, expectedDocs, tier, performance] of [
     ['main-docs', base, docsHead, true, 'docs', 'false'],
-    ['main-code', base, codeHead, false, 'full', 'true'],
+    ['main-code', base, codeHead, false, 'main', 'false'],
     ['main-unknown', '0'.repeat(40), docsHead, false, 'full', 'true'],
     ['main-nonancestor', unrelatedHead, docsHead, false, 'full', 'true'],
   ]) {

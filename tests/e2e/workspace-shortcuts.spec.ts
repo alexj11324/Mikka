@@ -1,4 +1,4 @@
-import { test, expect, register, rail, openCreateIssue } from './fixtures'
+import { test, expect, register, rail, openCreateIssue, expectItems } from './fixtures'
 
 for (const { platform, modifier } of [
   { platform: 'macOS', modifier: '⌘' },
@@ -13,9 +13,11 @@ for (const { platform, modifier } of [
     await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
     const settings = page.getByRole('menuitem', { name: '设置', exact: true })
     await expect(settings.locator('[data-slot="kbd-group"]')).toHaveCount(1)
-    await expect(settings.locator('[data-slot="kbd"]')).toHaveText([modifier, ','])
+    await expect(settings.locator('[data-slot="kbd"]')).toHaveCount(2)
+    await expectItems(settings.locator('[data-slot="kbd"]'), [modifier, ','])
     await page.keyboard.press('Escape')
-    await expect(page.getByRole('button', { name: '全局搜索', exact: true }).locator('[data-slot="kbd"]')).toHaveText([modifier, 'K'])
+    await expect(page.getByRole('button', { name: '全局搜索', exact: true }).locator('[data-slot="kbd"]')).toHaveCount(2)
+    await expectItems(page.getByRole('button', { name: '全局搜索', exact: true }).locator('[data-slot="kbd"]'), [modifier, 'K'])
     await rail(page, '看板').click()
     const create = await openCreateIssue(page)
     await expect(create.getByRole('button', { name: '创建任务', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Control+Enter Meta+Enter')
@@ -31,7 +33,8 @@ test('KBD 提示匹配真实快捷键，输入内容不会误触新建或设置'
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   const settings = page.getByRole('menuitem', { name: '设置', exact: true })
   const modifier = await page.evaluate(() => /Mac|iPhone|iPad|iPod/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl')
-  await expect(settings.locator('[data-slot="kbd"]')).toHaveText([modifier, ','])
+  await expect(settings.locator('[data-slot="kbd"]')).toHaveCount(2)
+  await expectItems(settings.locator('[data-slot="kbd"]'), [modifier, ','])
   await page.keyboard.press('Escape')
   await page.keyboard.press('Control+k')
   const search = page.getByRole('dialog', { name: '全局搜索', exact: true })
