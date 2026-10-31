@@ -26,10 +26,10 @@ test('credit billing history and remaining balance are workspace scoped', { skip
   })
   const receiptUrl = 'https://pay.stripe.com/receipts/fixture'
   await pool.query(`INSERT INTO workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId","amountCents",currency,"stripeFeeCents","receiptUrl","createdAt") VALUES
-    ($1,$2,'purchased',500,'purchase',$1::text,500,'usd',45,$3,'2026-10-02T00:00:00Z'),
-    ($4,$2,'purchased',-100,'refund',$4::text,-100,'usd',NULL,$3,'2026-10-03T00:00:00Z'),
-    ($5,$6,'purchased',9999,'purchase',$5::text,9999,'usd',NULL,NULL,'2026-10-04T00:00:00Z')`,
-  [randomUUID(), workspace.id, receiptUrl, randomUUID(), randomUUID(), foreign.id])
+    ($1,$2,'purchased',500,'purchase',$7,500,'usd',45,$3,'2026-10-02T00:00:00Z'),
+    ($4,$2,'purchased',-100,'refund',$8,-100,'usd',NULL,$3,'2026-10-03T00:00:00Z'),
+    ($5,$6,'purchased',9999,'purchase',$9,9999,'usd',NULL,NULL,'2026-10-04T00:00:00Z')`,
+  [randomUUID(), workspace.id, receiptUrl, randomUUID(), randomUUID(), foreign.id, `purchase_${randomUUID()}`, `refund_${randomUUID()}`, `purchase_${randomUUID()}`])
   await pool.query('INSERT INTO hosted_verifications ("workspaceId","verifiedAt") VALUES ($1,\'2026-10-01T00:00:00Z\')', [workspace.id])
   await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,600000)', [workspace.id])
   await pool.query(`INSERT INTO hosted_usage (id,"workspaceId",model,state,"purchasedMicroUsd","reservedPurchased") VALUES
