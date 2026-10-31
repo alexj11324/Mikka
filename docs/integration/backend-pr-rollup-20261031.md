@@ -18,6 +18,8 @@ Frontend/mixed candidates left untouched: #567, #557, #556, #552, #549, #547, #5
 - #576's failed claim fixtures imported the real auth graph or rejected the newly added issue-access import. Stub that IO boundary in fixtures, preserve production task authorization, and exercise denial before claim/token/receipt creation. The quota fixture also isolates the new model-admission IO boundary while checking the exact model and owner/workspace scope.
 - Retain ordinary Linear bidirectional sync's existing explicit default-off decision. Features completed by the source PRs otherwise retain their enabled defaults.
 
+- The first integrated CI run found floating action refs added to main after #576: two desktop-icon steps and the shared pnpm composite action. Pin them to the same vetted action revisions used elsewhere and extend the release regression to composite actions. The deterministic release-gate failure is occurrence 10 × impact 4 = 40; leaving composite actions floating also defeats the source PR’s intended dependency trust boundary.
+
 ## Migration ordering
 
 All incoming SQL files are new relative to main. Their names are advanced past main's `20261031040000_personal_plugins.sql`, preserving their relative order and SQL bodies. Existing migrations on main are unchanged. All exact filename references in tests/docs follow the rename.

@@ -108,9 +108,9 @@ test('desktop staging publishes only intended installers and the selected produc
 })
 
  test('all third-party workflow actions use immutable SHA refs', async () => {
-  const directory = new URL('../../.github/workflows/', import.meta.url)
-  for (const name of await readdir(directory)) {
-    if (!name.endsWith('.yml')) continue
+  const directory = new URL('../../.github/', import.meta.url)
+  for (const name of await readdir(directory, {recursive:true})) {
+    if (!name.endsWith('.yml') || !/^(workflows|actions)\//.test(name)) continue
     const content = await readFile(new URL(name, directory), 'utf8')
     for (const match of content.matchAll(/uses:\s+([^\s#]+)/g)) {
       if (!match[1].startsWith('./')) assert.match(match[1], /^[^@]+@[a-f0-9]{40}$/, `${name}: ${match[1]}`)
