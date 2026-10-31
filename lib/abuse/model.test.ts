@@ -9,7 +9,7 @@ let generated = 0,
   cost: unknown = '0.002'
 let managed = false, denyAt: 'prepare' | 'send' | null = null
 const modelOptions: unknown[] = []
-let gatewayConfig: { baseURL?: string; fetch?: typeof fetch } | undefined
+let gatewayConfig: { baseURL?: string; fetch?: typeof fetch; apiKey?: string } | undefined
 const usage = { inputTokens: { total: 12 }, outputTokens: { total: 3 } }
 const model = {
   specificationVersion: 'v4',
@@ -173,4 +173,17 @@ test('an unverified injected transport cannot impersonate the managed Gateway en
   await assert.rejects(Promise.resolve((await hostedModel('workspace', 'fixture-model', { ...model } as never, 'alice')).doGenerate({ prompt: [] })), /modelRouteDenied/)
   assert.equal(reservations.length, 0)
   assert.equal(generated, 0)
+})
+test('a trusted custom-key Gateway remains usable under an allowed managed route',async()=>{
+  managed=true
+  const {createTrustedGatewayModel}=await import('./model')
+  const provider=await createTrustedGatewayModel('fixture-model','synthetic-custom-key')
+  const wrapped=await hostedModel('workspace','fixture-model',provider,'alice')
+  await wrapped.doGenerate({prompt:[]})
+  assert.equal(generated,1)
+  assert.equal(gatewayConfig?.apiKey,'synthetic-custom-key')
+  assert.equal(gatewayConfig?.baseURL,'https://ai-gateway.vercel.sh/v4/ai')
+  denyAt='prepare'
+  await assert.rejects(Promise.resolve(wrapped.doGenerate({prompt:[]})),/modelRouteDenied/)
+  assert.equal(generated,1)
 })
