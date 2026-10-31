@@ -116,3 +116,70 @@ named is used but restyled at the call site.
 Overlap with other branches, not fixed here: `issue-pull-request-link.tsx:55`
 (`BoardBadge`) renders inside the kanban card; `billing/balance-section.tsx`
 and `usage-settings.tsx:97-108` share the members table's `pl-5/pr-5` gutters.
+
+## Motion: what opens, closes or moves with no animation
+
+R-37: animate only when the person's action changes a size or position;
+size and position move on springs, opacity and colour on a duration. Every
+fix respects `prefers-reduced-motion`.
+
+What exists:
+
+- **Library overlays already animate.** `dialog`, `alert-dialog`,
+  `popover`, `dropdown-menu`, `tooltip`, `hover-card`, `select`,
+  `combobox` and `context-menu` use `data-open:animate-in`. `sheet`,
+  `drawer` and `accordion` animate too, and sonner animates toasts.
+- **Three primitives do not animate:**
+  - `components/ui/collapsible.tsx`: the panel snaps open and shut.
+  - `components/ui/tabs.tsx`: no moving indicator, and content swaps
+    instantly.
+  - `components/ui/toggle-group.tsx`: the background just swaps.
+- **beUI pieces in `components/motion/`:** `shared-layout-bg.tsx` (a
+  sliding active pill), `animated-sidebar.tsx` (spring open, close and
+  resize, with a rail) and `file-tree.tsx` (expand). They all check
+  `useReducedMotion`.
+- **Business code never imports `components/motion/`.**
+- **No root reduced-motion setting.** There is no app-level
+  `MotionConfig reducedMotion="user"`.
+
+| Where (file:line) | What opens/closes/moves | Current motion | What to use | Severity |
+|---|---|---|---|---|
+| `components/nav/bot-list.tsx:157` | Bot list collapse `w-64` ↔ `w-0` | CSS `transition-[width] duration-150 ease-out` (not a spring) | `AnimatedSidebar` / `AnimatedSidebarRail` | high |
+| `components/nav/context-panel.tsx:115` | Thread panel widen `w-90` ↔ `w-130` | CSS width transition, 150ms | Spring width (`AnimatedSidebar` resize). Check `feat/resizable-coordinator-panel` first; it may share the code | high |
+| `components/workspace/issue-workspace.tsx:408` | Thread `ContextPanel` mounts / unmounts | none | `AnimatedSidebar` or `AnimatePresence` + width spring. May overlap `feat/resizable-coordinator-panel` | high |
+| `components/workspace/issue-workspace.tsx:407` (`browser/browser-pane.tsx:257`) | 浏览器 pane appears / disappears | none | `AnimatePresence` + width spring | high |
+| `components/workspace/task-detail.tsx:250-253` | Thread panel replaces the properties column (`w-80` → `w-108`); full-screen overlay on narrow screens | none, width jumps | Spring width + `AnimatePresence mode="popLayout"`; `Sheet` on narrow screens | high |
+| `components/ui/collapsible.tsx` → `nav/thread-list.tsx:81-85`, `workspace/project-milestones.tsx:19-21` | 已解决 group, milestones | chevron turns, panel snaps | Height on `CollapsibleContent` once (`h-(--collapsible-panel-height)` + starting/ending style), which fixes every collapsible | med |
+| `components/workspace/issue-relations.tsx:74-77` | Sub-issues `{expanded && …}` | none | Animated Collapsible | med |
+| `components/workspace/project-detail.tsx:73` | Project details aside (⌘I) | none | `AnimatedSidebar` | med |
+| `components/workspace/create-issue-dialog.tsx:144,155` | Dialog expand `max-w-3xl` → `5xl` | snaps | Layout spring on width | med |
+| `components/workspace/board-page.tsx:186-187,208` | Scope segment and board/list switch indicator | background swap | `SharedLayoutBg` pill inside the `segment` ToggleGroup | med |
+| `components/workspace/board-page.tsx:242-244` | Board ↔ list view | hard swap | Opacity crossfade (`AnimatePresence mode="wait"`) | med |
+| `components/nav/context-panel.tsx:116-154` | 概览/全部 and 详情/线程/PR/电脑 tabs | no indicator, content swaps | `SharedLayoutBg` indicator; content opacity fade | med |
+| `components/workspace/issue-workspace.tsx:383` | `{searchOpen && <GlobalSearch>}` | enter animates, exit is cut off by unmount | Keep mounted, drive `open` | med |
+| `{x && <Dialog open>}` ×12: `issue-thread-panel.tsx:179`, `artifact-library.tsx:80`, `factory-acceptance.tsx:131`, `project-detail.tsx:81-82`, `teams/project-team-control.tsx:25`, `secrets-settings.tsx:52,81`, `access-tokens-settings.tsx:111`, `workspace-settings.tsx:182,231`, `app-shell.tsx:69` | Dialogs | exit animation lost on unmount | Keep the dialog mounted; clear its data in `onOpenChangeComplete` | med |
+| `components/workspace/project-detail.tsx:58-71`, `teams/team-home.tsx:27-32`, `plugins/plugins-skills-view.tsx:80-106` | Page tabs | background swap / line fade | `SharedLayoutBg` indicator in `tabs.tsx` | low |
+| `components/nav/context-panel.tsx:40-45` | 展开 reveals rows past 5 | none | Height spring / `layout` list | low |
+| `components/suggestions/suggestion-feed.tsx:85`, `settings/memory-settings.tsx:56`, `coordinator/approved-write-actions.tsx:107` | Items added / removed | none | `AnimatePresence` + `motion.li layout` | low |
+| `components/coordinator/chat-composer.tsx:90-91` | Quote block appears | none | Height spring | low |
+| `components/artifacts/artifact-viewer.tsx:120-146` | Mobile content ↔ chat switch | `hidden` toggle | `AnimatePresence mode="wait"` | low |
+| `components/computer/computer-screen.tsx:55,61` | Agent cursor / box moves | CSS `transition-all duration-150` | `motion.span` spring on x/y | low |
+
+Owned elsewhere, not listed: the Coordinator panel on the board
+(`board-page.tsx:246-258`, `feat/resizable-coordinator-panel`), chat scroll
+(`fix/chat-scroll-jump`), OpenUI components (`feat/openui-charts`).
+
+## Proposed fix order
+
+1. 看板 toolbar (this PR).
+2. Shared primitives, so call sites inherit: `segment` ToggleGroup for every
+   segmented control; height animation in `collapsible.tsx`; one
+   `MotionConfig reducedMotion="user"` at the root.
+3. Greys: `settingsSectionAction` and the other `secondary` buttons →
+   `outline`; one pressed colour (`Toggle`).
+4. Tags and chips: one StatusBadge (`Badge tone`) and one chip size.
+5. Side panels on `AnimatedSidebar` springs (bot list, thread panel, 浏览器,
+   project details), after checking with `feat/resizable-coordinator-panel`.
+6. Rows and cards: `Item` for thread/PR/app rows, one card radius and fill.
+7. Dialog exit animations (keep mounted), list insert/remove, tab indicators.
+8. Error text (`FieldError` / `Alert`), retry buttons, smaller leftovers.
