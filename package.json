@@ -80,7 +80,7 @@
     "test:user-facts-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/profile/store.db.test.ts",
     "test:bot-chats-db": "node --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/bot-chats.db.test.ts lib/coordinator/wake-recovery.db.test.ts",
     "test:active-agents": "node --import ./tests/support/server-only.mjs --import tsx --test lib/active-agents.test.ts",
-    "test:request-log": "node --import tsx --test lib/request-log.test.ts",
+    "test:request-log": "node --import tsx --test lib/request-log.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test \"app/v1/devices/*/commands/route.test.ts\" \"app/v1/devices/*/fs/requests/route.test.ts\"",
     "test:legacy-reads": "node --import ./scripts/server-test.mjs --import tsx --experimental-test-module-mocks --test lib/agent-image-loader.test.ts tests/legacy-read-routes.test.ts",
     "test:conversation-reads": "node --import ./scripts/server-test.mjs --import tsx --experimental-test-module-mocks --test lib/conversation-reads-store.test.ts lib/conversation-reads-route.test.ts lib/group-reads.db.test.ts",
     "test:db": "node scripts/run-db-tests.mjs",
@@ -175,7 +175,7 @@
     "test:hosted-usage": "node --experimental-test-module-mocks --import tsx --test lib/billing/hosted-usage.test.ts lib/billing/verification-client.test.ts",
     "test:model-admission": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/contract.test.ts lib/model-admission/http.test.ts lib/model-admission/gateway-transport.test.ts lib/model-admission/decision.test.ts",
     "test:model-admission-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/store.db.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/model-admission/revocation-postpay.db.test.ts",
-    "test:release-security": "node --test scripts/release/security.test.mjs scripts/ops/monitor.test.mjs scripts/ops/recovery-failures.test.mjs",
+    "test:release-security": "node --test scripts/release/security.test.mjs scripts/ops/monitor.test.mjs scripts/ops/recovery-failures.test.mjs scripts/ops/deployment-regression.test.mjs scripts/ops/runtime-outcomes.test.mjs",
     "test:ops-db": "node --import ./scripts/server-test.mjs --import tsx --test lib/ops/monitor.db.test.ts",
     "test:plugins": "node --import tsx --test lib/plugins/plugins.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/plugins/routes.test.ts",
     "test:plugins-db": "node --import tsx --test lib/plugins/store.db.test.ts"

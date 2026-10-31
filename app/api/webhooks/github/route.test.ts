@@ -78,6 +78,22 @@ test('configuration, raw-body signature, size and JSON errors remain ahead of ev
   assert.deepEqual(loaded, [])
 })
 
+test('request logs mark only authenticated admission outcomes without payload or header data', async () => {
+  const lines: string[] = []
+  const log = mock.method(console, 'log', (line: string) => { lines.push(line) })
+  const warn = mock.method(console, 'warn', (line: string) => { lines.push(line) })
+  try {
+    await POST(request('check_run', { privateBody: 'SECRET_BODY' }))
+    await POST(request('check_run', { privateBody: 'SECRET_BODY' }, 'sha256=SECRET_SIGNATURE'))
+    await POST(request('pull_request', { action: 'synchronize', number: 'SECRET_NUMBER' }))
+    const completed = lines.map(line => JSON.parse(line)).filter(entry => entry.msg === 'api_request')
+    assert.deepEqual(completed.map(entry => [entry.status, entry.outcome]), [[204, 'ignored'], [401, undefined], [202, 'work']])
+    assert.ok(completed.every(entry => entry.route === '/api/webhooks/github'))
+    assert.ok(!lines.some(line => line.includes('SECRET_')))
+    assert.equal(callbacks.length, 1)
+  } finally { log.mock.restore(); warn.mock.restore() }
+})
+
 test('every pull-request action still refreshes publication without loading notification processing', async () => {
   for (const action of ['opened', 'closed', 'edited', 'synchronize']) {
     const payload = { action, pull_request: { number: 7 } }

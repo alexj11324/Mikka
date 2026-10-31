@@ -3,6 +3,7 @@ import { Daemon } from '../src/main'
 import { createLogger } from '../src/log'
 import { MemoryServer, type ServerLink } from '../src/server-link'
 import * as folders from '../src/fs-browse'
+import { ServerUnreachableError } from '../src/errors'
 
 const daemons: Daemon[] = []
 
@@ -92,4 +93,48 @@ it('does not start an idle pause when the server poll resolves during stop', asy
   await daemon.stop()
   expect(vi.getTimerCount()).toBe(0)
   expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+it('bounds repeated failures with capped exponential backoff and stops retrying on shutdown', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+  const fetch = vi.fn<NonNullable<ServerLink['fetchFsRequests']>>()
+    .mockRejectedValue(new ServerUnreachableError('offline'))
+  const { daemon } = pollFolders(fetch)
+  await vi.advanceTimersByTimeAsync(0)
+  let calls = 1
+  for (const delay of [1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000]) {
+    await vi.advanceTimersByTimeAsync(delay - 1)
+    expect(fetch).toHaveBeenCalledTimes(calls)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(fetch).toHaveBeenCalledTimes(++calls)
+  }
+  await daemon.stop()
+  expect(vi.getTimerCount()).toBe(0)
+  await vi.advanceTimersByTimeAsync(60_000)
+  expect(fetch).toHaveBeenCalledTimes(calls)
+})
+
+it('resets failure backoff after a successful empty response', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+  const error = new ServerUnreachableError('offline')
+  const fetch = vi.fn<NonNullable<ServerLink['fetchFsRequests']>>()
+    .mockRejectedValueOnce(error).mockRejectedValueOnce(error)
+    .mockResolvedValueOnce([]).mockRejectedValue(error)
+  pollFolders(fetch)
+  await vi.advanceTimersByTimeAsync(28_000)
+  expect(fetch).toHaveBeenCalledTimes(4)
+  await vi.advanceTimersByTimeAsync(999)
+  expect(fetch).toHaveBeenCalledTimes(4)
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetch).toHaveBeenCalledTimes(5)
+})
+
+it('does not browse work returned by a poll that resolves during shutdown', async () => {
+  const browse = vi.spyOn(folders, 'browseFolder')
+  const fetch = vi.fn<NonNullable<ServerLink['fetchFsRequests']>>((_device, _wait, { signal } = {}) =>
+    new Promise(resolve => signal?.addEventListener('abort', () => resolve([{ id: 'request-1', path: '/repo' }]), { once: true })))
+  const { daemon, answerFsRequest } = pollFolders(fetch)
+  await daemon.stop()
+  expect(browse).not.toHaveBeenCalled()
+  expect(answerFsRequest).not.toHaveBeenCalled()
 })

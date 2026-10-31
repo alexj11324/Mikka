@@ -1,13 +1,17 @@
 import { randomUUID } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import type { PoolClient } from 'pg'
 import { test, expect } from './test-account-fixtures'
 import { app, rail } from './fixtures'
 
-test('settings pause workspace reads and returning refreshes tasks and resumes polling', async ({ page, testAccounts }) => {
-  test.setTimeout(120_000)
+test('workspace idle reads stay within budget across settings, return and page departure', async ({ page, testAccounts }, testInfo) => {
+  test.setTimeout(180_000)
   const { scope } = testAccounts
   const issue = { type: 'issues', id: randomUUID(), ownerId: scope.owner.userId }
   const originalTitle = `Before settings ${randomUUID()}`
+  const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+  const windows: { state: string; durationMs: number; reads: number[]; total: number; budget: { perStreamMin: number; perStreamMax: number; totalMin: number; totalMax: number }; status: 'pass' | 'fail' }[] = []
+  let completed = false
   await scope.recordResource(issue)
   try {
     await scope.pool.transaction(async (client: PoolClient) => {
@@ -18,32 +22,62 @@ test('settings pause workspace reads and returning refreshes tasks and resumes p
     await page.goto(app('/?section=all-issues'))
     await expect(page.getByText(originalTitle, { exact: true })).toBeVisible()
     await page.waitForLoadState('networkidle')
+    await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1_000)
+    await page.waitForLoadState('networkidle')
 
     const actions: string[] = []
     page.on('request', request => {
       const action = request.headers()['next-action']
       if (request.method() === 'POST' && action) actions.push(action)
     })
-    // Learn the two real polling actions after all initial board reads settle.
-    await page.clock.runFor(16_000)
+    async function advance(durationMs: number) {
+      for (let elapsed = 0; elapsed < durationMs; elapsed += 5_000) {
+        await page.clock.runFor(Math.min(5_000, durationMs - elapsed))
+        // SWR schedules its next poll only after the real action completes.
+        await page.waitForLoadState('networkidle')
+      }
+    }
+    let pollingActions: string[] = []
+    function checkWindow(state: string, start: number, durationMs: number, perStreamMin: number, perStreamMax: number, totalMin = perStreamMin * 2, totalMax = perStreamMax * 2, observedActions = pollingActions) {
+      const reads = observedActions.map(action => actions.slice(start).filter(read => read === action).length)
+      const total = reads.reduce((sum, count) => sum + count, 0)
+      const status = reads.every(count => count >= perStreamMin && count <= perStreamMax) && total >= totalMin && total <= totalMax ? 'pass' : 'fail'
+      windows.push({ state, durationMs, reads, total, budget: { perStreamMin, perStreamMax, totalMin, totalMax }, status })
+      expect(status, `${state}: ${JSON.stringify({ reads, total })}`).toBe('pass')
+    }
+    // The board also polls task runs and its visible Coordinator chat.
+    await advance(16_000)
+    const boardPollingActions = [...new Set(actions)]
+    checkWindow('visible-board-periodic-discovery', 0, 16_000, 1, 2, 4, 6, boardPollingActions)
+    expect(boardPollingActions.length).toBe(4)
+
+    // Artifact has no extra periodic reads: learn the two shared workspace actions here.
+    await rail(page, '产物').click()
+    await expect(page.getByRole('heading', { level: 1, name: '产物', exact: true })).toBeVisible()
     await page.waitForLoadState('networkidle')
-    const pollingActions = new Set(actions)
-    expect(pollingActions.size).toBe(2)
-    const workspaceReads = () => actions.filter(action => pollingActions.has(action))
+    const sharedDiscovery = actions.length
+    await advance(60_000)
+    pollingActions = [...new Set(actions.slice(sharedDiscovery))]
+    checkWindow('stable-shared-workspace', sharedDiscovery, 60_000, 3, 6, 8, 10)
+    expect(pollingActions.length).toBe(2)
+    expect(pollingActions.every(action => boardPollingActions.includes(action))).toBe(true)
+
+    await rail(page, '看板').click()
+    await expect(page.getByText(originalTitle, { exact: true })).toBeVisible()
+    await page.waitForLoadState('networkidle')
 
     await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
     await page.getByRole('menuitem', { name: '设置', exact: true }).click()
     await expect(page.getByRole('group', { name: '界面主题', exact: true })).toBeVisible()
     await page.waitForLoadState('networkidle')
-    const pausedReads = workspaceReads().length
-    await page.clock.runFor(30_000)
+    const pausedReads = actions.length
+    await advance(30_000)
     await page.evaluate(() => {
       window.dispatchEvent(new Event('focus'))
       window.dispatchEvent(new Event('online'))
     })
-    await page.clock.runFor(6_000)
-    await page.waitForLoadState('networkidle')
-    expect(workspaceReads()).toHaveLength(pausedReads)
+    await advance(6_000)
+    checkWindow('settings-idle-focus-online', pausedReads, 36_000, 0, 0, 0, 0, boardPollingActions)
     await page.getByRole('button', { name: '浅色', exact: true }).click()
     await expect(page.getByRole('button', { name: '浅色', exact: true })).toHaveAttribute('aria-pressed', 'true')
 
@@ -55,34 +89,51 @@ test('settings pause workspace reads and returning refreshes tasks and resumes p
     const beforeReturn = actions.length
     await rail(page, '看板').click()
     await expect(page.getByText(freshTitle, { exact: true })).toBeVisible({ timeout: 5_000 })
-    await expect.poll(() => new Set(actions.slice(beforeReturn).filter(action => pollingActions.has(action))).size, { timeout: 5_000 }).toBe(2)
+    await expect.poll(() => new Set(actions.slice(beforeReturn).filter(action => pollingActions.includes(action))).size, { timeout: 5_000 }).toBe(2)
     await page.waitForLoadState('networkidle')
+    checkWindow('return-immediate-refresh', beforeReturn, 0, 1, 1)
     const resumedReads = actions.length
-    await page.clock.runFor(16_000)
-    await expect.poll(() => new Set(actions.slice(resumedReads).filter(action => pollingActions.has(action))).size).toBe(2)
+    await advance(60_000)
+    checkWindow('returned-workspace', resumedReads, 60_000, 3, 6, 8, 10)
 
     // The legacy entry starts with settingsOpen on its first render.
-    const beforeLegacy = workspaceReads().length
+    const beforeLegacy = actions.length
     await page.goto(app('/?settings=account&section=all-issues'))
     await expect(page.getByRole('heading', { level: 1, name: '账户', exact: true })).toBeVisible()
-    await page.clock.runFor(30_000)
+    await advance(30_000)
     await page.evaluate(() => {
       window.dispatchEvent(new Event('focus'))
       window.dispatchEvent(new Event('online'))
     })
-    await page.clock.runFor(6_000)
-    await page.waitForLoadState('networkidle')
-    expect(workspaceReads()).toHaveLength(beforeLegacy)
+    await advance(6_000)
+    checkWindow('legacy-settings-initial-idle-focus-online', beforeLegacy, 36_000, 0, 0, 0, 0, boardPollingActions)
     const beforeLegacyReturn = actions.length
     await rail(page, '看板').click()
     await expect(page.getByText(freshTitle, { exact: true })).toBeVisible({ timeout: 5_000 })
-    await expect.poll(() => new Set(actions.slice(beforeLegacyReturn).filter(action => pollingActions.has(action))).size, { timeout: 5_000 }).toBe(2)
+    await expect.poll(() => new Set(actions.slice(beforeLegacyReturn).filter(action => pollingActions.includes(action))).size, { timeout: 5_000 }).toBe(2)
+    await page.waitForLoadState('networkidle')
+    checkWindow('legacy-return-immediate-refresh', beforeLegacyReturn, 0, 1, 1)
+
+    await page.goto(app('/sign-in?addAccount=1'))
+    await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toHaveCount(0)
+    await page.waitForLoadState('networkidle')
+    const awayReads = actions.length
+    await advance(30_000)
+    checkWindow('left-workspace-document', awayReads, 30_000, 0, 0, 0, 0, boardPollingActions)
+    completed = true
   } finally {
-    await page.close()
-    await scope.pool.transaction(async (client: PoolClient) => {
-      await scope.pool.current(client, scope.lease)
-      await client.query('DELETE FROM issues WHERE id = $1 AND "userId" = $2', [issue.id, issue.ownerId])
-    })
-    await scope.markResourceCleaned(issue)
+    try {
+      await testInfo.attach('workspace-idle-request-budget', {
+        body: JSON.stringify({ headSha, normalCadencePer60Seconds: { listIssues: 6, listThreads: 4, combinedMax: 10 }, streamIdentity: 'dynamically-observed-actions-without-retained-identifiers', windows, status: completed ? 'pass' : 'fail' }, null, 2),
+        contentType: 'application/json',
+      })
+    } finally {
+      await page.close()
+      await scope.pool.transaction(async (client: PoolClient) => {
+        await scope.pool.current(client, scope.lease)
+        await client.query('DELETE FROM issues WHERE id = $1 AND "userId" = $2', [issue.id, issue.ownerId])
+      })
+      await scope.markResourceCleaned(issue)
+    }
   }
 })
