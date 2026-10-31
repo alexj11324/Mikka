@@ -35,6 +35,12 @@ Cloud Linux, loopback PostgreSQL 17 at port 55599, dedicated database
 `mikka_policy_closeout_e2e`; all three database URLs point there. Bootstrap
 applied all 154 baseline migrations. Prior databases, containers and ledgers
 were preserved. Raw logs remain local and must not be uploaded wholesale.
+The subsequent provider-owner integration takes policy core `efb56f54` and
+wrapper `3cd7754e` and applies its one additional migration (155 total) to the
+same isolated database. The postpayment transport test also passes against
+that real wrapper, which no longer reads model prices or computes a maximum:
+`/tmp/mikka-postpay-current-wrapper.log` (1 pass, zero fail/skip). The combined
+hosted source checks pass 15/15: `/tmp/mikka-postpay-combined-source.log`.
 
 | Check | Result | Local evidence |
 | --- | --- | --- |

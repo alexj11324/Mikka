@@ -49,6 +49,7 @@ test('hosted calls check positive balance, debit only after receipts, and resume
     server.closeAllConnections()
     await new Promise<void>(resolve => server.close(() => resolve()))
     await pool.end()
+    await (await import('../db')).pool.end()
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address() as { port: number }
@@ -98,7 +99,7 @@ test('hosted calls check positive balance, debit only after receipts, and resume
   await Promise.all([store.settle(paid.id, 9_999), store.settle(paid.id, 9_999)])
   assert.deepEqual(await store.balance(workspace), settled)
   assert.equal(settled.purchased, 0)
-  await assert.rejects(model.doStream({ prompt: [] }), /free_allowance_used/)
+  await assert.rejects(Promise.resolve(model.doStream({ prompt: [] })), /free_allowance_used/)
   assert.equal(providerCalls, 2)
   await credit()
   cost = '0.01'
