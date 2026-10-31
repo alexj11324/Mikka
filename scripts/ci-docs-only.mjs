@@ -125,7 +125,7 @@ const touchesPerformance = files => files.some(file => PERFORMANCE_SPECS.include
 export function browserPlan(files, { unsafeModes = false, integration = false, mainPush = false, specExists = name => existsSync(`tests/e2e/${name}`) } = {}) {
   const full = performance => ({ tier: 'full', specs: [], performance })
   if (integration) return full(true)
-  if (unsafeModes || !files.length) return full(touchesPerformance(files))
+  if (unsafeModes || !files.length) return full(mainPush || touchesPerformance(files))
   if (isDocsOnly(files)) return { tier: 'docs', specs: [], performance: false }
   if (mainPush) return { tier: 'main', specs: [], performance: false }
   const specs = new Set()
