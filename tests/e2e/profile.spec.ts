@@ -90,7 +90,7 @@ test('切换界面语言后停留在同一个设置分区', async ({ page }) => 
 
 // File payloads are explicit nonproduction backend fixtures; the leased browser
 // exercises real settings actions, cookie authentication, streaming and expiry.
-pooledTest('account export downloads owned file versions, captures and checkpoints while denying peer and expired grants', async ({ page, peerPage, testAccounts }) => {
+pooledTest('account export downloads owned file versions, captures and checkpoints while denying peer and expired grants', async ({ page, testAccounts }) => {
   if (!dbUrl) throw new Error('Portable account export requires the isolated browser database')
   if (process.env.RESEND_API_KEY) throw new Error('Portable account acceptance does not send provider mail')
   const database = new Pool({ connectionString: dbUrl, max: 2 })
@@ -129,11 +129,11 @@ pooledTest('account export downloads owned file versions, captures and checkpoin
     expect(bytes(firstVersion).equals(first)).toBe(true); expect(bytes(secondVersion).equals(second)).toBe(true)
     expect(bytes(captureId).equals(capture)).toBe(true); expect(bytes(runId).equals(patch)).toBe(true)
     expect(data.files.some((file: { artifactId?: string }) => file.artifactId === peerArtifact)).toBe(false)
-    const denied = await peerPage.request.get(new URL(href!, page.url()).href)
-    expect(denied.status()).toBe(404)
+    const denied = await testAccounts.scope.peer.request(href!)
+    expect(denied.status).toBe(404)
     await database.query('UPDATE account_data_exports SET "expiresAt"=now()-interval \'1 second\' WHERE "userId"=$1 AND "tokenHash"=$2', [owner, createHash('sha256').update(token).digest('hex')])
-    const expired = await page.request.get(new URL(href!, page.url()).href)
-    expect(expired.status()).toBe(404)
+    const expired = await testAccounts.scope.owner.request(href!)
+    expect(expired.status).toBe(404)
   } finally {
     try {
       await testAccounts.scope.assertActive()
