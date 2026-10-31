@@ -5,8 +5,10 @@
     "scheme": "mikka",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "icon": "./assets/icon.icon",
       "bundleIdentifier": "com.aspectlylabs.mikka",
       "supportsTablet": false,
       "infoPlist": {

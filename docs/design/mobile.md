@@ -222,6 +222,9 @@ mobile drawer.
 - **Not on the server yet**, so the app leaves them out: 待审阅 and 已归档
   threads, pinned bots, 电脑不在用时 (needs the web to report presence),
   dictation (so the composer has no mic yet), dark mode.
+- **App icon:** the Mikka mark, the same file as the desktop app's
+  (`apps/mobile/assets/icon.icon`, Icon Composer; `icon.png` is the opaque
+  1024 fallback). A new icon needs a new build.
 - **Updates:** EAS Update for JavaScript changes; store releases for native
   changes.
 
