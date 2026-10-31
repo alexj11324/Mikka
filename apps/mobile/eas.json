@@ -5,11 +5,15 @@
   },
   "build": {
     "production": {
+      "node": "24.22.1",
+      "pnpm": "10.34.3",
       "channel": "production",
       "distribution": "store",
       "autoIncrement": true
     },
     "preview": {
+      "node": "24.22.1",
+      "pnpm": "10.34.3",
       "channel": "preview",
       "distribution": "internal"
     }
