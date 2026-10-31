@@ -42,6 +42,8 @@ test('mapped paths add whole area specs next to the smoke set', () => {
     ['components/workspace-menu.tsx', ['workspace-menu.spec.ts', 'workspace.spec.ts', 'sign-out.spec.ts', 'workspace-shortcuts.spec.ts']],
     ['lib/suggestions/card.ts', ['suggestions-rail.spec.ts', 'suggestion-entry-contract.spec.ts']],
     ['lib/issue-relations.ts', ['relations.spec.ts']],
+    ['components/blocks/kanban-board-1/components/kanban-board.tsx', ['board-layout.spec.ts', 'offline-layout.spec.ts']],
+    ['components/workspace/board-page.tsx', ['board-layout.spec.ts', 'offline-layout.spec.ts']],
     // The OpenUI catalog parses saved replies: the archive spec must run when it changes.
     ['lib/agent-ui-catalog.ts', ['agent.spec.ts', 'coordinator-choice-card.spec.ts']],
     ['components/workspace/agent-ui-library.tsx', ['agent.spec.ts']],

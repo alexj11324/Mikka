@@ -2,89 +2,9 @@
   "library": {
     "root": "Stack",
     "components": {
-      "Card": {
-        "signature": "Card(children: (TextContent | MarkDownRenderer | CardHeader | Callout | TextCallout | CodeBlock | Image | ImageBlock | ImageGallery | Separator | HorizontalBarChart | RadarChart | PieChart | RadialChart | SingleStackedBarChart | ScatterChart | AreaChart | BarChart | LineChart | Table | TagBlock | Form | Buttons | IconButton | Steps | InlineHeader | EntityList | EditableTable | SnippetCardBlock | OverviewCardBlock | ContextCardBlock | CompositeCardBlock | VisualCardBlock | Tabs | Carousel | Stack)[], variant?: \"card\" | \"sunk\" | \"clear\", direction?: \"row\" | \"column\", gap?: \"none\" | \"xs\" | \"s\" | \"m\" | \"l\" | \"xl\" | \"2xl\", align?: \"start\" | \"center\" | \"end\" | \"stretch\" | \"baseline\", justify?: \"start\" | \"center\" | \"end\" | \"between\" | \"around\" | \"evenly\", wrap?: boolean)",
-        "description": "Styled container. variant: \"card\" (default, elevated) | \"sunk\" (recessed) | \"clear\" (transparent). Always full width. Accepts all Stack flex params (default: direction \"column\"). Cards flex to share space in row/wrap layouts."
-      },
-      "CardHeader": {
-        "signature": "CardHeader(title?: string, subtitle?: string)",
-        "description": "Header with optional title and subtitle"
-      },
-      "MarkDownRenderer": {
-        "signature": "MarkDownRenderer(textMarkdown: string, variant?: \"clear\" | \"card\" | \"sunk\")",
-        "description": "Renders markdown text with optional container variant"
-      },
-      "Callout": {
-        "signature": "Callout(variant: \"info\" | \"warning\" | \"error\" | \"success\" | \"neutral\", title: string, description: string, visible?: $binding<boolean>)",
-        "description": "Callout banner. Optional visible is a reactive $boolean — auto-dismisses after 3s by setting $visible to false."
-      },
-      "TextCallout": {
-        "signature": "TextCallout(variant?: \"neutral\" | \"info\" | \"warning\" | \"success\" | \"danger\", title?: string, description?: string)",
-        "description": "Text callout with variant, title, and description"
-      },
-      "Image": {
-        "signature": "Image(alt: string, src?: string)",
-        "description": "Image with alt text and optional URL"
-      },
-      "ImageBlock": {
-        "signature": "ImageBlock(src: string, alt?: string)",
-        "description": "Image block with loading state"
-      },
-      "ImageGallery": {
-        "signature": "ImageGallery(images: {src: string, alt?: string, details?: string}[])",
-        "description": "Gallery grid of images with modal preview"
-      },
-      "CodeBlock": {
-        "signature": "CodeBlock(language: string, codeString: string)",
-        "description": "Syntax-highlighted code block"
-      },
       "InlineHeader": {
         "signature": "InlineHeader(heading: string, description?: string)",
         "description": "Compact section heading with an optional one-line description, for use inside cards."
-      },
-      "Table": {
-        "signature": "Table(columns: Col[])",
-        "description": "Data table — column-oriented. Each Col holds its own data array."
-      },
-      "Col": {
-        "signature": "Col(label: string, data: any, type?: \"string\" | \"number\" | \"action\")",
-        "description": "Column definition — holds label + data array"
-      },
-      "RadarChart": {
-        "signature": "RadarChart(labels: string[], series: Series[])",
-        "description": "Spider/web chart; use for comparing multiple variables across one or more entities"
-      },
-      "HorizontalBarChart": {
-        "signature": "HorizontalBarChart(labels: string[], series: Series[], variant?: \"grouped\" | \"stacked\", xLabel?: string, yLabel?: string)",
-        "description": "Horizontal bars; prefer when category labels are long or for ranked lists"
-      },
-      "Series": {
-        "signature": "Series(category: string, values: number[])",
-        "description": "One data series"
-      },
-      "PieChart": {
-        "signature": "PieChart(labels: string[], values: number[], variant?: \"pie\" | \"donut\", appearance?: \"circular\" | \"semiCircular\")",
-        "description": "Circular slices; use plucked arrays: PieChart(data.categories, data.values)"
-      },
-      "SingleStackedBarChart": {
-        "signature": "SingleStackedBarChart(labels: string[], values: number[])",
-        "description": "Single horizontal stacked bar; use plucked arrays: SingleStackedBarChart(data.categories, data.values)"
-      },
-      "Slice": {
-        "signature": "Slice(category: string, value: number)",
-        "description": "One slice with label and numeric value"
-      },
-      "ScatterChart": {
-        "signature": "ScatterChart(datasets: ScatterSeries[], xLabel?: string, yLabel?: string)",
-        "description": "X/Y scatter plot; use for correlations, distributions, and clustering"
-      },
-      "ScatterSeries": {
-        "signature": "ScatterSeries(name: string, points: Point[])",
-        "description": "Named dataset"
-      },
-      "Point": {
-        "signature": "Point(x: number, y: number, z?: number)",
-        "description": "Data point with numeric coordinates"
       },
       "Form": {
         "signature": "Form(name: string, buttons: Buttons, fields?: FormControl[])",
@@ -177,22 +97,6 @@
       "Stack": {
         "signature": "Stack(children: any[], direction?: \"row\" | \"column\", gap?: \"none\" | \"xs\" | \"s\" | \"m\" | \"l\" | \"xl\" | \"2xl\", align?: \"start\" | \"center\" | \"end\" | \"stretch\" | \"baseline\", justify?: \"start\" | \"center\" | \"end\" | \"between\" | \"around\" | \"evenly\", wrap?: boolean)",
         "description": "Flex container. direction: \"row\"|\"column\" (default \"column\"). gap: \"none\"|\"xs\"|\"s\"|\"m\"|\"l\"|\"xl\"|\"2xl\" (default \"m\"). align: \"start\"|\"center\"|\"end\"|\"stretch\"|\"baseline\". justify: \"start\"|\"center\"|\"end\"|\"between\"|\"around\"|\"evenly\"."
-      },
-      "Tabs": {
-        "signature": "Tabs(items: TabItem[])",
-        "description": "Tabbed container"
-      },
-      "TabItem": {
-        "signature": "TabItem(value: string, trigger: string, content: (TextContent | MarkDownRenderer | CardHeader | Callout | TextCallout | CodeBlock | Image | ImageBlock | ImageGallery | Separator | HorizontalBarChart | RadarChart | PieChart | RadialChart | SingleStackedBarChart | ScatterChart | AreaChart | BarChart | LineChart | Table | TagBlock | Form | Buttons | IconButton | Steps | InlineHeader | EntityList | EditableTable | SnippetCardBlock | OverviewCardBlock | ContextCardBlock | CompositeCardBlock | VisualCardBlock)[])",
-        "description": "value is unique id, trigger is tab label, content is array of components"
-      },
-      "Accordion": {
-        "signature": "Accordion(items: AccordionItem[])",
-        "description": "Collapsible sections"
-      },
-      "AccordionItem": {
-        "signature": "AccordionItem(value: string, trigger: string, content: (TextContent | MarkDownRenderer | CardHeader | Callout | TextCallout | CodeBlock | Image | ImageBlock | ImageGallery | Separator | HorizontalBarChart | RadarChart | PieChart | RadialChart | SingleStackedBarChart | ScatterChart | AreaChart | BarChart | LineChart | Table | TagBlock | Form | Buttons | IconButton | Steps | InlineHeader | EntityList | EditableTable | SnippetCardBlock | OverviewCardBlock | ContextCardBlock | CompositeCardBlock | VisualCardBlock)[])",
-        "description": "value is unique id, trigger is section title"
       },
       "Steps": {
         "signature": "Steps(items: StepsItem[])",
@@ -374,10 +278,6 @@
         "signature": "SourceChip(url: string, label?: string)",
         "description": "内联网页来源，例如 pull request 或文档。url 为 http(s) 地址，label 为简短名称，可选；悬停显示网页预览。放在 InlineText 的 parts 里。"
       },
-      "ComputerCard": {
-        "signature": "ComputerCard(botId: string, runId: string, task: string, state?: \"working\" | \"approval\" | \"done\" | \"failed\", botName?: string, thread?: string)",
-        "description": "电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。botId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。"
-      },
       "BeAlert": {
         "signature": "BeAlert(title: string, description: string, variant?: \"default\" | \"info\" | \"success\" | \"warning\" | \"destructive\")",
         "description": "beUI 动效提示框，用作报告中的结论、风险或注意事项（callout）。variant 为 default、info、success、warning、destructive。只展示信息，不表示执行了操作。"
@@ -483,13 +383,12 @@
           "TaskChip",
           "RunChip",
           "SourceChip",
-          "BeCitations",
-          "ComputerCard"
+          "BeCitations"
         ],
         "notes": [
           "BeCitations 列出本次真正读取过的网页，不编造来源。",
           "引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。",
-          "Agent 用自己的电脑做事时放一张 ComputerCard，画面、状态和审批都在卡片里，正文不再复述操作过程。"
+          "ComputerCard 的画面、真实状态和审批由宿主控制，不由模型生成；正文不再复述操作过程。"
         ]
       },
       {
@@ -525,68 +424,8 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
-        "Card": {
-          "$ref": "#/$defs/Card"
-        },
-        "CardHeader": {
-          "$ref": "#/$defs/CardHeader"
-        },
-        "MarkDownRenderer": {
-          "$ref": "#/$defs/MarkDownRenderer"
-        },
-        "Callout": {
-          "$ref": "#/$defs/Callout"
-        },
-        "TextCallout": {
-          "$ref": "#/$defs/TextCallout"
-        },
-        "Image": {
-          "$ref": "#/$defs/Image"
-        },
-        "ImageBlock": {
-          "$ref": "#/$defs/ImageBlock"
-        },
-        "ImageGallery": {
-          "$ref": "#/$defs/ImageGallery"
-        },
-        "CodeBlock": {
-          "$ref": "#/$defs/CodeBlock"
-        },
         "InlineHeader": {
           "$ref": "#/$defs/InlineHeader"
-        },
-        "Table": {
-          "$ref": "#/$defs/Table"
-        },
-        "Col": {
-          "$ref": "#/$defs/Col"
-        },
-        "RadarChart": {
-          "$ref": "#/$defs/RadarChart"
-        },
-        "HorizontalBarChart": {
-          "$ref": "#/$defs/HorizontalBarChart"
-        },
-        "Series": {
-          "$ref": "#/$defs/Series"
-        },
-        "PieChart": {
-          "$ref": "#/$defs/PieChart"
-        },
-        "SingleStackedBarChart": {
-          "$ref": "#/$defs/SingleStackedBarChart"
-        },
-        "Slice": {
-          "$ref": "#/$defs/Slice"
-        },
-        "ScatterChart": {
-          "$ref": "#/$defs/ScatterChart"
-        },
-        "ScatterSeries": {
-          "$ref": "#/$defs/ScatterSeries"
-        },
-        "Point": {
-          "$ref": "#/$defs/Point"
         },
         "Form": {
           "$ref": "#/$defs/Form"
@@ -656,18 +495,6 @@
         },
         "Stack": {
           "$ref": "#/$defs/Stack"
-        },
-        "Tabs": {
-          "$ref": "#/$defs/Tabs"
-        },
-        "TabItem": {
-          "$ref": "#/$defs/TabItem"
-        },
-        "Accordion": {
-          "$ref": "#/$defs/Accordion"
-        },
-        "AccordionItem": {
-          "$ref": "#/$defs/AccordionItem"
         },
         "Steps": {
           "$ref": "#/$defs/Steps"
@@ -804,9 +631,6 @@
         "SourceChip": {
           "$ref": "#/$defs/SourceChip"
         },
-        "ComputerCard": {
-          "$ref": "#/$defs/ComputerCard"
-        },
         "BeAlert": {
           "$ref": "#/$defs/BeAlert"
         },
@@ -851,27 +675,7 @@
         }
       },
       "required": [
-        "Card",
-        "CardHeader",
-        "MarkDownRenderer",
-        "Callout",
-        "TextCallout",
-        "Image",
-        "ImageBlock",
-        "ImageGallery",
-        "CodeBlock",
         "InlineHeader",
-        "Table",
-        "Col",
-        "RadarChart",
-        "HorizontalBarChart",
-        "Series",
-        "PieChart",
-        "SingleStackedBarChart",
-        "Slice",
-        "ScatterChart",
-        "ScatterSeries",
-        "Point",
         "Form",
         "FormControl",
         "Label",
@@ -895,10 +699,6 @@
         "Buttons",
         "IconButton",
         "Stack",
-        "Tabs",
-        "TabItem",
-        "Accordion",
-        "AccordionItem",
         "Steps",
         "StepsItem",
         "Carousel",
@@ -944,7 +744,6 @@
         "TaskChip",
         "RunChip",
         "SourceChip",
-        "ComputerCard",
         "BeAlert",
         "BeTable",
         "BeTabs",
@@ -6755,12 +6554,12 @@
       "For forms, always provide the second Form argument with Buttons(...) actions: Form(name, buttons, fields).",
       "Never nest Form inside Form.",
       "Use @Reset($var1, $var2) after form submit to restore defaults — not @Set($var, \"\")",
-      "Use existing components (Tabs, Accordion, Modal) before inventing ternary show/hide patterns",
       "Card blocks (SnippetCardBlock, OverviewCardBlock, ContextCardBlock, CompositeCardBlock, VisualCardBlock) need at least 2 items; every item in a block must have the same structure.",
       "Text / BoldText / IconText / ImageText / ImageTextLarge / MetricIndicatorInline / MetricIndicatorWithStrikethrough are inline building blocks used INSIDE card items — do not place them directly in a Stack or Card.",
       "EntityList size='small' (no header/footer) is only for use inside a CompositeCardItem body; use size='default' everywhere else.",
       "Image URLs must be real (from a tool result or the user) — never invent or template an image URL.",
       "Always pass a category to Icon — it enables a topical fallback when the exact icon name is unavailable.",
+      "Use existing BeTabs, BeCollapsible and Modal before inventing ternary show/hide patterns.",
       "你是 Mikka 工作台中的 UI 生成助手。默认使用简体中文。严格输出 OpenUI Lang，不要输出代码围栏、HTML 或 React 代码。",
       "TextContent 的 text 字符串支持 Markdown（标题、粗体、列表、引用、表格、代码块）、KaTeX LaTeX 数学公式及 Mermaid 图表。数学公式使用 $$ 包裹，独立公式的 $$ 分别另起一行。流程图、时序图等使用 text 内标注 mermaid 的三反引号代码围栏。只在字符串内部使用 Markdown 围栏，整体回复仍严格遵循 OpenUI Lang；字符串中的换行、引号和 LaTeX 反斜杠按 OpenUI 字符串语法转义。Mermaid 不含初始化配置、HTML、外部图片或点击动作。",
       "TextContent 使用 JSON 双引号字符串：换行写成 \\n，LaTeX 命令的每个反斜杠写成 \\\\，不要再重复转义整段正文，也不要在双引号内混入真实换行。例如：root = TextContent(\"### 自注意力机制\\n\\n每个 token 投影为查询、键和值。\\n\\n$$\\n\\\\mathrm{Attention}(Q,K,V)=\\\\mathrm{softmax}\\\\left(\\\\frac{QK^\\\\top}{\\\\sqrt{d_k}}\\\\right)V\\n$$\\n\\n- 缩放点积防止 softmax 饱和。\")",

@@ -16,6 +16,7 @@ import { beforeSignup } from '@/lib/abuse/signup'
 import { newUserAvatar } from '@/lib/default-avatar'
 import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-authorization'
 import { issueDeviceToken } from '@/lib/device-link'
+import { auditAuthentication } from '@/lib/audit/authentication'
 
 /** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
 export const MOBILE_APP_ORIGIN = 'mikka://'
@@ -108,6 +109,7 @@ export const auth = betterAuth({
   hooks: {
     before: createAuthMiddleware(async ctx => { await beforeSignup(pool,ctx); return email.before(ctx) }),
     after: createAuthMiddleware(async ctx => {
+      await auditAuthentication(ctx)
       const deviceToken = await exchangeDaemonSession({
         path: ctx.path, clientId: ctx.body?.client_id,
         returned: ctx.context.returned, newSession: ctx.context.newSession,

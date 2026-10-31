@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createFirecrawlProvider } from './firecrawl'
-import { createSearchService, SearchProviderError, type SearchProvider } from './index'
+import { createSearchService as meteredSearchService, SearchProviderError, type SearchProvider } from './index'
+
+// Provider/cache unit tests isolate the durable admission boundary; its actual
+// cross-worker PostgreSQL/HTTP behavior is covered by rate-limit.db.test.ts.
+const createSearchService = (options: Parameters<typeof meteredSearchService>[0]) => meteredSearchService({ ...options, consumeRate: async () => true })
 
 const ctx = { userId: 'u1', caller: 'coordinator' as const }
 
