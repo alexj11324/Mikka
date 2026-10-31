@@ -10,13 +10,12 @@ import {
 } from "motion/react";
 import { useEffect, useLayoutEffect, useState } from "react";
 
-import { SPRING_GLIDE } from "@/lib/ease";
+import { SPRING_GLIDE, SPRING_PRESS } from "@/lib/ease";
 import { type SliderOptions, useSlider } from "@/lib/hooks/use-slider";
 import { TOUCH_GESTURE_CLASS } from "@/lib/touch";
 import { cn } from "@/lib/utils";
 
 // Bouncy grab feedback for the thumb scale only.
-const SPRING_BOUNCY = { type: "spring", stiffness: 500, damping: 14, mass: 0.7 } as const;
 
 export interface RangeSliderProps extends SliderOptions {
   /** Render a tick dot at each step. */
@@ -100,7 +99,7 @@ export function RangeSlider({ showTicks = true, className, ...options }: RangeSl
       <motion.div
         {...sliderProps}
         animate={reduce ? undefined : { scaleY: dragging ? 1.35 : 1 }}
-        transition={SPRING_BOUNCY}
+        transition={SPRING_PRESS}
         className="absolute left-0 top-1/2 h-6 w-1 rounded-full bg-foreground outline-none ring-inset ring-foreground/30 focus-visible:ring-4"
         style={{ x: thumbX, y: "-50%" }}
       />

@@ -7,7 +7,7 @@ import {
   MessageSquare,
   PencilLine,
   Search,
-  Sparkles,
+  Brain,
   SquareTerminal,
   Wrench,
 } from "lucide-react";
@@ -204,7 +204,7 @@ function ToolRow({ item }: { item: AgentActivityTool }) {
 }
 
 function TraceIcon({ kind }: { kind: AgentActivityTrace["kind"] }) {
-  if (kind === "thinking") return <Sparkles className="size-4" />;
+  if (kind === "thinking") return <Brain className="size-4" />;
   if (kind === "message") return <MessageSquare className="size-4" />;
   if (kind === "write") return <PencilLine className="size-4" />;
   if (kind === "run") return <SquareTerminal className="size-4" />;

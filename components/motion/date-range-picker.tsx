@@ -179,7 +179,7 @@ export function DateRangePickerSummary({
       )}
     >
       <div className="min-w-0">
-        <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="mb-1 text-[11px] font-medium text-muted-foreground">
           {labels.startDate}
         </p>
         <p className="text-[13px] font-medium tabular-nums">
@@ -192,7 +192,7 @@ export function DateRangePickerSummary({
         aria-hidden="true"
       />
       <div className="min-w-0">
-        <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="mb-1 text-[11px] font-medium text-muted-foreground">
           {labels.endDate}
         </p>
         <p

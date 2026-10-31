@@ -97,7 +97,7 @@ export function AgentDonutChart({ slices = [], unit, total }: Donut) {
       <Pie data={data} dataKey="value" nameKey="key" innerRadius={65} outerRadius={95} cornerRadius={8} paddingAngle={4} stroke="var(--background)" strokeWidth={4} isAnimationActive={!reduce}>
         {data.map(({ key }) => <Cell key={key} fill={`var(--color-${key})`} />)}
         <Label content={({ viewBox }) => viewBox && 'cx' in viewBox && 'cy' in viewBox ? <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-          <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-3xl font-bold tabular-nums">{compact.format(sum)}{unit ?? ''}</tspan>
+          <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-3xl font-semibold tabular-nums">{compact.format(sum)}{unit ?? ''}</tspan>
           {total && <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 22} className="fill-muted-foreground text-xs">{total}</tspan>}
         </text> : null} />
       </Pie>
