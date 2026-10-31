@@ -68,7 +68,7 @@ export function PrivacySettings() {
 
   return <>
     <SettingsSection id="export-heading" title={t('data')}>
-      <SettingRow title={t('export')} description={t('exportDescription')}>
+      <SettingRow title={t('export')}>
         <Button type="button" variant="secondary" size="sm" disabled={exporting} onClick={() => { void exportData() }}>{exporting ? t('exporting') : t('exportButton')}</Button>
       </SettingRow>
       {exportMessage && <p role="status" className="px-5 pb-3 text-sm text-muted-foreground">
