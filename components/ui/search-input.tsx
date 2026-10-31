@@ -16,7 +16,7 @@ function SearchInput({ className, ...props }: React.ComponentProps<"input">) {
     <InputGroup
       data-slot="search-input"
       className={cn(
-        "border-transparent bg-control shadow-none dark:bg-control has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:bg-control-hover has-[[data-slot=input-group-control]:focus-visible]:ring-2 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/30",
+        "border-transparent bg-control shadow-none dark:bg-control has-[[data-slot=input-group-control]:focus-visible]:border-transparent has-[[data-slot=input-group-control]:focus-visible]:bg-control-hover has-[[data-slot=input-group-control]:focus-visible]:ring-1 has-[[data-slot=input-group-control]:focus-visible]:ring-ring/40",
         className
       )}
     >
