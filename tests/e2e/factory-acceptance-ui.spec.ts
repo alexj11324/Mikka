@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { test, expect, register, seedTask, openIssueFromSearch } from './fixtures'
 
 // The server responses are fixtures: this checks the acceptance surface, not activation evidence.
-test('the issue page reviews Factory evidence, enables the skill and reconciles the publication', async ({ page }) => {
+test('the issue page reviews Factory evidence, enables the skill and reconciles the publication', { tag: '@smoke' }, async ({ page }) => {
   await register(page)
   const title = `Factory acceptance ${randomUUID()}`
   const issueId = await seedTask(page, title)
