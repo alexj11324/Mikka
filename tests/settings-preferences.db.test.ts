@@ -245,3 +245,32 @@ dbTest('每日建议 off: the briefings cron, the lazy read and the first briefi
   await writeDueBriefings({ now })
   assert.equal((await todays()).length, 0)
 })
+
+dbTest('the 线程完成 migration turns stored offs on, defaults new rows on, and a member can still turn it off', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const migration = await readFile(new URL('../drizzle/20261031151353_push_finished_default_on.sql', import.meta.url), 'utf8')
+  const client = await m.pool.connect()
+  try {
+    await client.query('begin')
+    const schema = `push_finished_${randomUUID().replaceAll('-', '')}`
+    await client.query(`create schema "${schema}"`)
+    await client.query(`set local search_path to "${schema}"`)
+    // The table as drizzle/20261027203647_mobile_push.sql created it, without the user foreign key.
+    await client.query(`create table user_preferences ("userId" text primary key, "pushDecide" boolean not null default true, "pushReview" boolean not null default true, "pushFinished" boolean not null default false, "pushBriefing" boolean not null default true, "pushWhen" text not null default 'always', "memoryEnabled" boolean not null default true, "updatedAt" timestamptz not null default now())`)
+    await client.query(`insert into user_preferences ("userId", "pushFinished") values ('old-default', false), ('already-on', true)`)
+    await client.query(migration)
+    await client.query(migration)
+    await client.query(`insert into user_preferences ("userId") values ('new-member')`)
+    const rows = await client.query(`select "userId", "pushFinished" from user_preferences order by "userId"`)
+    assert.deepEqual(rows.rows, [{ userId: 'already-on', pushFinished: true }, { userId: 'new-member', pushFinished: true }, { userId: 'old-default', pushFinished: true }])
+  } finally {
+    await client.query('rollback')
+    client.release()
+  }
+  // On the migrated app database: a member with no row reads on; turning it off sticks.
+  as(people.dana)
+  assert.equal((await m.preferences.getPreferences()).pushFinished, true)
+  assert.equal((await m.preferences.updatePreferences({ pushFinished: false }) as { pushFinished: boolean }).pushFinished, false)
+  assert.equal((await m.preferences.getPreferences()).pushFinished, false)
+  await m.preferences.updatePreferences({ pushFinished: true })
+})

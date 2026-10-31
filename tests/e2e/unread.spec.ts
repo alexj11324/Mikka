@@ -56,6 +56,18 @@ async function seedRead(page: Page, position: number | null, extra: { simulateSt
 }
 const storedPosts = (page: Page) => reads.get(page.context())?.posts ?? 0
 
+/**
+ * Waits for the Coordinator's next poll to serve the chat as it is now. The poll
+ * is SWR's 10s refreshInterval, timed from the end of the previous read, and Next
+ * sends a page's server actions one at a time, so on a busy runner two polls land
+ * 14–16s apart. A fixed wait from the moment the test adds messages is a coin toss;
+ * the poll that carries them is the event the pill reacts to.
+ */
+async function nextPoll(chat: { rewrites: number }) {
+  const before = chat.rewrites
+  await expect.poll(() => chat.rewrites, { timeout: 30_000, intervals: [250] }).toBeGreaterThan(before)
+}
+
 async function openCoordinator(page: Page) {
   await page.getByRole('button', { name: 'Coordinator', exact: true }).first().click()
   await expect(page.getByRole('region', { name: 'Coordinator', exact: true })).toBeVisible()
@@ -145,8 +157,8 @@ test('未读：不在底部时有新消息进来出现底部按钮，点击滚�
   await expect(conversation(page).getByText('消息 30', { exact: false })).toBeInViewport()
   await viewport(page).evaluate(element => element.scrollTo({ top: 0 }))
   chat.items = [...chat.items, ...range(31, 33)]
-  // Coordinator polls every 10s when idle.
-  await expect(bottomPill(page)).toContainText('3 条新消息', { timeout: 15_000 })
+  await nextPoll(chat)
+  await expect(bottomPill(page)).toContainText('3 条新消息')
   await bottomPill(page).getByRole('button', { name: /条新消息/ }).click()
   await expect(conversation(page).getByText('消息 33', { exact: false })).toBeInViewport()
   await expect(bottomPill(page)).toHaveCount(0)
@@ -160,11 +172,14 @@ test('未读：手动滚到底部时底部按钮自动消失，计数归零', as
   await expect(conversation(page).getByText('消息 30', { exact: false })).toBeInViewport()
   await viewport(page).evaluate(element => element.scrollTo({ top: 0 }))
   chat.items = [...chat.items, ...range(31, 32)]
-  await expect(bottomPill(page)).toBeVisible({ timeout: 15_000 })
+  await nextPoll(chat)
+  await expect(bottomPill(page)).toBeVisible()
   await viewport(page).evaluate(element => element.scrollTo({ top: element.scrollHeight }))
   await expect(bottomPill(page)).toHaveCount(0)
   chat.items = [...chat.items, ...range(33, 33)]
-  await page.waitForTimeout(11_000)
+  // Already at the bottom: the poll that brings message 33 must not raise the pill.
+  await nextPoll(chat)
+  await expect(conversation(page).getByText('消息 33', { exact: false })).toBeVisible()
   await expect(bottomPill(page)).toHaveCount(0)
 })
 
