@@ -121,9 +121,13 @@ claude mcp add --transport http mikka https://app.aspectlylabs.com/mikka/api/mcp
 
 Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和修改任务、派发运行，以及更新 Coordinator 的记忆。其他客户端的接入方式和完整工具列表参见 [MCP 文档](https://aspectlylabs.com/mikka/docs/mcp)。
 
-### 在你自己的电脑上运行 Agent
+### Agent 在哪里运行：Mikka Cloud，或你自己的环境
 
-[`packages/daemon`](packages/daemon) 中的 daemon 会检测电脑上已安装的 Agent，并通过它们执行线程：
+和 CI 的托管 runner 与自托管 runner 一样，Agent 要么运行在 Mikka 托管的机器上，要么运行在你自带的机器上。
+
+**Mikka Cloud（托管）。** Mikka 负责启动机器，空闲时休眠并保留磁盘。目前它使用工作区自己的 E2B API key（设置 › 密钥与环境）；由 Mikka 计费的算力已经完成，但由 `mikka-computer-billing` flag 隐藏。
+
+**你自己的环境。** 通过桌面应用或 daemon 接入你的电脑，或任何能通过 SSH 访问的服务器。Mikka 在上面安装 daemon，并把 Agent 派发过去。[`packages/daemon`](packages/daemon) 中的 daemon 会检测机器上已安装的 Agent，并通过它们执行线程：
 
 | Agent | 检测的 CLI |
 | --- | --- |
