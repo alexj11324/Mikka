@@ -12,6 +12,8 @@ import { desktopAuthCallbackURL, desktopAuthReturnPath } from '@/lib/desktop-aut
 import { bridgeFromWindow } from '@/lib/platform/detect'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
+import { signupRefusal, turnstileHeaders } from '@/lib/signup-refusal'
+import { Turnstile, type TurnstileHandle } from '@/components/auth/turnstile'
 
 const DESKTOP_OAUTH_STATE_KEY = 'mikka:desktop-oauth'
 const DESKTOP_OAUTH_TTL_MS = 10 * 60_000
@@ -179,19 +181,31 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
   }
   const registering = mode === 'sign-up'
+  const turnstile = useRef<TurnstileHandle>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!beginSubmit()) return
     const data = new FormData(event.currentTarget)
     try {
       const credentials = { email: String(data.get('email')).trim(), password: String(data.get('password')) }
-      const result = registering ? await authClient.signUp.email({ ...credentials, name: String(data.get('name')).trim() }) : await authClient.signIn.email(credentials)
-      if (result.error) { setError(t('submitFailed')); return }
+      const result = registering
+        ? await authClient.signUp.email({ ...credentials, name: String(data.get('name')).trim(), fetchOptions: { headers: turnstileHeaders(turnstileToken) } })
+        : await authClient.signIn.email(credentials)
+      if (result.error) {
+        const refusal = registering ? signupRefusal(result.error.status, result.error.code) : null
+        setError(refusal ? t(`signupRefusal.${refusal}`) : t('submitFailed'))
+        return
+      }
       const session = await authClient.getSession({ query: { disableCookieCache: true } })
       if (!session.data?.user) { setError(t('sessionNotKept')); return }
       window.location.replace(afterSignIn)
     } catch { setError(t('connectionFailed')) }
-    finally { endSubmit() }
+    finally {
+      // A Turnstile token is single-use, accepted or not.
+      if (registering) turnstile.current?.reset()
+      endSubmit()
+    }
   }
   async function enterTestWorkspace() {
     if (!beginSubmit()) return
@@ -221,7 +235,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
   }
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
-    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} notice={notice} googleCallbackURL={googleCallbackURL} githubCallbackURL={githubCallbackURL} next={returnPath} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} />
+    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} notice={notice} googleCallbackURL={googleCallbackURL} githubCallbackURL={githubCallbackURL} next={returnPath} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
       <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>
