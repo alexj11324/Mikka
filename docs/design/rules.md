@@ -334,6 +334,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   to white; ui-policy fails both as `style/secondary-button-fill`. Status
   tones (`statusTones`, used by status and priority pickers and status
   badges) are a tinted fill with no stroke; neutral uses `--control`.
+  Search fields use `SearchInput` (`components/ui/search-input.tsx`): the
+  `--control` fill, no stroke, the magnifier on the left and a light focus ring.
+  ui-policy fails an outlined `Input`, `InputGroup` or `SidebarInput` used for
+  search as `style/search-input`.
 - **R-32** Font Geist, self-hosted from `app/fonts/Geist-Variable.woff2` through
   `next/font/local` (no runtime font CDN). A local font is only allowed after
   its file and CSS variable are registered in `ui-policy.json` →
@@ -359,6 +363,13 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-38** Light-theme hover and column backgrounds use `rgba(0,0,0,a)`
   overlays, not a tinted overlay (an `rgba(16,24,40,…)` overlay read as mint
   green).
+
+- **R-39** One container per surface. A bordered or rounded card never wraps
+  another bordered card, outline item or loading card (a loading card inside a
+  settings section is `SettingsLoading bare`); a dialog is the only surface for
+  what it holds. A list row's hover and selected fill cover the whole row edge
+  to edge; buttons and switches inside it stay separately clickable.
+  `pnpm lint:ui` fails a frame inside a frame as `style/nested-frame`.
 
 ## Copy
 

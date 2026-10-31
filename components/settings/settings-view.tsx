@@ -103,7 +103,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'computers': return null
     case 'bots': return workspaceId && !preview ? <BotAgentsSettings key={workspaceId} /> : waiting
     case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
-    default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>
+    default: return null
   }
 }
 
@@ -113,13 +113,13 @@ function AppearanceSection() {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
   return <SettingsSection id="appearance-heading" title={t('title')}>
-    <SettingRow title={t('theme')} description={t('themeDescription')}>
+    <SettingRow title={t('theme')}>
       <ToggleGroup aria-label={t('themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}>
         <ToggleGroupItem value="light" aria-label={t('light')}><Sun />{t('light')}</ToggleGroupItem>
         <ToggleGroupItem value="dark" aria-label={t('dark')}><Moon />{t('dark')}</ToggleGroupItem>
         <ToggleGroupItem value="system" aria-label={t('systemLabel')}><Monitor />{t('system')}</ToggleGroupItem>
       </ToggleGroup>
     </SettingRow>
-    <SettingRow title={t('language')} description={t('languageDescription')}><LocaleSetting /></SettingRow>
+    <SettingRow title={t('language')}><LocaleSetting /></SettingRow>
   </SettingsSection>
 }

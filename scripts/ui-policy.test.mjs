@@ -302,3 +302,31 @@ test('the issue page may draw its header and comment-card lines (R-61, R-63); ot
   }
   assert.ok(auditSource('components/workspace/task-detail.tsx', '<div className="border-b border-rule" />', policy).some(d => d.rule === 'style/no-horizontal-rule'))
 })
+
+test('R-31: a search field is the shared SearchInput, never an outlined Input with a magnifier', () => {
+  const icons = `import { Search } from 'lucide-react'; import { Input } from '@/components/ui/input'; import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'; import { SidebarInput } from '@/components/ui/sidebar';`
+  has(`${icons} const ui = <Input type="search" />`, 'style/search-input')
+  has(`${icons} const ui = <Input aria-label={t('searchAria')} />`, 'style/search-input')
+  has(`${icons} const ui = <Input placeholder="搜索项目…" />`, 'style/search-input')
+  has(`${icons} const ui = <div><Search /><SidebarInput /></div>`, 'style/search-input')
+  has(`${icons} const ui = <InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput /></InputGroup>`, 'style/search-input')
+  const clean = source => assert.ok(!rules(`${icons} import { SearchInput } from '@/components/ui/search-input'; const ui = ${source}`).includes('style/search-input'), source)
+  clean(`<SearchInput aria-label={t('searchAria')} placeholder={t('searchPlaceholder')} />`)
+  clean(`<Input type="email" aria-label={t('email')} />`)
+  clean(`<InputGroup><InputGroupInput type="email" /><InputGroupAddon><Mail /></InputGroupAddon></InputGroup>`)
+})
+
+test('one container per surface: a frame inside a frame is a double border', () => {
+  const imports = `${prefix} import { Card, CardHeader, CardContent } from '@/components/ui/card'; import { Item } from '@/components/ui/item'; import { FramePanel } from '@/components/reui/frame'; import { SettingsLoading, SettingsSection } from '@/components/settings/primitives'; import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';`
+  has(`${imports} const ui = <div className="rounded-xl border"><div className="rounded-lg border p-3" /></div>`, 'style/nested-frame')
+  has(`${imports} const ui = <SettingsSection title="x"><SettingsLoading label="x" /></SettingsSection>`, 'style/nested-frame')
+  has(`${imports} const ui = <FramePanel><Item variant="outline" /></FramePanel>`, 'style/nested-frame')
+  has(`${imports} const ui = <Card><CardHeader /><CardContent><div className={cn('rounded-md border', active && 'border-primary')} /></CardContent></Card>`, 'style/nested-frame')
+  const clean = source => assert.ok(!rules(`${imports} const ui = ${source}`).includes('style/nested-frame'), source)
+  clean(`<SettingsSection title="x"><SettingsLoading label="x" bare /></SettingsSection>`)
+  clean(`<div className="rounded-xl border"><div className="rounded-lg bg-muted p-3" /></div>`)
+  clean(`<div className="rounded-xl border"><div className="hover:border rounded-lg" /></div>`)
+  clean(`<div className="rounded-lg border"><div className="rounded-full border bg-popover shadow-lg" /></div>`)
+  clean(`<Card><CardHeader /><CardContent><Dialog><DialogContent><DialogTitle>x</DialogTitle><div className="rounded-lg border" /></DialogContent></Dialog></CardContent></Card>`)
+  clean(`<FramePanel><Item /></FramePanel>`)
+})

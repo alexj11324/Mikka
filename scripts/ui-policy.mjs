@@ -93,6 +93,15 @@ function checkUtility(token, policy, report, options = {}) {
 // MIK-8: the 「新」 unread divider is the only chat file allowed to draw a horizontal rule.
 // The right column's group headers (「等待回复（2）」 and a rule, Figma 395:27702, Alex 2026-10-28) are the other.
 export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx', 'components/nav/group-header.tsx']
+// Files another open change owns; each fixes its own lines and then drops its entry here.
+// plugins-skills-view: the Plugins/Skills session moves its skill search to SearchInput.
+// secrets-settings: PR #557 rewrites the E2B section, whose loading rows need `bare`.
+// settings-sidebar: PR #591 rebuilds the sidebar; its 搜索设置 field moves to SearchInput there.
+export const UI_SWEEP_PENDING = new Map([
+  ['components/plugins/plugins-skills-view.tsx', 'style/search-input'],
+  ['components/settings/settings-sidebar.tsx', 'style/search-input'],
+  ['components/settings/secrets-settings.tsx', 'style/nested-frame'],
+])
 const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx']
 
 export function auditSource(file, text, policy) {
@@ -102,6 +111,7 @@ export function auditSource(file, text, policy) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {
+    if (UI_SWEEP_PENDING.get(file) === rule) return
     const start = node.getStart(source)
     const key = `${start}:${rule}:${message}`
     if (seen.has(key)) return
@@ -196,6 +206,44 @@ export function auditSource(file, text, policy) {
     let found = false
     const visit = n => { const o = opening(n); if (o && canonical(o) === wanted) found = true; if (!found) ts.forEachChild(n, visit) }
     if (ts.isJsxElement(node.parent)) node.parent.children.forEach(visit)
+    return found
+  }
+  // Unprefixed utilities on an element's className: its resting look, without hover:/dark: states.
+  const restingTokens = o => {
+    const initializer = attr(o, 'className')?.initializer
+    const expression = initializer && (ts.isJsxExpression(initializer) ? initializer.expression : initializer)
+    return resolve(expression).strings.flatMap(splitUtilities).filter(token => token === utilityBase(token))
+  }
+  const stringAttr = (o, name) => { const value = attr(o, name)?.initializer; return value && ts.isStringLiteral(value) ? value.text : undefined }
+  // A frame is a surface with its own visible edge: a bordered, rounded box, a Card, a settings card,
+  // an outline Item, or SettingsLoading's own card (`bare` renders rows only).
+  const isFrame = o => {
+    const name = canonical(o)
+    if (['Card', 'SettingsSection', 'FramePanel'].includes(name)) return true
+    if (name === 'Item') return stringAttr(o, 'variant') === 'outline'
+    if (name === 'SettingsLoading') return !attr(o, 'bare')
+    const tokens = restingTokens(o)
+    return tokens.some(token => /^border(?:-(?:[1-9]\d*|border|input))?$/.test(token)) && tokens.some(token => /^rounded(?:-(?!none$).+)?$/.test(token))
+  }
+  // Overlay content portals out of the frame, so a card inside a dialog opened from a card is not nested.
+  const portal = /^(?:Dialog|AlertDialog|Sheet|Drawer|Popover|Tooltip|HoverCard|DropdownMenu|ContextMenu|Menubar|Select|Combobox)/
+  const nestedFrames = element => {
+    const found = []
+    const walk = n => {
+      const o = opening(n)
+      if (o && portal.test(canonical(o))) return
+      // A floating bar (shadow) sits above the frame, not inside its edge.
+      if (o && isFrame(o) && !restingTokens(o).some(token => /^shadow-(?!none$)/.test(token))) { found.push(o); return }
+      ts.forEachChild(n, walk)
+    }
+    element.children.forEach(walk)
+    return found
+  }
+  const searchIcon = o => ['Search', 'SearchIcon'].includes(o.tagName.getText(source)) && imports.get(o.tagName.getText(source))?.from === policy.iconLibrary
+  const hasSearchIcon = nodes => {
+    let found = false
+    const walk = n => { const o = opening(n); if (o && searchIcon(o)) found = true; if (!found) ts.forEachChild(n, walk) }
+    nodes.forEach(walk)
     return found
   }
   function visit(node) {
@@ -298,6 +346,15 @@ export function auditSource(file, text, policy) {
         if (!vertical && !ruleExempt) add(node, 'style/no-horizontal-rule', '禁止水平 <Separator />；用间距或背景分组，只保留竖线分隔。')
       }
       if (name === 'Button' && (attr(node, 'isLoading') || attr(node, 'isPending'))) add(node, 'composition/button-loading', 'Button 使用 Spinner + disabled，不存在 isLoading/isPending。')
+      // R-31 search fields: one borderless grey SearchInput, never an outlined Input with a magnifier beside it.
+      if (['Input', 'InputGroupInput', 'SidebarInput'].includes(name)) {
+        const searchText = ['type', 'aria-label', 'placeholder', 'id'].some(key => /search|搜索/i.test(attr(node, key)?.initializer?.getText(source) ?? ''))
+        const siblings = ts.isJsxElement(node.parent) ? node.parent.children : []
+        if (searchText || hasSearchIcon(siblings)) add(node, 'style/search-input', '搜索框统一用 SearchInput（components/ui/search-input）：无描边灰底、图标在左。')
+      }
+      if (name === 'InputGroup' && ts.isJsxOpeningElement(node) && hasSearchIcon(node.parent.children)) add(node, 'style/search-input', '搜索框统一用 SearchInput（components/ui/search-input）：无描边灰底、图标在左。')
+      // One container per surface: a frame inside another frame draws two concentric edges.
+      if (ts.isJsxOpeningElement(node) && isFrame(node)) for (const inner of nestedFrames(node.parent)) add(inner, 'style/nested-frame', `${canonical(inner)} 嵌在 ${name} 里形成双层边框；只保留一层容器（内层去掉 border/rounded，SettingsLoading 用 bare）。`)
       if (['Input', 'Textarea'].includes(name) && parents.includes('InputGroup')) add(node, 'forms/input-group', 'InputGroup 内使用 InputGroupInput/InputGroupTextarea。')
       if (name === 'FieldContent' && ts.isJsxElement(node.parent)) {
         const children = node.parent.children.map(opening).filter(Boolean)

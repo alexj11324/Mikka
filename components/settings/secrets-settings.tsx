@@ -40,7 +40,7 @@ export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
 
   return <>
     <SettingsSection id="secrets-heading" title={t('heading')} action={<Button {...settingsSectionAction} onClick={() => { setWarning(null); setEditing('new') }}>{t('add')}</Button>}>
-      {!list.data && !list.error && <SettingsLoading label={t('loading')} rows={2} />}
+      {!list.data && !list.error && <SettingsLoading label={t('loading')} rows={2} bare />}
       {(list.error || list.data?.error) && <p role="alert" className="px-5 py-4 text-sm text-destructive">{actionError(list.data?.error)}</p>}
       {secrets?.length === 0 && <p className="px-5 py-4 text-sm text-muted-foreground">{t('empty')}</p>}
       {secrets && groupByScope(secrets).map(([repository, rows]) => <div key={repository || 'workspace'} role="group" aria-label={repository ? t('repositoryGroup', { repository }) : t('workspaceGroup')}>

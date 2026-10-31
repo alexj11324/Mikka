@@ -212,7 +212,6 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
         </div>
       })}
     </SettingsSection>
-    {state.connections.some(item => item.state === 'connected') && <p className="px-1 text-xs text-muted-foreground">{t('whenExhausted')}</p>}
     {attempt && <div className="flex flex-col gap-2 px-1 text-sm">
       <p>{attempt.flow === 'device' ? t('deviceInstructions') : t('callbackInstructions')}</p>
       {attempt.userCode && <p className="font-mono font-semibold select-all">{attempt.userCode}</p>}
