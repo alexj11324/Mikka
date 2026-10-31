@@ -80,13 +80,9 @@ cases remain covered by their real internal HTTP/SQL tests.
   SQL. Co-locating those domains in one physical database is a valid current
   deployment topology and matches the ordinary isolated account adapter; two
   physical source databases are not an added acceptance requirement.
-  The actual tool limitation is `validateTargets` in
-  `scripts/ops/isolated-recovery.mjs`: it requires two different database names
-  for both backup and restore. A read-only probe using the same owned target
-  for both source roles fails with `recoveryDistinctDatabasesRequired` before
-  SQL mutation, vault access or file creation. Thus the current backup tool
-  does not yet support source aliases. Restore targets must remain newly
-  isolated; no target guard or attestation was changed during this assessment.
+  The source-alias limitation found during assessment has now been fixed and
+  exercised separately below. The missing ordinary application producer
+  remains distinct from the now-verified co-located backup/restore component.
 - **#212:** the whole fixed-application key-flow baseline and original
   end-to-end provider/cleanup failure matrix. Current evidence establishes
   collector, logged HTTP response and restore components, plus the separately
@@ -98,6 +94,55 @@ production PITR, cross-region resources, new IAM/KMS or external paging as
 closure conditions. Owner-provided OAuth and the decision to skip our real
 Slack/Notion writes remain unchanged. Neither issue is closed by this
 component evidence alone.
+
+## Co-located source fix and real restore
+
+The original shared `validateTargets` rejected a valid source pair which
+pointed both logical roles at one owned database. A pre-fix read-only probe
+reproduced `recoveryDistinctDatabasesRequired` before mutation or file creation.
+The fix separates backup source validation from destination validation. Both
+source entries still prove loopback/container/database binding. Destinations
+still have to be two distinct, brand-new isolated databases; recorded source
+names, external endpoints and retained databases are refused.
+
+The source topology is derived from the actual verified pair, included in the
+independently hash-bound manifest and validated on restore. There is no general
+`allow_alias` input or weakened destination guard. Existing ordered main and
+workspace records still map to distinct `database-0.enc` / `database-1.enc`
+payloads, even when the source is co-located. Because both restored copies
+contain both data domains, deletion replay and credential/approval/effect
+quarantine run over both, including the otherwise-shadow copy. Old version-1
+separate-source manifests remain readable.
+
+Real acceptance ran on exact fixed code
+`d3408bcd0ebbd6510441474039c1a019ed79fb5f`. The already-owned ops source was
+forward-migrated through the normal runner to contain both domains and given
+additional uniquely-owned SQL fixtures. No new source database was created.
+Two new ordinary isolated restore databases were created, with the earlier
+restore targets, encrypted snapshots and reports retained. Free local space
+remained **341 MiB**, above the parent task's 200 MiB reserve.
+
+Backup at 11:11:57 UTC and restore at 11:12:03 UTC on 2026-10-31 verified both
+inventories and two object payloads; restore-command duration was **4,886 ms**.
+Each copy independently preserved the live user's app task/run/successful
+receipt and workspace membership, removed the currently deleted user's data
+from both domains, cleared sessions, revoked the device credential, declined
+pending approval and quarantined the executing effect as uncertain. Current
+deletion replay also removed the retired object while preserving the survivor
+object and hash. No provider effect was sent or replayed.
+
+Six real negative cases refused alias restore destinations, a source as a
+destination, retained existing targets, an external host, a wrong independent
+manifest anchor and a repeated restore into the now-existing destinations.
+The normal source suite additionally verifies topology/role ordering and
+legacy-manifest destination checks without Docker or SQL mutation.
+
+Private report: `/tmp/mikka-ops-colocated-qfbSLJ/report.json`; raw log:
+`/tmp/mikka-ops-colocated-acceptance.log`; reproducible private driver:
+`/tmp/mikka-ops-colocated-acceptance.mjs`. The report explicitly records
+`ordinaryApiProducer:false` and `externalProviderCalls:0`. This closes the
+backup utility topology bug and shadow-copy coverage gap, not the remaining
+ordinary Mikka HTTP business-producer acceptance in #211.
 
 ## #214 upstream status
 
