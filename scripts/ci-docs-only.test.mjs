@@ -363,3 +363,22 @@ test('the actual workflow bootstrap executes its trusted temporary ESM module', 
     }
   }
 })
+
+test('blocking CI checks synthetic PR merge candidates once and preserves every main run', () => {
+  const source = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
+  const events = source.split('\npermissions:')[0]
+  assert.match(events, /on:\n  push:\n    branches: \[main\]\n  pull_request:\n  merge_group:/)
+  assert.doesNotMatch(events, /branches-ignore:/)
+  assert.doesNotMatch(source, /github\.event\.pull_request\.head\.repo\.full_name != github\.repository/)
+  assert.match(source, /name: UI policy \(strict\)/)
+  assert.match(source, /name: Production build and browser interactions\n/)
+  assert.match(source, /if: github\.event_name != 'pull_request'/)
+  for (const workflow of ['ui-policy.yml', 'browser-tests.yml']) {
+    const text = readFileSync(`.github/workflows/${workflow}`, 'utf8')
+    assert.match(text, /github\.ref == 'refs\/heads\/main' && format\('-\{0\}', github\.run_id\)/)
+    assert.match(text, /cancel-in-progress: \$\{\{ github\.ref != 'refs\/heads\/main' \}\}/)
+  }
+  const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
+  assert.match(browser, /name: Browser tests \(before merge\)/)
+  assert.match(browser, /push:\n    branches: \[main\]/)
+})
