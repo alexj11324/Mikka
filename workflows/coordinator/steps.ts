@@ -32,7 +32,7 @@ import { webSearch } from '@/lib/search'
 import { issueMembers, issues } from '@/lib/db/schema'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
-import { proposeAction, proposeRepositoryPush } from '@/lib/pending-action-store'
+import { proposeRepositoryPush, writeAccountAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -244,12 +244,14 @@ export async function personalMcp(userId: string, botId: string | null, executio
 // preserve the first uncertain outcome rather than replaying this step.
 personalMcp.maxRetries = 0
 
-export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
+export async function accountWrite(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
   'use step'
   await assertNativeToolScope(userId,scope)
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
-  return accountId ? proposeAction(userId, action, input, accountId) : proposeAction(userId, action, input)
+  return accountId ? writeAccountAction(userId, action, input, accountId) : writeAccountAction(userId, action, input)
 }
+// A send has no idempotency key: a replayed step could send it twice.
+accountWrite.maxRetries = 0
 
 export async function proposeRepositoryPushApproval(userId: string, input: { repo: string }, scope?: NativeToolScope, task?: { eventId: string; botId: string | null }) {
   'use step'

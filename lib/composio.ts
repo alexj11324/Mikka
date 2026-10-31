@@ -1,6 +1,6 @@
 import 'server-only'
 import { Composio } from '@composio/core'
-import { COMPOSIO_ACTIONS, executeComposioAction, resolveComposioAccount, type ComposioActionName, type ComposioActionResult } from '@/lib/composio-actions'
+import { COMPOSIO_ACTIONS, executeComposioAction, resolveComposioAccount, type ComposioActionName, type ComposioActionResult, type ComposioDispatchGate } from '@/lib/composio-actions'
 import { COMPOSIO_TOOLKIT_IDS, disconnectAndForgetAccount, PROVIDER_IDENTITY, providerAnswer, SLACK_USER_INFO, sanitizeEmail, slackAnswer, slackUserEmail, slackUserId, type ComposioToolkitId } from '@/lib/composio-accounts'
 import { chosenComposioDefault, forgetComposioAccount } from '@/lib/composio-account-store'
 
@@ -12,8 +12,8 @@ export function getComposio() {
   return apiKey ? new Composio({ apiKey }) : null
 }
 
-export function runComposioAction(userId: string, action: ComposioActionName, input: unknown, accountId?: string): Promise<ComposioActionResult> {
-  return executeComposioAction(userId, action, input, getComposio(), toolkit => chosenComposioDefault(userId, toolkit), accountId)
+export function runComposioAction(userId: string, action: ComposioActionName, input: unknown, accountId?: string, gate?: ComposioDispatchGate): Promise<ComposioActionResult> {
+  return executeComposioAction(userId, action, input, getComposio(), toolkit => chosenComposioDefault(userId, toolkit), accountId, gate)
 }
 
 export async function resolveActionAccount(userId: string, action: ComposioActionName, accountId?: string) {

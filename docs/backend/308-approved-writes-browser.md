@@ -25,6 +25,10 @@ Supported actions: append_notion_paragraph `{page_id:UUID,text:1..2000}`, send_s
 
 HTTP400invalid envelope/input,401session/Bearer rejection,403Origin,409domain/uncertain COMMIT,503unavailable/disabled.200is a typed result, not automatic provider success. View/list statuses pending/running/done/declined; running+operationUncertain remains unresolved. COMMIT errors retain explicit committed/unconfirmed state from the foundation; clients keep IDs and inspect the same result. No automatic transaction-body retry.
 
+## Default permission (2026-10-31, R-77)
+
+An action that neither the agent's nor the workspace's `external_write_permissions` names takes the write tool's own default: `allow`, or `ask` when the tool's Composio tags include `destructiveHint`. `composioWriteProvider.prepare` reads the tags from the tool it already fetches, and the default is frozen in `operationBinding.run.approvalDefault` and the ledger `policyScope`, so every later policy check (insert, decide, ledger phases) resolves the same way. A provider that returns no default, and every binding made before this change, keeps `ask`. Explicit `ask` and `deny` still narrow. On 2026-10-31 Composio tagged `NOTION_APPEND_BLOCK_CHILDREN` and `SLACK_SEND_MESSAGE` without `destructiveHint` and `GOOGLECALENDAR_DELETE_EVENT` with it, so Calendar cancel still asks.
+
 ## Product approval integration
 
 The client first reads public GET `/api/approved-writes`, which returns only `{enabled:boolean}` with status 200 and `no-store`, using the same server-owned gate without loading auth, database or provider services. Until it reports exactly `true`, the client does not POST list/view requests or render retained uncertain cards. Stable disabled deployments therefore produce no repeated 503s. Availability grants no authority: every POST still checks the current gate, session and operation policy, and a disabled POST retains its 503 contract. There is no second `NEXT_PUBLIC` flag.

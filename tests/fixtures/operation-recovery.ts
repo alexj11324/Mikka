@@ -41,7 +41,8 @@ export async function recoverySlackProvider(origin: string, afterEffect?: () => 
     connectedAccounts: { list: async ({ userIds, toolkitSlugs }: { userIds: string[]; toolkitSlugs: string[] }) => ({
       items: userIds.length === 1 && ['owner', 'recovery-owner'].includes(userIds[0]) && toolkitSlugs[0] === 'slack' ? [{ id: 'fixture-slack-account', toolkit: { slug: 'slack' }, status: 'ACTIVE', isDisabled: false }] : [],
     }) },
-    tools: { proxyExecute: async (request: { endpoint: string; method: string; userId: string; connectedAccountId: string; body?: unknown; parameters?: { in: string; name: string; value: string | number }[] }, options?: { signal?: AbortSignal }) => {
+    // SLACK_SEND_MESSAGE's tags as Composio returned them on 2026-10-31.
+    tools: { getRawComposioToolBySlug: async () => ({ version: '00000000_00', tags: ['chat', 'important', 'openWorldHint'] }), proxyExecute: async (request: { endpoint: string; method: string; userId: string; connectedAccountId: string; body?: unknown; parameters?: { in: string; name: string; value: string | number }[] }, options?: { signal?: AbortSignal }) => {
       if (!['owner', 'recovery-owner'].includes(request.userId) || request.connectedAccountId !== 'fixture-slack-account') throw Error('fixture account mismatch')
       const url = new URL(request.endpoint, base)
       for (const parameter of request.parameters ?? []) {

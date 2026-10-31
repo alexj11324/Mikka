@@ -6,6 +6,7 @@ import { channelSnapshot, calendarSnapshot, snapshotDigest } from './write-targe
 import { createHash } from 'node:crypto'
 import { SLACK_CONVERSATION_READ_CONTRACT, type SlackConversationReader } from './slack-conversation-read'
 import { SLACK_DELIVERY_CONTRACT, type SlackDelivery } from './slack-delivery'
+import { toolApprovalDefault } from '../composio-tool-hints'
 
 const definitions = {
   append_notion_paragraph: { toolkit: 'notion', write: 'NOTION_APPEND_BLOCK_CHILDREN', read: 'NOTION_RETRIEVE_PAGE' },
@@ -63,8 +64,12 @@ export function composioWriteProvider(client: ComposioActionClient | null, actio
   return {
     name: `composio-${d.toolkit}`,
     async prepare(owner, payload) {
-      const accountId = await account(owner), pinned = action === 'send_slack_message' && slackDelivery ? SLACK_DELIVERY_CONTRACT : await version(d.write)
-      return { accountId, version: pinned, context: await inspect(owner, accountId, payload) }
+      // The write tool's own metadata (destructiveHint) sets whether it asks by
+      // default, also when Slack sends through its own transport.
+      const accountId = await account(owner), tool = await client!.tools.getRawComposioToolBySlug(d.write)
+      const custom = action === 'send_slack_message' && slackDelivery
+      if (!custom && (!tool.version || tool.version === 'latest')) throw new OperationError('integrationActionVersionUnavailable')
+      return { accountId, version: custom ? SLACK_DELIVERY_CONTRACT : tool.version!, context: await inspect(owner, accountId, payload), approvalDefault: toolApprovalDefault(tool.tags) }
     },
     async execute(p) {
       p.signal.throwIfAborted()

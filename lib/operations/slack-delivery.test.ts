@@ -71,7 +71,11 @@ test('the product provider pins its proxy contract and checks the current owner 
       assert.deepEqual(userIds, ['owner'])
       return { items: active ? [{ id: 'account', toolkit: { slug: 'slack' }, status: 'ACTIVE', isDisabled: false }] : [] }
     } },
-    tools: { proxyExecute: async ({ endpoint }: { endpoint: string }) => {
+    tools: { getRawComposioToolBySlug: async (slug: string) => {
+      assert.equal(slug, 'SLACK_SEND_MESSAGE')
+      // SLACK_SEND_MESSAGE's tags as Composio returned them on 2026-10-31.
+      return { version: '00000000_00', tags: ['chat', 'important', 'openWorldHint'] }
+    }, proxyExecute: async ({ endpoint }: { endpoint: string }) => {
       if (endpoint === '/conversations.info') return { status: 200, data: { ok: true, channel: { id: payload.channel, is_member: true } } }
       if (endpoint === '/chat.getPermalink') return { status: 200, data: { ok: false, error: 'message_not_found' } }
       assert.equal(endpoint, '/conversations.history'); historyReads++
@@ -79,7 +83,9 @@ test('the product provider pins its proxy contract and checks the current owner 
     } },
   } as unknown as ComposioActionClient
   const provider = composioWriteProvider(client, 'send_slack_message', undefined, undefined, composioSlackConversationReader(client), composioSlackDelivery(client))
-  assert.equal((await provider.prepare('owner', payload)).version, SLACK_DELIVERY_CONTRACT)
+  const prepared = await provider.prepare('owner', payload)
+  assert.equal(prepared.version, SLACK_DELIVERY_CONTRACT)
+  assert.equal(prepared.approvalDefault, 'allow')
   assert.equal((await provider.lookup(input))?.providerObjectId, '123.456')
   active = false
   await assert.rejects(provider.lookup(input), /integrationAccountUnavailable/)
