@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
-import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, proactiveFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
+import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, proactiveFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 
 test('pageviews strip query strings, hashes, document identifiers and unapproved properties', () => {
   const event = sanitizeAnalyticsEvent({ event: '$pageview', properties: {
@@ -66,6 +66,13 @@ test('gated features are on only when the remote flag is exactly true', () => {
   assert.equal(computerProductionEnabled('production', '1'), true)
   for (const environment of [undefined, 'development', 'preview']) assert.equal(computerProductionEnabled(environment, '1'), false)
   for (const flag of [undefined, '0', 'true']) assert.equal(computerProductionEnabled('production', flag), false)
+})
+
+test('the 电脑 tab has its own kill switch, apart from the cloud computer rollout flag', () => {
+  assert.equal(killSwitches.computerTab, 'mikka-computer-tab-off')
+  assert.notEqual(killSwitches.computerTab, gatedFeatures.cloudComputer)
+  const hook = readFileSync(new URL('../hooks/use-feature-availability.ts', import.meta.url), 'utf8')
+  assert.match(hook, /export function useComputerTab\(\)[\s\S]*?killSwitches\.computerTab[\s\S]*?!== true/)
 })
 
 test('the locale layout mounts the pageview tracker whenever PostHog is configured', () => {
