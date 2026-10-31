@@ -16,19 +16,25 @@ const REPLY_SECOND = `回复二 ${'第二条的回答 '.repeat(30)}`
 const ITEMS = /"items"\s*:\s*\[[^\]]*\]/
 
 async function mockChat(page: Page) {
-  const state = { items: history, working: false, served: 0, actionId: null as string | null }
+  const state = { items: history, working: false, error: null as string | null, served: 0, welcomes: 0, actionId: null as string | null }
   await page.route('**/*', async route => {
     const request = route.request()
     const actionId = request.headers()['next-action']
     if (request.method() !== 'POST' || !actionId) return route.fallback()
-    if (state.actionId && actionId !== state.actionId) return route.fallback()
+    if (state.actionId && actionId !== state.actionId) {
+      if ((request.postData() ?? '').trim() !== '[]') return route.fallback()
+      const response = await route.fetch()
+      const body = await response.text()
+      if (/"queued"\s*:\s*(true|false)/.test(body)) state.welcomes++
+      return route.fulfill({ response, body })
+    }
     if (!state.actionId && (request.postData() ?? '').trim() !== '[]') return route.fallback()
     const response = await route.fetch()
     const body = await response.text()
     if (!ITEMS.test(body) || !/"working"\s*:/.test(body)) return route.fulfill({ response, body })
     state.actionId = actionId
     state.served++
-    return route.fulfill({ response, body: body.replace(ITEMS, `"items":${JSON.stringify(state.items)}`).replace(/"working"\s*:\s*(true|false)/, `"working":${state.working}`).replace(/"enabled"\s*:\s*false/, '"enabled":true') })
+    return route.fulfill({ response, body: body.replace(ITEMS, `"items":${JSON.stringify(state.items)}`).replace(/"working"\s*:\s*(true|false)/, `"working":${state.working}`).replace(/"error"\s*:\s*(null|"(?:[^"\\]|\\.)*")/, `"error":${JSON.stringify(state.error)}`).replace(/"enabled"\s*:\s*false/, '"enabled":true') })
   })
   await page.context().route('**/api/conversations/coordinator/read', route => route.fulfill({ json: { lastReadMessageId: null, lastReadPosition: null, unreadCount: 0 } }))
   return state
@@ -36,6 +42,36 @@ async function mockChat(page: Page) {
 
 const viewport = (page: Page) => page.locator('[data-slot="message-scroller-viewport"]')
 const conversation = (page: Page) => page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+
+test('a failed hidden welcome does not enqueue another welcome on mount or poll', async ({ page }) => {
+  const chat = await mockChat(page)
+  chat.items = []
+  chat.error = 'wake_exhausted'
+  await register(page)
+  await page.getByRole('button', { name: 'Coordinator', exact: true }).first().click()
+  await expect(page.getByRole('alert').filter({ hasText: '回复重试已停止' })).toBeVisible()
+  const served = chat.served
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect.poll(() => chat.served, { timeout: 15000 }).toBeGreaterThan(served)
+  expect(chat.welcomes).toBe(0)
+})
+
+test('an unacknowledged wake keeps the message, stops the spinner and recovers through polling', async ({ page }) => {
+  const chat = await mockChat(page)
+  chat.items = [...history, item(17, 'person', FIRST, true)]
+  chat.error = 'wake_start_unconfirmed'
+  await register(page)
+  await page.getByRole('button', { name: 'Coordinator', exact: true }).first().click()
+  await expect(conversation(page).getByText(FIRST, { exact: true })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: '回复启动未确认 · 等待重试' })).toBeVisible()
+  await expect(conversation(page).getByText('Coordinator 正在处理…')).toHaveCount(0)
+  chat.error = 'wake_exhausted'
+  await expect(page.getByRole('alert').filter({ hasText: '回复重试已停止' })).toBeVisible({ timeout: 15000 })
+  chat.items = [...history, item(17, 'person', FIRST), item(18, 'coordinator', REPLY_FIRST)]
+  chat.error = null
+  await expect(conversation(page).getByText('回复一', { exact: false })).toBeVisible({ timeout: 15000 })
+  await expect(page.getByRole('alert').filter({ hasText: '回复重试已停止' })).toHaveCount(0)
+})
 
 /** Records, every frame, the viewport's scrollTop and the order of the messages on screen. */
 async function record(page: Page) {

@@ -2667,6 +2667,11 @@
     "working": "Coordinator is working…",
     "loadError": "Could not load the conversation. Retrying.",
     "failedTitle": "Reply failed",
+    "wakeErrors": {
+      "wake_failed": "Reply pending retry",
+      "wake_start_unconfirmed": "Reply start unconfirmed · retry pending",
+      "wake_exhausted": "Reply retries stopped"
+    },
     "unavailable": "{name} is unavailable",
     "input": "Message the Coordinator",
     "inputTo": "Message {name}",
