@@ -12,7 +12,14 @@ test('personal instructions retain host approval and existing OpenUI vocabulary'
   assert.match(instructions,/BeQuestions\(/)
   // A report renders as cards and a table, not ASCII art in a code block.
   assert.match(instructions,/BeStat\(/)
-  assert.match(instructions,/ShadcnTable\(/)
+  assert.match(instructions,/BeTable\(/)
+  // Reports can chart numbers and call out a takeaway.
+  assert.match(instructions,/BarChart\(/)
+  assert.match(instructions,/LineChart\(/)
+  assert.match(instructions,/AreaChart\(/)
+  assert.match(instructions,/DonutChart\(/)
+  assert.match(instructions,/BeAlert\(/)
+  assert.match(instructions,/Separator\(/)
   assert.match(instructions,/Never draw an interface as ASCII art/)
   assert.ok(instructions.endsWith(coordinatorPresentation()))
   assert.doesNotMatch(instructions,/Prime/)

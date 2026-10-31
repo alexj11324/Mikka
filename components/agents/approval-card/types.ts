@@ -25,6 +25,10 @@ export interface ApprovalCardQuestion {
   autoAdvance?: boolean;
   allowCustom?: boolean;
   customPlaceholder?: string;
+  /** Answer with a beUI control instead of radio/checkbox rows; the value is kept as the custom answer text. */
+  input?: "select" | "switch" | "slider" | "dateRange";
+  /** Bounds for `input: "slider"`. */
+  range?: { min: number; max: number; step?: number; unit?: string };
 }
 
 export interface ApprovalCardAnswer {
