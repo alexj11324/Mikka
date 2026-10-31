@@ -1,4 +1,5 @@
 import 'server-only'
+import { BASE_PATH } from '@/lib/base-path'
 import { createHash, createPrivateKey, createPublicKey, hkdfSync, sign } from 'node:crypto'
 import { POLICY_SNAPSHOT_TTL_MS, policyDistributionContextSchema, policyIssuer, policySnapshotMessage, signedPolicySnapshotSchema, type PolicySnapshotPayload } from '@mikka/protocol/policy-snapshot'
 import { policySnapshotHash } from '@mikka/protocol/node-policy-snapshot'
@@ -8,7 +9,9 @@ import type { readCliRunPolicy } from './policy-store'
 export function requestPolicyIssuer(request: Request) {
   const url = new URL(request.url), index = url.pathname.indexOf('/v1/')
   if (index < 0) throw Error('policyIssuerInvalid')
-  return policyIssuer(`${url.origin}${url.pathname.slice(0,index)}`)
+  // Next strips its basePath before adapting the route Request. The public
+  // deployment config remains authoritative even when request.url omits it.
+  return policyIssuer(`${url.origin}${BASE_PATH || url.pathname.slice(0,index)}`)
 }
 /** Domain-separated signing material from the existing server secret; never persisted or sent. */
 function signingKey(issuer: string) {
