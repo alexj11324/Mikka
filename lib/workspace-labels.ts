@@ -1,16 +1,11 @@
 import type { IssueLabel } from './issue-metadata'
 
-/**
- * The workspace's issue labels and their colours, for picking a rule's label
- * (#539, point 1). Until that action lands this reads the labels on the issues
- * the person can see, as the board's label filter does; when #539 merges, the
- * body becomes the backend's `listWorkspaceLabels()` call and nothing else changes.
- */
+/** The workspace's issue labels and their colours, for picking a rule's label (#539). */
 export type WorkspaceLabel = IssueLabel
 
 export async function listWorkspaceLabels(): Promise<WorkspaceLabel[]> {
-  const { listIssues } = await import('@/app/actions/issues')
-  return uniqueLabels((await listIssues()).flatMap(issue => issue.metadata.labels))
+  const { listWorkspaceIssueLabels } = await import('@/app/actions/execution-settings')
+  return uniqueLabels(await listWorkspaceIssueLabels() as WorkspaceLabel[])
 }
 
 /** One entry per name, matched without case, first colour wins, sorted by name. */
