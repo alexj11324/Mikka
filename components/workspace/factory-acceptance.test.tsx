@@ -96,7 +96,8 @@ test('approval bar uses component defaults and the Figma copy for each state', (
   for (const state of ['pending', 'approved', 'publishing', 'checking', 'failed', 'live', 'revoked', 'expired', 'invalidated'] as const) {
     const html = bar(state)
     assert.match(html, /data-slot="item"/)
-    assert.doesNotMatch(html, /bg-control|rounded-\[14px\]|line-through|bg-blue|bg-destructive/)
+    // `bg-control` is the secondary Button's own default (R-31), so it no longer marks a call-site override.
+    assert.doesNotMatch(html, /rounded-\[14px\]|line-through|bg-blue|bg-destructive/)
   }
   assert.match(bar('pending', true), />待启用<.*>启用</)
   assert.match(bar('live', true), />已启用</)
@@ -132,7 +133,7 @@ test('publish failed keeps revoke and offers publish again', () => {
 test('revoke is secondary and busy actions swap the icon for the spinner (fixed width)', () => {
   for (const state of ['approved', 'failed'] as const) {
     const idle = renderToStaticMarkup(<ApprovalBar state={state} isSkill={false} details={[]} />)
-    assert.match(idle, /<button[^>]*class="[^"]*bg-secondary [^"]*"[^>]*>撤销批准</)
+    assert.match(idle, /<button[^>]*data-button-variant="secondary"[^>]*>撤销批准</)
     const busy = renderToStaticMarkup(<ApprovalBar state={state} isSkill={false} details={[]} busy />)
     // Each action has exactly one inline-start icon whether idle or busy, so its width does not change.
     assert.equal((idle.match(/data-icon="inline-start"/g) ?? []).length, (busy.match(/data-icon="inline-start"/g) ?? []).length)
