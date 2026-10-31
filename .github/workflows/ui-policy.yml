@@ -138,6 +138,9 @@ jobs:
       - run: pnpm test:personal-mailbox-core
       - run: pnpm test:factory-monitor
       - run: pnpm test:execution-rules
+      - run: pnpm test:abuse
+      - run: pnpm test:model-admission
+      - run: pnpm test:audit
       - run: pnpm test:agent-kit
       - run: pnpm test:agent-kit-compat
       - run: pnpm test:approved-writes
