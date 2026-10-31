@@ -27,6 +27,7 @@ mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExp
     async botActive() { return botActive }
     async botModel() { if (settingsError) throw settingsError; return selected }
     async botModels() { return available }
+    async pooledBindings() { return [] }
     async botBinding() { return savedBinding }
     async bindingForBot(_scope: unknown, _bot: unknown, bindingId: string) { return bindingId }
   },

@@ -387,6 +387,26 @@ test(
       // Un-sharing takes it out of team B at once.
       await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, false);
       assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'un-shared: Mikka 默认');
+      // Alex 「B」: with 团队成员也可以用, other members' bots may use her shared subscription too.
+      await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, true);
+      assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'shared for her own bots only: bob\'s bot replies on Mikka 默认');
+      await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, true, true);
+      const pooled = await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies);
+      assert.equal(pooled.modelSelection?.ownerId,alice.ownerId,'the subscription is hers');
+      assert.equal(pooled.modelSelection?.runOwnerId,'bob','the run is bob\'s');
+      assert.equal(pooled.modelSelection?.consumerId,bobBot,'for bob\'s bot only');
+      assert.equal(pooled.modelSelection?.workspaceId,teamB.workspaceId);
+      assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'bob\'s Coordinator never uses another member\'s subscription');
+      assert.equal((await settings.botModels({ownerId:'bob',workspaceId:teamB.workspaceId})).length,0,'bob is never offered her credential as his own choice');
+      await assert.rejects(settings.bindingForOthersBot({ownerId:'bob',workspaceId:teamB.workspaceId},teamBot,alice.ownerId,catalogue.bindingId),{code:'executionModelUnknown'},'only for a bot of the run\'s own owner');
+      // The admin block disables both.
+      await pool.query('UPDATE workspace_personal_policies SET subscriptions=false WHERE "workspaceId"=$1',[teamB.workspaceId]);
+      assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'blocked: Mikka 默认');
+      await assert.rejects(settings.bindingForOthersBot({ownerId:'bob',workspaceId:teamB.workspaceId},bobBot,alice.ownerId,catalogue.bindingId),{code:'executionModelUnknown'});
+      await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1',[teamB.workspaceId]);
+      // Un-sharing takes it from everyone at once.
+      await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, false);
+      assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'un-shared: bob\'s bot replies on Mikka 默认');
       sessionOwner = null;
       await assert.rejects(actions.listExecutionRules());
       sessionOwner = "bob";

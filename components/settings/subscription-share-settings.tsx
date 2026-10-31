@@ -5,14 +5,20 @@ import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { getSubscriptionShare, updateSubscriptionShare } from '@/app/actions/personal-policy'
 import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { FieldError } from '@/components/ui/field'
 import { useActionError } from '@/lib/use-action-error'
 
+type Change = { shared: boolean; allowOthers?: boolean }
+
 /**
  * 在这里使用我的订阅: a member shares their own subscriptions into this team
- * workspace, for their own bots only. A personal workspace always uses them,
- * so it shows nothing here (decision 2026-10-31-2225).
+ * workspace for their own bots; 团队成员也可以用 lets other members' bots use
+ * them too, after a warning the owner confirms (Alex, 「B」). A personal
+ * workspace always uses its owner's subscriptions, so it shows nothing here
+ * (decision 2026-10-31-2225).
  */
 export function SubscriptionShareSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.subscriptionShare')
@@ -20,20 +26,22 @@ export function SubscriptionShareSettings({ workspaceId }: { workspaceId: string
   const actionError = useActionError()
   const share = useSWR(['settings:subscription-share', workspaceId], () => getSubscriptionShare(workspaceId))
   const [pending, setPending] = useState(false)
-  const [failed, setFailed] = useState<{ shared: boolean; message: string } | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [failed, setFailed] = useState<{ change: Change; message: string } | null>(null)
   const data = share.data && !share.data.error ? share.data : null
 
-  async function change(shared: boolean) {
+  async function change(next: Change) {
     setPending(true)
     setFailed(null)
     try {
-      const result = await updateSubscriptionShare(shared, workspaceId)
-      if (result.error) { setFailed({ shared, message: actionError(result.error) }); return }
+      const result = await updateSubscriptionShare(next, workspaceId)
+      if (result.error) { setFailed({ change: next, message: actionError(result.error) }); return }
       await share.mutate(result, { revalidate: false })
     } catch {
-      setFailed({ shared, message: actionError() })
+      setFailed({ change: next, message: actionError() })
     } finally {
       setPending(false)
+      setConfirming(false)
     }
   }
 
@@ -43,10 +51,26 @@ export function SubscriptionShareSettings({ workspaceId }: { workspaceId: string
     <SettingsSection id="subscription-share-heading" title={t('heading')}>
       <SettingRow title={t('share')}>
         {data.allowed
-          ? <Switch aria-label={t('share')} checked={data.shared} disabled={pending} onCheckedChange={shared => void change(shared)} />
+          ? <Switch aria-label={t('share')} checked={data.shared} disabled={pending} onCheckedChange={shared => void change({ shared })} />
           : <span className="text-sm text-muted-foreground">{t('blocked')}</span>}
       </SettingRow>
+      {data.allowed && data.shared && <SettingRow title={t('others')}>
+        <Checkbox aria-label={t('others')} checked={data.allowOthers} disabled={pending}
+          onCheckedChange={checked => { if (checked) setConfirming(true); else void change({ shared: true, allowOthers: false }) }} />
+      </SettingRow>}
+      {data.allowed && data.available.map(item => <SettingRow key={`${item.name}-${item.provider}`} title={t('available', { name: item.name, provider: t(`provider.${item.provider}`) })}>
+        <span className="text-sm text-muted-foreground">{t('availableState')}</span>
+      </SettingRow>)}
     </SettingsSection>
-    {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => void change(failed.shared)} />}
+    {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => void change(failed.change)} />}
+    <AlertDialog open={confirming} onOpenChange={open => { if (!open && !pending) setConfirming(false) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{t('othersWarning')}</AlertDialogTitle></AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>{t('cancel')}</AlertDialogCancel>
+          <AlertDialogAction disabled={pending} onClick={() => void change({ shared: true, allowOthers: true })}>{t('othersConfirm')}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </>
 }

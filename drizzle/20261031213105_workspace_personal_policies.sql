@@ -1,6 +1,7 @@
 -- Decision 2026-10-31-2225: subscriptions belong to the person. A member
 -- shares theirs into a team workspace themselves (在这里使用我的订阅), for
--- their own bots only; a team admin has one switch, 允许成员使用个人订阅, on by
+-- their own bots, and optionally for other members' bots too (allowOthers);
+-- a team admin has one switch, 允许成员使用个人订阅, on by
 -- default (an absent row means on), and never sees or uses the subscription.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -14,6 +15,8 @@ CREATE TABLE IF NOT EXISTS workspace_personal_policies (
 CREATE TABLE IF NOT EXISTS workspace_subscription_shares (
   "ownerId" text NOT NULL,
   "workspaceId" uuid NOT NULL,
+  -- 团队成员也可以用: other members' bots may use it too (Alex, 「B」). Off by default.
+  "allowOthers" boolean NOT NULL DEFAULT false,
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("ownerId", "workspaceId")
 );

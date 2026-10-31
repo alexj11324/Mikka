@@ -30,6 +30,18 @@ export async function freezeBotModel(
     (selected ? await settings.botBinding(settingsScope, selected) : undefined) ??
     available.find((row) => row.provider === "claude") ??
     available[0];
+  if (!binding && scope.botId) {
+    // The owner has none here: another member's subscription shared with 团队成员也可以用 (Alex, 「B」).
+    const pooled = (await settings.pooledBindings(settingsScope))[0];
+    if (pooled)
+      return freezeHostedModelSelection(
+        { ...scope, workspaceId },
+        { harness: "ai_sdk", model: null },
+        { type: "subscription", bindingId: await settings.bindingForOthersBot(settingsScope, scope.botId, pooled.ownerId, pooled.bindingId) },
+        dependencies,
+        pooled.ownerId,
+      );
+  }
   // No subscription bound: every bot, the Coordinator included, runs on the hosted default
   // through the same admission (verified card, allowance) and workspace billing.
   if (!binding) return { harness: "ai_sdk", model: COORDINATOR_MODEL };

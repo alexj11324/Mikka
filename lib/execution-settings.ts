@@ -6,7 +6,7 @@ import { enqueueDeviceCommand } from "./device-management";
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
-import { subscriptionsUsable } from "./personal-policy";
+import { othersMayUse, pooledOwners, subscriptionsUsable } from "./personal-policy";
 import {
   DEFAULT_EXECUTION_FALLBACKS,
   type ExecutionFallbacks,
@@ -442,17 +442,54 @@ export class ExecutionSettings {
     query: Pick<PoolClient, "query"> = this.pool,
   ) {
     if (!(await subscriptionsUsable(query, scope.ownerId, scope.workspaceId))) return [];
+    return this.bindingsOf(scope.ownerId, scope.workspaceId, bindingId, query);
+  }
+  private async bindingsOf(
+    ownerId: string,
+    workspaceId: string,
+    bindingId?: string,
+    query: Pick<PoolClient, "query"> = this.pool,
+  ) {
     return (
       await query.query(
-        `SELECT b.id AS "bindingId",b."consumerId",b."workspaceId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan
+        `SELECT b.id AS "bindingId",b."ownerId",b."consumerId",b."workspaceId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan
        FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
        AND c.epoch=b."connectionRevision" AND c.state='connected'
        WHERE b."ownerId"=$1 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
        AND ($3::uuid IS NULL OR b.id=$3)
        AND ($3::uuid IS NOT NULL OR c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId") ORDER BY (b."workspaceId"=$2) DESC,b."createdAt" DESC,b.id`,
-        [scope.ownerId, scope.workspaceId, bindingId ?? null],
+        [ownerId, workspaceId, bindingId ?? null],
       )
     ).rows;
+  }
+  /**
+   * For a bot whose owner has no subscription here: other members' subscriptions
+   * shared with 团队成员也可以用 (Alex, 「B」), Claude first, then by the oldest
+   * share. Only ever offered to the resolver, never listed to the bot's owner.
+   */
+  async pooledBindings(scope: ExecutionSettingsScope) {
+    const rows = [];
+    for (const ownerId of await pooledOwners(this.pool, scope.ownerId, scope.workspaceId))
+      rows.push(...(await this.bindingsOf(ownerId, scope.workspaceId)));
+    return [...rows.filter((row) => row.provider === "claude"), ...rows.filter((row) => row.provider !== "claude")];
+  }
+  /** Clone another member's binding for this bot only, while they allow it here; never a credential. */
+  async bindingForOthersBot(scope: ExecutionSettingsScope, botId: string, subscriptionOwnerId: string, bindingId: string) {
+    if (subscriptionOwnerId === scope.ownerId || !(await othersMayUse(this.pool, subscriptionOwnerId, scope.workspaceId)))
+      throw new ActionFailureError("executionModelUnknown");
+    const hash = createHash("sha256").update(JSON.stringify([subscriptionOwnerId, scope.workspaceId, botId, bindingId])).digest("hex");
+    const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+    const result = await this.pool.query(
+      `INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
+      SELECT $1,b."ownerId",$4::text,$2::text,b."connectionId",b."connectionRevision",b.route,b."modelId" FROM byos_bindings b
+      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected'
+      JOIN bots bot ON bot.id=$2::uuid AND bot."ownerId"=$3 AND bot."workspaceId"=$4::uuid AND bot."archivedAt" IS NULL
+      WHERE b.id=$5 AND b."ownerId"=$6 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
+      ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id RETURNING id`,
+      [id, botId, scope.ownerId, scope.workspaceId, bindingId, subscriptionOwnerId],
+    );
+    if (!result.rows[0]) throw new ActionFailureError("executionModelUnknown");
+    return result.rows[0].id as string;
   }
   /** False once the owner left or was suspended and the bot was archived (§8.3), or when it is not theirs. */
   async botActive(ownerId: string, botId: string) {

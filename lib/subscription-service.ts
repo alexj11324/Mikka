@@ -19,7 +19,7 @@ export class SubscriptionService {
     readonly worker: (scope: ReturnType<SubscriptionRepository['scope']>) => SubscriptionWorkerClient,
     readonly capabilities: SubscriptionCapabilities,
     readonly quota: (provider: 'codex' | 'claude', result: {status: number; body: unknown}) => Promise<QuotaSnapshot> | QuotaSnapshot = readSubscriptionQuota,
-    readonly workspace: (ownerId: string, workspaceId: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') },
+    readonly workspace: (ownerId: string, workspaceId: string, consumerId?: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') },
     readonly admitModel: (scope: { ownerId: string; workspaceId: string; runId?: string }, model: string, route: string, signal?: AbortSignal) => Promise<void> = async (...args) => {
       const { assertSubscriptionModelTransport } = await import('./model-admission/runtime')
       await assertSubscriptionModelTransport(...args)
@@ -28,7 +28,7 @@ export class SubscriptionService {
   async access(use: SubscriptionUse, signal?: AbortSignal): Promise<SubscriptionAccess> {
     const { modelId: _, ...binding } = await this.repository.binding(use.ownerId, use.bindingId)
     if (binding.workspaceId !== use.workspaceId || binding.consumerId !== use.consumerId) throw new SubscriptionRefusal('binding_mismatch')
-    await this.workspace(use.ownerId, binding.workspaceId)
+    await this.workspace(use.ownerId, binding.workspaceId, binding.consumerId)
     const row = await this.repository.connection(use.ownerId, binding.connectionId)
     const revision = Number(row.epoch)
     const readiness = this.capabilities.ready(binding.route) ? 'ready' : 'unavailable'

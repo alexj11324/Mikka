@@ -1107,6 +1107,7 @@
     "projectIssuesSaveFailed": "Could not link tasks. Check your access and try again.",
     "workspaceAccessDenied": "You do not have permission to manage this workspace, or your membership is suspended.",
     "workspaceNotFound": "No accessible workspace.",
+    "workspacePaymentTaken": "Another member's card already pays for this team.",
     "workspaceMemberExists": "One of these emails is already a workspace member. Manage or restore them in the member list.",
     "workspaceMemberNotFound": "This member does not exist.",
     "workspaceLastAdmin": "A workspace must keep at least one active admin.",
@@ -2249,11 +2250,29 @@
     "subscriptionShare": {
       "heading": "This workspace",
       "share": "Use my subscriptions here",
-      "blocked": "Turned off by an admin"
+      "blocked": "Turned off by an admin",
+      "others": "Team members can use them too",
+      "othersWarning": "Personal Claude and ChatGPT plans may not allow sharing with others. The risk is yours.",
+      "othersConfirm": "Allow anyway",
+      "cancel": "Cancel",
+      "available": "{name}'s {provider} subscription",
+      "availableState": "Available",
+      "provider": {
+        "claude": "Claude",
+        "codex": "ChatGPT"
+      }
     },
+
     "archivedBots": {
       "heading": "Paused bots",
       "takeOver": "Take over"
+    },
+    "paymentDesignation": {
+      "heading": "Payment",
+      "mine": "Pay for this team with my card",
+      "payer": "{name}'s card",
+      "active": "Paying",
+      "until": "Stops paying on {date}"
     },
     "personalPolicy": {
       "loading": "Loading personal subscription settings",

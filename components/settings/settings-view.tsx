@@ -17,6 +17,7 @@ import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
 import { SubscriptionShareSettings } from '@/components/settings/subscription-share-settings'
+import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
 import { SecuritySettings } from '@/components/settings/security-settings'
@@ -110,12 +111,12 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
-    case 'models': return workspaceId && !preview ? <><SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /><SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} /></> : waiting
+    case 'models': return workspaceId && !preview ? <><SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /><SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} /><PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} /></> : waiting
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
-    case 'billing': return workspaceId && !preview ? <BillingSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'billing': return workspaceId && !preview ? <><PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} /><BillingSettings key={workspaceId} workspaceId={workspaceId} /></> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
     case 'computers': return null
     case 'bots': return workspaceId && !preview ? <><BotAgentsSettings key={workspaceId} /><ArchivedBotsSettings key={`archived-${workspaceId}`} workspaceId={workspaceId} /></> : waiting

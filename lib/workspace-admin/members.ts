@@ -7,6 +7,7 @@ import { teamMembers, teams } from '@/lib/db/team-schema'
 import { workspaceInvitations, workspaceMembers } from '@/lib/db/workspace-schema'
 import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
+import { releasePaymentDesignation } from '@/lib/payment-designation'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/delivery'
 import type { MainTransaction } from './general'
@@ -64,6 +65,8 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
  * model call (the share and the membership are checked on every call).
  */
 export async function releaseDepartingMember(workspaceId: string, userId: string) {
+  // A card they designated keeps paying through its grace period; admins see when it stops (计费).
+  await releasePaymentDesignation(workspaceId, userId)
   await db.transaction(async main => {
     await main.execute(sql`delete from workspace_subscription_shares where "ownerId" = ${userId} and "workspaceId" = ${workspaceId}`)
     await main.update(bots).set({ archivedAt: new Date(), updatedAt: new Date() })

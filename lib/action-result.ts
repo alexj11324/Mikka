@@ -117,6 +117,7 @@ export const ACTION_ERROR_CODES = [
   'workspaceAccessDenied',
   'workspaceNotFound',
   'workspaceMemberExists',
+  'workspacePaymentTaken',
   'workspaceMemberNotFound',
   'workspaceLastAdmin',
   'inviteInvalid',

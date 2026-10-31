@@ -114,9 +114,18 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
 
 - **One E2B sandbox per thread**, so threads never slow each other down or the
   bots.
-- **Start:** from a workspace snapshot that holds the repo, dependencies and
-  the coding CLI logins, so it boots in seconds. The thread then checks out its
-  branch. Refresh the snapshot when dependencies change.
+- **Start:** from a workspace snapshot that holds the repo, its dependencies
+  and the installed harnesses (Claude Code, Codex), so it boots in seconds.
+  The thread then checks out its branch. Refresh the snapshot when
+  dependencies change.
+- **No credentials in a snapshot** (decision 2026-10-31-2225): no subscription
+  login or token is ever in a workspace or thread snapshot. At run start the
+  credential the resolver picked for that bot (its owner's shared
+  subscription, another member's shared with 团队成员也可以用, or none for
+  Mikka 默认) reaches the run through the run-scoped native broker; the
+  sandbox only ever sees a placeholder, and the broker is closed when the run
+  ends or pauses. Un-sharing or leaving takes effect on the next run with no
+  snapshot rebuild; a run frozen on that credential stops.
 - **Lifecycle:** pause while idle (no charge), resume on the next step, kill
   when the thread ends. A thread's changes live on its branch; nothing is
   copied back to the bot machine.

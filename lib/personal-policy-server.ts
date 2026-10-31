@@ -5,7 +5,9 @@ import { db, pool } from '@/lib/db'
 import { recordAudit } from '@/lib/audit/record'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
-import { memberSubscriptionsAllowed, setSubscriptionShare, sharedInput, subscriptionShared } from '@/lib/personal-policy'
+import { and, eq, inArray } from 'drizzle-orm'
+import { workspaceMembers } from '@/lib/db/workspace-schema'
+import { memberSubscriptionsAllowed, pooledOwners, setSubscriptionShare } from '@/lib/personal-policy'
 
 /** 团队权限 › 允许成员使用个人订阅. */
 export interface MemberSubscriptionPolicy { allowed: boolean; canEdit: boolean }
@@ -32,22 +34,41 @@ export async function setMemberSubscriptionPolicy(actor: { id: string; name: str
   return getMemberSubscriptionPolicy(actor.id, workspaceId)
 }
 
-/** 模型与额度 › 在这里使用我的订阅: the member's own choice for this workspace. */
-export interface SubscriptionShareView { personal: boolean; shared: boolean; allowed: boolean }
+/** 模型与额度 › 在这里使用我的订阅 and 团队成员也可以用, plus who else lets this member's bots use theirs. */
+export interface SubscriptionShareView {
+  personal: boolean; shared: boolean; allowOthers: boolean; allowed: boolean
+  /** Members whose subscriptions this member's bots may use here; names only, never the credential. */
+  available: { name: string; provider: 'claude' | 'codex' }[]
+}
+export const shareInput = z.strictObject({ shared: z.boolean(), allowOthers: z.boolean().optional() })
 
 export async function getSubscriptionShare(actorId: string, workspaceId: string): Promise<SubscriptionShareView> {
   const { workspace } = await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId))
   // A personal workspace always uses its owner's subscriptions (loadWorkspaceContext keeps its share row).
-  if (workspace.kind === 'personal') return { personal: true, shared: true, allowed: true }
-  const [shared, allowed] = await Promise.all([subscriptionShared(pool, actorId, workspaceId), memberSubscriptionsAllowed(pool, workspaceId)])
-  return { personal: false, shared, allowed }
+  if (workspace.kind === 'personal') return { personal: true, shared: true, allowOthers: false, allowed: true, available: [] }
+  const [row, allowed, owners] = await Promise.all([
+    pool.query<{ allowOthers: boolean }>('SELECT "allowOthers" FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [actorId, workspaceId]),
+    memberSubscriptionsAllowed(pool, workspaceId),
+    pooledOwners(pool, actorId, workspaceId),
+  ])
+  let available: SubscriptionShareView['available'] = []
+  if (owners.length) {
+    const [names, providers] = await Promise.all([
+      workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name }).from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId, workspaceId), inArray(workspaceMembers.userId, owners), eq(workspaceMembers.status, 'active'))),
+      pool.query<{ ownerId: string; provider: 'claude' | 'codex' }>(`SELECT DISTINCT "ownerId",provider FROM byos_connections WHERE "ownerId"=ANY($1) AND state='connected' AND "removedAt" IS NULL`, [owners]),
+    ])
+    const byId = new Map(names.map(member => [member.userId, member.name]))
+    available = owners.flatMap(owner => providers.rows.filter(row => row.ownerId === owner && byId.has(owner)).map(row => ({ name: byId.get(owner)!, provider: row.provider })))
+  }
+  return { personal: false, shared: Boolean(row.rowCount), allowOthers: Boolean(row.rows[0]?.allowOthers), allowed, available }
 }
 
 export async function setOwnSubscriptionShare(actorId: string, workspaceId: string, input: unknown): Promise<SubscriptionShareView> {
-  const shared = sharedInput.parse(input)
+  const { shared, allowOthers } = shareInput.parse(input)
   const { workspace } = await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId))
   if (workspace.kind === 'personal') return getSubscriptionShare(actorId, workspaceId)
   if (shared && !(await memberSubscriptionsAllowed(pool, workspaceId))) throw new WorkspaceError('workspaceAccessDenied')
-  await setSubscriptionShare(pool, actorId, workspaceId, shared)
+  await setSubscriptionShare(pool, actorId, workspaceId, shared, shared ? (allowOthers ?? false) : undefined)
   return getSubscriptionShare(actorId, workspaceId)
 }
