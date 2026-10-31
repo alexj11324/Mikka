@@ -5,20 +5,23 @@ import { Platform, View } from 'react-native'
 import { Stack, useRouter, type Href } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
+import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { DrawerHost } from '@/components/Drawer'
 import { Spinner } from '@/components/icons'
 import { SignIn } from '@/components/SignIn'
 import { authClient } from '@/lib/auth'
 import { HomeProvider } from '@/lib/home'
-import { colors } from '@/lib/theme'
+import { colors, screenOptions } from '@/lib/theme'
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <SessionGate />
+        <KeyboardProvider>
+          <StatusBar style="dark" />
+          <SessionGate />
+        </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )
@@ -33,8 +36,8 @@ function SessionGate() {
     <HomeProvider>
       <PushSetup />
       <DrawerHost>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.page }, animation: 'slide_from_right' }}>
-          <Stack.Screen name="settings" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack screenOptions={screenOptions(colors.page)}>
+          <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false, ...(Platform.OS === 'ios' ? {} : { animation: 'slide_from_bottom' }) }} />
         </Stack>
       </DrawerHost>
     </HomeProvider>

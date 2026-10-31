@@ -339,11 +339,11 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     assert.ok(!secrets.has(fairness[2]), 'two failed connections starved later cleanup')
     for(const name of fairness) blockedDeletes.delete(name)
     for(let pass=0;pass<4;pass++) await service.cleanupBatch()
-    // 移除: a pending (never finished) connection is fenced, then gone from the list for good.
+    // 移除: a pending (never finished) connection is not listed (#690), is fenced, and stays gone once removed.
     const abandoned = await post({ action: 'connect', workspaceId, provider: 'claude' })
     assert.equal(abandoned.status, 200)
     const listedIds = async () => (await (await subscriptionList(new Request(`http://localhost/api/subscriptions?workspace=${workspaceId}`, { headers: { cookie: 'fixture=alice' } }), dependencies)).json()).connections.map(item => item.id)
-    assert.ok((await listedIds()).includes(abandoned.body.connectionId))
+    assert.ok(!(await listedIds()).includes(abandoned.body.connectionId), 'a connection that never finished sign-in is listed')
     assert.equal((await post({ action: 'remove', connectionId: abandoned.body.connectionId, revision: abandoned.body.revision }, 'bob')).status, 409, 'another owner cannot remove it')
     const removed = await post({ action: 'remove', connectionId: abandoned.body.connectionId, revision: abandoned.body.revision })
     assert.equal(removed.status, 200)

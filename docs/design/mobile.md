@@ -31,18 +31,27 @@ briefing in the morning and see what is waiting on me.
 ## Where it lives
 
 A side drawer, like the ChatGPT iOS app; no bottom tabs. The app opens on the
-Coordinator chat. The menu button (top left) slides the drawer in from the
-left and pushes the current screen right.
+Coordinator chat. The menu button (top left), or a swipe right anywhere on a
+drawer screen, slides the drawer in from the left and pushes the current
+screen right; it follows the finger and settles by position and speed. A swipe
+left or a tap on the pushed screen closes it. Pushed pages (a thread, 设置)
+keep the system's swipe back instead.
+
+Controls are the system's where iOS has one
+([decision](decisions/2026-10-31-2200-mobile-native-ios.md)): the top bar is
+the iOS navigation bar with its own bar buttons, menus and back button;
+round buttons and the composer are Liquid Glass on iOS 26.
 
 Drawer, top to bottom:
 
 | Part | 中文 | What it holds |
 | --- | --- | --- |
+| Top | 搜索 · 新建 | A Liquid Glass search field that filters the drawer, and a compose button (new chat) |
 | Fixed rows | Coordinator · 建议 · 线程 · 任务 | Coordinator chat (first row, unread dot; the 08:00 briefing arrives here); 建议 (normal items, R-21); 线程 (every thread); 任务 (list only, no board) |
 | 置顶 | 置顶 | Pinned bots and group chats |
 | 最近 | 最近 | The other bots and group chats, newest first (the web bot list, R-01) |
 | 重启以更新 | 重启以更新 | Only once an update has downloaded; tapping restarts into it ([decision](decisions/2026-10-31-2010-ota-updates.md)) |
-| Bottom | 新建 · avatar | New bot or chat; the avatar opens Settings |
+| Bottom | Avatar · name | The person; opens Settings (as in ChatGPT and Claude on iOS) |
 
 The Coordinator is the first ordinary row in the drawer and the default
 screen; it gets no other special UI (R-06).
@@ -204,10 +213,19 @@ mobile drawer.
 - **Settings stored:** 主动消息 is lib/attention's switch
   (`attention_settings.enabled`); the push switches and 使用记忆 (off leaves
   the memory out of the prompt) are in `user_preferences`.
+- **Attachments:** the composer's 「+」 is a native menu: 拍照, 照片 (up to
+  two per message) and 文件 (text files). Photos are re-encoded as JPEG under
+  the server's 1 MB limit and sent as `images` with `POST /api/mobile/chat`;
+  a text file goes into the message as its contents under its name, as on the
+  web. Chat items carry `images` (a count) and the app loads each photo from
+  `GET /api/mobile/chat/image?message=<id>&index=<n>`, which serves only the
+  person's own messages.
 - **Not on the server yet**, so the app leaves them out: 待审阅 and 已归档
   threads, pinned bots, 电脑不在用时 (needs the web to report presence),
-  photo upload and dictation (so the composer has no 「+」 or mic yet), dark
-  mode.
+  dictation (so the composer has no mic yet), dark mode.
+- **App icon:** the Mikka mark, the same file as the desktop app's
+  (`apps/mobile/assets/icon.icon`, Icon Composer; `icon.png` is the opaque
+  1024 fallback). A new icon needs a new build.
 - **Updates:** EAS Update for JavaScript changes; store releases for native
   changes.
 

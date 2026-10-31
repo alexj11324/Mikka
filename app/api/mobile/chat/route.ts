@@ -12,6 +12,7 @@ import { getCoordinatorChat, sendCoordinatorMessage } from '@/app/actions/coordi
 import { ActionFailureError } from '@/lib/action-error'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { MESSAGE_MAX } from '@/lib/message-limits'
+import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,18 +46,20 @@ async function handleGET(request: Request) {
   }
 }
 
-/** `POST /api/mobile/chat` with `{ text, botId? }`: a message; the reply shows up in the chat. */
+/** `POST /api/mobile/chat` with `{ text, botId?, images? }`: a message, with up to two photos as data URLs; the reply shows up in the chat. */
 async function handlePOST(request: Request) {
   const user = await mobileUser(request)
   noteLogUser(user?.id)
   if (!user) return unauthorized()
   if (!writeAllowed(request)) return forbiddenOrigin()
-  const parsed = z.object({ text: z.string().trim().min(1).max(MESSAGE_MAX), botId: z.uuid().nullable().optional() }).safeParse(await request.json().catch(() => null))
+  const parsed = z.object({ text: z.string().trim().max(MESSAGE_MAX), botId: z.uuid().nullable().optional(), images: userImageInputsSchema.optional() })
+    .refine(value => Boolean(value.text || value.images?.length)).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return json({ error: 'messageRequired' }, 400)
+  const images = parsed.data.images?.length ? parsed.data.images : undefined
   if (typeof user[tokenWorkspace] === 'string') {
     const botId = parsed.data.botId ?? null
     if (!await tokenBotAllowed(user, botId)) return json({ error: 'botNotFound' }, 404)
-    try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId }) }
+    try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId, images }) }
     catch (error) {
       if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)
       throw error
@@ -64,7 +67,7 @@ async function handlePOST(request: Request) {
     after(() => wakeCoordinator(user.id))
     return json({ queued: true }, 202)
   }
-  const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null)
+  const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, undefined, undefined, null, images)
   return result.error ? json(result, 400) : json(result, 202)
 }
 

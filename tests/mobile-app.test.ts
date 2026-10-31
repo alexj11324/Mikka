@@ -38,3 +38,12 @@ test('a failed message stays with its words until it is delivered', () => {
   list = delivered(marked(list, a, 'sending'), a)
   assert.deepEqual(list.map(item => item.text), ['在吗'])
 })
+
+test('a message with photos keeps them while it goes and after it fails', () => {
+  const key = outgoingKey()
+  const photo = { uri: 'file:///photo.jpg', dataUrl: 'data:image/jpeg;base64,/9j/' }
+  let list = queued([], key, '', [photo])
+  list = marked(list, key, 'failed')
+  assert.deepEqual(list[0].images, [photo])
+  assert.equal(list[0].text, '')
+})

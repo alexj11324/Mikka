@@ -269,6 +269,8 @@ export interface ChatItem {
   notes?: BrowserNote[]
   /** The 建议 card the person tapped, drawn above their instruction (R-21). */
   suggestion?: SuggestionCard
+  /** How many photos the person sent with this message; the app loads each from `/api/mobile/chat/image`. */
+  images?: number
   /** Artifacts shown as cards under this entry, in order. */
   artifacts: string[]
 }
@@ -345,7 +347,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         const { quote, text: unquoted } = splitQuote(raw)
         const { notes, text: rest } = splitBrowserNotes(unquoted)
         const { suggestion, text } = splitSuggestion(rest)
-        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}) })
+        const images = typeof message.content === 'string' ? 0 : message.content.filter(part => part.type === 'file' && part.mediaType.startsWith('image/')).length
+        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}) })
       }
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content

@@ -21,6 +21,7 @@ Vendored on 2026-10-29, unmodified, from these pinned commits:
 | [param087/saas-ui-skills](https://github.com/param087/saas-ui-skills) | `4017eaf1e1167a56a5271839053d888faeb1f44a` | MIT, (c) 2026 Param Bhavsar | `settings-pages` |
 | [Dammyjay93/interface-design](https://github.com/Dammyjay93/interface-design) | `2f9be3206855bcb2d1d0af262c8bae25cba6658d` | MIT, (c) 2026 Damola Akinleye | `interface-design`, commands `interface-design:design-review` and `interface-design:design-deslop` (vendored 2026-10-31) |
 | [heydamir/unslop](https://github.com/heydamir/unslop) | `4652254daff586ff4739849395a127b56f7f8cc7` | CC BY 4.0, by Damir Sokolovsky ([@heydamir](https://x.com/heydamir)) | `unslop` (vendored 2026-10-31). Changed: upstream `scripts/` (`snapshot.mjs`, `story.mjs`) left out under the no-scripts rule below, so the live-site snapshot and story-video steps in `SKILL.md` do not run here; every other file is unmodified |
+| [uizze.sh](https://uizze.sh/.well-known/skills/index.json) (skills.sh listing `uizze.sh/ios-design`) | fetched 2026-10-31, checksums in `CHECKSUMS.sha256` | Apache-2.0 with MIT notices (`LICENSE`, `NOTICE`) | `ios-design` (vendored 2026-10-31 at Alex's request). Changed: `scripts/verify-visual-evidence.mjs` left out under the no-scripts rule below; every other file is unmodified |
 
 Full license texts are in [`../skill-licenses/`](../skill-licenses/).
 
@@ -35,6 +36,8 @@ Full license texts are in [`../skill-licenses/`](../skill-licenses/).
   already has a direction (`docs/design/`), so use its polish mode: fix the
   signs it finds and keep Mikka's palette, Geist and layout, as its own
   tokens page says to do for a project with a working system.
+
+- **iOS app UI** (`apps/mobile`): `ios-design`. Native controls first, gestures as springs, keyboard through `react-native-keyboard-controller`. Its Uizze MCP steps are optional and not connected here.
 
 - **Bug or failing test**: `debug` (root cause before a fix).
 - **Production incident**: `incident`, then `debug`.

@@ -6,18 +6,19 @@ import { Check, CircleCheck, Hand, List, LoaderCircle, Plus, SlidersHorizontal }
 import { useDrawer } from '@/components/Drawer'
 import { MachineIcon, MenuIcon, Spinner, StatusIcon } from '@/components/icons'
 import { Text } from '@/components/Text'
-import { Dot, Header, RoundButton } from '@/components/ui'
+import { NavBar, underBar } from '@/components/NavBar'
+import { Dot } from '@/components/ui'
 import type { Thread, Threads } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
 import { colors, lift } from '@/lib/theme'
 
 // 待审阅 and 已归档 (Figma 03b) wait for the server to track reviews and archiving.
 type Filter = 'all' | 'waiting' | 'running' | 'done'
-const filters: { id: Filter; label: string; icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }> }[] = [
-  { id: 'all', label: '全部', icon: List },
-  { id: 'waiting', label: '等你回复', icon: Hand },
-  { id: 'running', label: '进行中', icon: LoaderCircle },
-  { id: 'done', label: '已完成', icon: CircleCheck },
+const filters: { id: Filter; label: string; icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; symbol: 'list.bullet' | 'hand.raised' | 'arrow.triangle.2.circlepath' | 'checkmark.circle' }[] = [
+  { id: 'all', label: '全部', icon: List, symbol: 'list.bullet' },
+  { id: 'waiting', label: '等你回复', icon: Hand, symbol: 'hand.raised' },
+  { id: 'running', label: '进行中', icon: LoaderCircle, symbol: 'arrow.triangle.2.circlepath' },
+  { id: 'done', label: '已完成', icon: CircleCheck, symbol: 'checkmark.circle' },
 ]
 
 const matches = (thread: Thread, filter: Filter) => {
@@ -45,14 +46,16 @@ export default function ThreadsScreen() {
 
   return (
     <View style={styles.screen}>
-      <Header
-        left={<RoundButton label="菜单" onPress={drawer.open}><MenuIcon /></RoundButton>}
+      <NavBar
+        left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }}
         title="线程"
-        right={<RoundButton label="筛选" onPress={() => setMenu(true)}><SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} /></RoundButton>}
+        right={{ icon: 'line.3.horizontal.decrease', label: '筛选', web: <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />, onOpen: () => setMenu(true),
+          items: filters.map(f => ({ label: f.label, icon: f.symbol, on: filter === f.id, onPress: () => setFilter(f.id) })) }}
       />
       <FlatList
         data={list}
         keyExtractor={t => t.id}
+        {...underBar}
         contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
         ListHeaderComponent={
           <View>

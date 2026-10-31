@@ -1,8 +1,10 @@
-import { type ReactNode, useRef } from 'react'
-import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { Animated, Image, PanResponder, Pressable, StyleSheet, View, type ImageURISource } from 'react-native'
 import { CircleAlert } from 'lucide-react-native'
 import { StatusIcon } from '@/components/icons'
 import { Text } from '@/components/Text'
+import { authHeaders } from '@/lib/api'
+import { API_URL } from '@/lib/config'
 import type { ThreadStatus } from '@/lib/types'
 import { colors } from '@/lib/theme'
 
@@ -11,24 +13,65 @@ export function BotBubble({ children }: { children: ReactNode }) {
   return <View style={styles.botBubble}>{children}</View>
 }
 
-/** The person's words sit in the blue bubble (R-14). */
-export function MyBubble({ text }: { text: string }) {
+/** The person's words sit in the blue bubble (R-14); photos they sent sit above it, as in Messages. */
+export function MyBubble({ text, photos }: { text: string; photos?: ImageURISource[] }) {
   return (
-    <View style={styles.myBubble}>
-      <Text style={[styles.body, { color: '#fff' }]}>{text}</Text>
+    <View style={styles.mine}>
+      {photos?.length ? <Photos photos={photos} /> : null}
+      {text ? (
+        <View style={[styles.myBubble, { maxWidth: '100%' }]}>
+          <Text style={[styles.body, { color: '#fff' }]}>{text}</Text>
+        </View>
+      ) : null}
     </View>
   )
+}
+
+/** Sent photos, each 160 wide at its own aspect, grey while loading. */
+function Photos({ photos }: { photos: ImageURISource[] }) {
+  return (
+    <View style={styles.photos}>
+      {photos.map((source, index) => <Photo key={index} source={source} />)}
+    </View>
+  )
+}
+
+function Photo({ source }: { source: ImageURISource }) {
+  const [ratio, setRatio] = useState(3 / 4)
+  if (!source.uri) return <View style={[styles.photo, { aspectRatio: ratio }]} />
+  return (
+    <Image source={source} accessibilityLabel="照片" resizeMode="cover"
+      onLoad={event => { const { width, height } = event.nativeEvent.source; if (width && height) setRatio(Math.min(Math.max(width / height, 0.5), 2)) }}
+      style={[styles.photo, { aspectRatio: ratio }]} />
+  )
+}
+
+/** A sent photo as the chat loads it: the person's own message, signed in. */
+export function useChatPhotos(): (messageId: string | undefined, count: number | undefined) => ImageURISource[] {
+  const [headers, setHeaders] = useState<Record<string, string> | null>(null)
+  useEffect(() => { void authHeaders().then(setHeaders) }, [])
+  return (messageId, count) => {
+    if (!count) return []
+    // Still in the inbox (no message row yet): grey stand-ins until the next poll.
+    if (!messageId || !headers) return Array.from({ length: count }, () => ({ uri: '' }))
+    return Array.from({ length: count }, (_, index) => ({ uri: `${API_URL}/api/mobile/chat/image?message=${messageId}&index=${index}`, headers }))
+  }
 }
 
 /**
  * A message the server has not taken yet: faded while it goes, and when it
  * failed, 「未发送 · 重试」 under it; tapping either sends it again (iMessage).
  */
-export function OutgoingBubble({ text, failed, onRetry }: { text: string; failed: boolean; onRetry: () => void }) {
+export function OutgoingBubble({ text, photos, failed, onRetry }: { text: string; photos?: string[]; failed: boolean; onRetry: () => void }) {
   return (
     <Pressable accessibilityRole={failed ? 'button' : undefined} accessibilityHint={failed ? '重试' : undefined} disabled={!failed} onPress={onRetry} style={styles.outgoing}>
-      <View style={[styles.myBubble, { maxWidth: '100%' }, !failed && { opacity: 0.6 }]}>
-        <Text style={[styles.body, { color: '#fff' }]}>{text}</Text>
+      <View style={[{ alignItems: 'flex-end', gap: 4 }, !failed && { opacity: 0.6 }]}>
+        {photos?.length ? <Photos photos={photos.map(uri => ({ uri }))} /> : null}
+        {text ? (
+          <View style={[styles.myBubble, { maxWidth: '100%' }]}>
+            <Text style={[styles.body, { color: '#fff' }]}>{text}</Text>
+          </View>
+        ) : null}
       </View>
       {failed ? (
         <View style={styles.retryRow}>
@@ -85,6 +128,9 @@ const styles = StyleSheet.create({
   body: { fontSize: 16, lineHeight: 25 },
   botBubble: { alignSelf: 'flex-start', maxWidth: '86%', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11 },
   myBubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.accent, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
+  mine: { alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '78%', gap: 4 },
+  photos: { alignItems: 'flex-end', gap: 4 },
+  photo: { width: 160, borderRadius: 18, backgroundColor: colors.bubble },
   outgoing: { alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '78%', gap: 4 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   retry: { fontSize: 12, color: colors.danger },

@@ -232,3 +232,15 @@ test('execution-identity discovery is hidden in the footer without removing disp
   const prompt = promptMessages(null, rows)
   assert.deepEqual(prompt.slice(1, 3), discovery, 'discovery calls and results still reach the model')
 })
+
+test('a person\'s message counts the photos sent with it, without carrying them in the chat', () => {
+  const photo = { type: 'file' as const, mediaType: 'image/jpeg', data: 'data:image/jpeg;base64,/9j/' }
+  const items = chatItems(stored([
+    { role: 'user', content: [{ type: 'text', text: '看看这张' }, photo, photo] },
+    { role: 'user', content: '没有图' },
+  ]).map(row => ({ ...row, createdAt: new Date(0) })))
+  assert.equal(items[0].images, 2)
+  assert.equal(items[0].text, '看看这张')
+  assert.ok(!JSON.stringify(items).includes('base64'))
+  assert.equal(items[1].images, undefined)
+})
