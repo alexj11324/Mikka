@@ -1008,7 +1008,7 @@ export const userPreferences = pgTable('user_preferences', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   pushDecide: boolean('pushDecide').notNull().default(true),
   pushReview: boolean('pushReview').notNull().default(true),
-  pushFinished: boolean('pushFinished').notNull().default(false),
+  pushFinished: boolean('pushFinished').notNull().default(true),
   pushBriefing: boolean('pushBriefing').notNull().default(true),
   pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
   memoryEnabled: boolean('memoryEnabled').notNull().default(true),

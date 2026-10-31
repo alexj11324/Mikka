@@ -19,7 +19,7 @@
 // copy, never by PR-supplied path patterns.
 
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, existsSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 /** Paths whose changes cannot require a build or a browser test. */
@@ -62,63 +62,45 @@ export function isSchemaOnly(files) {
 // Every spec file belongs to main or to the nightly-only list, so a new spec has
 // to choose its tier; a test is never dropped, only scheduled later.
 export const BROWSER_SMOKE_TAG = '@smoke'
-/** Spec files that hold at least one @smoke test. */
-export const BROWSER_SMOKE_FILES = Object.freeze([
-  'artifact-share-lifecycle.spec.ts', 'device-authorization.spec.ts', 'factory-acceptance-a2.spec.ts',
-  'factory-acceptance-ui.spec.ts', 'pending-actions.spec.ts', 'profile.spec.ts', 'routes.spec.ts',
-  'test-account-pool.spec.ts', 'workspace.spec.ts',
-])
-/** Whole files run after every code-bearing merge to main (with the smoke files). */
-export const BROWSER_MAIN_SPECS = Object.freeze([
-  ...BROWSER_SMOKE_FILES,
-  'agent.spec.ts', 'bot-computer-tab.spec.ts', 'bot-image-read.spec.ts', 'bots.spec.ts', 'computer-policy-settings.spec.ts',
-  'coordinator-choice-card.spec.ts', 'coordinator-scroll.spec.ts', 'global-search-scope.spec.ts', 'invalid-issue-content.spec.ts',
-  'issue-threads.spec.ts', 'linear-sync-disabled.spec.ts', 'members.spec.ts', 'mobile-handoff.spec.ts',
-  'plugins-page.spec.ts',
-  'settings.spec.ts', 'settings-background-polling.spec.ts', 'sign-out.spec.ts', 'suggestion-entry-contract.spec.ts', 'suggestions-rail.spec.ts',
-  'teams.spec.ts', 'thread-cards.spec.ts', 'thread-projection.spec.ts', 'thread-stop.spec.ts',
-  'workspace-menu.spec.ts',
-  'abuse-ui.spec.ts', 'settings-audit.spec.ts', 'settings-billing.spec.ts', 'settings-general.spec.ts',
-  'settings-secrets.spec.ts', 'settings-team-permissions.spec.ts', 'settings-tokens.spec.ts',
-  'settings-usage.spec.ts', 'signup-turnstile.spec.ts',
-  'bot-agents-settings.spec.ts', 'devices-settings.spec.ts', 'factory-evidence-viewer.spec.ts', 'onboarding.spec.ts',
-  // API-only specs; they stay here until they move into the HTTP gate.
-  'active-agents.spec.ts', 'factory-api.spec.ts', 'factory-check-api.spec.ts',
-  'factory-execution-claim.spec.ts', 'self-improvement-api.spec.ts', 'site-search.spec.ts',
-  'slack-webhook.spec.ts',
-])
-/** Run nightly (and on demand) only: performance, visual/layout, the click crawler,
- * slower edge cases, mocked-UI and harness specs waiting to be converted. */
-export const BROWSER_NIGHTLY_SPECS = Object.freeze([
-  'agent-performance.spec.ts', 'navigation-performance.spec.ts',
-  'board-layout.spec.ts', 'browser-pane.spec.ts', 'desktop-translucent.spec.ts', 'issue-header-breadcrumb.spec.ts',
-  'issue-menu-collision.spec.ts', 'offline-layout.spec.ts', 'settings-surface.spec.ts',
-  'workspace-shortcuts.spec.ts', 'controls.spec.ts',
-  'artifact-share.spec.ts', 'avatar.spec.ts', 'detail-return.spec.ts', 'github-integration.spec.ts',
-  'progressive-loading.spec.ts', 'relations.spec.ts', 'thread-question.spec.ts',
-  'credential-login-card.spec.ts', 'subagent-login-needs.spec.ts', 'unread.spec.ts',
-  'control-audit.spec.ts', 'history-request-observer.spec.ts', 'test-account-origin-fence.spec.ts',
-  'e2b-machine-name.spec.ts', 'factory-acceptance-shots.spec.ts',
-])
-export const BROWSER_INFRA_FILES = Object.freeze([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/actions/pnpm-install/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "CONTRIBUTING.md"])
+export const BROWSER_SPEC_NAME = /^[a-z0-9][a-z0-9-]*\.spec\.ts$/
+const BROWSER_MAP_PATH = 'scripts/ci-browser-map.json'
+
+function mapFields(value, fields, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).sort().join(',') !== [...fields].sort().join(',')) throw new Error('Invalid browser map ' + label)
+}
+
+function mapStrings(values, label, pattern) {
+  if (!Array.isArray(values) || new Set(values).size !== values.length || values.some(value => typeof value !== 'string' || !value.trim() || (pattern && !pattern.test(value)))) throw new Error('Invalid browser map ' + label)
+}
+
+function readBrowserMap(file) {
+  if (!lstatSync(file).isFile()) throw new Error('Browser map must be a regular file')
+  const map = JSON.parse(readFileSync(file, 'utf8'))
+  mapFields(map, ['smoke', 'main', 'nightly', 'areas'], 'fields')
+  for (const tier of ['smoke', 'main', 'nightly']) mapStrings(map[tier], tier, BROWSER_SPEC_NAME)
+  if (map.smoke.some(spec => !map.main.includes(spec)) || map.main.some(spec => map.nightly.includes(spec))) throw new Error('Invalid browser map tier membership')
+  if (!Array.isArray(map.areas)) throw new Error('Invalid browser map areas')
+  const names = new Set()
+  for (const area of map.areas) {
+    mapFields(area, ['area', 'paths', 'specs'], 'area fields')
+    if (typeof area.area !== 'string' || !area.area.trim() || names.has(area.area)) throw new Error('Invalid browser map area name')
+    names.add(area.area)
+    mapStrings(area.paths, 'paths')
+    mapStrings(area.specs, 'area specs', BROWSER_SPEC_NAME)
+    if (!area.paths.length || !area.specs.length) throw new Error('Empty browser map area')
+  }
+  return map
+}
+
+const BROWSER_MAP = readBrowserMap(new URL('./ci-browser-map.json', import.meta.url))
+export const BROWSER_SMOKE_FILES = Object.freeze(BROWSER_MAP.smoke)
+export const BROWSER_MAIN_SPECS = Object.freeze(BROWSER_MAP.main)
+export const BROWSER_NIGHTLY_SPECS = Object.freeze(BROWSER_MAP.nightly)
+// Only the paired trusted map's expressions are compiled; PR paths remain data.
+const SCOPED_BROWSER = BROWSER_MAP.areas.map(area => ({ ...area, paths: area.paths.map(path => new RegExp(path)) }))
+export const BROWSER_INFRA_FILES = Object.freeze([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/workflows/analytics-ssr.yml", ".github/actions/pnpm-install/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-browser-map.json", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "CONTRIBUTING.md"])
 const SELECTION_POLICY_FILES = new Set([".github/workflows/browser-tests.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/test-accounts/evidence.mjs"])
 export const needsSelectionValidation = files => files.some(file => SELECTION_POLICY_FILES.has(file))
-const SCOPED_BROWSER = [
-  { area: 'search', paths: [/^lib\/(?:search|federated-search)\//, /^lib\/(?:issue|site)-search(?:\.|-)/, /^app\/api\/(?:search|issues\/search)\//, /^components\/workspace\/issue-search\.tsx$/], specs: ['site-search.spec.ts', 'global-search-scope.spec.ts'] },
-  { area: 'settings', paths: [/^components\/settings\//, /^app\/\[locale\]\/settings\//, /^lib\/settings[-/.]/, /^lib\/profile\//, /^lib\/workspace-admin\//, /^components\/teams\//, /^components\/workspace-menu\.tsx$/, /^components\/workspace\/members-settings\.tsx$/], specs: ['settings.spec.ts', 'settings-surface.spec.ts', 'members.spec.ts', 'teams.spec.ts', 'workspace-menu.spec.ts', 'profile.spec.ts', 'computer-policy-settings.spec.ts', 'linear-sync-disabled.spec.ts', 'bots.spec.ts', 'abuse-ui.spec.ts', 'settings-audit.spec.ts', 'settings-billing.spec.ts', 'settings-general.spec.ts', 'settings-secrets.spec.ts', 'settings-team-permissions.spec.ts', 'settings-tokens.spec.ts', 'settings-usage.spec.ts', 'bot-agents-settings.spec.ts'] },
-  { area: 'computer', paths: [/^components\/computer\//, /^components\/nav\/context-panel\.tsx$/, /^hooks\/use-(?:computer|feature-availability)\.ts$/], specs: ['bot-computer-tab.spec.ts', 'e2b-machine-name.spec.ts'] },
-  { area: 'plugins', paths: [/^components\/plugins\//, /^app\/api\/integrations\//], specs: ['plugins-page.spec.ts', 'linear-sync-disabled.spec.ts', 'github-integration.spec.ts'] },
-  { area: 'slack', paths: [/^lib\/slack\//, /^app\/api\/webhooks\/slack\//], specs: ['slack-webhook.spec.ts'] },
-  { area: 'factory', paths: [/^lib\/factory\//, /^app\/api\/factory\//, /^components\/(?:factory|workspace\/factory-)/, /^lib\/self-improvement\//, /^app\/api\/self-improvement\//, /^components\/workspace\/self-improvement\.tsx$/], specs: ['factory-acceptance-ui.spec.ts', 'factory-acceptance-a2.spec.ts', 'factory-evidence-viewer.spec.ts', 'thread-question.spec.ts', 'factory-api.spec.ts', 'factory-check-api.spec.ts', 'factory-execution-claim.spec.ts', 'self-improvement-api.spec.ts'] },
-  { area: 'threads', paths: [/^components\/coordinator\//, /^lib\/coordinator[-/.]/, /^lib\/(?:issue-threads|thread-groups|issue-thread-questions|run-control)\./, /^components\/workspace\/issue-thread/, /^app\/api\/(?:threads|coordinator)\//], specs: ['thread-cards.spec.ts', 'thread-projection.spec.ts', 'thread-stop.spec.ts', 'issue-threads.spec.ts', 'thread-question.spec.ts', 'coordinator-choice-card.spec.ts', 'coordinator-scroll.spec.ts'] },
-  { area: 'suggestions', paths: [/^lib\/suggestions\//, /^components\/suggestions\//, /^app\/api\/suggestions\//], specs: ['suggestions-rail.spec.ts', 'suggestion-entry-contract.spec.ts'] },
-  { area: 'devices', paths: [/^lib\/(?:device|mobile)-/, /^components\/(?:device-authorization\.tsx|devices\/)/, /^app\/api\/(?:devices|mobile)\//, /^app\/\[locale\]\/device\//], specs: ['device-authorization.spec.ts', 'mobile-handoff.spec.ts', 'devices-settings.spec.ts'] },
-  { area: 'auth', paths: [/^lib\/(?:auth|session|email-sign-in)[-.]/, /^lib\/abuse\//, /^app\/api\/auth\//, /^components\/auth(?:\/|-form\.tsx$)/, /^app\/\[locale\]\/(?:sign-in|sign-up|verify-email|forgot-password|reset-password)\//], specs: ['sign-out.spec.ts', 'workspace.spec.ts', 'signup-turnstile.spec.ts'] },
-  { area: 'relations', paths: [/^lib\/issue-relation/, /^components\/workspace\/issue-relations\.tsx$/], specs: ['relations.spec.ts'] },
-  { area: 'active agents', paths: [/^lib\/active-agents\./], specs: ['active-agents.spec.ts'] },
-  { area: 'account menu', paths: [/^components\/workspace-menu\.tsx$/, /^components\/nav\/icon-rail\.tsx$/], specs: ['workspace-menu.spec.ts', 'workspace.spec.ts', 'sign-out.spec.ts', 'workspace-shortcuts.spec.ts'] },
-  { area: 'agent ui', paths: [/^lib\/agent-ui[-.]/, /^lib\/legacy-chat-content\.ts$/, /^components\/workspace\/agent-(?:ui-library|generative-ui|theme|chart|report|editable-table|text-bubble|decision|citations)\.tsx$/], specs: ['agent.spec.ts', 'coordinator-choice-card.spec.ts', 'bot-image-read.spec.ts', 'e2b-machine-name.spec.ts'] },
-]
 export const BROWSER_SCOPED_SPECS = Object.freeze([...new Set(SCOPED_BROWSER.flatMap(rule => rule.specs))].sort())
 const PERFORMANCE_SPECS = ['tests/e2e/navigation-performance.spec.ts', 'tests/e2e/agent-performance.spec.ts']
 /** Paths the performance budgets measure: navigation shell, settings and saved history. */
@@ -127,7 +109,6 @@ const PERFORMANCE_PATHS = [
   /^components\/settings\//, /^app\/\[locale\]\/settings\//, /^lib\/settings-(?:navigation|sections)\.ts$/,
   /^components\/workspace\/agent-conversation\.tsx$/, /^lib\/agent-history\.ts$/, /^next\.config\./,
 ]
-export const BROWSER_SPEC_NAME = /^[a-z0-9][a-z0-9-]*\.spec\.ts$/
 const touchesPerformance = files => files.some(file => PERFORMANCE_SPECS.includes(file) || PERFORMANCE_PATHS.some(pattern => pattern.test(file)))
 
 /** No dependency graph guess: unknown paths run smoke; mapped paths add whole area specs. */
@@ -149,6 +130,20 @@ export function browserPlan(files, { unsafeModes = false, integration = false, m
     for (const rule of SCOPED_BROWSER) if (rule.paths.some(pattern => pattern.test(file))) for (const spec of rule.specs) specs.add(spec)
   }
   return { tier: specs.size ? 'targeted' : 'smoke', specs: [...specs].sort(), performance: touchesPerformance(files) }
+}
+
+function changedMappingSpecs(candidate) {
+  const specs = new Set()
+  for (const tier of ['smoke', 'main', 'nightly']) {
+    for (const spec of [...BROWSER_MAP[tier], ...candidate[tier]]) if (BROWSER_MAP[tier].includes(spec) !== candidate[tier].includes(spec)) specs.add(spec)
+  }
+  const trustedAreas = new Map(BROWSER_MAP.areas.map(area => [area.area, area]))
+  const candidateAreas = new Map(candidate.areas.map(area => [area.area, area]))
+  for (const name of new Set([...trustedAreas.keys(), ...candidateAreas.keys()])) {
+    const before = trustedAreas.get(name), after = candidateAreas.get(name)
+    if (JSON.stringify(before) !== JSON.stringify(after)) for (const spec of [...(before?.specs ?? []), ...(after?.specs ?? [])]) specs.add(spec)
+  }
+  return [...specs].filter(spec => existsSync('tests/e2e/' + spec))
 }
 
 /** Only non-executable regular files are eligible. */
@@ -254,8 +249,12 @@ export function main() {
     ? `${result.files.length} changed file(s)`
     : 'no changed files'
   const docsOnly = isDocsOnly(result.files, result.unsafeModes)
-  const plan = browserPlan(result.files, { unsafeModes: result.unsafeModes, mainPush })
+  let plan = browserPlan(result.files, { unsafeModes: result.unsafeModes, mainPush })
+  if (process.env.GITHUB_EVENT_NAME === 'pull_request' && !result.unsafeModes && plan.tier !== 'full' && result.files.includes(BROWSER_MAP_PATH)) {
+    const extra = changedMappingSpecs(readBrowserMap(BROWSER_MAP_PATH))
+    if (extra.length) plan = { ...plan, tier: 'targeted', specs: [...new Set([...plan.specs, ...extra])].sort(), performance: plan.performance || touchesPerformance(extra.map(spec => 'tests/e2e/' + spec)) }
+  }
   output(docsOnly, result.unsafeModes ? `${reason}; non-regular path or unmerged entry` : reason, plan, !mainPush && needsSelectionValidation(result.files))
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
+if (process.argv[1] && existsSync(process.argv[1]) && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main()

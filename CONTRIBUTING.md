@@ -55,8 +55,11 @@ cannot.
    the protected gate requires every shard to succeed.
 3. **Ready pull requests** (CI job "Browser tests (before merge)"): the browser
    smoke set plus the specs of the areas the change touches, against the PR
-   merged with main, in one job ("Browser tests (pull request)": install, build,
-   start, run). Draft PRs defer this layer. The trusted classifier on `main`
+   merged with main. One build feeds two parallel jobs with independent PostgreSQL
+   databases: "Browser tests (pull request)" runs smoke/targeted browser tests and
+   Turnstile; "Browser runtime gates" runs HTTP/account checks, the first MVP
+   real-daemon test and any required performance checks. Draft PRs defer this layer.
+   The trusted classifier on `main`
    chooses:
 
    | Change | Browser acceptance before merge |
@@ -66,7 +69,8 @@ cannot.
    | Mapped paths (search, settings, Slack, Factory, threads, suggestions, devices, auth, relations, active agents) | Smoke plus the complete specs of each touched area |
    | An edited spec under `tests/e2e/` | Smoke plus that complete spec |
    | Paths the performance budgets measure (navigation shell, settings, saved history) or a performance spec | Also the desktop/mobile performance suite |
-   | Selection-policy changes (classifier, runner, this workflow) | Also "Browser selection validation": every scoped spec partitioned across four isolated subsets, each retaining the smoke tag |
+   | Browser mapping data (`scripts/ci-browser-map.json`) | Smoke plus affected specs; mapping additions/removals add their old/new specs without reducing trusted-main coverage |
+   | Executable selection-policy changes (classifier, runner, this workflow) | Also "Browser selection validation": every scoped spec partitioned across four isolated subsets, each retaining the smoke tag |
    | Unsafe file modes, unavailable comparisons, `integrate/` branches | The full tier (below) before merge |
 
    The smoke set covers anonymous redirects, sign-up (with Cloudflare's public
@@ -74,12 +78,15 @@ cannot.
    isolation, a settings save, Factory acceptance and approval, device
    authorization, share revocation, an approval card and the real daemon loop.
    The tags live in the specs; the area map, the main list and the nightly-only
-   list live in `scripts/ci-docs-only.mjs`, and every spec file is in exactly one
-   of the main or nightly-only lists. During policy updates the workflow uses a
+   list live in `scripts/ci-browser-map.json`, and every spec file is in exactly one
+   of the main or nightly-only lists. Update that JSON when adding an area or
+   assigning a new spec to a tier. During policy updates the workflow uses a
    fixed CI-only allowlist plus the trusted main classifier's documentation/mode
    checks; it cannot classify its own change as documentation-only, and any
-   other file escalates to the full tier. Failed classification or a
-   skipped/failed selected job fails the required gate.
+   other file escalates to the full tier. Mapping data is parsed as JSON, never
+   executed; only trusted-main code can choose a narrower tier. The browser,
+   runtime and policy-validation jobs all reuse the exact candidate build.
+   Failed classification or any skipped/failed required lane fails the gate.
 4. **After merge** (CI, every code-bearing push to main): the functional spec
    files (the main list) on four shards, plus the runtime gates and both MVP
    tests. A red run opens one issue (or comments on the open one) that names the

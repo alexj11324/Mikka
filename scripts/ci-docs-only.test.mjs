@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, existsSync, symlinkSync, unlinkSync, realpathSync } from 'node:fs'
+import { tmpdir as systemTmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 
 import { hasUnsafeModes, isDocsOnly } from './ci-docs-only.mjs'
+
+const tmpdir = () => realpathSync(systemTmpdir())
+function copyTrustedClassifier(entry) {
+  writeFileSync(entry, readFileSync(new URL('./ci-docs-only.mjs', import.meta.url)))
+  writeFileSync(join(dirname(entry), 'ci-browser-map.json'), readFileSync(new URL('./ci-browser-map.json', import.meta.url)))
+}
 
 test('approved documentation paths are documentation-only', () => {
   const files = [
@@ -175,26 +181,27 @@ test('real git diffs retain all fixtures while testing rename, deletion and even
 test('the workflow-extracted trusted classifier executes as an ES module', () => {
   const dir = mkdtempSync(join(tmpdir(), 'docs-gate-loader-retained-'))
   console.log(`Retained docs gate loader evidence: ${dir}`)
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml', '.github/workflows/analytics-ssr.yml']) {
     const workflow = readFileSync(file, 'utf8')
-    const allocation = workflow.match(/trusted="\$\((mktemp[^\n]*)\)"/)
+    const allocation = workflow.match(/trusted_dir="\$\((mktemp[^\n]*)\)"/)
     assert.ok(allocation, file)
     const env = { PATH: process.env.PATH, TMPDIR: dir, HOME: process.env.HOME ?? '' }
-    const extracted = execFileSync('bash', ['-ceu', allocation[1]], { env, encoding: 'utf8' }).trim()
-    writeFileSync(extracted, readFileSync('scripts/ci-docs-only.mjs'))
+    assert.equal(allocation[1], 'mktemp -d')
+    const extracted = join(execFileSync('mktemp', ['-d'], { env, encoding: 'utf8' }).trim(), 'ci-docs-only.mjs')
+    copyTrustedClassifier(extracted)
     const output = execFileSync(process.execPath, [extracted, '--base', 'missing-base', '--head', 'missing-head'], { env, encoding: 'utf8' })
     assert.match(output, /docs_only=false/, file)
   }
 })
 
 test('trusted workflow classifier executes as an ES module from its retained temporary file', () => {
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml', '.github/workflows/analytics-ssr.yml']) {
     const workflow = readFileSync(file, 'utf8')
-    const command = /trusted="\$\((mktemp[^)]+)\)"/.exec(workflow)?.[1]
-    assert.equal(command, 'mktemp --suffix=.mjs')
-    const trusted = execFileSync('mktemp', ['--suffix=.mjs'], { encoding: 'utf8' }).trim()
+    const command = /trusted_dir="\$\((mktemp[^)]+)\)"/.exec(workflow)?.[1]
+    assert.equal(command, 'mktemp -d')
+    const trusted = join(execFileSync('mktemp', ['-d'], { encoding: 'utf8' }).trim(), 'ci-docs-only.mjs')
     console.log(`Retained trusted classifier fixture: ${trusted}`)
-    writeFileSync(trusted, readFileSync('scripts/ci-docs-only.mjs', 'utf8'))
+    copyTrustedClassifier(trusted)
     const output = execFileSync(process.execPath, [trusted], {
       encoding: 'utf8', env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' },
     })
@@ -229,15 +236,15 @@ test('all required gates reject failed classification and skipped full jobs', ()
 })
 
 test('each actual workflow temp-file command produces a classifier Node can load outside the package', () => {
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml', '.github/workflows/analytics-ssr.yml']) {
     const source = readFileSync(file, 'utf8')
-    const command = source.match(/^          (trusted="\$\(mktemp[^\n]*\)")$/m)?.[1]
+    const command = source.match(/^          (trusted_dir="\$\(mktemp -d\)"\n          trusted="\$trusted_dir\/ci-docs-only\.mjs")$/m)?.[1]
     assert.ok(command, 'Exercise the actual workflow temporary-file command')
     const dir = mkdtempSync(join(tmpdir(), 'docs-gate-module-retained-'))
     const env = { PATH: process.env.PATH, TMPDIR: dir, HOME: process.env.HOME ?? '' }
     const trusted = execFileSync('bash', ['-e', '-c', command + '; printf "%s" "$trusted"'], { cwd: dir, env, encoding: 'utf8' })
-    assert.equal(resolve(trusted, '..'), dir, 'Fixture must belong to this new temporary directory')
-    writeFileSync(trusted, readFileSync('scripts/ci-docs-only.mjs'))
+    assert.notEqual(realpathSync(dirname(trusted)), resolve('scripts'), 'Exercise the module outside the repository package')
+    copyTrustedClassifier(trusted)
     const output = execFileSync(process.execPath, [trusted], { cwd: dir, env: { ...env, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' }, encoding: 'utf8' })
     assert.match(output, /docs_only=false \(no comparable range\)/)
     assert.match(output, /browser_tier=full; performance=true; specs=\[\]/)
@@ -253,31 +260,31 @@ test('the exact trusted-classifier workflow step executes ESM from a retained te
   const git = join(bin, 'git')
   writeFileSync(git, `#!/bin/sh
 case "$1" in
-  fetch|diff) exit 0 ;;
-  show) cat "$FIXTURE_CLASSIFIER" ;;
+  fetch|diff|cat-file) exit 0 ;;
+  show) case "$2" in *ci-browser-map.json) cat "$FIXTURE_MAP" ;; *) cat "$FIXTURE_CLASSIFIER" ;; esac ;;
   *) exit 1 ;;
 esac
 `, { flag: 'wx' })
   chmodSync(git, 0o700)
-  for (const name of ['ui-policy', 'browser-tests']) {
+  for (const name of ['ui-policy', 'browser-tests', 'analytics-ssr']) {
     const source = readFileSync(`.github/workflows/${name}.yml`, 'utf8')
     const block = /      - id: docs[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:)/.exec(source)
     assert.ok(block, 'trusted classifier step must be present')
     const script = block[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
     const outputFile = join(dir, `${name}.output`)
     const output = execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { cwd: dir, encoding: 'utf8', env: {
-      PATH: `${bin}:${process.env.PATH}`, FIXTURE_CLASSIFIER: resolve('scripts/ci-docs-only.mjs'),
+      PATH: `${bin}:${process.env.PATH}`, FIXTURE_CLASSIFIER: resolve('scripts/ci-docs-only.mjs'), FIXTURE_MAP: resolve('scripts/ci-browser-map.json'),
       TMPDIR: dir,
       GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_OUTPUT: outputFile,
     } })
-    assert.match(output, /Retained trusted classifier: .*\.mjs/)
+    if (script.includes('Retained trusted classifier:')) assert.match(output, /Retained trusted classifier: .*\.mjs/)
     assert.match(readFileSync(outputFile, 'utf8'), /docs_only=false/)
     writeFileSync(join(dir, `${name}.log`), output, { flag: 'wx' })
   }
 })
 
 test('actual workflow classifier launches trusted ESM from its retained temporary file', () => {
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml', '.github/workflows/analytics-ssr.yml']) {
     const source = readFileSync(file, 'utf8')
     const block = source.match(/      - id: docs[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:)/)?.[1]
     assert.ok(block, file)
@@ -290,7 +297,7 @@ test('actual workflow classifier launches trusted ESM from its retained temporar
       GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.invalid', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.invalid' }
     const git = args => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', ...args], { cwd: repo, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
     git(['init', '--initial-branch=main', '--template=' + template])
-    writeFileSync(join(repo, 'scripts/ci-docs-only.mjs'), readFileSync('scripts/ci-docs-only.mjs'))
+    copyTrustedClassifier(join(repo, 'scripts/ci-docs-only.mjs'))
     git(['add', '.']); git(['commit', '-m', 'trusted classifier'])
     const base = git(['rev-parse', 'HEAD'])
     git(['remote', 'add', 'origin', repo])
@@ -309,11 +316,20 @@ test('actual workflow classifier launches trusted ESM from its retained temporar
 test('the trusted classifier runs as a copied .mjs entry point', () => {
   const dir = mkdtempSync(join(tmpdir(), 'trusted-docs-entry-'))
   const entry = join(dir, 'classifier.mjs')
-  writeFileSync(entry, readFileSync(new URL('./ci-docs-only.mjs', import.meta.url)))
+  copyTrustedClassifier(entry)
   const output = execFileSync(process.execPath, [entry, '--base', 'HEAD', '--head', 'HEAD'], {
     cwd: resolve(import.meta.dirname, '..'), encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: '' },
   })
   assert.match(output, /docs_only=false/)
+})
+
+test('a trusted stdin wrapper can import the paired classifier without running its entry point', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'trusted-docs-stdin-')), entry = join(dir, 'ci-docs-only.mjs')
+  copyTrustedClassifier(entry)
+  const output = execFileSync(process.execPath, ['--input-type=module', '-', entry], {
+    encoding: 'utf8', input: "import { pathToFileURL } from 'node:url'; const policy = await import(pathToFileURL(process.argv[2]).href); console.log(policy.BROWSER_SMOKE_TAG)",
+  })
+  assert.equal(output.trim(), '@smoke')
 })
 
 test('the actual workflow bootstrap executes its trusted temporary ESM module', () => {
@@ -331,7 +347,7 @@ test('the actual workflow bootstrap executes its trusted temporary ESM module', 
   git(['config', 'gc.auto', '0'])
   git(['config', 'maintenance.auto', 'false'])
   mkdirSync(join(dir, 'scripts'))
-  writeFileSync(join(dir, 'scripts/ci-docs-only.mjs'), readFileSync('scripts/ci-docs-only.mjs'), { flag: 'wx' })
+  copyTrustedClassifier(join(dir, 'scripts/ci-docs-only.mjs'))
   writeFileSync(join(dir, 'README.md'), 'base\n', { flag: 'wx' })
   git(['add', '.'])
   git(['commit', '-m', 'base'])
@@ -349,7 +365,7 @@ test('the actual workflow bootstrap executes its trusted temporary ESM module', 
   git(['add', 'code.js'])
   git(['commit', '-m', 'code change'])
   const code = git(['rev-parse', 'HEAD'])
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml', '.github/workflows/analytics-ssr.yml']) {
     const workflow = readFileSync(file, 'utf8')
     const block = workflow.split('      - id: docs\n')[1]?.split('        run: |\n')[1]
     assert.ok(block, file)
@@ -360,7 +376,7 @@ test('the actual workflow bootstrap executes its trusted temporary ESM module', 
     }
     const script = body.join('\n')
     for (const [name, head, expected] of [['docs', docs, true], ['code', code, false]]) {
-      const prefix = `${file.includes('ui-policy') ? 'ui' : 'browser'}-${name}`
+      const prefix = `${file.split('/').at(-1).replace('.yml', '')}-${name}`
       const event = join(dir, `${prefix}-event.json`), output = join(dir, `${prefix}-output`)
       writeFileSync(event, JSON.stringify({ before: base, after: head }), { flag: 'wx' })
       writeFileSync(output, '', { flag: 'wx' })
@@ -414,4 +430,137 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   const gate = job('ui-policy')
   assert(gate.includes('needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks]'))
   for (const name of ['ui-policy-full', 'ui-policy-integrations', 'source-checks', 'daemon-checks']) assert(gate.includes(`needs.${name}.result`))
+})
+
+const fixtureBrowserMap = () => ({
+  smoke: ['routes.spec.ts'],
+  main: ['routes.spec.ts', 'settings.spec.ts'],
+  nightly: ['unread.spec.ts'],
+  areas: [{ area: 'fixture', paths: ['^lib/fixture/'], specs: ['settings.spec.ts'] }],
+})
+
+function mappingFixture(map = fixtureBrowserMap()) {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'browser-map-retained-')))
+  const repo = join(dir, 'repo'), trusted = join(dir, 'trusted')
+  for (const path of [repo, trusted, join(repo, 'scripts'), join(repo, 'tests'), join(repo, 'tests/e2e')]) mkdirSync(path)
+  const env = { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.invalid', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.invalid' }
+  const git = args => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', ...args], { cwd: repo, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  git(['init', '--initial-branch=main', '--template='])
+  const entry = join(trusted, 'ci-docs-only.mjs'), candidate = join(repo, 'scripts/ci-browser-map.json')
+  writeFileSync(entry, readFileSync(new URL('./ci-docs-only.mjs', import.meta.url)))
+  writeFileSync(join(trusted, 'ci-browser-map.json'), JSON.stringify(map))
+  writeFileSync(candidate, JSON.stringify(map))
+  for (const name of [...map.main, ...map.nightly]) writeFileSync(join(repo, 'tests/e2e', name), '// existing fixture\n')
+  git(['add', '.']); git(['commit', '-m', 'base'])
+  const base = git(['rev-parse', 'HEAD'])
+  return { dir, repo, trusted, entry, candidate, git, map, run(extraEnv = {}) {
+    git(['add', '.']); git(['commit', '--allow-empty', '-m', 'candidate'])
+    const event = join(dir, 'event.json'), output = join(dir, 'output')
+    writeFileSync(event, JSON.stringify({ pull_request: { base: { sha: base }, head: { sha: git(['rev-parse', 'HEAD']) } } }))
+    execFileSync(process.execPath, [entry], { cwd: repo, env: { ...env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event, GITHUB_OUTPUT: output, ...extraEnv }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    return Object.fromEntries(readFileSync(output, 'utf8').trim().split('\n').map(line => { const at = line.indexOf('='); return [line.slice(0, at), line.slice(at + 1)] }))
+  } }
+}
+
+test('mapping JSON plus business code and a new spec stays targeted without selection validation', () => {
+  const fixture = mappingFixture()
+  fixture.map.areas.push({ area: 'new area', paths: ['^business/'], specs: ['new-area.spec.ts'] })
+  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
+  writeFileSync(join(fixture.repo, 'business.ts'), 'export const changed = true\n')
+  writeFileSync(join(fixture.repo, 'tests/e2e/new-area.spec.ts'), '// new spec\n')
+  const result = fixture.run()
+  assert.equal(result.browser_tier, 'targeted')
+  assert.deepEqual(JSON.parse(result.browser_specs), ['new-area.spec.ts'])
+  assert.equal(result.verify_selection, 'false')
+})
+
+test('a new mapping selects an existing unmodified spec without executing PR path expressions', () => {
+  const fixture = mappingFixture(), marker = join(fixture.repo, 'executed')
+  fixture.map.areas.push({ area: 'new area', paths: [`(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'bad'))()`], specs: ['unread.spec.ts'] })
+  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
+  const result = fixture.run()
+  assert.equal(result.browser_tier, 'targeted')
+  assert.deepEqual(JSON.parse(result.browser_specs), ['unread.spec.ts'])
+  assert.equal(result.verify_selection, 'false')
+  assert.equal(existsSync(marker), false)
+})
+
+test('removing a PR mapping cannot shrink trusted coverage', () => {
+  const fixture = mappingFixture()
+  fixture.map.areas = []
+  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
+  mkdirSync(join(fixture.repo, 'lib')); mkdirSync(join(fixture.repo, 'lib/fixture'))
+  writeFileSync(join(fixture.repo, 'lib/fixture/change.ts'), '// changed\n')
+  const result = fixture.run()
+  assert.equal(result.browser_tier, 'targeted')
+  assert.deepEqual(JSON.parse(result.browser_specs), ['settings.spec.ts'])
+})
+
+test('changed tier lists include added and removed existing specs without narrowing trusted coverage', () => {
+  const fixture = mappingFixture()
+  fixture.map.main = ['routes.spec.ts', 'unread.spec.ts']
+  fixture.map.nightly = ['settings.spec.ts']
+  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
+  const result = fixture.run()
+  assert.deepEqual(JSON.parse(result.browser_specs), ['settings.spec.ts', 'unread.spec.ts'])
+})
+
+test('a JSON-only mapping of an existing performance spec requires performance acceptance', () => {
+  const map = fixtureBrowserMap()
+  map.nightly.push('agent-performance.spec.ts')
+  const fixture = mappingFixture(map)
+  fixture.map.areas.push({ area: 'performance fixture', paths: ['^performance/'], specs: ['agent-performance.spec.ts'] })
+  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
+  const result = fixture.run()
+  assert.equal(result.browser_tier, 'targeted')
+  assert.equal(result.browser_performance, 'true')
+})
+
+test('invalid PR mapping JSON fails classification instead of silently skipping coverage', () => {
+  const fixture = mappingFixture()
+  writeFileSync(fixture.candidate, '{ invalid JSON')
+  assert.throws(() => fixture.run())
+})
+
+test('unsafe mapping modes retain the full fail-closed tier', () => {
+  const fixture = mappingFixture()
+  chmodSync(fixture.candidate, 0o755)
+  const result = fixture.run()
+  assert.equal(result.browser_tier, 'full')
+  assert.equal(result.docs_only, 'false')
+})
+
+test('mapping JSON must be a regular file even when the Git diff describes a regular file', () => {
+  const fixture = mappingFixture()
+  fixture.map.areas.push({ area: 'new area', paths: ['^business/'], specs: ['unread.spec.ts'] })
+  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
+  fixture.git(['add', '.']); fixture.git(['commit', '-m', 'mapping change'])
+  const outside = join(fixture.dir, 'outside.json')
+  writeFileSync(outside, JSON.stringify(fixture.map))
+  unlinkSync(fixture.candidate); symlinkSync(outside, fixture.candidate)
+  // Keep the committed mapping range while replacing only its checkout entry.
+  const event = join(fixture.dir, 'symlink-event.json')
+  writeFileSync(event, JSON.stringify({ pull_request: { base: { sha: fixture.git(['rev-parse', 'HEAD^']) }, head: { sha: fixture.git(['rev-parse', 'HEAD']) } } }))
+  assert.throws(() => execFileSync(process.execPath, [fixture.entry], { cwd: fixture.repo, encoding: 'utf8', stdio: 'pipe', env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event } }))
+})
+
+test('trusted mapping schema rejects invalid fields, duplicate entries and malformed regexes', () => {
+  for (const change of [
+    map => { map.extra = true },
+    map => { map.smoke = 'routes.spec.ts' },
+    map => { map.main.push('routes.spec.ts') },
+    map => { map.nightly = ['../escape.spec.ts'] },
+    map => { map.areas.push({ ...map.areas[0] }) },
+    map => { map.areas[0].extra = true },
+    map => { map.areas[0].paths = [42] },
+    map => { map.areas[0].paths = ['['] },
+    map => { map.areas[0].paths.push(map.areas[0].paths[0]) },
+    map => { map.areas[0].specs.push(map.areas[0].specs[0]) },
+  ]) {
+    const fixture = mappingFixture(), map = fixtureBrowserMap()
+    change(map)
+    writeFileSync(join(fixture.trusted, 'ci-browser-map.json'), JSON.stringify(map))
+    assert.throws(() => fixture.run())
+  }
 })

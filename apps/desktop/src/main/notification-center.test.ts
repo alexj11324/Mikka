@@ -73,3 +73,14 @@ test('badge counts are bounded', () => {
   assert.throws(() => center.setBadge(-1))
   assert.throws(() => center.setBadge(10_000))
 })
+
+test('a finished thread (线程完成) is a desktop notification kind', () => {
+  const recorder = recordingSink()
+  const delivered: string[] = []
+  const center = new NotificationCenter(recorder.sink, href => delivered.push(href), () => 0)
+  center.show({ ...notification('done'), kind: 'finished', title: 'Ship the desktop app', body: 'Coordinator' })
+  assert.equal(recorder.shown.length, 1)
+  assert.equal(recorder.shown[0].title, 'Ship the desktop app')
+  recorder.shown[0].onClick()
+  assert.deepEqual(delivered, ['/issue/mik-1'])
+})
