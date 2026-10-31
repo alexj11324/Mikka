@@ -177,7 +177,17 @@
       "connected": "Connected",
       "notConnected": "Not connected",
       "paused": "Paused"
-    }
+    },
+    "popular": "Popular",
+    "latest": "New",
+    "showAll": "See all in {name}",
+    "appMenu": "{name} actions",
+    "connectApp": "Connect {name}",
+    "manage": "Manage",
+    "storeLoadFailed": "Couldn't load the app directory.",
+    "loadingApps": "Loading apps…",
+    "noConnections": "No connected apps yet",
+    "openStore": "Open Plugins"
   },
   "Auth": {
     "haveAccount": "Already have an account?",
@@ -2159,6 +2169,15 @@
         "auth": {
           "signed_in": "signed in",
           "sign_in_failed": "failed to sign in"
+        },
+        "credential": {
+          "created": "saved a credential",
+          "replaced": "updated a credential",
+          "revoked": "revoked a credential"
+        },
+        "agent": {
+          "approval_decided": "{decision, select, approved {approved a tool request} denied {denied a tool request} other {decided a tool request}}",
+          "approval_consumed": "used a tool approval"
         },
         "workspace": {
           "slug_changed": "changed the address from {from} to {to}",

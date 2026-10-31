@@ -7,7 +7,7 @@ export const PLACEHOLDER_SELECTOR = '[data-loading-placeholder]'
 
 /**
  * When a loading placeholder inside `ref` gives way to its content, the element that held it fades in
- * briefly (decisions.md 2026-10-31, motion audit: skeleton → content). Nothing else animates, and
+ * briefly (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md: skeleton → content). Nothing else animates, and
  * reduced motion turns it off.
  */
 export function useRevealLoaded(ref: RefObject<HTMLElement | null>) {

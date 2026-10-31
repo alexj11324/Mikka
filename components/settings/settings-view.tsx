@@ -76,7 +76,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   }, [preview, roleKnown, resolvedWorkspaceId, admin, cache])
   const title = t(`sections.${section}.title`)
   const routedBody = section === 'members' || section === 'teams'
-  // Switching sections fades the new one in briefly; the section the page opened on does not (decisions.md 2026-10-31).
+  // Switching sections fades the new one in briefly; the section the page opened on does not (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md).
   const firstSection = useRef(section)
   const switched = useRef(false)
   if (section !== firstSection.current) switched.current = true

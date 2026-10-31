@@ -48,7 +48,7 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, narrow, co
     setColumns(groupIssues(issues))
   }
   const [message, setMessage] = useState('')
-  // Only the person's own moves animate (decisions.md 2026-10-31): a card moved with the status menu fades in at its
+  // Only the person's own moves animate (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md): a card moved with the status menu fades in at its
   // new place, a deleted card fades out before it leaves. Changes from others, and drags (dnd-kit animates those), snap.
   const [cardMotion, setCardMotion] = useState<ReadonlyMap<string, 'enter' | 'leave'>>(() => new Map())
   const setMotion = (id: string, kind: 'enter' | 'leave' | null) => setCardMotion(current => {
