@@ -1,3 +1,5 @@
+import { FatalError } from 'workflow'
+import { SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
 import { FACTORY_QUESTION_INSTRUCTIONS } from '@/lib/factory/instructions'
 import { FACTORY_CHECK_RECOVERY_INSTRUCTIONS } from '@/lib/factory/check-recovery'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
@@ -23,6 +25,7 @@ import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rem
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
+import { coordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
@@ -162,11 +165,12 @@ export async function preparePrompt(userId: string, botId: string | null = null,
     await store.saveSummary(userId, summary, cut, botId)
     messages = messages.filter(row => row.position > cut)
   }
-  const base = snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS)
+  // The hosted Coordinator renders OpenUI like the native one, so it gets the same presentation rules and catalog.
+  const base = (snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS)) + '\n\n' + coordinatorPresentation()
   const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
   const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
   // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
-  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions), memory) + factoryPolicy, messages: promptMessages(summary, messages, summaryTrust) }
+  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
@@ -180,10 +184,11 @@ export async function mailboxCatalogue(userId: string, botId: string | null, exe
 }
 export async function personalMailbox(userId: string, botId: string | null, request: MailboxToolRequest, scope?: NativeToolScope, executionId?: string) {
   'use step'
+  if(scope?.scheduledRead)throw new FatalError('scheduleToolNotAllowed')
   await assertNativeToolScope(userId, scope)
   if (!personalMailboxEnabled()) return { error: 'personal_mailbox_unavailable' }
   const { personalConversationMailbox } = await import('@/lib/personal-mailbox-runtime')
-  const result = await personalConversationMailbox(userId, botId, request, scope, executionId)
+  const result = await personalConversationMailbox(userId, botId, request, scope?.holder!==undefined?scope:undefined, executionId)
   return result.body
 }
 
@@ -222,6 +227,22 @@ export async function composioAction(userId: string, action: ComposioActionName,
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return accountId ? runComposioAction(userId, action, input, accountId) : runComposioAction(userId, action, input)
 }
+
+export async function personalMcp(userId: string, botId: string | null, executionId: string | undefined, input: import('@/lib/plugins/mcp').PersonalMcpCommand, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  // Scheduled read grants never authorize arbitrary remote MCP tools.
+  if (scope?.scheduledRead) return { error: 'mcpNotAllowedForScheduledRead' }
+  const { agentScope, agentKitStore } = await import('@/lib/agent-kit/service')
+  const ownerScope = await agentScope(userId, botId)
+  const execution = executionId ? await agentKitStore.readExecution(ownerScope, executionId) : null
+  if (execution && execution.status !== 'running') return { error: 'agentExecutionClosed' }
+  const { runPersonalMcp } = await import('@/lib/plugins/runtime')
+  return runPersonalMcp(userId, execution ? execution.snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined, input)
+}
+// Remote tools may have side effects and no idempotency key. The workflow must
+// preserve the first uncertain outcome rather than replaying this step.
+personalMcp.maxRetries = 0
 
 export async function proposeAccountAction(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
   'use step'
@@ -487,6 +508,7 @@ export async function startWebSubagent(userId: string, input: { botId: string; t
 /** Host-owned identity and native fence are not model arguments. */
 export async function personalWrite(userId:string, botId:string | null, executionId:string, call:import('@/lib/operations/model-write-tools').ModelWriteCall, scope?:NativeToolScope) {
   'use step'
+  if(scope?.scheduledRead)throw new FatalError('scheduleToolNotAllowed')
   await assertNativeToolScope(userId,scope)
   const { WRITE_TOOL_APPS } = await import('@/lib/app-policy/apps')
   const app = WRITE_TOOL_APPS[call.action]
@@ -495,7 +517,7 @@ export async function personalWrite(userId:string, botId:string | null, executio
     if (!(await botMayUseApp(botId, app))) return { error: 'integrationBlockedByWorkspace' }
   }
   const { personalWriteFromRun } = await import('@/lib/operations/write-runtime')
-  return personalWriteFromRun(userId,botId,executionId,call,scope)
+  return personalWriteFromRun(userId,botId,executionId,call,scope?.holder!==undefined?scope:undefined)
 }
 /** Durable personal intake; existing issue receipts recover a crash before routing. */
 export async function intakeFactoryRequest(userId: string, input: import('@/lib/factory/intake').IntakeInput, scope?: NativeToolScope, botId: string | null = null) {
@@ -561,3 +583,28 @@ export async function escalateFactoryQuestionScoped(userId:string,input:import('
   return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).questions.escalate(userId,input))
 }
 export { listFactoryRequests, resolveFactoryTask, stopFactoryTask, listFactoryQuestions, answerFactoryContext, escalateFactoryQuestion, dispatchRun as dispatchFactoryRunStep, selectBaselineSkill, selectActiveSkill, registerSkillCandidate, skillEvaluation, dispatchBaselineRehearsal, recordRunFeedback, proposeSkillImprovement, readRunImprovements, handoffSkillImprovement, getSkillImprovementFactory, createIssueFromRequestStep, routeFactoryTask, getFactoryTask, getFactoryQuestion, answerFactoryQuestionFromUser } from './factory-steps'
+
+
+/** Scheduling is bound to a host-identified user message and its current chat. */
+export async function scheduleCommand(userId:string,botId:string|null,sourceEventId:string|undefined,input:import('@/lib/schedules/contract').Command,scope?:NativeToolScope){
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  const {executeScheduleCommand}=await import('@/lib/schedules/runtime')
+  return executeScheduleCommand(userId,botId,sourceEventId,input)
+}
+export async function assertScheduleRead(userId:string,botId:string|null,scope:import('@/lib/schedules/contract').ScheduledRead){
+  'use step'
+  const {assertScheduledRead}=await import('@/lib/schedules/runtime')
+  await assertScheduledRead(userId,botId,scope)
+}
+export async function completeScheduleRead(userId:string,botId:string|null,scope:import('@/lib/schedules/contract').ScheduledRead,text:string){
+  'use step'
+  const {schedules}=await import('@/lib/schedules/runtime')
+  await schedules().completeRead(userId,botId,scope,text)
+}
+export async function failScheduleRead(scope:import('@/lib/schedules/contract').ScheduledRead,denied=false){
+  'use step'
+  const {schedules}=await import('@/lib/schedules/runtime')
+  const {ScheduleError}=await import('@/lib/schedules/contract')
+  await schedules().fail({id:scope.occurrenceId,lease_token:scope.leaseToken},denied?new ScheduleError('scheduleReadAuthorityLost',403):new Error('scheduledReadFailed'))
+}

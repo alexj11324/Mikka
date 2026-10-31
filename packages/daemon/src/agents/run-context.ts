@@ -1,4 +1,5 @@
 import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../../../../lib/personal-agent-message'
+import { prepareGitHubEnvironment, type RunGitHub } from './github-runtime'
 // What every real harness adapter needs about one run: the sandbox policy,
 // the Mikka MCP server (hand-in tools) and the handoff file it writes, and
 // the instructions that tell the agent how a run ends.
@@ -82,6 +83,10 @@ export interface McpServerSpec {
 export type ComputerSpecProvider = (runId: string, policy?: RunPolicy) => McpServerSpec | undefined
 
 export interface RunContextOptions {
+  github?: RunGitHub
+  githubRuntime?: { nodeBinary: string; ghBinary: string }
+  /** Clean caller PATH, before adding a run-local gh wrapper. */
+  childPath?: string
   /** Only the host may advertise this bound control-channel capability. */
   mailboxEnabled?: boolean
   harness: Exclude<Harness, "mock">
@@ -190,6 +195,7 @@ export function runPaths(stateDir: string, runId: string) {
 }
 
 export class RunContext {
+  private githubEnv: Record<string, string> = {}
   /** Real path of the worktree (macOS: `/tmp` is `/private/tmp`). */
   readonly worktree: string
   /** The worktree's own git administration (`<repo>/.git/worktrees/<name>`). */
@@ -225,6 +231,9 @@ export class RunContext {
     this.capturesDir = join(this.runDir, CAPTURES_DIR)
     ownDir(this.capturesDir)
     this.writeSkills()
+    if (options.github && options.kind !== 'plan' && !runPolicy(options.policy).readOnly) {
+      this.githubEnv = prepareGitHubEnvironment(this.runDir, options.github, options.childPath ?? process.env.PATH ?? '', options.githubRuntime)
+    }
   }
 
   /**
@@ -302,7 +311,7 @@ export class RunContext {
         ...HARNESS_DOMAINS[this.options.harness],
         ...runDomains(
           runPolicy(this.options.policy),
-          this.options.networkAllow ?? [],
+          [...(this.options.networkAllow ?? []), ...(this.options.github ? ['github.com', 'api.github.com', new URL(this.options.github.endpoint).host] : [])],
         ),
       ],
     }
@@ -320,7 +329,7 @@ export class RunContext {
       this.skillsDir,
     )
     return [
-      runInstructions(this.worktree, this.options.policy),
+      runInstructions(this.worktree, this.options.policy, this.options.kind === 'plan' ? undefined : this.options.github),
       this.options.kind === "plan" ? planInstructions() : "",
       skills,
       PERSONAL_MESSAGE_INSTRUCTIONS,
@@ -349,7 +358,7 @@ export class RunContext {
    * and zsh writes here-docs to `$TMPPREFIX` (default `/tmp/zsh`).
    */
   tempEnv(): Record<string, string> {
-    return { TMPDIR: this.tmpDir, TMPPREFIX: join(this.tmpDir, "zsh") }
+    return { TMPDIR: this.tmpDir, TMPPREFIX: join(this.tmpDir, "zsh"), ...this.githubEnv }
   }
 
   /** A hand-in from an earlier session would end this one at once. */
@@ -477,13 +486,18 @@ export function planInstructions(): string {
 }
 
 /** Appended to the harness's system prompt (or the first message). */
-export function runInstructions(worktree: string, policy?: RunPolicy): string {
+export function runInstructions(worktree: string, policy?: RunPolicy, github?: RunGitHub): string {
   return [
     "You are running as an Mikka agent, unattended, in a git worktree:",
     `${worktree}`,
     "Rules for this run:",
     ...policyInstructions(runPolicy(policy)),
-    "- Do not commit, push or switch branches. Mikka verifies, commits and pushes your work after you hand it in.",
+    ...(github && !runPolicy(policy).readOnly ? [
+      `- You own delivery to https://github.com/${github.repository}. Keep the current local branch. Commit your tested work and push HEAD to ${github.branch} using the HTTPS repository URL. Never force-push.`,
+      `- Open or update the task pull request with gh, using head ${github.branch}. Its body must end with <!-- mikka-issue:${github.issueId} --> so Mikka can attach the result.`,
+      '- Run gh pr checks <PR URL> --watch. Read failing CI logs, fix the code, test, commit and push again, and repeat until every check has finished successfully. A queued, pending, missing or failed check is not a successful delivery.',
+      '- Only submit after CI passes for the final pushed commit and the worktree is clean. Do not change files after the final successful CI run. Git and gh receive run-scoped credentials automatically; never print or copy them.',
+    ] : ["- Do not commit, push or switch branches. Mikka verifies, commits and pushes your work after you hand it in."]),
     "- Run every command in the foreground. Nothing keeps running after your turn: when your turn ends, the run ends.",
     "- When the task is done and checked, call the `submit` tool of the `mikka` MCP server with a short summary. That is the only way to finish successfully.",
     "- First use the issue and existing facts. For missing task context call `request_help`: the Orchestrator checks known facts before involving the person. Call `ask_human` only for a genuinely unresolved product decision or missing permission. Call `report_blocked` for an external condition. These preserve a durable question and stop this run; an answer continues its original worktree/session. Never invent authorization or start another task while waiting.",

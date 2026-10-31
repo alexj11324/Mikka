@@ -129,7 +129,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
         return rows[0]
       })
     },
-    /** Trusted readback only; never invokes an effect. Unknown/absent objects stay uncertain:
+    /** Trusted readback only; never invokes an effect. Unknown/absent objects keep their state:
      * a negative query cannot prove an old in-flight request will not later complete.
      */
     async reconcile(input: OperationIdentity, lookup: (record: Readonly<OperationRecord>) => Promise<OperationReceipt | null>) {
@@ -137,10 +137,20 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
         const row = await owned(tx, input)
         assertOperationRun(row.binding, row.runId)
         await authorize(tx, row.binding, row.runId, 'reconcile')
+        return row
+      }, async (tx, row, lease) => {
         if (!['executing', 'uncertain'].includes(row.status)) return row
+        // External readback shares the same current-authority lease as effects.
+        await lease?.check()
+        await authorize(tx, row.binding, row.runId, 'reconcile')
         const evidence = await lookup(row)
-        const receipt = evidence === null ? null : receiptSchema.parse(evidence)
-        const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=$2,receipt=$3,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, receipt ? 'succeeded' : 'uncertain', receipt])
+        await lease?.check()
+        await authorize(tx, row.binding, row.runId, 'reconcile')
+        // Absence is not proof of failure and must not invalidate a concurrent
+        // claim before its first invocation has started.
+        if (evidence === null) return row
+        const receipt = receiptSchema.parse(evidence)
+        const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=$2,receipt=$3,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, 'succeeded', receipt])
         return rows[0]
       })
     },

@@ -15,7 +15,8 @@ export async function beginAgentExecution(userId: string, botId: string | null, 
   if (!agentKitEnabled()) return null
   const scope = await agentScope(userId,botId)
   const instructions = await botInstructions(userId,botId,runtime.harness === 'ai_sdk' ? COORDINATOR_INSTRUCTIONS : personalCoordinatorInstructions())
-  return agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,() => runtime.harness === 'ai_sdk' ? freezeBotModel(scope,{service:()=>subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace}) : Promise.resolve({harness:runtime.harness,model:'model' in runtime ? runtime.model ?? null : null}),agentKitDefaults())
+  const { personalPlugins } = await import('@/lib/plugins/runtime')
+  return agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,() => runtime.harness === 'ai_sdk' ? freezeBotModel(scope,{service:()=>subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace}) : Promise.resolve({harness:runtime.harness,model:'model' in runtime ? runtime.model ?? null : null}),agentKitDefaults(), client => personalPlugins.snapshot(userId,client))
 }
 /** Durable model selection also applies when versioned definitions are disabled. */
 export async function botRuntime(userId:string,botId:string|null) {

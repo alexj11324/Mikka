@@ -94,6 +94,25 @@ test(
         candidateId: task.candidateId,
       });
       await t.test(
+        "two-field mutation fence keeps owner checks, rejects stale revisions and replays legacy context",
+        async () => {
+          const changes = createFactoryStore(pool, authorize, null, {});
+          const task = (await changes.route('owner', await fixture())).task;
+          const minimal = { taskId: task.id, revision: task.revision };
+          await denies(() => changes.apply('other', minimal, randomUUID(), { action: 'cancel', reason: 'foreign' }), 'factoryNotFound');
+          await denies(() => changes.apply('owner', { ...minimal, revision: minimal.revision + 1 }, randomUUID(), { action: 'cancel', reason: 'stale' }), 'factoryStale');
+          const eventId = randomUUID();
+          const changed = await changes.apply('owner', minimal, eventId, { action: 'finish', status: 'blocked', reason: 'Waiting for external prerequisite', evidence: [], output: {} });
+          assert.equal(changed.task.status, 'blocked');
+          assert.equal(changed.task.revision, minimal.revision + 1);
+          // Prior clients still send display/provenance fields. They cannot
+          // alter the authorization fence or create a second mutation.
+          assert.deepEqual(await changes.apply('owner', { ...minimal, issueId: randomUUID(), attemptId: randomUUID(), candidateId: randomUUID() }, eventId, { action: 'finish', status: 'blocked', reason: 'Waiting for external prerequisite', evidence: [], output: {} }), changed);
+          await denies(() => changes.apply('owner', minimal, randomUUID(), { action: 'cancel', reason: 'stale' }), 'factoryStale');
+          assert.equal((await pool.query('SELECT count(*)::int n FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId])).rows[0].n, 1);
+        },
+      );
+      await t.test(
         "ten replays create one task and attempt; changed payload and wrong owner reject",
         async () => {
           const input = await fixture();

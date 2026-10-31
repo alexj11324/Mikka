@@ -1,16 +1,16 @@
 name: CI
 
-# Three layers, as in large monorepos:
-# - presubmit: every push to any branch runs CI, with or without a PR;
-# - merge queue: merge_group tests the change on top of the latest main;
-# - postsubmit: every push to main runs CI gates; docs-only changes skip heavy jobs.
-# A PR from a branch in this repo is already covered by its push run, so the
-# pull_request run is kept only for PRs from forks (see the job conditions).
-# Browser tests (Playwright) are the slow part and live in browser-tests.yml,
-# which runs only on the way into main. See CONTRIBUTING.md, "How changes are tested".
+# Merge-blocking source and database checks run on GitHub's PR merge candidate,
+# not a same-repository branch push. This avoids duplicating the same expensive
+# jobs and detects integration failures against the target branch at PR time.
+# - pull_request: premerge checks (same-repo and fork PRs);
+# - merge_group: synthetic queue candidate, if a queue is enabled later;
+# - push main: postmerge verification of each distinct main commit.
+# Browser acceptance has its own smoke/targeted PR and full main/nightly tiers
+# in browser-tests.yml. Preserve the existing protected status-check names.
 on:
   push:
-    branches-ignore: ['gh-readonly-queue/**']
+    branches: [main]
   pull_request:
   merge_group:
 
@@ -18,8 +18,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ui-policy-${{ github.event_name }}-${{ github.ref }}
-  # Superseded branch pushes are cancelled; every commit on main finishes.
+  # Main commits need unique groups: a new pending run must not evict an older
+  # pending run (cancel-in-progress: false alone does not guarantee that).
+  group: ui-policy-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
@@ -107,7 +108,7 @@ jobs:
   ui-policy-full:
     name: UI policy (full)
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
     # Fixed standard Linux image; host namespace/security policy stays unchanged.
     runs-on: ubuntu-22.04
     timeout-minutes: 20
@@ -118,14 +119,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/pnpm-install
       - run: pnpm test:factory-check-independence
       - run: pnpm test:factory-check-recovery
       - run: pnpm test:factory-routing
@@ -147,6 +141,8 @@ jobs:
       - run: pnpm test:agent-kit-compat
       - run: pnpm test:approved-writes
       - run: pnpm test:coordinator-events
+      - run: pnpm test:schedules
+      - run: pnpm test:run-recovery
       - run: pnpm test:mvp-fixtures
       - run: pnpm test:credentials
       - run: pnpm test:run-publication
@@ -226,6 +222,8 @@ jobs:
       - run: pnpm test:integrations
       - run: pnpm test:github
       - run: pnpm test:request-log
+      # Legacy read routes; previously only in legacy-read-compat.yml, which ran on merged branches.
+      - run: pnpm test:legacy-reads
       - run: pnpm test:slack
       - run: pnpm test:telegram
       - run: pnpm test:agent
@@ -274,7 +272,7 @@ jobs:
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
     needs: [changes, ui-policy-full]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -302,7 +300,7 @@ jobs:
     # database suites that the required check names cover.
     name: Production build and browser interactions (full)
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     services:
@@ -332,14 +330,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.34.3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/pnpm-install
       - name: Install native dependencies for the CLI approval database roundtrip
         run: sudo apt-get update && sudo apt-get install -y bubblewrap socat ripgrep
       - name: Generate ephemeral test-only auth secret
@@ -368,7 +359,7 @@ jobs:
           RUN_DISPATCH_DB_TESTS: '1'
           FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
           CREDENTIAL_TEST_RETAIN_RESOURCES: '1'
-          DB_TEST_EXPECTED: test:abuse-db,test:onboarding-db,test:execution-settings-db,test:device-enrollment-db,test:account-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:agent-tool-approval-db,test:approved-writes-db,test:artifact-migration-db,test:audit-db,test:bot-chats-db,test:bot-threads-db,test:captures-db,test:cloud-backend-db,test:computer-db,test:conversation-reads,test:coordinator-issue-create-db,test:coordinator-issue-tools-db,test:coordinator-native,test:coordinator-task-binding-db,test:credentials-db,test:desktop-auth,test:factory,test:factory-approval-db,test:factory-check-independence-db,test:factory-checks-db,test:factory-monitor-db,test:factory-routing-db,test:group-turns,test:groups,test:issue-search-db,test:local-repository-migration-db,test:migration-steps-db,test:pat-db,test:pat-api-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:run-dispatch,test:run-publication-db,test:scope-detachment-db,test:secrets-db,test:self-improvement-db,test:self-improvement-unit,test:settings-activity-db,test:settings-prefs-db,test:skill-semantic-db,test:suggestion-artifact-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-admin-db,test:workspace-migration-db
+          DB_TEST_EXPECTED: test:abuse-db,test:onboarding-db,test:execution-settings-db,test:device-enrollment-db,test:account-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:agent-tool-approval-db,test:approved-writes-db,test:artifact-migration-db,test:audit-db,test:bot-chats-db,test:bot-threads-db,test:captures-db,test:cloud-backend-db,test:computer-db,test:conversation-reads,test:coordinator-issue-create-db,test:coordinator-issue-tools-db,test:coordinator-native,test:coordinator-task-binding-db,test:credentials-db,test:desktop-auth,test:factory,test:factory-approval-db,test:factory-check-independence-db,test:factory-checks-db,test:factory-monitor-db,test:factory-routing-db,test:group-turns,test:groups,test:issue-search-db,test:local-repository-migration-db,test:migration-steps-db,test:pat-db,test:pat-api-db,test:personal-mailbox-default-off-db,test:plugins-db,test:preview-driver,test:relation-cycle,test:run-dispatch,test:run-publication-db,test:scope-detachment-db,test:secrets-db,test:self-improvement-db,test:self-improvement-unit,test:settings-activity-db,test:settings-prefs-db,test:skill-semantic-db,test:suggestion-artifact-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-admin-db,test:workspace-migration-db,test:device-revocation-db,test:worker-authorization-db,test:schedules-db,test:run-recovery-db
       - name: Preserve synthetic CLI approval database evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -379,13 +370,16 @@ jobs:
             /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
             ${{ runner.temp }}/pr13-personal-mailbox-results.xml
           if-no-files-found: warn
+      # Browser tests (pull request) build the exact synthetic merge candidate.
+      # Avoid rebuilding that candidate here; main and merge-group still build.
       - run: pnpm build
+        if: github.event_name != 'pull_request'
 
   browser-tests:
     # The required check name. Same docs-only behavior as UI policy above.
     name: Production build and browser interactions
     needs: [changes, browser-tests-full]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

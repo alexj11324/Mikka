@@ -19,6 +19,11 @@ Newest first.
 
 | Date | Decision | Rule | Replaces |
 | --- | --- | --- | --- |
+| 2026-10-31 | `Button variant="secondary"` uses the same `--control` grey as `outline` (R-31), so settings rows stop showing two greys for the same role; a `secondary` or `outline` Button may not be turned white at the call site (`style/secondary-button-fill`). Pressed state: a pane toggle (浏览器 globe, artifact chat pane) is `bg-muted`; a tool mode (选择元素, 引用) keeps the blue tint. Source: Alex, fix order step 3 approved 2026-10-31. | R-31 | `secondary` = opaque `--secondary`; 回到最新 forced to white |
+| 2026-10-31 | UI consistency fix order from `ui-consistency-audit.md` is approved (「可以」): toolbar, shared primitives, greys, tags/chips, side-panel springs, rows/cards, dialog and list motion, leftovers, one small PR per step. Unified so far: a segmented control is `ToggleGroup variant="segment"` (one `--control` track at the button height, 8px, pressed item raised) and a call site may not restyle the track (`style/segment-track` in ui-policy); a `CollapsibleContent` grows from and shrinks to zero height; motion follows the OS reduced-motion setting app-wide (`MotionConfig reducedMotion="user"`). Source: Alex, 「怪得很呢，都不协调」 and 「没有 motion 就会很生硬」, fix order approved 2026-10-31. | R-31, R-33, R-37 | Per-call-site segmented controls; collapsibles that snap |
+| 2026-10-31 | The macOS desktop window is translucent like Codex: the rail, window bar and the card's first column (bot list, settings list) show the blurred desktop through a tinted `sidebar` vibrancy material; the content column stays opaque. Off under macOS Reduce transparency; the web app, Windows and Linux are unchanged (Windows Mica needs its own transparency testing and was not added). Source: Alex's request relayed to this session, with Codex desktop as the reference | [`platforms.md`](platforms.md) | Opaque desktop window on macOS |
+| 2026-10-30 | Use Codex-style premerge/postmerge CI: run required PR checks on GitHub's synthetic merged candidate; avoid duplicate same-repository branch-push CI, retain the existing required gate names, and verify every distinct main commit after merge. Do not require PR authors or agents to rebase merely because main moved; only real conflicts and new PR commits require revalidation. GitHub's separate branch-protection "Require branches to be up to date before merging" toggle must use loose mode; code changes alone do not set it. Source: Alex, request to align Mikka CI with Codex and preceding no-rebase discussion. | `.github/workflows/README.md` | Branch-push-based presubmit and mandatory latest-main rebase |
+| 2026-10-31 | A bot's avatar at rest plays bloub's own animations by itself (rests and blinks between egg, wink, hexagon, wide, play, orbit, comet and burst) and no longer follows the cursor. thinking, notify, exclaim and sleep stay reserved for 工作中, 等你处理, 出错 and 离线. Source: Alex, 「跟着鼠标动本来就是很低级的一种东西啊，它自己动就行了」 | R-36 | Idle = eyes following the cursor, plus blink/wink/wide only |
 | 2026-10-30 | E2B runs only on the workspace's own API key (BYO E2B in 密钥与环境), so Mikka does not bill cloud computer time. The points UI that would bill it (计费 › 点数, and 删除工作区's unused purchased points line) stays built but hidden behind the PostHog flag `mikka-computer-billing` (off unless PostHog returns true). Source: Alex on #535 (「E2B…目前只接受 API，所以说你不需要计费云电脑…用 PostHog 把这个 E2B 计费的相关的东西把它隐藏起来」) | AGENTS.md "Ship features on" (explicit Alex decision) | 计费 › 点数 shown to admins |
 | 2026-10-30 | Settings v4 remaining sections (PR #482): 常规 is fully wired, including 转让工作区 (no frame draws it; it sits in 危险操作 above 删除, owner only); members see values as plain text with no controls they cannot use; 密钥与环境 has no environment selector (scope is workspace or repository only); 个人访问令牌 is not shipped until an API consumes tokens (hidden by the one-line `unbuilt` flag); no egress / network-policy UI. Sidebar names follow Figma (设备, 个人访问令牌, 团队权限, 登录与密钥). Source: Alex's owner decisions relayed for #482 | `components.md` Settings v4 row | Environment badge and selector in 密钥与环境; a shipped 个人访问令牌 page |
 | 2026-10-30 | Desktop releases are versioned by UTC build time, `YYYY.MMDD.HHMM` (「不要用这个标签，我们以后用时间戳」). The Desktop release workflow stamps the version and tags the commit `desktop-<version>` itself; nobody bumps `package.json` or creates a tag by hand. | | Semver `desktop-vX.Y.Z` tags created by hand |
@@ -229,3 +234,15 @@ authority. Track the concrete rollout prerequisites and verification in
 ## 2026-10-30 — First-run onboarding spec
 
 Alex approved the first-run onboarding spec ([onboarding.md](onboarding.md), #129); its Figma page 241:4483 (「Onboarding · 我们的版本（Claude · 2026-10-25）」) is accepted.
+
+## 2026-10-31 — Icon rail without labels; Codex dark surfaces
+
+Alex asked to drop the small names under the rail icons: each rail item is now an icon button whose name shows as a tooltip on hover (and stays its accessible name). Dark mode follows Codex's surfaces: page rgb(24 24 24), cards and popovers rgb(35 35 35).
+
+## 2026-10-31 — Personal plugin backend delivery
+
+Alex confirmed #581, #582 and #583 ship together in one PR with backend scope
+only (「按 issue，仅后端」). Personal MCP connections and installed skills are
+owner-scoped; the app catalog exposes supported Composio toolkits. Plugin-page
+tabs, counts, switches and browse controls follow separately. See
+[the backend contract](personal-plugins-backend.md).

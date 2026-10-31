@@ -46,6 +46,7 @@ import { CursorAdapter } from "./adapters/cursor"
 import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
+import { agentPublishedReceipt, githubReceiptEnvironment } from './agents/github-runtime'
 import { runPaths } from "./agents/run-context"
 import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
@@ -457,7 +458,13 @@ export class Daemon {
       publisher: {
         snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
         publish: async ({ runId, worktree, repo, assignment, report, tree }) =>
-          publishRun({
+          assignment.github && assignment.mcp ? agentPublishedReceipt({
+            runId, repoPath: repo.path, worktree, tree,
+            github: { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId },
+            privateDir: join(paths.adapterState, 'pids'),
+            ...(hosted ? { hosted: true } : {}),
+            env: githubReceiptEnvironment(),
+          }) : publishRun({
             runId,
             repoPath: repo.path,
             worktree,
@@ -551,6 +558,7 @@ export class Daemon {
     let backoff = 1_000
     while (!this.stopped) {
       const deviceId = this.device.deviceId
+      const credential = this.device.credential
       try {
         if (!this.registered || !deviceId) {
           await this.pauseCommands(1_000, signal)
@@ -579,6 +587,7 @@ export class Daemon {
         if (commands.length > 0 && !acted) await this.pauseCommands(500, signal)
       } catch (error) {
         if (this.stopped || signal.aborted) return
+        if (error instanceof SessionRejectedError) this.rejectDeviceSession(credential)
         if (!(error instanceof ServerUnreachableError))
           this.log.warn({ err: error }, "fetching run commands failed")
         await this.pauseCommands(backoff, signal)
@@ -599,6 +608,7 @@ export class Daemon {
     let backoff = 1_000
     while (!this.stopped) {
       const deviceId = this.device.deviceId
+      const credential = this.device.credential
       try {
         if (!this.registered || !deviceId) {
           await this.pauseCommands(1_000, signal)
@@ -622,6 +632,7 @@ export class Daemon {
         )
       } catch (error) {
         if (this.stopped || signal.aborted) return
+        if (error instanceof SessionRejectedError) this.rejectDeviceSession(credential)
         if (!(error instanceof ServerUnreachableError))
           this.log.warn({ err: error }, "answering folder requests failed")
         await this.pauseCommands(backoff, signal)
@@ -825,6 +836,7 @@ export class Daemon {
   }
 
   private async register(credential: string) {
+    const { workspaceId, deviceId: knownDeviceId } = this.device
     const { deviceId } = await this.options.link.registerDevice(
       credential,
       {
@@ -837,12 +849,14 @@ export class Daemon {
         deviceType: process.env.MIKKA_DEVICE_TYPE === "server" ? "server" : process.env.MIKKA_DEVICE_TYPE === "laptop" ? "laptop" : await detectDeviceType(),
         harnesses: this.harnesses,
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
-        ...(this.device.workspaceId
-          ? { workspaceId: this.device.workspaceId }
+        ...(workspaceId
+          ? { workspaceId }
           : {}),
       },
-      this.device.deviceId
+      knownDeviceId
     )
+    // A late registration must not restore the session replaced over RPC.
+    if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) throw new Error('Device session changed during registration')
     if (deviceId !== this.device.deviceId) {
       this.saveDevice({ deviceId })
       this.log.info({ device_id: deviceId }, "device registered")
@@ -872,7 +886,7 @@ export class Daemon {
 
   private async syncPass() {
     const { link } = this.options
-    const credential = this.device.credential
+    const { credential, workspaceId } = this.device
     if (!credential) {
       this.server = "unregistered"
       return
@@ -973,22 +987,31 @@ export class Daemon {
       await this.pruneWorktrees()
       await this.sweepEmptyRuns()
     } catch (error) {
+      if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) return
       this.server = "offline"
       if (error instanceof SessionRejectedError) {
-        // Signed out on the server: drop the dead credential and wait for
-        // `mikka daemon login` (or the app, which signs in again when it
-        // sees no credential, ADR 0026).
-        this.server = "unregistered"
-        this.revokeLocalComputerGrants()
-        this.registered = false
-        this.reviewAbort?.abort()
-        this.reviewAbort = null
-        this.saveDevice({ credential: undefined })
-        this.log.warn("server refused the device session; sign in again")
+        this.rejectDeviceSession(credential)
       } else if (!(error instanceof ServerUnreachableError)) {
         this.log.error({ err: error }, "server sync failed")
       }
     }
+  }
+
+  /** A refused credential stops its local work as well as future polling.
+   * The supervisor cancels immediately and applies its bounded CLI kill grace. */
+  private rejectDeviceSession(credential: string | undefined) {
+    // An old in-flight request cannot sign out a newly connected credential.
+    if (!credential || this.device.credential !== credential) return
+    this.server = "unregistered"
+    this.revokeLocalComputerGrants()
+    this.registered = false
+    this.reviewAbort?.abort()
+    this.reviewAbort = null
+    this.saveDevice({ credential: undefined })
+    for (const runId of this.supervisor?.activeRunIds() ?? []) {
+      void this.supervisor.cancel(runId).catch(() => this.log.warn({ run_id: runId }, 'could not stop revoked session'))
+    }
+    this.log.warn("server refused the device session; sign in again")
   }
 
   private async claimAndStart(runId: string) {

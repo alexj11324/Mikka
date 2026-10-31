@@ -285,8 +285,6 @@ export function createVercelPublicationAdapter(
       const hash = context(input);
       await project();
       await input.beforeCreate?.();
-      if (Date.parse(input.authorization!.expiresAt) <= Date.now())
-        throw new FactoryError("factoryApprovalInvalid");
       // Do not use branch tips, project/build overrides, files, forceNew or promotion.
       const d = object.parse(
         await client.request(`/v13/deployments?${q}`, "POST", {

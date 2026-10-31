@@ -59,7 +59,7 @@ export async function handleFactoryApproval(
     if (!parsed.success || parsed.data.input.binding.taskId !== req.taskId)
       return { status: 422, body: { error: "factoryInvalid" } };
     const { operation, input } = parsed.data;
-    return { status: 200, body: await service[operation](req.actor, input) };
+    return { status: 200, body: await (operation === 'approve' ? service.approveAndPublish(req.actor, input) : service[operation](req.actor, input)) };
   } catch (error) {
     if (error instanceof PublicationDeferred)
       return {

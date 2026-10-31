@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { bindingSchema, routeSchema, routeStage } from "./contract";
+import { bindingSchema, revisionBindingSchema, routeSchema, routeStage } from "./contract";
 import { factoryScopeAllows } from "./scope";
 import { handleFactory } from "./http";
 import type { FactoryStore } from "./http";
+
+test("mutation requests need only the owned task id and revision", () => {
+  const binding = { taskId: randomUUID(), revision: 1 };
+  assert.deepEqual(revisionBindingSchema.parse(binding), binding);
+  assert.deepEqual(revisionBindingSchema.parse({ ...binding, issueId: randomUUID(), attemptId: randomUUID(), candidateId: randomUUID() }), binding);
+  for (const input of [{ ...binding, revision: 0 }, { ...binding, revision: 1.5 }, { ...binding, taskId: 'invalid' }])
+    assert.equal(revisionBindingSchema.safeParse(input).success, false);
+});
 
 test("clear authorization routes directly; only missing items clarify, spec is optional", () => {
   const base = routeSchema.parse({

@@ -319,7 +319,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   dark grey in dark mode, never white at low opacity.
   Secondary buttons follow the same rule: a grey fill and no stroke, like
   the 「Add folder…」 button in Claude desktop's settings (a light grey pill
-  on a white panel, no outline). `Button variant="outline"` (and the
+  on a white panel, no outline). `Button variant="outline"` and `variant="secondary"` (and the
   `outline` Toggle, the motion `secondary`/`outline` buttons) use the
   `--control` / `--control-hover` tokens, a translucent black (light) or
   white (dark) overlay, so the button still reads on grey cards and
@@ -421,6 +421,7 @@ place, not a licence to pick either.
 | `border/rule` | `#e5e5e5` / dark `#383838` | `--rule` | `oklch(0.922 0 0)` / dark `oklch(0.269 0 0)` | |
 | `accent/default` | `#2f6bff` | `--sidebar-primary` | shadcn blue | yes |
 | `status/*` | StatusBadge set | `--success`, `--warning`, `--destructive` | Tailwind palette | check |
+| `brand/claude` (R-74 mark) | none yet | `--color-brand-claude` | `#D97757`, both themes | Figma to add |
 
 The drift rows are open in `decisions.md`. Until they are settled, the code
 value is what ships and Figma is updated to match.

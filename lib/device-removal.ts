@@ -62,11 +62,18 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
     const row = device.rows[0]
     const online = row.lastSeenAt && Date.now() - new Date(row.lastSeenAt).getTime() < DEVICE_ONLINE_WINDOW_MS
     if (online) await enqueueDeviceCommand(userId, target, 'uninstall', client)
-    const revoked = await client.query(`UPDATE device_tokens SET "revokedAt"=CASE WHEN $3::boolean THEN NULL ELSE now() END,
-      "expiresAt"=CASE WHEN $3::boolean THEN LEAST("expiresAt",$4::timestamptz) ELSE "expiresAt" END
+    const revoked = await client.query(`WITH changed AS (
+      UPDATE device_tokens SET "revokedAt"=CASE WHEN $3::boolean THEN NULL ELSE now() END,
+        "revokedBy"=CASE WHEN $3::boolean THEN "revokedBy" ELSE $2 END,
+        "expiresAt"=CASE WHEN $3::boolean THEN LEAST("expiresAt",$4::timestamptz) ELSE "expiresAt" END
       WHERE "userId"=$2 AND "revokedAt" IS NULL
         AND (id IN (SELECT "tokenId" FROM device_token_devices WHERE "deviceId"=$1) OR "boundDeviceId"=$1)
-      RETURNING id`, [target, userId, Boolean(online), new Date(Date.now() + DEVICE_UNINSTALL_GRACE_MS)])
+      RETURNING id,"revokedAt"
+    ), receipts AS (
+      INSERT INTO device_credential_revocations ("tokenId","ownerId","actorId","revokedAt")
+      SELECT id,$2,$2,"revokedAt" FROM changed WHERE "revokedAt" IS NOT NULL
+      RETURNING "tokenId"
+    ) SELECT id FROM changed`, [target, userId, Boolean(online), new Date(Date.now() + DEVICE_UNINSTALL_GRACE_MS)])
     await client.query(`UPDATE agents SET "deviceId"=NULL,"updatedAt"=now() WHERE "deviceId"=$1 AND "userId"=$2`, [target, userId])
     await client.query(`UPDATE devices SET "removedAt"=now(),enabled=false,"updatedAt"=now() WHERE id=$1`, [target])
     await client.query('COMMIT')

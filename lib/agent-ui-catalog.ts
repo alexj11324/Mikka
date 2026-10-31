@@ -5,6 +5,13 @@ import { z } from 'zod/v4'
 
 const text = z.string().max(8000)
 const children = z.array(z.any()).max(30)
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+/** At most five series, one per chart token (--chart-1 … --chart-5); every series has one value per label. */
+const chart = {
+  labels: z.array(z.string().min(1).max(40)).min(1).max(24),
+  series: z.array(z.object({ name: z.string().min(1).max(40), values: z.array(z.number().min(-1e12).max(1e12)).max(24) })).min(1).max(5),
+}
+const seriesMatchLabels = ({ labels, series }: { labels: string[]; series: { values: number[] }[] }) => series.every(item => item.values.length === labels.length)
 
 export const agentComponentCatalog = {
   TextContent: {
@@ -62,7 +69,7 @@ export const agentComponentCatalog = {
     props: z.object({ title: z.string().min(1).max(200), description: text, context: z.string().min(1).max(4000) }),
   },
   BeQuestions: {
-    description: 'beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。派发失败的云端选项是在用户自己的 E2B 密钥上运行云电脑（不是 Mikka 自有云），问题写“派不出去：{设备名} 不在线。等它上线，还是用你的 E2B 在云端运行？”，选项 value 固定为 wait（等它上线）与 cloud（用你的 E2B 运行），宿主按 value 本地化，不加解释段落；用户未配置 E2B 密钥时该选项设 action:"cloudKeySettings"，宿主显示为去设置密钥的入口，不发送回答。',
+    description: 'beUI ApprovalCard 提问模式，支持单选、多选、自定义回答和多步骤问题。context 必须包含完整任务背景。每个问题和选项的 id/value 必须唯一。用户在卡片内提交回答后直接继续对话，不经输入框；保留失败重试，不得索取密码或密钥。只有一个单选问题时显示为 A/B/C/D 选项行，点击的选项文字即用户回复：Factory 任务派发前澄清（intake 路由到 clarify）或派发失败需用户二选一时用它，问题写清楚、选项 2–4 个；task 可选，为工具返回的真实任务 id，宿主在问题前显示任务引用。派发失败的云端选项是在用户自己的 E2B 密钥上运行云电脑（不是 Mikka 自有云），问题写“派不出去：{设备名} 不在线。等它上线，还是用你的 E2B 在云端运行？”，选项 value 固定为 wait（等它上线）与 cloud（用你的 E2B 运行），宿主按 value 本地化，不加解释段落；用户未配置 E2B 密钥时该选项设 action:"cloudKeySettings"，宿主显示为去设置密钥的入口，不发送回答。input 可选，用 beUI 控件作答：select 为下拉选择（需 options），switch 为是/否开关，slider 为数值滑块（需 range:{min,max,step?,unit?}），dateRange 为日期区间；未设 input 时单选用 Radio、多选用 Checkbox。',
     props: z.object({
       context: z.string().min(1).max(4000),
       questions: z.array(z.object({
@@ -71,7 +78,11 @@ export const agentComponentCatalog = {
         options: z.array(z.object({ value: z.string().min(1).max(80), label: z.string().min(1).max(200), description: z.string().max(300).optional(), action: z.enum(['cloudKeySettings']).optional() })).min(1).max(6).optional(),
         multiple: z.boolean().optional(),
         allowCustom: z.boolean().optional(),
-      }).refine(question => Boolean(question.options?.length || question.allowCustom), '问题必须提供选项或允许自定义回答')
+        input: z.enum(['select', 'switch', 'slider', 'dateRange']).optional(),
+        range: z.object({ min: z.number().min(-1e9).max(1e9), max: z.number().min(-1e9).max(1e9), step: z.number().positive().max(1e9).optional(), unit: z.string().max(12).optional() }).refine(range => range.min < range.max, 'min 必须小于 max').optional(),
+      }).refine(question => Boolean(question.options?.length || question.allowCustom || question.input === 'switch' || question.input === 'dateRange' || question.input === 'slider'), '问题必须提供选项或允许自定义回答')
+        .refine(question => question.input !== 'select' || Boolean(question.options?.length), '下拉选择必须提供选项')
+        .refine(question => question.input !== 'slider' || Boolean(question.range), '滑块必须提供 range')
         .refine(question => new Set(question.options?.map(option => option.value)).size === (question.options?.length ?? 0), '选项值不可重复'))
         .min(1).max(10).refine(questions => new Set(questions.map(question => question.id)).size === questions.length, '问题 ID 不可重复'),
       task: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).optional(),
@@ -109,6 +120,58 @@ export const agentComponentCatalog = {
   ComputerCard: {
     description: '电脑卡片：一句任务和 bot 电脑的实时画面，状态和审批由宿主读取并显示在卡片里。botId、runId 必须是工具返回的真实 id；task 是一句话任务；state 可选，默认 working；thread 可选，是这次运行（线程）的名字，例如「#66 预览部署检查」，不是 bot 名。每个电脑任务只放一张，不要另写步骤清单、操作记录或系统配置。',
     props: z.object({ botId: z.string().min(1).max(80), runId: z.string().min(1).max(80), task: z.string().min(1).max(200), state: z.enum(['working', 'approval', 'done', 'failed']).optional(), botName: z.string().min(1).max(80).optional(), thread: z.string().min(1).max(80).optional() }),
+  },
+  BeAlert: {
+    description: 'beUI 动效提示框，用作报告中的结论、风险或注意事项（callout）。variant 为 default、info、success、warning、destructive。只展示信息，不表示执行了操作。',
+    props: z.object({ title: z.string().min(1).max(200), description: text, variant: z.enum(['default', 'info', 'success', 'warning', 'destructive']).optional() }),
+  },
+  BeTable: {
+    description: 'beUI 数据表格，点击表头可排序。columns 为列名，rows 为二维数组，单元格为文本或数字；数字单元格按数值排序。最多 6 列、30 行。',
+    props: z.object({ columns: z.array(z.string().min(1).max(80)).min(1).max(6), rows: z.array(z.array(z.union([z.string().max(2000), z.number().min(-1e12).max(1e12)])).max(6)).max(30) }),
+  },
+  BeTabs: {
+    description: 'beUI 标签页。items 中每项包含 title 和 children 组件数组，最多 6 项。',
+    props: z.object({ items: z.array(z.object({ title: z.string().min(1).max(40), children })).min(1).max(6) }),
+  },
+  BeCollapsible: {
+    description: 'beUI 动效折叠区，标题常显、children 折叠。只放补充内容，重要结论不要折叠；defaultOpen 可选。',
+    props: z.object({ title: z.string().min(1).max(200), children, defaultOpen: z.boolean().optional() }),
+  },
+  BeTimeline: {
+    description: 'beUI 时间线，横向浏览按日期排列的事件，适合里程碑、计划和回顾。events 为 1–12 项，date 为 YYYY-MM-DD，title 为短标题，description 和 meta 可选。计划中的日期是建议，不代表已排期。',
+    props: z.object({ events: z.array(z.object({ date: isoDate, title: z.string().min(1).max(80), description: z.string().max(300).optional(), meta: z.string().max(80).optional() })).min(1).max(12) }),
+  },
+  BarChart: {
+    description: '柱状图（shadcn chart，颜色来自主题图表色）。labels 为分类，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个分类；horizontal 为 true 时横向；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。',
+    props: z.object({ ...chart, horizontal: z.boolean().optional(), unit: z.string().max(12).optional() }).refine(seriesMatchLabels, 'values 必须与 labels 等长'),
+  },
+  LineChart: {
+    description: '折线图（shadcn chart），用于随时间变化的趋势。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。',
+    props: z.object({ ...chart, unit: z.string().max(12).optional() }).refine(seriesMatchLabels, 'values 必须与 labels 等长'),
+  },
+  AreaChart: {
+    description: '堆叠面积图（ReUI c-chart-14），用于累计或构成随时间的变化。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；第一组画在最上层；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。',
+    props: z.object({ ...chart, unit: z.string().max(12).optional() }).refine(seriesMatchLabels, 'values 必须与 labels 等长'),
+  },
+  DonutChart: {
+    description: '环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。',
+    props: z.object({ slices: z.array(z.object({ name: z.string().min(1).max(40), value: z.number().min(0).max(1e12) })).min(2).max(5), unit: z.string().max(12).optional(), total: z.string().max(20).optional() }),
+  },
+  Separator: {
+    description: '段落分隔，用于分开报告中的部分。按界面规范显示为留白而不是横线。不带参数。',
+    props: z.object({}),
+  },
+  BeFileTree: {
+    description: 'beUI 文件树。paths 为以 / 分隔的相对路径（最多 60 个），宿主自动按目录分组。只展示用户或工具给出的真实路径，或明确标为建议的目录结构。',
+    props: z.object({ paths: z.array(z.string().min(1).max(300).refine(value => !value.startsWith('/') && !value.split('/').includes('..') && !/[\r\n<>]/.test(value))).min(1).max(60) }),
+  },
+  BeCitations: {
+    description: 'beUI 引用来源列表。sources 为 1–10 个 {title, url}，url 为 http(s) 地址。只列出本次真正读取过的网页或用户提供的链接，不编造来源；正文内引用单个网页用 SourceChip。',
+    props: z.object({ sources: z.array(z.object({ title: z.string().min(1).max(200), url: z.string().url().max(2000).refine(value => /^https?:\/\//i.test(value)) })).min(1).max(10) }),
+  },
+  BeFileDiff: {
+    description: 'beUI 代码差异，用于展示建议的修改。file 为文件路径；diff 为逐行文本，以 "+" 开头为新增、"-" 为删除、空格为上下文；language 可选。只表示建议，不代表修改已应用或文件已保存；真实工具结果由宿主展示，不由模型生成。',
+    props: z.object({ file: z.string().min(1).max(300), diff: z.string().min(1).max(20000), language: z.enum(['bash', 'diff', 'json', 'text', 'tsx']).optional() }),
   },
   ShadcnCard: {
     description: '本地 shadcn 卡片。用于有标题的建议、说明或内容分组，可嵌套已注册组件。',
@@ -166,8 +229,8 @@ export const agentComponentGroups: { name: string; components: AgentComponentNam
   { name: '审批与问题', components: ['BeApproval', 'BeQuestions'], notes: ['Confirmation → ApprovalCard；选择问题复用 ApprovalCard 提问模式。在回答区直接提交并继续对话，不执行工具、不持久保存审批。ToolApproval 已安装但仅供未来真实工具授权流程使用，不开放给模型伪造授权。'] },
   { name: '任务与进度', components: ['BeTodoList', 'BeStat', 'ShadcnProgress'], notes: ['Plan/Task → TodoList；Loader/Shimmer → AgentProgress、ReasoningText、ThinkingShimmer，由宿主根据请求状态控制。建议计划保持待开始；数字只能来自用户输入。'] },
   { name: '图标状态与操作', components: ['AgentIcon', 'BeBadge', 'BeButton', 'BeFollowUps'], notes: ['Lucide 提供图标；beUI AnimatedBadge 提供动态状态图标；Button 提供操作反馈。不得用动态图标伪造执行结果。'] },
-  { name: '任务与来源引用', components: ['InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'ComputerCard'], notes: ['引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。', 'Agent 用自己的电脑做事时放一张 ComputerCard，画面、状态和审批都在卡片里，正文不再复述操作过程。'] },
-  { name: '本地内容与兼容组件', components: ['TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；FileDiff、ToolResult、AgentActivity、Citations、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不自动生成虚构工具记录。'] },
+  { name: '任务与来源引用', components: ['InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'BeCitations', 'ComputerCard'], notes: ['BeCitations 列出本次真正读取过的网页，不编造来源。', '引用任务、运行和网页时用 InlineText 把文字和 chip 排在同一段，chip 是内联小标签，不用卡片。TaskChip、RunChip 只用工具返回的真实 id，宿主负责查出编号、标题和状态。', 'Agent 用自己的电脑做事时放一张 ComputerCard，画面、状态和审批都在卡片里，正文不再复述操作过程。'] },
+  { name: '本地内容与兼容组件', components: ['TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BeTimeline', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'Separator', 'BeFileTree', 'BeFileDiff', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame'], notes: ['复用已安装的本地 shadcn 与 REUI 内容组件。beUI CodeBlock 用于代码回复；BeFileDiff 只展示建议修改；ToolResult、AgentActivity、ImageGeneration 已安装，仅在有真实数据的宿主流程中使用，不开放给模型，不自动生成虚构工具记录。', '报告优先使用 beUI：提示用 BeAlert，表格用 BeTable，标签页用 BeTabs；趋势用 LineChart，分类对比用 BarChart，图表颜色来自主题图表色，只用用户或工具提供的数字。'] },
 ]
 
 export function createAgentLibrary(renderers: Partial<AgentComponentRenderers> = {}) {

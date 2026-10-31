@@ -280,7 +280,7 @@ test("no match stays uncertain, grant mismatch and missing token make no provide
     await f.close();
   }
 });
-test("preflight expiry and trusted live-grant hook prevent the create POST", async () => {
+test("approved reservation survives legacy expiry while the live task hook still prevents POST", async () => {
   const f = await vercelProtocolFixture();
   try {
     const a = createVercelPublicationAdapter(
@@ -290,8 +290,8 @@ test("preflight expiry and trusted live-grant hook prevent the create POST", asy
       i = input("production");
     f.state.projectDelayMs = 100;
     i.authorization!.expiresAt = new Date(Date.now() + 30).toISOString();
-    await assert.rejects(() => a.execute(i), /factoryApprovalInvalid/);
-    assert.equal(f.posts(), 0);
+    assert.ok(await a.execute(i));
+    assert.equal(f.posts(), 1);
     i.authorization!.expiresAt = new Date(Date.now() + 600000).toISOString();
     let checked = false;
     i.beforeCreate = async () => {
@@ -300,7 +300,7 @@ test("preflight expiry and trusted live-grant hook prevent the create POST", asy
     };
     await assert.rejects(() => a.execute(i), /factoryHumanRequired/);
     assert.equal(checked, true);
-    assert.equal(f.posts(), 0);
+    assert.equal(f.posts(), 1);
   } finally {
     await f.close();
   }

@@ -112,7 +112,7 @@ export function ContextPanel({ issues, threads, conversation, onOpenIssue, onSea
   const shown = tabs.includes(tab) ? tab : 'threads'
 
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
-  return <aside aria-label={t('label')} className={cn('min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : cn('hidden border-l transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90'))}>
+  return <aside aria-label={t('label')} className={cn('min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : cn('hidden border-l bg-background transition-[width] duration-150 ease-out motion-reduce:transition-none xl:flex', wide ? 'w-130' : 'w-90'))}>
     <Tabs value={view} onValueChange={value => setView(value as PanelView)} className="min-h-0 flex-1 gap-0">
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
         <TabsList aria-label={t('views')} className="gap-1 bg-transparent p-0">

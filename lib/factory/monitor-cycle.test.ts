@@ -227,16 +227,7 @@ test(
               }),
             "factoryReplayMismatch",
           );
-          await rejects(
-            () =>
-              store.apply(
-                "owner",
-                { ...binding(task), candidateId: randomUUID() },
-                eventId,
-                retry,
-              ),
-            "factoryReplayMismatch",
-          );
+          assert.deepEqual(await store.apply("owner", { ...binding(task), candidateId: randomUUID() }, eventId, retry), await store.apply("owner", binding(task), eventId, retry));
           const competing = await fixture();
           const settled = await Promise.allSettled(
             Array.from({ length: 10 }, () => apply(competing)),
@@ -259,7 +250,7 @@ test(
       );
 
       await t.test(
-        "wrong owner/issue/candidate and inconsistent candidate never write",
+        "wrong owner/task/revision and inconsistent candidate never write",
         async () => {
           const task = await fixture(),
             before = await counts(task.id);
@@ -271,18 +262,18 @@ test(
             () =>
               store.apply(
                 "owner",
-                { ...binding(task), issueId: randomUUID() },
+                { ...binding(task), taskId: randomUUID() },
                 randomUUID(),
                 retry,
               ),
             "factoryNotFound",
           );
-          for (const candidateId of [randomUUID(), null])
+          for (const revision of [task.revision + 1, task.revision + 2])
             await rejects(
               () =>
                 store.apply(
                   "owner",
-                  { ...binding(task), candidateId },
+                  { ...binding(task), revision },
                   randomUUID(),
                   retry,
                 ),

@@ -117,7 +117,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
           {canQuote && <Button variant="ghost" size="sm" aria-pressed={selecting} onClick={() => setSelecting(on => !on)} className={cn('hidden md:inline-flex', selecting && 'bg-sidebar-primary-soft text-sidebar-primary-soft-foreground hover:bg-sidebar-primary-soft hover:text-sidebar-primary-soft-foreground')}><SquareDashedMousePointer data-icon="inline-start" />{t('selectElement')}</Button>}
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('openInBrowser')} render={<a href={versionPath(artifactId, version, 'frame')} target="_blank" rel="noopener noreferrer" />} />}><Globe data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('openInBrowser')}</TooltipContent></Tooltip>
         </>}
-        <Button variant="ghost" size="icon-sm" className="md:hidden" aria-pressed={pane === 'chat'} aria-label={pane === 'chat' ? t('showContent') : t('showChat')} onClick={() => setPane(current => current === 'chat' ? 'content' : 'chat')}><MessageSquare data-icon="inline-start" /></Button>
+        <Button variant="ghost" size="icon-sm" className="aria-pressed:bg-muted aria-pressed:text-foreground md:hidden" aria-pressed={pane === 'chat'} aria-label={pane === 'chat' ? t('showContent') : t('showChat')} onClick={() => setPane(current => current === 'chat' ? 'content' : 'chat')}><MessageSquare data-icon="inline-start" /></Button>
         <Separator orientation="vertical" className="mx-1 data-vertical:h-5 data-vertical:self-center" />
         <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
       </header>
@@ -129,7 +129,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
             <span className="flex-1" />
             {markdown && <Label className="shrink-0 font-normal text-muted-foreground"><Switch checked={showDiff} onCheckedChange={setShowDiff} />{t('showDiff', { latest })}</Label>}
             {markdown && <Separator orientation="vertical" className="data-vertical:h-5 data-vertical:self-center" />}
-            <Button variant="secondary" size="sm" className="bg-background hover:bg-background/80" onClick={() => pickVersion(latest)}>{t('backToLatest', { latest })}</Button>
+            <Button variant="outline" size="sm" onClick={() => pickVersion(latest)}>{t('backToLatest', { latest })}</Button>
           </div>}
           {failed
             ? <Empty className="flex-1"><EmptyHeader><EmptyTitle>{t('loadError')}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={() => void mutate()}>{t('retry')}</Button></Empty>

@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { deviceHeartbeatSchema } from '@mikka/protocol/device'
@@ -24,7 +25,7 @@ export const dynamic = 'force-dynamic'
  * Afterwards, runs the owner lost on another device are queued again, and
  * (Factory on) queued Factory runs this device could not take are marked re-dispatched once.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
@@ -53,3 +54,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   after(() => reclaimLostRuns(caller.userId).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error)))
   return NextResponse.json({ ...result, deviceCommands: await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? [], parsed.data.failedDeviceCommands ?? []), ...(cloudCredential ? { cloudCredential } : {}) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
+
+export const POST = withDeviceRoute(handlePOST)

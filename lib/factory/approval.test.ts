@@ -292,6 +292,73 @@ test(
         ...extra,
       });
 
+      await t.test('one browser approve starts one publication; concurrent replays and legacy publish reuse the same result', async () => {
+        const state = await prepare(), req = await request(state);
+        const responses = await Promise.all(Array.from({ length: 10 }, () => handleFactoryApproval(local, httpReq(state.task.id, { method: 'POST', body: { operation: 'approve', input: req } }))));
+        assert.ok(responses.some(response => response.status === 200), JSON.stringify(responses));
+        assert.ok(responses.every(response => response.status === 200 || (response.status === 409 && (response.body as { nextOperation?: string }).nextOperation === 'reconcile')), JSON.stringify(responses));
+        const results = responses.map(response => response.body as { approvalId: string; publicationId: string; binding: FactoryBinding });
+        assert.equal(new Set(results.map(result => result.publicationId)).size, 1);
+        assert.equal((await store.read(actor.userId, state.task.id)).task.status, 'passed');
+        assert.equal((await pool.query('SELECT count(*)::int n FROM factory_publications WHERE "taskId"=$1', [state.task.id])).rows[0].n, 1);
+        const finished = results.find(result => result.approvalId)!;
+        const legacy = await local.publish(actor, publication({ approvalId: finished.approvalId, binding: finished.binding }));
+        assert.equal(legacy?.publicationId, finished.publicationId);
+      });
+
+      await t.test('reservation SQL failure rolls back the approval, lifecycle events and publish transition together', async () => {
+        const state = await prepare(), req = await request(state);
+        await pool.query(`CREATE FUNCTION reject_approval_reservation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'reservation write failed'; END $$; CREATE TRIGGER reject_approval_reservation BEFORE INSERT ON factory_publications FOR EACH ROW WHEN (NEW."taskId"='${state.task.id}'::uuid) EXECUTE FUNCTION reject_approval_reservation()`);
+        try {
+          await assert.rejects(() => local.approve(actor, req), /reservation write failed/);
+          assert.equal((await store.read(actor.userId, state.task.id)).task.revision, state.task.revision);
+          assert.equal((await pool.query('SELECT count(*)::int n FROM factory_approvals WHERE "taskId"=$1', [state.task.id])).rows[0].n, 0);
+          assert.equal((await pool.query('SELECT count(*)::int n FROM factory_publications WHERE "taskId"=$1', [state.task.id])).rows[0].n, 0);
+          assert.equal((await pool.query('SELECT count(*)::int n FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [state.task.id, req.eventId])).rows[0].n, 0);
+        } finally { await pool.query('DROP TRIGGER reject_approval_reservation ON factory_publications; DROP FUNCTION reject_approval_reservation()'); }
+      });
+
+      await t.test('confirmed publication failure returns the same candidate to approval and a new approval can retry', async () => {
+        const adapter = createLocalPublicationAdapter({ root: targetDirectory, target: 'local-isolated-filesystem', repository: 'fixture/Mikka', environment: 'local-contract', candidateEnvironment: 'local-contract' });
+        const failing = createFactoryApprovals(pool, authorize, store, [{ ...adapter, execute: async input => { throw new PublicationDeferred(input.idempotencyKey, 'failed'); } }]);
+        const state = await prepare(), req = await request(state);
+        await assert.rejects(() => failing.approveAndPublish(actor, req), (error: unknown) => error instanceof PublicationDeferred && error.state === 'failed');
+        const retryable = await store.read(actor.userId, state.task.id);
+        assert.equal(retryable.task.stage, 'approval');
+        assert.equal(retryable.task.status, 'pending');
+        assert.equal(retryable.task.candidateId, state.task.candidateId);
+        const completed = await local.approveAndPublish(actor, await request(retryable)) as { publicationId: string };
+        const publications = (await pool.query('SELECT id,status FROM factory_publications WHERE "taskId"=$1 ORDER BY "createdAt"', [state.task.id])).rows;
+        assert.deepEqual(publications.map(row => row.status), ['failed', 'succeeded']);
+        assert.equal(publications[1].id, completed.publicationId);
+      });
+
+      await t.test('a lost response after the durable effect claim never allows a second execution', async () => {
+        const state = await prepare(), req = await request(state), approved = await local.approve(actor, req), input = publication(approved);
+        let failCommit = true, effects = 0;
+        const crashPool = new Proxy(pool, { get(target, key) {
+          if (key === 'connect') return async () => {
+            const client = await pool.connect();
+            return new Proxy(client, { get(connection, field) {
+              if (field === 'query') return async (...args: any[]) => {
+                const result = await (connection.query as any)(...args);
+                if (failCommit && args[0] === 'COMMIT') { failCommit = false; throw new Error('lost effect-claim response'); }
+                return result;
+              };
+              const value = Reflect.get(connection, field);
+              return typeof value === 'function' ? value.bind(connection) : value;
+            } });
+          };
+          const value = Reflect.get(target, key);
+          return typeof value === 'function' ? value.bind(target) : value;
+        } });
+        const adapter = { action: input.action, target: input.target, environment: input.targetEnvironment, execute: async () => { effects++; throw new Error('must not execute'); } };
+        await assert.rejects(() => createFactoryApprovals(crashPool, authorize, store, [adapter]).publish(actor, input), /lost effect-claim response/);
+        assert.equal((await local.ledger(actor, state.task.id)).publications[0].status, 'uncertain');
+        await rejects(() => createFactoryApprovals(pool, authorize, store, [adapter]).publish(actor, input), 'factoryPublicationUncertain');
+        assert.equal(effects, 0);
+      });
+
       await t.test(
         "missing review/verify and absent gates stay closed",
         async () => {
@@ -318,7 +385,7 @@ test(
         },
       );
       await t.test(
-        "cookie-only HTTP, owner, read receipt, exact candidate/scope and expiry",
+        "cookie-only HTTP, owner, exact candidate/scope and legacy timestamp compatibility",
         async () => {
           const s = await prepare(),
             req = await request(s);
@@ -388,24 +455,12 @@ test(
               }),
             "factoryEvidenceMismatch",
           );
-          await rejects(
-            () =>
-              service.approve(actor, {
-                ...req,
-                expiresAt: new Date(Date.now() - 1000).toISOString(),
-              }),
-            "factoryApprovalExpiry",
-          );
-          await rejects(
-            () =>
-              service.approve(actor, {
-                ...req,
-                expiresAt: new Date(Date.now() + 90000000).toISOString(),
-              }),
-            "factoryApprovalExpiry",
-          );
+          for (const expiresAt of [new Date(Date.now() - 1000).toISOString(), new Date(Date.now() + 90000000).toISOString()]) {
+            const separate = await prepare();
+            assert.ok((await service.approve(actor, await request(separate, { expiresAt }))).approvalId);
+          }
           const result = await handleFactoryApproval(
-            service,
+            local,
             httpReq(s.task.id, {
               method: "POST",
               body: { operation: "approve", input: req },
@@ -555,7 +610,7 @@ test(
         },
       );
       await t.test(
-        "an approval's eventId reused by publish or revoke: publish has no effect, revoke is its own operation",
+        "approval event reuse cannot start an effect; grant revoke is obsolete and task STOP remains authoritative",
         async () => {
           const s = await prepare(),
             req = await request(s),
@@ -573,43 +628,18 @@ test(
             () => local.publish(actor, { ...p, eventId: req.eventId }),
             "factoryReplayMismatch",
           );
-          assert.equal(await publications(), 0);
-          const revoke = {
-            binding: a.binding,
-            eventId: req.eventId,
-            approvalId: a.approvalId,
-          };
-          assert.deepEqual(await service.revoke(actor, revoke), {
-            approvalId: a.approvalId,
-            revoked: true,
-          });
-          const {
-            rows: [approval],
-          } = await pool.query(
-            'SELECT "revokedAt" IS NOT NULL AS revoked FROM factory_approvals WHERE id=$1',
-            [a.approvalId],
-          );
-          assert.equal(approval.revoked, true);
-          const controls = await pool.query(
-            'SELECT 1 FROM factory_approval_controls WHERE "taskId"=$1 AND "eventId"=$2',
-            [s.task.id, req.eventId],
-          );
-          assert.equal(controls.rowCount, 1);
-          // Each table replays its own row: the approve replay sees the revocation, the revoke replays itself.
-          await rejects(
-            () => service.approve(actor, req),
-            "factoryApprovalInvalid",
-          );
-          assert.deepEqual(await service.revoke(actor, revoke), {
-            approvalId: a.approvalId,
-            revoked: true,
-          });
-          await rejects(() => local.publish(actor, p), "factoryApprovalInvalid");
-          assert.equal(await publications(), 0);
+          assert.equal(await publications(), 1);
+          const revoke = { binding: a.binding, eventId: req.eventId, approvalId: a.approvalId };
+          await rejects(() => service.revoke(actor, revoke), 'factoryPublicationAlreadyClaimed');
+          assert.equal((await service.approve(actor, req)).approvalId, a.approvalId);
+          const stopped = await store.apply(actor.userId, a.binding, randomUUID(), { action: 'cancel', reason: 'Stop the task' });
+          assert.equal(stopped.task.status, 'cancelled');
+          await rejects(() => local.publish(actor, p), 'factoryStopped');
+          assert.equal(await publications(), 1);
         },
       );
       await t.test(
-        "no approval, wrong action/target, expiration, revocation and session sign-out cause no effect",
+        "missing approval, changed action/target/evidence, current session and task STOP remain enforced",
         async () => {
           const s = await prepare(),
             req = await request(s),
@@ -702,14 +732,7 @@ test(
             "UPDATE factory_approvals SET \"expiresAt\"=now()-interval '1 second' WHERE id=$1",
             [a.approvalId],
           );
-          await rejects(
-            () => local.publish(actor, p),
-            "factoryApprovalInvalid",
-          );
-          await rejects(
-            () => service.approve(actor, req),
-            "factoryApprovalInvalid",
-          );
+          assert.equal((await service.approve(actor, req)).approvalId, a.approvalId);
           await pool.query(
             "UPDATE factory_approvals SET \"expiresAt\"=now()+interval '1 hour' WHERE id=$1",
             [a.approvalId],
@@ -723,28 +746,10 @@ test(
             'UPDATE "session" SET "expiresAt"=now()+interval \'1 hour\' WHERE id=$1',
             [actor.sessionId],
           );
-          await service.revoke(actor, {
-            binding: a.binding,
-            eventId: randomUUID(),
-            approvalId: a.approvalId,
-          });
-          await rejects(
-            () => local.publish(actor, p),
-            "factoryApprovalInvalid",
-          );
-          assert.equal(
-            (
-              await pool.query(
-                'SELECT count(*) FROM factory_publications WHERE "taskId"=$1',
-                [s.task.id],
-              )
-            ).rows[0].count,
-            "0",
-          );
-          await assert.rejects(
-            () => readdir(targetDirectory),
-            (e: unknown) => (e as NodeJS.ErrnoException).code === "ENOENT",
-          );
+          await rejects(() => service.revoke(actor, { binding: a.binding, eventId: randomUUID(), approvalId: a.approvalId }), 'factoryPublicationAlreadyClaimed');
+          await store.apply(actor.userId, a.binding, randomUUID(), { action: 'cancel', reason: 'Stop publication' });
+          await rejects(() => local.publish(actor, p), 'factoryStopped');
+          assert.equal((await pool.query('SELECT count(*)::int n FROM factory_publications WHERE "taskId"=$1', [s.task.id])).rows[0].n, 1);
         },
       );
       await t.test(
@@ -774,7 +779,7 @@ test(
           await rejects(() => local.publish(actor, p), "factoryStale");
           await rejects(
             () => local.publish(actor, { ...p, binding: binding(failed.task) }),
-            "factoryApprovalInvalid",
+            "factoryStale",
           );
           await store.apply(actor.userId, binding(failed.task), randomUUID(), {
             action: "revoke",
@@ -793,7 +798,7 @@ test(
                 ...publication(otherApproval),
                 binding: {
                   ...otherApproval.binding,
-                  candidateId: randomUUID(),
+                  revision: otherApproval.binding.revision + 1,
                 },
               }),
             "factoryStale",
@@ -839,6 +844,7 @@ test(
             approvalReq = await request(s),
             a = await service.approve(actor, approvalReq),
             p = publication(a);
+          const priorFiles = (await readdir(targetDirectory)).length;
           const all = await Promise.allSettled(
             Array.from({ length: 10 }, () => local.publish(actor, p)),
           );
@@ -851,7 +857,7 @@ test(
             ).size,
             1,
           );
-          assert.equal((await readdir(targetDirectory)).length, 1);
+          assert.equal((await readdir(targetDirectory)).length, priorFiles + 1);
           assert.equal(
             (await store.read(actor.userId, s.task.id)).task.status,
             "passed",
@@ -909,9 +915,9 @@ test(
           );
           await rejects(
             () => local.publish(actor, { ...p, approvalId: randomUUID() }),
-            "factoryReplayMismatch",
+            "factoryStale",
           );
-          assert.equal((await readdir(targetDirectory)).length, 1);
+          assert.equal((await readdir(targetDirectory)).length, priorFiles + 1);
           sources.push({
             taskId: s.task.id,
             candidateId: s.task.candidateId,
@@ -1050,7 +1056,7 @@ test(
             );
             await rejects(
               () => recovered.publish(actor, p),
-              "factoryPublicationAlreadyClaimed",
+              "factoryPublicationUncertain",
             );
             assert.equal(calls, 1);
             assert.equal(
@@ -1109,7 +1115,7 @@ test(
           );
           await rejects(
             () => effect.publish(actor, p),
-            "factoryPublicationAlreadyClaimed",
+            "factoryPublicationUncertain",
           );
           assert.equal((await readdir(uncertainPath)).length, 1);
         },
@@ -1200,10 +1206,10 @@ test(
                   operation.status,
                   window === "queued" ? "reserved" : "uncertain",
                 );
-                assert.deepEqual(operation.request, p);
+                assert.deepEqual({ ...operation.request, eventId: p.eventId }, p);
                 await rejects(
                   () => provider.publish(actor, p),
-                  "factoryPublicationAlreadyClaimed",
+                  window === "queued" ? "factoryPublicationPending" : "factoryPublicationUncertain",
                 );
                 await rejects(
                   () =>
@@ -1277,7 +1283,7 @@ test(
               }
             });
           await t.test(
-            "approval/session expiration during provider preflight prevents POST",
+            "legacy expiry cannot interrupt approved publication; current session expiry still blocks POST",
             async () => {
               const f = await vercelProtocolFixture();
               try {
@@ -1290,6 +1296,7 @@ test(
                   ]);
                 f.state.projectDelayMs = 1000;
                 for (const field of ["approval", "session"]) {
+                  const before = f.posts();
                   const s = await prepare(
                     "approval",
                     `device:${randomUUID()}`,
@@ -1314,13 +1321,13 @@ test(
                       [actor.sessionId],
                     );
                   try {
-                    await rejects(
-                      () => provider.publish(actor, p),
-                      field === "approval"
-                        ? "factoryApprovalInvalid"
-                        : "factoryHumanRequired",
-                    );
-                    assert.equal(f.posts(), 0);
+                    if (field === 'approval') {
+                      assert.ok(await provider.publish(actor, p));
+                      assert.equal(f.posts(), before + 1);
+                    } else {
+                      await rejects(() => provider.publish(actor, p), 'factoryHumanRequired');
+                      assert.equal(f.posts(), before);
+                    }
                   } finally {
                     await pool.query(
                       'UPDATE "session" SET "expiresAt"=now()+interval \'1 hour\' WHERE id=$1',
@@ -1334,7 +1341,7 @@ test(
             },
           );
           await t.test(
-            "revoked/stale grants cannot inspect or complete an operation; an expired one still reconciles",
+            "task STOP and stale revision block reconciliation; legacy expiry does not hide the provider result",
             async () => {
               const f = await vercelProtocolFixture();
               try {
@@ -1384,12 +1391,14 @@ test(
                     assert.equal(f.posts(), 1);
                     continue;
                   }
-                  if (invalid === "revoked")
-                    await provider.revoke(actor, {
+                  if (invalid === "revoked") {
+                    await rejects(() => provider.revoke(actor, {
                       binding: p.binding,
                       eventId: randomUUID(),
                       approvalId: a.approvalId,
-                    });
+                    }), 'factoryPublicationAlreadyClaimed');
+                    await store.apply(actor.userId, p.binding, randomUUID(), { action: 'revoke', reason: 'Stop task' });
+                  }
                   else
                     await pool.query(
                       "UPDATE factory_tasks SET revision=revision+1 WHERE id=$1",
@@ -1400,7 +1409,7 @@ test(
                       provider.reconcile(actor, { ...p, publicationId: id }),
                     invalid === "stale"
                       ? "factoryStale"
-                      : "factoryApprovalInvalid",
+                      : "factoryStopped",
                   );
                   assert.equal(f.requests.length, before);
                   assert.equal(f.posts(), invalid === "revoked" ? 2 : 3);
@@ -1584,7 +1593,8 @@ test(
               body: JSON.stringify({
                 operation: "publish",
                 input: {
-                  ...approval,
+                  approvalId: approval.approvalId,
+                  binding: approval.binding,
                   action: input.action,
                   target: input.target,
                   targetEnvironment: input.targetEnvironment,

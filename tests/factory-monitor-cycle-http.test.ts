@@ -8,7 +8,7 @@ import { createFactoryStore, type FactoryTask } from "../lib/factory/store";
 import type { FactoryStage } from "../lib/factory/contract";
 
 test(
-  "real isolated HTTP: passed monitor retry, replay, owner/candidate/stop/access boundaries",
+  "real isolated HTTP: passed monitor retry, replay, owner/revision/stop/access boundaries",
   {
     skip: process.env.FACTORY_CYCLE_LOCAL_HTTP !== "1",
     timeout: 120000,
@@ -178,10 +178,15 @@ test(
         (
           await owner(path(task), "POST", {
             ...request,
-            binding: { ...request.binding, candidateId: randomUUID() },
+            binding: { ...request.binding, revision: request.binding.revision + 1 },
           })
         ).status,
         409,
+      );
+      assert.equal(
+        (await pool.query('SELECT revision FROM factory_tasks WHERE id=$1', [task.id])).rows[0].revision,
+        task.revision,
+        "a mismatched revision must leave the task unchanged",
       );
       const next = await owner(path(task), "POST", request);
       assert.equal(next.status, 200);

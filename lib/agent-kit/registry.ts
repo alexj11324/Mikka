@@ -1,3 +1,5 @@
+import { PERSONAL_MCP_TOOLS } from '@/lib/plugins/contracts'
+
 /** Registered capabilities, not grants. Every implementation retains its own host authorization. */
 export const COMPUTER_TOOL_IDS = [
   'list_computer_workspaces', 'create_computer_bot', 'list_computer_bots', 'wake_bot_computer',
@@ -32,7 +34,12 @@ export const FACTORY_TOOL_IDS = [
   'get_skill_improvement_factory',
 ] as const
 
+export const SCHEDULE_TOOL_IDS = ['schedule_create', 'schedule_list', 'schedule_history', 'schedule_update', 'schedule_pause', 'schedule_resume', 'schedule_cancel'] as const
+
 export const AGENT_TOOL_IDS = [
+  ...PERSONAL_MCP_TOOLS,
+  'list_drive_files',
+  ...SCHEDULE_TOOL_IDS,
   'search_notion_pages', 'read_notion_page_blocks', 'search_slack_messages', 'read_slack_thread',
   'search_gmail', 'read_gmail_message', 'list_calendar_events', 'get_calendar_event', 'send_email',
   'create_calendar_event', 'update_calendar_event', 'web_search', 'list_issues', 'get_issue', 'create_issue', 'update_issue',

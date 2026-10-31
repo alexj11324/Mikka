@@ -63,7 +63,7 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
   await expect(switcher).toContainText('回归测试成员的工作区')
 })
 
-test('注册、创建任务、菜单、搜索、视图切换和退出登录', async ({ page }) => {
+test('注册、创建任务、菜单、搜索、视图切换和退出登录', { tag: ['@smoke', '@turnstile'] }, async ({ page }) => {
   const account = await register(page)
   await expect(page.getByRole('button', { name: /^Coordinator/ })).toHaveAttribute('aria-current', 'page')
   await rail(page, '看板').click()

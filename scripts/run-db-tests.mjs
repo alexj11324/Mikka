@@ -10,6 +10,12 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
+  { marker: 'lib/schedules/store.ts', file: 'lib/schedules/store.db.test.ts', script: 'test:schedules-db' },
+  { marker: 'lib/run-leases.ts', file: 'tests/run-recovery.db.test.ts', script: 'test:run-recovery-db' },
+  { marker: 'app/v1/runs/[runId]/checkpoint/route.ts', file: 'tests/checkpoint-recovery.db.test.ts', script: 'test:run-recovery-db' },
+  { marker: 'lib/mcp/worker.ts', file: 'lib/mcp/worker-authorization.db.test.ts', script: 'test:worker-authorization-db' },
+  { marker: 'lib/device-revocation.ts', file: 'lib/device-revocation.db.test.ts', script: 'test:device-revocation-db' },
   { marker:'lib/abuse/store.ts',file:'lib/abuse/store.db.test.ts',script:'test:abuse-db' },
   { marker: 'lib/onboarding.ts', file: 'lib/onboarding.db.test.ts', script: 'test:onboarding-db' },
   { marker: 'lib/device-enrollment.ts', file: 'lib/device-enrollment.db.test.ts', script: 'test:device-enrollment-db' },

@@ -28,7 +28,7 @@ const database = {
   },
   transaction: async (fn: (transaction: typeof tx) => Promise<unknown>) => fn(tx),
 }
-mock.module(new URL('./db/index.ts', import.meta.url).href, { exports: { db: database } })
+mock.module(new URL('./db/index.ts', import.meta.url).href, { exports: { db: database, pool: { query: () => { throw Error('Unexpected raw database query in per-owner retry fixture') } } } })
 mock.module(new URL('./coordinator-event-store.ts', import.meta.url).href, { exports: {
   recordCoordinatorEvent: async (_tx: unknown, event: { botId?: string | null }) => { events.push(event) },
 } })

@@ -8,6 +8,8 @@ let user: { id: string } | null = { id: 'admin' }
 let denied = false
 let webhookError: Error | null = null
 let webhookCalls = 0
+let cardSetupCalls = 0
+let cardCheckoutCalls = 0
 const workspaceId = '11111111-1111-4111-8111-111111111111'
 const secret = 'synthetic-stripe-webhook-secret'
 const calls: unknown[][] = []
@@ -27,6 +29,7 @@ before(async () => {
     if (webhookError) throw webhookError
   } } })
   mock.module('@/lib/billing/stripe', { namedExports: { stripeConfig: () => ({ webhookSecret: secret }), verifyStripeSignature } })
+  mock.module('@/lib/abuse/card', { namedExports: { applyCardSetup: async () => { cardSetupCalls++ }, applyCardCheckout: async () => { cardCheckoutCalls++ } } })
   auditRoute = await import('../app/api/workspaces/[workspaceId]/audit-log/route')
   stripeRoute = await import('../app/api/billing/stripe/route')
 })
@@ -70,4 +73,21 @@ test('Stripe webhook verifies raw-body signatures before applying an event and l
   webhookError = new Error('isolated database failure')
   await assert.rejects(stripeRoute.POST(request(body)), /isolated database failure/)
   webhookError = null
+})
+
+test('signed setup Checkout events and legacy SetupIntents reach verification; invalid signatures do not', async () => {
+  cardSetupCalls = 0
+  cardCheckoutCalls = 0
+  const request = (type: string, object: unknown, valid = true) => {
+    const body = JSON.stringify({ id: 'evt_card_fixture', type, data: { object } })
+    const timestamp = Math.floor(Date.now() / 1000)
+    const digest = createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex')
+    return new Request('https://mikka.example/api/billing/stripe', { method: 'POST', body, headers: { 'stripe-signature': `t=${timestamp},v1=${valid ? digest : '0'.repeat(64)}` } })
+  }
+  assert.equal((await stripeRoute.POST(request('checkout.session.completed', { mode: 'setup' }, false))).status, 400)
+  assert.equal(cardCheckoutCalls, 0)
+  assert.equal((await stripeRoute.POST(request('checkout.session.completed', { mode: 'setup' }))).status, 200)
+  assert.equal(cardCheckoutCalls, 1)
+  assert.equal((await stripeRoute.POST(request('setup_intent.succeeded', {}))).status, 200)
+  assert.equal(cardSetupCalls, 1)
 })

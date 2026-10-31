@@ -3,7 +3,7 @@
 import { closeSync, existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
-import { spawn } from "node:child_process"
+import { execFileSync, spawn } from "node:child_process"
 
 const args = process.argv.slice(2)
 const flag = (key) => {
@@ -69,6 +69,7 @@ lines.on("line", async (line) => {
     if (answer.result?.isError) process.exit(2)
   }
   if(text==='PROBE_GIT') {
+    if (process.env.GH_REPO && !execFileSync('gh', ['--version'], { encoding: 'utf8' }).startsWith('gh version')) process.exit(2)
     const target=lstatSync('.git').isFile()?'.git':'.git/guard'
     try{writeFileSync(target,'synthetic metadata mutation');process.exit(2)}catch(error){if(!['EROFS','EBUSY','EACCES'].includes(error.code))process.exit(2)}
   }

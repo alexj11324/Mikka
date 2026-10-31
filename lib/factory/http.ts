@@ -1,6 +1,6 @@
 import { maskFactoryNote } from "./note-mask";
 import { z } from "zod";
-import { bindingSchema, FactoryError } from "./contract";
+import { revisionBindingSchema, FactoryError } from "./contract";
 import type { createFactoryStore } from "./store";
 
 export type FactoryStore = ReturnType<typeof createFactoryStore>;
@@ -14,7 +14,7 @@ export interface FactoryRequest {
 }
 const controlSchema = z
   .object({
-    binding: bindingSchema,
+    binding: revisionBindingSchema,
     eventId: z.uuid(),
     action: z.enum(["cancel", "revoke", "retry", "repair"]),
     reason: z.string().trim().min(1).max(4000),

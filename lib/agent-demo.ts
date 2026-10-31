@@ -82,6 +82,24 @@ computer = ComputerCard("demo-done", "${DEMO_RUN}", "打开 #66 的预览部署�
   },
   {
     id: 'ui', title: 'shadcn、REUI 与数据图表', description: '折叠面板、标签页、表格、进度条和 OpenUI 数据图表，均使用固定演示数据。',
-    response: `root = Stack([ShadcnCard("交付检查（演示）", [ShadcnBadge("待评审", "secondary"), ShadcnAlert("仅供预览", "这些内容不代表真实任务状态。"), ShadcnProgress("示例进度", 60), ShadcnTable(["项目", "数量"], [["已完成", "3"], ["待完成", "2"]]), ShadcnButton("继续细化", "演示：继续完善交付检查", "outline")], "shadcn 本地组件"), ShadcnTabs([{title:"概览", children:[${content('标签页内同样支持 **Markdown**。')}]}, {title:"说明", children:[${content('这是第二个标签页，可自由切换。')}]}]), ShadcnAccordion([{title:"这些数据来自模型吗？", content:"不是，演示使用预设样例。"}, {title:"会保存演示操作吗？", content:"不会，退出或重播即可重置演示。"}], true), ReuiFrame("REUI 示例", [ReuiBadge("示例标签", "info-light"), ReuiAlert("本地反馈", "此面板仅展示组件样式。", "info")], "与工作区共享主题"), BarChart(["需求", "设计", "检查"], [Series("示例完成数", [3, 2, 1])], "grouped", "阶段", "数量", 240)])`,
+    response: `root = Stack([ShadcnCard("交付检查（演示）", [ShadcnBadge("待评审", "secondary"), ShadcnAlert("仅供预览", "这些内容不代表真实任务状态。"), ShadcnProgress("示例进度", 60), ShadcnTable(["项目", "数量"], [["已完成", "3"], ["待完成", "2"]]), ShadcnButton("继续细化", "演示：继续完善交付检查", "outline")], "shadcn 本地组件"), ShadcnTabs([{title:"概览", children:[${content('标签页内同样支持 **Markdown**。')}]}, {title:"说明", children:[${content('这是第二个标签页，可自由切换。')}]}]), ShadcnAccordion([{title:"这些数据来自模型吗？", content:"不是，演示使用预设样例。"}, {title:"会保存演示操作吗？", content:"不会，退出或重播即可重置演示。"}], true), ReuiFrame("REUI 示例", [ReuiBadge("示例标签", "info-light"), ReuiAlert("本地反馈", "此面板仅展示组件样式。", "info")], "与工作区共享主题"))])`,
+  },
+  {
+    id: 'report', title: 'beUI 报告与图表', description: '提示、可排序表格、柱状图、折线图、时间线、折叠区、标签页、文件树、来源与建议修改，均使用固定演示数据。',
+    response: `root = Stack([alert, stats, table, bars, trend, stack, share, divider, timeline, more, tabs, tree, sources, diff])
+alert = BeAlert("示例数据", "以下数字均为演示数据，不代表真实项目。", "info")
+stats = BeCardGrid([BeStat("本周完成", 12, "项"), BeStat("平均耗时", 3.4, "天", 1)])
+table = BeTable(["阶段", "完成", "负责人"], [["需求", 5, "Alex"], ["设计", 3, "Sam"], ["检查", 4, "Lee"]])
+bars = BarChart(["需求", "设计", "检查"], [{name: "本周", values: [5, 3, 4]}, {name: "上周", values: [4, 4, 2]}], false, "项")
+trend = LineChart(["周一", "周二", "周三", "周四", "周五"], [{name: "完成数", values: [1, 3, 2, 4, 2]}], "项")
+stack = AreaChart(["周一", "周二", "周三", "周四", "周五"], [{name: "完成", values: [1, 3, 2, 4, 2]}, {name: "新增", values: [2, 1, 3, 1, 2]}], "项")
+share = DonutChart([{name: "需求", value: 5}, {name: "设计", value: 3}, {name: "检查", value: 4}], "项", "合计")
+divider = Separator()
+timeline = BeTimeline([{date: "2026-11-02", title: "需求确认", description: "整理范围与验收标准。"}, {date: "2026-11-09", title: "设计评审", meta: "建议日期"}, {date: "2026-11-16", title: "交付检查"}])
+more = BeCollapsible("补充说明", [TextContent("折叠区只放补充内容。")])
+tabs = BeTabs([{title: "概览", children: [TextContent("第一页")]}, {title: "细节", children: [TextContent("第二页")]}])
+tree = BeFileTree(["app/page.tsx", "app/layout.tsx", "lib/report.ts"])
+sources = BeCitations([{title: "OpenUI 文档", url: "https://www.openui.com/docs"}])
+diff = BeFileDiff("lib/report.ts", "-const title = '旧标题'\\n+const title = '周报'", "tsx")`,
   },
 ] as const

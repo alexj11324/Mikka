@@ -87,6 +87,38 @@ async function noSession(path, init = {}) {
 }
 const post = messageId => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messageId }) })
 
+acceptance('personal plugin APIs keep MCP and skill settings private across real authenticated sessions', async () => {
+  const scope = await acquire('personal-plugins')
+  const json = (method, body) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  let serverId
+  try {
+    for (const path of ['/api/integrations/mcp', '/api/skills', '/api/integrations/composio/catalog']) {
+      assert.equal((await noSession(path)).status, 401)
+      const response = await scope.owner.request(path)
+      assert.equal(response.status, 200)
+      assert.equal(response.headers.get('cache-control'), 'private, no-store')
+    }
+    const created = await scope.owner.request('/api/integrations/mcp', json('POST', { name: 'Private fixture', url: 'https://mcp.acme.dev/rpc', transport: 'http' }))
+    assert.equal(created.status, 201)
+    serverId = (await created.json()).server.id
+    assert.equal((await (await scope.owner.request('/api/integrations/mcp')).json()).count, 1)
+    assert.equal((await (await scope.peer.request('/api/integrations/mcp')).json()).count, 0)
+    assert.equal((await scope.peer.request('/api/integrations/mcp', json('PATCH', { id: serverId, enabled: false }))).status, 404)
+    assert.equal((await scope.peer.request('/api/integrations/mcp', json('DELETE', { id: serverId }))).status, 404)
+    const updated = await scope.owner.request('/api/integrations/mcp', json('PATCH', { id: serverId, name: 'Renamed', enabled: false }))
+    assert.equal(updated.status, 200)
+    assert.equal((await updated.json()).server.enabled, false)
+    assert.equal((await scope.owner.request('/api/skills', json('POST', { source: '../invalid', slug: 'fixture' }))).status, 400)
+    assert.equal((await scope.owner.request('/api/skills', json('PATCH', { id: randomUUID(), enabled: false }))).status, 404)
+    assert.equal((await scope.owner.request('/api/integrations/mcp', json('DELETE', { id: serverId }))).status, 200)
+    serverId = undefined
+    assert.equal((await (await scope.owner.request('/api/integrations/mcp')).json()).count, 0)
+  } finally {
+    if (serverId) await scope.owner.request('/api/integrations/mcp', json('DELETE', { id: serverId })).catch(() => {})
+    await release(scope)
+  }
+})
+
 async function authenticationSnapshot() {
   const result = {}
   for (const name of ['user', 'account', 'session']) {
