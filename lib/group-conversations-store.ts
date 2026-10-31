@@ -139,9 +139,28 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const { rows } = await q('SELECT * FROM conversation_messages WHERE "conversationId"=$1 AND ($2::bigint IS NULL OR position < $2) ORDER BY position DESC LIMIT $3', [req.id, before, limit + 1])
         const more = rows.length > limit
         const messages = rows.slice(0, limit)
+        // Read existing links only; this is not the private-exchange producer.
+        // Links share their source message's page/cursor. They add no message
+        // position or unread event, and never expose the private DM transcript.
+        const links = messages.length ? await q(`SELECT l.id AS "linkId",l."linkedConversationId",l."anchorPosition"::text,l."messageCount"::text AS count
+          FROM conversation_links l JOIN conversations dm ON dm.id=l."linkedConversationId"
+          WHERE l."sourceConversationId"=$1 AND l."anchorPosition"=ANY($2::bigint[])
+            AND dm.kind='agent_dm' AND dm."workspaceId"=$4 AND dm."createdBy"=$3
+          ORDER BY l."anchorPosition" DESC,l.id`, [group.id, messages.map(m => m.position), group.createdBy, group.workspaceId]) : { rows: [] }
+        const exchanges: { type: 'agent_exchange'; linkId: string; anchorPosition: string; count: string; participants: { id: string; name: string; harness: string; avatarUrl: null }[] }[] = []
+        for (const link of links.rows) {
+          const { rows: participants } = await q(`SELECT a.id,a.name,a.harness,NULL AS "avatarUrl"
+            FROM conversation_members cm JOIN agents a ON a.id::text=cm."memberId" AND a."userId"=$2
+            WHERE cm."conversationId"=$1 AND cm."memberType"='agent' AND cm."leftAt" IS NULL ORDER BY cm."memberId"`, [link.linkedConversationId, group.createdBy])
+          if (participants.length === 2) exchanges.push({ type: 'agent_exchange', linkId: link.linkId, anchorPosition: link.anchorPosition, count: link.count, participants })
+        }
+        const timeline = messages.flatMap(m => [
+          { type: 'message', ...m },
+          ...exchanges.filter(link => link.anchorPosition === m.position),
+        ])
         const active = queueAgents ? await q(`SELECT "agentId",status,"updatedAt" FROM group_turns WHERE "conversationId"=$1 AND status IN ('queued','running') ORDER BY "createdAt" LIMIT 1`, [req.id]) : { rows: [] }
         const failed = queueAgents ? await q(`SELECT error FROM group_turns WHERE "conversationId"=$1 ORDER BY "createdAt" DESC,"messageId" DESC LIMIT 1`, [req.id]) : { rows: [] }
-        result = { messages, nextBefore: more ? messages.at(-1)?.position : null, agentStatus: active.rows[0] ?? null,
+        result = { messages, timeline, nextBefore: more ? messages.at(-1)?.position : null, agentStatus: active.rows[0] ?? null,
           ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, routingError: ['group_judgment_pending','group_lead_required'].includes(failed.rows[0]?.error) ? { code: 'group_judgment_pending' } : null } : {}) }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)

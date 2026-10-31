@@ -101,3 +101,45 @@ Remaining #110 work is explicit: real exchange creation/contiguous aggregation,
 timeline `agent_exchange` projection and its pagination/unread behavior, actual
 Bot/avatar binding and frontend read-only presentation with full system
 acceptance. The bounded read API alone does not complete #110 or parent #105.
+
+## #110 existing-link timeline projection (night follow-up)
+
+Baseline `59ae2c2f`, with both issue bodies and empty comment lists rechecked on
+2026-10-31. An existing authorized link was readable by its dedicated API but
+absent from group history: occurrence 10 × impact 3 = 30. Group history now
+returns an additive `timeline` alongside the unchanged `messages` and
+`nextBefore`. Each source message has `type: 'message'`; its existing links
+follow it as `{ type: 'agent_exchange', linkId, anchorPosition, count,
+participants }`. Positions and counts remain exact decimal strings. A link
+travels with its source message's page, so an exclusive source cursor cannot
+repeat it on the next page. Markers allocate no message position and do not
+affect persisted reads, unread counts or last-message previews.
+
+Projection reuses the source group's current member/workspace/PAT checks and
+includes only same-workspace, same-creator `agent_dm` links with exactly two
+current creator-owned agent participants. It returns public sender metadata,
+never DM bodies, instructions or the private conversation ID. The existing
+link API remains the only bounded-message view; raw DM history stays denied.
+
+The exported-route/real PG17 test passes 7/7 with zero skips against this
+agent's retained isolated `scope184_ca4f5c0154df48d6ba451ba6882b1103_e2e` database
+on loopback port 55599, with three matching database URLs. It checks the
+one-message boundary page, following page, marker shape, foreign/kind-denied
+links, read/unread stability and current caller authorization. Next's real
+request/after context is drained; only session lookup is an identity fixture.
+Log: `/tmp/mikka-group110-night-timeline.log`. No model/provider calls,
+application signup/browser acceptance, new database or schema were used.
+`pnpm typecheck`, focused oxlint and `git diff --check` pass. `pnpm test:groups`
+passes its seven source tests; its separate Actions-only migration test stays
+skipped locally, with its isolation guard preserved.
+
+This is **not an exchange producer**. Runtime still has no `agent_dm` creation
+or `conversation_links` writer. `groupRuntime.generate` only creates public
+group replies and mentions; the private mailbox's trusted records identify
+owner/workspace and run/Coordinator/Bot sessions, without a source group,
+anchor message or authorized DM binding. Automatically sharing those messages
+would invent provenance and expose private correspondence. Producer and
+contiguous aggregation therefore remain skipped pending an actual trusted
+group-originated exchange event. The Bot-versus-legacy-Agent identity binding,
+stored avatars and frontend marker/panel also remain outside this patch;
+neither #110 nor parent #105 is complete.
