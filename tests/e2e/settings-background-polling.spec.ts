@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { performance } from 'node:perf_hooks'
+import type { Request } from '@playwright/test'
 import type { PoolClient } from 'pg'
 import { test, expect } from './test-account-fixtures'
 import { app, rail } from './fixtures'
@@ -11,7 +13,7 @@ test('workspace idle reads stay within budget across settings, return and page d
   const originalTitle = `Before settings ${randomUUID()}`
   const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
   const windows: { state: string; durationMs: number; reads: number[]; total: number; budget: { perStreamMin: number; perStreamMax: number; totalMin: number; totalMax: number }; status: 'pass' | 'fail' }[] = []
-  const conditions: { durationMs: number; visibility: string; online: boolean; section: string; virtualElapsedMs: number }[] = []
+  const conditions: { durationMs: number; visibility: string; online: boolean; section: string; virtualElapsedMs: number; wallElapsedMs: number }[] = []
   let completed = false
   await scope.recordResource(issue)
   try {
@@ -28,10 +30,18 @@ test('workspace idle reads stay within budget across settings, return and page d
     await page.waitForLoadState('networkidle')
 
     const actions: string[] = []
+    const inFlight = new Set<Request>()
+    let lastActivity = performance.now()
     page.on('request', request => {
       const action = request.headers()['next-action']
-      if (request.method() === 'POST' && action) actions.push(action)
+      if (request.method() === 'POST' && action) { actions.push(action); inFlight.add(request); lastActivity = performance.now() }
     })
+    const settled = (request: Request) => { if (inFlight.delete(request)) lastActivity = performance.now() }
+    page.on('requestfinished', settled)
+    page.on('requestfailed', settled)
+    async function waitForActionsQuiet(started = performance.now()) {
+      await expect.poll(() => inFlight.size === 0 && performance.now() - Math.max(started, lastActivity) >= 500, { timeout: 15_000, intervals: [50, 100] }).toBe(true)
+    }
     async function advance(durationMs: number) {
       const state = await page.evaluate(() => {
         const url = new URL(window.location.href)
@@ -39,16 +49,19 @@ test('workspace idle reads stay within budget across settings, return and page d
         return { visibility: document.visibilityState, online: navigator.onLine, section }
       })
       const started = await page.evaluate(() => Date.now())
-      const condition = { durationMs, ...state, virtualElapsedMs: 0 }
+      const wallStarted = performance.now()
+      const condition = { durationMs, ...state, virtualElapsedMs: 0, wallElapsedMs: 0 }
       conditions.push(condition)
       expect(state.visibility).toBe('visible')
       expect(state.online).toBe(true)
       for (let elapsed = 0; elapsed < durationMs; elapsed += 5_000) {
+        const stepStarted = performance.now()
         await page.clock.runFor(Math.min(5_000, durationMs - elapsed))
         // SWR schedules its next poll only after the real action completes.
-        await page.waitForLoadState('networkidle')
+        await waitForActionsQuiet(stepStarted)
       }
       condition.virtualElapsedMs = await page.evaluate(() => Date.now()) - started
+      condition.wallElapsedMs = performance.now() - wallStarted
       expect(condition.virtualElapsedMs).toBe(durationMs)
     }
     let pollingActions: string[] = []
@@ -71,7 +84,7 @@ test('workspace idle reads stay within budget across settings, return and page d
     // Artifact has no extra periodic reads: learn the two shared workspace actions here.
     await rail(page, '产物').click()
     await expect(page.getByRole('heading', { level: 1, name: '产物', exact: true })).toBeVisible()
-    await page.waitForLoadState('networkidle')
+    await waitForActionsQuiet()
     await advance(5_000)
     const sharedDiscovery = actions.length
     await advance(60_000)
@@ -82,12 +95,15 @@ test('workspace idle reads stay within budget across settings, return and page d
 
     await rail(page, '看板').click()
     await expect(page.getByText(originalTitle, { exact: true })).toBeVisible()
-    await page.waitForLoadState('networkidle')
+    await waitForActionsQuiet()
 
+    await page.clock.resume()
     await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
     await page.getByRole('menuitem', { name: '设置', exact: true }).click()
     await expect(page.getByRole('group', { name: '界面主题', exact: true })).toBeVisible()
-    await page.waitForLoadState('networkidle')
+    await waitForActionsQuiet()
+    await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1_000)
+    await waitForActionsQuiet()
     const pausedReads = actions.length
     await advance(30_000)
     await page.evaluate(() => {
@@ -108,7 +124,7 @@ test('workspace idle reads stay within budget across settings, return and page d
     await rail(page, '看板').click()
     await expect(page.getByText(freshTitle, { exact: true })).toBeVisible({ timeout: 5_000 })
     await expect.poll(() => new Set(actions.slice(beforeReturn).filter(action => pollingActions.includes(action))).size, { timeout: 5_000 }).toBe(2)
-    await page.waitForLoadState('networkidle')
+    await waitForActionsQuiet()
     checkWindow('return-immediate-refresh', beforeReturn, 0, 1, 1)
     const resumedReads = actions.length
     await advance(60_000)
@@ -117,7 +133,11 @@ test('workspace idle reads stay within budget across settings, return and page d
     // The legacy entry starts with settingsOpen on its first render.
     const beforeLegacy = actions.length
     await page.goto(app('/?settings=account&section=all-issues'))
+    await page.clock.resume()
     await expect(page.getByRole('heading', { level: 1, name: '账户', exact: true })).toBeVisible()
+    await waitForActionsQuiet()
+    await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1_000)
+    await waitForActionsQuiet()
     await advance(30_000)
     await page.evaluate(() => {
       window.dispatchEvent(new Event('focus'))
@@ -129,12 +149,12 @@ test('workspace idle reads stay within budget across settings, return and page d
     await rail(page, '看板').click()
     await expect(page.getByText(freshTitle, { exact: true })).toBeVisible({ timeout: 5_000 })
     await expect.poll(() => new Set(actions.slice(beforeLegacyReturn).filter(action => pollingActions.includes(action))).size, { timeout: 5_000 }).toBe(2)
-    await page.waitForLoadState('networkidle')
+    await waitForActionsQuiet()
     checkWindow('legacy-return-immediate-refresh', beforeLegacyReturn, 0, 1, 1)
 
     await page.goto(app('/sign-in?addAccount=1'))
     await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toHaveCount(0)
-    await page.waitForLoadState('networkidle')
+    await waitForActionsQuiet()
     const awayReads = actions.length
     await advance(30_000)
     checkWindow('left-workspace-document', awayReads, 30_000, 0, 0, 0, 0, boardPollingActions)
