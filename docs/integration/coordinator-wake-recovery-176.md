@@ -53,3 +53,20 @@ after inbox consumption. In particular, it does not claim a live provider's
 exactly-once external write, full original-chat result recovery after model
 failure, or complete #176/#181 fixed-version runtime acceptance. Completion's
 event/token transaction and existing effect-authorization checks are unchanged.
+
+## Subsequent production activation
+
+PR #607 merged at `0fd03d5885128ea000c940ee89f14b6a26130c91` and its matching
+application deployment was verified READY with the tracked migrations applied.
+The existing `mikka-suggestions-cron` Worker was deployed at 2026-10-31
+06:56:50 UTC as version `2ad3aab0-240d-447e-95e9-b1750b959568`. Its single
+`* * * * *` event preserves the existing UTC quarter-hour, hourly and half-hour
+cadences inside the Worker, avoiding the account's trigger-count limit.
+
+The real natural event at 07:07:20 UTC completed with `outcome:ok` and HTTP 200
+from wakes, schedules, run recovery, account deletion, audit maintenance and
+operational observations. Production operational rows were independently read
+back at 07:06:22 and 07:07:20 UTC. This supersedes the earlier rollout status;
+it proves delivery to the production handlers, not model consumption or a
+provider business effect. No manual production tick was used as substitute
+evidence. See the [deployment evidence on #176](https://github.com/alexj11324/Mikka/issues/176#issuecomment-6540437534).
