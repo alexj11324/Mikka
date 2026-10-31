@@ -2218,7 +2218,9 @@
           "limits_changed": "changed usage limits"
         },
         "audit": {
-          "exported": "exported audit log"
+          "exported": "exported audit log",
+          "retention_changed": "changed audit retention",
+          "retention_applied": "applied audit retention"
         }
       },
       "roles": {

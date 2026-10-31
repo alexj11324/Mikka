@@ -139,3 +139,31 @@ settings request/receipt status integration and fresh reauthentication policy,
 complete portable export coverage (files/harness checkpoints), real BYOS/cloud
 cleanup evidence, verified historical object inventory/lifecycle, current
 manifest backup drill, and the explicit retention/hold/backup policy above.
+
+## Explicit audit retention and hold (#210)
+
+`workspace_audit_retention` lives beside the main audit sink, so each explicit
+admin policy change and its audit record commit together. No row or NULL days
+means retain. `legalHold` blocks cleanup. The backend API accepts only a human
+session, a current active workspace admin, same-origin mutation and explicit
+`{retentionDays: integer|null, legalHold: boolean}`; it never infers a period
+from a product default or invents a legal policy. The numeric bound is a storage
+validation bound, not a recommended legal retention period.
+
+The existing cron workload can call `/api/cron/audit-retention`. It applies only
+explicit non-held policies. Event deletion and its exact-count audit record
+share one transaction; an audit failure rolls deletion back. A workspace lock
+serializes export publication with cleanup, and any unexpired export receipt
+postpones cleanup so resumable snapshots retain their promised data window.
+Receipt digests/anchors are retained separately; their own destruction and any
+legal retention mandate still require an explicit policy.
+
+PG17 tests cover default retain, member/other-tenant denial, hold, policy rollback
+on failed audit, scoped expiry/count, live-export delay, deletion rollback on
+failed audit, and restoring NULL retention. Only disposable fixture history was
+deleted. No production retention policy was selected or changed. Endpoint tests
+are route fixtures; fixed-revision Mikka HTTP acceptance and the existing design
+owner's policy/hold controls remain required. Cross-database member/permission
+writes still use log-only `recordAuditSafe`; its durable event delivery and the
+full event catalogue/failure paths remain concrete #210 gaps, so this component
+work alone does not justify closing #210.

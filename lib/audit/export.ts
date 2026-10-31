@@ -37,6 +37,7 @@ export async function createAuditExport(actorId: string, workspaceId: string, fi
   const ws = await database.workspace.connect(), app = await database.main.connect()
   try {
     await ws.query('BEGIN')
+    await ws.query('SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))', [`mikka-audit-retention:${workspaceId}`])
     const actor = await admin(ws, actorId, workspaceId)
     await app.query('BEGIN ISOLATION LEVEL REPEATABLE READ')
     const from = new Date(now.getTime() - AUDIT_WINDOW_DAYS * 86_400_000)
