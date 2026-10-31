@@ -71,6 +71,7 @@ it("checks real SHA, blocks dirty/head replacement, and produces actual command/
   const daemon = await new Daemon({
     dataDir,
     flavor: "dev",
+    agentSandbox: null,
     link: server.link(),
     credential: "fixture-credential",
     harnesses: [{ harness: "mock", installed: true, version: "fixture" }],

@@ -12,6 +12,8 @@
   belongs to」, and 「work with no workspace of its own bills the personal
   workspace」. Its personal workspace, `kind`, settings nav and moved
   settings stand.
+- Where this and [orchestration](../orchestration.md) differ, orchestration
+  wins ([2026-10-31-2300-orchestration-spec](2026-10-31-2300-orchestration-spec.md)).
 
 1. **The workspace where the work happens pays.** Every run, triage, memory
    extraction and cloud machine belongs to one workspace and is charged
