@@ -2,6 +2,7 @@ import "server-only";
 import { pool } from "./db";
 import { ExecutionSettings, executionWorkspace } from "./execution-settings";
 import { SubscriptionRefusal } from "@mikka/protocol/subscription";
+import { COORDINATOR_MODEL } from "./coordinator/model";
 import {
   freezeHostedModelSelection,
   type HostedModelDependencies,
@@ -23,7 +24,11 @@ export async function freezeBotModel(
   const binding = selected
     ? await settings.botBinding(settingsScope, selected)
     : available[0];
-  if (!binding) throw new SubscriptionRefusal("binding_required");
+  if (!binding) {
+    if (scope.botId === null && !selected)
+      return { harness: "ai_sdk", model: COORDINATOR_MODEL };
+    throw new SubscriptionRefusal("binding_required");
+  }
   return freezeHostedModelSelection(
     { ...scope, workspaceId },
     { harness: "ai_sdk", model: null },
