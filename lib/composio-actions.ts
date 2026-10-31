@@ -205,6 +205,7 @@ export async function executeComposioAction(
   if (!parsed) return { error: 'invalidIntegrationInput' }
   if (!client) return { error: 'composioNotConfigured' }
 
+  let dispatched = false
   try {
     const { accountId, accounts } = await resolveComposioAccount(userId, action.toolkit, client, chosenDefault, boundAccountId)
     if (!accountId) return accounts.length > 0
@@ -214,6 +215,7 @@ export async function executeComposioAction(
     const schema = await client.tools.getRawComposioToolBySlug(action.slug)
     if (!schema.version || schema.version === 'latest') return { error: 'integrationActionVersionUnavailable' }
 
+    dispatched = true
     const result = await client.tools.execute(action.slug, {
       userId,
       connectedAccountId: accountId,
@@ -222,13 +224,15 @@ export async function executeComposioAction(
     })
     return result.successful
       ? { data: result.data, accountId, ...(result.logId ? { logId: result.logId } : {}) }
-      : { error: result.error ?? 'integrationActionFailed', ...(result.logId ? { logId: result.logId } : {}) }
+      : { error: isApprovalAction(actionName) ? 'operationUncertain' : result.error ?? 'integrationActionFailed', ...(result.logId ? { logId: result.logId } : {}) }
   } catch (error) {
     console.error('Composio action failed', {
       action: action.slug,
       error: error instanceof Error ? error.name : 'unknown',
     })
-    return { error: 'integrationActionFailed' }
+    // A transport/provider error after dispatch cannot prove that an external
+    // write did not happen. Keep its proposal consumed; never invite a resend.
+    return { error: dispatched && isApprovalAction(actionName) ? 'operationUncertain' : 'integrationActionFailed' }
   }
 }
 
