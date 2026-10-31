@@ -20,6 +20,9 @@ type Issue = Awaited<ReturnType<typeof listIssues>>[number]
  * as "#71 Infisical 连接超时排查", else the first line of what it was asked.
  * Never the bot's name.
  */
+/** Two-line row (name, then a muted line) shared by the thread and PR lists in the right panel. */
+export const TWO_LINE_ROW = 'flex h-auto w-full flex-col items-stretch justify-start gap-0.5 rounded-lg px-2 py-1.5 text-left font-normal whitespace-normal'
+
 export function threadName(thread: Thread, issues: Issue[], fallback: string) {
   const issue = thread.issueId ? issues.find(item => item.id === thread.issueId) : undefined
   if (issue) return `${issueIdentifier(issue)} ${issue.title}`
@@ -53,11 +56,10 @@ function ThreadRow({ thread, issues, bots, all, now, onOpenIssue }: { thread: Th
     </span>
     {thread.lastReply && <span className={cn('block w-full truncate text-xs text-muted-foreground', all && 'pl-6')}>{thread.lastReply}</span>}
   </>
-  const row = 'flex h-auto w-full flex-col items-stretch justify-start gap-0.5 rounded-lg px-2 py-1.5 text-left font-normal whitespace-normal'
   return <li>
     {thread.issueId
-      ? <Button variant="ghost" className={row} aria-label={name} onClick={() => onOpenIssue(thread.issueId!)}>{body}</Button>
-      : <div className={row}>{body}</div>}
+      ? <Button variant="ghost" className={TWO_LINE_ROW} aria-label={name} onClick={() => onOpenIssue(thread.issueId!)}>{body}</Button>
+      : <div className={TWO_LINE_ROW}>{body}</div>}
   </li>
 }
 
