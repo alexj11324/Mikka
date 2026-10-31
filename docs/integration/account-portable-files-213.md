@@ -14,6 +14,23 @@ gzip patch. It does not select native authentication/session caches or
 platform credential records. User-authored file contents remain unchanged.
 Storage keys and provider credentials are not in the exported metadata.
 
+Checkpoint descriptors also retain the existing `baseCommit`, `files`,
+`takenAt` and `updatedAt` fields. A patch is relative to that commit; its blob
+hashes alone do not identify the original repository commit. These fields make
+the exported checkpoint interpretable without introducing an import service.
+Unavailable checkpoints retain their metadata and explicit unavailable state.
+
+The metadata follow-up was verified against the existing isolated PostgreSQL
+17 `mikka_auth_audit210_e2e` target on loopback port 55599, with new random
+owner/peer fixtures cleaned up by the existing suite. The same file suite
+passes 7/7, including exact checkpoint timestamps, hash/byte manifest, peer
+checkpoint denial and a real Git base-commit plus exported-patch application
+that reproduces the source file. Account/route tests pass 5 + 22, typecheck and
+targeted lint pass. Logs: `/tmp/mikka-213-checkpoint-db.log`,
+`/tmp/mikka-213-checkpoint-account.log`, `/tmp/mikka-213-checkpoint-types.log`.
+This is a portable-file contract check, not complete deployed-account or daemon
+recovery acceptance.
+
 Metadata is enumerated first, then only one inline file or R2 object is opened
 at a time. R2 recordings stream through the existing authenticated storage
 adapter; base64 encoding carries incomplete byte triples between chunks. The

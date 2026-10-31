@@ -5,7 +5,7 @@
 // A translated brand (「Mikka 云」, 「Mikka 云端」) and the old 「切换到云端」 action.
 export const banned = /mikka[\s_-]*云|切换到云端/i
 // Dated decision log keeps history as written; the policy test holds the negative examples.
-export const allowedPaths = ['docs/design/decisions.md', 'scripts/copy-policy.mjs', 'scripts/copy-policy.test.mjs']
+export const allowedPaths = ['docs/design/decisions.md', 'docs/design/decisions', 'scripts/copy-policy.mjs', 'scripts/copy-policy.test.mjs']
 
 export function bannedHits(text) {
   return text.split('\n').flatMap((line, index) => banned.test(line) ? [{ line: index + 1, text: line.trim() }] : [])

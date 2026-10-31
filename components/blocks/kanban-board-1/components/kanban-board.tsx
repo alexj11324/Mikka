@@ -53,6 +53,8 @@ export type CardContext = {
   properties: ReadonlySet<CardProperty>
   agentStates: ReadonlyMap<string, AgentState>
   subtasks: ReadonlyMap<string, { done: number; total: number }>
+  /** Cards the person just moved with the status menu (enter) or deleted (leave); others' changes are absent and snap (R-37). */
+  motion?: ReadonlyMap<string, 'enter' | 'leave'>
 }
 
 function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss }: CardHandlers & {
@@ -116,7 +118,8 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   </div>
 
   if (isOverlay) return <KanbanItem value={task.id} disabled className="shrink-0">{card}</KanbanItem>
-  return <KanbanItem value={task.id} disabled={disabled} className="shrink-0" role="group" tabIndex={-1} aria-label={task.title}>
+  const cardMotion = context.motion?.get(task.id)
+  return <KanbanItem value={task.id} disabled={disabled} className={cn('shrink-0', cardMotion === 'enter' && 'animate-in fade-in-0 duration-150 motion-reduce:animate-none', cardMotion === 'leave' && 'pointer-events-none opacity-0 transition-opacity duration-150 motion-reduce:transition-none')} role="group" tabIndex={-1} aria-label={task.title}>
     <ContextMenu>
       <ContextMenuTrigger render={<KanbanItemHandle cursor={false} role="group" tabIndex={disabled ? -1 : 0} className="block cursor-pointer touch-pan-y rounded-md outline-none select-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing" aria-label={t('openTask', { title: task.title })} aria-roledescription={t('openableDraggableTask')} aria-keyshortcuts="Enter Space" onClick={event => {
         if (disabled || event.defaultPrevented || (event.target as HTMLElement).closest('[data-card-control]')) return

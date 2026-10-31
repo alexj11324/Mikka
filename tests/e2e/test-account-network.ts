@@ -6,7 +6,6 @@ type PausedRequest = {
   request: { url: string; method: string }
   resourceType: string
   responseErrorReason?: string
-  networkId?: string
 }
 export type LocalImageFixture = Readonly<{ url: string; body: Uint8Array }>
 type FailurePhase = 'lease' | 'cdp-continue' | 'cdp-fulfill' | 'cdp-abort' | 'route-continue' | 'route-fulfill' | 'route-abort' | 'detach' | 'setup'
@@ -83,12 +82,6 @@ export async function installAccountOriginFence(
       // The first adapter's configured/locked browser is Chromium. Unsupported
       // engines fail before the route releases a request; no weaker fallback.
       const session = await context.newCDPSession(page)
-      const paused = new Set<{ networkId?: string; canceled: boolean }>()
-      session.on('Network.loadingFailed', (event: { requestId: string; canceled?: boolean }) => {
-        if (event.canceled === true) for (const pending of paused) {
-          if (pending.networkId === event.requestId) pending.canceled = true
-        }
-      })
       const originalPageClose = page.close.bind(page)
       Object.defineProperty(page, 'close', {
         configurable: true,
@@ -100,23 +93,24 @@ export async function installAccountOriginFence(
       })
       session.on('close', () => {
         entry.active = false
-        paused.clear()
         if (!closing && !closingPages.has(page) && !page.isClosed() && !context.isClosed()) {
           reportFailure('detach')
           void context.close().catch(() => {})
         }
       })
       session.on('Fetch.requestPaused', (event: PausedRequest) => {
-        const pending = { networkId: event.networkId, canceled: false }
-        paused.add(pending)
         void (async () => {
           let phase: FailurePhase = 'lease'
           const continueRequest = async () => {
             phase = 'cdp-continue'
             try { await session.send('Fetch.continueRequest', { requestId: event.requestId }) }
             catch (error) {
-              // A canceled request can lose its interception while its lease check awaits.
-              if (!pending.canceled || failureCategory(error) !== 'invalid-interception') throw error
+              // Chromium drops the interception of a request canceled while its
+              // lease check awaits: by script, page close or a navigation such as
+              // reload. Navigation cancels often emit no Network event, so none
+              // can confirm them. Nothing was released and nothing left the
+              // browser, so this one outcome is not a fence failure.
+              if (failureCategory(error) !== 'invalid-interception') throw error
             }
           }
           try {
@@ -142,10 +136,9 @@ export async function installAccountOriginFence(
             // Lease loss already closes contexts through the runner callback;
             // an interception failure must also make the fixture fail closed.
             if (!context.isClosed()) { reportFailure(phase, error); await context.close().catch(() => {}) }
-          } finally { paused.delete(pending) }
+          }
         })()
       })
-      await session.send('Network.enable')
       await session.send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] })
       entry.active = true
     })()

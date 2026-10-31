@@ -2,7 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createFirecrawlProvider } from './firecrawl'
 import { SearchProviderError } from './types'
-import { createWebService } from './index'
+import { createWebService as meteredWebService } from './index'
+
+// Keep provider/parser unit tests independent of the real PG rate gate.
+const createWebService = (options: Parameters<typeof meteredWebService>[0]) => meteredWebService({ ...options, consumeRate: async () => true })
 
 const publicHost = async () => [{ address: '8.8.8.8' }]
 const url = 'https://www.iana.org/help/example-domains'

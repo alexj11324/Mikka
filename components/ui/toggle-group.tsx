@@ -4,11 +4,10 @@ import * as React from "react"
 import { Toggle as TogglePrimitive } from "@base-ui/react/toggle"
 import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group"
 import { type VariantProps } from "class-variance-authority"
-import { motion } from "motion/react"
 import { cn } from "cn"
 
+import { SegmentIndicator } from '@/components/ui/segment-indicator'
 import { toggleVariants } from '@/components/ui/toggle'
-import { SPRING_LAYOUT } from '@/lib/ease'
 
 const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants> & {
@@ -77,7 +76,7 @@ function ToggleGroupItem({
       // In a segmented control the raised pill is one element per group that glides to the
       // pressed item (R-37: a position change moves on a spring), instead of each item swapping its fill.
       render={segment && !props.render ? (itemProps, state) => <button {...itemProps}>
-        {state.pressed && <motion.span layoutId={`segment-${context.id}`} transition={SPRING_LAYOUT} aria-hidden="true" className="absolute inset-0 -z-10 rounded-sm bg-background shadow-xs dark:bg-control-hover" />}
+        {state.pressed && <SegmentIndicator layoutId={`segment-${context.id}`} />}
         {itemProps.children}
       </button> : undefined}
       data-slot="toggle-group-item"

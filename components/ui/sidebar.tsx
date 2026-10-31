@@ -339,7 +339,7 @@ function SidebarInput({
     <Input
       data-slot="sidebar-input"
       data-sidebar="input"
-      className={cn("h-8 w-full bg-background shadow-none in-data-desktop-translucent:bg-control", className)}
+      className={cn("h-8 w-full bg-control shadow-none", className)}
       {...props}
     />
   )

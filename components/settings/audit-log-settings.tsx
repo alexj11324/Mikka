@@ -63,7 +63,7 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
   return <>
     <SettingsSection id="audit-controls">
       <SettingRow title={t('filter')}>
-        <ToggleGroup aria-label={t('filter')} variant="outline" spacing={0} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'security') setFilter(next) }}>
+        <ToggleGroup aria-label={t('filter')} variant="segment" spacing={0.5} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'security') setFilter(next) }}>
           <ToggleGroupItem value="all">{t('filters.all')}</ToggleGroupItem>
           <ToggleGroupItem value="security">{t('filters.security')}</ToggleGroupItem>
         </ToggleGroup>

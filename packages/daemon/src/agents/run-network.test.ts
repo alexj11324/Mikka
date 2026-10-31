@@ -108,3 +108,13 @@ it('cloud allow never creates an approval while explicit deny cannot be bypassed
  decision='deny';expect(await network({host:'example.invalid',port:443},signal)).toBe(false)
  expect(ask).not.toHaveBeenCalled()
 })
+
+it('reaches the run\'s Mikka app host without a network ask, inside the ceiling only', async () => {
+  const ask = vi.fn(async () => 'allow' as const)
+  const gate = new ToolApprovalGate('run-a',{permission:()=> 'deny',ask,isLive:()=>true})
+  const signal = new AbortController().signal
+  expect(await runNetworkApproval('run-a','claude_code',gate,['mikka.example'],undefined,'mikka.example')({host:'mikka.example',port:443},signal)).toBe(true)
+  expect(await runNetworkApproval('run-a','claude_code',gate,[],undefined,'mikka.example')({host:'mikka.example',port:443},signal)).toBe(false)
+  expect(await runNetworkApproval('run-a','claude_code',gate,['mikka.example','other.example'],undefined,'mikka.example')({host:'other.example',port:443},signal)).toBe(false)
+  expect(ask).not.toHaveBeenCalled()
+})

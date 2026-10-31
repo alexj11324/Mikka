@@ -1,8 +1,9 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { useRevealLoaded } from '@/lib/hooks/use-reveal-loaded'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
@@ -82,7 +83,10 @@ export function SignOutBoundary({ pending, children }: { pending: boolean; child
 export function AppShellContent({ parent, title, actions, children, variant = 'workspace', hideHeader = false, listToggle = true }: { parent: string; title: string; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean; listToggle?: boolean }) {
   const i18nText = useTranslations();
   const { isMobile, openMobile, open, toggleSidebar } = useSidebar()
-  return <SidebarInset className={cn('min-h-0 min-w-0', 'overflow-y-auto overscroll-contain')}>
+  // A section's loading placeholder gives way to its content with a short fade.
+  const contentRef = useRef<HTMLElement>(null)
+  useRevealLoaded(contentRef)
+  return <SidebarInset ref={contentRef} className={cn('min-h-0 min-w-0', 'overflow-y-auto overscroll-contain')}>
     {/* Desktop has no title bar (MIK-40): the top bar searches and the pill names the conversation. Phones keep it, having no rail. */}
     {!hideHeader && <header className={cn('flex h-12 shrink-0 items-center justify-between gap-3 px-4 md:hidden')}>
       <div className="flex min-w-0 items-center gap-2">

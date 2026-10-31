@@ -3,7 +3,7 @@ import { useTranslations } from 'next-intl'
 
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
-import { Check, ChevronDown, Plus } from 'lucide-react'
+import { Check, ChevronDown, LogOut, Plus, Settings, UserPlus, type LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { authClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
@@ -30,9 +30,15 @@ function WorkspaceAvatar({ name, large = false }: { name: string; large?: boolea
   return <span aria-hidden="true" className={cn('flex shrink-0 items-center justify-center rounded-full bg-sidebar-primary-soft font-semibold text-sidebar-primary-soft-foreground', large ? 'size-8 text-sm' : 'size-6 text-xs')}>{name.slice(0, 1)}</span>
 }
 
-/** A workspace's mark inside the menu: the same soft initial as the trigger, at item size. */
+/** A workspace's mark inside the menu: the same soft initial as the trigger, in the 20px box every row's icon uses. */
 function ItemAvatar({ name }: { name: string }) {
-  return <Avatar size="sm" aria-hidden="true" className="size-5"><AvatarFallback className="bg-sidebar-primary-soft text-xs font-semibold text-sidebar-primary-soft-foreground">{name.slice(0, 1)}</AvatarFallback></Avatar>
+  // No `size`: `data-[size=sm]:size-6` outranks `size-5`, which put workspace names 4px right of the action rows.
+  return <Avatar aria-hidden="true" className="size-5"><AvatarFallback className="bg-sidebar-primary-soft text-xs font-semibold text-sidebar-primary-soft-foreground">{name.slice(0, 1)}</AvatarFallback></Avatar>
+}
+
+/** An action row's icon, in a 20px box like the workspace avatars so every row's text starts on one column. */
+function ItemIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return <span aria-hidden="true" className="flex size-5 items-center justify-center text-muted-foreground"><Icon /></span>
 }
 
 /**
@@ -135,19 +141,19 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
       </div>
       <DropdownMenuGroup>
         <DropdownMenuItem disabled={busy} onClick={() => run(async () => { setOpenMobile(false); window.location.assign(withBasePath('/workspaces/new')) })}>
-          <span aria-hidden="true" className="flex size-5 items-center justify-center text-muted-foreground"><Plus /></span>{i18nText("FeatureCopy.c_d92d1b8d")}
+          <ItemIcon icon={Plus} />{i18nText("FeatureCopy.c_d92d1b8d")}
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         <DropdownMenuItem aria-keyshortcuts="Control+, Meta+," onClick={() => settings()}>
-          {i18nText("Settings.title")}<DropdownMenuShortcut aria-hidden="true" className="tracking-normal">{settingsShortcut}</DropdownMenuShortcut>
+          <ItemIcon icon={Settings} />{i18nText("Settings.title")}<DropdownMenuShortcut aria-hidden="true" className="tracking-normal">{settingsShortcut}</DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
-        <DropdownMenuItem disabled={busy} onClick={addAccount}>{i18nText("FeatureCopy.c_c771c7d8")}</DropdownMenuItem>
-        <DropdownMenuItem onClick={onSignOut} disabled={busy}>{signingOut ? i18nText("Nav.signingOut") : i18nText("Nav.signOut")}</DropdownMenuItem>
+        <DropdownMenuItem disabled={busy} onClick={addAccount}><ItemIcon icon={UserPlus} />{i18nText("FeatureCopy.c_c771c7d8")}</DropdownMenuItem>
+        <DropdownMenuItem onClick={onSignOut} disabled={busy}><ItemIcon icon={LogOut} />{signingOut ? i18nText("Nav.signingOut") : i18nText("Nav.signOut")}</DropdownMenuItem>
       </DropdownMenuGroup>
     </DropdownMenuContent>
   </DropdownMenu>

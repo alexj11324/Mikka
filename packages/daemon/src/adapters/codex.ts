@@ -37,6 +37,7 @@ import type { AgentSandbox } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
 import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
 import { runNetworkApproval } from "../agents/run-network"
+import { runAppsHost, type RunApps } from "../agents/run-apps"
 import { rawCliShellAvailable, runPolicy } from "../permissions"
 import { codexHasAuditedDynamicTools, codexSupportsRunApproval } from "./codex-version"
 import type { RunChunk } from "../chunks"
@@ -117,6 +118,14 @@ function subscriptionTokens(
 
 /** What a follow-up run copies from the earlier run's `CODEX_HOME`. */
 const CODEX_HISTORY = ["sessions", "archived_sessions", "session_index.jsonl"]
+
+/** One streamable-HTTP MCP entry per connected app, each pointing at the Mikka server. */
+export function codexAppArgs(apps?: RunApps): string[] {
+  return (apps?.apps ?? []).flatMap(app => [
+    "-c", `mcp_servers.${app.name}.url=${toml(app.url)}`,
+    "-c", `mcp_servers.${app.name}.http_headers={ Authorization = ${toml(`Bearer ${apps!.token}`)} }`,
+  ])
+}
 
 /** TOML value for a `-c key=value` override (JSON strings are TOML strings). */
 function toml(value: string | string[]): string {
@@ -319,6 +328,7 @@ export class CodexAdapter implements AgentAdapter {
     )
     const ctx = new RunContext({
       github: options.github,
+      apps: options.apps,
       githubRuntime: options.githubRuntime,
       childPath: options.env.PATH,
       mailboxEnabled: Boolean(options.mailbox),
@@ -361,6 +371,7 @@ export class CodexAdapter implements AgentAdapter {
         ] : []),
         ...Object.entries(computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
       ] : []),
+      ...codexAppArgs(options.apps),
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
         "-c",
@@ -383,7 +394,7 @@ export class CodexAdapter implements AgentAdapter {
     let launcher: ReturnType<typeof spawnRunSandbox> | undefined
     const child = this.options.spawnCli || this.options.sandbox.kind === 'none'
       ? await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
-      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp)) }))
+      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps)) }))
     if (launcher) {
       const ownedLauncher = launcher
       const off = options.toolApproval!.onRevoke(() => { void ownedLauncher.revoke().catch(() => undefined) })
@@ -407,7 +418,8 @@ export class CodexAdapter implements AgentAdapter {
     const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
     const registeredMcpTool = (server: string, tool: string) =>
       (server === MCP_SERVER_NAME && ['submit','request_help','ask_human','report_blocked'].includes(tool)) ||
-      (Boolean(computerMcp) && server === COMPUTER_MCP_SERVER_NAME && ['get_desktop_state','click','type_text','press_key','scroll'].includes(tool))
+      (Boolean(computerMcp) && server === COMPUTER_MCP_SERVER_NAME && ['get_desktop_state','click','type_text','press_key','scroll'].includes(tool)) ||
+      Boolean(options.apps?.apps.some(app => app.name === server))
 
     /** The CLI and everything it started are gone before the exit is told. */
     let ended: Promise<void> | undefined

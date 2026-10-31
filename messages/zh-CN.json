@@ -177,7 +177,17 @@
       "connected": "已连接",
       "notConnected": "未连接",
       "paused": "已暂停"
-    }
+    },
+    "popular": "热门",
+    "latest": "新品推荐",
+    "showAll": "查看全部{name}",
+    "appMenu": "{name} 的操作",
+    "connectApp": "连接 {name}",
+    "manage": "管理",
+    "storeLoadFailed": "暂时无法加载应用目录。",
+    "loadingApps": "正在加载应用…",
+    "noConnections": "还没有连接的应用",
+    "openStore": "打开插件"
   },
   "Auth": {
     "haveAccount": "已经有账号？",
@@ -1852,6 +1862,10 @@
       "startFailed": "{provider} 授权启动失败",
       "finishFailed": "{provider} 授权未完成",
       "signedOut": "登录已过期，请重新登录后再连接。",
+      "refusedOff": "此部署未开启模型订阅",
+      "refusedAccount": "{provider} 账号不可用",
+      "refusedProvider": "{provider} 拒绝了授权请求",
+      "refusedPage": "{provider} 返回的授权页面无法识别",
       "restart": "重新开始"
     },
     "integrations": {
@@ -2163,6 +2177,15 @@
         "auth": {
           "signed_in": "登录",
           "sign_in_failed": "登录失败"
+        },
+        "credential": {
+          "created": "保存凭据",
+          "replaced": "更新凭据",
+          "revoked": "撤销凭据"
+        },
+        "agent": {
+          "approval_decided": "{decision, select, approved {批准工具请求} denied {拒绝工具请求} other {处理工具请求}}",
+          "approval_consumed": "使用工具批准"
         },
         "workspace": {
           "slug_changed": "把地址从 {from} 改为 {to}",
@@ -2706,6 +2729,13 @@
     "working": "Coordinator 正在处理…",
     "loadError": "对话加载失败，正在重试。",
     "failedTitle": "回复失败",
+    "subscriptionRefusal": {
+      "unavailable": "所选订阅不可用",
+      "reconnect": "订阅需要重新连接",
+      "quotaUsed": "订阅额度已用完",
+      "retry": "订阅暂时不可用",
+      "open": "模型与额度"
+    },
     "wakeErrors": {
       "wake_failed": "回复等待重试",
       "wake_start_unconfirmed": "回复启动未确认",

@@ -349,7 +349,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   account's email (small, muted) with its workspaces under it (avatar, name,
   a check on the current one; about five show, more scroll), 创建工作区;
   then 设置 with its shortcut as one quiet text hint (⌘, not keycaps); then
-  添加账户 and 退出登录. Menu text and item height are the defaults; the
+  添加账户 and 退出登录. Every action row leads with a muted lucide icon in
+  the same 20px box as the workspace avatars (创建工作区 `Plus`, 设置
+  `Settings`, 添加账户 `UserPlus`, 退出登录 `LogOut`), so all rows share
+  one text column. Menu text and item height are the defaults; the
   menu is 240px wide and opens above the rail avatar, never over it.
 
 ## Look

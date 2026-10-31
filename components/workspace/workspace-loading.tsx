@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 export function WorkspaceContentLoading() {
   const t = useTranslations('Workspace')
-  return <div role="status" aria-label={t('loadingEditor')} aria-busy="true" className="flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6">
+  return <div role="status" aria-label={t('loadingEditor')} aria-busy="true" data-loading-placeholder="" className="flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6">
     <span className="sr-only">{t('loadingEditor')}</span>
     <div aria-hidden="true" className="flex flex-1 flex-col gap-6">
       <Skeleton className="h-8 w-40" />

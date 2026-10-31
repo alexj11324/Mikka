@@ -84,14 +84,17 @@ export function SourceAvatar({ source, className }: { source: StreamingSource; c
   );
 }
 
-/** The inline chip's look, shared with chips that render through another trigger (a hover card). */
+/** The inline chip's look, shared with chips that render through another trigger (a hover card): an icon, then the name as plain text in the surrounding font, with no box around the whole. */
 export const sourceChipClassName =
-  "ml-0 mr-1 inline-flex h-4.5 max-w-56 translate-y-[-1px] cursor-pointer items-center gap-1 rounded-[5px] bg-inset pr-1.5 pl-[3px] align-middle font-mono text-[10.5px] text-ink-2 no-underline shadow-hairline outline-none transition-colors duration-150 hover:bg-hover hover:text-ink focus-visible:ring-2 focus-visible:ring-ring data-popup-open:bg-hover data-popup-open:text-ink animate-in fade-in-0 zoom-in-95 animation-duration-250 ease-[cubic-bezier(0.23,1,0.32,1)] fill-mode-both";
+  "mx-0.5 inline-flex max-w-64 translate-y-[-1px] cursor-pointer items-center gap-1.5 align-middle text-current underline decoration-current/30 underline-offset-[3px] outline-none transition-[text-decoration-color] duration-150 hover:decoration-current focus-visible:rounded-[4px] focus-visible:ring-2 focus-visible:ring-ring data-popup-open:decoration-current animate-in fade-in-0 animation-duration-250 ease-[cubic-bezier(0.23,1,0.32,1)] fill-mode-both";
+
+/** A source's icon inside a chip: its own small rounded tile. The neutral fill shows only where the favicon is transparent, or behind the globe when there is none. */
+export const sourceTileClassName = "size-4.5 rounded-[5px] bg-muted [&:is(span)]:p-[3px] [&:is(span)]:text-muted-foreground";
 
 export function SourceChip({ source = SOURCES[0] }: { source?: StreamingSource }) {
   return (
     <a href={source.href} target="_blank" rel="noreferrer" className={sourceChipClassName}>
-      <SourceAvatar source={source} />
+      <SourceAvatar source={source} className={sourceTileClassName} />
       <span className="truncate">{source.domain}</span>
     </a>
   );
