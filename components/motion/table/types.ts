@@ -28,6 +28,23 @@ export type TableColumn<T> = {
 
 export type InsertPosition = "before" | "after";
 
+/** Mikka: control and menu text, so the host can translate it. */
+export type TableLabels = {
+  selectAll: string;
+  selectRow: (row: number) => string;
+  columnOptions: (column: string) => string;
+  rowOptions: (row: number) => string;
+  reorderColumn: (column: string) => string;
+  renameColumn: (column: string) => string;
+  resizeColumn: (column: string) => string;
+  editCell: (column: string, row: number) => string;
+  emptyCell: string;
+  insertBefore: string;
+  insertAfter: string;
+  deleteColumn: string;
+  deleteRow: string;
+};
+
 export interface TableProps<T> {
   data: T[];
   columns: TableColumn<T>[];
@@ -74,6 +91,7 @@ export interface TableProps<T> {
   /** How many skeleton rows to show while loading more (default 3). */
   skeletonRows?: number;
   emptyState?: ReactNode;
+  labels?: Partial<TableLabels>;
   className?: string;
 }
 

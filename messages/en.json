@@ -3761,5 +3761,52 @@
       "verifyCard": "Verify card",
       "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
     }
+  },
+  "BeUi": {
+    "dateRange": {
+      "startDate": "Start date",
+      "endDate": "End date",
+      "selectDate": "Select date",
+      "selectEnd": "Select end",
+      "chooseMonth": "Choose month",
+      "chooseYear": "Choose year",
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "previousYear": "Previous year",
+      "nextYear": "Next year",
+      "previousYears": "Previous years",
+      "nextYears": "Next years",
+      "monthsIn": "Choose a month in {year}",
+      "yearsFrom": "Choose a year from {start} to {end}",
+      "keyboardHelp": "Use arrow keys to navigate dates, Home and End for the week, Page Up and Page Down for months, Shift with Page Up or Page Down for years. Enter or Space selects a date. Use the month and year buttons to jump directly. In the month or year choices, use arrow keys to move and Escape to return.",
+      "daysSelected": "{count, plural, one {# day selected} other {# days selected}}",
+      "chooseStartDate": "Choose a start date",
+      "chooseEndDate": "Choose an end date",
+      "clear": "Clear",
+      "clearRange": "Clear date range",
+      "startChosen": "Start date {date}. Choose an end date.",
+      "unavailableRange": "This range includes unavailable dates. Choose another end date.",
+      "rangeSelected": "{from} to {to} selected.",
+      "cleared": "Date range cleared.",
+      "presetSelected": "{name} selected."
+    },
+    "table": {
+      "selectAll": "Select all rows",
+      "selectRow": "Select row {row}",
+      "columnOptions": "{column} column options",
+      "rowOptions": "Row {row} options",
+      "reorderColumn": "Reorder {column} column",
+      "renameColumn": "Rename {column} column",
+      "resizeColumn": "Resize {column} column",
+      "editCell": "{column} for row {row}",
+      "emptyCell": "Empty",
+      "insertBefore": "Insert before",
+      "insertAfter": "Insert after",
+      "deleteColumn": "Delete column",
+      "deleteRow": "Delete row"
+    },
+    "timeline": {
+      "keyboardHint": "Use the left and right arrow keys to move between events."
+    }
   }
 }

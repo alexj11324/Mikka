@@ -3761,5 +3761,52 @@
       "verifyCard": "验证银行卡",
       "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅"
     }
+  },
+  "BeUi": {
+    "dateRange": {
+      "startDate": "开始日期",
+      "endDate": "结束日期",
+      "selectDate": "选择日期",
+      "selectEnd": "选择结束日期",
+      "chooseMonth": "选择月份",
+      "chooseYear": "选择年份",
+      "previousMonth": "上个月",
+      "nextMonth": "下个月",
+      "previousYear": "上一年",
+      "nextYear": "下一年",
+      "previousYears": "更早的年份",
+      "nextYears": "更晚的年份",
+      "monthsIn": "选择 {year} 年的月份",
+      "yearsFrom": "选择 {start}–{end} 年中的年份",
+      "keyboardHelp": "方向键切换日期，Home 和 End 跳到本周首尾，Page Up 和 Page Down 切换月份，按住 Shift 再按 Page Up 或 Page Down 切换年份。Enter 或空格选中日期。用月份和年份按钮直接跳转；在月份或年份列表中，方向键移动，Esc 返回。",
+      "daysSelected": "已选 {count} 天",
+      "chooseStartDate": "选择开始日期",
+      "chooseEndDate": "选择结束日期",
+      "clear": "清除",
+      "clearRange": "清除日期范围",
+      "startChosen": "开始日期 {date}，请选择结束日期。",
+      "unavailableRange": "该范围包含不可选的日期，请另选结束日期。",
+      "rangeSelected": "已选 {from} 至 {to}。",
+      "cleared": "已清除日期范围。",
+      "presetSelected": "已选 {name}。"
+    },
+    "table": {
+      "selectAll": "全选",
+      "selectRow": "选择第 {row} 行",
+      "columnOptions": "{column} 列选项",
+      "rowOptions": "第 {row} 行选项",
+      "reorderColumn": "移动 {column} 列",
+      "renameColumn": "重命名 {column} 列",
+      "resizeColumn": "调整 {column} 列宽",
+      "editCell": "第 {row} 行的 {column}",
+      "emptyCell": "空",
+      "insertBefore": "在前面插入",
+      "insertAfter": "在后面插入",
+      "deleteColumn": "删除列",
+      "deleteRow": "删除行"
+    },
+    "timeline": {
+      "keyboardHint": "用左右方向键在事件之间切换。"
+    }
   }
 }
