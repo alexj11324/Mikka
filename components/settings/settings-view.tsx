@@ -29,6 +29,7 @@ import { SecretsSettings } from '@/components/settings/secrets-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
+import { BotAgentsSettings } from '@/components/settings/bot-agents-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
@@ -76,7 +77,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const routedBody = section === 'members' || section === 'teams'
 
   return <>
-    <SettingsSidebar user={user} section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache) }} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} />
+    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache) }} onRail={onRail} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent className="gap-6">
@@ -108,8 +109,10 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'billing': return workspaceId && !preview ? <BillingSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
+    case 'computers': return null
+    case 'bots': return workspaceId && !preview ? <BotAgentsSettings key={workspaceId} /> : waiting
     case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
-    default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>
+    default: return null
   }
 }
 
@@ -119,13 +122,13 @@ function AppearanceSection() {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
   return <SettingsSection id="appearance-heading" title={t('title')}>
-    <SettingRow title={t('theme')} description={t('themeDescription')}>
+    <SettingRow title={t('theme')}>
       <ToggleGroup aria-label={t('themeLabel')} variant="outline" spacing={0} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}>
         <ToggleGroupItem value="light" aria-label={t('light')}><Sun />{t('light')}</ToggleGroupItem>
         <ToggleGroupItem value="dark" aria-label={t('dark')}><Moon />{t('dark')}</ToggleGroupItem>
         <ToggleGroupItem value="system" aria-label={t('systemLabel')}><Monitor />{t('system')}</ToggleGroupItem>
       </ToggleGroup>
     </SettingRow>
-    <SettingRow title={t('language')} description={t('languageDescription')}><LocaleSetting /></SettingRow>
+    <SettingRow title={t('language')}><LocaleSetting /></SettingRow>
   </SettingsSection>
 }

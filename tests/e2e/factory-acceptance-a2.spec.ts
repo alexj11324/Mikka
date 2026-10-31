@@ -22,6 +22,7 @@ async function setup(page: Page, opts: { taskId?: string; stage?: string; ledger
   const calls: Call[] = []
   const ledger = { binding, ...opts.ledger({ candidateId, binding }) }
   await page.route('**/api/factory/tasks?issueId=*', route => route.fulfill({ json: { tasks: [{ id: taskId, issueId, stage: opts.stage ?? 'approval', status: 'pending', reason: '独立检查通过', candidateId, candidateRunId: null, isSkillCandidate: false }] } }))
+  await page.route(`**/api/factory/tasks/${taskId}`, route => route.fulfill({ json: { checks: [], delivery: { candidateSha: candidate.sha, pullRequest: null, repository: candidate.repository, environment: null, previewUrl: null, databaseBranch: null, deploymentEnvironment: null } } }))
   await page.route(`**/api/factory/tasks/${taskId}/approval*`, async route => {
     const url = new URL(route.request().url())
     if (route.request().method() === 'GET') {
@@ -34,8 +35,9 @@ async function setup(page: Page, opts: { taskId?: string; stage?: string; ledger
     return route.fulfill(reply)
   })
   await openIssueFromSearch(page, title)
-  await page.getByRole('button', { name: /Factory 验收/ }).click()
-  const dialog = page.getByRole('dialog')
+  await page.getByRole('button', { name: 'Factory 验收', exact: true }).click()
+  // No producing thread in these fixtures: acceptance opens alone, beside the issue.
+  const dialog = page.getByRole('region', { name: 'Factory 验收', exact: true })
   await expect(dialog.getByRole('heading', { name: 'Factory 验收' })).toBeVisible()
   return { dialog, calls, binding }
 }
@@ -98,7 +100,7 @@ test('failed publication returned to approval requires a new approval request', 
   const { dialog, calls } = await setup(page, { stage: 'approval', ledger: ({ candidateId }) => ({ approvals: [approval(candidateId, id)], publications: [{ id: randomUUID(), approvalId: id, status: 'failed', request: {}, receipt: null }] }) })
   await expect(dialog.getByText('待你确认', { exact: true }).first()).toBeVisible()
   await expect(dialog.getByRole('button', { name: '发布', exact: true })).toHaveCount(0)
-  await dialog.getByRole('button', { name: '批准发布', exact: true }).click()
+  await dialog.getByRole('button', { name: '批准并发布', exact: true }).click()
   await expect.poll(() => calls.map(call => call.operation)).toEqual(['approve'])
   expect(calls[0].input).not.toHaveProperty('approvalId')
 })

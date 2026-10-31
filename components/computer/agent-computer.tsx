@@ -50,6 +50,6 @@ export function AgentComputer({ botId, name, header = true, workspaceId }: { bot
       </ComputerScreen>}
     <p className="max-w-full truncate text-xs text-muted-foreground">{missing ? `E2B API Key ${e2b('missing')}` : t('screenOf', { name })}</p>
     {viewing && <ComputerViewer botId={botId} name={name} open={viewing} onOpenChange={setViewing} />}
-    {keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAdding(false); if (changed) void status.mutate() }} />}
+    {keyDialog.value && <E2BKeyDialog workspaceId={workspaceId} open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAdding(false); if (changed) void status.mutate() }} />}
   </div>
 }

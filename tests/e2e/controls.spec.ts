@@ -64,7 +64,13 @@ for (const surface of surfaces) {
           await surface.prepare(isolated)
           const isolatedRoot = surface.scope ? isolated.getByRole(surface.scope) : isolated
           const candidate = isolatedRoot.locator(controlsSelector).nth(index)
-          expect((await inspectControl(candidate, isolated)).label, '页面恢复后控件身份必须一致').toBe(label)
+          const restored = (await inspectControl(candidate, isolated)).label
+          if (restored !== label) {
+            // Diagnostics only: the restored page's own list shows which controls moved or went missing.
+            const list = await Promise.all((await isolatedRoot.locator(controlsSelector).all()).map(async control => (await inspectControl(control, isolated)).label))
+            await testInfo.attach(`恢复后控件清单-${index}`, { body: JSON.stringify({ expected: candidates.map(item => item.label), restored: list }, null, 2), contentType: 'application/json' })
+          }
+          expect(restored, '页面恢复后控件身份必须一致').toBe(label)
           await clickWithEffect(isolated, candidate)
           expect(runtimeErrors, '点击不得伴随运行异常').toEqual([])
           coverage.push({ label, status: '已点击且有可观察变化' })

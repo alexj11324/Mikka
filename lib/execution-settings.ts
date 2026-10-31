@@ -577,7 +577,9 @@ export class ExecutionSettings {
       )
     ).rows[0]?.bindingId;
     if (saved) return saved;
-    const first = (await this.botModels(scope))[0];
+    // Decision 2026-10-30 (#537): a Claude subscription first, otherwise ChatGPT/Codex, as `suggested` does.
+    const models = await this.botModels(scope);
+    const first = models.find((m) => m.provider === "claude") ?? models[0];
     if (!first) return undefined;
     const bindingId = await this.bindingForBot(scope, botId, first.bindingId);
     await this.pool.query(
