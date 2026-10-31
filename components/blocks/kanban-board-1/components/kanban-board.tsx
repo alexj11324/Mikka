@@ -2,7 +2,7 @@
 
 import { useState, type ComponentProps, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { Box, CalendarDays, ChevronsLeftRight, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
@@ -25,6 +25,14 @@ function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typ
     <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="flex h-2.5 touch-none flex-col p-px select-none"><ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-foreground/15" /></ScrollAreaPrimitive.Scrollbar>
     <ScrollAreaPrimitive.Corner />
   </ScrollAreaPrimitive.Root>
+}
+
+/** Linear-style priority mark, 14px (Figma 看板/优先级): 紧急 is a filled square with !, the rest three bars. */
+const PRIORITY_BARS: Record<string, number> = { high: 3, normal: 2, low: 1 }
+function PriorityMark({ priority }: { priority: string }) {
+  if (priority === 'urgent') return <svg aria-hidden="true" viewBox="0 0 14 14" className="size-3.5 shrink-0 text-warning"><rect width="14" height="14" rx="3" fill="currentColor" /><path d="M7 3.5v4.25" stroke="var(--card)" strokeWidth="1.75" strokeLinecap="round" /><circle cx="7" cy="10.25" r="1" fill="var(--card)" /></svg>
+  const filled = PRIORITY_BARS[priority] ?? 0
+  return <svg aria-hidden="true" viewBox="0 0 14 14" className="size-3.5 shrink-0">{[[1, 5], [5.5, 8], [10, 11]].map(([x, height], index) => <rect key={x} x={x} y={12.5 - height} width="3" height={height} rx="1" className={index < filled ? 'fill-muted-foreground' : 'fill-foreground/15'} />)}</svg>
 }
 
 const AGENT_STATE_BADGES = { running: 'success-light', waiting: 'warning-light', failed: 'destructive-light' } as const satisfies Record<AgentState, string>
@@ -67,28 +75,42 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   const agentState = context.agentStates.get(task.id)
   const subtasks = context.subtasks.get(task.id)
   const metadata = task.metadata
+  const format = useFormatter()
+  const now = useNow({ updateInterval: 60_000 })
+  const done = ['done', 'canceled', 'duplicate'].includes(task.status)
+  const overdue = !done && Boolean(metadata.dueDate) && metadata.dueDate! < `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const labels = show('labels') ? metadata.labels : []
+  // The newest PR, then a count of the rest (Figma 看板/任务卡片).
+  const pullRequest = show('pullRequests') ? metadata.pullRequests.at(-1) : undefined
+  const meta = 'flex items-center gap-1 text-xs text-muted-foreground tabular-nums [&_svg]:size-3.5 [&_svg]:shrink-0'
+  // Row 3 shows only what the task has; it wraps when it does not fit.
   const chips = [
-    show('priority') && <CardControlBoundary key="priority"><IssuePropertyMenu label={tIssue('priorityLabel')} value={task.priority} options={priorityOptions} icon={Flag} iconOnly compact disabled={controlsDisabled} onChange={value => onPriorityChange(task, value)} /></CardControlBoundary>,
-    ...(show('labels') ? metadata.labels.map(label => <Badge key={`label-${label.name}`} variant="outline" size="lg" className="border-transparent px-1 max-w-36"><LabelDot color={label.color} /><span className="truncate">{label.name}</span></Badge>) : []),
-    show('project') && metadata.project && <Badge key="project" variant="outline" size="lg" className="border-transparent px-1 max-w-36"><Box /><span className="truncate">{metadata.project}</span></Badge>,
-    ...(show('pullRequests') ? metadata.pullRequests.map(pr => <CardControlBoundary key={pr.url}><IssuePullRequestLink issueId={task.id} pr={pr} compact /></CardControlBoundary>) : []),
-    show('subtasks') && subtasks && subtasks.total > 0 && <Badge key="subtasks" variant="outline" size="lg" className="border-transparent px-1 tabular-nums" title={tCard('subtasks')}><ListChecks />{subtasks.done}/{subtasks.total}</Badge>,
+    show('priority') && <CardControlBoundary key="priority"><div className="-mx-[3px] flex"><IssuePropertyMenu label={tIssue('priorityLabel')} value={task.priority} options={priorityOptions} icon={Flag} iconOnly compact disabled={controlsDisabled} renderIcon={value => <PriorityMark priority={value} />} onChange={value => onPriorityChange(task, value)} /></div></CardControlBoundary>,
+    labels.length > 0 && <div key="labels" className="flex min-w-0 items-center gap-2">
+      {labels.slice(0, 2).map(label => <span key={label.name} className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"><LabelDot color={label.color} small /><span className="max-w-20 truncate">{label.name}</span></span>)}
+      {labels.length > 2 && <span className="text-xs text-muted-foreground/70 tabular-nums">+{labels.length - 2}</span>}
+    </div>,
+    show('project') && metadata.project && <span key="project" className={cn(meta, 'min-w-0')}><Box /><span className="max-w-28 truncate">{metadata.project}</span></span>,
+    pullRequest && <span key="pr" className="flex items-center gap-1"><CardControlBoundary><IssuePullRequestLink issueId={task.id} pr={pullRequest} compact /></CardControlBoundary>{metadata.pullRequests.length > 1 && <span className="text-xs text-muted-foreground/70 tabular-nums">+{metadata.pullRequests.length - 1}</span>}</span>,
+    show('subtasks') && subtasks && subtasks.total > 0 && <span key="subtasks" className={meta} title={tCard('subtasks')}><ListChecks />{subtasks.done}/{subtasks.total}</span>,
     show('agentState') && agentState && <Badge key="agent" variant={AGENT_STATE_BADGES[agentState]} size="lg"><span aria-hidden="true" className={cn('size-1.5 rounded-full', AGENT_STATE_DOTS[agentState])} />{tCard(`agent.${agentState}`)}</Badge>,
-    show('dueDate') && metadata.dueDate && <Badge key="due" variant="outline" size="lg" className="border-transparent px-1 tabular-nums"><CalendarDays />{metadata.dueDate.slice(5)}</Badge>,
+    show('dueDate') && metadata.dueDate && <span key="due" className={cn(meta, overdue && 'text-destructive')}><CalendarDays />{format.dateTime(new Date(`${metadata.dueDate}T00:00:00`), { month: 'short', day: 'numeric' })}</span>,
   ].filter(Boolean)
 
-  const card = <div className={cn('flex flex-col gap-1.5 rounded-lg border bg-card px-3 pt-2.5 pb-3 text-card-foreground shadow-xs transition-shadow hover:border-foreground/20', isOverlay && 'pointer-events-none rotate-1 shadow-lg')}>
+  // Figma 看板/任务卡片: filled, no stroke (R-31); radius 8, padding 12, rows 8 apart.
+  const card = <div className={cn('group/card flex flex-col gap-2 rounded-md bg-card p-3 text-card-foreground shadow-xs transition-colors hover:bg-muted/50', isOverlay && 'pointer-events-none rotate-2 shadow-lg')}>
     <div className="flex h-5 min-w-0 items-center gap-1.5">
       {show('identifier') && <span className="truncate text-xs text-muted-foreground tabular-nums">{issueIdentifier(task, tIssue('unassignedNumber'))}</span>}
-      {task.scope === 'personal' && <Lock aria-label={tCard('personal')} className="size-3 shrink-0 text-muted-foreground" />}
-      {show('assignee') && <div className="ml-auto flex shrink-0 items-center"><CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary></div>}
+      {task.scope === 'personal' && <Lock aria-label={tCard('personal')} className="size-3.5 shrink-0 text-muted-foreground" />}
+      {/* No placeholder circle when nobody owns the task; the control appears on hover and focus. */}
+      {show('assignee') && <div className={cn('ml-auto flex shrink-0 items-center', !metadata.assignee && 'opacity-0 group-hover/card:opacity-100 focus-within:opacity-100')}><CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary></div>}
     </div>
-    <div className="flex min-w-0 items-start gap-1">
-      <CardControlBoundary><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></CardControlBoundary>
-      <h3 data-slot="kanban-task-title" className="line-clamp-3 min-w-0 flex-1 pt-0.5 text-sm font-medium break-words">{task.title}</h3>
+    <div className="flex min-w-0 items-start gap-[3px]">
+      <CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>
+      <h3 data-slot="kanban-task-title" className={cn('line-clamp-2 min-w-0 flex-1 text-[13px] leading-5 font-medium break-words', done && 'text-muted-foreground')}>{task.title}</h3>
     </div>
-    {chips.length > 0 && <div className="flex flex-wrap items-center gap-1 pl-7">{chips}</div>}
-    {show('createdAt') && <div className="pl-7"><CardCreatedAt createdAt={task.createdAt} /></div>}
+    {chips.length > 0 && <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-5">{chips}</div>}
+    {show('createdAt') && <div className="pl-5"><CardCreatedAt createdAt={task.createdAt} /></div>}
     {/* Opened from the context menu: labels, project and PR editors, rendered off-card. */}
     {!isOverlay && <div hidden><IssueMetadataControls task={task} section="all" compact disabled={controlsDisabled} request={request && request.target !== 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>}
   </div>
@@ -96,7 +118,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   if (isOverlay) return <KanbanItem value={task.id} disabled className="shrink-0">{card}</KanbanItem>
   return <KanbanItem value={task.id} disabled={disabled} className="shrink-0" role="group" tabIndex={-1} aria-label={task.title}>
     <ContextMenu>
-      <ContextMenuTrigger render={<KanbanItemHandle cursor={false} role="group" tabIndex={disabled ? -1 : 0} className="block cursor-pointer touch-pan-y rounded-lg outline-none select-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing" aria-label={t('openTask', { title: task.title })} aria-roledescription={t('openableDraggableTask')} aria-keyshortcuts="Enter Space" onClick={event => {
+      <ContextMenuTrigger render={<KanbanItemHandle cursor={false} role="group" tabIndex={disabled ? -1 : 0} className="block cursor-pointer touch-pan-y rounded-md outline-none select-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing" aria-label={t('openTask', { title: task.title })} aria-roledescription={t('openableDraggableTask')} aria-keyshortcuts="Enter Space" onClick={event => {
         if (disabled || event.defaultPrevented || (event.target as HTMLElement).closest('[data-card-control]')) return
         onOpen(task.id)
       }} onKeyDownCapture={event => {
@@ -162,21 +184,23 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, narrowColumns = []
   const shown = BOARD_COLUMNS.filter(column => columns.includes(column.value))
   const [opened, setOpened] = useState<IssueStatus[]>([])
   const narrow = (status: IssueStatus) => narrowColumns.includes(status) && !opened.includes(status)
-  // Beside the Coordinator sidebar the columns share the width instead of scrolling (R-25); hidden columns stay reachable from 显示.
-  const fit = narrowColumns.length > 0
+  // R-25: columns are a fixed 300px, as Linear; when they do not fit, the board scrolls and spare width stays empty.
+  // Beside the Coordinator sidebar the hidden lane is left out; hidden columns stay reachable from 显示.
+  const sidebarOpen = narrowColumns.length > 0
   return <Kanban {...props} getItemValue={item => item.id} className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
     <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label={t('horizontalScroll')} aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
-      <KanbanBoardPrimitive className={cn('flex h-full min-h-0 min-w-full items-stretch gap-3 pb-2', fit ? 'w-full' : 'w-max')}>
+      <KanbanBoardPrimitive className="flex h-full min-h-0 w-max min-w-full items-stretch gap-3 pb-2">
         {shown.map(column => {
           const tasks = props.value[column.value] ?? []
           if (narrow(column.value)) return <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-10 min-w-10 shrink-0">
             <Button variant="ghost" className="h-full w-10 flex-col items-center justify-start gap-2 overflow-hidden rounded-xl bg-muted/60 dark:bg-muted/30 px-0 py-2.5 font-medium hover:bg-muted" aria-label={tBoard('expandColumn', { status: statusLabel(column.value) })} onClick={() => setOpened(current => [...current, column.value])}>
               <column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />
-              <span className="shrink-0 text-sm leading-tight [writing-mode:vertical-rl]">{statusLabel(column.value)}</span>
+              {/* One glyph per line: vertical writing-mode stacks CJK glyphs on one spot with fonts that lack vertical metrics. */}
+              <span aria-hidden="true" className="flex shrink-0 flex-col items-center text-sm leading-[18px]">{Array.from(statusLabel(column.value)).map((glyph, index) => <span key={index}>{glyph}</span>)}</span>
               <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{tasks.length}</span>
             </Button>
           </KanbanColumn>
-          return <KanbanColumn key={column.value} value={column.value} className={cn('min-h-0', fit ? 'max-w-72 min-w-44 flex-1 basis-0' : 'w-60 min-w-60 shrink-0')}>
+          return <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-75 min-w-75 shrink-0">
             <section className="group/column flex min-h-0 flex-1 flex-col gap-1 rounded-xl bg-muted/60 dark:bg-muted/30 p-1.5" aria-label={t('columnLabel', { status: statusLabel(column.value) })}>
               <div className="flex h-8 shrink-0 items-center gap-2 pr-0.5 pl-1.5">
                 <column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />
@@ -196,7 +220,7 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, narrowColumns = []
             </section>
           </KanbanColumn>
         })}
-        {hidden.length > 0 && !fit && <section aria-label={tBoard('hiddenLane')} className="flex w-52 shrink-0 flex-col gap-1 rounded-xl bg-muted/60 dark:bg-muted/30 p-1.5">
+        {hidden.length > 0 && !sidebarOpen && <section aria-label={tBoard('hiddenLane')} className="flex w-52 shrink-0 flex-col gap-1 rounded-xl bg-muted/60 dark:bg-muted/30 p-1.5">
           <h2 className="flex h-8 items-center px-1.5 text-sm font-medium text-muted-foreground">{tBoard('hiddenLane')}</h2>
           {hidden.map(({ status, count }) => {
             const column = BOARD_COLUMNS.find(item => item.value === status)!

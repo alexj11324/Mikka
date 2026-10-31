@@ -127,14 +127,25 @@ source wins in a conflict is in [`README.md`](README.md).
   machine). Settings › 设备 uses the same two groups.
 - **R-24** A device's online state is a StatusDot on the top-right of its
   icon (green online, grey offline, red error), never a text badge.
-- **R-25** Board cards show the id, the assignee's avatar (never a name),
-  the status icon, the title, then one row with priority, labels, linked PRs
-  and the latest run's state. Only the run state is a tinted pill; priority,
-  labels and PRs are bare icon + text with no border, wrapping onto a second
-  row when needed. The board is the reUI Kanban with no column `+` (R-22) and
-  no page-title pill (the rail says where you are). With the Coordinator
-  sidebar open, 已完成 collapses to a 40px strip (icon, vertical name, count)
-  so the other columns are never cut off. Figma: section `77:2`.
+- **R-25** Board cards follow Figma 「看板卡片 v1」 (`714:5283`): a filled card
+  with no stroke (R-31), radius 8px, padding 12px, rows 8px apart, icons
+  14px. Row 1 is the id, a lock when the task is personal, and the assignee
+  avatar group on the right (never a name; nothing when unassigned). When a
+  Bot owns the task its avatar is on top. Row 2 is the status icon and the
+  title, at most two lines, then an ellipsis. Row 3 shows only what the task
+  has, in this order, wrapping when needed: priority, labels (bare dot and
+  text, at most two, then 「+N」), the newest PR (then 「+N」), subtasks, the
+  latest run's state and the due date. Only the run state is a tinted pill
+  (运行中, 等你处理, 运行失败). Colour carries meaning only: a failed run and an
+  overdue date are red; run state, urgent priority and PR state are green or
+  orange; a done card's title is the secondary grey. The board is the reUI
+  Kanban with no column `+` (R-22) and no page-title pill (the rail says
+  where you are). Columns are a fixed 300px, as in Linear: when they do not
+  fit, the board scrolls horizontally, and spare width stays empty. With the
+  Coordinator sidebar open, only 已完成 collapses, to a 40px strip (icon, the
+  name one glyph per line, count) that expands when clicked; every other
+  column keeps its 300px. Figma: page 「看板卡片 v1 · 定稿 2026-10-31」
+  (`714:5283`).
 - **R-26** Workspace tasks sync with Linear (`MIK-xx`); personal tasks stay in
   Mikka. A task can move both ways: a workspace task can be turned back into
   a personal one (its Linear issue is archived; issue #184). Teammates see agent runs on workspace issues only, never left-column
