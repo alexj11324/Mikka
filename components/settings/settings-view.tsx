@@ -13,7 +13,7 @@ import { MembersPanel } from '@/components/settings/members-panel'
 import { LinearSettings } from '@/components/settings/linear-settings'
 import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
 import { IntegrationsSettings } from '@/components/settings/integrations-settings'
-import { ComputerPolicySettings } from '@/components/settings/computer-policy-settings'
+import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
@@ -26,6 +26,11 @@ import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
 import { LocaleSetting } from '@/components/settings/locale-setting'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
+import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
+import { SecretsSettings } from '@/components/settings/secrets-settings'
+import { AuditLogSettings } from '@/components/settings/audit-log-settings'
+import { UsageSettings } from '@/components/settings/usage-settings'
+import { BillingSettings } from '@/components/settings/billing-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { SettingsSectionId } from '@/lib/settings-sections'
@@ -89,8 +94,13 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'memory': return <MemorySettings />
     case 'connections': return <><IntegrationsSettings /><LinearSettings notice={linearNotice ?? null} /><TelegramSettings preview={preview} /></>
     case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'billing': return workspaceId && !preview ? <BillingSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
-    case 'permissions': return workspaceId && !preview ? <ComputerPolicySettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return <p className="py-8 text-sm text-muted-foreground">{t('sectionUnavailable')}</p>
   }
 }

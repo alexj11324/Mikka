@@ -79,6 +79,27 @@ export async function seedSuggestion(page: Page, { source = 'gmail', action = 'r
   return id
 }
 
+/** The Coordinator's last turn failed with `error`, as a refused hosted-model call leaves it. */
+export async function seedCoordinatorError(page: Page, error: string) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedCoordinatorError 需要已登录的页面。')
+  const db = database()
+  const { rows: [session] } = await db.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!session) throw new Error('找不到当前登录会话。')
+  await db.query('INSERT INTO coordinator_sessions ("userId", "botId", "lastError", "lastErrorAt") VALUES ($1, NULL, $2, now()) ON CONFLICT ON CONSTRAINT coordinator_sessions_chat_key DO UPDATE SET "lastError" = $2, "lastErrorAt" = now()', [session.userId, error])
+}
+
+/** The signed-in person's workspace has a verified card and `remaining` microdollars of Mikka 默认 allowance (#523, #525). */
+export async function seedHostedVerification(page: Page, remaining: number) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedHostedVerification 需要已登录的页面。')
+  const db = database()
+  const { rows: [member] } = await db.query<{ workspaceId: string }>('SELECT m."workspaceId" FROM session s JOIN mikka_workspace_members m ON m."userId" = s."userId" WHERE s.token = $1 LIMIT 1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!member) throw new Error('找不到当前登录会话的工作区。')
+  await db.query('INSERT INTO hosted_verifications ("workspaceId") VALUES ($1) ON CONFLICT DO NOTHING', [member.workspaceId])
+  await db.query('INSERT INTO hosted_allowances ("workspaceId", remaining) VALUES ($1, $2) ON CONFLICT ("workspaceId") DO UPDATE SET remaining = $2', [member.workspaceId, remaining])
+}
+
 /** The current conversation's title pill over the chat (desktop). */
 export function conversationPill(page: Page) {
   // Conversations opened earlier stay mounted but hidden; only the current one is visible.

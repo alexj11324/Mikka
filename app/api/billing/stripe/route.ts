@@ -5,7 +5,7 @@ import { stripeConfig, verifyStripeSignature } from '@/lib/billing/stripe'
 
 export const runtime = 'nodejs'
 
-/** Stripe webhook: records subscription state for 计费. Signature-checked; idempotent by event id. */
+/** Stripe webhook: subscription state, purchased points and refunds. Signature-checked. */
 export async function POST(request: Request) {
   const secret = stripeConfig()?.webhookSecret
   if (!secret) return new NextResponse(null, { status: 404 })
