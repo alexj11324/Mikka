@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { ConversationPill } from '@/components/nav/conversation-pill'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { UserMessageText } from '@/components/workspace/user-message-text'
 import { cn } from '@/lib/utils'
 import { authorRuns, chronological, fetchGroupMessages, GroupMessagesRequestError, type GroupMessagePage } from '@/lib/group-messages'
 
@@ -64,7 +65,7 @@ export function GroupChatView({ group, userId, people }: {
                         <div className={cn('flex min-w-0 flex-col gap-1', mine ? 'max-w-[min(26rem,80%)] items-end' : 'max-w-[min(35rem,85%)]')}>
                           {mine ? <span className="sr-only">{name}</span> : <span className="text-xs font-medium text-muted-foreground">{name}</span>}
                           {run.messages.map(message => <Bubble key={message.id} variant={mine ? 'secondary' : 'muted'} align={mine ? 'end' : 'start'} className={cn('max-w-full', mine && '*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground')}>
-                            <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{message.body}</BubbleContent>
+                            <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{run.authorType === 'user' ? <UserMessageText text={message.body} /> : message.body}</BubbleContent>
                           </Bubble>)}
                         </div>
                       </li>
