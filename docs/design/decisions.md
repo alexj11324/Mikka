@@ -238,3 +238,11 @@ Alex approved the first-run onboarding spec ([onboarding.md](onboarding.md), #12
 ## 2026-10-31 — Icon rail without labels; Codex dark surfaces
 
 Alex asked to drop the small names under the rail icons: each rail item is now an icon button whose name shows as a tooltip on hover (and stays its accessible name). Dark mode follows Codex's surfaces: page rgb(24 24 24), cards and popovers rgb(35 35 35).
+
+## 2026-10-31 — Personal plugin backend delivery
+
+Alex confirmed #581, #582 and #583 ship together in one PR with backend scope
+only (「按 issue，仅后端」). Personal MCP connections and installed skills are
+owner-scoped; the app catalog exposes supported Composio toolkits. Plugin-page
+tabs, counts, switches and browse controls follow separately. See
+[the backend contract](personal-plugins-backend.md).
