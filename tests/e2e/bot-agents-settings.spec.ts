@@ -147,3 +147,27 @@ test('Bot 与 Agents：规则标签从工作区已有标签中选，标签带颜
   await expect(picked).toBeVisible()
   await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
 })
+
+test('Bot 与 Agents：没有绑定订阅时，Coordinator 和每个 Bot 都显示 Mikka 默认', async ({ page }) => {
+  await register(page, '/settings?section=bots')
+  await expect(page.getByRole('heading', { level: 1, name: 'Bot 与 Agents' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '添加规则', exact: true })).toBeVisible()
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('需要已登录的页面。')
+  const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  const { rows: [member] } = await db().query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId" = $1 AND status = $2 LIMIT 1', [session.userId, 'active'])
+  // One Bot never chose a model; the other still holds a choice whose Claude account was disconnected.
+  const [fresh, stale, connection, binding] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()]
+  await db().query(`INSERT INTO bots (id, "ownerId", "workspaceId", name) VALUES ($1, $3, $4, 'E2E 新 Bot'), ($2, $3, $4, 'E2E 断开 Bot')`, [fresh, stale, session.userId, member.workspaceId])
+  await db().query(`INSERT INTO byos_connections (id, "ownerId", "workspaceId", provider, state, epoch, "secretName", "secretDigest", "providerSubject")
+    VALUES ($1, $2, $3, 'claude', 'disconnected', 1, $4, $5, 'e2e-subject')`, [connection, session.userId, member.workspaceId, `e2e-fixture-${connection}`, 'a'.repeat(64)])
+  await db().query(`INSERT INTO byos_bindings (id, "ownerId", "workspaceId", "consumerId", "connectionId", "connectionRevision", route, "modelId")
+    VALUES ($1, $2, $3, $4, $5, 1, 'claude_cpa', 'claude-e2e-model')`, [binding, session.userId, member.workspaceId, stale, connection])
+  await db().query(`INSERT INTO bot_model_choices ("ownerId", "workspaceId", "botKey", "bindingId") VALUES ($1, $2, $3, $4)`, [session.userId, member.workspaceId, stale, binding])
+  await page.reload()
+
+  for (const name of ['Coordinator', 'E2E 新 Bot', 'E2E 断开 Bot']) {
+    await expect(page.locator(`[data-bot="${name}"]`).getByRole('button', { name: `${name} 模型：Mikka 默认`, exact: true })).toBeVisible()
+  }
+  await expect(page.getByRole('main').getByText('未连接账号')).toHaveCount(0)
+})

@@ -12,7 +12,7 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
-import { DeviceLabel, HarnessLabel, ModelLabel, ProviderMark, harnessName } from '@/components/labels/entity-labels'
+import { DeviceLabel, HarnessLabel, HostedModelLabel, ModelLabel, ProviderMark, harnessName } from '@/components/labels/entity-labels'
 import { SettingsLoading, SettingsSaveError } from '@/components/settings/primitives'
 import { LabelDot } from '@/components/workspace/issue-metadata-controls'
 import {
@@ -252,7 +252,10 @@ function RuleRow({ t, rule, places, onChange, onDelete, onRedetect }: {
   </TableRow>
 }
 
-/** A Bot's own model. Bots always run on Mikka, so the row has no place or harness. */
+/**
+ * A Bot's own model. Bots always run on Mikka, so the row has no place or harness.
+ * With no connected subscription a Bot replies on Mikka 默认, the hosted model (decision 2026-10-31-2110).
+ */
 function BotRow({ t, botId, bot, rows, onSave, onRefresh }: {
   t: T
   botId: string | null
@@ -274,8 +277,8 @@ function BotRow({ t, botId, bot, rows, onSave, onRefresh }: {
   })
   return <Line data-bot={title} title={title}
     leading={bot ? <BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} /> : <CoordinatorAvatar size="row" />}>
-    <Picker t={t} wide ariaLabel={t('cell', { row: title, column: t('columns.model'), value: selected?.modelId ?? t('noAccount') })} disabled={choice.data === undefined || rows.length === 0}
-      value={selected ? <ModelLabel model={selected.modelId} source={selected.provider} /> : <span className="truncate text-muted-foreground">{t('noAccount')}</span>}>
+    <Picker t={t} wide ariaLabel={t('cell', { row: title, column: t('columns.model'), value: selected?.modelId ?? t('hostedDefault') })} disabled={choice.data === undefined || rows.length === 0}
+      value={selected ? <ModelLabel model={selected.modelId} source={selected.provider} /> : <HostedModelLabel name={t('hostedDefault')} />}>
       {close => accounts.map((account, index) => <CommandGroup key={account.connectionId} className={cn(index > 0 && 'border-t')} heading={<PickerHeading t={t} title={<span className="flex items-center gap-1.5"><ProviderMark provider={modelProvider('', account.provider)} small />{account.provider === 'claude' ? t('claudeAccount') : t('openaiAccount')}</span>} onRefresh={onRefresh} />}>
         {account.models.map(model => <CommandItem key={model.key} value={model.key} keywords={[model.modelId]} data-checked={selected?.key === model.key} onSelect={() => { close(); void choose(model.bindingId) }}><ModelLabel model={model.modelId} source={account.provider} /></CommandItem>)}
       </CommandGroup>)}

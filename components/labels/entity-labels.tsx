@@ -5,6 +5,7 @@ import { Box, Cloud, Laptop, Monitor, Server, type LucideIcon } from 'lucide-rea
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { modelProvider, type DeviceKind, type ModelProvider } from '@/lib/execution-settings-view'
+import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { ClaudeCodeMark, ClaudeMark, CodexMark, CursorMark, OpenAIMark } from './brand-marks'
 
 /*
@@ -64,6 +65,14 @@ export function ProviderMark({ provider, small }: { provider: ModelProvider; sma
 }
 
 /** A model: its provider's mark, read from the id or the account it came through, then the id. */
+/** Mikka's hosted model (Mikka 默认), marked with the small Mikka mark in the model icon's box. */
+export function HostedModelLabel({ name }: { name: string }) {
+  return <span className="inline-flex min-w-0 items-center gap-1.5">
+    <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center"><MikkaMarkSmall /></span>
+    <span className="truncate">{name}</span>
+  </span>
+}
+
 export function ModelLabel({ model, source }: { model: string; source?: string | null }) {
   return <EntityLabel icon={PROVIDER_MARKS[modelProvider(model, source)]}><span className="truncate">{model}</span></EntityLabel>
 }

@@ -7,7 +7,7 @@ const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')
 const scope = { ownerId: 'alice', botId: null, workspaceId: id(2) }
 const binding = { id: id(3), ownerId: 'alice', consumerId: id(1), workspaceId: id(2), connectionId: id(4), connectionRevision: 7, modelId: 'subscription-model', route: 'claude_cpa' }
 let selected: string | undefined
-let available: { bindingId: string }[] = []
+let available: { bindingId: string; provider?: string }[] = []
 let savedBinding: { bindingId: string } | undefined
 let settingsError: Error | undefined
 let workspaceCalls = 0
@@ -60,13 +60,14 @@ test('Coordinator without a subscription freezes and resolves the configured hos
   assert.deepEqual(hostedCalls, [[scope, COORDINATOR_MODEL]])
 })
 
-test('unavailable explicit Coordinator subscription never falls back even with another available binding', async () => {
+test('a saved choice whose account is gone, with no subscription bound, replies on Mikka 默认', async () => {
+  // The Settings page showed 未连接账号 and these bots refused (binding_required) instead of replying.
   selected = id(9)
-  for (const options of [[], [{ bindingId: id(3) }]]) {
-    available = options
-    await assert.rejects(freezeBotModel(scope, noSubscription), { code: 'binding_required' })
+  available = []
+  for (const botId of [null, id(1)]) {
+    const frozen = await freezeBotModel({ ...scope, botId }, noSubscription)
+    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
   }
-  assert.equal(hostedCalls.length, 0)
 })
 
 test('Bot without a subscription replies on the same hosted default as the Coordinator, in its own workspace', async () => {
@@ -79,12 +80,20 @@ test('Bot without a subscription replies on the same hosted default as the Coord
   assert.deepEqual(hostedCalls, [[bot, COORDINATOR_MODEL]])
 })
 
-test('Bot with a chosen but missing or revoked binding refuses and never takes the hosted default', async () => {
-  selected = id(9)
-  for (const options of [[], [{ bindingId: id(3) }]]) {
-    available = options
-    await assert.rejects(freezeBotModel({ ...scope, botId: id(1) }, noSubscription), { code: 'binding_required' })
+test('a saved choice whose account is gone switches to a bound subscription, Claude first, not Mikka 默认', async () => {
+  const dependencies = {
+    service: () => ({ repository: {
+      binding: async () => ({ ...binding }),
+      connection: async () => ({ ownerId: scope.ownerId, workspaceId: scope.workspaceId, epoch: '7', state: 'connected' }),
+    } }) as unknown as SubscriptionService,
+    workspace: async () => {},
   }
+  selected = id(9)
+  savedBinding = undefined
+  available = [{ bindingId: id(8), provider: 'codex' }, { bindingId: binding.id, provider: 'claude' }]
+  const frozen = await freezeBotModel(scope, dependencies)
+  assert.equal(frozen.modelSelection?.bindingId, binding.id)
+  assert.equal(frozen.model, binding.modelId)
   assert.equal(hostedCalls.length, 0)
 })
 
