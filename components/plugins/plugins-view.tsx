@@ -15,15 +15,13 @@ import { AppTile, ConnectedAppDetail, ConnectedAppRow, ConnectedAppsStatus, Plug
 import { GitHubSettings } from '@/components/plugins/github-settings'
 import { LinearSettings } from '@/components/settings/linear-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
-import { SettingsSection } from '@/components/settings/primitives'
-import { Frame, FramePanel } from '@/components/reui/frame'
+import { SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { IconTile } from '@/components/reui/icon-tile'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 /** Apps Mikka links itself, after the Composio toolkits. */
@@ -116,9 +114,8 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
   )
 
   const name = (id: PluginAppId) => id === 'linear' ? tLinear('title') : id === 'telegram' ? tTelegram('title') : tApps(id)
-  const description = (id: PluginAppId) => isComposioAppId(id) ? tApps(`${id}Description`) : t(`descriptions.${id}`)
   const needle = trimmedQuery.toLowerCase()
-  const shownApps = APP_IDS.filter(id => !needle || `${name(id)} ${description(id)}`.toLowerCase().includes(needle))
+  const shownApps = APP_IDS.filter(id => !needle || name(id).toLowerCase().includes(needle))
   // 添加 offers what is not connected yet: Composio apps connect at once, the rest open their page.
   const addable = APP_IDS.filter(id => isComposioAppId(id) ? apps.canLink && !apps.accountsFor(id).length : ownStates?.[id] === 'notConnected')
 
@@ -131,10 +128,7 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
           <PluginBreadcrumb rootLabel={rootLabel} rootHref={href(null)} onBack={back} name={name(app)} />
           <header className="flex flex-wrap items-center gap-4">
             <AppTile app={app} size="xl" />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <h2 className="text-xl font-semibold">{name(app)}</h2>
-              <p className="text-sm text-muted-foreground">{description(app)}</p>
-            </div>
+            <h2 className="min-w-0 flex-1 text-xl font-semibold">{name(app)}</h2>
           </header>
           {app === 'github' ? <GitHubSettings /> : app === 'linear' ? <LinearSettings notice={linearNotice} /> : <TelegramSettings />}
         </div>}
@@ -177,7 +171,7 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
         {shownApps.length ? <SettingsSection id="plugin-apps">
             {shownApps.map(id => isComposioAppId(id)
               ? <ConnectedAppRow key={id} apps={apps} app={id as ComposioAppId} href={href(id)} onOpen={() => openApp(id)} />
-              : <PluginRow key={id} app={id} name={name(id)} description={description(id)} href={href(id)} onOpen={() => openApp(id)} dim={ownStates?.[id as OwnAppId] === 'paused'}>
+              : <PluginRow key={id} app={id} name={name(id)} href={href(id)} onOpen={() => openApp(id)} dim={ownStates?.[id as OwnAppId] === 'paused'}>
                 {ownStates?.[id as OwnAppId] && <span className="text-xs text-muted-foreground">{t(`state.${ownStates[id as OwnAppId]!}`)}</span>}
               </PluginRow>)}
         </SettingsSection> : <Empty className="min-h-48">
@@ -190,14 +184,11 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
       </TabsContent>
       <TabsContent value="skills" className="flex flex-col gap-5 pt-4">
         <h2 className="text-sm font-semibold">{trimmedQuery ? t('results') : t('trending')}</h2>
-        {shortQuery ? (
-          <p className="text-xs text-muted-foreground">{t('searchHint')}</p>
-        ) : error ? (
+        {shortQuery ? null : error ? (
           <Empty className="min-h-48" role="alert">
             <EmptyHeader>
               <EmptyMedia variant="icon"><Puzzle aria-hidden="true" /></EmptyMedia>
               <EmptyTitle>{t('loadFailed')}</EmptyTitle>
-              <EmptyDescription>{t('loadFailedDescription')}</EmptyDescription>
             </EmptyHeader>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Button type="button" variant="secondary" size="sm" onClick={() => void mutate()}>{t('retry')}</Button>
@@ -207,19 +198,7 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
             </div>
           </Empty>
         ) : isLoading || !queryReady ? (
-          <Frame stacked role="status" aria-busy="true" aria-label={t('loading')}>
-            {[0, 1, 2].map(index => (
-              <FramePanel key={index}>
-                <div className="flex items-center gap-3">
-                  <Skeleton className="size-8 shrink-0" />
-                  <span className="flex flex-1 flex-col gap-2">
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="h-3 w-60 max-w-full" />
-                  </span>
-                </div>
-              </FramePanel>
-            ))}
-          </Frame>
+          <SettingsLoading label={t('loading')} />
         ) : !skills?.length ? (
           <Empty className="min-h-48">
             <EmptyHeader>
@@ -229,33 +208,24 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
             <Button type="button" variant="ghost" size="sm" onClick={() => setQuery('')}>{t('clearSearch')}</Button>
           </Empty>
         ) : (
-          <Frame stacked>
+          <SettingsSection id="plugin-skills">
             {skills.map(skill => (
-              <FramePanel key={skill.id}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="flex min-w-0 items-center gap-3">
-                    <IconTile size="sm" variant="elevated" aria-hidden="true"><Puzzle /></IconTile>
-                    <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate text-sm font-medium">{skill.name}</span>
-                      <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="truncate">{skill.source}</span>
-                        <span aria-hidden="true" className="size-1 shrink-0 rounded-full bg-muted-foreground/40" />
-                        <span>{t('installCount', { count: skill.installs.toLocaleString() })}</span>
-                      </span>
+              <div key={skill.id} className="relative flex items-center gap-3 py-3 pr-4 pl-5 transition-colors hover:bg-muted/50">
+                <a href={skill.url} target="_blank" rel="noopener noreferrer" aria-label={t('openSkill', { name: skill.name })} className="flex min-w-0 flex-1 items-center gap-3 outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring/40 focus-visible:after:ring-inset">
+                  <IconTile size="sm" variant="elevated" aria-hidden="true"><Puzzle /></IconTile>
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate text-sm font-medium">{skill.name}</span>
+                    <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                      <span className="truncate">{skill.source}</span>
+                      <span aria-hidden="true" className="size-1 shrink-0 rounded-full bg-muted-foreground/40" />
+                      <span className="shrink-0">{t('installCount', { count: skill.installs.toLocaleString() })}</span>
                     </span>
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    nativeButton={false}
-                    render={<a href={skill.url} target="_blank" rel="noopener noreferrer" aria-label={t('openSkill', { name: skill.name })} />}
-                  >
-                    {t('openSkillAction')}<ArrowUpRight data-icon="inline-end" />
-                  </Button>
-                </div>
-              </FramePanel>
+                </a>
+                <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+              </div>
             ))}
-          </Frame>
+          </SettingsSection>
         )}
       </TabsContent>
     </Tabs>

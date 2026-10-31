@@ -210,8 +210,6 @@ export function ConnectedAppsStatus({ apps }: { apps: ConnectedApps }) {
   const { state, error, notice } = apps
   return <>
     {!state && !error && <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>}
-    {state && !state.configured && <p role="status" className="text-sm text-muted-foreground">{t('composioNotConfigured')}</p>}
-    {state?.configured && !state.callbackVerifierConfigured && <p role="status" className="text-sm text-muted-foreground">{t('callbackVerifierNotConfigured')}</p>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice && <p role={notice.tone} className={cn('text-sm', notice.tone === 'alert' ? 'text-destructive' : 'text-muted-foreground')}>{notice.text}</p>}
   </>
@@ -233,24 +231,20 @@ function openInPlace(event: MouseEvent<HTMLAnchorElement>, onOpen: (() => void) 
 }
 
 /**
- * One row of the 插件 list: icon, name, one line, then the row's control and a
- * chevron into the app's page. The row is a real link (`href`) for a new tab.
+ * One row of the 插件 list: icon, name, then the row's control and a chevron.
+ * The whole row is the link into the app's page (its hover covers the row edge
+ * to edge); the control sits above the link and stays separately clickable.
  */
-export function PluginRow({ app, name, description, href, onOpen, dim = false, badge, children }: { app: PluginAppId; name: string; description: string; href: string; onOpen?: () => void; dim?: boolean; badge?: ReactNode; children?: ReactNode }) {
+export function PluginRow({ app, name, href, onOpen, dim = false, badge, children }: { app: PluginAppId; name: string; href: string; onOpen?: () => void; dim?: boolean; badge?: ReactNode; children?: ReactNode }) {
   const t = useTranslations('Settings.integrations')
-  return <div className="flex items-center gap-3 py-3 pr-3 pl-5">
-    <Button variant="ghost" nativeButton={false} role="link" render={<a href={href} onClick={event => openInPlace(event, onOpen)} />} className="h-auto min-w-0 flex-1 justify-start gap-3 p-0 text-left font-normal whitespace-normal hover:bg-transparent active:not-aria-[haspopup]:translate-y-0">
+  return <div className="relative flex items-center gap-3 py-3 pr-4 pl-5 transition-colors hover:bg-muted/50">
+    <a href={href} aria-label={t('openApp', { name })} onClick={event => openInPlace(event, onOpen)} className="flex min-w-0 flex-1 items-center gap-3 outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring/40 focus-visible:after:ring-inset">
       <AppTile app={app} dim={dim} />
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className={cn('text-sm font-medium', dim && 'text-muted-foreground')}>{name}</span>
-          {badge}
-        </span>
-        <span className="line-clamp-2 text-xs text-muted-foreground">{description}</span>
-      </span>
-    </Button>
-    {children}
-    <Button variant="ghost" size="icon-sm" nativeButton={false} role="link" aria-label={t('openApp', { name })} render={<a href={href} onClick={event => openInPlace(event, onOpen)} />}><ChevronRight data-icon="inline-start" /></Button>
+      <span className={cn('truncate text-sm font-medium', dim && 'text-muted-foreground')}>{name}</span>
+      {badge}
+    </a>
+    {children && <div className="relative z-10 flex shrink-0 items-center gap-2">{children}</div>}
+    <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
   </div>
 }
 
@@ -260,7 +254,7 @@ export function ConnectedAppRow({ apps, app, href, onOpen }: { apps: ConnectedAp
   const accounts = apps.accountsFor(app)
   const name = t(app)
   const { usable, expired, on, off } = appState(accounts)
-  return <PluginRow app={app} name={name} description={t(`${app}Description`)} href={href} onOpen={onOpen} dim={off || expired} badge={<>
+  return <PluginRow app={app} name={name} href={href} onOpen={onOpen} dim={off || expired} badge={<>
     {off && <Badge variant="secondary">{t('statusDisabled')}</Badge>}
     {/* On a phone the 重新连接 button beside the row says it. */}
     {expired && <Badge tone="destructive" className="hidden sm:inline-flex">{t('needsReconnect')}</Badge>}
@@ -319,7 +313,6 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
       <AppTile app={app} size="xl" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <h2 className="text-xl font-semibold">{name}</h2>
-        <p className="text-sm text-muted-foreground">{t(`${app}Description`)}</p>
       </div>
       {!accounts.length && <WhyDisabled reason={apps.unavailable}><Button type="button" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
     </header>

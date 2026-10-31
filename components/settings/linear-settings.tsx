@@ -137,10 +137,10 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
   return <div className="flex flex-col gap-8">
     <SettingsSection
       id="linear-heading"
-      description={enabled === false ? undefined : state?.connected ? t('connectedTo', { organization: state.organizationName ?? '' }) : t('description')}
+      description={enabled !== false && state?.connected ? t('connectedTo', { organization: state.organizationName ?? '' }) : undefined}
       action={<div className="flex flex-wrap items-center gap-2">{enabled === false && <Badge variant="secondary">{t('syncDisabled')}</Badge>}{state?.connected ? <><Badge variant="secondary">{t('connected')}</Badge><Button {...settingsSectionAction} disabled={busy} onClick={() => void disconnect()}><Unplug data-icon="inline-start" />{t('disconnect')}</Button></> : <Button size="sm" disabled={busy || enabled !== true || !state?.configured} onClick={() => void connect()}>{t('connect')}<ArrowRight data-icon="inline-end" /></Button>}</div>}
     >
-      {state?.connected && <SettingRow title={t('teamLabel')} description={t('teamDescription')}>
+      {state?.connected && <SettingRow title={t('teamLabel')}>
         <div className="flex flex-col items-start gap-2">
           <NativeSelect aria-label={t('teamLabel')} id="linear-team" value={activeTeam?.linearTeamId ?? selectedTeam} disabled={busy || enabled !== true || teams.length === 0 || Boolean(activeTeam)} onChange={event => setSelectedTeam(event.target.value)}>
             <NativeSelectOption value="">{t('teamPlaceholder')}</NativeSelectOption>

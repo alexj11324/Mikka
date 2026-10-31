@@ -34,7 +34,7 @@ for (const width of [1280, 402]) {
     connected = false
     await refocus()
     await expect(repositories).toHaveCount(0)
-    await expect(page.getByText('先关联你的 GitHub 账号。', { exact: true })).toBeVisible()
+    await expect(page.getByText('未关联', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '关联 GitHub', exact: true })).toBeVisible()
     await testInfo.attach(`github-settings-revoked-fixture-${width}`, { body: await page.screenshot(), contentType: 'image/png' })
     connected = true
