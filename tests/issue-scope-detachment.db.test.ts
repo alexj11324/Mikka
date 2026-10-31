@@ -113,7 +113,8 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     return noExternalFetch(input, init)
   }) as typeof fetch
   t.after(async () => { globalThis.fetch = noExternalFetch; await pool.end() })
-  const doc = JSON.stringify({ type: 'doc', attrs: { mikka: { number: 12 } }, content: [] })
+  const doc = JSON.stringify({ type: 'doc', attrs: { mikka: {} }, content: [] })
+  const mainDoc = JSON.stringify({ type: 'doc', attrs: { mikka: { number: 12 } }, content: [] })
   for (const id of [owner, member]) await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$2,$3,true,now(),now())', [id,'Alex',`${id}@example.invalid`])
   await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,\'ALEX\')', [owner])
   await pool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'scope synthetic acceptance\')', [workspace,owner])
@@ -164,9 +165,10 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     if (linked && remoteId === id) {
       const imported=await createAppIssueFromLinear(teamSync,{...remote(id),title:'Synthetic scope task',updatedAt:'2020-01-01T00:00:00.000Z'})
       assert.ok(imported);assert.equal(imported.id,id)
-      // Preserve a real import's verified target while giving the test its
-      // familiar metadata; the tracked trigger queues the resulting edit.
-      await pool.query('update issues set content=$2 where id=$1',[id,doc])
+      // Preserve each real import's number, except the main ALEX-12 fixture.
+      // This edit still exercises the tracked outbox trigger for every seed.
+      const content = id === issue ? mainDoc : JSON.stringify({ type: 'doc', attrs: { mikka: { number: readIssueMetadata(imported.content).number } }, content: [] })
+      await pool.query('update issues set content=$2 where id=$1',[id,content])
     } else {
       await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Synthetic scope task\',$3,\'todo\',\'normal\',\'workspace\')', [id,owner,doc])
       if (linked) await pool.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$5,\'MIK-184\')', [randomUUID(),id,owner,sync,remoteId])
@@ -788,7 +790,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   async function privatize(id:string,title='personal-only-draft') {
     const revision=(await pool.query('select revision from issues where id=$1',[id])).rows[0].revision
     assert.ok('issue' in await localFlip(id,revision))
-    const privateContent={type:'doc',attrs:{mikka:{number:12}},content:[{type:'paragraph',content:[{type:'text',text:'privatebodysecret'}]}]}
+    const privateContent={type:'doc',attrs:{mikka:{}},content:[{type:'paragraph',content:[{type:'text',text:'privatebodysecret'}]}]}
     await pool.query('update issues set title=$2,content=$3,revision=revision+1,"updatedAt"=now() where id=$1',[id,title,JSON.stringify(privateContent)])
   }
   async function republish(id:string,title='new-publication-title') {
