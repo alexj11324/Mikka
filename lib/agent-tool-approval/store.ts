@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import { recordAudit } from '@/lib/audit/record'
 import { lockCliRunPolicy, cliPolicyGuard, realCliMembershipGuard, type CliMembershipGuard } from './policy-store'
 import { writeTransaction } from '@/lib/operations/write-transaction'
 
@@ -69,11 +71,14 @@ export class AgentToolApprovalStore {
       return rows[0] as { id: string; digest: string; status: string }
     }, true)
   }
-  async decide(userId: string, runId: string, id: string, digest: string, decision: 'approve' | 'deny') {
+  async decide(userId: string, runId: string, id: string, digest: string, decision: 'approve' | 'deny', human?: { name: string }) {
     return this.transaction(runId, userId, async client => {
       const policy = await lockCliRunPolicy(client, runId, userId)
       const { rows } = await client.query(`UPDATE agent_tool_approvals SET status=$5,"decidedAt"=now() WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND digest=$4 AND "policyRevision"=$6 AND status='pending' AND "expiresAt">now() RETURNING status`, [id,runId,userId,digest,decision === 'approve' ? 'approved' : 'denied',policy.revision])
       if (!rows[0]) throw new ApprovalUnavailable()
+      for (const workspaceId of policy.workspaceIds) await recordAudit(drizzle(client), { workspaceId,
+        actor: human ? { type: 'user', id: userId, name: human.name } : { type: 'system' }, action: 'agent.approval_decided',
+        target: { type: 'approval', id }, metadata: { runId, decision: rows[0].status, revision: policy.revision } })
       return rows[0] as { status: string }
     })
   }
@@ -85,7 +90,12 @@ export class AgentToolApprovalStore {
       if (state.rows[0].status === 'paused') return 'pending' as const
       const policy = await lockCliRunPolicy(client, runId, actor.userId)
       const { rows } = await client.query(`UPDATE agent_tool_approvals SET status='consumed' WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND "deviceId"=$4 AND digest=$5 AND "policyRevision"=$6 AND status='approved' AND "expiresAt">now() RETURNING status`, [id,runId,actor.userId,actor.deviceId,digest,policy.revision])
-      if (rows[0]) return 'allow' as const
+      if (rows[0]) {
+        for (const workspaceId of policy.workspaceIds) await recordAudit(drizzle(client), { workspaceId,
+          actor: { type: 'system', id: actor.deviceId, name: 'Mikka device' }, action: 'agent.approval_consumed',
+          target: { type: 'approval', id }, metadata: { runId, revision: policy.revision } })
+        return 'allow' as const
+      }
       const found = await client.query(`SELECT status FROM agent_tool_approvals WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND "deviceId"=$4 AND digest=$5 AND "policyRevision"=$6 AND "expiresAt">now()`, [id,runId,actor.userId,actor.deviceId,digest,policy.revision])
       if (!found.rows[0]) throw new ApprovalUnavailable()
       return found.rows[0].status === 'pending' ? 'pending' as const : 'deny' as const

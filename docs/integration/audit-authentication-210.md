@@ -35,11 +35,12 @@ intent before inspecting the sink, so the relay cannot publish after cleanup.
 Cloud Linux verification used the new disposable
 `mikka_auth_audit210_e2e` on the existing PG17/loopback55599 container, prepared
 with the normal tracked main/workspace setup. Old databases, ledgers and
-historical fixtures were retained. Setup/test logs:
-`/tmp/mikka-auth-audit210-{setup,db}.log`.
+historical fixtures were retained. Setup log: `/tmp/mikka-auth-audit210-setup.log`. The current combined test
+log `/tmp/mikka-auth-audit210-db.log` covers both producer changes below; it
+replaces the earlier auth-only log and is not a retained raw log of `d4055907`.
 
 The actual Better Auth handler, API dispatcher and installed nextCookies plugin
-passed 5/5 tests, zero skipped: correct actors/current workspace scope, unknown
+passed its five tests within the combined 8/8 run, zero skipped: correct actors/current workspace scope, unknown
 account parity, exact session IDs and metadata privacy, actual sink failure and
 relay recovery, source failure with HTTP503/no response cookie or token/no new
 Next cookie-store write/session revocation, and unchanged actual account-pool
@@ -47,3 +48,42 @@ fingerprint restoration after pending and delivered login cleanup. Only Next's
 request cookie-store is an explicit fixture port. The fingerprint check uses
 real pool owned-row traversal; it does not claim a full leased-browser execution.
 No OAuth provider, SaaS write or real production login was invoked.
+
+
+## Credential and Agent approval transitions
+
+The remaining ordinary #210 source gaps were credential save/replace/revoke and
+Agent approval decision/consumption (occurrence8 × impact6 = 48 for missing
+records of these normal security operations). Both now use the existing main
+DB transaction-bound audit writer; an audit failure rolls back the protected
+transition. Repeated revocation or approval consumption creates no false event.
+
+Credential events contain only the opaque credential ID and empty metadata.
+The request-authenticated user/PAT supplies the actor; internal callers without
+that context remain system actors. No site, username, password or encrypted
+payload is recorded. Human approval decisions take the cookie-authenticated
+principal from the existing route. A device consuming approval is a system
+actor identified by its device ID, rather than a claimed human action. Both the
+Bot and task workspaces receive the same approval ID, run ID, decision (when
+applicable) and policy revision; tool input is excluded. Current membership,
+run ownership, lease and policy checks remain in the existing transaction guard.
+The five actions also have ordinary English and Chinese audit sentences.
+
+The same tracked, fully prepared isolated PG target passed 8/8 combined tests,
+zero skipped: the five authentication tests above plus the lifecycle parent and
+its two subtests. Real credential create/replace/revoke, peer rejection, actual
+user/token actors, both Bot/task workspace records, approve/deny, ten concurrent
+consume attempts yielding one permit, and audit-write rejection/atomic rollback
+were exercised. The KMS envelope generator and authenticated caller are explicit
+fixture ports; this is a business/database proof, not a live-provider run.
+New disposable lifecycle fixtures are retained on that target; historical DBs,
+account baselines and quarantine evidence are unchanged.
+
+Source verification also passed the complete credential unit scripts, audit
+contracts/routes, DB-runner inventory, typecheck and i18n/copy checks. Existing
+credential DB fixtures now load the tracked audit-table migration, matching the
+new transaction dependency; the required CI inventory includes both new tests.
+Real OAuth/model/SaaS and end-to-end provider fault-matrix acceptance remain
+unexecuted according to the owner's instructions and belong to #181. No new
+retention UI, legal retention period, SIEM platform or future event catalogue is
+introduced by this closeout.

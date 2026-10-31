@@ -2144,6 +2144,15 @@
           "signed_in": "登录",
           "sign_in_failed": "登录失败"
         },
+        "credential": {
+          "created": "保存凭据",
+          "replaced": "更新凭据",
+          "revoked": "撤销凭据"
+        },
+        "agent": {
+          "approval_decided": "{decision, select, approved {批准工具请求} denied {拒绝工具请求} other {处理工具请求}}",
+          "approval_consumed": "使用工具批准"
+        },
         "workspace": {
           "slug_changed": "把地址从 {from} 改为 {to}",
           "deleted": "删除了工作区",

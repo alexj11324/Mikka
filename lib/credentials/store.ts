@@ -1,5 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import { recordAudit } from '../audit/record'
 import { canonicalOrigin, CredentialError, type Actor, type BrowserCaller, type Envelope } from './contracts'
 import { seal, type Kms } from './kms'
 import { fingerprint } from './fingerprint'
@@ -52,6 +54,8 @@ export class CredentialStore {
       // Retain the snapshot but prevent reuse after replacing the secret.
       // Leases also bind the secret nonce and are rechecked under this lock.
       await client.query('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now()) WHERE credential_id=$1', [id])
+      await recordAudit(drizzle(client), { workspaceId: caller.workspaceId, actor: caller.auditActor ?? { type: 'system' },
+        action: existing ? 'credential.replaced' : 'credential.created', target: { type: 'credential', id } })
       await client.query('COMMIT')
       return { status: 'saved' as const, origin }
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
@@ -93,10 +97,12 @@ export class CredentialStore {
       await client.query('BEGIN')
       origin = canonicalOrigin(origin)
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${actor.userId}:${origin}`])
-      const row = (await client.query('UPDATE credentials SET revoked_at=now() WHERE user_id=$1 AND origin=$2 AND username=$3 RETURNING id', [actor.userId, origin, username])).rows[0]
+      const row = (await client.query('UPDATE credentials SET revoked_at=now() WHERE user_id=$1 AND origin=$2 AND username=$3 AND revoked_at IS NULL RETURNING id', [actor.userId, origin, username])).rows[0]
       if (row) {
         await client.query('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now()) WHERE credential_id=$1', [row.id])
         await client.query('UPDATE credential_fill_leases SET consumed_at=COALESCE(consumed_at,now()),input_envelope=NULL WHERE credential_id=$1', [row.id])
+        await recordAudit(drizzle(client), { workspaceId: actor.workspaceId, actor: actor.auditActor ?? { type: 'system' },
+          action: 'credential.revoked', target: { type: 'credential', id: row.id } })
       }
       await client.query('COMMIT')
       return { status: 'revoked' as const }

@@ -72,6 +72,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
   { marker: 'lib/audit/record.ts', file: 'tests/audit-record.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/audit/authentication.ts', file: 'tests/authentication-audit.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/credentials/store.ts', file: 'tests/security-lifecycle-audit.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/audit/delivery.ts', file: 'tests/audit-delivery.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/account/delete.ts', file: 'lib/account/store.db.test.ts', script: 'test:account-db' },
   { marker: 'lib/account/export-files.ts', file: 'lib/account/export-files.db.test.ts', script: 'test:account-db' },
