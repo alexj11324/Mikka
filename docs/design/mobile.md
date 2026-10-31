@@ -205,6 +205,14 @@ mobile drawer.
   following the link alone never changes its signed-in account. Proposals from
   `/api/pending-actions` sit at the end of every chat with 不要 and
   发送/保存到日历 (`POST /api/mobile/pending-actions/:id`).
+- **Navigation:** picking anything in the drawer, 新建, 新线程, a 建议 item or
+  a push about a chat starts the stack over on that screen (`lib/navigate.ts`),
+  so Back never returns to a screen left through the drawer. A chat's 线程
+  button pushes that bot's threads over the chat (Back returns to it); a thread
+  card or a push about a thread pushes the thread. The drawer's swipe works
+  only where nothing is pushed, so the system's swipe back always wins.
+- **Lists:** 线程, 任务 and 建议 pull to refresh; message text can be selected
+  and copied by long press.
 - **Lost session:** a 401 signs the app out locally and shows sign-in with
   「登录已失效，请重新登录。」.
 - **Sending:** a message that fails stays as its bubble with

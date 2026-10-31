@@ -1,11 +1,10 @@
 import { Pressable } from 'react-native'
-import * as WebBrowser from 'expo-web-browser'
 import { SourceIcon } from '@/components/icons'
 import { Row, SettingsPage } from '@/components/settings'
 import { Text } from '@/components/Text'
 import { Group } from '@/components/ui'
-import { API_URL } from '@/lib/config'
 import { useSettings } from '@/lib/settings'
+import { openOnWeb } from '@/lib/web'
 import { colors } from '@/lib/theme'
 
 const NAME: Record<string, string> = { gmail: 'Gmail', googlecalendar: 'Google 日历', notion: 'Notion', slack: 'Slack', linear: 'Linear', github: 'GitHub' }
@@ -15,8 +14,9 @@ export default function AppsScreen() {
   const { data, reload } = useSettings()
   const connected = (data?.apps ?? []).filter(app => app.connected)
   const available = (data?.apps ?? []).filter(app => !app.connected)
+  // Signed in on the web (a one-time token), not its sign-in page.
   const connect = async () => {
-    await WebBrowser.openBrowserAsync(`${API_URL}/settings`)
+    await openOnWeb('/settings')
     await reload()
   }
   return (

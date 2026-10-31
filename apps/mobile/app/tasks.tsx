@@ -1,4 +1,4 @@
-import { SectionList, StyleSheet, View } from 'react-native'
+import { RefreshControl, SectionList, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Circle, CircleCheck, CircleDashed, CircleDot, CircleX } from 'lucide-react-native'
 import { useDrawer } from '@/components/Drawer'
@@ -6,7 +6,7 @@ import { MenuIcon, Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import type { Task } from '@/lib/types'
-import { useApi } from '@/lib/useApi'
+import { useApi, useRefresh } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
 
 /** The web's task statuses (lib/issue-meta.ts) in board order, with their names. */
@@ -31,7 +31,8 @@ function TaskIcon({ status }: { status: string }) {
 export default function TasksScreen() {
   const drawer = useDrawer()
   const insets = useSafeAreaInsets()
-  const { data, error, loading } = useApi<{ tasks: Task[] }>('/api/mobile/tasks', 30_000)
+  const { data, error, loading, reload } = useApi<{ tasks: Task[] }>('/api/mobile/tasks', 30_000)
+  const refresh = useRefresh(reload)
   const sections = SECTIONS.map(s => ({ title: s.title, data: (data?.tasks ?? []).filter(t => s.status.includes(t.status)) })).filter(s => s.data.length)
   return (
     <View style={styles.screen}>
@@ -41,6 +42,7 @@ export default function TasksScreen() {
         keyExtractor={t => t.id}
         stickySectionHeadersEnabled={false}
         {...underBar}
+        refreshControl={<RefreshControl {...refresh} />}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : <Text style={styles.empty}>{error ? '任务加载失败。' : '还没有任务。'}</Text>}
         renderSectionHeader={({ section }) => <Text style={styles.section}>{section.title}</Text>}

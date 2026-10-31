@@ -12,6 +12,7 @@ import { Symbol } from '@/components/Symbol'
 import { Dot, Field, RoundButton } from '@/components/ui'
 import { tap } from '@/lib/haptics'
 import { useHome } from '@/lib/home'
+import { switchTo } from '@/lib/navigate'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
 import { colors, font } from '@/lib/theme'
 
@@ -36,6 +37,7 @@ export function DrawerHost({ children }: { children: ReactNode }) {
   const { width } = useWindowDimensions()
   const panel = Math.min(width * 0.82, 340)
   const path = usePathname()
+  const router = useRouter()
   const [isOpen, setOpen] = useState(false)
   // 0 closed … 1 open.
   const progress = useSharedValue(0)
@@ -60,7 +62,8 @@ export function DrawerHost({ children }: { children: ReactNode }) {
   }), [changed, isOpen, settle])
 
   const pan = Gesture.Pan()
-    .enabled(isOpen || drawerRoot(path))
+    // A screen pushed over another (threads from a chat) keeps the system's swipe back.
+    .enabled(isOpen || (drawerRoot(path) && !router.canGoBack()))
     // Closed: only a rightward swipe takes over, so the chat's leftward swipe (message times) and vertical scrolling stay theirs.
     .activeOffsetX(isOpen ? [-12, 12] : [-10000, 14])
     .failOffsetY([-14, 14])
@@ -105,7 +108,7 @@ function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const path = usePathname()
-  const go = (href: Href) => { onNavigate(); setQuery(null); Keyboard.dismiss(); router.replace(href) }
+  const go = (href: Href) => { onNavigate(); setQuery(null); Keyboard.dismiss(); switchTo(href) }
   const { data } = useHome()
   const updateReady = useUpdateReady()
   // 最近: newest chat first (mobile.md). Pinning is not on the server yet, so there is no 置顶 group.
@@ -125,7 +128,7 @@ function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
           <TextInput value={query ?? ''} onChangeText={setQuery} placeholder="搜索" placeholderTextColor={colors.secondary} returnKeyType="search"
             accessibilityLabel="搜索" style={styles.search} clearButtonMode="while-editing" />
         </Field>
-        <RoundButton label="新建" onPress={() => go('/')}>
+        <RoundButton label="新建" onPress={() => go({ pathname: '/', params: { compose: '1' } })}>
           <Symbol name="square.and.pencil" size={19} web={<PenLine size={19} color={colors.ink} strokeWidth={2} />} />
         </RoundButton>
       </View>

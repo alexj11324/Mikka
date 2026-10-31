@@ -43,3 +43,13 @@ export function useApi<T>(path: string | null, every = 0) {
 
   return { data, error, loading, reload: load, setData }
 }
+
+/** Pull to refresh for a list (the system's RefreshControl): reloads and shows the spinner until the data is back. */
+export function useRefresh(reload: () => Promise<void>) {
+  const [refreshing, setRefreshing] = useState(false)
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try { await reload() } finally { setRefreshing(false) }
+  }, [reload])
+  return { refreshing, onRefresh }
+}
