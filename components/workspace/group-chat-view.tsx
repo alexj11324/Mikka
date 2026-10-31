@@ -39,7 +39,7 @@ export function GroupChatView({ group, userId, people }: {
   const older = pages?.at(-1)?.nextBefore ?? null
   const loadingOlder = isValidating && !!pages && size > pages.length
   const code = error instanceof GroupMessagesRequestError ? error.code : error ? 'unavailable' : null
-  const authorName = (type: 'user' | 'agent', id: string) => type === 'user'
+  const authorName = (type: 'user' | 'agent' | 'bot', id: string) => type === 'user'
     ? id === userId ? t('you') : people.get(id) ?? t('member')
     : bots.find(bot => bot.id === id)?.name ?? t('bot')
 
