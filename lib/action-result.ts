@@ -2,6 +2,7 @@ export const ACTION_ERROR_CODES = [
   'generic',
   'botNotFound',
   'executionPlaceInvalid',
+  'executionAutoNotAllowed',
   'executionHarnessUnavailable',
   'executionModelUnknown',
   'executionRuleNotFound',

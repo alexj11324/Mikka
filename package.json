@@ -153,7 +153,7 @@
     "test:issue-readonly-dom": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/issue-readonly-dom.test.tsx",
     "test:factory-acceptance-ui": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/factory/acceptance-state.test.ts lib/factory/reject-flow.test.ts components/workspace/factory-acceptance.test.tsx scripts/factory-acceptance-ui.test.tsx",
     "test:device-enrollment-db": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/device-enrollment.db.test.ts",
-    "test:execution-rules": "node --import ./scripts/server-test.mjs --import tsx --test lib/execution-rules.test.ts lib/execution-worker.test.ts && pnpm --filter @mikka/daemon exec vitest run src/harness-models.test.ts test/commands.test.ts && pnpm --filter @mikka/protocol exec vitest run src/execution.test.ts",
+    "test:execution-rules": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/bot-quota-fallback.test.ts lib/execution-rules.test.ts lib/execution-worker.test.ts && pnpm --filter @mikka/daemon exec vitest run src/harness-models.test.ts test/commands.test.ts && pnpm --filter @mikka/protocol exec vitest run src/execution.test.ts",
     "test:execution-settings-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/execution-settings.db.test.ts",
     "test:audit": "node --import tsx --test lib/audit/events.test.ts",
     "test:audit-db": "node --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/audit-record.db.test.ts",

@@ -19,10 +19,9 @@ export async function freezeBotModel(
   const settings = new ExecutionSettings(pool);
   const settingsScope = { ownerId: scope.ownerId, workspaceId };
   const selected = await settings.botModel(settingsScope, scope.botId);
-  const available = await settings.botModels(settingsScope);
   const binding = selected
     ? await settings.botBinding(settingsScope, selected)
-    : available[0];
+    : undefined;
   if (!binding) throw new SubscriptionRefusal("binding_required");
   return freezeHostedModelSelection(
     { ...scope, workspaceId },

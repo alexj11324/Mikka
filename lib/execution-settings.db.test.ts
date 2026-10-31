@@ -24,7 +24,7 @@ test(
     });
     try {
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
-      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
+      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
@@ -48,6 +48,7 @@ test(
       await pool.query(migration);
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
+      const explicitMigration = await readFile(new URL("../drizzle/20261031001500_explicit_execution.sql",import.meta.url),"utf8");
       const settings = new ExecutionSettings(pool),
         alice = { ownerId: "alice", workspaceId: randomUUID() },
         bob = { ...alice, ownerId: "bob" },
@@ -58,14 +59,29 @@ test(
         binding = randomUUID(),
         connection = randomUUID();
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",kind,enabled,harnesses) VALUES ($1,'alice','local',true,'[{"harness":"codex","installed":true,"models":["explicit-model"]}]'),($2,'bob','local',true,'[]')`,
+        `INSERT INTO devices (id,"ownerId",kind,enabled,"lastSeenAt",harnesses) VALUES ($1,'alice','local',true,now(),'[{"harness":"codex","installed":true,"models":["explicit-model"],"defaultModelSlot":"default","modelSlots":[{"slot":"default","model":"explicit-model","name":"Explicit model"}]}]'),($2,'bob','local',true,now(),'[]')`,
         [own, foreign],
       );
+      const legacyId = randomUUID();
+      await pool.query(
+        `INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,'alice',$2,'legacy','auto','auto','auto',0)`,
+        [legacyId, alice.workspaceId],
+      );
+      await pool.query(explicitMigration);
+      await pool.query(explicitMigration);
+      assert.equal((await pool.query('SELECT model FROM execution_rules WHERE id=$1',[legacyId])).rows[0].model,'default');
+      const migrated = await settings.list(alice);
+      assert.equal(
+        migrated.find((r) => r.id === legacyId)?.model,
+        "default",
+      );
+      assert.equal(migrated.find((r) => r.id === legacyId)?.place, own);
+      await settings.mutate(alice, { kind: "delete", id: legacyId });
       const value = {
         label: "backend",
         place: own,
         harness: "codex" as const,
-        model: "auto",
+        model: "explicit-model",
       };
       assert.deepEqual(
         (await settings.list(alice)).map((r) => r.id),
@@ -74,11 +90,51 @@ test(
       await settings.mutate(alice, { kind: "save", value });
       await settings.mutate(alice, {
         kind: "save",
-        value: { ...value, label: "frontend", place: "cloud" },
+        value: { ...value, label: "frontend" },
       });
+      await pool.query('DELETE FROM execution_rules WHERE label IS NULL AND "ownerId"=$1 AND "workspaceId"=$2',[alice.ownerId,alice.workspaceId]);
+      await Promise.all(Array.from({ length: 12 }, () => settings.list(alice)));
+      await settings.mutate(alice, {
+        kind: "save",
+        id: "default",
+        value: { ...value, model: "explicit-model" },
+      });
+      assert.equal(
+        (await settings.list(alice)).find((r) => r.id === "default")?.place,
+        own,
+      );
+      assert.equal(
+        (
+          await pool.query(
+            'SELECT count(*)::int AS n FROM execution_rules WHERE label IS NULL AND "ownerId"=$1 AND "workspaceId"=$2',
+            [alice.ownerId, alice.workspaceId],
+          )
+        ).rows[0].n,
+        1,
+      );
+      assert.deepEqual(await settings.fallbacks("alice"), {
+        whenDeviceOffline: "wait",
+        whenQuotaExhausted: "stop",
+      });
+      await settings.setFallbacks("alice", {
+        whenDeviceOffline: "cloud",
+        whenQuotaExhausted: "switchAccount",
+      });
+      assert.equal(
+        (await settings.fallbacks("alice")).whenDeviceOffline,
+        "cloud",
+      );
+      for (const field of ["place", "harness", "model"])
+        await assert.rejects(
+          settings.mutate(alice, {
+            kind: "save",
+            value: { ...value, [field]: "auto" },
+          }),
+          { code: "executionAutoNotAllowed" },
+        );
       const rules = await settings.list(alice),
         ids = rules.filter((r) => r.label !== null).map((r) => r.id);
-      assert.equal((await settings.list(bob)).length, 1);
+      await assert.rejects(settings.list(bob),{code:"executionModelUnknown"});
       assert.equal((await settings.list(other)).length, 1);
       await assert.rejects(
         settings.mutate(alice, {
@@ -163,12 +219,21 @@ test(
         "dynamic-model",
       );
       assert.equal((await settings.botModels(bob)).length, 0);
+      const server = randomUUID(),claudeConnection=randomUUID(),claudeBinding=randomUUID();
+      await pool.query(`INSERT INTO devices (id,"ownerId",kind,enabled,"lastSeenAt","deviceType",harnesses) VALUES ($1,'alice','local',true,now(),'server',$2)`,[server,JSON.stringify([{harness:'claude_code',installed:true,models:['opus'],defaultModelSlot:'opus',modelSlots:[{slot:'opus',model:'reported-opus',name:'Reported opus'}]}])]);
+      await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",epoch,state,provider) VALUES ($1,'alice',$2,1,'connected','claude')`,[claudeConnection,alice.workspaceId]);
+      await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision","modelId",route) VALUES ($1,'alice',$2,$3,$4,1,'reported-opus','claude_cpa')`,[claudeBinding,alice.workspaceId,bot,claudeConnection]);
+      assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:server,harness:'claude_code',model:'opus',position:2147483647});
+      await pool.query(`UPDATE byos_connections SET state='disconnected' WHERE id=$1`,[claudeConnection]);
+      assert.equal((await settings.suggested(alice)).harness,'codex');
+      assert.equal((await settings.suggested(alice)).model,'default');
+      await pool.query('DELETE FROM devices WHERE id=$1',[server]);
+
       await assert.rejects(settings.setBotModel(bob, bot, binding));
       await assert.rejects(settings.setBotModel(other, bot, binding));
       await settings.setBotModel(alice, bot, binding);
       assert.equal(await settings.botModel(alice, bot), binding);
-      await settings.setBotModel(alice, bot, null);
-      assert.equal(await settings.botModel(alice, bot), undefined);
+      await assert.rejects(settings.setBotModel(alice, bot, null),{code:"executionAutoNotAllowed"});
       await settings.setBotModel(alice, null, binding);
       assert.equal(await settings.botModel(alice, null), binding);
       const secondBot = randomUUID();
@@ -218,7 +283,7 @@ test(
       }), {code:'executionAccountUnavailable'});
       assert.equal((await pool.query(`SELECT count(*)::int AS count FROM byos_bindings WHERE "modelId"='stale-provider-model'`)).rows[0].count,0);
       await pool.query(`UPDATE byos_connections SET epoch=1 WHERE id=$1`,[connection]);
-      const ruleValue = {label:'typed', place:own,harness:'codex' as const,model:'auto'};
+      const ruleValue = {label:'typed', place:own,harness:'codex' as const,model:'explicit-model'};
       for (const [patch,code] of [[{place:'invalid'},'executionPlaceInvalid'],[{harness:'missing'},'executionHarnessUnavailable'],[{model:'missing'},'executionModelUnknown']] as const) {
         await assert.rejects(settings.mutate(alice, {kind:'save',value:{...ruleValue,...patch} as typeof ruleValue}), {code});
       }
