@@ -273,7 +273,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   agents use their own brand mark (Claude Code, Codex, Cursor…); models use
   their provider's mark (Claude, OpenAI…); apps use the R-70 brand tile.
   Brand marks are the colored logo on its own, never set in a white disc or
-  a bordered circle. 自动 uses one neutral icon so lists line up. Name-only
+  a bordered circle. There is no 自动 choice (decision 2026-10-30). Name-only
   text for these things fails review. Build them with the shared label
   components, not by hand.
 - **R-72** Two kinds of work. A real task, such as coding, is a thread: a full

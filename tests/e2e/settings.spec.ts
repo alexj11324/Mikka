@@ -265,7 +265,7 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(sidebar.getByRole('link', { name: '设置回归团队', exact: true })).toHaveAttribute('aria-current', 'page')
   await expectItems(sidebar.locator('[data-slot="sidebar-group-label"]'), ['个人', '工作区', '你的团队'])
   const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^工作区$/ }) })
-  await expectItems(administration.locator('[data-slot="sidebar-menu-button"]'), ['常规', '成员', '团队', '团队权限', '密钥与环境', '审计日志', '用量', '计费'])
+  await expectItems(administration.locator('[data-slot="sidebar-menu-button"]'), ['常规', '成员', '团队', 'Bot 与 Agents', '团队权限', '密钥与环境', '审计日志', '用量', '计费'])
   await expect(sidebar.locator('[data-slot="sidebar-menu-sub"]')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '团队常规设置', exact: true })).toHaveCount(0)
   const settings = page.getByRole('region', { name: '团队设置选项', exact: true })

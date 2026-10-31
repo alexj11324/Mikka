@@ -1633,7 +1633,8 @@
         "title": "General"
       },
       "bots": {
-        "title": "Bots"
+        "title": "Bots & Agents",
+        "keywords": "bots agents model location harness rules labels"
       },
       "permissions": {
         "title": "Team permissions"
@@ -2267,6 +2268,53 @@
         "unpaid": "Unpaid",
         "incomplete": "Payment pending"
       }
+    },
+    "botAgents": {
+      "bots": "Bots",
+      "addRule": "Add rule",
+      "default": "Default",
+      "cloud": "Cloud",
+      "online": "Online",
+      "offline": "Offline",
+      "removedDevice": "Removed device",
+      "redetect": "Detect again",
+      "searchModels": "Search models",
+      "claudeAccount": "Claude",
+      "openaiAccount": "ChatGPT",
+      "add": "Add",
+      "save": "Save",
+      "delete": "Delete",
+      "rowMenu": "More for {label}",
+      "cell": "{row} {column}: {value}",
+      "loading": "Loading bots and agents",
+      "loadFailed": "Couldn't load bots and agents",
+      "notSaved": "Not saved",
+      "retry": "Retry",
+      "columns": {
+        "label": "Label",
+        "place": "Runs on",
+        "harness": "Harness",
+        "model": "Model",
+        "actions": "Actions"
+      },
+      "botHint": "Talks with you and hands out tasks",
+      "defaults": "Task defaults",
+      "noAccount": "No account connected",
+      "whenQuotaExhausted": "When quota runs out",
+      "whenQuotaExhaustedHint": "After the Bot's account runs out of quota",
+      "quotaStop": "Stop and wait for me",
+      "quotaSwitch": "Switch to another account",
+      "setting": "{name}: {value}",
+      "defaultsNote": "Tasks whose labels match no rule use these",
+      "placeHint": "Where a task runs",
+      "harnessHint": "The coding agent that runs the task",
+      "modelHint": "The model the harness uses",
+      "whenDeviceOffline": "When the device is offline",
+      "whenDeviceOfflineHint": "When the chosen device is not online",
+      "offlineWait": "Wait for it",
+      "offlineCloud": "Run in the cloud",
+      "labels": "By label",
+      "labelsNote": "Matched against task labels from top to bottom"
     }
   },
   "TelegramBot": {
