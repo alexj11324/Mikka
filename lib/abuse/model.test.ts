@@ -3,7 +3,8 @@ import { before, beforeEach, mock, test } from 'node:test'
 let verified = true,
   allow = true
 const reservations: string[] = [],
-  settlements: Array<{ id: string; cost: number | null }> = []
+  settlements: Array<{ id: string; cost: number | null; generationId?: string }> = [],
+  generations: string[] = []
 let generated = 0,
   streamed = 0,
   cost: unknown = '0.002'
@@ -73,8 +74,9 @@ mock.module(new URL('./runtime.ts', import.meta.url).href, {
         if (!allow) throw Error('points_exhausted')
         reservations.push(id)
       },
-      settle: async (id: string, cost: number | null) => {
-        settlements.push({ id, cost })
+      recordGeneration: async (_id: string, generationId: string) => { generations.push(generationId) },
+      settle: async (id: string, cost: number | null, _input?: number, _output?: number, generationId?: string) => {
+        settlements.push({ id, cost, ...(generationId ? { generationId } : {}) })
       },
     },
   },
@@ -94,6 +96,7 @@ beforeEach(() => {
   streamed = 0
   reservations.length = 0
   settlements.length = 0
+  generations.length = 0
   modelOptions.length = 0
   managed = false
   denyAt = null
@@ -186,4 +189,35 @@ test('a trusted custom-key Gateway remains usable under an allowed managed route
   denyAt='prepare'
   await assert.rejects(Promise.resolve(wrapped.doGenerate({prompt:[]})),/modelRouteDenied/)
   assert.equal(generated,1)
+})
+
+for (const ending of ['error', 'cancel', 'finish'] as const) test(`early Gateway identity survives ${ending} without invented cost`, async () => {
+  let controller!: ReadableStreamDefaultController
+  let cancelled = false
+  const source = new ReadableStream({
+    start(value) {
+      controller = value
+      value.enqueue({ type: 'text-delta', id: 't', delta: 'Partial', providerMetadata: { gateway: { generationId: 'synthetic-generation' } } })
+    },
+    cancel() { cancelled = true },
+  })
+  const wrapped = await hostedModel('workspace', 'fixture-model', { ...model, doStream: async () => ({ stream: source }) } as never)
+  const reader = (await wrapped.doStream({ prompt: [] })).stream.getReader()
+  await reader.read()
+  assert.deepEqual(generations, ['synthetic-generation'], 'identity is persisted before content reaches the caller')
+  assert.equal(settlements.length, 0, 'the identity alone does not settle or debit money')
+  if (ending === 'cancel') {
+    await reader.cancel()
+    assert.equal(cancelled, true)
+  } else if (ending === 'error') {
+    controller.error(new Error('Synthetic interrupted transport'))
+    await assert.rejects(reader.read(), /interrupted transport/)
+  } else {
+    controller.enqueue({ type: 'finish', usage, finishReason: { unified: 'stop', raw: 'stop' }, providerMetadata: { gateway: { cost: '0.002' } } })
+    controller.close()
+    while (!(await reader.read()).done) {}
+  }
+  assert.ok(settlements.length)
+  assert.ok(settlements.every(row => row.generationId === 'synthetic-generation'))
+  assert.equal(settlements.at(-1)?.cost, ending === 'finish' ? 2000 : null)
 })

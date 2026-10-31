@@ -112,32 +112,56 @@ export async function hostedModel(
             requestStarted = true
             const result = await selected.doStream(prepared)
             let finished = false
+            let generationId: string | undefined
+            const reader = result.stream.getReader()
             return {
               ...result,
-              stream: result.stream.pipeThrough(
-                new TransformStream({
-                  async transform(chunk, controller) {
+              stream: new ReadableStream({
+                async pull(controller) {
+                  try {
+                    const { value: chunk, done } = await reader.read()
+                    if (done) {
+                      if (!finished) await hostedUsage.settle(id, null, 0, 0, generationId)
+                      controller.close()
+                      return
+                    }
+                    // Gateway exposes its lookup ID on the first content chunk,
+                    // before a finish receipt can be lost to interruption.
+                    if (chunk.type !== 'finish' && 'providerMetadata' in chunk) {
+                      const observed = gatewayGenerationId(chunk.providerMetadata)
+                      if (observed && observed !== generationId) {
+                        await hostedUsage.recordGeneration(id, observed)
+                        generationId = observed
+                      }
+                    }
                     if (chunk.type === 'finish') {
-                      finished = true
                       const cost = gatewayCost(chunk.providerMetadata)
                       await hostedUsage.settle(
                         id,
                         cost,
                         chunk.usage.inputTokens.total ?? 0,
                         chunk.usage.outputTokens.total ?? 0,
-                        gatewayGenerationId(chunk.providerMetadata),
+                        gatewayGenerationId(chunk.providerMetadata) ?? generationId,
                       )
+                      finished = true
                       await checkAbuseAlerts()
                       if (cost === null)
                         throw new PaidResourceError('usage_cost_unavailable')
                     }
                     controller.enqueue(chunk)
-                  },
-                  async flush() {
-                    if (!finished) await hostedUsage.settle(id, null)
-                  },
-                }),
-              ),
+                  } catch (error) {
+                    try { if (!finished) await hostedUsage.settle(id, null, 0, 0, generationId) }
+                    finally {
+                      controller.error(error)
+                      await reader.cancel(error).catch(() => {})
+                    }
+                  }
+                },
+                async cancel(reason) {
+                  try { if (!finished) await hostedUsage.settle(id, null, 0, 0, generationId) }
+                  finally { await reader.cancel(reason) }
+                },
+              }),
             }
           } catch (error) {
             await hostedUsage.settle(id, requestStarted ? null : 0)
