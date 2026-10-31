@@ -12,6 +12,7 @@ export function detectComputerDriver(
   binary?: string,
 ): Promise<ComputerDriver | null>;
 export function normalizeCall(value: unknown): ComputerCall;
+export function actionStep(value: unknown): string | null;
 export function executeDriver(
   driver: ComputerDriver,
   input: unknown,
@@ -23,7 +24,8 @@ export function executeDriver(
 export type CaptureCall =
   | { action: "screenshot"; title: string }
   | { action: "start_recording"; title: string; maxSeconds?: number }
-  | { action: "stop_recording" };
+  | { action: "stop_recording" }
+  | { action: "step"; label: string; source: "action" | "mark" };
 export const CAPTURE_TOOLS: { name: string; description: string; inputSchema: Record<string, unknown> }[];
 export function normalizeCaptureCall(value: unknown): CaptureCall;
 export function isCaptureTool(name: unknown): boolean;

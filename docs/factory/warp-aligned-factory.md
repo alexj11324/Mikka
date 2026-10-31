@@ -14,7 +14,8 @@ Mikka adopts the Warp Factories trust model:
    the definition digest it started under, so a mid-flight configuration change
    cannot silently change its authorization.
 2. **Humans approve work; repositories enforce merges.** A person signs off a
-   spec when one is required, and a person merges pull requests. Factory agents
+   spec when one is required, and a person merges pull requests (in Mikka,
+   with 验收并合并, as themselves). Factory agents
    open pull requests and never merge. Branch protection and repository
    permissions are the enforced control, not an in-application membership
    check.
@@ -70,43 +71,42 @@ secrets: []
 - `secrets` are **names only**. Values live in the managed secret store and are
   granted to specific agents; a definition can never carry a secret value.
 
-## Publication authorization in this repository
+## Acceptance is the merge (#528)
 
-The application's approval is a human one. A person approves in the browser and
-`factory_approvals` records the live, GitHub- or Google-linked session; the same
-session is re-checked at the gate, pre-POST and reconciliation boundaries. No
-decision credential, policy service or attestation issuer is required, and an
-agent cannot approve its own work because only a real browser session crosses
-that route. The optional policy host below is the stricter path for worker-side
-or unattended publication, not a prerequisite for the default model.
+As in Warp Factories, a code candidate has no approve, publish or deploy step
+and no expiry window. The acceptance tab shows the PR, the review and
+verification results and the evidence; its one action, 验收并合并, merges the
+PR as the accepting person:
 
-`FactoryPublicationHost.reviewKey` is optional. A host that installs a trusted
-public key keeps the strict deployment: every publication must carry a signed
-review envelope, verified against that key.
+- `POST /api/factory/tasks/:taskId/approval` with `operation: "accept"`
+  (`lib/factory/merge.ts`). Only a browser session reaches it: the route refuses
+  any `Authorization` header, so agents and workers cannot merge.
+- The merge uses that person's GitHub App user-to-server token
+  (`githubUserToken`), never an app, installation or agent identity, and passes
+  GitHub's `sha` parameter so it merges only the reviewed candidate commit. The
+  merge method is the repository's first allowed one (merge, squash, rebase).
+- GitHub's branch protection, required checks and permissions decide. A refusal
+  is a stable code and the task keeps waiting for acceptance:
+  `githubMergeAuthorizationRequired` (with the PR URL to open on GitHub),
+  `githubMergeForbidden`, `githubMergeBlocked`, `githubMergeConflict`,
+  `githubMergeHeadMoved`, `githubMergeClosed`, `githubUnavailable`.
+- `factory_merges` records each attempt; one merge per candidate is active at a
+  time, so a double click makes one merge call.
+- The task completes (approval and publish pass, each gate checking the merged
+  row) on the merge's success or on a verified `pull_request` closed+merged
+  webhook, which also completes a merge made directly on GitHub.
+- Preview deployments come from the repository's own integration (Vercel on the
+  PR) and are evidence only. The local and Vercel publication adapters are not
+  registered for acceptance, and the production composition refuses `approve` for
+  a code candidate (`codeCandidatesMerge`, error `factoryAcceptanceIsMerge`).
 
-The policy host installs no key and no signer by default, so the review cannot
-carry authority and nothing requires it:
+A skill candidate has no PR. It is still approved and enabled through
+`factory_approvals` / `factory_publications` with the skill activation adapter.
+Those tables stay readable for history.
 
-- Authorization comes from the registered policy (`host.policy()`), the
-  committed `passed` review/verify receipts, and the existing task, run, token,
-  device, lease and STOP fences.
-- The returned decision evidence records `verification.attestation: "advisory"`
-  with no signature digest, key fingerprint or model judgment. Advisory grants
-  use the host-owned issuer name `factory-host-policy` for ledger uniqueness;
-  the credential id is only an idempotency key.
-- Advisory mode may accompany `deploy_preview` only. `deploy_production` and
-  `activate_skill` fail with `factoryPolicyAttestationRequired` until a trusted
-  signer is installed.
-- `merge` is denied in both modes. The application opens pull requests; a person
-  merges, and repository protection is the enforced control.
-
-A chunk written by an agent can never change an advisory decision: the verifier
-does not read it, and a registered `deny` or `readOnly` policy still stops the
-publication.
-
-There is no production composition of this host yet. When one is added, it mints
-the approval's `decisionCredentialId` server-side; the field is an idempotency
-key, not a caller-supplied authority.
+Deployment requirement: the GitHub App that signs people in must grant
+`contents: write` and `pull_requests: write`, or GitHub refuses the merge
+(`githubMergeForbidden`).
 
 ## Credentials
 
@@ -135,15 +135,15 @@ migration.
 
 1. **Landed:** definition, strict validator, digest, CI check, tests. No
    production behavior changes.
-2. **Landed:** `reviewKey` optional, advisory review, no merge, irreversible
-   actions behind the strict attestation. Wiring the definition digest into the
-   host follows when a production composition exists.
+2. **Landed:** advisory review; acceptance is the person's own merge of the
+   candidate PR (#528). Agents and workers still never merge.
 3. Per-agent secret allowlists and `credentialStrategy` execution.
 4. Runner shapes, `workerHost` and hard budget caps for per-thread machines.
 
 ## Non-goals
 
-- No in-application merge authority.
+- No agent or app merge authority: only the accepting person's own GitHub
+  identity merges.
 - No secret values in the definition or in prompts.
 - No self-approved publication: an agent cannot approve its own work.
 - No claim that a passing factory-config check proves provider acceptance.

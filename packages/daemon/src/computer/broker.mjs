@@ -6,9 +6,11 @@ import {
 } from "node:crypto";
 import { chmodSync } from "node:fs";
 import { createServer } from "node:net";
-import { normalizeCall, normalizeCaptureCall, executeDriver } from "./driver.mjs";
+import { actionStep, normalizeCall, normalizeCaptureCall, executeDriver } from "./driver.mjs";
 export class ComputerBroker {
   grants = new Map();
+  // runId → when its screen recording stops by itself; only set while one runs.
+  recordingUntil = new Map();
   pending = new Map();
   sockets = new Set();
   suspended = false;
@@ -91,6 +93,20 @@ export class ComputerBroker {
     if (!grant || signal?.aborted || !this.permitted(grant.runId))
       return Promise.reject(new Error("Not permitted"));
     const call = normalizeCall(value);
+    const step = actionStep(value);
+    return this.requestCall(token, grant, call, signal).then((result) => {
+      this.markStep(grant.runId, step);
+      return result;
+    });
+  }
+  /** While this run records, a done action's description becomes a step on the recording (best effort; never fails the action). */
+  markStep(runId, label) {
+    const until = this.recordingUntil.get(runId);
+    if (!label || !this.capture || until === undefined) return;
+    if (this.now() > until) { this.recordingUntil.delete(runId); return; }
+    void Promise.resolve().then(() => this.capture(runId, { action: "step", label, source: "action" })).catch(() => {});
+  }
+  requestCall(token, grant, call, signal) {
     const actionId = randomUUID();
     const assertLive = () => {
       if (this.suspended || signal?.aborted || this.grants.get(token) !== grant ||
@@ -148,7 +164,11 @@ export class ComputerBroker {
       return { error: "Not permitted" };
     const call = normalizeCaptureCall(value);
     try {
-      return { result: await this.capture(grant.runId, call, signal) };
+      const result = await this.capture(grant.runId, call, signal);
+      // The broker keeps the recording window so it reports action steps only while one runs.
+      if (call.action === "start_recording" && typeof result?.stopsAt === "string") this.recordingUntil.set(grant.runId, Date.parse(result.stopsAt));
+      if (call.action === "stop_recording") this.recordingUntil.delete(grant.runId);
+      return { result };
     } catch (error) {
       // Only the server's own fixed wording, never transport or provider detail.
       const detail = typeof error?.safeMessage === "string" ? error.safeMessage.slice(0, 300) : undefined;

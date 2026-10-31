@@ -403,7 +403,7 @@ test("capture calls skip review but still need the run's grant", async (t) => {
 });
 test("capture calls cannot choose the desktop, a path or a longer recording", async (t) => {
   const { normalizeCaptureCall, CAPTURE_TOOLS } = await import("./driver.mjs");
-  assert.deepEqual(CAPTURE_TOOLS.map(tool => tool.name), ["capture_screenshot", "start_screen_recording", "stop_screen_recording"]);
+  assert.deepEqual(CAPTURE_TOOLS.map(tool => tool.name), ["capture_screenshot", "start_screen_recording", "stop_screen_recording", "mark_recording_step"]);
   for (const value of [
     { name: "capture_screenshot", arguments: { title: "x", display: ":3" } },
     { name: "capture_screenshot", arguments: { title: "x", path: "/etc/passwd" } },
@@ -447,4 +447,43 @@ test("the proxy lists capture tools only with --captures and relays them over th
   assert.ok(cloud.get(1).tools.some(tool => tool.name === "capture_screenshot"));
   assert.deepEqual(JSON.parse(cloud.get(2).content[0].text), { action: "screenshot", capture: { id: "c1", title: "Home" } });
   assert.equal(b.list().length, 0);
+});
+
+test("a done action's step goes on the recording timeline only while recording; the driver never sees it", async (t) => {
+  const { normalizeCall, normalizeCaptureCall, TOOLS } = await import("./driver.mjs");
+  for (const name of ["click", "type_text", "press_key", "scroll"]) assert.ok(TOOLS.find(tool => tool.name === name).inputSchema.required.includes("step"), `${name} asks for its step`);
+  assert.deepEqual(normalizeCall({ name: "click", arguments: { x: 1, y: 2, step: "  Click  Sign in " } }), { name: "click", arguments: { x: 1, y: 2 } });
+  assert.throws(() => normalizeCall({ name: "get_desktop_state", arguments: { step: "look" } }));
+  assert.throws(() => normalizeCall({ name: "click", arguments: { x: 1, y: 2, step: " " } }));
+  assert.deepEqual(normalizeCaptureCall({ name: "mark_recording_step", arguments: { label: "首屏出现" } }), { action: "step", label: "首屏出现", source: "mark" });
+  assert.throws(() => normalizeCaptureCall({ name: "mark_recording_step", arguments: { label: "x", atMs: 5 } }));
+  const relayed = [];
+  const executed = [];
+  let clock = 1_000;
+  const b = await fixture(t, {
+    now: () => clock,
+    execute: async (_, call) => { executed.push(call); return { content: [] }; },
+    capture: async (_runId, call) => {
+      relayed.push(call);
+      if (call.action === "start_recording") return { action: call.action, recordingId: "r1", stopsAt: new Date(clock + 60_000).toISOString() };
+      return { action: call.action };
+    },
+  });
+  const { token } = b.spec("run-1", "allow");
+  const tick = () => new Promise(resolve => setImmediate(resolve));
+  await b.request(token, { name: "click", arguments: { x: 1, y: 2, step: "Before recording" } });
+  await tick();
+  assert.deepEqual(relayed, [], "no recording, no step");
+  // Fake clock: Date.parse(stopsAt) is relative to the broker's own now().
+  clock = Date.now();
+  await b.captureRequest(token, { name: "start_screen_recording", arguments: { title: "Flow" } });
+  await b.request(token, { name: "click", arguments: { x: 1, y: 2, step: "点击登录按钮" } });
+  await tick();
+  assert.deepEqual(relayed.at(-1), { action: "step", label: "点击登录按钮", source: "action" });
+  assert.deepEqual(executed.at(-1), { name: "click", arguments: { x: 1, y: 2 } }, "the driver gets the action, never the description");
+  await b.captureRequest(token, { name: "stop_screen_recording", arguments: {} });
+  const count = relayed.length;
+  await b.request(token, { name: "scroll", arguments: { direction: "down", amount: 3, x: 1, y: 2, step: "After" } });
+  await tick();
+  assert.equal(relayed.length, count, "a stopped recording takes no more steps");
 });

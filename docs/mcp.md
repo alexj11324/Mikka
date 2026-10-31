@@ -116,7 +116,7 @@ credential (cloud threads also have no network):
 | Where the thread runs | Tools | Path |
 | --- | --- | --- |
 | Local daemon (Playwright on the person's machine) | `submit_capture { path, title }` on the daemon's `mikka` MCP | The MCP copies a file from the worktree or the run's temp dir into the run dir; the daemon checks it again (no links, bytes, limit), then `POST /v1/runs/:runId/captures` → PUT to a presigned R2 URL (or the server without a bucket) → `POST …/:captureId/complete`, where the server re-reads the object and checks size, sha256 and type before it counts |
-| Cloud computer | `capture_screenshot { title }`, `start_screen_recording { title, maxSeconds? }`, `stop_screen_recording {}` on `mikka_computer` | The cloud worker relays the call to `POST /v1/runs/:runId/screen`; the server picks the desktop from the run's binding and runs `scripts/e2b/screen-capture.sh` (ffmpeg x11grab) in the sandbox through E2B |
+| Cloud computer | `capture_screenshot { title }`, `start_screen_recording { title, maxSeconds? }`, `stop_screen_recording {}`, `mark_recording_step { label }` on `mikka_computer` | The cloud worker relays the call to `POST /v1/runs/:runId/screen`; the server picks the desktop from the run's binding and runs `scripts/e2b/screen-capture.sh` (ffmpeg x11grab) in the sandbox through E2B |
 
 Cloud captures need no per-call review: the image never goes back to the
 model. New screenshots and recordings are refused while the person holds the
@@ -130,6 +130,18 @@ Screenshot and recording starts serialize with revocation and STOP, with a
 bounded wait and cancellation. If an issued provider request times out or
 is cancelled, its outcome is unknown; it is not automatically retried and
 the caller must not assume the remote operation was undone.
+
+A recording has a step timeline (Figma 13 「操作」). Each computer action
+(`click`, `type_text`, `press_key`, `scroll`) carries a required `step`: what it
+does in plain words for the person (「点击登录按钮」), never coordinates or a
+tool name. The driver never sees it. While the broker's own recording window
+is open (from `start_screen_recording`'s `stopsAt` until stop), it relays a
+done action's step as `POST /v1/runs/:runId/screen {action:"step",label,source:"action"}`;
+`mark_recording_step` marks a moment that is not an action (`source:"mark"`).
+The server masks the label like a title and keeps it in `run_capture_steps`
+as an offset from `run_captures.startedAt` (set once ffmpeg is up), at most
+200 per recording; with no recording going, nothing is kept. The Factory
+evidence viewer lists the steps beside the video and seeks on click.
 
 The daemon can resume an upload it registered while the run was active, even
 after that run ends, while its 15-minute reservation is valid. A stop request

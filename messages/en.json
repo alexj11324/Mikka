@@ -3007,7 +3007,9 @@
     "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
     "send": "Send",
     "retryStop": "Try stopping again",
-    "waiting": "Waiting for you"
+    "waiting": "Waiting for you",
+    "chatTab": "Chat",
+    "acceptanceTab": "Acceptance"
   },
   "Computer": {
     "status": {
@@ -3542,21 +3544,21 @@
       "expired": "Expired",
       "unavailable": "Cannot approve",
       "failed": "Publish failed",
-      "invalidated": "Invalidated"
+      "invalidated": "Invalidated",
+      "merging": "Merging",
+      "merged": "Merged"
     },
     "stage": {
       "execute": "Execute",
       "review": "Review",
       "verify": "Verify"
     },
-    "approve": "Approve publication",
     "enable": "Enable",
     "publish": "Publish",
     "reconcile": "Check publication",
     "revoke": "Revoke approval",
     "preview": "Preview",
     "production": "Production",
-    "expires": "Valid until {time}",
     "internalSkill": "Built-in skill",
     "error": "That did not finish.",
     "decisionUnavailable": "Approval is unavailable: no publication decision is configured.",
@@ -3582,7 +3584,56 @@
     "rejectFailed": "Couldn't submit. Try again.",
     "resubmit": "Resubmit",
     "cancel": "Cancel",
-    "publishFailed": "Publish failed. The approval is kept."
+    "publishFailed": "Publish failed. The approval is kept.",
+    "evidenceEmpty": "No evidence",
+    "captureLabel": "{kind} · {title}",
+    "kind": {
+      "screenshot": "Screenshot",
+      "video": "Recording",
+      "log": "Log",
+      "report": "Report",
+      "request": "Request"
+    },
+    "counter": "{index} / {total}",
+    "previous": "Previous evidence",
+    "next": "Next evidence",
+    "download": "Download",
+    "allEvidence": "All evidence",
+    "pullRequest": "PR",
+    "commitLabel": "Commit",
+    "previewLabel": "Preview",
+    "environmentLabel": "Environment",
+    "criteria": "Acceptance criteria",
+    "results": "Independent results",
+    "otherEvidence": "Other evidence",
+    "passed": "Passed",
+    "notPassed": "Not passed",
+    "reviewPassed": "Merge suggested",
+    "reviewFailed": "Changes needed",
+    "inProgress": "In progress",
+    "opinions": "{count} comments",
+    "review": "Review",
+    "verify": "Verify",
+    "reviewThread": "Independent review",
+    "verifyThread": "Independent verify",
+    "envChip": {
+      "preview": "Preview",
+      "production": "Production"
+    },
+    "textLabel": "{stage} {kind}",
+    "accept": "Accept and merge",
+    "openOnGitHub": "Open on GitHub",
+    "cannotMerge": "Can't merge",
+    "mergeRefusal": {
+      "githubMergeAuthorizationRequired": "GitHub merge not authorized",
+      "githubMergeForbidden": "No permission to merge",
+      "githubMergeBlocked": "Checks or reviews required",
+      "githubMergeConflict": "Merge conflicts",
+      "githubMergeHeadMoved": "New commits on the PR",
+      "githubMergeClosed": "PR closed",
+      "githubUnavailable": "GitHub unavailable"
+    },
+    "steps": "Steps {count}"
   },
   "AccountEmail": {
     "exportSubject": "Your Mikka data export",

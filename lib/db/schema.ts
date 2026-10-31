@@ -873,6 +873,8 @@ export const runCaptures = pgTable('run_captures', {
   /** A cloud computer recording: the desktop it records and when it stops by itself. */
   display: integer('display'),
   expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  /** When the recording itself began (ffmpeg up); the timeline's zero. */
+  startedAt: timestamp('startedAt', { withTimezone: true }),
   error: text('error'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -881,6 +883,17 @@ export const runCaptures = pgTable('run_captures', {
   index('run_captures_user_idx').on(table.userId, table.createdAt),
   uniqueIndex('run_captures_recording_key').on(table.runId).where(sql`${table.status} = 'recording'`),
 ])
+
+/** A recording's timeline (Figma 13): what the agent did, in its own words, and when. */
+export const runCaptureSteps = pgTable('run_capture_steps', {
+  id: uuid('id').primaryKey(),
+  captureId: uuid('captureId').notNull().references(() => runCaptures.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  atMs: integer('atMs').notNull(),
+  label: varchar('label', { length: 200 }).notNull(),
+  source: text('source').$type<'action' | 'mark'>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('run_capture_steps_capture_idx').on(table.captureId, table.atMs)])
 
 /** A link anyone can open, as `artifact_shares`: only the token's hash is stored; revoking ends it. */
 export const runCaptureShares = pgTable('run_capture_shares', {
