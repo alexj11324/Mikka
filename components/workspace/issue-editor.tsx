@@ -159,8 +159,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
-      {layout === 'issue' && !compact && <><div className="flex flex-wrap items-center justify-between gap-2 pb-2">
-        <span className="text-xs text-muted-foreground">{t('hint')}</span>
+      {layout === 'issue' && !compact && <><div className="flex justify-end pb-2">
         <Button variant="ghost" size="xs" onClick={() => setPanel(panel === 'comments' ? '' : 'comments')} aria-expanded={panel === 'comments'}><MessageSquare data-icon="inline-start" />{t('selectionComment')}</Button>
       </div>
       {panel === 'comments' && <div className="flex flex-col gap-3 rounded-lg border p-4">
