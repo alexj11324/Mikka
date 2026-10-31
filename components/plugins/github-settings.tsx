@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -11,6 +12,22 @@ import { openSettingsInBrowser } from '@/lib/platform/open-settings'
 import { FieldError } from '@/components/ui/field'
 
 type GitHubState = { viewerId: string; configured: boolean; connected: boolean; installed: boolean; repositories: { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }[] }
+/** A readable state, or an account link GitHub no longer accepts. */
+type GitHubRead = { state: GitHubState; reconnect: false } | { state: null; reconnect: true }
+
+const githubKey = (userId: string) => ['integrations:github', userId] as const
+
+async function readGitHub([, userId]: ReturnType<typeof githubKey>): Promise<GitHubRead> {
+  const response = await fetch(withBasePath('/api/integrations/github'), { cache: 'no-store' })
+  const next = await response.json() as GitHubState & { error?: string }
+  if (next.viewerId !== userId) throw new Error('viewer')
+  if (!response.ok) {
+    if (next.error === 'githubReconnectRequired') return { state: null, reconnect: true }
+    throw new Error(String(response.status))
+  }
+  if (typeof next.configured !== 'boolean' || typeof next.connected !== 'boolean' || typeof next.installed !== 'boolean' || !Array.isArray(next.repositories) || next.repositories.some(repository => !repository || typeof repository.id !== 'string' || typeof repository.fullName !== 'string')) throw new Error('shape')
+  return { state: next, reconnect: false }
+}
 
 /** GitHub's page on 插件: the account link, the app installation and the repositories it reaches. */
 export function GitHubSettings() {
@@ -21,44 +38,30 @@ export function GitHubSettings() {
 
 function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefined; isPending: boolean }) {
   const t = useTranslations('Settings.integrations')
-  const [githubState, setGithubState] = useState<GitHubState | null>(null)
-  const [githubLoading, setGithubLoading] = useState(true)
-  const [githubReconnect, setGithubReconnect] = useState(false)
+  // Cached across visits: a revisit shows the last state at once and re-checks it behind.
+  // Every mount and focus asks GitHub again (no deduping), like the PR badge.
+  const { data, error, isLoading, mutate } = useSWR(userId ? githubKey(userId) : null, readGitHub, { revalidateOnFocus: false, shouldRetryOnError: false, dedupingInterval: 0 })
+  // Back from the browser, the cookie may belong to someone else: hide what was
+  // shown until GitHub answers again.
+  const [rechecking, setRechecking] = useState(false)
+  const hidden = rechecking || Boolean(error)
+  const githubState = hidden ? null : data?.state ?? null
+  const githubReconnect = !hidden && Boolean(data?.reconnect)
+  const githubLoading = isPending || isLoading || rechecking
+  const githubError = error && !rechecking ? t('githubLoadFailed') : githubReconnect ? t('githubReconnectRequired') : ''
   const [githubLinking, setGithubLinking] = useState(false)
-  const [githubError, setGithubError] = useState('')
   const [githubLinkError, setGithubLinkError] = useState('')
-  const githubRequest = useRef(0)
-
-  const refreshGitHub = useCallback(async () => {
-    const request = ++githubRequest.current
-    setGithubLoading(true); setGithubState(null); setGithubReconnect(false); setGithubError('')
-    if (!userId) { setGithubLoading(isPending); return }
-    try {
-      const response = await fetch(withBasePath('/api/integrations/github'), { cache: 'no-store' })
-      const next = await response.json() as GitHubState & { error?: string }
-      if (next.viewerId !== userId) throw new Error()
-      if (!response.ok) {
-        if (next.error === 'githubReconnectRequired') {
-          if (request === githubRequest.current) { setGithubReconnect(true); setGithubError(t('githubReconnectRequired')) }
-          return
-        }
-        throw new Error()
-      }
-      if (typeof next.configured !== 'boolean' || typeof next.connected !== 'boolean' || typeof next.installed !== 'boolean' || !Array.isArray(next.repositories) || next.repositories.some(repository => !repository || typeof repository.id !== 'string' || typeof repository.fullName !== 'string')) throw new Error()
-      if (request === githubRequest.current) setGithubState(next)
-    } catch {
-      if (request === githubRequest.current) setGithubError(t('githubLoadFailed'))
-    } finally {
-      if (request === githubRequest.current) setGithubLoading(false)
-    }
-  }, [t, userId, isPending])
 
   useEffect(() => {
-    void refreshGitHub()
-    const onFocus = () => { void refreshGitHub() }
+    if (!userId) return
+    let current = true
+    const onFocus = () => {
+      setRechecking(true)
+      void mutate().finally(() => { if (current) setRechecking(false) })
+    }
     window.addEventListener('focus', onFocus)
-    return () => { window.removeEventListener('focus', onFocus); githubRequest.current++ }
-  }, [refreshGitHub])
+    return () => { current = false; window.removeEventListener('focus', onFocus) }
+  }, [userId, mutate])
 
   useEffect(() => {
     if (!userId) return

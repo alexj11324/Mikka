@@ -159,7 +159,7 @@
     "skillsTab": "Skills",
     "searchAria": "Search skills.sh skills",
     "searchPlaceholder": "Search skills…",
-    "trending": "Trending skills",
+    "leaderboard": "Leaderboard",
     "results": "Search results",
     "loading": "Loading skills…",
     "loadFailed": "Could not load the skills.sh directory right now.",

@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
+import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowUpRight, ChevronRight, Ellipsis, Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -25,6 +26,15 @@ import { cn } from '@/lib/utils'
 type IntegrationState = { configured: boolean; callbackVerifierConfigured: boolean; webhookConfigured: boolean; accounts: ConnectedAccountView[] }
 
 const integrationPath = withBasePath('/api/integrations/composio')
+
+/** The SWR key of the Composio apps' state; 建议 reads the same key. */
+export const connectedAppsKey = integrationPath
+
+export async function readConnectedApps(): Promise<IntegrationState> {
+  const response = await fetch(integrationPath, { cache: 'no-store' })
+  if (!response.ok) throw new Error(String(response.status))
+  return await response.json() as IntegrationState
+}
 
 /** Facts for 关于: who makes the app and where it lives. */
 const APP_ABOUT: Record<ComposioAppId, { developer: string; website: string }> = {
@@ -75,29 +85,24 @@ const needsReconnect = (account: ConnectedAccountView) => account.status !== 'AC
 /** State and actions for the Composio apps, shared by the list and the detail page. */
 export function useConnectedApps(enabled = true) {
   const t = useTranslations('Settings.integrations')
-  const [state, setState] = useState<IntegrationState | null>(null)
+  // Cached across visits: a revisit shows the last state at once and re-reads it behind.
+  const { data, error: loadError, mutate } = useSWR(enabled ? connectedAppsKey : null, readConnectedApps, { revalidateOnFocus: false })
+  const state = data ?? null
   // The toolkit or account id an action is running for.
   const [pending, setPending] = useState('')
-  const [error, setError] = useState('')
+  const [actionError, setError] = useState('')
   const [notice, setNotice] = useState<{ tone: 'status' | 'alert'; text: string } | null>(null)
+  const error = actionError || (loadError ? t('loadFailed') : '')
 
-  const refresh = useCallback(async () => {
-    if (!enabled) return
-    try {
-      const response = await fetch(integrationPath, { cache: 'no-store' })
-      if (!response.ok) throw new Error()
-      setState(await response.json() as IntegrationState)
-    } catch {
-      setError(t('loadFailed'))
-    }
-  }, [t, enabled])
+  const refresh = async () => { if (enabled) await mutate() }
 
-  useEffect(() => { void refresh() }, [refresh])
+  // Back from the connect callback in the browser: re-read at once, not after SWR's focus throttle.
   useEffect(() => {
-    const onFocus = () => { void refresh() }
+    if (!enabled) return
+    const onFocus = () => { void mutate() }
     window.addEventListener('focus', onFocus)
     return () => { window.removeEventListener('focus', onFocus) }
-  }, [refresh])
+  }, [enabled, mutate])
 
   useEffect(() => {
     if (!enabled) return
@@ -142,7 +147,7 @@ export function useConnectedApps(enabled = true) {
   async function setEnabled(accountIds: string[], enabled: boolean) {
     if (!accountIds.length) return false
     setError('')
-    setState(current => current && { ...current, accounts: current.accounts.map(account => accountIds.includes(account.id) ? { ...account, enabled } : account) })
+    await mutate(current => current && { ...current, accounts: current.accounts.map(account => accountIds.includes(account.id) ? { ...account, enabled } : account) }, { revalidate: false })
     const results = await Promise.all(accountIds.map(accountId => patch({ accountId, enabled }).catch(() => null)))
     const ok = results.every(response => response?.ok)
     if (!ok) setError(t('updateFailed'))
@@ -197,6 +202,8 @@ export function useConnectedApps(enabled = true) {
   const unavailable = state && !canLink ? t('connectUnavailable') : undefined
   return {
     state, pending, error, notice, canLink, unavailable,
+    // Nothing read yet: rows hold their place without guessing 连接 or the switch.
+    loading: enabled && !state && !loadError,
     accountsFor: (app: ComposioAppId) => state?.accounts.filter(account => account.toolkit === app) ?? [],
     connect: (app: ComposioAppId) => startLink(app, { toolkit: app }),
     reconnect: (accountId: string) => startLink(accountId, { accountId }),
@@ -218,9 +225,9 @@ function WhyDisabled({ reason, fill = false, children }: { reason?: string; fill
  */
 export function ConnectedAppsStatus({ apps }: { apps: ConnectedApps }) {
   const t = useTranslations('Settings.integrations')
-  const { state, error, notice } = apps
+  const { error, notice } = apps
   return <>
-    {!state && !error && <span role="status" className="sr-only">{t('loading')}</span>}
+    {apps.loading && <span role="status" className="sr-only">{t('loading')}</span>}
     {error && <FieldError>{error}</FieldError>}
     {notice && <p role={notice.tone} className={cn('text-sm', notice.tone === 'alert' ? 'text-destructive' : 'text-muted-foreground')}>{notice.text}</p>}
   </>
@@ -275,7 +282,7 @@ export function ConnectedAppRow({ apps, app, href, onOpen }: { apps: ConnectedAp
       ? <Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || Boolean(apps.pending)} onClick={() => void apps.reconnect(accounts[0].id)}>{apps.pending === accounts[0].id ? t('working') : t('reconnect')}</Button>
       : <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={href} onClick={event => openInPlace(event, onOpen)} />}>{t('reconnect')}</Button>)}
     {/* Until the accounts arrive the trailing slot holds the 连接 button's size, so the row does not shift. */}
-    {!apps.state && !apps.error ? <Skeleton data-slot="app-row-pending" aria-hidden="true" className="h-7 w-12 rounded-[min(var(--radius-md),12px)]" />
+    {apps.loading ? <Skeleton data-slot="app-row-pending" aria-hidden="true" className="h-7 w-12 rounded-[min(var(--radius-md),12px)]" />
       : accounts.length
       ? <Switch aria-label={t('enableApp', { name })} checked={on} disabled={expired} onCheckedChange={checked => {
         void apps.setEnabled(usable.filter(account => account.enabled !== checked).map(account => account.id), checked).then(ok => {
@@ -327,7 +334,7 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <h2 className="text-xl font-semibold">{name}</h2>
       </div>
-      {!accounts.length && <WhyDisabled reason={apps.unavailable}><Button type="button" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
+      {!accounts.length && !apps.loading && <WhyDisabled reason={apps.unavailable}><Button type="button" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
     </header>
 
     {accounts.length > 0 && <SettingsSection id="connected-accounts-heading" title={t('accountsHeading')}>

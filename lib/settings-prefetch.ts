@@ -13,6 +13,7 @@ import { botAgentsReads } from '@/lib/execution-settings-client'
 import { creditBillingKey } from '@/components/billing/balance-section'
 import { cardVerificationKey } from '@/components/billing/free-allowance-section'
 import { computerPolicyKey, readComputerPolicy } from '@/components/settings/computer-policy-settings'
+import { connectedAppsKey, readConnectedApps } from '@/components/plugins/connected-apps'
 import { currentMonth } from '@/lib/usage/month'
 import { settingsRead } from '@/lib/settings-read'
 import { visibleSettingsSections, type SettingsSectionId } from '@/lib/settings-sections'
@@ -28,6 +29,8 @@ const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: un
   security: () => [['account:password', () => settingsRead<Result<typeof getPasswordStatus>>('password')], ['account:sessions', () => settingsRead<Result<typeof listSessions>>('sessions')]],
   notifications: () => [['preferences', () => settingsRead<Result<typeof getPreferences>>('preferences')]],
   logins: () => [['account:saved-logins', () => settingsRead<Result<typeof listSavedLogins>>('saved-logins')]],
+  // 连接 is also the rail's 插件 page: the Composio apps' state, a GET.
+  connections: () => [[connectedAppsKey, readConnectedApps]],
   general: id => [
     [['workspace:general', id], () => settingsRead<Result<typeof getWorkspaceGeneral>>('workspace-general', { workspace: id })],
     [['workspace:transfer-targets', id], () => settingsRead<Result<typeof getWorkspaceTransferTargets>>('transfer-targets', { workspace: id })],
@@ -48,7 +51,7 @@ export function prefetchSettingsSection(section: SettingsSectionId, workspaceId:
   const reads = READS[section]
   // Workspace sections need the workspace; a section is fetched once per page, then SWR revalidates as usual.
   const once = `${section}:${workspaceId ?? ''}`
-  if (!reads || started.has(once) || (!workspaceId && !['security', 'notifications', 'logins'].includes(section))) return
+  if (!reads || started.has(once) || (!workspaceId && !['security', 'notifications', 'logins', 'connections'].includes(section))) return
   started.add(once)
   for (const [key, read] of reads(workspaceId ?? '')) {
     // A key SWR already holds belongs to a section that has been open: a preload
@@ -64,12 +67,20 @@ export function prefetchSettingsSection(section: SettingsSectionId, workspaceId:
  * they run alongside a save instead of queuing in front of it. Hover still
  * fetches a section sooner when the person gets there first.
  */
-export function prefetchAllSettings(workspaceId: string, admin: boolean, cache: Cache) {
-  const run = () => { for (const { id } of visibleSettingsSections({ admin })) prefetchSettingsSection(id, workspaceId, cache) }
+/** Once the app is idle, the 插件 list's state, so the rail's 插件 page opens on it. */
+export function prefetchConnectedApps(cache: Cache) {
+  return whenIdle(() => prefetchSettingsSection('connections', undefined, cache))
+}
+
+function whenIdle(run: () => void) {
   if (typeof window.requestIdleCallback === 'function') {
     const handle = window.requestIdleCallback(run, { timeout: 2000 })
     return () => window.cancelIdleCallback(handle)
   }
   const timer = window.setTimeout(run, 200)
   return () => window.clearTimeout(timer)
+}
+
+export function prefetchAllSettings(workspaceId: string, admin: boolean, cache: Cache) {
+  return whenIdle(() => { for (const { id } of visibleSettingsSections({ admin })) prefetchSettingsSection(id, workspaceId, cache) })
 }
