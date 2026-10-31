@@ -124,6 +124,8 @@ test('Bot 与 Agents：规则标签从工作区已有标签中选，标签带颜
   await db().query('INSERT INTO issues (id, "userId", title, content, status, priority, scope) VALUES ($1, $2, $3, $4, $5, $6, $7)', [issue, session.userId, 'Labelled issue', JSON.stringify(content), 'todo', 'normal', 'workspace'])
   await db().query('INSERT INTO mikka_teams (id, "workspaceId", "userId", name, identifier) VALUES ($1, $2, $3, $4, $5)', [team, member.workspaceId, session.userId, 'Labels', `L${team.slice(0, 4).toUpperCase()}`])
   await db().query('INSERT INTO mikka_team_issues ("issueId", "teamId", "workspaceId", "userId") VALUES ($1, $2, $3, $4)', [issue, team, member.workspaceId, session.userId])
+  // A rule needs a real place and model to save, as the server checks; seed the device and accounts.
+  await seed(page)
   await page.reload()
 
   await page.getByRole('button', { name: '添加规则', exact: true }).click()
