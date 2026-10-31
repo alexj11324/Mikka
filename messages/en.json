@@ -1117,7 +1117,9 @@
     "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
     "e2bKeyRateLimited": "E2B is rate limiting this key right now. Wait a few minutes and try again.",
     "tokenNotFound": "This token does not exist or was already revoked.",
-    "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first."
+    "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first.",
+    "accountDeletionPending": "Account deletion is pending cleanup.",
+    "SESSION_NOT_FRESH": "Sign in again before deleting your account."
   },
   "Overview": {
     "sections": {
@@ -2217,6 +2219,21 @@
           "credits_purchased": "bought points",
           "auto_recharge_changed": "changed auto recharge",
           "limits_changed": "changed usage limits"
+        },
+        "audit": {
+          "exported": "exported audit log",
+          "retention_changed": "changed audit retention",
+          "retention_applied": "applied audit retention"
+        },
+        "model": {
+          "policy_changed": "changed model permissions",
+          "admitted": "allowed a model request",
+          "denied": "blocked a model request"
+        },
+        "skill": {
+          "registered": "registered skill {target}",
+          "reviewed": "approved skill {target}",
+          "withdrawn": "withdrew skill {target}"
         }
       },
       "roles": {

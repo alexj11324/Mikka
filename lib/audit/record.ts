@@ -6,7 +6,7 @@
 //   row commits or rolls back with the change. Never use recordAuditSafe for them.
 // - Only cross-database member/permission writes (DATABASE_URL, which cannot share
 //   a transaction with MIKKA_DATABASE_URL) use recordAuditSafe, after they commit.
-// - Retention: no TTL/cleanup job yet (pending Alex).
+// - Retention defaults to retain; only an explicit admin policy enables expiry (./retention.ts).
 import 'server-only'
 import { db as defaultDb } from '@/lib/db'
 import { workspaceAuditEvents } from '@/lib/db/audit-schema'

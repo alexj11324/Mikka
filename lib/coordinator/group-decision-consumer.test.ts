@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { mock } from 'node:test'
 import { createHash } from 'node:crypto'
 import { DECISION_MODEL } from './decision'
 import { invokeDecision } from './decide'
 import { createGroupJudgment } from './group-judgment'
 import { GroupJudgmentPendingError } from './group-correction'
+// Explicit server/billing fixtures; the REST payload remains synthetic.
+mock.module(new URL('../abuse/context.ts',import.meta.url).href,{namedExports:{hostedBillingScope:{getStore:()=>({workspaceId:'fixture-workspace',ownerId:'fixture-owner'})}}})
+mock.module(new URL('../abuse/runtime.ts',import.meta.url).href,{namedExports:{canUseMikkaPaid:async()=>{},hostedUsage:{reserve:async()=>{},settle:async()=>{}}}})
+mock.module(new URL('../abuse/alerts.ts',import.meta.url).href,{namedExports:{checkAbuseAlerts:async()=>{}}})
+mock.module(new URL('../model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertUnmanagedModelTransport:async()=>{}}})
 
 const a = '00000000-0000-4000-8000-000000000001', b = '00000000-0000-4000-8000-000000000002'
 const members = [{id:a,name:'A',description:'role A'},{id:b,name:'B',description:'role B'}]

@@ -7,9 +7,10 @@ const member = z.object({ memberType: z.enum(['user', 'agent']), memberId: z.str
 const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional() }).strict()
 const configure = z.object({ leadAgentId: z.uuid().nullable() }).strict()
 const message = z.object({ body: z.string().trim().min(1).max(32000), mentions: z.array(member).max(100).default([]), replyToId: z.uuid().nullable().optional() }).strict()
+const read = z.object({ messageId: z.string().min(1).max(64) }).strict()
 export type Member = z.infer<typeof member>
 export type Directory = (workspaceId: string, userId: string, members: Member[]) => Promise<boolean>
-export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; limit?: string | null; workspaceId?: string | null }
+export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members' | 'read' | 'links'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; limit?: string | null; workspaceId?: string | null }
 class Failure extends Error { constructor(readonly status: number) { super(String(status)) } }
 const fail = (status: number): never => { throw new Failure(status) }
 function parse<T>(schema: z.ZodType<T>, body?: string): T {
@@ -33,7 +34,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
   try {
     const userId = req.userId
     if (!userId) return fail(401)
-    if (req.method !== 'GET' && req.origin) {
+    if ((req.method !== 'GET' || req.resource === 'read' || req.resource === 'links') && req.origin) {
       let origin: URL
       try { origin = new URL(req.origin) } catch { return fail(403) }
       if (!['https:', 'http:'].includes(origin.protocol) || origin.host !== req.host) return fail(403)
@@ -67,14 +68,59 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       for (const row of rows) if (await directory(row.workspaceId, userId, [])) accessible.push(row)
       result = { conversations: accessible }
     } else {
+      // A link is a bounded view granted by its source group, never membership
+      // in the private DM. Locate the group before taking the normal group lock.
+      let groupId = req.id
+      if (req.resource === 'links') {
+        const { rows: [link] } = await q('SELECT "sourceConversationId" FROM conversation_links WHERE id=$1', [req.id])
+        if (!link) return fail(404)
+        groupId = link.sourceConversationId
+      }
       // Acquire the serialization lock before reading membership in a new statement.
       // A joined SELECT FOR UPDATE can retain a pre-wait membership snapshot.
-      const { rows: groups } = await q(`SELECT * FROM conversations WHERE id=$1 AND kind='group' FOR UPDATE`, [req.id])
+      const { rows: groups } = await q(`SELECT * FROM conversations WHERE id=$1 AND kind='group' FOR UPDATE`, [groupId])
       const group = groups[0]
-      const { rows: memberships } = await q(`SELECT role FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [req.id, userId])
+      const { rows: memberships } = await q(`SELECT role FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [groupId, userId])
       if (!group || !memberships.length || !await directory(group.workspaceId, userId, [])) return fail(404)
       group.role = memberships[0].role
-      if (req.resource === 'conversations' && req.method === 'PATCH') {
+      if (req.resource === 'links' && req.method === 'GET') {
+        const { rows: [link] } = await q(`SELECT l."linkedConversationId",l."firstPosition"::text,l."lastPosition"::text,l."messageCount"::text
+          FROM conversation_links l JOIN conversations dm ON dm.id=l."linkedConversationId"
+          WHERE l.id=$1 AND l."sourceConversationId"=$2 AND dm.kind='agent_dm' AND dm."workspaceId"=$3 AND dm."createdBy"=$4
+          FOR SHARE OF l,dm`, [req.id, group.id, group.workspaceId, group.createdBy])
+        if (!link) return fail(404)
+        const { rows: members } = await client.query<{ id: string; name: string; harness: string }>(`SELECT cm."memberId" AS id,a.name,a.harness
+          FROM conversation_members cm JOIN agents a ON a.id::text=cm."memberId" AND a."userId"=$2
+          WHERE cm."conversationId"=$1 AND cm."memberType"='agent' AND cm."leftAt" IS NULL ORDER BY cm."memberId"`, [link.linkedConversationId, group.createdBy])
+        if (members.length !== 2) return fail(404)
+        const participants = members.map(m => ({ ...m, avatarUrl: null }))
+        const before = req.before == null ? null : decimal(req.before, '')
+        const limit = Number(decimal(req.limit, '50'))
+        if (limit > 100) return fail(422)
+        const { rows } = await q(`SELECT id,position::text,body,"authorId","createdAt" FROM conversation_messages
+          WHERE "conversationId"=$1 AND position BETWEEN $2::bigint AND $3::bigint
+            AND ($4::bigint IS NULL OR position<$4) AND "authorType"='agent' AND "authorId"=ANY($5::text[])
+          ORDER BY position DESC LIMIT $6`, [link.linkedConversationId, link.firstPosition, link.lastPosition, before, members.map(m => m.id), limit + 1])
+        const messages = rows.slice(0, limit).map(m => ({ id: m.id, position: m.position, body: m.body, createdAt: m.createdAt, author: participants.find(p => p.id === m.authorId)! }))
+        result = { linkId: req.id, sourceConversationId: group.id, firstPosition: link.firstPosition, lastPosition: link.lastPosition, messageCount: link.messageCount, participants, messages, nextBefore: rows.length > limit ? messages.at(-1)?.position : null }
+      } else if (req.resource === 'read' && ['GET', 'POST'].includes(req.method)) {
+        if (req.method === 'POST') {
+          const input = parse(read, req.body)
+          const byId = z.uuid().safeParse(input.messageId).success
+          const value = byId ? input.messageId : decimal(input.messageId, '')
+          const { rows: messages } = await q(`SELECT id,position FROM conversation_messages WHERE "conversationId"=$1 AND ${byId ? 'id=$2::uuid' : 'position=$2::bigint'}`, [req.id, value])
+          const selected = messages[0]
+          if (!selected || BigInt(selected.position) > BigInt(2147483647)) return fail(422)
+          await q(`INSERT INTO conversation_reads AS r ("userId","conversationId","lastReadPosition","lastReadMessageId","updatedAt") VALUES ($1,$2,$3,$4,now())
+            ON CONFLICT ("userId","conversationId") DO UPDATE SET
+              "lastReadPosition"=GREATEST(r."lastReadPosition",EXCLUDED."lastReadPosition"),
+              "lastReadMessageId"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."lastReadMessageId" ELSE r."lastReadMessageId" END,
+              "updatedAt"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."updatedAt" ELSE r."updatedAt" END`, [userId, req.id, selected.position, selected.id])
+        }
+        const { rows: [state] } = await q(`SELECT "lastReadPosition","lastReadMessageId" FROM conversation_reads WHERE "userId"=$1 AND "conversationId"=$2`, [userId, req.id])
+        const { rows: [unread] } = await q(`SELECT count(*)::text AS n FROM conversation_messages WHERE "conversationId"=$1 AND position>$2 AND NOT ("authorType"='user' AND "authorId"=$3)`, [req.id, state?.lastReadPosition ?? 0, userId])
+        result = { lastReadMessageId: state?.lastReadMessageId ?? null, lastReadPosition: state ? Number(state.lastReadPosition) : null, unreadCount: Number(unread.n) }
+      } else if (req.resource === 'conversations' && req.method === 'PATCH') {
         if (group.role !== 'owner' || group.createdBy !== userId) return fail(403)
         if (!queueAgents) return fail(405)
         const input = parse(configure, req.body)

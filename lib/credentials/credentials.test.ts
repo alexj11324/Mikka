@@ -11,6 +11,13 @@ import { CredentialStore } from './store'
 import { browserLoginContinuation } from '../cloud-computer/login-result'
 import { assertCredentialPageBinding, type CredentialPageBinding } from './page-binding'
 import { assertNoSecret, fingerprint } from './fingerprint'
+import { credentialVaultEnabled } from './feature'
+
+test('credential vault ships on and retains an explicit incident kill switch', () => {
+  for (const VERCEL_ENV of [undefined, 'production', 'preview', 'development']) assert.equal(credentialVaultEnabled({ VERCEL_ENV }), true)
+  assert.equal(credentialVaultEnabled({ CREDENTIAL_VAULT_ENABLED: '1' }), true)
+  for (const CREDENTIAL_VAULT_ENABLED of ['0', '', 'false', 'true']) assert.equal(credentialVaultEnabled({ CREDENTIAL_VAULT_ENABLED }), false)
+})
 
 function fixtureKms(): Kms {
   const keys = new Map<string, { key: Buffer; context: string }>()

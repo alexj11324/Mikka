@@ -39,6 +39,7 @@ await copyFile(resolve(root, 'src/agents/github-credentials.mjs'), resolve(out, 
 await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })
 await copyFile(resolve(root, '../../LICENSE'), resolve(out, 'LICENSE'))
 await copyFile(resolve(root, 'README.md'), resolve(out, 'README.md'))
+await copyFile(resolve(root, 'THIRD_PARTY_NOTICES.md'), resolve(out, 'THIRD_PARTY_NOTICES.md'))
 const exports = Object.fromEntries(Object.entries(source.exports).map(([key]) => [key, `./${key === '.' ? 'main' : key.slice(2)}.js`]))
 await writeFile(resolve(out, 'package.json'), `${JSON.stringify({
   name: packageName, version: source.version, description: source.description,

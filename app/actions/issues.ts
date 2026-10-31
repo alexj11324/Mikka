@@ -195,13 +195,15 @@ export async function previewIssuePersonalScope(id: string) {
   })
 }
 
-/** The linked case remains closed until the archive/unlink policy is chosen. */
+/** The owner's confirmation retires the active link and queues its archive. */
 export async function confirmIssuePersonalScope(input: { id: string; revision: number; confirmation: string }) {
   return runAction(async () => {
     const userId = await getUserId()
     const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), confirmation: z.string().regex(/^[a-f0-9]{64}$/) }).safeParse(input)
     if (!parsed.success) return { error: 'issueScopeInvalid' as const }
-    return changeIssueScopeLocally(userId, { id: parsed.data.id, revision: parsed.data.revision, scope: 'personal' }, { allowLinkedPersonal: false, confirmation: parsed.data.confirmation })
+    const result = await changeIssueScopeLocally(userId, { id: parsed.data.id, revision: parsed.data.revision, scope: 'personal' }, { allowLinkedPersonal: true, confirmation: parsed.data.confirmation })
+    if ('issue' in result && result.issue) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
+    return result
   })
 }
 
@@ -219,7 +221,7 @@ export async function listIssueVersions(id: string) {
 /**
  * The one-click scope change (MIK-47). The person's choice wins over the
  * agent's and becomes an example for its next judgment. Linked transitions
- * await the archive/unlink decision in #184.
+ * retain the team's history through the existing archive outbox.
  */
 export async function setIssueScope(input: { id: string; revision: number; scope: string }): Promise<ActionResult<{ issue: IssueView }>> {
   return runAction(async () => {
@@ -231,9 +233,9 @@ export async function setIssueScope(input: { id: string; revision: number; scope
     // This legacy action has no team target or team permission check. It must
     // not infer the owner's active Linear team or publish an unassigned task.
     if (parsed.data.scope === 'workspace') return { error: 'issueScopeTeamRequired' }
-    // #184 leaves archive vs unlink open. Keep linked transitions closed until
-    // the provider disposition is confirmed and reviewed.
-    return changeIssueScopeLocally(userId, parsed.data, { allowLinkedPersonal: false })
+    const result = await changeIssueScopeLocally(userId, parsed.data, { allowLinkedPersonal: true })
+    if ('issue' in result && result.issue) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
+    return result
 
   })
 }

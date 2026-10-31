@@ -161,6 +161,8 @@ test("keys and scrolling require the exact approval and use the selected desktop
     await b.decide(row.id, row.digest, true);
     await pending;
   }
+  for (const platform of ['linux', 'darwin']) assert.deepEqual(driverArguments({ name: 'type_text', arguments: { text: 'isolated marker' } }, platform),
+    { text: 'isolated marker', scope: 'desktop', delivery_mode: 'foreground' });
   assert.deepEqual(driverArguments({ name: "press_key", arguments: { key: "tab" } }, "linux"), { key: "tab", scope: "desktop", delivery_mode: "foreground" });
   assert.deepEqual(driverArguments({ name: "scroll", arguments: { direction: "down", amount: 2, x: 10, y: 20 } }, "linux"), { direction: "down", amount: 2, x: 10, y: 20, scope: "desktop", coordinate_frame: "desktop", delivery_mode: "foreground" });
 });

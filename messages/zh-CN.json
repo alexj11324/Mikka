@@ -1117,7 +1117,9 @@
     "e2bKeyUnverifiable": "暂时无法验证，请稍后重试。",
     "e2bKeyRateLimited": "E2B 当前对该密钥限流，请几分钟后再试。",
     "tokenNotFound": "令牌不存在或已被撤销。",
-    "tokenLimitReached": "你在当前工作区的有效令牌已达 50 个上限，请先撤销一个。"
+    "tokenLimitReached": "你在当前工作区的有效令牌已达 50 个上限，请先撤销一个。",
+    "accountDeletionPending": "账户删除等待清理完成。",
+    "SESSION_NOT_FRESH": "请重新登录后删除账户。"
   },
   "Overview": {
     "sections": {
@@ -2217,6 +2219,21 @@
           "credits_purchased": "购买了点数",
           "auto_recharge_changed": "修改了自动充值",
           "limits_changed": "修改了用量上限"
+        },
+        "audit": {
+          "exported": "导出审计日志",
+          "retention_changed": "更改审计留存",
+          "retention_applied": "执行审计留存清理"
+        },
+        "model": {
+          "policy_changed": "更改了模型权限",
+          "admitted": "允许了模型请求",
+          "denied": "拒绝了模型请求"
+        },
+        "skill": {
+          "registered": "登记了技能 {target}",
+          "reviewed": "批准了技能 {target}",
+          "withdrawn": "撤回了技能 {target}"
         }
       },
       "roles": {

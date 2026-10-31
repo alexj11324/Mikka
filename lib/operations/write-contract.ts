@@ -13,5 +13,5 @@ export interface WriteProvider {
    * access with that account. A connection or target string is never authority. */
   prepare(ownerId: string, payload: Record<string, unknown>): Promise<{ accountId: string; version: string; context?: Record<string, unknown> | null }>
   execute(input: { ownerId: string; accountId: string; version: string; payload: Record<string, unknown>; approvalContext: Record<string, unknown> | null; idempotencyKey: string; signal: AbortSignal; beforeSend: () => Promise<void> }): Promise<OperationReceipt>
-  lookup(input: { ownerId: string; accountId: string; idempotencyKey: string }): Promise<OperationReceipt | null>
+  lookup(input: { ownerId: string; accountId: string; version: string; payload: Record<string, unknown>; idempotencyKey: string; signal?: AbortSignal }): Promise<OperationReceipt | null>
 }

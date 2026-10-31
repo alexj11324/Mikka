@@ -54,7 +54,7 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   const server = createServer(async (req, res) => {
     try {
       const url = `http://127.0.0.1:${(server.address() as { port: number }).port}${req.url}`
-      currentHeaders = new Headers(Object.entries(req.headers).flatMap(([key, value]) => typeof value === 'string' ? [[key, value]] : []))
+      currentHeaders = new Headers(Object.entries(req.headers).flatMap(([key, value]): [string, string][] => typeof value === 'string' ? [[key, value]] : []))
       const body = req.method === 'POST' ? await new Promise<string>((resolve, reject) => { let value = ''; req.on('data', chunk => { value += chunk }); req.on('end', () => resolve(value)); req.on('error', reject) }) : undefined
       const request = new Request(url, { method: req.method, headers: currentHeaders, body })
       const pathname = new URL(url).pathname

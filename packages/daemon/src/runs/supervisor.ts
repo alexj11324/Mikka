@@ -1101,6 +1101,11 @@ export class RunSupervisor {
     verifySkillAssignment(assignment)
     if (assignment.skillReceipt && (this.leases.get(runId)??0)<=Date.now())
       throw new Error('Receipted Skill assignment requires a current server lease')
+    if(assignment.skillReceipt?.artifact.registryId==='mikka-team') {
+      if(!this.deps.revalidateSkillAssignment)throw new Error('Current team Skill authorization unavailable')
+      const current=await this.deps.revalidateSkillAssignment(assignment)
+      this.leases.set(runId,Date.parse(verifySkillResume(assignment,current)))
+    }
     const adapter = this.adapterFor(runId)
     if (
       assignment.requireSessionResume &&

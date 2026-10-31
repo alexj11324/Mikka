@@ -16,7 +16,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 import { z } from "zod"
 import { ToolApprovalGate } from "./agents/tool-approval"
 import { toolApprovalDecision } from "./agents/tool-approval-policy"
-import { SKILL_ARTIFACT_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
+import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCaptureResponse, type CaptureUploadRequest, type CaptureUploadResponse, type ScreenCaptureRequest } from '@mikka/protocol/capture'
@@ -226,6 +226,7 @@ export class HttpServerLink implements ServerLink {
           "content-type": "application/json",
           [CLIENT_VERSION_HEADER]: this.clientVersion,
           [SKILL_ARTIFACT_HEADER]: '1',
+          [TEAM_SKILL_HEADER]: '1',
           [REPO_ORIGIN_HEADER]: '1',
           [RECOVERY_WORKTREE_HEADER]: '1',
           ...(token ? { authorization: `Bearer ${token}` } : {}),

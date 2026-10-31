@@ -49,6 +49,7 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
   const hash = sha256(content)
 
   const result = await db.transaction(async tx => {
+    await tx.execute(sql`select mikka_account_assert_writable(${submitter.userId})`)
     let artifactId = input.artifactId
     let version = 1
     if (artifactId) {
