@@ -25,17 +25,13 @@ async function probe(request: APIRequestContext, { feature, path, on }: Probe) {
   return { feature, status: response.status(), on: on(response.status(), body) }
 }
 
-test('the generated workflow route loads on the deployed origin', async ({ request }) => {
-  const flow = '/.well-known/workflow/v1/flow'
-  const health = await request.post(app(`${flow}?__health`), { maxRedirects: 0 })
-  expect(health.status(), 'workflow flow health').toBe(200)
-  expect(await health.json()).toMatchObject({ healthy: true, endpoint: app(flow) })
-})
-
-test('the smoke account signs in, reaches its chat and reports feature state', async ({ page, baseURL }) => {
+test.beforeAll(() => {
   // Only a tagged account may run here, so its traffic stays marked as test traffic.
   expect(isSmokeAccountEmail(email), 'SMOKE_OWNER_EMAIL must be a +mikka-smoke account').toBe(true)
   expect(password, 'SMOKE_OWNER_PASSWORD is required').not.toBe('')
+})
+
+test('the smoke account signs in, reaches its chat and reports feature state', async ({ page, baseURL }) => {
   const signIn = await page.request.post(app('/api/auth/sign-in/email'), { data: { email, password }, headers: { origin: new URL(baseURL!).origin } })
   expect(signIn.status(), 'sign-in').toBe(200)
   const session = await (await page.request.get(app('/api/auth/get-session'))).json()
