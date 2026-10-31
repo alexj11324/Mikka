@@ -100,7 +100,7 @@ export function SecuritySettings() {
       </SettingRow>
     </SettingsSection>
 
-    <SettingsSection id="devices-heading" title={t('devices')} description={t('devicesDescription')}>
+    <SettingsSection id="devices-heading" title={t('devices')}>
       {(sessions.error || (sessions.data && 'error' in sessions.data)) && <FieldError className="px-5 py-3">{sessions.data && 'error' in sessions.data ? actionError(sessions.data.error) : t('devicesError')}</FieldError>}
       {!sessions.data && !sessions.error && <SettingsLoading label={t('devicesLoading')} rows={3} />}
       {devices.map(device => <SettingRow key={device.id} title={device.label ?? t('unknownDevice')} description={t('lastActive', { when: relativeTime(device.lastActiveAt, locale) })}>
@@ -108,7 +108,7 @@ export function SecuritySettings() {
           ? <Badge variant="secondary">{t('currentDevice')}</Badge>
           : <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void signOut(device.id) }}>{pendingSession === device.id ? t('signingOut') : t('signOut')}</Button>}
       </SettingRow>)}
-      {devices.length > 1 && <SettingRow title={t('signOutOthers')} description={t('signOutOthersDescription')}>
+      {devices.length > 1 && <SettingRow title={t('signOutOthers')}>
         <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void signOutEverywhere() }}>{t('signOutOthers')}</Button>
       </SettingRow>}
       {signOutError && <FieldError className="px-5 py-3">{signOutError}</FieldError>}

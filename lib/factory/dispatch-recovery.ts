@@ -162,7 +162,7 @@ export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: Cl
       const { rows: [task] } = await tx.query('SELECT id FROM factory_tasks WHERE id=$1 AND "userId"=$2', [taskId, userId]);
       if (!task) return { status: 404, body: { error: 'factoryNotFound' } };
       if (!FACTORY_CLOUD_DISPATCH_AVAILABLE) return { status: 409, body: { error: 'cloudDispatchUnavailable' } };
-      if (!await cloudKeyConfigured(tx, userId)) return { status: 409, body: { error: 'e2bKeyNotConfigured', action: 'cloudKeySettings', settingsUrl: '/settings?section=integrations' } };
+      if (!await cloudKeyConfigured(tx, userId)) return { status: 409, body: { error: 'e2bKeyNotConfigured', action: 'cloudKeySettings', settingsUrl: '/settings?section=secrets' } };
       // The BYO key store and cloud placement land with #436/#438; nothing starts here until then.
       return { status: 409, body: { error: 'cloudDispatchUnavailable' } };
     } finally { tx.release(); }
