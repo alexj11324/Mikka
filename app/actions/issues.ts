@@ -17,7 +17,6 @@ import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
-import { ensureIssueNumbers } from '@/lib/issue-numbering'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { createTeamIssueForUser } from '@/lib/team-issue-create'
 import { promoteExistingIssueForUser } from '@/lib/team-issue-promotion'
@@ -77,11 +76,6 @@ async function readIssues(workspaceId?: string) {
   const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
   const links = await issueTeamScope(userId, rows.map(row => row.id))
   const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return row.scope === 'personal' || !link || teams.some(team => team.id === link.teamId) })
-  const ownersWithoutNumbers = [...new Set(visibleRows.filter(row => row.ownerId === userId && !readIssueMetadata(row.content).number).map(row => row.ownerId))]
-  if (ownersWithoutNumbers.length) {
-    for (const ownerId of ownersWithoutNumbers) await ensureIssueNumbers(ownerId)
-    return readIssues(workspaceId)
-  }
   const liveRows = visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt)
   const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
   return liveRows.map(({ content, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: issueChecklist(content) }))
@@ -93,13 +87,7 @@ export async function getIssue(id: string): Promise<ActionResult<{ issue: IssueV
 }
 
 async function readIssue(id: string) {
-  let { issue, user } = await requireIssueAccess(id)
-  // Reading another owner's legacy task must not initiate maintenance writes:
-  // that entry ACL may be retired while the numbering transaction waits.
-  if (issue.userId === user.id && !readIssueMetadata(issue.content).number) {
-    await ensureIssueNumbers(issue.userId)
-    issue = (await requireIssueAccess(id)).issue
-  }
+  const { issue, user } = await requireIssueAccess(id)
   return db.transaction(async tx => {
     const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion)
