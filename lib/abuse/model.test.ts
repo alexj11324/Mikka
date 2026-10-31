@@ -166,7 +166,7 @@ test('managed refusal precedes budget reservation; revocation during reservation
   await assert.rejects(Promise.resolve(wrapped.doStream({ prompt: [] })), /modelRouteDenied/)
   assert.equal(reservations.length, 1)
   assert.equal(generated + streamed, 0)
-  assert.equal(settlements[0].cost, null)
+  assert.equal(settlements[0].cost, 0)
 })
 test('an unverified injected transport cannot impersonate the managed Gateway endpoint', async () => {
   managed = true

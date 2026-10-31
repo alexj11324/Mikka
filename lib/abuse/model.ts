@@ -53,7 +53,6 @@ export async function hostedModel(
     if (promptBytes > 16 * 1024 * 1024)
       throw new PaidResourceError('usage_cost_unavailable')
     await hostedUsage.reserve(workspaceId, modelId, id, process.env)
-    await checkAbuseAlerts()
   }
   const options = (value: Parameters<Model['doGenerate']>[0], admission: GatewayAdmission | null) => ({
     ...value,
@@ -73,10 +72,15 @@ export async function hostedModel(
         return async (args: Parameters<Model['doGenerate']>[0]) => {
           const id = randomUUID()
           await reserve(id, args)
+          let requestStarted = false
           try {
+            await checkAbuseAlerts()
             const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal })
             const selected = await executionModel(admission)
-            const result = await selected.doGenerate(options(args, admission))
+            const prepared = options(args, admission)
+            if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
+            requestStarted = true
+            const result = await selected.doGenerate(prepared)
             const cost = gatewayCost(result.providerMetadata)
             await hostedUsage.settle(
               id,
@@ -90,7 +94,7 @@ export async function hostedModel(
               throw new PaidResourceError('usage_cost_unavailable')
             return result
           } catch (error) {
-            await hostedUsage.settle(id, null)
+            await hostedUsage.settle(id, requestStarted ? null : 0)
             throw error
           }
         }
@@ -98,10 +102,15 @@ export async function hostedModel(
         return async (args: Parameters<Model['doStream']>[0]) => {
           const id = randomUUID()
           await reserve(id, args)
+          let requestStarted = false
           try {
+            await checkAbuseAlerts()
             const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal })
             const selected = await executionModel(admission)
-            const result = await selected.doStream(options(args, admission))
+            const prepared = options(args, admission)
+            if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
+            requestStarted = true
+            const result = await selected.doStream(prepared)
             let finished = false
             return {
               ...result,
@@ -131,7 +140,7 @@ export async function hostedModel(
               ),
             }
           } catch (error) {
-            await hostedUsage.settle(id, null)
+            await hostedUsage.settle(id, requestStarted ? null : 0)
             throw error
           }
         }
