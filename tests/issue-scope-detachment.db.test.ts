@@ -801,7 +801,8 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
   const { seal }=await import('../lib/linear-sync/crypto')
   await pool.query('insert into linear_connections ("userId","linearUserId","organizationId","organizationName","accessToken","refreshToken","expiresAt") values ($1,\'synthetic\',\'synthetic\',\'Synthetic\',$2,$2,now()+interval \'1 hour\')',[owner,seal('synthetic-loopback-only')])
   async function waitFor(check:()=>Promise<boolean>,label:string) {
-    for(let n=0;n<300;n++) {if(await check()) return}
+    // Poll on a clock, not a spin: 300 back-to-back queries can finish in ~200ms on a fast runner.
+    for(let n=0;n<300;n++) {if(await check()) return;await new Promise(resolve=>setTimeout(resolve,20))}
     assert.fail(label)
   }
   async function setDiscussion(id:string,body:string) {
