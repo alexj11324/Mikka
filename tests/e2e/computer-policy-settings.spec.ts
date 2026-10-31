@@ -38,8 +38,10 @@ test('电脑操作默认允许，可以禁止再允许，非管理员只看到�
   expect(writes).toEqual(['deny', 'allow'])
   canEdit = false
   await page.reload()
-  // Non-admins see the value as text, with no control they cannot use.
-  await expect(page.getByText('允许', { exact: true })).toBeVisible()
+  // Non-admins see the value as text, with no control they cannot use. 团队权限 also lists
+  // 允许使用的应用, whose app selects read 允许 too, so look inside the 电脑操作 section.
+  const section = page.getByRole('region').filter({ has: page.getByRole('heading', { name: '电脑操作', exact: true }) })
+  await expect(section.getByText('允许', { exact: true })).toBeVisible()
   await expect(controls).toHaveCount(0)
   await expect(page.getByRole('button', { name: /^(允许|禁止)$/ })).toHaveCount(0)
   expect(writes).toEqual(['deny', 'allow'])

@@ -12,7 +12,15 @@ async function context(workspaceId?: string) {
   return { ownerId: session.user.id, workspaceId: workspace.workspace.id };
 }
 export async function listExecutionRules() {
-  return new ExecutionSettings(pool).list(await context());
+  const scope = await context();
+  try {
+    return await new ExecutionSettings(pool).list(scope);
+  } catch (error) {
+    // A new account has no device or connected account to suggest a default from yet:
+    // there are no rules to show, and the settings page fills in the initial choice.
+    if (error instanceof ActionFailureError && error.code === "executionModelUnknown") return [];
+    throw error;
+  }
 }
 export async function createExecutionRule(
   value: Extract<
