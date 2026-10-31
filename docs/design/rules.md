@@ -339,7 +339,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   (group title), 11/14 Medium (badge), and 24/32 SemiBold for the 建议 page
   title only (R-55).
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
-  14 approval and list card, 16 dialog, 999 pill. Spacing is a multiple of 4.
+  14 approval and list card, 14 dialog (`rounded-xl`, the `DialogContent` /
+  `AlertDialogContent` default; a call site does not change it), 999 pill. Spacing is a multiple of 4.
   Exception: 建议 cards use 16 (R-55).
 - **R-34** Status colours come only from the StatusBadge set (Figma
   `99:75`), shared by devices, threads and tasks.

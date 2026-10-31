@@ -48,7 +48,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
   }
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="gap-4 rounded-2xl p-0 shadow-2xl sm:max-w-130" closeLabel={tCommon('close')}>
+    <DialogContent className="gap-4 p-0 shadow-2xl sm:max-w-130" closeLabel={tCommon('close')}>
       <DialogHeader className="px-5 pt-4">
         <DialogTitle className="text-base">{t('title')}</DialogTitle>
         <DialogDescription className="sr-only">{t('description')}</DialogDescription>
