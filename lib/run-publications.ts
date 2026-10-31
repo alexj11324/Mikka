@@ -25,7 +25,7 @@ import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunComple
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Run = typeof agentRuns.$inferSelect
 type Publication = typeof runPublications.$inferSelect
-const LIVE = ['queued', 'preparing', 'running', 'waiting_input', 'finishing']
+const LIVE = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']
 const TERMINAL_PUBLICATIONS = ['published', 'blocked', 'skipped']
 const PUBLICATION_LEASE_MS = 120_000
 const MAX_ATTEMPTS = 5
@@ -170,7 +170,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
           if (gate.state !== 'pending') status = 'stopped'
         }
       }
-      ;[run] = await tx.update(agentRuns).set({ status, stopReason: completion.stopReason, report: report ?? null, finishedAt: sql`clock_timestamp()`, updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
+      ;[run] = await tx.update(agentRuns).set({ status, pauseReason: null, resumeStatus: null, stopReason: completion.stopReason, report: report ?? null, finishedAt: sql`clock_timestamp()`, updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
       await settleRunCompletionEffects(client, run, completion.stopReason, factoryBound)
     }

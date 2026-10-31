@@ -7,10 +7,13 @@ export async function setCliPolicy(pool: Pick<Pool, 'connect'>, ownerId: string,
   const policy = cliPolicyLayerSchema.parse(input)
   const guard = cliPolicyGuard(runId,ownerId,membership)
   return writeTransaction(pool, async tx => {
+    // Tool liveness and approval decisions lock run -> policy. Take the run
+    // first as well, so changing policy cannot hold its advisory lock while
+    // waiting for a concurrent tool check's run lock.
+    const { rows: [run] } = await tx.query<{ botId:string | null; agentId:string }>('SELECT "botId","agentId" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId,ownerId])
+    if (!run) throw new Error('agentPolicyUnavailable')
     const current = await lockCliRunPolicy(tx,runId,ownerId)
     if (current.revision !== expectedRevision) throw new Error('agentPolicyChanged')
-    const { rows: [run] } = await tx.query<{ botId:string | null; agentId:string }>('SELECT "botId","agentId" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR SHARE', [runId,ownerId])
-    if (!run) throw new Error('agentPolicyUnavailable')
     if (target === 'agent') await tx.query('UPDATE agent_kit_heads SET cli_run_policy=$3 WHERE owner_id=$1 AND bot_key=$2', [ownerId,run.botId ?? 'coordinator',policy])
     else if (target === 'worker') await tx.query('UPDATE agents SET cli_run_policy=$3 WHERE id=$1 AND "userId"=$2', [run.agentId,ownerId,policy])
     else {
