@@ -7,6 +7,8 @@ import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/reposi
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER } from '@mikka/protocol/device'
+import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
+import { issuePolicySnapshot, policyDistributionContext, requestPolicyIssuer } from '@/lib/agent-tool-approval/policy-distribution'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
 import { assertUnmanagedModelTransport, assertSubscriptionModelTransport } from '@/lib/model-admission/runtime'
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
@@ -128,6 +130,13 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     }
   }
   catch (error) { return NextResponse.json({ error: error instanceof ModelAdmissionError ? error.code : 'Agent policy unavailable.' }, { status: 409 }) }
+  const snapshotCapability = request.headers.get(POLICY_SNAPSHOT_HEADER)
+  if ((snapshotCapability !== null && snapshotCapability !== POLICY_SNAPSHOT_VERSION) || (cliPolicy.policySnapshotRequired && snapshotCapability !== POLICY_SNAPSHOT_VERSION)) return NextResponse.json({error:'Signed policy consumer required.',code:'policyConsumerUpgradeRequired'},{status:409})
+  let distribution: ReturnType<typeof policyDistributionContext> | undefined
+  if (snapshotCapability === POLICY_SNAPSHOT_VERSION) {
+    try { distribution = policyDistributionContext(requestPolicyIssuer(request),caller.userId,deviceId,runId,cliPolicy) }
+    catch { return NextResponse.json({error:'Policy signing unavailable.'},{status:503}) }
+  }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
   let factoryClaim: Record<string, unknown> = {}
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
@@ -246,6 +255,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...skillAssignment,
     ...benchmarkAssignment,
     policy: assignmentPolicy,
+    ...(distribution ? {policySnapshotRequired:distribution.required,policySnapshot:issuePolicySnapshot(distribution,assignmentPolicy)} : {}),
   }))
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }

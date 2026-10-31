@@ -1,3 +1,4 @@
+import { policySnapshotHash } from '@mikka/protocol/node-policy-snapshot'
 import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../../../../lib/personal-agent-message'
 import { prepareGitHubEnvironment, type RunGitHub } from './github-runtime'
 // What every real harness adapter needs about one run: the sandbox policy,
@@ -97,6 +98,8 @@ export interface RunContextOptions {
   networkAllow?: readonly string[]
   /** The workspace's agent policy (ADR 0028); defaults when absent. */
   policy?: RunPolicy
+  /** Host-verified final policy binding, checked before any run files exist. */
+  policyHash?: string
   /** The skills the run was given; none when the assignment carries none. */
   skills?: readonly RunSkill[]
   skillReceipt?: SkillAssignmentReceipt
@@ -214,6 +217,7 @@ export class RunContext {
   readonly capturesDir: string
 
   constructor(private readonly options: RunContextOptions) {
+    if (options.policyHash && (!options.policy || policySnapshotHash(options.policy) !== options.policyHash)) throw new Error('Run child policy hash mismatch')
     this.worktree = realpathSync(options.worktree)
     this.gitDir = realpathSync(
       execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
@@ -358,7 +362,7 @@ export class RunContext {
    * and zsh writes here-docs to `$TMPPREFIX` (default `/tmp/zsh`).
    */
   tempEnv(): Record<string, string> {
-    return { TMPDIR: this.tmpDir, TMPPREFIX: join(this.tmpDir, "zsh"), ...this.githubEnv }
+    return { TMPDIR: this.tmpDir, TMPPREFIX: join(this.tmpDir, "zsh"), ...this.githubEnv, ...(this.options.policyHash ? { MIKKA_POLICY_HASH: this.options.policyHash } : {}) }
   }
 
   /** A hand-in from an earlier session would end this one at once. */

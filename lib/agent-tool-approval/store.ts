@@ -27,6 +27,16 @@ export class AgentToolApprovalStore {
       return work(client)
     }, { guard: cliPolicyGuard(runId,userId,this.membership) })
   }
+  /** Authenticated distribution only; snapshots never replace live tool authorization. */
+  async policyDistribution(actor: DeviceActor, runId: string, revision?: string) {
+    return this.transaction(runId, actor.userId, async client => {
+      const owned = await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "deviceId"=$2',[runId,actor.deviceId])
+      if (!owned.rowCount) throw new ApprovalUnavailable()
+      const current = await lockCliRunPolicy(client,runId,actor.userId)
+      if (revision && current.revision !== revision) throw new ApprovalUnavailable()
+      return current
+    }, true)
+  }
   async check(actor: DeviceActor, runId: string, revision: string) {
     const state = await this.checkState(actor, runId, revision)
     return state.live && !state.paused

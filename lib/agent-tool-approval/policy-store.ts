@@ -141,7 +141,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     policy.permissions.git_push = 'deny'
   }
   const revision = createHash('sha256').update(JSON.stringify(['sandbox-task-policy-v2',deviceKind,userId,scope.botId,scope.workspaceId,scope.agentId,agentRow.rows[0].generation,agentVersion,workerRow.rows[0].generation,workerVersion,workspaceVersions,scopeVersions,task ?? null])).digest('hex')
-  return { policy, revision, workspaceId: primaryWorkspaceId, workspaceIds, hierarchy, layers: { agent, worker, workspace, ...scopeLayers } }
+  return { policy, revision, workspaceId: primaryWorkspaceId, workspaceIds, hierarchy, policySnapshotRequired: [...workspaceLayers, ...scopedLayers].some(layer => Object.keys(layer).length > 0), layers: { agent, worker, workspace, ...scopeLayers } }
 }
 
 /** Resolve a run's exact owner, Bot and worker; then use the same policy layer. */

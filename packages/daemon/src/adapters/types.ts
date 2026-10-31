@@ -87,6 +87,8 @@ export interface SessionOptions {
    * the CLI's own permission rules where it has them, the agent's rules.
    */
   policy?: RunPolicy
+  /** Final policy digest from the independently verified server snapshot. */
+  policyHash?: string
   /**
    * The skills the run was given (the assignment's `skills`). They are
    * written under the run dir and read into the agent's instructions.

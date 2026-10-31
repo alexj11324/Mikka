@@ -46,6 +46,7 @@ function scripted(respond: (call: Call) => Response | Promise<Response>): {
       body: init?.body ? JSON.parse(String(init.body)) : undefined,
       redirect: init?.redirect,
     }
+    if (call.path.includes("/policy-snapshot?")) return new Response(null,{status:404})
     calls.push(call)
     return respond(call)
   }) as typeof fetch
@@ -165,10 +166,12 @@ describe("HttpServerLink", () => {
     let observed: AbortSignal | undefined
     let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
     try {
-      const fetch=(async (_url: unknown,init?: RequestInit) => new Promise<Response>((_resolve,reject)=>{
+      const fetch=(async (_url: unknown,init?: RequestInit) => {
+        if (String(_url).includes("/policy-snapshot?")) return new Response(null,{status:404})
+        return new Promise<Response>((_resolve,reject)=>{
         observed=init?.signal ?? undefined
         observed?.addEventListener('abort',()=>reject(new Error('aborted')),{once:true})
-      })) as typeof globalThis.fetch
+      })}) as typeof globalThis.fetch
       gate=await new HttpServerLink('http://server.test',fetch).prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy:defaultRunPolicy(),policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
       await vi.advanceTimersByTimeAsync(1000)
       expect(deadline).toHaveBeenCalledWith(5000)
@@ -176,7 +179,7 @@ describe("HttpServerLink", () => {
       gate.revoke()
       expect(observed?.aborted).toBe(true)
       await vi.advanceTimersByTimeAsync(2000)
-      expect(deadline).toHaveBeenCalledTimes(1)
+      expect(deadline).toHaveBeenCalledTimes(2)
     } finally { gate?.revoke(); deadline.mockRestore(); vi.useRealTimers() }
   })
   it('revokes an idle run when its server-side policy revision or lease ceases to be live', async () => {

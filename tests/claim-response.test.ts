@@ -6,6 +6,9 @@ import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, type RunCheckpoint } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
+import { POLICY_SNAPSHOT_HEADER } from '@mikka/protocol/policy-snapshot'
+import { policyDistributionContext } from '../lib/agent-tool-approval/policy-distribution'
+import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { POST } from '../app/v1/devices/[deviceId]/runs/[runId]/claim/route'
 
 function fixture() {
@@ -16,7 +19,8 @@ function fixture() {
     device: {id:'device',ownerId:'member',enabled:true,kind:'local',protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]},
     agent: {id:'agent',userId:'member',deviceId:'device',harness:'codex'},
     repo: {id:'repo',userId:'member',deviceId:'device',baseBranch:'main',repoPath:repository.key,remoteUrl:repository.remoteUrl},
-    cliPolicy: {revision:'a'.repeat(64),policy:defaultRunPolicy(),workspaceIds:[] as string[]},
+    cliPolicy: {revision:'a'.repeat(64),policy:defaultRunPolicy(),workspaceIds:[] as string[],workspaceId:null,hierarchy:undefined,policySnapshotRequired:false,layers:{agent:{},worker:{},workspace:{}}},
+    policyCapability:undefined as string|undefined,
     publication: {pushBranch:'synthetic-claim-branch',policy:defaultRunPolicy()},
     checkpoint: null as RunCheckpoint | null,
     strictRecovery: false,
@@ -29,7 +33,7 @@ function fixture() {
   return probe
 }
 async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings']) {
-  try { return await POST(new Request('http://127.0.0.1/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
+  try { return await POST(new Request('http://127.0.0.1/mikka/v1/devices/device/runs/run/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
   finally {
     // Trace the intended gate: an unrelated failed prerequisite must not
     // masquerade as a successful lineage, scope or lease rejection.
@@ -263,4 +267,26 @@ test('platform cloud claims inject the configured secret assignment with BYO off
       assert.ok(!probe.preparation.includes('secrets'))
     }
   } finally {keys.forEach((key,i)=>{if(saved[i]===undefined)delete process.env[key];else process.env[key]=saved[i]})}
+})
+
+test('managed policy rejects an incapable worker before publication, claims or credentials',async()=>{
+  for(const capability of [undefined,'2']) {
+    const probe=fixture();probe.cliPolicy.policySnapshotRequired=true;probe.policyCapability=capability
+    const response=await claim(probe,['skill-preflight','policy'])
+    assert.equal(response.status,409);assert.equal(probe.run.status,'queued');assert.equal(probe.run.leaseExpiresAt,null)
+    assert.equal((await response.json()).code,'policyConsumerUpgradeRequired')
+  }
+})
+test('capable workers receive the signed final composed policy, not the earlier CLI layer',async()=>{
+  const before=process.env.BETTER_AUTH_SECRET;process.env.BETTER_AUTH_SECRET='isolated-claim-policy-signing-fixture-only'
+  try {
+    const probe=fixture();probe.policyCapability='1';probe.cliPolicy.policySnapshotRequired=true
+    probe.publication.policy.permissions.git_push='deny'
+    const response=await claim(probe),body=await response.json();assert.equal(response.status,200)
+    const context=policyDistributionContext('http://127.0.0.1/mikka','member','device','run',probe.cliPolicy)
+    const verified=verifyPolicySnapshot(body.policySnapshot,context,{runId:'run',deviceId:'device',revision:body.policyRevision,policy:body.policy})
+    assert.equal(verified.payload.policy.permissions.git_push,'deny')
+    assert.equal(probe.cliPolicy.policy.permissions.git_push,'ask')
+    assert.equal(body.policySnapshotRequired,true)
+  } finally {if(before===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=before}
 })

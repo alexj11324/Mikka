@@ -402,6 +402,13 @@ export class Daemon {
       startSubscription: hosted?.start,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
+      verifyRunPolicy: this.options.link.verifyRunPolicy ? async (assignment,signal) => {
+        // resumeAll runs before the first sync; establish the existing device
+        // session before fetching the independent signing context.
+        if (!this.device.credential) throw new Error('Current policy device credential unavailable')
+        if (!this.registered || !this.device.deviceId) await this.register(this.device.credential)
+        return this.options.link.verifyRunPolicy!(assignment,signal)
+      } : undefined,
       bootstrap: hosted
         ? async (worktree, repo) => {
             if (

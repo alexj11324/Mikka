@@ -7,6 +7,9 @@ import { Pool } from 'pg'
 import { readCliRunPolicy } from './policy-store'
 import { setCliPolicy } from './policy-settings'
 import { AgentToolApprovalStore } from './store'
+import { issuePolicySnapshot, policyDistributionContext } from './policy-distribution'
+import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
+import { POLICY_SNAPSHOT_TTL_MS } from '@mikka/protocol/policy-snapshot'
 
 const target = process.env.E2E_DATABASE_URL
 if (target) {
@@ -17,6 +20,8 @@ if (target) {
 if (!target && process.env.REQUIRE_DB === '1') throw Error('An isolated task policy database is required')
 
 test('task workspace policy applies to Coordinator and cross-workspace Bot runs', { skip: !target }, async t => {
+  const priorSecret = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'isolated-policy-distribution-test-fixture-only'
   const pool = new Pool({ connectionString: target })
   const { workspacePool } = await import('../workspace-db')
   const { pool: appPool } = await import('../db')
@@ -29,7 +34,7 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
         await new Promise<void>(resolve => server!.close(() => resolve()))
       }
       await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [tokenId])
-    } finally { await Promise.all([pool.end(), workspacePool.end(), appPool.end()]) }
+    } finally { if(priorSecret===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=priorSecret; await Promise.all([pool.end(), workspacePool.end(), appPool.end()]) }
   })
   const owner = `policy230-${randomUUID()}`, device = randomUUID(), agent = randomUUID()
   const workspaceA = randomUUID(), workspaceB = randomUUID(), botB = randomUUID()
@@ -62,11 +67,13 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
   const read = (run: string) => readCliRunPolicy(pool, run, owner)
   await pool.query('INSERT INTO device_tokens (id,"userId","tokenHash") VALUES ($1,$2,$3)', [tokenId, owner, createHash('sha256').update(token).digest('hex')])
   const { POST } = await import('../../app/v1/runs/[runId]/tool-approval/route')
+  const snapshotRoutes = await import('../../app/v1/runs/[runId]/policy-snapshot/route')
   server = createServer(async (request, response) => {
     try {
       const chunks: Buffer[] = []
       for await (const chunk of request) chunks.push(Buffer.from(chunk))
-      const result = await POST(new Request(`http://127.0.0.1${request.url}`, { method: 'POST', headers: request.headers as HeadersInit, body: Buffer.concat(chunks) }), { params: Promise.resolve({ runId: new URL(request.url!, 'http://127.0.0.1').pathname.split('/')[3] }) })
+      const route = request.url!.includes('/policy-snapshot') ? (request.method==='GET'?snapshotRoutes.GET:snapshotRoutes.POST) : POST
+      const result = await route(new Request(`http://${request.headers.host}${request.url}`, { method: request.method, headers: request.headers as HeadersInit, ...(request.method==='GET'?{}:{body:Buffer.concat(chunks)}) }), { params: Promise.resolve({ runId: new URL(request.url!, 'http://127.0.0.1').pathname.split('/')[3] }) })
       response.writeHead(result.status, Object.fromEntries(result.headers)); response.end(await result.text())
     } catch { response.writeHead(500).end() }
   })
@@ -75,6 +82,49 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
   const checkHTTP = (policyRevision: string, runId = a.run) => fetch(`http://127.0.0.1:${address.port}/v1/runs/${runId}/tool-approval`, {
     method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ operation: 'check', deviceId: device, policyRevision }),
+  })
+  await t.test('signed policy HTTP context and renewal bind the current run and retain final restrictions', async () => {
+    const issuer=`http://127.0.0.1:${address.port}`,url=`${issuer}/v1/runs/${a.run}/policy-snapshot`,auth={authorization:`Bearer ${token}`,'content-type':'application/json'}
+    const current=await read(a.run),context=policyDistributionContext(issuer,owner,device,a.run,current)
+    const finalPolicy={...current.policy,readOnly:true,permissions:{...current.policy.permissions,computer_use:'deny' as const}}
+    const expired=issuePolicySnapshot(context,finalPolicy,Date.now()-POLICY_SNAPSHOT_TTL_MS-1000)
+    assert.equal((await fetch(`${url}?deviceId=${device}`)).status,401)
+    const metadata=await fetch(`${url}?deviceId=${device}`,{headers:auth})
+    assert.equal(metadata.status,200);assert.deepEqual(await metadata.json(),context)
+    const renew=async(snapshot:unknown,deviceId=device)=>fetch(url,{method:'POST',headers:auth,body:JSON.stringify({deviceId,snapshot})})
+    const response=await renew(expired);assert.equal(response.status,200)
+    const renewed=verifyPolicySnapshot(await response.json(),context,{runId:a.run,deviceId:device,revision:current.revision,policy:finalPolicy})
+    assert.equal(renewed.payload.policy.readOnly,true);assert.equal(renewed.payload.policy.permissions.computer_use,'deny')
+    assert.equal(renewed.payload.policyHash,expired.payload.policyHash)
+    assert.ok(renewed.payload.expiresAt>Date.now())
+    const tampered=structuredClone(expired);tampered.payload.policy.readOnly=false
+    assert.equal((await renew(tampered)).status,409)
+    const foreign=issuePolicySnapshot({...context,ownerId:'foreign-owner'},finalPolicy)
+    assert.equal((await renew(foreign)).status,409)
+    assert.equal((await renew(expired,randomUUID())).status,409)
+    // The same exact endpoint must pass the cloud token's narrow run ownership gate.
+    const scopedId=randomUUID(),scopedToken=randomUUID()
+    await pool.query(`UPDATE devices SET kind='cloud' WHERE id=$1`,[device])
+    await pool.query(`INSERT INTO cloud_machines("workspaceId","ownerId","deviceId","operationId") VALUES($1,$2,$3,$4)`,[workspaceA,owner,device,randomUUID()])
+    await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1,$2,$3,$4,$5,now()+interval '5 minutes')`,[scopedId,owner,createHash('sha256').update(scopedToken).digest('hex'),device,workspaceA])
+    try {
+      const scoped={authorization:`Bearer ${scopedToken}`,'content-type':'application/json'}
+      assert.equal((await fetch(`${url}?deviceId=${device}`,{headers:scoped})).status,200)
+      const cloudCurrent=await read(a.run),cloudContext=policyDistributionContext(issuer,owner,device,a.run,cloudCurrent)
+      const cloudSnapshot=issuePolicySnapshot(cloudContext,{...cloudCurrent.policy,readOnly:true})
+      assert.equal((await fetch(url,{method:'POST',headers:scoped,body:JSON.stringify({deviceId:device,snapshot:cloudSnapshot})})).status,200)
+      assert.equal((await fetch(`${issuer}/v1/runs/${randomUUID()}/policy-snapshot?deviceId=${device}`,{headers:scoped})).status,401)
+    } finally {
+      await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1',[scopedId])
+      await pool.query('DELETE FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2',[workspaceA,owner])
+      await pool.query(`UPDATE devices SET kind='local' WHERE id=$1`,[device])
+    }
+    await setCliPolicy(pool,owner,a.run,'workspace',current.revision,{permissions:{install_dependency:'deny',network:'deny'}})
+    assert.equal((await renew(expired)).status,409,'current revision cannot renew an old approval policy')
+    await setCliPolicy(pool,owner,a.run,'workspace',(await read(a.run)).revision,workspacePolicyA)
+    await pool.query(`UPDATE agent_runs SET status='stopped' WHERE id=$1`,[a.run])
+    assert.equal((await fetch(`${url}?deviceId=${device}`,{headers:auth})).status,409)
+    await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`,[a.run])
   })
   await t.test('Coordinator tasks inherit their own workspace ceiling without changing the global head', async () => {
     const policyA = await read(a.run), policyB = await read(b.run), privatePolicy = await read(personal.run)
