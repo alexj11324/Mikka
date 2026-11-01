@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import type { EditorView } from "@tiptap/pm/view"
 import { useTranslations } from "next-intl"
 import { IssueActivity } from './issue-activity'
-import { useEditor, type JSONContent } from "@tiptap/react"
+import { useEditor, useEditorState, type JSONContent } from "@tiptap/react"
 import { createEditorExtensions, readableIssueContent } from "./issue-editor-schema"
 import { TextSelection } from "@tiptap/pm/state"
 import { Collaboration } from "@tiptap/extension-collaboration"
@@ -109,6 +109,8 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
       replacementCallback.current?.(applied)
     }
   }, [editor, replacement, layout])
+  // 选区评论 appears only while text is selected, as in Linear and Notion (R-40).
+  const hasSelection = useEditorState({ editor, selector: ({ editor: current }) => !!current && !current.state.selection.empty }) ?? false
   const { changes } = useRichTextChanges(editor)
   const { anchors, activeId } = useCommentAnchors(editor)
   const outline = useRichTextOutline(editor)
@@ -160,9 +162,9 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
-      {layout === 'issue' && !compact && <><div className="flex justify-end pb-2">
+      {layout === 'issue' && !compact && <>{(hasSelection || panel === 'comments') && <div className="flex justify-end pb-2">
         <Button variant="ghost" size="xs" onClick={() => setPanel(panel === 'comments' ? '' : 'comments')} aria-expanded={panel === 'comments'}><MessageSquare data-icon="inline-start" />{t('selectionComment')}</Button>
-      </div>
+      </div>}
       {panel === 'comments' && <div className="flex flex-col gap-3 rounded-lg border p-4">
         <FieldGroup><Field><FieldLabel htmlFor="selection-comment" className="sr-only">{t('selectionCommentLabel')}</FieldLabel><Input id="selection-comment" value={comment} onChange={event => setComment(event.target.value)} maxLength={2000} placeholder={t('selectionCommentPlaceholder')} /></Field></FieldGroup>
         <div className="flex justify-end"><Button size="sm" variant="outline" disabled={!comment.trim()} onClick={addComment}>{t('addSelectionComment')}</Button></div>
