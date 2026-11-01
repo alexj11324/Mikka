@@ -146,6 +146,9 @@ test('OpenUI Tag, Steps and an EditableTable in a Form render for the Coordinato
   const review = render(reviewTasks)
   assert.match(review, /Write brief/)
   assert.match(review, /Create these tasks/)
+  // The Form's confirm button is the project Button at sm, not OpenUI's own (R-33).
+  assert.match(review, /data-slot="button"[^>]*>Create these tasks</)
+  assert.doesNotMatch(review, /openui-button-base/)
   // OpenUI's own save bar is English-only; ours writes edits into the Form instead.
   assert.doesNotMatch(review, /Save Changes|changes made/)
   const { EditableTable } = agentComponentCatalog
