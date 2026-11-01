@@ -189,3 +189,11 @@ test('repository push approval composes with CLI limits without broadening unrel
  selectIndex=0;cliPolicy.permissions.git_push='allow';publicationPolicy.permissions.git_push='ask'
  const pending=await request();assert.equal(pending.status,200);assert.equal((await pending.json()).policy.permissions.git_push,'ask')
 })
+
+test('a claim without a publication never forwards git_push allow as a push grant', async () => {
+ cloud=true;cliPolicy.permissions.git_push='allow'
+ const response=await request();assert.equal(response.status,200);const body=await response.json()
+ assert.equal(prepared.mock.callCount(),0)
+ assert.equal(body.policy.permissions.git_push,'ask');assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny')
+ assert.equal(cliPolicy.permissions.git_push,'allow','the stored CLI policy is unchanged')
+})

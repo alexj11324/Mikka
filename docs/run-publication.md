@@ -35,7 +35,21 @@ Coordinator can request a confirmation, but only the authenticated person can
 decide it. Revoking a repository approval invalidates its pending confirmations.
 This entry point still requires fixed-Preview and user-interface acceptance.
 
-Claim sends `pushBranch` and `policy.permissions.git_push`. `/repos` does not
+A push needs two gates, both true. The repository approval above decides
+which repositories may be pushed. The `git_push` action permission decides
+whether a person confirms a push: `allow` drops that confirmation, `ask` keeps
+it, `deny` blocks the push. `git_push: allow` never stands in for the
+repository approval: admission, the run's GitHub token and publication all
+require a valid approval for that owner and repository, and deny on either
+gate denies. An admission receipt records the approval it rests on
+(`authority: 'repository_approval'`, `approvedAt`). Old receipts with
+`authority: 'configured_allow'` and no `approvedAt` still parse but grant
+nothing. See
+[the decision](design/decisions/2026-11-01-0500-push-needs-repository-approval.md).
+
+Claim sends `pushBranch` and `policy.permissions.git_push`; it sends `allow`
+only when both gates hold, and a claim without a publication never forwards a
+configured `allow`. `/repos` does not
 cache push approval. The daemon uses the same policy for fetching the previous
 task branch and pushing the next commit, with local git credentials and no
 force push. Settings revocation blocks subsequent claims and server PR creation.
