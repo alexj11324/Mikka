@@ -118,7 +118,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     } } } as unknown as import('e2b').Sandbox
     const workerRuntime = { ...runtime, ensureHostedRunnerImage: async () => {} } as typeof provider
     await assert.rejects(startCloudWorker(pool, bob, sandbox, 'https://mikka.example/mikka', sha, workerRuntime), /busy or unavailable/)
-    await assert.rejects(startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', 'b'.repeat(40), workerRuntime), /version mismatch/)
+    await assert.rejects(startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', 'b'.repeat(40), workerRuntime), /worker_version_mismatch/)
     const worker = await startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', sha, workerRuntime)
     assert.equal(worker.deviceId, handoff!.deviceId)
     assert.equal((await pool.query('SELECT "workerLeaseId" FROM cloud_machines WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0].workerLeaseId, null)
