@@ -37,8 +37,8 @@
       }
     },
     "properties": "任务属性",
-    "statusLabel": "任务状态",
-    "priorityLabel": "任务优先级",
+    "statusLabel": "状态",
+    "priorityLabel": "优先级",
     "members": "协作成员",
     "access": "访问权限",
     "restricted": "仅授权成员可访问",
@@ -88,8 +88,7 @@
       "emptyTitle": "这里还没有任务",
       "newTask": "新建任务"
     },
-    "createdAtDate": "创建于 {date}",
-    "unassignedNumber": "正在分配编号"
+    "createdAtDate": "创建于 {date}"
   },
   "Nav": {
     "switchLanguage": "切换语言",
@@ -410,7 +409,8 @@
       "group": "负责人",
       "newMember": "新成员",
       "invite": "邀请并分配…",
-      "reload": "重新读取成员"
+      "reload": "重新读取成员",
+      "delegatedTo": "交给 {name}"
     },
     "membersTitle": "成员管理 · Mikka",
     "membersDescription": "管理工作区成员、角色与邀请，支持 CSV 拖拽批量邀请和成员导出。",
@@ -3178,6 +3178,7 @@
     "back": "返回 {name}",
     "starting": "正在准备",
     "close": "关闭线程",
+    "openTask": "打开任务",
     "conversation": "线程对话",
     "loading": "正在打开线程",
     "loadFailed": "线程加载失败",
@@ -3344,6 +3345,11 @@
       "noRoutines": "还没有例行",
       "noLibrary": "还没有资料",
       "noPullRequests": "还没有 PR",
+      "noMatches": "无匹配结果",
+      "members": "成员（{count}）",
+      "membersLoading": "成员",
+      "membersError": "成员加载失败",
+      "retry": "重试",
       "prGroup": {
         "review": "等待审查（{count}）",
         "running": "进行中（{count}）",
@@ -3457,12 +3463,11 @@
         "dueDate": "截止日期",
         "createdAt": "创建时间"
       },
-      "hiddenColumns": "隐藏的列",
+      "columns": "看板列",
       "hiddenLane": "已隐藏",
       "expandColumn": "展开{status}列",
       "foldColumn": "收起成窄条",
       "hideColumn": "隐藏此列",
-      "hideColumnNamed": "隐藏{status}列",
       "showColumn": "显示{status}列",
       "columnMenu": "{status}列选项",
       "newTask": "新建任务",
@@ -3522,7 +3527,7 @@
     "connect": "连接应用",
     "action": {
       "reply": "回复",
-      "review": "Review",
+      "review": "评审",
       "handle": "处理",
       "read": "查看"
     },
@@ -3576,6 +3581,7 @@
     "frameTitle": "{title}（网页）",
     "share": "分享",
     "createLink": "创建链接",
+    "shareAccess": "拿到链接的人可查看",
     "copyLink": "复制链接",
     "linkCopied": "链接已复制",
     "stopSharing": "停止分享",
@@ -3678,7 +3684,7 @@
   },
   "GroupChat": {
     "untitled": "未命名群聊",
-    "readOnly": "群聊暂时只能阅读，发送消息还没有开放。",
+    "composer": "群聊暂不能发送",
     "messages": "群聊消息",
     "you": "你",
     "member": "成员",

@@ -10,8 +10,7 @@ import type { IssueMetadata } from '@/lib/issue-metadata'
 import { Button } from '@/components/ui/button'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { avatarImageSrc } from '@/lib/default-avatar'
+import { PersonAvatar } from '@/components/person-avatar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from '@/components/ui/command'
 import { ROW_VALUE } from './issue-property-row'
@@ -26,7 +25,8 @@ export function AssigneeAvatar({ assignee, compact = false }: { assignee: IssueM
   if (!assignee) return <CircleUserRound data-icon="inline-start" />
   // Agents are blobs, people are photos or initials.
   if (assignee.kind === 'agent') return <AgentSphere name={assignee.name} compact={compact} />
-  return <Avatar size={compact ? 'xs' : 'sm'}><AvatarImage src={avatarImageSrc(assignee.image)} alt="" draggable={false} /><AvatarFallback>{assignee.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+  // The same avatar as the account menu and comments (R-36).
+  return <PersonAvatar name={assignee.name} image={assignee.image} size={compact ? 'row' : 'comment'} />
 }
 
 export function IssueAssigneeMenu({ id, assignee, avatar, disabled, compact, onChange, onInvite, request }: {
@@ -40,6 +40,8 @@ export function IssueAssigneeMenu({ id, assignee, avatar, disabled, compact, onC
   useEffect(() => { if (request?.target === 'assignee') { setOpen(true); setQuery('') } }, [request])
   const { data, error, mutate } = useSWR(open ? ['issue-property-options', id] : null, () => getIssuePropertyOptions(id))
   async function select(value: { kind: 'member'; id: string } | null) {
+    // Picking the current value changes nothing.
+    if (value === null ? !assignee : assignee?.kind === value.kind && assignee.id === value.id) { setOpen(false); setQuery(''); return }
     if (await onChange(value)) { setOpen(false); setQuery('') }
   }
   return <Popover open={open} onOpenChange={value => { setOpen(value); setQuery('') }}>

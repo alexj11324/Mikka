@@ -88,8 +88,7 @@
       "emptyTitle": "No tasks yet",
       "newTask": "New task"
     },
-    "createdAtDate": "Created {date}",
-    "unassignedNumber": "Assigning number"
+    "createdAtDate": "Created {date}"
   },
   "Nav": {
     "switchLanguage": "Switch language",
@@ -410,7 +409,8 @@
       "group": "Assignee",
       "newMember": "New member",
       "invite": "Invite and assign…",
-      "reload": "Reload members"
+      "reload": "Reload members",
+      "delegatedTo": "Delegated to {name}"
     },
     "membersTitle": "Members · Mikka",
     "membersDescription": "Manage workspace members, roles, and invitations, with CSV bulk invites and member export.",
@@ -3178,6 +3178,7 @@
     "back": "Back to {name}",
     "starting": "Getting ready",
     "close": "Close thread",
+    "openTask": "Open task",
     "conversation": "Thread conversation",
     "loading": "Opening thread",
     "loadFailed": "Thread failed to load",
@@ -3344,6 +3345,11 @@
       "noRoutines": "No routines yet",
       "noLibrary": "No files yet",
       "noPullRequests": "No PRs yet",
+      "noMatches": "No matches",
+      "members": "Members ({count})",
+      "membersLoading": "Members",
+      "membersError": "Members failed to load",
+      "retry": "Retry",
       "prGroup": {
         "review": "Waiting for review ({count})",
         "running": "In progress ({count})",
@@ -3457,12 +3463,11 @@
         "dueDate": "Due date",
         "createdAt": "Created"
       },
-      "hiddenColumns": "Hidden columns",
+      "columns": "Board columns",
       "hiddenLane": "Hidden",
       "expandColumn": "Expand the {status} column",
       "foldColumn": "Fold to a strip",
       "hideColumn": "Hide column",
-      "hideColumnNamed": "Hide {status} column",
       "showColumn": "Show {status} column",
       "columnMenu": "{status} column options",
       "newTask": "New task",
@@ -3576,6 +3581,7 @@
     "frameTitle": "{title} (web page)",
     "share": "Share",
     "createLink": "Create link",
+    "shareAccess": "Anyone with the link can view",
     "copyLink": "Copy link",
     "linkCopied": "Link copied",
     "stopSharing": "Stop sharing",
@@ -3678,7 +3684,7 @@
   },
   "GroupChat": {
     "untitled": "Untitled group chat",
-    "readOnly": "Group chats are read-only for now; sending isn't open yet.",
+    "composer": "Sending to groups isn't open yet",
     "messages": "Group chat messages",
     "you": "You",
     "member": "Member",

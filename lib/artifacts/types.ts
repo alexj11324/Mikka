@@ -32,6 +32,8 @@ export interface ArtifactDetail extends ArtifactSummary {
 export interface ArtifactListItem extends ArtifactSummary {
   runId: string | null
   issueId: string | null
+  /** The bot whose run made it, so the reader sits beside that bot's chat; null outside a run or for the Coordinator. */
+  botId: string | null
   /** Who made the latest version: the agent's name. */
   authorName: string | null
   /** The task it was made for, as 「MIK-41」; null without one. */

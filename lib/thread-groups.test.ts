@@ -172,5 +172,5 @@ test('a bot\'s PRs come from the tasks its threads worked on', () => {
     { id: 'other', metadata: { pullRequests: [pr(9, 'open')] } },
   ]
   const rows = pullRequestsOf([thread('succeeded', 'a'), thread('running', 'b'), thread('succeeded', 'c'), thread('succeeded', 'b'), thread('running', null)], issues)
-  assert.deepEqual(rows.map(row => [row.number, row.group, row.issueId]), [[247, 'review', 'a'], [251, 'running', 'b'], [240, 'merged', 'c']])
+  assert.deepEqual(rows.map(row => [row.number, row.group, row.issueId, row.state]), [[247, 'review', 'a', 'open'], [251, 'running', 'b', 'open'], [240, 'merged', 'c', 'merged']])
 })

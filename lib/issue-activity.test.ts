@@ -89,3 +89,12 @@ test('derived events carry the version actor', () => {
   ], [])
   assert.deepEqual(events.map(event => event.actorKey), ['user:u1', 'agent:a1'])
 })
+
+test('derived events carry the resolved actor for the row to name (R-63)', () => {
+  const ada = { type: 'user' as const, id: 'u1', name: 'Ada', avatarUrl: '/avatars/blue.webp' }
+  const events = deriveIssueActivity([
+    { id: 'v1', revision: 1, title: 'A', status: 'todo', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:00:00.000Z', actorType: 'user', actorId: 'u1', actor: ada },
+    { id: 'v2', revision: 2, title: 'A', status: 'doing', priority: 'normal', content: content(null), createdAt: '2026-10-22T10:05:00.000Z' },
+  ], [])
+  assert.deepEqual(events.map(event => event.actor ?? null), [ada, null])
+})
