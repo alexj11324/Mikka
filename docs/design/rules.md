@@ -227,8 +227,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot's avatar and name (R-02), then the tabs 详情, 线程, PR, 电脑. 线程
   lists only the threads this bot dispatched (for the Coordinator, the
   threads it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
-  全部线程 lists every bot's threads; each row carries the 16px mark of the
-  Agent running it (R-78), the only thread list that shows one, and a
+  全部线程 lists every bot's threads; each row carries the small mark of the
+  Agent running it (R-78), the only thread list that shows one, beside a
   relative time on the right (2 分钟前, 昨天).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
@@ -260,6 +260,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   - 已解决 only when the outcome is done, or its task is done, cancelled or a
     duplicate, or its PR is merged. A run nobody could judge sits under 受阻
     (failed) or 等待你, never 已解决.
+  - Every row leads with its group's status icon and colour, the phone's set
+    (`ThreadStatusIcon`): 进行中 spins, 受阻 a red alert, 等待你 a hollow
+    circle, 空闲 a slashed circle, 已解决 a green check.
   - A task's existing threads fold into its newest one, which carries
     「第 N 次尝试」 past the first and stays out of 已解决 until the task is
     resolved; the task's own 线程 tab lists every attempt. (New work keeps one

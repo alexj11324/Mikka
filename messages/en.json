@@ -3268,6 +3268,13 @@
         "resolved": "Resolved ({count})"
       },
       "attempt": "Attempt {count}",
+      "state": {
+        "running": "Running",
+        "blocked": "Blocked",
+        "waiting": "Waiting for you",
+        "idle": "Idle",
+        "resolved": "Resolved"
+      },
       "waitingFor": "Waiting for {device} to come online"
     },
     "newBot": {

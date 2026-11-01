@@ -3268,6 +3268,13 @@
         "resolved": "已解决（{count}）"
       },
       "attempt": "第 {count} 次尝试",
+      "state": {
+        "running": "进行中",
+        "blocked": "受阻",
+        "waiting": "等待你",
+        "idle": "空闲",
+        "resolved": "已解决"
+      },
       "waitingFor": "等待 {device} 上线"
     },
     "newBot": {
