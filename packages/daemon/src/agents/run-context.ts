@@ -1,5 +1,5 @@
 import { policySnapshotHash } from '@mikka/protocol/node-policy-snapshot'
-import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../../../../lib/personal-agent-message'
+import { PERSONAL_MESSAGE_INSTRUCTIONS } from '@mikka/protocol/personal-agent-message'
 import { prepareGitHubEnvironment, type RunGitHub } from './github-runtime'
 import { runAppsHost, type RunApps } from './run-apps'
 // What every real harness adapter needs about one run: the sandbox policy,
