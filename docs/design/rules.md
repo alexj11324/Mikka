@@ -398,10 +398,18 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `--control` fill, no stroke, the magnifier on the left and a light focus ring.
   ui-policy fails an outlined `Input`, `InputGroup` or `SidebarInput` used for
   search as `style/search-input`.
-- **R-32** Font Geist, self-hosted from `app/fonts/Geist-Variable.woff2` through
-  `next/font/local` (no runtime font CDN). A local font is only allowed after
+- **R-32** Type follows Comma (decision `2026-11-01-1204-type-follows-comma`):
+  Inter Variable for text and Geist Mono for code, self-hosted from
+  `app/fonts/` through `next/font/local` (no runtime font CDN, no metric
+  fallback, `font-display: block`), then the system stack `"SF Pro Display",
+  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, …, sans-serif`. No
+  Chinese font is named: Chinese takes the system font (PingFang on a Mac), and
+  no self-hosted text font may draw a CJK code point (`ui-policy.test.mjs`).
+  Regular is 450 (`font-normal`); `font-synthesis: none`,
+  `text-rendering: optimizeLegibility`, `-webkit-font-smoothing: antialiased`.
+  A local font is only allowed after
   its file and CSS variable are registered in `ui-policy.json` →
-  `typography.localFonts`. Chinese falls back to the system font. Only these text
+  `typography.localFonts`. Only these text
   styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
   (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium
   (group title), 11/14 Medium (badge), and 24/32 SemiBold for the 建议 page
