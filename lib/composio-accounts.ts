@@ -79,9 +79,15 @@ export type ComposioAccountRecord = {
   /** The last time the provider was asked, final answer or not; null when never. */
   lastAttemptAt: Date | null
   isDefault: boolean
+  /** The provider refused the person's authorization while Composio still lists the account as ACTIVE. */
+  needsReconnect?: boolean
 }
 
-/** Adds what Mikka stores (email, chosen default) to the accounts Composio listed. */
+/**
+ * Adds what Mikka stores (email, chosen default) to the accounts Composio
+ * listed. An account the provider refused shows as Composio's own EXPIRED,
+ * so the list offers the same reconnect it gives an expired one.
+ */
 export function withAccountRecords(accounts: ConnectedAccountView<string>[], records: ComposioAccountRecord[]): ConnectedAccountView<string>[] {
   const byId = new Map(records.map(record => [record.accountId, record]))
   const defaults = new Map<string, string | null>()
@@ -90,7 +96,12 @@ export function withAccountRecords(accounts: ConnectedAccountView<string>[], rec
     const chosen = records.find(record => record.isDefault && (record.toolkit === app || own.some(account => account.id === record.accountId)))?.accountId
     defaults.set(app, pickDefaultAccountId(own.map(account => ({ ...account, isDisabled: !account.enabled })), chosen))
   }
-  return accounts.map(account => ({ ...account, email: byId.get(account.id)?.email ?? null, isDefault: defaults.get(account.toolkit) === account.id }))
+  return accounts.map(account => ({
+    ...account,
+    ...(account.status === 'ACTIVE' && byId.get(account.id)?.needsReconnect ? { status: 'EXPIRED' } : {}),
+    email: byId.get(account.id)?.email ?? null,
+    isDefault: defaults.get(account.toolkit) === account.id,
+  }))
 }
 
 const EMAIL = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/

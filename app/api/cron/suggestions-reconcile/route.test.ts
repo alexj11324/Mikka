@@ -5,7 +5,7 @@ import type { ReconcileResult } from '@/lib/suggestions/reconcile'
 const originalSecret = process.env.CRON_SECRET
 const secret = 'source-only-cron-test-secret'
 const verifyBearer = mock.fn(async (_value: string | null, _secret: string) => false)
-const result = (): ReconcileResult => ({ people: 2, read: { gmail: 3 }, failed: {}, deferred: 1, linear: { deliveries: 4, notifications: 2 }, github: { configured: true, scanned: 30, failed: 27, redelivered: 25, errors: 0 } })
+const result = (): ReconcileResult => ({ people: 2, read: { gmail: 3 }, failed: {}, reconnect: {}, deferred: 1, linear: { deliveries: 4, notifications: 2 }, github: { configured: true, scanned: 30, failed: 27, redelivered: 25, errors: 0 } })
 const reconcile = mock.fn(async (_options: { deadline: number }) => result())
 mock.module(new URL('../../../../lib/linear-sync/webhook.ts', import.meta.url).href, { namedExports: { verifyBearer } })
 mock.module(new URL('../../../../lib/suggestions/reconcile.ts', import.meta.url).href, { namedExports: { reconcileSuggestions: reconcile } })
@@ -86,6 +86,17 @@ test('GitHub errors and caught source failures report 502 with the complete resu
     assert.equal(response.status, 502, source)
     assert.deepEqual(await response.json(), { ...summary, factoryMonitor: sweepResult(), outcome: { suggestions: 'ok', factoryMonitor: 'ok' } })
   }
+})
+
+test('a connection that needs reconnecting is reported, not a failed run', async () => {
+  process.env.CRON_SECRET = secret
+  verifyBearer.mock.mockImplementation(async () => true)
+  const summary = result()
+  summary.reconnect.notion = 1
+  reconcile.mock.mockImplementation(async () => summary)
+  const response = await GET(request())
+  assert.equal(response.status, 200)
+  assert.deepEqual((await response.json()).reconnect, { notion: 1 })
 })
 
 test('the Factory monitor sweep runs once, alongside the backfill, with a 50-second budget', async () => {

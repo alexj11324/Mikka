@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { after,before,beforeEach,mock,test } from 'node:test'
 import type { ActionTitleInput } from './action-title'
-const savedKey=process.env.DECISION_GATEWAY_API_KEY
+const savedKey=process.env.AI_GATEWAY_API_KEY
 let allowed=true
 const providers=new WeakSet<object>(),keys:string[]=[],writes:unknown[]=[]
 const generateText=mock.fn(async()=>({text:JSON.stringify({titles:[{id:'item',title:'Review the change'}]})}))
@@ -18,12 +18,13 @@ mock.module(new URL('../abuse/model.ts',import.meta.url).href,{namedExports:{
 }})
 let writeActionTitles:typeof import('./action-title-server').writeActionTitles
 before(async()=>{writeActionTitles=(await import('./action-title-server')).writeActionTitles})
-beforeEach(()=>{process.env.DECISION_GATEWAY_API_KEY='synthetic-action-key';allowed=true;keys.length=0;writes.length=0;generateText.mock.resetCalls()})
-after(()=>{if(savedKey===undefined)delete process.env.DECISION_GATEWAY_API_KEY;else process.env.DECISION_GATEWAY_API_KEY=savedKey})
+beforeEach(()=>{process.env.AI_GATEWAY_API_KEY='synthetic-action-key';allowed=true;keys.length=0;writes.length=0;generateText.mock.resetCalls()})
+after(()=>{if(savedKey===undefined)delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=savedKey})
 const items:ActionTitleInput[]=[{id:'item',source:'github',action:'review',title:'Change',actor:null,excerpt:'Review the change'}]
-test('an allowed action-title route uses the trusted fixed-endpoint model and preserves its dedicated key',async()=>{
+test('an allowed action-title route uses the trusted fixed-endpoint model on the app\'s one gateway credential',async()=>{
   await writeActionTitles('owner',items)
-  assert.deepEqual(keys,['synthetic-action-key'])
+  // No key of its own: the SDK signs in with AI_GATEWAY_API_KEY or the deployment OIDC token, like every model call.
+  assert.deepEqual(keys,[undefined])
   assert.equal(generateText.mock.callCount(),1)
   assert.deepEqual(writes,[{actionTitle:'Review the change'}])
 })

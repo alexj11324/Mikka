@@ -301,6 +301,8 @@ export interface ChatItem {
   artifacts: string[]
   /** An event line the chat draws in the person's language: the turn moved to their API key after the subscription ran out. */
   notice?: QuotaSwitchNotice
+  /** The person stopped this reply (停止); it keeps what it had said. */
+  stopped?: true
 }
 
 /** The run id a successful local or Bot-computer dispatch carries. */
@@ -384,12 +386,15 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
       const last = items.at(-1)
       const shown = [...waiting.ids, ...cited.ids]
+      // 停止 cut this reply short (lib/coordinator/stop.ts); the mark may sit on an empty message.
+      const stopped = (message as { mikkaStopped?: unknown }).mikkaStopped === true
       if (last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary) {
         last.text = [last.text, cited.text].filter(Boolean).join('\n\n')
         last.tools.push(...tools)
         last.artifacts = [...new Set([...last.artifacts, ...cited.ids])]
-      } else if (cited.text || tools.length || shown.length) {
-        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)] })
+        if (stopped) last.stopped = true
+      } else if (cited.text || tools.length || shown.length || stopped) {
+        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)], ...(stopped ? { stopped } : {}) })
         waiting.ids = []
         // Only a reply that shows ends the boundary; hidden tool-only steps do not.
         briefingBoundary = false

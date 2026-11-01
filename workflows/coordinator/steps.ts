@@ -121,9 +121,17 @@ export async function failTurn(userId: string, holder: string, error: string, bo
   await store.failTurn(userId, holder, error, botId)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false) {
   'use step'
-  return store.appendMessages(userId, holder, messages, warning, botId, streamId)
+  return store.appendMessages(userId, holder, messages, warning, botId, streamId, stopped)
+}
+
+/** What the model call cut short by 停止 had streamed in turn `streamId`, read back from this run's own stream (lib/coordinator/stop.ts). */
+export async function stoppedStepText(holder: string, streamId: string) {
+  'use step'
+  const { getRun } = await import('workflow/api')
+  const { stoppedStepText: read } = await import('@/lib/coordinator/stop')
+  return read(getRun(holder).getReadable<CoordinatorWorkflowStreamPart>(), streamId)
 }
 
 /**

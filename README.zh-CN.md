@@ -222,7 +222,7 @@ pnpm dev
 pnpm desktop:dev
 ```
 
-开发过程中，运行 `pnpm typecheck`、`pnpm lint`、所改动部分的单元测试，以及所改动流程对应的一个浏览器测试。Pull request 运行 `@smoke` 浏览器测试集和所涉及区域的 spec；推送到 main 时运行主功能测试列表；每晚运行全部 spec。详见 [`CONTRIBUTING.md`](CONTRIBUTING.md)（"How changes are tested"）。
+开发过程中，运行 `pnpm typecheck`、`pnpm lint`、所改动部分的单元测试，以及所改动流程对应的一个浏览器测试。CI 运行源码、daemon 和数据库检查；浏览器测试只在手动启动时运行（Actions → Browser tests），`main` 由 Vercel 构建，CI 不做生产构建。详见 [`CONTRIBUTING.md`](CONTRIBUTING.md)（"How changes are tested"）。
 
 建议首先阅读以下文档：
 

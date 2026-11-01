@@ -10,6 +10,12 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
   member may start it, from any workspace; it is always recorded on their own
   personal workspace, which gets the USD 1 once per card. 计费 offers it only in
   the personal workspace, and the chat's 验证银行卡 link only there too.
+- Credit shares (decision 2026-10-31-2300 item 4): in a team, a member may turn on
+  我的点数也可用于这个团队 (`workspace_credit_shares`, `lib/credit-shares.ts`).
+  A Mikka 默认 call is admitted and reserved against the team's own balance
+  first; when that is empty, against each sharer's personal workspace, oldest
+  share first, and the usage row is charged there. Only active members' shares
+  count; leaving or a suspension deletes the share.
 - `startCardVerification(workspaceId?)` needs membership of `workspaceId` and
   returns a Stripe Checkout `{ url }` in `mode: 'setup'`, with USD currency and
   the personal workspace's Stripe customer. Redirect the browser to that URL. The
@@ -104,7 +110,8 @@ attention decisions carry the server-owned workspace billing context.
 Subscription-model snapshots retain their existing model seam and never debit
 hosted credit. Own-device work and BYO E2B do not require a card or debit points.
 Unscoped internal decision transport is exempt for the host's own judgments;
-it retains the separate existing `DECISION_GATEWAY_API_KEY` provider budget.
+it signs in with the app's one gateway credential (`lib/ai-gateway-auth.ts`)
+under the team's AI Gateway budget; there is no Decisions-only key.
 The standalone `routeGroupMessage`/`callDecisionRequest` helpers have no active
 unscoped user-facing consumer in this revision.
 
