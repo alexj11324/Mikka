@@ -75,5 +75,27 @@ class WorkerHash(unittest.TestCase):
             finally:
                 bt.ROOT = root
 
+class WorkerImports(unittest.TestCase):
+    def test_packaged_code_only_imports_what_the_template_ships(self):
+        # The template holds WORKER_PATHS only: a relative import that leaves them works in the
+        # repository and fails in the cloud worker (ERR_MODULE_NOT_FOUND), so no worker starts.
+        import os, re
+        spec = re.compile(r"""(?:from\s+|import\s*\(\s*|require\s*\(\s*|^\s*import\s+)['"](\.{1,2}/[^'"]+)['"]""", re.M)
+        roots = [bt.ROOT / path for path in bt.WORKER_PATHS if (bt.ROOT / path).is_dir()]
+        shipped = [os.path.realpath(bt.ROOT / path) for path in bt.WORKER_PATHS]
+        escapes = []
+        for root in roots:
+            for directory, dirs, files in os.walk(root):
+                dirs[:] = [d for d in dirs if d not in ('node_modules', 'dist', 'test', '__tests__')]
+                for name in files:
+                    if not re.search(r'\.(ts|tsx|mts|cts|js|mjs|cjs)$', name) or re.search(r'\.(test|spec)\.|\.node\.ts$', name):
+                        continue
+                    source = Path(directory, name)
+                    for target in spec.findall(source.read_text(errors='ignore')):
+                        resolved = os.path.realpath(os.path.join(directory, target))
+                        if not any(resolved == top or resolved.startswith(top + os.sep) for top in shipped):
+                            escapes.append(f'{source.relative_to(bt.ROOT)} -> {target}')
+        self.assertEqual(escapes, [])
+
 if __name__ == '__main__':
     unittest.main()

@@ -99,8 +99,9 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
   const nextPriority = issuePriorityForLinear(remote.priority)
   let doneEvent = false
   // A task Linear marks done tells its owner's Coordinator; its bot row is resolved here, before the transaction.
+  // A Linear team sync belongs to its owner and names no workspace: the personal workspace's Coordinator.
   const coordinator = link.issue.status !== 'done' && issueStatusForLinearType(remote.state?.type ?? '', link.issue.status as Parameters<typeof issueStatusForLinearType>[1], remote.state?.name) === 'done'
-    ? (await (await import('@/lib/coordinator/coordinator-bot')).coordinatorBot(team.ownerId, { backfill: false })).botId : null
+    ? (await (await import('@/lib/coordinator/coordinator-bot')).coordinatorBot(team.ownerId, null, { backfill: false })).botId : null
   const saved = await db.transaction(async tx => {
     await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
     const [latest] = await tx.select().from(issues).where(and(eq(issues.id, link.issue.id), eq(issues.userId, team.ownerId))).for('update')

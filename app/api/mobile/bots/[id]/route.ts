@@ -6,7 +6,7 @@ import { bots } from '@/lib/db/schema'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { setChatPreference } from '@/lib/chat-preferences'
 import { mobileBot } from '@/lib/mobile-threads'
-import { chatBotId, coordinatorBot } from '@/lib/coordinator/coordinator-bot'
+import { coordinatorBot, openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 
 export const dynamic = 'force-dynamic'
@@ -18,8 +18,8 @@ async function handleGET(request: Request, context: { params: Promise<{ id: stri
   if (!user) return unauthorized()
   const { id } = await context.params
   const workspace = (await loadWorkspaceContext(undefined, user)).workspace
-  // `coordinator` names the person's Coordinator, an ordinary bot row (its workspace may differ from the current one).
-  if (id === 'coordinator') { const coordinator = await coordinatorBot(user.id); return json(await mobileBot(user.id, coordinator.workspaceId, coordinator.botId)) }
+  // `coordinator` names the Coordinator of the workspace the app has open, an ordinary bot row of that workspace.
+  if (id === 'coordinator') { const coordinator = await coordinatorBot(user.id, workspace.id); return json(await mobileBot(user.id, workspace.id, coordinator.botId)) }
   if (!z.uuid().safeParse(id).success) return json({ error: 'Not found' }, 404)
   const [bot] = await db.select({ id: bots.id }).from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, user.id), eq(bots.workspaceId, workspace.id))).limit(1)
   if (!bot) return json({ error: 'Not found' }, 404)
@@ -38,7 +38,7 @@ async function handlePATCH(request: Request, context: { params: Promise<{ id: st
   const body = change.safeParse(await request.json().catch(() => null))
   if (!body.success) return json({ error: 'invalidChange' }, 400)
   if (id !== 'coordinator' && !z.uuid().safeParse(id).success) return json({ error: 'Not found' }, 404)
-  if (!await setChatPreference(user.id, await chatBotId(user.id, id === 'coordinator' ? null : id), body.data)) return json({ error: 'Not found' }, 404)
+  if (!await setChatPreference(user.id, await openChatBotId(user, id === 'coordinator' ? null : id), body.data)) return json({ error: 'Not found' }, 404)
   return json({ ok: true })
 }
 

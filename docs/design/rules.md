@@ -146,9 +146,9 @@ source wins in a conflict is in [`README.md`](README.md).
   Kanban with no column `+` (R-22) and no page-title pill (the rail says
   where you are). Columns are a fixed 300px, as in Linear: when they do not
   fit, the board scrolls horizontally, and spare width stays empty. With the
-  Coordinator sidebar open, only 已完成 collapses, to a 40px strip (icon, the
-  name one glyph per line, count) that expands when clicked; every other
-  column keeps its 300px. Figma: page 「看板卡片 v1 · 定稿 2026-10-31」
+  Coordinator sidebar open every column, 已完成 included, keeps its 300px;
+  no column folds to a strip
+  ([decision](decisions/2026-11-01-1144-board-done-keeps-its-width.md)). Figma: page 「看板卡片 v1 · 定稿 2026-10-31」
   (`714:5283`).
 - **R-26** Workspace tasks sync with Linear (`MIK-xx`); personal tasks stay in
   Mikka. A task can move both ways: a workspace task can be turned back into

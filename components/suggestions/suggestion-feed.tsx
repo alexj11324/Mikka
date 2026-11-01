@@ -74,8 +74,9 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
     } catch { setSendError(actionError()) } finally { setSending(null) }
   }
 
-  return <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-    <section aria-labelledby="suggestions-title" className="flex min-h-0 flex-1 flex-col md:basis-1/2">
+  // min-w-0 on both halves: one long unbroken line in a card must not widen its half and push the chat off screen.
+  return <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
+    <section aria-labelledby="suggestions-title" className="flex min-h-0 min-w-0 flex-1 flex-col md:basis-1/2">
       <header className="flex items-center justify-between gap-3 px-6 pt-6 pb-4">
         <h1 id="suggestions-title" className="text-2xl font-semibold">{t('title')}</h1>
         <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('refresh')} disabled={isValidating} onClick={() => { void mutate().then(() => toast.success(t('refreshed')), () => toast.error(t('refreshFailed'))) }} />}><RotateCw data-icon="inline-start" className={cn(isValidating && 'animate-spin')} /></TooltipTrigger><TooltipContent>{t('refresh')}</TooltipContent></Tooltip>
@@ -91,7 +92,7 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
         {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader>{noConnection && <Button variant="secondary" className="rounded-full" onClick={onConnect}>{t('connect')}</Button>}</Empty>}
       </div>
     </section>
-    <div className="relative hidden min-h-0 flex-1 flex-col border-l border-rule md:flex md:basis-1/2 has-data-[slot=thread-view]:[&_[data-slot=conversation-pill]]:hidden">
+    <div data-slot="suggestions-coordinator" className="relative hidden min-h-0 min-w-0 flex-1 flex-col border-l border-rule md:flex md:basis-1/2 has-data-[slot=thread-view]:[&_[data-slot=conversation-pill]]:hidden">
       <ConversationPill name={tNav('coordinator')} avatar={<CoordinatorAvatar size="pill" />} />
       <CoordinatorChat onOpenIssue={onOpenIssue} />
     </div>

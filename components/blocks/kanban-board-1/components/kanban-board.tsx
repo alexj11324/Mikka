@@ -3,7 +3,7 @@
 import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Box, CalendarDays, ChevronsLeftRight, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
+import { Box, CalendarDays, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
@@ -202,35 +202,24 @@ type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children
   onViewportKeyDown: ComponentProps<'div'>['onKeyDown']
   onHideColumn: (status: IssueStatus) => void
   onShowColumn: (status: IssueStatus) => void
-  /** Columns folded to a 40px strip (已完成 while the Coordinator sidebar is open), until clicked. */
-  narrowColumns?: IssueStatus[]
+  /** The Coordinator sidebar is beside the board: the hidden lane is left out. Columns keep their width either way. */
+  sidebarOpen?: boolean
 } & CardHandlers
 
-export function KanbanBoard({ columns, hiddenColumns: hidden, narrowColumns = [], context, pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onHideColumn, onShowColumn, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, ...props }: KanbanBoardProps) {
+export function KanbanBoard({ columns, hiddenColumns: hidden, sidebarOpen = false, context, pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onHideColumn, onShowColumn, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, ...props }: KanbanBoardProps) {
   const handlers = { onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss }
   const t = useTranslations('Board')
   const tBoard = useTranslations('Shell.board')
   const tIssue = useTranslations('Issue')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const shown = BOARD_COLUMNS.filter(column => columns.includes(column.value))
-  const [opened, setOpened] = useState<IssueStatus[]>([])
-  const narrow = (status: IssueStatus) => narrowColumns.includes(status) && !opened.includes(status)
-  // R-25: columns are a fixed 300px, as Linear; when they do not fit, the board scrolls and spare width stays empty.
-  // Beside the Coordinator sidebar the hidden lane is left out; hidden columns stay reachable from 显示.
-  const sidebarOpen = narrowColumns.length > 0
+  // R-25: every column is a fixed 300px, as Linear, sidebar open or not; when they do not fit, the board scrolls
+  // and spare width stays empty. Beside the Coordinator sidebar the hidden lane is left out; hidden columns stay reachable from 显示.
   return <Kanban {...props} getItemValue={item => item.id} className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
     <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label={t('horizontalScroll')} aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
       <KanbanBoardPrimitive className="flex h-full min-h-0 w-max min-w-full items-stretch gap-3 pb-2">
         {shown.map(column => {
           const tasks = props.value[column.value] ?? []
-          if (narrow(column.value)) return <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-10 min-w-10 shrink-0">
-            <Button variant="ghost" className="h-full w-10 flex-col items-center justify-start gap-2 overflow-hidden rounded-xl bg-muted/60 dark:bg-muted/30 px-0 py-2.5 font-medium hover:bg-muted" aria-label={tBoard('expandColumn', { status: statusLabel(column.value) })} onClick={() => setOpened(current => [...current, column.value])}>
-              <column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />
-              {/* One glyph per line: vertical writing-mode stacks CJK glyphs on one spot with fonts that lack vertical metrics. */}
-              <span aria-hidden="true" className="flex shrink-0 flex-col items-center text-sm leading-[18px]">{Array.from(statusLabel(column.value)).map((glyph, index) => <span key={index}>{glyph}</span>)}</span>
-              <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{tasks.length}</span>
-            </Button>
-          </KanbanColumn>
           return <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-75 min-w-75 shrink-0">
             <section className="group/column flex min-h-0 flex-1 flex-col gap-1 rounded-xl bg-muted/60 dark:bg-muted/30 p-1.5" aria-label={t('columnLabel', { status: statusLabel(column.value) })}>
               <div className="flex h-8 shrink-0 items-center gap-2 pr-0.5 pl-1.5">
@@ -241,7 +230,6 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, narrowColumns = []
                   <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" aria-label={tBoard('columnMenu', { status: statusLabel(column.value) })} />}><Ellipsis /></DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={() => onHideColumn(column.value)}><EyeOff />{tBoard('hideColumn')}</DropdownMenuItem>
-                    {narrowColumns.includes(column.value) && <DropdownMenuItem onClick={() => setOpened(current => current.filter(item => item !== column.value))}><ChevronsLeftRight />{tBoard('foldColumn')}</DropdownMenuItem>}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

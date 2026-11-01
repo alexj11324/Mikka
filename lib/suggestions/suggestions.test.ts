@@ -4,7 +4,7 @@ import { createHmac } from 'node:crypto'
 import { actionLocale, actionTitlePrompt, clampTitle, displayTitle, parseActionTitles } from './action-title'
 import { BRIEFING_HOUR, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
 import { verifyGitHubSignature } from './github-webhook'
-import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, notionNotification, notionSearchNotification, slackNotification } from './notification'
+import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, notionNotification, notionSearchNotification, readableText, slackNotification } from './notification'
 import { missingTriggers, needsConfig, triggerSlugs } from './triggers'
 
 const me = 'user-1'
@@ -57,8 +57,36 @@ test('GitHub: review requests and replies on my PRs', () => {
   assert.equal(githubNotification({ ...recipient, githubId: '8' }, 'pull_request', review), null)
   const changes = githubNotification(recipient, 'pull_request_review', { ...base, action: 'submitted', review: { id: 5, state: 'changes_requested', body: 'see notes' }, pull_request: { number: 73, title: 'Add briefing', user: { id: 42 } } })!
   assert.equal(changes.required, true)
-  const bot = githubNotification(recipient, 'issue_comment', { ...base, sender: { id: 9, type: 'Bot' }, action: 'created', issue: { number: 1, title: 'x', user: { id: 42 } }, comment: { id: 3, body: 'CI passed' } })!
-  assert.equal(bot.automated, true)
+  const botAssigned = githubNotification(recipient, 'issues', { ...base, sender: { id: 9, login: 'triage[bot]', type: 'Bot' }, action: 'assigned', assignee: { id: 42 }, issue: { number: 2, title: 'Flaky test' } })!
+  assert.equal(botAssigned.automated, true)
+})
+
+test('GitHub: a bot\'s comment or review is not a reply for the person', () => {
+  const recipient = { userId: me, githubId: '42' }
+  const issue = { number: 1, title: 'x', user: { id: 42 } }
+  const pr = { number: 2, title: 'y', user: { id: 42 } }
+  for (const sender of [{ id: 9, login: 'deploy-preview[bot]', type: 'Bot' }, { id: 9, login: 'deploy-preview[bot]' }, { id: 9, login: 'ci', type: 'Bot' }]) {
+    const repository = { full_name: 'a/b' }
+    assert.equal(githubNotification(recipient, 'issue_comment', { repository, sender, action: 'created', issue, comment: { id: 3, body: 'Preview ready' } }), null)
+    assert.equal(githubNotification(recipient, 'pull_request_review_comment', { repository, sender, action: 'created', pull_request: pr, comment: { id: 4, body: 'Possible issue here' } }), null)
+    assert.equal(githubNotification(recipient, 'pull_request_review', { repository, sender, action: 'submitted', pull_request: pr, review: { id: 5, state: 'commented', body: 'Summary' } }), null)
+  }
+})
+
+test('GitHub and Linear comments become readable lines, never raw markup', () => {
+  const recipient = { userId: me, githubId: '42' }
+  const base = { repository: { full_name: 'a/b' }, sender: { id: 7, login: 'dana', type: 'User' }, action: 'created', issue: { number: 1, title: 'x', user: { id: 42 } } }
+  // A fake hidden-metadata line in the shape a deploy bot leaves (a link reference definition), then an HTML comment, a heading and a link.
+  const hidden = `[pv]: #${'QUJDREVGR0hJSktMTU5PUA'.repeat(8)}=:${'eyJmYWtlIjp0cnVlfQ'.repeat(6)}`
+  const body = `${hidden}\n<!-- bot: state -->\n#### ⚠️ Please **rebase** onto [main](https://github.com/a/b/tree/main)\n> quoted line`
+  const comment = githubNotification(recipient, 'issue_comment', { ...base, comment: { id: 3, body } })!
+  assert.equal(comment.title, '⚠️ Please rebase onto main quoted line')
+  // Nothing readable left: no card.
+  assert.equal(githubNotification(recipient, 'issue_comment', { ...base, comment: { id: 4, body: `${hidden}\n<!-- only metadata -->` } }), null)
+  assert.equal(readableText('Ship `v2` in the ~~old~~ new way'), 'Ship v2 in the old new way')
+  assert.equal(readableText('- [x] done\n1. next'), 'done next')
+  const linear = linearCommentNotification({ userId: me, linearUserId: 'lin-1' }, { type: 'Comment', action: 'create', data: { id: 'c1', body: '## Heads up\nSee [doc](https://x.test)', issue: { title: 'T' } } })!
+  assert.equal(linear.title, 'Heads up See doc')
 })
 
 test('GitHub signatures are checked against the raw body', () => {

@@ -461,7 +461,7 @@ test('run result publication commits one owner-scoped result through retries and
       // The person's Coordinator is an ordinary bot row in their workspace; the request is in its chat.
       const {seedWorkspace}=await import('./support/workspace-admin-db')
       const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])
-      const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null)
+      const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null, workspace.id)
       await pool.query('insert into coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,$6,\'user_message\',$5,$3,$4,now())', [eventId, f.userId, f.issueId, JSON.stringify({ text: 'Synthetic owner task; no provider invocation', taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + eventId, coordinator])
       const before = Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n)
       await assert.rejects(queueRun(f.userId, input, coordinator, undefined, eventId), /runInvalid/, 'ask cannot execute before its human decision')
@@ -563,6 +563,8 @@ test('run result publication commits one owner-scoped result through retries and
 
     await t.test('Plugins › GitHub: 推送分支 is the run policy the token issuer reads; 创建 Pull Request deny blocks, ask waits on one card, allow opens', async () => {
       const { readGitHubPermissions, setGitHubPermissions } = await import('../lib/github/plugin-permissions')
+      // The runs here name no bot; they are the personal workspace's Coordinator's, whose settings these are.
+      const home = async (userId: string) => (await (await import('../lib/coordinator/coordinator-bot')).coordinatorBot(userId, null)).workspaceId
       const { readCliRunPolicy } = await import('../lib/agent-tool-approval/policy-store')
       const { decidePendingAction } = await import('../lib/pending-actions')
       const ready = async () => {
@@ -577,17 +579,17 @@ test('run result publication commits one owner-scoped result through retries and
       // 推送分支: the Coordinator's own git_push, the value authorizeRunGitHubToken refuses on deny.
       const pushed = await ready()
       assert.equal((await readCliRunPolicy(pool, pushed.runId, pushed.userId)).policy.permissions.git_push, 'ask')
-      let settings = await setGitHubPermissions(pool, pushed.userId, { version: (await readGitHubPermissions(pool, pushed.userId)).version, push: 'deny' })
+      let settings = await setGitHubPermissions(pool, pushed.userId, await home(pushed.userId), { version: (await readGitHubPermissions(pool, pushed.userId, await home(pushed.userId))).version, push: 'deny' })
       assert.equal((await readCliRunPolicy(pool, pushed.runId, pushed.userId)).policy.permissions.git_push, 'deny')
-      settings = await setGitHubPermissions(pool, pushed.userId, { version: settings.version, push: 'allow' })
+      settings = await setGitHubPermissions(pool, pushed.userId, await home(pushed.userId), { version: settings.version, push: 'allow' })
       assert.equal((await readCliRunPolicy(pool, pushed.runId, pushed.userId)).policy.permissions.git_push, 'allow')
-      await assert.rejects(setGitHubPermissions(pool, pushed.userId, { version: '0:0', push: 'deny' }), { code: 'githubPermissionsChanged' })
+      await assert.rejects(setGitHubPermissions(pool, pushed.userId, await home(pushed.userId), { version: '0:0', push: 'deny' }), { code: 'githubPermissionsChanged' })
       // Unset 创建 Pull Request keeps today's behaviour: the approved push opens it.
       assert.deepEqual(await publishRunResult(pushed.runId, async () => prFor(pushed)), { done: true })
       assert.equal((await receipt(pushed)).status, 'published')
 
       const denied = await ready()
-      await setGitHubPermissions(pool, denied.userId, { version: '0:0', pullRequest: 'deny' })
+      await setGitHubPermissions(pool, denied.userId, await home(denied.userId), { version: '0:0', pullRequest: 'deny' })
       assert.deepEqual(await publishRunResult(denied.runId, never), { done: true })
       assert.equal((await receipt(denied)).status, 'blocked')
       assert.equal((await receipt(denied)).errorCode, 'pull_request_denied')
@@ -595,7 +597,7 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await cards(denied), [])
 
       const asked = await ready()
-      await setGitHubPermissions(pool, asked.userId, { version: '0:0', pullRequest: 'ask' })
+      await setGitHubPermissions(pool, asked.userId, await home(asked.userId), { version: '0:0', pullRequest: 'ask' })
       assert.deepEqual(await publishRunResult(asked.runId, never), { done: true })
       assert.equal((await receipt(asked)).status, 'awaiting_approval')
       assert.deepEqual(await publishRunResult(asked.runId, never), { done: true }, 'a duplicate workflow stops while the card waits')
@@ -618,7 +620,7 @@ test('run result publication commits one owner-scoped result through retries and
       await assert.rejects(decidePendingAction(asked.userId, card.id, false, async () => {}), 'a decided card cannot be decided again')
 
       const declined = await ready()
-      await setGitHubPermissions(pool, declined.userId, { version: '0:0', pullRequest: 'ask' })
+      await setGitHubPermissions(pool, declined.userId, await home(declined.userId), { version: '0:0', pullRequest: 'ask' })
       await publishRunResult(declined.runId, never)
       const [declinedCard] = await cards(declined)
       await decidePendingAction(declined.userId, declinedCard.id, false, async () => {})
@@ -627,11 +629,11 @@ test('run result publication commits one owner-scoped result through retries and
 
       // Approved, then turned to deny before the restart: deny wins.
       const revoked = await ready()
-      let revokedSettings = await setGitHubPermissions(pool, revoked.userId, { version: '0:0', pullRequest: 'ask' })
+      let revokedSettings = await setGitHubPermissions(pool, revoked.userId, await home(revoked.userId), { version: '0:0', pullRequest: 'ask' })
       await publishRunResult(revoked.runId, never)
       const [revokedCard] = await cards(revoked)
       await decidePendingAction(revoked.userId, revokedCard.id, true, async () => {})
-      revokedSettings = await setGitHubPermissions(pool, revoked.userId, { version: revokedSettings.version, pullRequest: 'deny' })
+      revokedSettings = await setGitHubPermissions(pool, revoked.userId, await home(revoked.userId), { version: revokedSettings.version, pullRequest: 'deny' })
       assert.deepEqual(await publishRunResult(revoked.runId, never), { done: true })
       assert.equal((await receipt(revoked)).errorCode, 'pull_request_denied')
     })
