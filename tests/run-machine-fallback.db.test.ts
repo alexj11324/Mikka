@@ -54,7 +54,7 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
   const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
   const ownWorkspace = async (userId: string) => (await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId"=$1 AND status=\'active\' LIMIT 1', [userId])).rows[0].workspaceId
   const dispatch = async (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId ?? await chatBotId(userId, null, await ownWorkspace(userId)))
-  type NoMachine = { error: string; card: { title: string; options: { value: string; action: string }[] } }
+  type NoMachine = { error: string; card: { title: string; description: string; options: { value: string; action: string }[] } }
   const actions = (result: NoMachine) => result.card.options.map(option => option.action)
   const runOf = async (runId: string) => (await pool.query('SELECT "deviceId",status FROM agent_runs WHERE id=$1', [runId])).rows[0]
 
@@ -62,7 +62,8 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     const a = await person('fresh')
     const result = await dispatch(a.id, a.issueId) as unknown as NoMachine
     assert.equal(result.error, 'machineUnavailable')
-    assert.equal(result.card.title, '这个任务需要一台电脑来跑')
+    assert.equal(result.card.title, '没有可用的电脑')
+    assert.equal(result.card.description, '先连接或开启一台电脑，任务才能开始运行。')
     assert.deepEqual(actions(result), ['enableThisMac', 'e2bKey', 'connectServer'])
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [a.id])).rows[0].n, 0, 'nothing is queued')
 

@@ -180,7 +180,7 @@ async function deviceTarget(ownerId: string, selected: { place: string; harness:
 }
 
 /**
- * 这个任务需要一台电脑来跑: what the person can do when no machine can take a new
+ * 没有可用的电脑: what the person can do when no machine can take a new
  * run. The host handles each row by its action; the value of an
  * `allowAutoSchedule` row is the device it switches on.
  */
@@ -195,7 +195,7 @@ export function machineUnavailableCard(devices: readonly DeviceRow[]) {
   options.push(servers.length
     ? { value: "server", label: copy.needsMachineServerOnline, action: "serverOnline" }
     : { value: "server", label: copy.needsMachineServer, action: "connectServer" });
-  return { title: copy.needsMachineTitle, options };
+  return { title: copy.needsMachineTitle, description: copy.needsMachineDescription, options };
 }
 
 /** The person's local devices, most recently seen first. */

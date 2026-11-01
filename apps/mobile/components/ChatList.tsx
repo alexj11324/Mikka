@@ -17,7 +17,7 @@ export function useChatRows(needle = '') {
   const match = (name: string) => !needle || name.toLowerCase().includes(needle)
   const rows: ChatRow[] = [
     // The Coordinator's bot row is the pinned Coordinator entry, not another row.
-    ...(home.data?.bots ?? []).filter(bot => !bot.coordinator && match(bot.name)).map(bot => ({ kind: 'bot' as const, bot, at: bot.at ?? '' })),
+    ...(home.data?.bots ?? []).filter(bot => match(bot.name)).map(bot => ({ kind: 'bot' as const, bot, at: bot.at ?? '' })),
     ...(groups.data?.conversations ?? []).filter(group => match(group.title))
       .map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt })),
   ].sort((a, b) => b.at.localeCompare(a.at))

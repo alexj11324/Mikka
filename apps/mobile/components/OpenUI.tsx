@@ -117,7 +117,7 @@ function useAnswer() {
 
 const Failed = ({ state }: { state: string }) => state === 'failed' ? <Text style={cardText.error}>没发出去，再试一次。</Text> : null
 
-interface Question { id: string; title: string; options: { value: string; label: string }[]; multiple: boolean; allowCustom: boolean }
+interface Question { id: string; title: string; description: string; options: { value: string; label: string }[]; multiple: boolean; allowCustom: boolean }
 
 function questionsOf(value: Component): Question[] {
   return arr(value.props.questions).map((item, index) => {
@@ -125,6 +125,7 @@ function questionsOf(value: Component): Question[] {
     return {
       id: str(q.id) || String(index),
       title: str(q.title),
+      description: str(q.description),
       options: arr(q.options).map(option => ({ value: str(obj(option).value), label: str(obj(option).label) })).filter(option => option.label),
       multiple: q.multiple === true,
       allowCustom: q.allowCustom === true,
@@ -151,6 +152,7 @@ function Questions({ value }: { value: Component }) {
     return (
       <ChatCard>
         <Text style={cardText.title}>{only.title}</Text>
+        {only.description ? <Text style={cardText.meta}>{only.description}</Text> : null}
         <View style={{ gap: 4 }}>
           {only.options.map((option, index) => (
             <Pressable key={option.value || index} accessibilityRole="button" accessibilityState={{ selected: choice === option.value, disabled: !open }} disabled={!open}

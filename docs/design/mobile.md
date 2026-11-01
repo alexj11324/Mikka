@@ -42,9 +42,11 @@ no search field at the top. The person's avatar (top left) opens the
 「重启以更新」 once an update has downloaded
 ([decision](decisions/2026-10-31-2010-ota-updates.md)); a swipe right on a
 tab's root opens it too. 「+」 (top right) opens 新建 Bot and 新建群聊. The
-Coordinator is pinned on top (a star on its avatar) with the bots the person
-pinned, then every other bot and group chat with its last line and time,
-newest first (the web bot list, R-01).
+pinned bots sit on top, each with a star (the star is the pin, the same for
+every bot; the Coordinator is pinned until the person unpins it,
+[decision](decisions/2026-11-01-1215-star-is-the-pin.md)), then every other
+bot and group chat with its last line and time, newest first (the web bot
+list, R-01).
 **搜索** is the tab bar's search: its field sits at the bottom and matches
 bots and group chats by name.
 The Coordinator gets no other special UI (R-06).
@@ -99,7 +101,7 @@ the tasks its threads worked on, each with 等待审查 / 进行中 / 已合并;
 GitHub), 资料库 (what its threads handed over; Markdown opens in the app, HTML
 on the web) and 例行 (its scheduled tasks and when each runs next, or 已暂停).
 A section with nothing in it is left out. On top sit two switches: 置顶 (the
-bot joins the Coordinator in 对话's pinned row) and 通知 (off: no pushes from
+bot joins 对话's pinned row, with the star; the Coordinator too) and 通知 (off: no pushes from
 this chat) ([decision](decisions/2026-11-01-0050-mobile-chat-settings.md)).
 
 Message times are hidden. Swiping the chat from right to left reveals each
@@ -177,7 +179,7 @@ large Dynamic Type. Plus:
 - Coordinator chat: streaming reply, proactive card (unanswered / answered /
   snoozed), thread card (running / waiting / failed / done).
 - Push: lock screen and banner, one per kind (mail, CI, run finished,
-- 对话: the bot list with the Coordinator pinned, search, and 重启以更新.
+- 对话: the bot list with the pinned bots on top, search, and 重启以更新.
 - Drawer: open over the Coordinator chat, with unread dots.
 - 线程: each filter, running / waiting / failed / done rows.
 - 建议: no apps connected (connect CTA), nothing today, briefing generating.

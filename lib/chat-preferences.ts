@@ -23,8 +23,18 @@ export async function chatMuted(userId: string, botId: string): Promise<boolean>
  */
 export async function setChatPreference(userId: string, botId: string, change: Partial<ChatPreference>): Promise<boolean> {
   if (!(await pool.query('SELECT 1 FROM bots WHERE id=$1::uuid AND "ownerId"=$2', [botId, userId])).rowCount) return false
-  await pool.query(`INSERT INTO chat_preferences ("userId","chatKey",pinned,muted) VALUES ($1,$2,COALESCE($3,false),COALESCE($4,false))
-    ON CONFLICT ("userId","chatKey") DO UPDATE SET pinned=COALESCE($3,chat_preferences.pinned), muted=COALESCE($4,chat_preferences.muted), "updatedAt"=now()`,
-    [userId, botId, change.pinned ?? null, change.muted ?? null])
+  // A first change to the Coordinator keeps it pinned unless it is the pin itself (pinnedByDefault).
+  await pool.query(`INSERT INTO chat_preferences ("userId","chatKey",pinned,muted) VALUES ($1,$2,COALESCE($3::boolean,$5::boolean),COALESCE($4::boolean,false))
+    ON CONFLICT ("userId","chatKey") DO UPDATE SET pinned=COALESCE($3::boolean,chat_preferences.pinned), muted=COALESCE($4::boolean,chat_preferences.muted), "updatedAt"=now()`,
+    [userId, botId, change.pinned ?? null, change.muted ?? null, await pinnedByDefault(userId, botId)])
   return true
+}
+
+/**
+ * Whether a chat is pinned before the person changes it: the Coordinator is,
+ * like any bot they pin, and they can unpin it (Alex: the star is the pin, the
+ * same for every bot; the Coordinator is an ordinary bot).
+ */
+export async function pinnedByDefault(userId: string, botId: string): Promise<boolean> {
+  return Boolean((await pool.query('SELECT 1 FROM coordinator_bots WHERE "ownerId"=$1 AND "botId"=$2', [userId, botId])).rowCount)
 }
