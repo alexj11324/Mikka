@@ -79,12 +79,20 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
     return t(key, { provider: t(provider) })
   }, [t])
   // The meters are cached too, and re-read every five minutes while the page is visible.
-  const usageRead = useSWR(connectedKey ? ['settings:subscription-usage', workspaceId, connectedKey] : null, () => readUsage(workspaceId), { revalidateOnFocus: false, refreshInterval: USAGE_EVERY_MS })
+  const usageRead = useSWR(connectedKey ? subscriptionUsageKey(workspaceId) : null, () => readSubscriptionUsage(workspaceId), { revalidateOnFocus: false, refreshInterval: USAGE_EVERY_MS })
   const usage: Usage = usageRead.error ? 'failed' : usageRead.data ?? null
   const usageLoading = usageRead.isValidating
   const { mutate: mutateUsage } = usageRead
+  // A connection added, signed in again or removed after the list was on screen: read the meters again.
+  // The list's first answer is not a change, so the prefetched meters stand.
+  const readFor = useRef(connectedKey)
+  useEffect(() => {
+    const before = readFor.current
+    readFor.current = connectedKey
+    if (before && connectedKey && before !== connectedKey) void mutateUsage()
+  }, [connectedKey, mutateUsage])
   // A retry that fails again leaves 暂时无法读取 on screen.
-  const reloadUsage = useCallback(() => { void mutateUsage(readUsage(workspaceId, true), { revalidate: false }).catch(() => undefined) }, [mutateUsage, workspaceId])
+  const reloadUsage = useCallback(() => { void mutateUsage(readSubscriptionUsage(workspaceId, true), { revalidate: false }).catch(() => undefined) }, [mutateUsage, workspaceId])
   const usageData = usageRead.data
   useEffect(() => { setNow(Date.now()) }, [usageData, usageRead.error])
   useEffect(() => {
@@ -298,7 +306,8 @@ export async function readSubscriptions(workspaceId: string): Promise<State> {
   if (!response.ok) throw new Error('Subscription list unavailable')
   return subscriptionListSchema.parse(await response.json())
 }
-async function readUsage(workspaceId: string, force = false) {
+export const subscriptionUsageKey = (workspaceId: string) => ['settings:subscription-usage', workspaceId] as const
+export async function readSubscriptionUsage(workspaceId: string, force = false) {
   const response = await fetch(`${path}/usage?workspace=${encodeURIComponent(workspaceId)}${force ? '&refresh=1' : ''}`, { cache: 'no-store', credentials: 'same-origin' })
   if (!response.ok) throw new Error('Subscription usage unavailable')
   const result = subscriptionUsageSchema.parse(await response.json())
