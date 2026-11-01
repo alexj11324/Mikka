@@ -4,7 +4,8 @@ import { useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { KeyRound } from 'lucide-react'
-import { createApiKey, deleteApiKey, getApiKeys, updateApiKeyAfterQuota, updateApiKeyShare } from '@/app/actions/model-api-keys'
+import { createApiKey, deleteApiKey, updateApiKeyAfterQuota, updateApiKeyShare, type getApiKeys } from '@/app/actions/model-api-keys'
+import { settingsRead } from '@/lib/settings-read'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,8 @@ type Key = ApiKeyView & { shared: boolean }
 const providers = [...API_KEY_PRESETS, 'custom'] as const
 
 export const apiKeysKey = (workspaceId: string) => ['settings:api-keys', workspaceId] as const
+/** A GET, like the other settings reads: it never waits in front of a save in the server-action queue. */
+export const readApiKeys = (workspaceId: string) => settingsRead<Awaited<ReturnType<typeof getApiKeys>>>('api-keys', { workspace: workspaceId })
 
 function ProviderIcon({ provider }: { provider: ApiKeyProvider }) {
   if (provider === 'anthropic') return <Claude className="size-5 shrink-0 text-brand-claude" />
@@ -41,7 +44,7 @@ export function useApiKeyList(workspaceId: string) {
   const shareT = useTranslations('Settings.subscriptionShare')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const keys = useSWR(apiKeysKey(workspaceId), () => getApiKeys(workspaceId))
+  const keys = useSWR(apiKeysKey(workspaceId), () => readApiKeys(workspaceId))
   const [adding, setAdding] = useState(false)
   const [sharing, setSharing] = useState<Key | null>(null)
   const [removing, setRemoving] = useState<Key | null>(null)
@@ -120,7 +123,7 @@ export function ApiKeyFallbackSetting({ workspaceId }: { workspaceId: string }) 
   const t = useTranslations('Settings.apiKeys')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const keys = useSWR(apiKeysKey(workspaceId), () => getApiKeys(workspaceId))
+  const keys = useSWR(apiKeysKey(workspaceId), () => readApiKeys(workspaceId))
   const [failed, setFailed] = useState<{ on: boolean; message: string } | null>(null)
   const data = keys.data && !keys.data.error ? keys.data : null
   async function save(on: boolean) {
