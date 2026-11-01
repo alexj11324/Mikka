@@ -236,7 +236,7 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     expect(evidence.observations.filter(item => item.kind === 'tool').map(item => item.toolName)).toEqual(expect.arrayContaining(['create_issue', 'list_agents', 'dispatch_run']))
     expect(Number((await pool.query('SELECT count(*) FROM pending_actions WHERE "userId" = $1 AND action = $2', [loop.userId, 'approve_repository_push'])).rows[0].count)).toBe(1)
     loop.checkpoint('published', 'Real verification and push completed; GitHub stub confirmed the commit and stored PR on the task')
-    // The thread sits beside the chat (R-80); closing it leaves the chat as it was.
+    // The thread sits beside the chat (R-82); closing it leaves the chat as it was.
     await loop.thread.getByRole('button', { name: '关闭线程', exact: true }).click()
     await expect(loop.chat).toContainText('已完成：Added MIKKA_MOCK.md', { timeout: 60_000 })
     await expect(loop.chat.locator(`[data-agent-markdown] a[href="${pr}"]`)).toBeVisible()

@@ -61,7 +61,7 @@ test('历史仅可读取，原始数据保留，新对话动作进入当前 Bot'
   await page.getByRole('list', { name: 'Bot', exact: true }).getByRole('button', { name: 'Coordinator', exact: true }).click()
   await expect(archive).toHaveCount(0)
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
-  // The Coordinator's chat is the bare address (R-80).
+  // The Coordinator's chat is the bare address (R-82).
   await expect(page).not.toHaveURL(/[?&](section|bot)=/)
   expect(generationRequests).toEqual([])
   await info.attach('retirement-http-evidence', { body: JSON.stringify({ retiredPost: 405, ownerHistory: stored.status(), noGenerationRequests: generationRequests.length, computerRequests: computerRequests.length, archivedTextSelectable: true, allPanelsReadable: true, botInputVisible: true }), contentType: 'application/json' })

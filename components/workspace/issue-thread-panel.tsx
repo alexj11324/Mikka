@@ -40,7 +40,7 @@ const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whites
 /**
  * An open thread: a conversation between people and the agent running it (R-62, R-10).
  * It sits in the right column beside the chat or the task with a close button, wherever it
- * was opened from (R-80); the header names the bot that dispatched it.
+ * was opened from (R-82); the header names the bot that dispatched it.
  */
 type ThreadTab = 'chat' | 'acceptance'
 type IssueThreadPanelProps = { issueId: string; runId: string; onClose: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void }
@@ -138,7 +138,7 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <ThreadStatus status={view?.status ?? data.thread.status} stopping={stopRequested} waiting={question === 'waiting'} />
             <span>{t('started', { time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>
-            {/* The bot that dispatched it, also when it is not the chat beside it (R-78, R-80). */}
+            {/* The bot that dispatched it, also when it is not the chat beside it (R-78, R-82). */}
             {detail?.agentName && <span>{detail.agentName} {t('dispatched')}</span>}
           </div>
           {data.thread.prompt.trim() && <p className={cn(BUBBLE, data.thread.ownedByCurrentUser ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}>{data.thread.prompt.trim()}</p>}

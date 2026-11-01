@@ -3,7 +3,7 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
 /**
  * The workspace's address. One URL describes what is on screen, and every
  * change a person makes goes through here, so the browser's back and forward
- * step through it one place at a time (rules.md R-80,
+ * step through it one place at a time (rules.md R-82,
  * decisions/2026-11-01-1320-navigation-model.md).
  *
  * Nothing outside this file and lib/settings-navigation.ts writes the
@@ -51,7 +51,7 @@ export type WorkspaceLocation = {
   bot: string | null
   /** The task open in the centre. */
   issue: string | null
-  /** The thread (its run id) open in the right column, beside whatever is in the centre (R-80). */
+  /** The thread (its run id) open in the right column, beside whatever is in the centre (R-82). */
   thread: string | null
 }
 
@@ -177,7 +177,7 @@ export function navigate(change: Partial<WorkspaceLocation>, mode: 'push' | 'rep
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
 
-/** Opens a thread in the right column beside what is in the centre (R-80). */
+/** Opens a thread in the right column beside what is in the centre (R-82). */
 export function openThread(runId: string) {
   navigate({ thread: runId })
 }

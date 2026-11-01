@@ -98,7 +98,7 @@ function FollowSentMessages({ count }: { count: number | null }) {
  * `embedded`, with chips instead of cards and the quote from the artifact in
  * the composer.
  */
-/** A thread card or chip opens the thread in the right column; the chat stays (R-66, R-80). */
+/** A thread card or chip opens the thread in the right column; the chat stays (R-66, R-82). */
 const showThread = ({ runId }: { runId: string }) => openThread(runId)
 
 export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string }) {

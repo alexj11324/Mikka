@@ -3,7 +3,7 @@ import { Pool } from 'pg'
 import type { Page } from '@playwright/test'
 import { test, expect, register, app, rail, seedTask, openIssueFromSearch, conversationPill, hydrated } from './fixtures'
 
-// R-80: one address says what is on screen, every move is a history entry,
+// R-82: one address says what is on screen, every move is a history entry,
 // and back / forward step through it one move at a time without leaving Mikka.
 // Each test below is one row of the navigation table in
 // docs/design/decisions/2026-11-01-1320-navigation-model.md.
@@ -207,7 +207,7 @@ test('a thread card opens the thread beside the chat; back closes it, forward an
   const { runId } = await chatWithThread(page)
   await page.getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).first().click()
   await expectThreadBesideChat(page, runId)
-  // The bot that dispatched it is named in the thread (R-78, R-80).
+  // The bot that dispatched it is named in the thread (R-78, R-82).
   await expect(threadIn(page)).toContainText('Coordinator 派出线程')
 
   await back(page)

@@ -170,7 +170,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
   // Below xl the column has no room, so 打开右栏 shows it in a Sheet instead.
   const [panelSheet, setPanelSheet] = useState(false)
-  // The thread open in the right column, beside the chat or the task (R-80); its address is ?thread=.
+  // The thread open in the right column, beside the chat or the task (R-82); its address is ?thread=.
   const [threadId, setThreadId] = useState<string | null>(() => readLocation(params).thread)
   useEffect(() => {
     const wide = window.matchMedia('(min-width: 80rem)')
@@ -424,7 +424,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const isConversation = !selected && section === 'coordinator'
   // A group chat has its own 详情 in the right column (R-13): members, no computer.
   const groupPanel = !selected && section === 'group' && groupRequest ? groupRequest : null
-  // An open thread takes the right column beside the chat or a page (R-80); a task shows it in its own right column.
+  // An open thread takes the right column beside the chat or a page (R-82); a task shows it in its own right column.
   const threadShown = !selected && threadId ? threadId : null
   // One thing on the right at a time: the thread, else the browser, else 概览.
   const rightTaken = browserShown || !!threadShown

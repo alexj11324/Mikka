@@ -214,7 +214,7 @@ async function readableThread(issueId: string, runId: string) {
 }
 
 /**
- * The task a thread works on, for a thread opened from its address alone (R-80).
+ * The task a thread works on, for a thread opened from its address alone (R-82).
  * Null unless the viewer may read that thread, exactly as getIssueThread decides.
  */
 export async function findThreadIssue(runId: string): Promise<string | null> {

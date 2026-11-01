@@ -42,7 +42,7 @@ async function loadIssue(id: string) {
   return result.issue
 }
 type WorkspaceUser = { id: string; name: string; email: string }
-type DetailProps = { /** The thread open in the right column, from the address (R-80). */ thread: string | null; navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
+type DetailProps = { /** The thread open in the right column, from the address (R-82). */ thread: string | null; navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
 
 function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () => void; onClose: () => void }) {
   const t = useTranslations('IssueDetail')
@@ -127,7 +127,7 @@ function TaskForm({ initial, thread: openThread, user, onSaved, onDirty, onClose
   // 验收 opens on the thread that produced the candidate (Figma 357:4750, frame 06); a task with no known thread opens alone.
   const [threadTab, setThreadTab] = useState<'chat' | 'acceptance'>('chat')
   const [openAcceptance, setOpenAcceptance] = useState<FactoryTask | null>(null)
-  // The open thread is the address's (?thread=), so back closes it and a link reopens it beside this task (R-80).
+  // The open thread is the address's (?thread=), so back closes it and a link reopens it beside this task (R-82).
   const showThread = useCallback((runId: string | null) => { setOpenAcceptance(null); setThreadTab('chat'); navigate({ thread: runId }) }, [])
   const showAcceptance = useCallback((task: FactoryTask) => {
     if (task.candidateRunId) { setOpenAcceptance(null); setThreadTab('acceptance'); navigate({ thread: task.candidateRunId }) }

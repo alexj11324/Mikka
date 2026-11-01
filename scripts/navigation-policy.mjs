@@ -1,6 +1,6 @@
 // Every move inside the app window goes through one place, so the address
 // always says what is on screen and back steps through it one move at a time
-// (docs/design/rules.md R-80; decisions/2026-11-01-1320-navigation-model.md).
+// (docs/design/rules.md R-82; decisions/2026-11-01-1320-navigation-model.md).
 //
 // - Only components/workspace/workspace-navigation.ts and
 //   lib/settings-navigation.ts write the browser history.
@@ -47,9 +47,9 @@ export const navigationAllowlist = {
 
 const WORKSPACE_SECTIONS = 'coordinator|agent|plugins|suggestions|artifacts|all-issues|projects'
 const rules = [
-  { rule: 'navigation/history', pattern: /\bhistory\.(?:pushState|replaceState)\s*\(/g, message: '不要直接写浏览器历史：用 components/workspace/workspace-navigation.ts 的 goTo / goToHref / dropQueryKeys（R-80）。' },
-  { rule: 'navigation/router', pattern: /\brouter\.(?:push|replace)\s*\(/g, message: '应用窗口内的跳转不用 router.push / replace：用 goTo，或从外部入口用 openAppLink（R-80）。' },
-  { rule: 'navigation/address', pattern: new RegExp(String.raw`[?&](?:issue|bot|thread)=(?!=)|searchParams\.(?:set|append)\(\s*['"](?:issue|bot|thread)['"]|[?&]section=(?:${WORKSPACE_SECTIONS})\b|searchParams\.(?:set|append)\(\s*['"]section['"]\s*,\s*['"](?:${WORKSPACE_SECTIONS})['"]`, 'g'), message: '不要手拼工作区地址（?issue= / ?bot= / ?section=…）：用 workspaceLink / workspaceSearch / goTo（R-80）。' },
+  { rule: 'navigation/history', pattern: /\bhistory\.(?:pushState|replaceState)\s*\(/g, message: '不要直接写浏览器历史：用 components/workspace/workspace-navigation.ts 的 goTo / goToHref / dropQueryKeys（R-82）。' },
+  { rule: 'navigation/router', pattern: /\brouter\.(?:push|replace)\s*\(/g, message: '应用窗口内的跳转不用 router.push / replace：用 goTo，或从外部入口用 openAppLink（R-82）。' },
+  { rule: 'navigation/address', pattern: new RegExp(String.raw`[?&](?:issue|bot|thread)=(?!=)|searchParams\.(?:set|append)\(\s*['"](?:issue|bot|thread)['"]|[?&]section=(?:${WORKSPACE_SECTIONS})\b|searchParams\.(?:set|append)\(\s*['"]section['"]\s*,\s*['"](?:${WORKSPACE_SECTIONS})['"]`, 'g'), message: '不要手拼工作区地址（?issue= / ?bot= / ?section=…）：用 workspaceLink / workspaceSearch / goTo（R-82）。' },
 ]
 
 /** Blanks comments so a doc line that names an address is not a finding; offsets stay put. */

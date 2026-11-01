@@ -13,7 +13,7 @@ import { IssueThreadPanel } from './issue-thread-panel'
 import { closeThread, navigate, openThread } from './workspace-navigation'
 
 /**
- * An open thread, in the right column beside what is in the centre (R-80): it
+ * An open thread, in the right column beside what is in the centre (R-82): it
  * takes 概览's place and width, and closing it brings 概览 back. Below xl,
  * where the column has no room, it covers the window; on a phone that is the
  * pushed page R-66 describes.
