@@ -276,8 +276,27 @@ jobs:
       - uses: ./.github/actions/pnpm-install
       - name: Prepare pinned hosted-runner test image
         run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
+      - name: Let the hosted runner tests use bubblewrap, as on the E2B machine
+        # Hosted runs execute the CLI under Anthropic's sandbox-runtime (no Docker),
+        # which needs bubblewrap, socat and ripgrep and capability-bearing user
+        # namespaces. Ubuntu 24.04 runners restrict those
+        # (kernel.apparmor_restrict_unprivileged_userns=1, recorded on run 41313960870);
+        # sandbox-runtime's README (Ubuntu 24.04+ note) lifts it with this sysctl. The
+        # E2B machine (Debian 12) has no such restriction. The setting is put back right
+        # after the unit tests, so the later steps still run on the unchanged host policy.
+        timeout-minutes: 5
+        run: |
+          apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get "${apt_options[@]}" update
+          sudo apt-get "${apt_options[@]}" install -y bubblewrap socat ripgrep
+          echo "USERNS_RESTRICT_BEFORE=$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo none)" >> "$GITHUB_ENV"
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
       - name: Daemon unit and transport regression tests
         run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
+      - name: Put the host's user namespace policy back
+        if: ${{ always() }}
+        run: |
+          if [ "$USERNS_RESTRICT_BEFORE" != none ]; then sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns="$USERNS_RESTRICT_BEFORE"; fi
       - name: Existing mailbox CLI integration tests
         run: pnpm --filter @mikka/daemon test:mailbox-cli
       - name: Local computer authority through actual daemon and adapter protocol
