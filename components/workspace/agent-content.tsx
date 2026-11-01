@@ -24,7 +24,8 @@ export const AgentTextContent: AgentComponentRenderers['TextContent'] = ({ props
 
 export const AgentContent: AgentComponentRenderers['BeResponse'] = ({ props, renderNode }) => {
   const streaming = useIsStreaming()
-  return <StreamingResponse status={streaming ? 'streaming' : 'complete'} announce={false} showActions={false}>
+  // Each TextContent spaces its own blocks (gap-3); StreamingResponse's prose margins on lists stacked on top of that (~64px between one-line lists).
+  return <StreamingResponse status={streaming ? 'streaming' : 'complete'} announce={false} showActions={false} contentClassName="[&_ol]:my-0 [&_ul]:my-0">
     <div className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</div>
   </StreamingResponse>
 }
