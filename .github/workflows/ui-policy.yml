@@ -454,9 +454,7 @@ jobs:
             /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
             ${{ runner.temp }}/pr13-personal-mailbox-results.xml
           if-no-files-found: warn
-      # PR and main builds run in browser-tests.yml; merge-group has no browser workflow.
-      - run: pnpm build
-        if: github.event_name == 'merge_group' && matrix.shard == 1
+      # No production build in CI: Vercel builds main (decision 2026-11-01-0230).
 
   browser-tests:
     # The required check name. Same docs-only behavior as UI policy above.
