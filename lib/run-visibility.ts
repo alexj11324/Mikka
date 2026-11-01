@@ -6,7 +6,7 @@ import type { RunView } from './agent-runs'
 export function workspaceRunView(run: RunView): RunView {
   return {
     id: run.id, issueId: run.issueId, agentId: '', agentName: run.harness,
-    harness: run.harness, status: run.status, kind: 'implement',
+    harness: run.harness, status: run.status, outcome: run.outcome ?? null, kind: 'implement',
     stopReason: null, error: null, report: null,
     createdAt: run.createdAt, startedAt: run.startedAt, finishedAt: run.finishedAt,
   }

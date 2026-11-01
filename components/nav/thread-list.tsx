@@ -11,7 +11,7 @@ import { activityLabel, groupThreads, lastActivity, THREAD_GROUPS, type ThreadGr
 import { cn } from '@/lib/utils'
 import { HarnessMark } from '@/components/labels/entity-labels'
 import { GroupHeader } from './group-header'
-import { ThreadStatusIcon } from './thread-status-icon'
+import { ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
@@ -69,7 +69,7 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
   const waiting = thread.status === 'queued' ? (thread as ThreadView).waitingFor : undefined
   const body = <>
     <span className="flex w-full min-w-0 items-center gap-2">
-      <span data-slot="thread-status" className="flex size-4 shrink-0 items-center justify-center"><ThreadStatusIcon group={group} /></span>
+      <span data-slot="thread-status" className="flex size-4 shrink-0 items-center justify-center"><ThreadStatusIcon group={group} small /></span>
       <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
       {all && <span data-slot="thread-agent" className="flex shrink-0 items-center text-muted-foreground opacity-80 [&_svg]:size-3">{thread.harness ? <HarnessMark harness={thread.harness} /> : <ThreadMark size="row" />}</span>}
       {all && <span className="shrink-0 text-xs text-muted-foreground">{when === 'relative' ? format.relativeTime(at, now) : t(when)}</span>}
