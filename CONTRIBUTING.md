@@ -124,6 +124,17 @@ is printed in the Changed files job and its summary. The browser environment
 remains an isolated PostgreSQL service and the built application on the GitHub
 Linux runner's localhost; this workflow does not test a Vercel Preview.
 
+### Test logins: never ask for a password
+
+Sessions never ask Alex for an account, password or login step. To test
+signed in, create the login yourself: hash a random password with
+`better-auth/crypto`'s `hashPassword`, insert a `credential` row into `account`,
+store the email and password in Infisical (the database's environment), and
+check it through `POST <base>/api/auth/sign-in/email`. Only a click on a
+third-party site under Alex's identity (a GitHub App install, an OAuth consent)
+or a session permission prompt may be asked of him. Details and the current
+test accounts: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
+
 ## License
 
 Mikka is licensed under [AGPL-3.0-only](LICENSE). Contributions are submitted
