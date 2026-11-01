@@ -8,7 +8,7 @@ a minute, a second run only checks and takes about a second.
 eval "$(scripts/dev/bootstrap-local.sh)"
 ```
 
-It prints one `export` line (no secrets), which `eval` applies to the shell.
+It prints one `export` line, which `eval` applies to the shell. The disposable `e2e` role has a generated password in `/var/lib/mikka-dev/e2e-password` (mode 0600); the database URLs read it with `$(cat …)`, so the line itself carries no secret and the URLs pass `scripts/test-accounts`' `databaseTarget`. The line also sets `MIKKA_LOCAL_TEST_ACCOUNTS=1` (local test mode, [dev-workflow.md](dev-workflow.md)).
 Run it without `eval` to see the line.
 
 | Step | What it does |
