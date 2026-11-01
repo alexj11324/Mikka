@@ -4,7 +4,7 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, SquareKanban, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
 import { runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
@@ -41,14 +41,14 @@ const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.5 whitesp
  * card it fills the centre column and `back` names the chat it returns to (R-66).
  */
 type ThreadTab = 'chat' | 'acceptance'
-type IssueThreadPanelProps = { issueId: string; runId: string; onClose: () => void; back?: string; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void }
+type IssueThreadPanelProps = { issueId: string; runId: string; onClose: () => void; back?: string; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Opened in the centre: the task it works on, as a header link. */ onOpenTask?: () => void }
 
 export function IssueThreadPanel(props: IssueThreadPanelProps) {
   // Drafts, in-flight callbacks and retry deadlines belong to exactly one run.
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab = 'chat', onOpenThread }: IssueThreadPanelProps) {
+function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab = 'chat', onOpenThread, onOpenTask }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const { mutate: mutateCache } = useSWRConfig()
@@ -125,6 +125,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
       <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{detail?.name ?? t('title')}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
+      {back && onOpenTask && <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={onOpenTask}><SquareKanban data-icon="inline-start" />{t('openTask')}</Button>}
       {/* Frame 06 draws the machine in the wide centre-column header; the side panel has no room for it. */}
       {acceptance && back && <CandidateMachine taskId={acceptance.id} />}
       {acceptance && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">

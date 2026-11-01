@@ -3133,6 +3133,7 @@
     "back": "返回 {name}",
     "starting": "正在准备",
     "close": "关闭线程",
+    "openTask": "打开任务",
     "conversation": "线程对话",
     "loading": "正在打开线程",
     "loadFailed": "线程加载失败",
