@@ -3300,6 +3300,7 @@
       "noRoutines": "还没有例行",
       "noLibrary": "还没有资料",
       "noPullRequests": "还没有 PR",
+      "noMatches": "无匹配结果",
       "prGroup": {
         "review": "等待审查（{count}）",
         "running": "进行中（{count}）",
