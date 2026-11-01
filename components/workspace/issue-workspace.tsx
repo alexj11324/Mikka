@@ -55,7 +55,7 @@ import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
 import { PluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import { ArtifactLibrary } from '@/components/artifacts/artifact-library'
-import { dropQueryKeys, goTo, NAVIGATE_EVENT, openThread, queryMoved, readLocation, sameLocation, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
+import { backToTaskOrigin, dropQueryKeys, goTo, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, taskOrigin, tidyAddress, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest } from '@/lib/settings-navigation'
 import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
@@ -152,7 +152,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects, whileSettings)
   const { data: teams = [] } = useSWR('teams', listTeams, whileSettings)
   const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams, whileSettings)
-  const { data: bots = [] } = useSWR('bots', listBots, { ...whileSettings })
+  const { data: botList } = useSWR('bots', listBots, { ...whileSettings })
+  const bots = botList ?? []
   const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))
   const { data: threads = [], mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : 15000 })
   const settingsWereShown = useRef(settingsShown)
@@ -281,8 +282,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const leaveRef = useRef(leave)
   leaveRef.current = leave
   /** Writes the workspace's own move; a new centre closes the open thread (workspaceHref), so the column follows the address. */
-  function move(change: Partial<WorkspaceLocation>, mode: 'push' | 'replace' = 'push') {
-    goTo(change, mode)
+  function move(change: Partial<WorkspaceLocation>, mode: 'push' | 'replace' = 'push', list = false) {
+    goTo(change, mode, { list })
     setThreadId(readLocation(new URL(window.location.href).searchParams).thread)
   }
   /** What is on screen, as an address; back and forward compare against it. */
@@ -325,22 +326,35 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     window.addEventListener(NAVIGATE_EVENT, show)
     return () => { window.removeEventListener('popstate', onPop); window.removeEventListener(NAVIGATE_EVENT, show) }
   }, [])
+  // An unknown section, a key that is not an id, and (once the list has loaded) a bot that is not one of the person's:
+  // the address rewrites itself to the chat or page shown, with no new entry (R-82).
+  useEffect(() => {
+    if (settingsShown) return
+    const known = botList && ((id: string) => id === createdBot?.id || botList.some(bot => bot.id === id && !bot.coordinator))
+    if (known && activeBotId && !known(activeBotId)) { setActiveBotId(null); if (lastChat.current.kind === 'bot') lastChat.current = { kind: 'coordinator' } }
+    tidyAddress(known || undefined)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new bot list or leaving Settings makes the address stale; the workspace's own moves write it whole
+  }, [botList, settingsShown])
   function closeSettings() {
     setSettingsOpen(false)
     dropQueryKeys('settings')
   }
-  function open(id: string | null) {
+  /** `fromList`: the board, a list or a project opened it, so its ↑↓ step through that list. */
+  function open(id: string | null, fromList = false) {
     if (boardBusy || leaving.current) return false
     setPendingSelection(id)
     void leave(() => {
-      // A directly opened/reloaded detail has no remembered in-memory section.
-      // Its Board breadcrumb must still return to issues, not the default Projects page.
-      const back = id === null && directDetail.current ? changeSection(teamId ? 'team-issues' : 'all-issues') : {}
+      // ✕ on a task opened by a move in this page load steps back there: the chat as it was, its open thread too (R-82).
+      if (id === null && backToTaskOrigin()) return
+      // Opened directly (a link, a reload), ✕ goes to the place its address names; a bare link names none and goes to the board.
+      const back = id === null && directDetail.current && !taskOrigin(new URL(window.location.href).searchParams) ? changeSection(teamId ? 'team-issues' : 'all-issues') : {}
+      if (id === null) directDetail.current = false
       applySelection(id)
-      move({ ...back, issue: id })
+      move({ ...back, issue: id }, 'push', fromList)
     }).finally(() => setPendingSelection(undefined))
     return true
   }
+  const openFromList = (id: string) => open(id, true)
   function deleted() {
     flushDetail.current = null
     dirtyRef.current = false
@@ -417,7 +431,15 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
   const pagerId = pendingSelection !== undefined ? pendingSelection : selected
-  const pagerIndex = pagerId ? filtered.findIndex(task => task.id === pagerId) : -1
+  // ↑↓ step through the list that opened the task; opened from a chat, ⌘K or a link, there is no list to step through.
+  const pagerIndex = pagerId && openedFromList() ? filtered.findIndex(task => task.id === pagerId) : -1
+  const boardLabel = i18nText('IssueDetail.breadcrumbBoard')
+  // The task page's first crumb is where it was opened from (a bare link: the board), and returns there.
+  const originLabel = directDetail.current && !taskOrigin(params) ? boardLabel
+    : section === 'coordinator' ? activeBot?.name ?? (activeBotId && activeBotId !== coordinatorBot?.id && !botList ? '' : sectionTitles.coordinator)
+    : rail === 'board' ? boardLabel
+    : isProjects ? scopedProjects.find(project => project.id === projectId)?.name ?? sectionTitles[section]
+    : sectionTitles[section]
   // The rail leaves routed Settings for the app page, then opens the chosen destination there.
   if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={destination => { if (pushSettingsHistory('/')) openRail(destination); else router.push('/') }}
     onSearch={() => { if (pushSettingsHistory('/')) setSearchOpen(true); else { requestShellSearch(); router.push('/') } }} onBrowser={() => { showBrowser(true); if (!pushSettingsHistory('/')) router.push('/') }} />
@@ -453,12 +475,12 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it. */}
     <AppShellContent listToggle={!fullPage && !selected} hideHeader={!!selected || section === 'agent' || section === 'group'} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : undefined} title={sectionTitles[section]} actions={section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? undefined : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} aria-keyshortcuts="Control+k Meta+k" disabled={boardBusy} onClick={() => setSearchOpen(true)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText("Workspace.search.title")}<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>}>
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
-      {selected ? <TaskDetail key={draftKey} id={selected} thread={threadId} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('team-projects'), issue: null }); setProjectId(id) }) }} /> : section === 'group' && groupRequest ? <GroupChatView key={groupRequest.id} group={groupRequest} userId={user.id} people={groupPeople} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} bot={activeBot} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsPage key={pluginsVisit} /> : section === 'suggestions' ? <SuggestionFeed onOpenIssue={id => { open(id) }} onConnect={() => openRail('plugins')} onSent={() => { if (window.matchMedia('(max-width: 767px)').matches) openChat({ kind: 'coordinator' }) }} /> : section === 'artifacts' ? <ArtifactLibrary onOpenIssue={id => { open(id) }} /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage issues={filtered} userId={user.id} onOpen={open} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
+      {selected ? <TaskDetail key={draftKey} id={selected} thread={threadId} origin={originLabel} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={openFromList} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('team-projects'), issue: null }); setProjectId(id) }) }} /> : section === 'group' && groupRequest ? <GroupChatView key={groupRequest.id} group={groupRequest} userId={user.id} people={groupPeople} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} bot={activeBot} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsPage key={pluginsVisit} /> : section === 'suggestions' ? <SuggestionFeed onOpenIssue={id => { open(id) }} onConnect={() => openRail('plugins')} onSent={() => { if (window.matchMedia('(max-width: 767px)').matches) openChat({ kind: 'coordinator' }) }} /> : section === 'artifacts' ? <ArtifactLibrary onOpenIssue={id => { open(id) }} /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage issues={filtered} userId={user.id} onOpen={openFromList} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex flex-wrap items-center gap-2"><h1 className="text-sm font-semibold">{section === 'my-issues' ? i18nText("Workspace.myCreatedTasks") : viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge>{section !== 'my-issues' && <NativeSelect aria-label={i18nText("Workspace.filterStatus")} value={view} disabled={boardBusy} onChange={event => navigate(event.target.value as IssueView)}><NativeSelectOption value="all">{i18nText("Projects.allStatuses")}</NativeSelectOption><NativeSelectOption value="favorites">{i18nText("Overview.favorites")}</NativeSelectOption><NativeSelectOption value="following">{i18nText("Overview.following")}</NativeSelectOption>{ISSUE_STATUSES.map(status => <NativeSelectOption key={status.value} value={status.value}>{statusLabel(status.value)}</NativeSelectOption>)}</NativeSelect>}</div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><SearchInput className="min-w-0 sm:w-48" aria-label={i18nText("Workspace.search.title")} placeholder={i18nText("Projects.issuePicker.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /><ToggleGroup aria-label={i18nText("Workspace.taskView")} size="sm" variant="segment" spacing={0.5} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label={i18nText("Workspace.listView")}><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label={i18nText("Workspace.boardView")}><Columns3 /></ToggleGroupItem></ToggleGroup><Button size="sm" disabled={boardBusy} onClick={() => create()}><Plus data-icon="inline-start" />{i18nText("Nav.newTask")}</Button></div>
         </div>
-        <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />
+        <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={openFromList} onCreate={() => create()} />
       </>}
     </AppShellContent>
     {browserShown && !threadShown && <BrowserPane onClose={() => showBrowser(false)} />}

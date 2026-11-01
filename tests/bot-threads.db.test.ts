@@ -32,7 +32,7 @@ test('bot thread list', { skip: !dbUrl }, async t => {
   }
   // Task A: two runs → one row, latest run running, activity = newest of the two.
   await run(owner, issueA, 'succeeded', 'a1', 60, 50)
-  await run(owner, issueA, 'running', 'a2', 40, 30)
+  const latestA = await run(owner, issueA, 'running', 'a2', 40, 30)
   // Task B: one finished run; its lastReplyAt (5) is newer than updatedAt (45).
   await run(owner, issueB, 'succeeded', 'b1', 50, 45, 5)
   // Owner's chat: three runs, opening line comes from the first; latest finished.
@@ -55,7 +55,7 @@ test('bot thread list', { skip: !dbUrl }, async t => {
     assert.equal(page.nextCursor, null)
     assert.deepEqual(page.threads.map(row => row.threadId).sort(), [...allThreads].sort())
     const by = new Map(page.threads.map(row => [row.threadId, row]))
-    assert.deepEqual(by.get(T.a), { threadId: T.a, initiator: { id: owner, name: by.get(T.a)!.initiator.name, avatarUrl: `/api/avatars/${owner}/abc` }, title: 'Owner private task', status: 'running', lastActivityAt: by.get(T.a)!.lastActivityAt, canOpen: true, href: `/?issue=${issueA}` })
+    assert.deepEqual(by.get(T.a), { threadId: T.a, initiator: { id: owner, name: by.get(T.a)!.initiator.name, avatarUrl: `/api/avatars/${owner}/abc` }, title: 'Owner private task', status: 'running', lastActivityAt: by.get(T.a)!.lastActivityAt, canOpen: true, href: `/?issue=${issueA}&thread=${latestA}` })
     assert.equal(by.get(T.b)!.status, 'done')
     assert.equal(page.threads[0].threadId, T.b, 'lastReplyAt counts as activity; most recent first')
     assert.equal(page.summary.lastActivityAt, page.threads[0].lastActivityAt)

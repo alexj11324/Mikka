@@ -2,7 +2,7 @@ import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import type { TaskRun } from '@/app/actions/task-runs'
 import type { DecisionAnswer, DecisionQuestion } from '@/lib/coordinator/decision'
 
-export type DesktopRun = Pick<TaskRun, 'issueId' | 'issueTitle' | 'agentName' | 'status'>
+export type DesktopRun = Pick<TaskRun, 'issueId' | 'runId' | 'issueTitle' | 'agentName' | 'status'>
 export type DesktopNotification = {
   id: string
   kind: 'awaiting' | 'failed' | 'finished'
@@ -43,7 +43,8 @@ export function desktopRunUpdate(previous: Map<string, DesktopRun['status']> | n
       kind,
       title: run.issueTitle,
       body: run.agentName,
-      href: workspaceLink({ issue: run.issueId }),
+      // The thread that changed, beside its task (R-82).
+      href: workspaceLink({ issue: run.issueId, thread: run.runId }),
     })
   }
   return { badge, notifications, next }

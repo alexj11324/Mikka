@@ -23,7 +23,7 @@ function appHref(href: string): string | null {
  * on the runs waiting for the person. When a run enters 等你 or fails, or
  * finishes while 线程完成 is on, the Decisions API decides whether it raises a
  * system notification (app/actions/desktop-notifications.ts); clicking one
- * opens the issue. Web renders nothing.
+ * opens that thread beside its task. Web renders nothing.
  */
 export function DesktopIntegration() {
   const platform = usePlatform()

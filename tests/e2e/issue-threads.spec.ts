@@ -72,8 +72,8 @@ test('Issue threads open on the right as a conversation; comments are cards with
   await card.getByLabel('回复内容').fill('Agreed')
   await card.getByRole('button', { name: '发送回复', exact: true }).click()
   await expect(card).toContainText('Agreed')
-  // Board navigation uses the existing document flush before unmounting the editor.
-  await page.getByRole('navigation', { name: '当前位置', exact: true }).getByRole('button', { name: '看板', exact: true }).click()
+  // The first crumb names the chat the task was opened from; leaving through it uses the existing document flush before unmounting the editor.
+  await page.getByRole('navigation', { name: '当前位置', exact: true }).getByRole('button', { name: 'Coordinator', exact: true }).click()
   await openIssueFromSearch(page, title)
   await page.reload()
   await expect(page.getByRole('region', { name: '任务活动', exact: true }).getByRole('article', { name: /的评论$/ })).toContainText('Agreed')

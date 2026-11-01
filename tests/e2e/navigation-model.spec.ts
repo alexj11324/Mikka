@@ -13,6 +13,11 @@ const board = (page: Page) => page.getByRole('region', { name: '任务看板', e
 const taskTitle = (page: Page) => page.getByLabel('任务标题', { exact: true })
 const query = (page: Page) => new URL(page.url()).searchParams
 
+const closeTask = (page: Page) => page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
+/** The task page's first crumb: where the task was opened from. */
+const originCrumb = (page: Page, name: string) => page.getByRole('navigation', { name: '当前位置', exact: true }).getByRole('button', { name, exact: true })
+const pager = (page: Page) => page.getByRole('button', { name: '下一个任务', exact: true })
+
 async function back(page: Page) {
   await page.goBack()
   // Back never leaves the app while there is a step inside it.
@@ -89,10 +94,11 @@ test('a task opened from the chat is its own page; back returns to the chat, for
   await page.goForward()
   await expect(taskTitle(page)).toHaveValue(title)
 
-  // Closing the task is a step too, and back reopens it.
-  await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
+  // ✕ steps back to the chat it was opened from, so forward reopens the task.
+  await closeTask(page)
   await expect(chat(page)).toBeVisible()
-  await back(page)
+  expect(query(page).get('issue')).toBeNull()
+  await page.goForward()
   await expect(taskTitle(page)).toHaveValue(title)
 })
 
@@ -284,4 +290,105 @@ test('全部线程: another bot\'s thread opens beside the current chat, naming 
   await expectThreadBesideChat(page, runId)
   await expect(conversationPill(page)).toHaveText('Coordinator')
   await expect(threadIn(page)).toContainText('写作助手 派出线程')
+})
+
+// ── The task page's origin (PR 4): crumb, ✕, ↑↓, and addresses that rewrite themselves ──
+
+test('chat → thread → 打开任务: the first crumb names the chat; ✕ brings back the chat with its thread, no ↑↓', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  const { title, runId } = await chatWithThread(page)
+  await page.getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).first().click()
+  await expectThreadBesideChat(page, runId)
+  await threadIn(page).getByRole('button', { name: '打开任务', exact: true }).click()
+  await expect(taskTitle(page)).toHaveValue(title)
+  // The address names the chat it came from, so a reload or a copied link knows it too.
+  expect(query(page).get('section')).toBe('coordinator')
+  // The thread beside it narrows the page, so the first crumb is folded into 更多位置.
+  await page.getByRole('button', { name: '更多位置', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: 'Coordinator', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(pager(page)).toHaveCount(0)
+
+  await closeTask(page)
+  await expectThreadBesideChat(page, runId)
+  expect(query(page).get('issue')).toBeNull()
+})
+
+test('a pasted chat task link: ✕ opens that chat, not the board; a bare task link closes onto the board', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await register(page)
+  const title = `来源任务 ${randomUUID()}`
+  const issueId = await seedTask(page, title)
+
+  await page.goto(app(`/?section=coordinator&issue=${issueId}`))
+  await expect(taskTitle(page)).toHaveValue(title)
+  await expect(originCrumb(page, 'Coordinator')).toBeVisible()
+  await hydrated(taskTitle(page))
+  await closeTask(page)
+  await expect(chat(page)).toBeVisible()
+  expect([...query(page).keys()]).toEqual([])
+
+  await page.goto(app(`/?issue=${issueId}`))
+  await expect(originCrumb(page, '看板')).toBeVisible()
+  await hydrated(taskTitle(page))
+  await originCrumb(page, '看板').click()
+  await expect(board(page)).toBeVisible()
+})
+
+test('a bot\'s task link names the bot; ✕ opens that bot\'s chat', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await register(page)
+  const title = `Bot 来源任务 ${randomUUID()}`
+  const issueId = await seedTask(page, title)
+  await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click()
+  const dialog = page.getByRole('dialog', { name: '新建 Bot' })
+  await dialog.getByLabel('名字', { exact: true }).fill('来源 Bot')
+  await dialog.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(conversationPill(page)).toHaveText('来源 Bot')
+  const botId = query(page).get('bot')
+
+  await page.goto(app(`/?bot=${botId}&issue=${issueId}`))
+  await expect(taskTitle(page)).toHaveValue(title)
+  await expect(originCrumb(page, '来源 Bot')).toBeVisible()
+  await hydrated(taskTitle(page))
+  await closeTask(page)
+  await expect(conversationPill(page)).toHaveText('来源 Bot')
+  expect(query(page).get('bot')).toBe(botId)
+})
+
+test('board → task: ↑↓ step through the board and the crumb says 看板; ⌘K from the chat: no ↑↓', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await register(page)
+  const first = `看板翻页 A ${randomUUID()}`
+  const second = `看板翻页 B ${randomUUID()}`
+  await seedTask(page, first)
+  await seedTask(page, second)
+  await page.goto(app('/?section=all-issues'))
+  await hydrated(rail(page, '看板'))
+  await board(page).getByText(first, { exact: true }).click()
+  await expect(taskTitle(page)).toHaveValue(first)
+  await expect(originCrumb(page, '看板')).toBeVisible()
+  await expect(pager(page)).toBeVisible()
+
+  await closeTask(page)
+  await expect(board(page)).toBeVisible()
+  await rail(page, '主页').click()
+  await hydrated(chat(page))
+  await openIssueFromSearch(page, second)
+  await expect(taskTitle(page)).toHaveValue(second)
+  await expect(originCrumb(page, 'Coordinator')).toBeVisible()
+  await expect(pager(page)).toHaveCount(0)
+})
+
+test('an unknown section or bot in the address rewrites itself to what is shown, without a new entry', async ({ page }) => {
+  await register(page)
+  await page.goto(app('/?section=nope'))
+  await expect(chat(page)).toBeVisible()
+  await expect(page).toHaveURL(url => !url.searchParams.has('section'))
+  const entries = await page.evaluate(() => window.history.length)
+
+  await page.goto(app(`/?bot=${randomUUID()}`))
+  await expect(conversationPill(page)).toHaveText('Coordinator')
+  await expect(page).toHaveURL(url => !url.searchParams.has('bot'))
+  expect(await page.evaluate(() => window.history.length)).toBe(entries + 1)
 })

@@ -14,6 +14,8 @@ import { runWaitingDeviceId } from '@/lib/run-waiting-for'
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
 export interface TaskRun {
   issueId: string
+  /** The newest run on the issue: a notification opens it beside its task (R-82). */
+  runId: string
   issueTitle: string
   agentId: string
   /** The Agent running the newest thread (Claude Code, Codex): the desktop notification's line (R-78). */
@@ -34,7 +36,7 @@ export async function listTaskRuns(): Promise<TaskRun[]> {
   // (or lands in 等你) even when none of the person's devices is online.
   await reclaimLostRuns(session.user.id).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error))
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
-    issueId: agentRuns.issueId, issueTitle: issues.title, agentId: agentRuns.agentId, agentName: runAgentName,
+    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: issues.title, agentId: agentRuns.agentId, agentName: runAgentName,
     status: agentRuns.status, error: agentRuns.error, finishedAt: agentRuns.finishedAt,
     botId: runBotId,
     harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`,
