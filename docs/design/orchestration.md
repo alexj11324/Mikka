@@ -212,6 +212,12 @@ token or key.
    only inside the run's environment: the sandbox, the container, or the
    temporary Agent config dir. It never comes from, or goes to, the person's
    own CLI config.
+   On a device, a subscription run gets only that run's short-lived access
+   token, on a pipe or in memory, never on disk; the refresh grant never
+   leaves the server. A member's share used on the member's own device works
+   the same way. Each lease request is checked again (run, device, binding,
+   revocation). Codex asks again when the token expires; a Claude Code run
+   ends when its token does.
    A subscription on a device or a sandbox never leaves the server: the
    Agent holds a placeholder and sends its model requests to Mikka, which
    checks the run and adds the token to each one. That holds for a member's

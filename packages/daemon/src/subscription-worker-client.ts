@@ -27,6 +27,8 @@ export interface WorkerConfiguration {
   retainEnrollmentSources?: boolean
   use?: { bindingId: string; consumerId: string; runId?: string }
   executionOnly?: boolean
+  /** The worker may export one live run's access lease (never the refresh grant) for a device runner. */
+  exportAccessLease?: boolean
   enableCodexOAuth?: boolean
   enableRuntime?: boolean
   enablePlainModels?: boolean

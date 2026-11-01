@@ -85,12 +85,6 @@ export interface ClaudeAdapterOptions {
   binary?: string
   /** The daemon's pinned Claude Code, installed on first need. */
   ensureBinary?: () => Promise<string>
-  /**
-   * The run's local subscription broker (`http://127.0.0.1:<port>`, from
-   * subscription-local-runner.ts): model requests go there and the server
-   * adds the owner's credential; the CLI holds only a placeholder.
-   */
-  modelEndpoint?: string
   /** Trusted host-only restriction; never widens the run's network ceiling. */
   networkCeiling?: readonly string[]
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
@@ -436,7 +430,7 @@ export class ClaudeAdapter implements AgentAdapter {
     let nativeToken: string | undefined
     let expiresAt = 0
     if (externalAuth) {
-      if(externalAuth.brokered && !this.options.spawnHosted && !this.options.modelEndpoint)throw new Error(SUBSCRIPTION_ERROR)
+      if(externalAuth.brokered && !this.options.spawnHosted)throw new Error(SUBSCRIPTION_ERROR)
       const clean = buildChildEnv({
         host: options.env,
         runId:
@@ -481,9 +475,8 @@ export class ClaudeAdapter implements AgentAdapter {
     if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_ERROR)
     const credentialEnv = claudeCredentialEnv(options.credential)
     const providerDomain = credentialDomain(options.credential)
-    const modelEndpoint = this.options.modelEndpoint ? new URL(this.options.modelEndpoint).host : undefined
     const ctx = new RunContext({
-      harnessDomains: [...(providerDomain ? [providerDomain] : []), ...(modelEndpoint ? [modelEndpoint] : [])],
+      harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
@@ -552,7 +545,7 @@ export class ClaudeAdapter implements AgentAdapter {
         : policy.allowDomains.includes('*') ? [...requested]
         : requested.includes('*') ? policy.allowDomains
         : requested.filter(domain => policy.allowDomains.includes(domain))
-      const child = spawnRunSandbox({ command:binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps),modelEndpoint), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
+      const child = spawnRunSandbox({ command:binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps)), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
       const off = options.toolApproval!.onRevoke(() => { void child.revoke().catch(() => undefined) })
       void child.exited.finally(off)
       return child.process
@@ -568,7 +561,6 @@ export class ClaudeAdapter implements AgentAdapter {
           ...CLAUDE_RUN_ENV,
           CLAUDE_CODE_TMPDIR: ctx.tmpDir,
           ...credentialEnv,
-          ...(this.options.modelEndpoint ? { ANTHROPIC_BASE_URL: this.options.modelEndpoint } : {}),
           HOME: nativeHome,
           CLAUDE_CONFIG_DIR: configDir,
         },
