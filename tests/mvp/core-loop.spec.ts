@@ -22,7 +22,7 @@ type Device = { id: string; name: string; protocolVersion: number }
 type Run = { id: string; issueId: string; deviceId: string; deviceRepoId: string; baseBranch: string | null; status: string; stopReason: string | null; error: string | null; report: { summary: string; verify: { status: string }; publish?: { pushed: boolean; commit: string; branch: string } } | null; worktreePath: string | null; stopRequestedAt: string | null }
 type Observation = { kind: string; toolName?: string; deviceId?: string; runId?: string; issueId?: string; url?: string; commit?: string; branch?: string; requestId?: string; path?: string }
 type ServiceEvidence = { observations: Observation[]; errors: unknown[]; pullRequests: { number: number; url: string; branch: string; draft: boolean }[] }
-type MvpCheckpoint = 'accounts-active' | 'home-open' | 'fixture-ready' | 'daemon-started' | 'daemon-registered' | 'task-submitted' | 'event-bound' | 'run-dispatched' | 'worktree-ready' | 'reply-delivered' | 'published' | 'favicon-decoded' | 'chat-result-verified' | 'stop-completed'
+type MvpCheckpoint = 'accounts-active' | 'home-open' | 'fixture-ready' | 'daemon-started' | 'daemon-registered' | 'task-submitted' | 'event-bound' | 'run-dispatched' | 'worktree-ready' | 'reply-delivered' | 'published' | 'citation-mark' | 'chat-result-verified' | 'stop-completed'
 
 assertMvpEnvironment()
 const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 2 })
@@ -230,10 +230,12 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     await loop.thread.getByRole('button', { name: '关闭线程', exact: true }).click()
     await expect(loop.chat).toContainText('已完成：Added MIKKA_MOCK.md', { timeout: 60_000 })
     await expect(loop.chat.locator(`[data-agent-markdown] a[href="${pr}"]`)).toBeVisible()
-    const favicon = loop.chat.locator(`img[src="${GITHUB_FAVICON}"]`).first()
-    await expect(favicon).toBeVisible()
-    await expect.poll(() => favicon.evaluate(image => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)).toBe(true)
-    loop.checkpoint('favicon-decoded', 'The real PR citation image decoded the synthetic favicon response')
+    // A GitHub citation carries GitHub's mark in the text colour, not its favicon,
+    // which vanished on the dark page (#747, components/workspace/agent-citations.tsx).
+    const citation = loop.chat.locator(`a[data-slot="inline-citation-trigger"][href="${pr}"]`).first()
+    await expect(citation.locator('.source-avatar svg')).toBeVisible()
+    await expect(loop.chat.locator(`img[src="${GITHUB_FAVICON}"]`)).toHaveCount(0)
+    loop.checkpoint('citation-mark', 'The real PR citation shows the GitHub mark')
     const prCard = loop.chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: `打开线程 ${loop.threadTitle}`, exact: true }) })
     const prChip = prCard.getByRole('link', { name: 'PR #41', exact: true })
     await expect(prChip).toHaveAttribute('href', pr)

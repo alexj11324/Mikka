@@ -1,0 +1,3 @@
+// Current templates compile ahead of time; old task snapshots remain resumable.
+// No credential enters this command, its argv or environment.
+export const CLOUD_WORKER_COMMAND = 'cd /opt/mikka/worker/packages/daemon && { export HOME=/home/mikka-runner; read -r preload_pid < /home/mikka-runner/.mikka/preloaded.pid 2>/dev/null || preload_pid=; if test -n "$preload_pid" && test -r "/proc/$preload_pid/cmdline" && tr "\\0" "\\n" < "/proc/$preload_pid/cmdline" | grep -Fxq -- "--wait-bootstrap" && kill -0 "$preload_pid" 2>/dev/null; then kill -USR1 "$preload_pid"; elif test -f dist/cloud/cloud-worker.js; then node dist/cloud/cloud-worker.js; else ./node_modules/.bin/tsx bin/cloud-worker.ts; fi; }'

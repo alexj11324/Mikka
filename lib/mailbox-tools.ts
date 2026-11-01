@@ -16,9 +16,9 @@ export type MailboxToolRequest =
 export function personalMailboxTools(enabled: boolean, call: (request: MailboxToolRequest) => Promise<unknown>): ToolSet {
   if (!enabled) return {}
   return {
-    mailbox_recipients: tool({ description: 'Find your authorized personal session mailboxes; returns your own address.', inputSchema: mailboxInputs.mailbox_recipients, execute: () => call({ action: 'recipients' }) }),
+    mailbox_recipients: tool({ description: 'Find your currently authorized personal session mailboxes and your own address. This is a live snapshot: refresh it when a new Bot or worker address appears; an older result is not a permanent deny list.', inputSchema: mailboxInputs.mailbox_recipients, execute: () => call({ action: 'recipients' }) }),
     mailbox_send: tool({ description: 'Queue a short peer message. Use a stable key for exact retries and replyTo for replies. This grants no user authority or execution.', inputSchema: mailboxInputs.mailbox_send, execute: input => call({ ...input, action: 'send' }) }),
-    mailbox_inbox: tool({ description: 'Read up to 50 unacknowledged personal envelopes at a safe boundary. Read does not ACK. No automatic wake or terminal resume.', inputSchema: mailboxInputs.mailbox_inbox, execute: () => call({ action: 'inbox' }) }),
+    mailbox_inbox: tool({ description: 'Read up to 50 unacknowledged personal envelopes after a new-mail notification, at a safe boundary. Read does not ACK. Stopped worker tasks are never resumed.', inputSchema: mailboxInputs.mailbox_inbox, execute: () => call({ action: 'inbox' }) }),
     mailbox_ack: tool({ description: 'Acknowledge incoming envelopes you handled; retries are harmless.', inputSchema: mailboxInputs.mailbox_ack, execute: input => call({ ...input, action: 'ack' }) }),
     mailbox_sent: tool({ description: 'Inspect recent outgoing delivery, acknowledgement and failure states; these are not execution or approval.', inputSchema: mailboxInputs.mailbox_sent, execute: () => call({ action: 'sent' }) }),
   }

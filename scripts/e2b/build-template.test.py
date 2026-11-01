@@ -4,6 +4,8 @@ import io
 import json
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('build_template', Path(__file__).with_name('build-template.py'))
 bt = importlib.util.module_from_spec(spec)
@@ -21,6 +23,53 @@ def fake(template):
     return opener, calls
 
 class Publish(unittest.TestCase):
+    def test_runtime_files_do_not_replace_requested_template_name(self):
+        class Recipe:
+            def from_base_image(self): return self
+            def copy(self, *_): return self
+            def run_cmd(self, command, **__):
+                called.setdefault('commands', []).append(command)
+                return self
+            def set_user(self, user):
+                self.user = user
+                return self
+            def set_start_cmd(self, start, ready):
+                self.start, self.ready = start, ready
+                return self
+        called = {}
+        def build_recipe(recipe, **options):
+            called.update(options)
+            called['start'], called['ready'] = recipe.start, recipe.ready
+            return SimpleNamespace(template_id='tpl1', build_id='b1')
+        class Template:
+            def __new__(cls, **_): return Recipe()
+            build = staticmethod(build_recipe)
+        sdk = SimpleNamespace(Template=Template)
+        with patch.dict('sys.modules', {'e2b': sdk}), patch.object(bt, 'source_context', return_value='a' * 40):
+            sha, result = bt.build('mikka-versioned-worker', api_key='fixture-key')
+        self.assertEqual(called['name'], 'mikka-versioned-worker')
+        self.assertEqual(sha, 'a' * 40)
+        self.assertEqual(result.template_id, 'tpl1')
+        self.assertIn('systemctl start mikka-preload.service mikka-viewer.service', called['start'])
+        self.assertTrue(any('systemctl enable mikka-preload.service mikka-viewer.service' in command for command in called['commands']))
+        self.assertIn('test ! -e /run/mikka-viewer/key', called['ready'])
+
+    def test_cold_boot_scrubs_capabilities_once_before_starting_anonymous_services(self):
+        scrub = bt.BOOT_SERVICES['mikka-boot-scrub.service']
+        for path in ('/home/mikka-runner/.mikka/worker', '/home/mikka-runner/.mikka/bootstrap.json', '/home/mikka-runner/.mikka/preloaded.pid', '/run/mikka-viewer'):
+            self.assertIn(path, scrub)
+        self.assertIn('RemainAfterExit=yes', scrub)
+        self.assertIn('DefaultDependencies=no', scrub)
+        self.assertIn('envd.service', scrub)
+        for service in ('mikka-preload.service', 'mikka-viewer.service'):
+            unit = bt.BOOT_SERVICES[service]
+            self.assertIn('Requires=mikka-boot-scrub.service', unit)
+            self.assertIn('After=mikka-boot-scrub.service', unit)
+            self.assertIn('WantedBy=multi-user.target', unit)
+            self.assertIn('DefaultDependencies=no', unit)
+            self.assertNotIn('envd.service', unit)
+        self.assertIn('--wait-bootstrap', bt.BOOT_SERVICES['mikka-preload.service'])
+
     def test_patches_public_and_verifies_ready(self):
         opener, calls = fake({'public': True, 'buildStatus': 'ready', 'builds': [{'buildID': 'b1', 'status': 'ready'}]})
         self.assertEqual(bt.publish('tpl1', 'b1', 'k', opener), {'public': True, 'buildStatus': 'ready'})
@@ -50,6 +99,9 @@ class Publish(unittest.TestCase):
                 names = [m.name for m in tar.getmembers() if m.isfile()]
             self.assertTrue(names)
             self.assertTrue(all(n in bt.WORKER_PATHS or n.split('/', 2)[0] in bt.WORKER_PATHS or '/'.join(n.split('/')[:2]) in bt.WORKER_PATHS for n in names))
+            import subprocess
+            for name in bt.COMPUTER_FILES:
+                self.assertEqual(Path(temp, name).read_bytes(), subprocess.check_output(['git', 'show', f'{sha}:scripts/e2b/{name}'], cwd=bt.ROOT))
 
 class WorkerHash(unittest.TestCase):
     def test_changes_only_with_what_the_template_packages(self):
@@ -71,7 +123,10 @@ class WorkerHash(unittest.TestCase):
                 second = bt.worker_hash('HEAD')
                 self.assertNotEqual(second, first)
                 write('scripts/e2b/bootstrap.sh', 'two'); git('commit', '-qam', 'recipe')
-                self.assertNotEqual(bt.worker_hash('HEAD'), second)
+                recipe = bt.worker_hash('HEAD')
+                self.assertNotEqual(recipe, second)
+                write('scripts/e2b/viewer-gateway.py', 'guard'); git('add', '.'); git('commit', '-qm', 'viewer guard')
+                self.assertNotEqual(bt.worker_hash('HEAD'), recipe)
             finally:
                 bt.ROOT = root
 

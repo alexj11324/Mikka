@@ -17,10 +17,15 @@ test('dev:local holds only in local test-account mode, off any deployment or pro
   assert.equal(devLocalMode({ ...local, NODE_ENV: 'production' }), false)
 })
 
-test('only GitHub, and Decisions without a real gateway key, go to the local fake', () => {
+test('only GitHub, and the gateway and Resend without a real key, go to the local fake', () => {
   assert.equal(devLocalTarget('https://api.github.com/repos/mikka-e2e/core-loop/installation?x=1', local), 'http://127.0.0.1:3191/github/repos/mikka-e2e/core-loop/installation?x=1')
-  assert.equal(devLocalTarget('https://ai-gateway.vercel.sh/v1/decisions', { ...local, AI_GATEWAY_API_KEY: 'mvp-synthetic-decisions' }), 'http://127.0.0.1:3191/decisions')
+  assert.equal(devLocalTarget('https://ai-gateway.vercel.sh/v1/decisions', { ...local, AI_GATEWAY_API_KEY: 'mvp-synthetic-decisions' }), 'http://127.0.0.1:3191/gateway/v1/decisions')
+  assert.equal(devLocalTarget('https://ai-gateway.vercel.sh/v4/ai/language-model', { ...local, AI_GATEWAY_API_KEY: 'mvp-synthetic-decisions' }), 'http://127.0.0.1:3191/gateway/v4/ai/language-model')
   assert.equal(devLocalTarget('https://ai-gateway.vercel.sh/v1/decisions', { ...local, AI_GATEWAY_API_KEY: 'a-real-key' }), null)
+  assert.equal(devLocalTarget('https://ai-gateway.vercel.sh/v4/ai/language-model', local), null)
+  assert.equal(devLocalTarget('https://api.resend.com/emails', { ...local, RESEND_API_KEY: 'mikka-local-outbox' }), 'http://127.0.0.1:3191/resend/emails')
+  assert.equal(devLocalTarget('https://api.resend.com/emails', { ...local, RESEND_API_KEY: 're_real' }), null)
+  assert.equal(devLocalTarget('https://api.resend.com/domains', { ...local, RESEND_API_KEY: 'mikka-local-outbox' }), null)
   assert.equal(devLocalTarget('https://api.deepseek.com/v1/chat/completions', local), null)
   assert.equal(devLocalTarget('https://github.com/login/oauth/authorize', local), null)
 })

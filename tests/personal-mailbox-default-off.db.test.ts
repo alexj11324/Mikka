@@ -41,7 +41,7 @@ test('default-off claim, MCP and Coordinator work on the tracked schema with the
       assert.equal((await pool.query("select to_regclass('public.session_mailboxes') as mailbox")).rows[0].mailbox, 'session_mailboxes')
       const cols = await pool.query("select table_name,column_name from information_schema.columns where table_schema='public' and table_name in ('agent_runs','run_messages') and column_name in ('mailboxId','senderMailboxId','dedupeKey')")
       assert.equal(cols.rowCount, 4)
-      assert.notEqual(process.env.MIKKA_PERSONAL_MAILBOX_ENABLED, '1')
+      assert.equal(process.env.MIKKA_PERSONAL_MAILBOX_ENABLED, '0')
     })
     // Seven nonce-owned synthetic fixture rows. The only generated credential
     // is a CI-only device token hash; claim issues its normal short-lived run token.

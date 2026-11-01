@@ -1,12 +1,13 @@
-// Only the dedicated local GitHub Actions PostgreSQL service is permitted.
+// Only disposable loopback PostgreSQL test databases are permitted, locally or in CI.
 // Create a separate database; never touch a pre-existing database.
 import { randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import pg from 'pg'
+import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
 
 const source = process.env.E2E_DATABASE_URL
-const url = new URL(source ?? 'invalid:')
-if (process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true' || url.protocol !== 'postgresql:' || url.hostname !== '127.0.0.1' || url.port !== '5432' || url.pathname !== '/mikka_e2e' || url.search || url.hash || process.env.MIKKA_DATABASE_URL !== source || process.env.DATABASE_URL !== source) throw new Error('Requires isolated GitHub Actions PostgreSQL service')
+if (!disposableDatabase(process.env) || process.env.MIKKA_DATABASE_URL !== source || process.env.DATABASE_URL !== source) throw new Error('Requires the same disposable loopback *_e2e database for all application targets')
+const url = new URL(source)
 const files = process.argv.slice(2)
 if (files.length !== 2 || files[0] !== 'lib/agent-tool-approval/store.db.test.ts' || files[1] !== 'lib/agent-tool-approval/http.db.test.mts') throw new Error('Unexpected test scope')
 const name = `approval_e2e_${randomBytes(12).toString('hex')}`
@@ -23,7 +24,7 @@ try {
     if (result.status !== 0) { process.exitCode = result.status || 1; break }
   }
 } finally {
-  // Preserve the test database; the isolated CI service owns its lifecycle.
+  // Preserve the test database; the owning isolated harness controls its lifecycle.
   if (created) console.log(`Retained approval test database: ${name}`)
   await client.end()
 }

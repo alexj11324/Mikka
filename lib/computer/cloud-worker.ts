@@ -6,12 +6,13 @@ import { provisionCloudDevice } from './cloud-device'
 import { claimWorkerLease, releaseWorkerLease, renewWorkerLease } from './worker-lease'
 import * as provider from './e2b-provider'
 import { CloudWorkerError } from './worker-error'
+import { CLOUD_WORKER_COMMAND } from './worker-command'
 
 type Actor = { userId: string; workspaceId: string }
 
 /** Start or rotate the trusted worker on an existing machine. The database
  * lease serializes handoffs even when Postgres connections are pooled. */
-export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbox, server: string, sourceSha: string, runtime = provider) {
+export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbox, server: string, sourceSha: string, _runtime = provider) {
   const url = new URL(server)
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || !/^[a-f0-9]{40}$/.test(sourceSha)) throw new Error('Invalid cloud worker configuration')
   const protectionBypass = process.env.VERCEL_ENV === 'preview' ? process.env.MIKKA_CLOUD_PREVIEW_BYPASS : undefined
@@ -28,7 +29,8 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
         AND d."lastSeenAt">now()-interval '60 seconds' AND t."lastUsedAt">now()-interval '2 minutes'
         AND t."revokedAt" IS NULL AND t."expiresAt">now()+interval '1 hour' LIMIT 1`, [actor.workspaceId, actor.userId, sandbox.sandboxId])
     if (existing.rowCount) return { deviceId: existing.rows[0].id as string }
-    await runtime.ensureHostedRunnerImage(sandbox)
+    // Hosted tasks use the installed sandbox-runtime, not a nested container.
+    // Pulling the obsolete hosted image here added 32s to a cold start.
     if (!await renewWorkerLease(pool, actor, leaseId)) throw new Error('Cloud worker lease expired')
     const started = (await pool.query('SELECT clock_timestamp() AS now')).rows[0].now as Date
     const credential = await provisionCloudDevice(pool, actor, new Date(started.getTime() + 24 * 60 * 60_000), leaseId)
@@ -40,7 +42,7 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
     await sandbox.commands.run(`install -d -o mikka-runner -g mikka-runner -m 0700 /home/mikka-runner/.mikka && install -o mikka-runner -g mikka-runner -m 0600 ${temporary} /home/mikka-runner/.mikka/bootstrap.next && mv /home/mikka-runner/.mikka/bootstrap.next /home/mikka-runner/.mikka/bootstrap.json && unlink ${temporary}`, { user: 'root', timeoutMs: 10_000 })
     // 4e3: the worker process gets no workspace secrets. Each task receives its explicit user
     // variable set in the claim response (taskEnv) and the hosted runner passes only that into the task container.
-    await sandbox.commands.run('cd /opt/mikka/worker/packages/daemon && HOME=/home/mikka-runner ./node_modules/.bin/tsx bin/cloud-worker.ts > /home/mikka-runner/.mikka/worker-bootstrap.log 2>&1', { user: 'mikka-runner', background: true, timeoutMs: 0 })
+    await sandbox.commands.run(`{ ${CLOUD_WORKER_COMMAND}; } > /home/mikka-runner/.mikka/worker-bootstrap.log 2>&1`, { user: 'mikka-runner', background: true, timeoutMs: 0 })
     const deadline = Date.now() + 30_000
     do {
       const ready = await pool.query(`SELECT 1 FROM devices d JOIN device_tokens t ON t."boundDeviceId"=d.id

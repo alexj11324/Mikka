@@ -98,7 +98,7 @@ import {
 import type { WorktreeManager } from "../worktrees"
 import type { JournalEntry, RunJournal } from "./journal"
 import type { ToolApprovalGate } from "../agents/tool-approval"
-import { assertMailboxRunAuthority, type RunMailbox } from '../run-mailbox'
+import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '../run-mailbox'
 
 export interface SupervisorDeps {
   journal: RunJournal
@@ -595,6 +595,26 @@ export class RunSupervisor {
         this.leases.set(entry.assignment.runId, Date.now() + DEFAULT_LEASE_MS)
       this.launch(entry.assignment.runId, repo)
     }
+  }
+
+  /** Notify an existing authorized session; never start or resume a task. */
+  async notifyMailbox(runId: string, messageIds: readonly string[]) {
+    const run = this.active.get(runId)
+    if (!run?.session || !run.mailbox || !run.toolApproval || !run.mailbox.tools.some(tool => tool.name === 'mailbox_inbox'))
+      throw new RunNotFoundError(runId)
+    const state = this.deps.journal.get(runId)?.state
+    if (state !== 'running' && state !== 'waiting_input') throw new RunNotFoundError(runId)
+    const check = () => assertMailboxRunAuthority({ held: this.active.get(runId) === run,
+      state: this.deps.journal.get(runId)?.state,
+      stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted,
+      lease: this.leases.get(runId) })
+    check()
+    // This fixed notice grants no action authority. Avoid waiting on a human
+    // control handback here, which would block the same poll's stop channel.
+    // Reading the inbox and every subsequent tool still use their live gate.
+    if (run.toolApproval.revoked) throw new Error('Run mailbox unavailable')
+    check()
+    await this.send(runId, mailboxNoticeText(runId, messageIds))
   }
 
   async send(runId: string, text: string) {

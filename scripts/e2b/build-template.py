@@ -22,7 +22,57 @@ E2B_API = 'https://api.e2b.app'
 WORKER_PATHS = ('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
                 'packages/daemon', 'packages/protocol', 'packages/config', 'patches')
 # What else decides the template's contents: its bootstrap and the build steps below.
-RECIPE_PATHS = ('scripts/e2b/bootstrap.sh', 'scripts/e2b/build-template.py')
+COMPUTER_FILES = ('start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py')
+RECIPE_PATHS = ('scripts/e2b/bootstrap.sh', 'scripts/e2b/build-template.py',
+                *(f'scripts/e2b/{name}' for name in COMPUTER_FILES))
+
+# Filesystem snapshots reboot without template memory. Start the anonymous
+# runtime beside E2B's boot services; only capability cleanup precedes envd.
+# Scrubbing is a separate once-per-boot job: a later worker restart must keep
+# a fresh control-plane handoff, and a memory resume must keep its identity.
+BOOT_SERVICES = {
+    'mikka-boot-scrub.service': '''[Unit]
+Description=Remove copied Mikka worker capabilities before cold boot
+DefaultDependencies=no
+After=local-fs.target
+Before=mikka-preload.service mikka-viewer.service envd.service shutdown.target
+Conflicts=shutdown.target
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -ec 'rm -rf /home/mikka-runner/.mikka/worker /run/mikka-viewer /run/mikka-subagents; install -d -m 700 -o mikka-runner -g mikka-runner /home/mikka-runner/.mikka; rm -f /home/mikka-runner/.mikka/bootstrap.json /home/mikka-runner/.mikka/bootstrap.next /home/mikka-runner/.mikka/preloaded.pid; install -m 600 -o mikka-runner -g mikka-runner /dev/null /home/mikka-runner/.mikka/worker-preload.log; install -d -m 710 -o root -g mikka-runner /run/mikka-viewer'
+''',
+    'mikka-preload.service': '''[Unit]
+Description=Preload the anonymous Mikka worker
+DefaultDependencies=no
+Requires=mikka-boot-scrub.service
+After=mikka-boot-scrub.service
+Before=shutdown.target
+Conflicts=shutdown.target
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=45
+ExecStart=/bin/sh -ec 'runuser -u mikka-runner -- /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/home/mikka-runner LANG=C.UTF-8 node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --wait-bootstrap >>/home/mikka-runner/.mikka/worker-preload.log 2>&1 & for i in $(seq 1 600); do test -s /home/mikka-runner/.mikka/preloaded.pid && exit 0; sleep .05; done; exit 1'
+[Install]
+WantedBy=multi-user.target
+''',
+    'mikka-viewer.service': '''[Unit]
+Description=Start the Mikka viewer without a signing key
+DefaultDependencies=no
+Requires=mikka-boot-scrub.service
+After=mikka-boot-scrub.service
+Before=shutdown.target
+Conflicts=shutdown.target
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=45
+ExecStart=/bin/sh -ec 'flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py >>/run/mikka-viewer/gateway.log 2>&1 & for i in $(seq 1 600); do test "$(curl -s -o /dev/null -w "%%{http_code}" http://127.0.0.1:6080/vnc)" = 401 && exit 0; sleep .05; done; exit 1'
+[Install]
+WantedBy=multi-user.target
+''',
+}
 
 def commit(ref):
     sha = subprocess.check_output(['git', 'rev-parse', '--verify', f'{ref}^{{commit}}'], cwd=ROOT, text=True).strip()
@@ -45,6 +95,11 @@ def source_context(directory, ref):
     subprocess.run(['git', 'archive', '--format=tar', f'--output={directory / "worker.tar"}', sha, '--', *WORKER_PATHS], cwd=ROOT, check=True)
     bootstrap = subprocess.check_output(['git', 'show', f'{sha}:scripts/e2b/bootstrap.sh'], cwd=ROOT)
     (directory / 'bootstrap.sh').write_bytes(bootstrap)
+    for name in COMPUTER_FILES:
+        content = subprocess.check_output(['git', 'show', f'{sha}:scripts/e2b/{name}'], cwd=ROOT)
+        (directory / name).write_bytes(content)
+    for name, unit in BOOT_SERVICES.items():
+        (directory / name).write_text(unit)
     # The worker checks this against MIKKA_CLOUD_WORKER_SHA before it starts.
     (directory / 'source-sha').write_text(worker_hash(sha) + '\n')
     return sha
@@ -59,10 +114,24 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None):
                     .run_cmd('bash /tmp/mikka-bootstrap.sh', user='root')
                     .copy('worker.tar', '/tmp/mikka-worker.tar')
                     .copy('source-sha', '/opt/mikka/worker-source-sha')
-                    .run_cmd('mkdir -p /opt/mikka/worker && tar -xf /tmp/mikka-worker.tar -C /opt/mikka/worker && rm /tmp/mikka-worker.tar && cd /opt/mikka/worker && HOME=/tmp corepack pnpm install --filter @mikka/daemon... --frozen-lockfile && chown -R root:root /opt/mikka/worker && chmod -R go-w /opt/mikka/worker && chown root:root /opt/mikka/worker-source-sha && chmod 0444 /opt/mikka/worker-source-sha', user='root')
+                    .run_cmd('mkdir -p /opt/mikka/worker && tar -xf /tmp/mikka-worker.tar -C /opt/mikka/worker && rm /tmp/mikka-worker.tar && cd /opt/mikka/worker && HOME=/tmp corepack pnpm install --filter @mikka/daemon... --frozen-lockfile && node packages/daemon/scripts/build-cloud-worker.mjs && chown -R root:root /opt/mikka/worker && chmod -R go-w /opt/mikka/worker && chown root:root /opt/mikka/worker-source-sha && chmod 0444 /opt/mikka/worker-source-sha', user='root')
                     # The official, version-pinned native Codex CLI, from the daemon's own pins and
                     # installer. Its authentication comes later from the owner-bound broker.
                     .run_cmd('ln -sf "$(node /opt/mikka/worker/packages/daemon/harness/cli.mjs /opt/mikka/harness codex)" /usr/local/bin/codex && chmod -R go+rX,go-w /opt/mikka/harness && /usr/local/bin/codex --version', user='root'))
+        for runtime_file in COMPUTER_FILES:
+            template = template.copy(runtime_file, f'/opt/mikka/computer/{runtime_file}')
+        template = template.run_cmd('chown root:root /opt/mikka/computer/start-desktop.sh /opt/mikka/computer/viewer-gateway.py /opt/mikka/computer/lease-driver.py && chmod 0755 /opt/mikka/computer/start-desktop.sh /opt/mikka/computer/viewer-gateway.py /opt/mikka/computer/lease-driver.py', user='root')
+        for service in BOOT_SERVICES:
+            template = template.copy(service, f'/etc/systemd/system/{service}')
+        template = template.run_cmd('systemctl daemon-reload && systemctl enable mikka-preload.service mikka-viewer.service', user='root')
+        # Freeze imported modules and the unauthenticated viewer into the
+        # template's ready state. No identity or signing key exists at build
+        # time: the control plane hands those to each instance afterwards.
+        template = template.set_user('root').set_start_cmd(
+            'systemctl start mikka-preload.service mikka-viewer.service && exec sleep infinity',
+            'test -s /home/mikka-runner/.mikka/preloaded.pid && '
+            'test ! -e /home/mikka-runner/.mikka/bootstrap.json && test ! -e /run/mikka-viewer/key && '
+            'test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401')
         return sha, Template.build(template, name=name, cpu_count=2, memory_mb=4096,
                                    min_free_disk_mb=16384, skip_cache=True, api_key=api_key, on_build_logs=on_build_logs)
 

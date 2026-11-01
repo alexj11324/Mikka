@@ -3,6 +3,17 @@ import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { toolApprovalDecision } from './tool-approval-policy'
 import type { ToolApprovalRequest } from './tool-approval'
 
+it('permits only the host-enabled fixed mailbox transport without widening other tools', () => {
+  const policy = { ...defaultRunPolicy(), readOnly: true }
+  for (const name of ['mailbox_recipients', 'mailbox_send', 'mailbox_inbox', 'mailbox_ack', 'mailbox_sent']) {
+    const request: ToolApprovalRequest = { runId: 'r', requestId: name, harness: 'claude_code', method: `cli/mcp__mikka_mailbox__${name}`, input: {} }
+    expect(toolApprovalDecision(request, policy, '/worktree')).toBe('unavailable')
+    expect(toolApprovalDecision(request, policy, '/worktree', [], [], true)).toBe('allow')
+  }
+  for (const method of ['cli/mcp__mikka_mailbox__arbitrary_tool', 'cli/mcp__other_mailbox__mailbox_send', 'cli/Bash'])
+    expect(toolApprovalDecision({ runId: 'r', requestId: method, harness: 'claude_code', method, input: {} }, policy, '/worktree', [], [], true)).toBe('unavailable')
+})
+
 it('uses the trusted network setting for host proxy requests without inspecting commands', () => {
   const base = defaultRunPolicy()
   const request: ToolApprovalRequest = {runId:'r',requestId:'i',harness:'codex',method:'sandbox/network',input:{host:'example.invalid',port:443}}

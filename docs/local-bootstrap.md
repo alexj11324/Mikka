@@ -22,8 +22,9 @@ Run it without `eval` to see the line.
 
 The export line sets `MIKKA_LOCAL_TEST_ACCOUNTS=1`, which also raises the local registration limits (`lib/abuse/signup.ts`, see `docs/dev-workflow.md`); nothing else needs setting.
 
-It sets no CI variables, so suites gated to GitHub Actions only (such as
-`test:run-publication-db`) still refuse to run locally.
+It sets no CI variables. DB suites such as `test:run-publication-db` run
+because `mikka_e2e` is a loopback `*_e2e` database; suites gated to hosted
+GitHub Actions only still refuse to run locally.
 
 Overrides: `MIKKA_DEV_HOME` (default `/var/lib/mikka-dev`), `MIKKA_PGDATA`,
 `MIKKA_PG_PORT` (default `5432`).

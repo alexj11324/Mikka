@@ -22,6 +22,7 @@ import { insertRunOnce } from "../run-dispatch";
 import { runPrompt } from "../run-prompt";
 import { tiptapToText } from "../tiptap-text";
 import { digest } from "../agent-kit/definition";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const localDB = process.env.FACTORY_TEST_DATABASE_URL;
 if (localDB) {
@@ -32,15 +33,7 @@ if (localDB) {
 }
 const dbURL =
   localDB ??
-  (process.env.FACTORY_LOCAL_DB_TESTS === "1" ||
-  (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true")
-    ? process.env.E2E_DATABASE_URL
-    : undefined);
-if (dbURL && !localDB) {
-  const url = new URL(dbURL);
-  assert.equal(url.hostname, "127.0.0.1");
-  assert.equal(url.pathname, "/mikka_e2e");
-}
+  (disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined);
 const binding = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id,
   issueId: task.issueId,

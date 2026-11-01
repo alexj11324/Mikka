@@ -8,15 +8,13 @@ import { execFile } from 'node:child_process'
 import { createServer } from 'node:http'
 import { promisify } from 'node:util'
 import test from 'node:test'
-import { assertE2eTarget } from './helpers/e2e-target.mjs'
+import { assertE2eTarget, disposableDatabase } from './helpers/e2e-target.mjs'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) {
   const target = assertE2eTarget(url)
-  const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.port === '5432' && target.pathname === '/mikka_e2e'
-  const cloud = process.env.ISSUE184_LOCAL_TEST === '1' && target.port === '55484' && target.pathname === '/issue184_e2e'
-  const local = process.env.GITHUB_ACTIONS !== 'true' && process.env.ISSUE184_LOCAL_TEST !== '1' && process.env.REQUIRE_DB === '1'
-  if ((!ci && !cloud && !local) || process.env.GITHUB_ACTIONS === 'true' && !ci || process.env.ISSUE184_LOCAL_TEST === '1' && !cloud || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) throw new Error('Team task tests require the isolated PG17 service')
+  const cloud = target.port === '55484' && target.pathname === '/issue184_e2e'
+  if (!disposableDatabase() || process.env.ISSUE184_LOCAL_TEST === '1' && !cloud || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) throw new Error('Team task tests require the isolated PG17 service')
 }
 if (!url && process.env.REQUIRE_DB === '1') throw new Error('Team task DB tests cannot skip in required CI')
 

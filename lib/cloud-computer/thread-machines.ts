@@ -3,11 +3,13 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { NotFoundError, Sandbox, SandboxNotFoundError } from 'e2b'
 import { z } from 'zod'
+import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import { ComputerError } from '@/lib/computer/store'
 import { computerPermission } from '@/lib/computer/permission'
-import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant, ensureHostedRunnerImage } from '@/lib/computer/e2b-provider'
+import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant } from '@/lib/computer/e2b-provider'
+import { CLOUD_WORKER_COMMAND } from '@/lib/computer/worker-command'
 import { installSubagentRuntime, runtimeRequest } from './runtime'
-import { e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { computerTemplate, e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { workspaceSecretMasker } from '@/lib/secrets/runtime'
@@ -186,6 +188,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       LEFT JOIN device_repos source_repo ON source_repo.id=runtime."repoId" AND source_repo."userId"=r."userId"
       WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run || !run.botSandboxId || !['queued', 'preparing', 'running', 'waiting_input'].includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
+    const repositoryTask = Boolean(run.remoteUrl)
     // Stop check 1, before any provider call, under the run lock stopOwnedRun also takes.
     if (run.status === 'queued' && run.stopRequestedAt) {
       const stale = await endStopRequestedRun(client, actor, runId)
@@ -193,6 +196,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       if (stale) await provider.kill(stale, actor.userId)
       throw new ComputerError(409, 'Thread stopped')
     }
+    if (repositoryTask && !repositoryBindingMatches(run.repoPath, run.remoteUrl)) throw new ComputerError(409, 'Repository identity unavailable')
     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
     if (machine?.state === 'ended') throw new ComputerError(409, 'Thread ended')
     if (machine?.state === 'running' && machine.sandboxId) {
@@ -213,11 +217,14 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (machine?.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now() && machine.state !== 'paused') throw new ComputerError(409, 'Thread provisioning in progress')
     // No Mikka caps: the person's own E2B account sets the limit (orchestration.md § 5).
     if (!machine || machine.snapshotId === 'pending') {
-      // The task's own paused sandbox comes first; only its first run starts from the workspace snapshot.
+      // A follow-up keeps this task's own machine. A new repository task starts
+      // from the anonymous ready template: the daemon clones its admitted
+      // remote and creates the task worktree from the configured base branch.
+      // Only non-repository computer work retains the existing desktop snapshot.
       const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run) : null
       if (adopted) machine = adopted
       else {
-        const snapshotId = await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
+        const snapshotId = repositoryTask ? computerTemplate() : await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
         machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state)
           VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, snapshotId, randomUUID()])).rows[0]
       }
@@ -258,21 +265,24 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       throw new ComputerError(409, 'Thread stopped')
     }
     await client.query('COMMIT')
-    if (!machine.sandboxId) {
+    if (!machine.sandboxId && !repositoryTask) {
       // Filesystem snapshots start no old worker process. Remove copied device
       // identity/capabilities before a new worker can make any network call.
       // A snapshot never holds a credential; scrub the same list again in case an older snapshot did.
       await sandbox.commands.run(`rm -rf /home/mikka-runner/.mikka/worker /home/mikka-runner/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; ${credentialScrubCommand()}; install -d -m 700 /run/mikka-viewer`, { user: 'root', timeoutMs: 10_000 })
     }
-    await installComputerRuntime(sandbox)
-    await ensureHostedRunnerImage(sandbox)
     const deviceId = machine.deviceId ?? randomUUID()
     const repoId = machine.repoId ?? randomUUID()
     const credential = `orv_${randomBytes(32).toString('base64url')}`
     const origin = new URL(process.env.MIKKA_CLOUD_WORKER_URL ?? '')
     if (origin.protocol !== 'https:' || origin.username || origin.password) throw new Error('Worker unavailable')
     const expectedSha = process.env.MIKKA_CLOUD_WORKER_SHA
-    const sourceSha = (await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim()
+    // Version verification and viewer startup are independent. Hosted runs no
+    // longer use Docker; never pull its obsolete image on the critical path.
+    const [sourceSha] = await Promise.all([
+      sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' }).then(value => value.trim()),
+      installComputerRuntime(sandbox),
+    ])
     if (!expectedSha || sourceSha !== expectedSha) throw new Error('Worker version mismatch')
     await client.query('BEGIN')
     // Provision, end and desktop all lock the parent run before its machine.
@@ -289,11 +299,11 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query('COMMIT')
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     await sandbox.files.write(handoff, JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) }), { user: 'root' })
-    await sandbox.commands.run(`install -d -o mikka-runner -g mikka-runner -m 700 /home/mikka-runner/.mikka; install -o mikka-runner -g mikka-runner -m 600 ${handoff} /home/mikka-runner/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', timeoutMs: 10_000 })
+    await sandbox.commands.run(`install -d -o mikka-runner -g mikka-runner -m 700 /home/mikka-runner/.mikka; install -o mikka-runner -g mikka-runner -m 600 ${handoff} /home/mikka-runner/.mikka/bootstrap.next; mv /home/mikka-runner/.mikka/bootstrap.next /home/mikka-runner/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', timeoutMs: 10_000 })
     // The worker's output streams into the server logs only while this invocation lives;
     // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
     const mask = await workspaceSecretMasker(actor.workspaceId)
-    await sandbox.commands.run(workerCommand('cd /opt/mikka/worker/packages/daemon && HOME=/home/mikka-runner ./node_modules/.bin/tsx bin/cloud-worker.ts'), { user: 'mikka-runner', background: true, timeoutMs: 0, ...workerOutputForwarder(runId, mask) })
+    await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'mikka-runner', background: true, timeoutMs: 0, ...workerOutputForwarder(runId, mask) })
     const deadline = Date.now() + 30_000
     let ready = false
     do {

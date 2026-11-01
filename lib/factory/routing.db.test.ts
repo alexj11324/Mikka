@@ -8,17 +8,13 @@ import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { createFactoryStore } from "./store";
 import { FactoryError, type FactoryBinding } from "./contract";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 const ci = process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true";
 const url =
   process.env.FACTORY_ROUTING_TEST_URL ??
-  (ci ? process.env.E2E_DATABASE_URL : undefined);
+  (disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined);
 if (ci) assert.ok(url, "CI must run actual isolated PostgreSQL, never skip");
-if (url) {
-  const u = new URL(url);
-  assert.equal(u.hostname, "127.0.0.1");
-  assert.equal(u.username, ci ? "e2e" : "factory192");
-  assert.equal(u.pathname, "/mikka_e2e");
-}
+if (url) assert.ok(disposableDatabase(process.env, url), "loopback *_e2e only");
 const denies = (fn: () => Promise<unknown>, code: string) =>
   assert.rejects(fn, (e) => e instanceof FactoryError && e.code === code);
 test(

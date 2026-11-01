@@ -229,6 +229,8 @@ export class Daemon {
   private tick: Promise<void> = Promise.resolve()
   private updating = false
   private claimsInFlight = 0
+  /** Shared by the heartbeat, commands poll and RPC so one run has one claim. */
+  private claims = new Map<string, ReturnType<Daemon['claimAndStartInternal']>>()
   private updateCheck: Promise<void> | null = null
   private maintenance: Promise<void> | null = null
   private updateVersion: string | undefined
@@ -241,6 +243,8 @@ export class Daemon {
   private registered = false
   /** Run ids the server sent that were refused as unsafe (reported once). */
   private refusedRuns = new Set<string>()
+  /** Runs the commands poll reported queued: being claimed, or failed until the next heartbeat retries them. */
+  private queuedClaims = new Map<string, "claiming" | "failed">()
   private quota: QuotaPoller | null = null
   /** Ends the commands long-poll when the daemon stops. */
   private commandsAbort = new AbortController()
@@ -610,24 +614,38 @@ export class Daemon {
           continue
         }
         if (this.unacked.size > 0) {
-          const ids = [...this.unacked]
+          // One notice may contain several mailbox IDs; keep ACK requests
+          // within the protocol bound even when input and notices arrive together.
+          const ids = [...this.unacked].slice(0, 500)
           await link.ackCommands(deviceId, ids)
           for (const id of ids) this.unacked.delete(id)
         }
         // Runs being stopped or already ended would come back on every
         // answer; leaving them out lets the poll wait for new commands.
-        const skipRuns = [...this.stopping, ...this.ended].slice(
+        // So are queued runs this daemon refused or failed to claim: the
+        // heartbeat retries those, and the poll must not answer them again.
+        const failedClaims = [...this.queuedClaims].flatMap(([id, state]) => state === "failed" ? [id] : [])
+        const skipRuns = [...failedClaims, ...this.refusedRuns, ...this.stopping, ...this.ended].slice(
           0,
           COMMANDS_MAX_SKIP
         )
         const started = performance.now()
+        let queued: string[] = []
         const commands = await link.fetchCommands(deviceId, wait, {
           signal,
           skipRuns,
+          onQueuedRuns: (runIds) => { queued = runIds },
         })
         if (this.stopped || signal.aborted) return
         backoff = 1_000
         const acted = await this.applyCommands(commands)
+        // A new run starts now instead of on the next heartbeat; then poll
+        // again at once. Runs already being claimed only wait for that claim.
+        if (queued.length > 0) {
+          if (this.claimQueued(queued)) continue
+          await this.pauseCommands(500, signal)
+          continue
+        }
         if (this.unacked.size > 0) continue // ack right away
         if (commands.length === 0 && !signal.aborted) {
           const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
@@ -700,6 +718,25 @@ export class Daemon {
     }
   }
 
+  /** Starts claiming the reported queued runs; true when any claim began. */
+  private claimQueued(runIds: string[]): boolean {
+    let started = false
+    for (const runId of runIds) {
+      if (this.draining || this.updating || this.stopped) break
+      if (this.queuedClaims.has(runId) || this.refusedRuns.has(runId) || this.journal.get(runId)) continue
+      this.queuedClaims.set(runId, "claiming")
+      started = true
+      void this.claimAndStart(runId).then(
+        () => { this.queuedClaims.delete(runId) },
+        (error: unknown) => {
+          this.queuedClaims.set(runId, "failed")
+          this.log.warn({ run_id: runId, err: error }, "could not start run")
+        }
+      )
+    }
+    return started
+  }
+
   /** Waits `ms`, or less if the daemon stops or the device registers. */
   private pauseCommands(ms: number, signal: AbortSignal): Promise<void> {
     if (signal.aborted) return Promise.resolve()
@@ -747,6 +784,20 @@ export class Daemon {
             this.log.warn({ run_id: command.runId, err }, "cancel failed")
           )
           .finally(() => this.stopping.delete(command.runId))
+        continue
+      }
+      if (command.kind === 'mailbox_notice') {
+        if (this.stopping.has(command.runId)) continue
+        const ids = command.messageIds.filter(id => !this.unacked.has(id))
+        if (!ids.length) continue
+        try {
+          await this.supervisor.notifyMailbox(command.runId, ids)
+          for (const id of ids) this.unacked.add(id)
+          acted = true
+          this.log.info({ run_id: command.runId, count: ids.length }, 'mailbox notice handed to the agent')
+        } catch (error) {
+          if (!(error instanceof RunNotFoundError)) this.log.warn({ run_id: command.runId, err: error }, 'could not notify the agent mailbox')
+        }
         continue
       }
       if (this.unacked.has(command.messageId)) continue
@@ -1167,8 +1218,10 @@ export class Daemon {
         // A receipted run blocked while offline may resume only after its
         // server authorization is available; no second recovery scheduler.
         await this.supervisor.resumeAll(true)
+        // Claims that failed after the commands poll reported them are retried here.
+        for (const [runId, state] of this.queuedClaims) if (state === "failed") this.queuedClaims.delete(runId)
         for (const runId of await link.pendingRuns(deviceId)) {
-          if (this.refusedRuns.has(runId)) continue
+          if (this.refusedRuns.has(runId) || this.queuedClaims.has(runId)) continue
           await this.claimAndStart(runId).catch((error: unknown) =>
             this.log.warn({ run_id: runId, err: error }, "could not start run")
           )
@@ -1208,9 +1261,16 @@ export class Daemon {
     if (this.draining || this.updating || this.stopped) {
       throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
     }
+    const existing = this.claims.get(runId)
+    if (existing) return await existing
     this.claimsInFlight++
-    try { return await this.claimAndStartInternal(runId) }
-    finally { this.claimsInFlight-- }
+    const claim = this.claimAndStartInternal(runId)
+    this.claims.set(runId, claim)
+    try { return await claim }
+    finally {
+      this.claims.delete(runId)
+      this.claimsInFlight--
+    }
   }
 
   private async claimAndStartInternal(runId: string) {
@@ -1219,10 +1279,12 @@ export class Daemon {
     }
     const deviceId = this.device.deviceId
     if (!deviceId) throw new ServerUnreachableError("device not registered")
+    const credential = this.device.credential
+    const workspaceId = this.device.workspaceId
     if (!isSafeId(runId)) return this.refuseRun(runId)
     const existing = this.journal.get(runId)
     if (existing) return this.supervisor.summary(existing)
-    const assignment = await this.options.link.claimRun(deviceId, runId)
+    const assignment = await this.options.link.claimRun(deviceId, runId, this.commandsAbort.signal)
     if (assignment.runId !== runId) return this.refuseRun(runId)
     if (assignment.expectedRepoRemote) {
       let matches = false
@@ -1251,6 +1313,11 @@ export class Daemon {
       }
     }
     if (assignment.computer && (!this.cloudComputerBroker || assignment.computer.ownerId !== credentialOwner(assignment))) throw new Error('Cloud computer runtime unavailable')
+    // A response may arrive after shutdown began, including while repository
+    // validation awaited I/O. Its server lease can expire; never launch it.
+    if (this.stopped) throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
+    if (this.device.deviceId !== deviceId || this.device.credential !== credential || this.device.workspaceId !== workspaceId)
+      throw new ServerUnreachableError('Device session changed while claiming run')
     return await this.supervisor.start(assignment)
   }
 
@@ -1524,6 +1591,9 @@ export class Daemon {
     await this.commandsLoop.catch(() => undefined)
     await this.fsLoop.catch(() => undefined)
     await this.tick
+    // The commands poll starts claims outside the heartbeat tick. Abort their
+    // HTTP requests and settle them before stopping the run supervisor.
+    await Promise.allSettled([...this.claims.values()])
     await this.rpc?.close()
     try {
       await this.supervisor?.stop()
