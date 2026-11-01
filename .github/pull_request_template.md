@@ -18,4 +18,4 @@
 
 ## How it was checked
 
-<!-- CI run, Preview URL, commit SHA. -->
+<!-- Local acceptance (commands, origin, database), commit SHA; the CI run once it reports. -->
