@@ -195,12 +195,13 @@ async function reclaimLostRun(run: Run, now: Date) {
       movedToDeviceId: target?.deviceId ?? null, movedTo: bound ? { kind: 'cloud' } : target ? { kind: 'device', deviceId: target.deviceId } : null }))
     return true
   })
-  if (!retried) return
-  await revokeRunTokens(run.id)
-  stopRecordingsAfter([run.id])
-  await afterRunEnded(run.userId, run.id)
-  if (bound) await startThreadMachine({ userId: run.userId, workspaceId: bound.workspaceId }, retryId)
-  if (cloud) await moveToCloud(run, cloud, outcome.attempt, now)
+  if (retried) {
+    await revokeRunTokens(run.id)
+    stopRecordingsAfter([run.id])
+    await afterRunEnded(run.userId, run.id)
+    if (bound) await startThreadMachine({ userId: run.userId, workspaceId: bound.workspaceId }, retryId)
+    if (cloud) await moveToCloud(run, cloud, outcome.attempt, now)
+  }
 }
 
 type CloudTarget = { botId: string; workspaceId: string; harness: 'codex' | 'claude_code'; agentId: string; repoId: string; deviceId: string; remoteUrl: string }
