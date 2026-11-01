@@ -1,8 +1,7 @@
-// Bot chats for the demo workspace. Each entry is one AI SDK model message,
-// stored as a coordinator_messages row of that bot (lib/coordinator/context.ts
-// reads them). Assistant text that has a `root = …` line renders as OpenUI
-// (lib/agent-ui-source.ts); anything else renders as Markdown.
-// Placeholders the seed replaces: {{issue:<key>}} and {{run:<key>}} with row ids.
+// Bot chats: one AI SDK model message per coordinator_messages row of that bot
+// (lib/coordinator/context.ts reads them). Assistant text with a `root = …`
+// line renders as OpenUI (lib/agent-ui-source.ts); anything else is Markdown.
+// Placeholders the seed replaces: {{issue:<key>}}, {{run:<key>}}, {{bot:<key>}}, {{artifact:<key>}}.
 
 const user = content => ({ role: 'user', content })
 const bot = content => ({ role: 'assistant', content: [{ type: 'text', text: content }] })
@@ -10,125 +9,129 @@ const bot = content => ({ role: 'assistant', content: [{ type: 'text', text: con
 const botWithTools = (text, tools) => ({ role: 'assistant', content: [...tools.map(toolName => ({ type: 'tool-call', toolCallId: `call_${toolName}`, toolName, input: {} })), { type: 'text', text }] })
 const toolResult = (toolName, value) => ({ role: 'tool', content: [{ type: 'tool-result', toolCallId: `call_${toolName}`, toolName, output: { type: 'json', value } }] })
 
-// A 1×1 PNG, enough for the chat's image count on a user message.
+// A 1×1 PNG: the chat shows an image count on the user's message.
 const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 
 export const CHATS = {
   frontend: [
-    user('看板在 13 寸上最后一张卡被横向滚动条挡住了，你看下 {{issue:i-board-scroll}}'),
-    botWithTools('看了，是列内容区 `overflow-y-auto` 的底部没有给横向滚动条留空间。Windows 和 macOS「始终显示滚动条」时都会遮住约 12px。\n\n我已经开了线程去改，只动内容区的 padding，不碰 300px 列宽（R-25）。', ['get_issue', 'dispatch_run']),
-    toolResult('dispatch_run', { runId: '{{run:r-board-scroll}}' }),
-    user([{ type: 'text', text: '这是我这边的截图，「已完成」那列' }, { type: 'file', mediaType: 'image/png', data: PIXEL }]),
-    bot('收到截图，和我复现的一致。改动是这一处：\n\n```tsx\n// components/blocks/kanban-board-1/components/kanban-board.tsx\n<KanbanColumnContent\n  value={column.value}\n  className="min-h-0 flex-1 gap-1.5 overflow-y-auto overscroll-y-contain p-0.5 pb-[var(--scrollbar-size)]"\n/>\n```\n\n`--scrollbar-size` 在 `globals.css` 里按平台给值，macOS 叠加滚动条时是 0，不会多出空白。'),
-    user('顺便把这周前端相关的 PR 状态列一下'),
+    user('有客户说 Mac 上登录页一片空白，你看下 {{issue:i-safari-blank}}'),
+    botWithTools('Safari 17.0–17.3 能复现，Chrome 正常。控制台报：\n\n```text\nSyntaxError: Invalid regular expression: invalid group specifier name\n```\n\n这是 lookbehind 正则，Safari 17.4 之前不支持。v2.3.2 里只有 `date-fns-tz` 从 3.0 升到了 3.1，大概率是它。我开线程去写一个能复现的 WebKit 用例。', ['get_issue', 'dispatch_run']),
+    toolResult('dispatch_run', { runId: '{{run:r-safari}}' }),
+    user([{ type: 'text', text: '这是客户发来的截图' }, { type: 'file', mediaType: 'image/png', data: PIXEL }]),
+    bot('和我复现的一致。线程那边 CI 上 WebKit 没装上，失败了；根因我已经确认，写在 Artifact 里：[[artifact:{{artifact:a-safari-rca}}]]\n\n先发一个热修：把 `date-fns-tz` 锁回 3.0.1。\n\n```diff\n-    "date-fns-tz": "^3.1.0",\n+    "date-fns-tz": "3.0.1",\n```'),
+    user('这周前端的 PR 都什么状态'),
     bot(`root = Stack([title, table])
-title = TextContent("前端相关 PR（本周）", "large-heavy")
-table = BeTable(["PR", "标题", "状态", "评审"], [["#845", "看板最后一张卡避开滚动条", "进行中", "等 CI"], ["#851", "引用保留 Artifact 版本", "进行中", "1 条意见"], ["#790", "半透明窗口去掉对话框模糊", "已合并", "通过"], ["#781", "旧组件名继续解析", "已合并", "通过"]])`),
-    user('#851 的意见是什么？'),
-    bot(`root = Stack([intro, diff, alert])
-intro = InlineText(["评审在 ", SourceChip("https://github.com/mikka-demo/web/pull/851", "PR #851"), " 里指出：引用对象里的 version 用的是字符串，", TaskChip("{{issue:i-quote-artifact}}"), " 的根因其实在序列化那一层。"])
-diff = BeFileDiff("lib/artifacts/quote.ts", "-  version: String(selection.version ?? ''),\\n+  version: selection.version,\\n   kind: selection.kind,", "tsx")
-alert = BeAlert("还需要一个迁移？", "不需要：历史消息里空的 version 会按最新版处理，和现在行为一致。", "info")`),
+title = TextContent("ledger-web 本周 PR", "large-heavy")
+table = BeTable(["PR", "标题", "作者", "状态"], [["#488", "去掉 components/ui 的 barrel 导入", "前端助手", "CI 中"], ["#485", "导出 CSV 加 UTF-8 BOM", "前端助手", "待评审"], ["#479", "隐私政策链接 404", "王蕾", "已合并"], ["#471", "首页预加载首图、字体子集化", "前端助手", "已合并"]])`),
+    user('#485 改了什么'),
+    bot(`root = Stack([intro, diff, note])
+intro = InlineText(["修 ", TaskChip("{{issue:i-csv-garbled}}"), "：Windows Excel 打开没有 BOM 的 CSV 会按 GBK 解析。见 ", SourceChip("https://github.com/qingning-tech/ledger-web/pull/485", "PR #485"), "。"])
+diff = BeFileDiff("lib/export/csv.ts", "-  return rows.map(toLine).join('\\\\n')\\n+  return '\\\\uFEFF' + rows.map(toLine).join('\\\\r\\\\n')", "tsx")
+note = BeAlert("顺带改了换行", "Excel 对 CRLF 更友好；Numbers 和 WPS 不受影响。", "info")`),
+    user('好，#485 我下午看'),
+    bot('好的。合并后我在 staging 上用 Windows Excel 再验一遍。'),
   ],
 
   backend: [
-    user('群聊同时 @ 三个 Bot 只有第一个回复，你查一下'),
-    botWithTools('查了 `group_turns`：每条消息只排了一个 turn，`route.botIds` 只取了第一个提及。这是 #640 改问题卡流程时顺手改坏的。\n\n复现条件很窄：必须在**同一条**消息里提及 3 个及以上 Bot，两个时走的是另一条分支，所以测试没覆盖到。', ['search_issues', 'read_file']),
-    user('多久能修？顺便估一下影响面'),
+    user('Stripe 续费从昨天开始都没入账，怎么回事'),
+    botWithTools('查了：昨天 14:20 起所有 `invoice.paid` webhook 都返回 400。\n\n```text\nStripeSignatureVerificationError: No signatures found matching the expected signature for payload.\n```\n\n昨天网关升级后，body 在到达我们之前就被解析成了 JSON，再序列化时字段顺序变了，签名自然对不上。陈予已经提了 PR，用原始 body 校验。', ['search_logs', 'read_file']),
+    user('影响多少客户？修完之后漏掉的怎么补'),
     bot(`root = Stack([stats, chart, steps])
-stats = Stack([BeStat("近 7 天受影响消息", 37, "条", 0), BeStat("涉及群聊", 5, "个", 0), BeStat("预计修复", 0.5, "天", 1)], "row")
-chart = BarChart(["周一", "周二", "周三", "周四", "周五"], [{name: "多提及消息", values: [4, 9, 6, 11, 7]}, {name: "只回复一个", values: [4, 9, 6, 11, 7]}])
-steps = Steps([StepsItem("补测试", "三个提及各自一个 turn"), StepsItem("修路由", "route.botIds 保留全部提及"), StepsItem("回放", "对这 37 条消息补发给漏掉的 Bot？需要你确认")])`),
-    user('回放先别做，可能会吵到人'),
-    bot('好，不回放。只修路由和补测试，线程已经在跑：{{run:r-group-route}}。\n\n合并前我会在描述里写清楚「历史消息不补发」。'),
-    user('昨天的 E2B 429 是怎么回事'),
+stats = Stack([BeStat("受影响事件", 186, "个", 0), BeStat("涉及客户", 171, "家", 0), BeStat("待补金额", 25308, "元", 0)], "row")
+chart = BarChart(["14:00", "16:00", "18:00", "20:00", "22:00"], [{name: "invoice.paid 400", values: [12, 41, 47, 52, 34]}])
+steps = Steps([StepsItem("合并 #216", "webhook 用 raw body 校验"), StepsItem("重放", "从 Stripe 事件列表重放 186 个失败事件（#218）"), StepsItem("核对", "对比 Stripe 与账本的订阅到期日")])`),
+    user('开放平台那边米粒电商又在说 429'),
     bot(`root = Stack([tabs])
-tabs = BeTabs([{title: "现象", children: [TextContent("E2B 返回 429 后 dispatch 一直重试，线程停在「准备中」。")]}, {title: "日志", children: [BeCodeBlock("2026-10-31T14:02:11Z dispatch run=7f3c… sandbox.create 429 Too Many Requests\\n2026-10-31T14:02:41Z dispatch run=7f3c… retry 1/∞\\n2026-10-31T14:03:11Z dispatch run=7f3c… retry 2/∞", "text", "dispatch.log", [2, 3])]}, {title: "建议", children: [BeTodoList("修复计划", [{id: "a", title: "429 计入失败，最多重试 1 次", status: "in-progress"}, {id: "b", title: "失败时给出更换 Key 的卡片", status: "pending"}, {id: "c", title: "监控 429 比例", status: "pending"}], "suggestion")]}])`),
+tabs = BeTabs([{title: "现象", children: [TextContent("米粒电商每分钟导入约 300 张订单，限流是每个 token 每分钟 60 次。")]}, {title: "日志", children: [BeCodeBlock("2026-10-31T09:12:03Z 429 POST /v1/orders token=tk_mili… limit=60/min\\n2026-10-31T09:12:03Z 429 POST /v1/orders token=tk_mili… limit=60/min\\n2026-10-31T09:12:04Z 429 POST /v1/orders token=tk_mili… limit=60/min", "text", "gateway.log", [1])]}, {title: "方案", children: [BeTodoList("建议", [{id: "a", title: "批量接口单独限流：600 次/分钟", status: "in-progress"}, {id: "b", title: "提供 POST /v1/orders:batch，一次 100 条", status: "pending"}, {id: "c", title: "429 响应里带 Retry-After", status: "pending"}], "suggestion")]}])`),
+    user('先做 a 和 c'),
+    bot('好，PR #214 先改成按路由分级限流，并在 429 里返回 `Retry-After`。`orders:batch` 放到下个迭代。'),
   ],
 
-  daemon: [
-    user('daemon 的 CI 又红了，还是 sandbox verify 超时吗'),
-    botWithTools('是。最近 20 次 main 构建失败 4 次，全部是 `daemon/sandbox.verify.test.ts`。本地 `--repeat 50` 能稳定复现：verify 在 `git config` 写完之前就读了配置。', ['list_runs', 'read_file', 'run_command']),
+  ops: [
+    user('月度报表这两天特别慢，客户在群里抱怨'),
+    botWithTools('`/api/reports/monthly` 的 P95 从 1.2s 涨到了 8s。慢查询日志：\n\n```sql\nSELECT date_trunc(\'day\', created_at), sum(amount)\nFROM transactions\nWHERE account_id = $1 AND created_at >= $2 AND created_at < $3\nGROUP BY 1;\n-- Seq Scan on transactions  (rows=2104331)  7612 ms\n```\n\n`transactions` 上没有 `(account_id, created_at)` 的复合索引。上周数据量过了 200 万行，开始全表扫描。线程已经在 staging 上加索引对比：{{run:r-slow-report}}', ['query_metrics', 'read_slow_log']),
     bot(`root = Stack([line, collapse])
-line = LineChart(["10/25", "10/26", "10/27", "10/28", "10/29", "10/30", "10/31"], [{name: "失败率", values: [0, 5, 10, 15, 20, 20, 25]}], "%")
-collapse = BeCollapsible("失败用例明细", [BeTable(["构建", "用例", "耗时"], [["#4412", "verify > rejects dirty tree", "30.0s 超时"], ["#4418", "verify > rejects dirty tree", "30.0s 超时"], ["#4431", "verify > accepts clean tree", "30.0s 超时"], ["#4440", "verify > rejects dirty tree", "30.0s 超时"]])], false)`),
-    user('修复方案给我看一下'),
+line = LineChart(["10/25", "10/26", "10/27", "10/28", "10/29", "10/30", "10/31"], [{name: "P95 (秒)", values: [1.2, 1.3, 1.8, 3.4, 5.9, 7.6, 8.1]}], "s")
+collapse = BeCollapsible("最慢的 4 条查询", [BeTable(["查询", "次数/小时", "平均耗时"], [["monthly report aggregate", "1,240", "7.6s"], ["invoice list by account", "3,980", "820ms"], ["export csv", "96", "2.1s"], ["dashboard summary", "8,410", "140ms"]])], false)`),
+    user('索引怎么加，会锁表吗'),
     bot(`root = Stack([tree, diff, approve])
-tree = BeFileTree(["daemon/src/sandbox/verify.ts", "daemon/src/sandbox/git-config.ts", "daemon/test/sandbox.verify.test.ts"])
-diff = BeFileDiff("daemon/src/sandbox/verify.ts", "-  void writeGitConfig(dir, identity)\\n+  await writeGitConfig(dir, identity)\\n   const status = await git(dir, ['status', '--porcelain'])", "tsx")
-approve = BeApproval("合并 #61 到 main？", "改动只有一行 await，外加把测试里的固定 sleep 去掉。", "mikka-demo/daemon#61")`),
-    user('可以，合吧'),
-    bot('已提交合并请求，等 CI 跑完会自动合。线程在这里：{{run:r-flaky-daemon}}'),
+tree = BeFileTree(["db/migrations/20261031_transactions_account_created_idx.sql", "src/reports/monthly.ts", "test/reports/monthly.test.ts"])
+diff = BeFileDiff("db/migrations/20261031_transactions_account_created_idx.sql", "+CREATE INDEX CONCURRENTLY IF NOT EXISTS transactions_account_created_idx\\n+  ON transactions (account_id, created_at);", "diff")
+approve = BeApproval("今晚 22:00 在生产执行？", "CONCURRENTLY 不锁写，预计 6 分钟；staging 上 P95 降到 0.9s。", "qingning-tech/ledger-api#217")`),
+    user('Sentry 昨晚那个 amount 报错呢'),
+    bot('`TypeError: Cannot read properties of undefined (reading \'amount\')`，昨晚 21:00 起每小时 200+ 次，全部来自没有任何收支记录的新账户：账单详情页默认取了 `transactions[0].amount`。\n\n已经建了任务 {{issue:i-sentry-spike}}，分给刘洋。修法是空列表时显示空状态，一行改动。'),
   ],
 
-  qa: [
-    user('今天的回归巡检结果？'),
+  data: [
+    user('10 月的经营数据出来了吗'),
     bot(`root = Stack([alert, donut, radial, list])
-alert = BeAlert("2 个失败", "登录死循环仍可复现；iOS 冷启动白屏 2 秒。", "destructive")
-donut = DonutChart([{name: "通过", value: 46, status: "success"}, {name: "失败", value: 2, status: "destructive"}, {name: "跳过", value: 3, status: "neutral"}], "个", "用例")
-radial = RadialChart("本月 E2E 时长额度", 312, 500, "分钟")
-list = BeTodoList("待跟进", [{id: "1", title: "登录死循环：等 handoff 修复", status: "pending", detail: "APP 任务，紧急"}, {id: "2", title: "冷启动白屏：已有线程在跑", status: "in-progress", progress: 40}, {id: "3", title: "离线横幅：无法稳定复现", status: "cancelled"}])`),
-    user('登录死循环那个能给我复现步骤吗'),
-    bot('复现步骤（桌面版 0.9.4，macOS 26.1）：\n\n1. 退出登录。\n2. 点「用浏览器登录」。\n3. 在浏览器授权页点**拒绝**。\n4. 回到桌面端：登录页闪一下又打开浏览器，无限循环。\n\n关键日志：\n\n```text\n[auth] handoff refused state=9c1e…\n[auth] no session, starting handoff\n[auth] handoff refused state=a42b…\n```\n\n任务：{{issue:i-signin-loop}}。失败的那次线程：{{run:r-signin-loop}}。'),
-    user('哪些页面最近改动最大，巡检要加重'),
-    bot(`root = Stack([area, cards])
-area = AreaChart(["第 41 周", "第 42 周", "第 43 周", "第 44 周"], [{name: "看板", values: [3, 8, 12, 9]}, {name: "聊天", values: [6, 7, 15, 18]}, {name: "设置", values: [2, 4, 3, 6]}], "个 PR")
-cards = BeCard("建议加重", [TextContent("聊天（OpenUI 卡片、引用、图片）和看板（R-25 卡片）。设置页改动小，保持冒烟即可。"), Separator(), Stack([Tag("聊天", null, "sm", "neutral"), Tag("看板", null, "sm", "neutral")], "row", "xs")], "按最近四周合入的 PR 数")`),
+alert = BeAlert("付费转化率下降", "10 月试用转付费 11.2%，比 9 月低 2.4 个点。主要发生在 Safari 白屏那两天。", "warning")
+donut = DonutChart([{name: "基础版", value: 412}, {name: "专业版", value: 238}, {name: "团队版", value: 61}], "家", "付费客户")
+radial = RadialChart("10 月 MRR 目标", 186000, 200000, "元")
+list = BeTodoList("建议跟进", [{id: "1", title: "给白屏期间流失的试用用户发补偿邮件", status: "pending", detail: "约 140 人"}, {id: "2", title: "专业版定价页 A/B 测试", status: "in-progress", progress: 60}, {id: "3", title: "团队版年付折扣", status: "cancelled"}])`),
+    user('哪些功能用得最多'),
+    bot(`root = Stack([area, card])
+area = AreaChart(["第 41 周", "第 42 周", "第 43 周", "第 44 周"], [{name: "记账", values: [52100, 53800, 55200, 54900]}, {name: "开发票", values: [8200, 8900, 9600, 11800]}, {name: "导出报表", values: [3100, 3300, 3500, 3700]}], "次")
+card = BeCard("观察", [TextContent("开发票增长最快，第 44 周环比 +23%，和发票模板灰度时间吻合。导出报表平稳。"), Separator(), Stack([Tag("发票模板", null, "sm", "success"), Tag("需关注：导出报表慢", null, "sm", "warning")], "row")], "数据来自产品埋点，按周统计")`),
+    user('把重复扣费的客户名单拉一下'),
+    bot('10 月因 Stripe webhook 重放导致重复扣费的客户共 **3 家**：禾木咖啡、北岸花艺、小满烘焙，合计 597 元。退款单已经准备好，等你确认后由客服助手发邮件说明。'),
   ],
 
   release: [
-    user('这周五能发桌面 0.9.5 吗'),
+    user('v2.4 周五能发吗'),
     bot(`root = Stack([intro, questions])
-intro = TextContent("发版前有两个阻塞和一个待定项，需要你先定几件事。")
-questions = BeQuestions("0.9.5 发版准备", [{id: "scope", title: "登录死循环没修完，要不要等？", options: [{value: "wait", label: "等修复再发", description: "可能推迟到下周二"}, {value: "ship", label: "照常发，下个版本修"}]}, {id: "channels", title: "发布渠道", options: [{value: "stable", label: "Stable"}, {value: "beta", label: "Beta"}], multiple: true}, {id: "rollout", title: "首日灰度比例", input: "slider", range: {min: 5, max: 100, step: 5, unit: "%"}}, {id: "notes", title: "发版说明额外要写的", allowCustom: true}])`),
-    user('等修复再发，只发 Beta，灰度 20%'),
+intro = TextContent("还有两个阻塞、一个待定项，需要你先定几件事。")
+questions = BeQuestions("v2.4 发版", [{id: "ios", title: "iOS 16 冷启动崩溃还没修完，iOS 端要不要等？", options: [{value: "wait", label: "等修复一起发", description: "可能推到下周二"}, {value: "web-first", label: "Web 先发，iOS 下周"}]}, {id: "channels", title: "发布渠道", options: [{value: "web", label: "Web"}, {value: "ios", label: "App Store"}, {value: "android", label: "应用宝"}], multiple: true}, {id: "rollout", title: "iOS 首日灰度比例", input: "slider", range: {min: 5, max: 100, step: 5, unit: "%"}}, {id: "notes", title: "发版说明还要补充的", allowCustom: true}])`),
+    user('Web 先发，iOS 下周；灰度 20%'),
     bot(`root = Stack([timeline, form])
-timeline = Steps([StepsItem("周三", "登录死循环修复合入"), StepsItem("周四", "Beta 构建、签名、公证"), StepsItem("周五 10:00", "Beta 20% 灰度"), StepsItem("下周一", "看崩溃率决定是否全量")])
-form = Form("release-checklist", Buttons([Button("确认这份清单", Action([@ToAssistant("确认 0.9.5 Beta 发版清单")]), "primary")]), [FormControl("发版检查项", EditableTable("checklist", [{type: "text", key: "item", header: "检查项"}, {type: "text", key: "owner", header: "负责人"}], [{id: "1", values: ["SBOM 跳过未安装的可选包"]}, {id: "2", values: ["macOS 26 图标全尺寸"]}, {id: "3", values: ["自动更新回滚演练"]}]))])`),
-    user('发版说明先写个草稿'),
-    bot('草稿已经写成 Artifact，你可以直接在里面圈改：[[artifact:{{artifact:a-release-notes}}]]\n\n要点：\n\n- 修复：拒绝浏览器授权后登录页循环\n- 修复：半透明窗口下对话框背后的模糊\n- 改进：后台下载更新，头像上方出现「重启以更新」'),
+timeline = Steps([StepsItem("周三", "冻结 main，打 v2.4.0-rc.1"), StepsItem("周四", "staging 回归、数据迁移演练"), StepsItem("周五 10:00", "Web 发布，迁移在低峰执行"), StepsItem("下周一", "看 Sentry 和工单量，决定 iOS 时间")])
+form = Form("release-checklist", Buttons([Button("确认这份清单", Action([@ToAssistant("确认 v2.4 发版清单")]), "primary")]), [FormControl("发版检查项", EditableTable("checklist", [{type: "text", key: "item", header: "检查项"}, {type: "text", key: "owner", header: "负责人"}], [{id: "1", values: ["多币种迁移在生产快照上演练", "陈予"]}, {id: "2", values: ["Stripe webhook 修复已上线", "陈予"]}, {id: "3", values: ["回滚方案和开关", "Alex"]}]))])`),
+    user('发版说明写个草稿'),
+    bot('草稿在这里，可以直接在里面改：[[artifact:{{artifact:a-release-notes}}]]\n\n要点：\n\n- 多币种账户\n- 发票模板\n- iOS 桌面小组件（随 iOS 版本下周发）\n- 修复 CSV 乱码、支付宝状态不同步'),
   ],
 
-  mobile: [
-    user('TestFlight 冷启动白屏的线程现在什么状态'),
+  ios: [
+    user('iOS 16 闪退那个线程现在什么情况'),
     bot(`root = Stack([computer, note])
-computer = ComputerCard("{{bot:mobile}}", "{{run:r-testflight}}", "在模拟器里冷启动 20 次，记录首帧时间，并对比改动前后。", "approval", "iOS 客户端", "TestFlight 冷启动白屏")
-note = InlineText(["线程 ", RunChip("{{run:r-testflight}}"), " 在等你确认：要不要把 SecureStore 的读取挪到首帧之后。"])`),
-    user('挪吧，但登录态要先读'),
-    bot('明白：先读登录 token（一个 key），其他偏好在首帧后补。我已经把这句话转给线程。\n\n首帧时间对比（模拟器，20 次中位数）：\n\n| | 改动前 | 改动后 |\n|---|---|---|\n| 冷启动首帧 | 2.1s | 0.6s |\n| 热启动首帧 | 0.4s | 0.3s |'),
-    user('冷启动回归要覆盖哪几台测试机？'),
+computer = ComputerCard("{{bot:ios}}", "{{run:r-ios-crash}}", "在 iOS 16.4 模拟器上冷启动 10 次，抓崩溃日志。", "approval", "iOS 助手", "iOS 16 冷启动崩溃")
+note = InlineText(["线程 ", RunChip("{{run:r-ios-crash}}"), " 在等你确认：要不要把 Keychain 读取挪到 didFinishLaunching 之后。"])`),
+    user('挪吧，但登录态要先读出来'),
+    bot('明白：登录 token 在 `application(_:didFinishLaunchingWithOptions:)` 里同步读，其余偏好设置延后到首帧之后。已经转给线程。\n\n```swift\n// AppDelegate.swift\nfunc application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: ...) -> Bool {\n    Session.shared.restoreToken()          // 只读这一项\n    DispatchQueue.main.async { Preferences.shared.load() }\n    return true\n}\n```'),
+    user('回归要覆盖哪几台机器'),
     bot(`root = Stack([grid, image, buttons])
-grid = BeCardGrid([BeImageCard("iPhone 13", "iPhone 13", "主力机型，冷启动基线在这台上量。", ["基线"]), BeImageCard("iPhone SE", "iPhone SE 2020", "小屏和老芯片，白屏最明显。", ["小屏", "A13"]), BeImageCard("iPad Air", "iPad Air 2020", "确认分栏布局下首帧也正常。", ["平板"])])
-image = BeImage("MacBook Pro 2021", "跑模拟器的 MacBook Pro", "公共图库示意图")
-buttons = Stack([BeButton("继续细化", "把三台测试机的首帧时间做成表格", "primary"), BeButton("直接提问", "iPhone SE 上还需要测热启动吗？", "outline")], "row")`),
+grid = BeCardGrid([BeImageCard("iPhone 13", "iPhone 13", "主力机型，iOS 17.6。", ["基线"]), BeImageCard("iPhone SE", "iPhone SE 2020", "iOS 16.7，这次崩溃的机型。", ["iOS 16", "小屏"]), BeImageCard("iPad Air", "iPad Air 2020", "确认分栏布局和小组件。", ["平板"])])
+image = BeImage("MacBook Pro 2021", "跑模拟器和 Instruments 的 MacBook Pro", "公共图库示意图")
+buttons = Stack([BeButton("继续细化", "把三台机器的冷启动时间整理成表格", "primary"), BeButton("直接提问", "iOS 15 还需要支持吗？", "outline")], "row")`),
+    user('iPhone SE 那台在一鸣那里，让他明早测'),
+    bot('好，已经在线程里@赵一鸣，明早 10 点前给结果。'),
   ],
 
-  docs: [
-    user('R-40 文案规则能给新人讲清楚吗？'),
-    bot(`root = BeResponse([TextContent("R-40：界面上没有填充语。"), BeCard("三条判断", [TextContent("1. 删掉这句，屏幕还在说同一件事 → 删。"), TextContent("2. 对话框和弹层没有副标题。"), TextContent("3. 安心感用标记表达（🔒 Secured by Mikka），不用句子。")], "评审时逐条过"), BeCitations([{title: "docs/design/rules.md", url: "https://github.com/mikka-demo/web/blob/main/docs/design/rules.md"}, {title: "docs/review-checklist.md", url: "https://github.com/mikka-demo/web/blob/main/docs/review-checklist.md"}])])`),
-    user('给几个反例'),
+  support: [
+    user('禾木咖啡投诉这个月被扣了两次会员费，帮我起草回复'),
+    bot(`root = BeResponse([TextContent("回复草稿："), BeCard("给禾木咖啡张老板", [TextContent("张老板您好，非常抱歉给您带来困扰。10 月 30 日我们的支付回调出现故障，系统在恢复时重复扣了一次专业版月费 199 元。"), TextContent("我们已经发起全额退款，预计 3–5 个工作日原路退回，同时为您的账户延长一个月专业版作为补偿。"), TextContent("如有任何问题，直接回复这封邮件即可。——青柠账本客服 孙婷")], "可以直接发送，或改完再发"), BeCitations([{title: "Stripe 退款记录 re_3Q8…", url: "https://dashboard.stripe.com/test/refunds"}, {title: "故障说明：Stripe webhook 签名校验失败", url: "https://status.qingning-tech.example/incidents/2026-10-30"}])])`),
+    user('最近客户问得最多的是哪些'),
     bot(`root = Stack([icon, table])
-icon = AgentIcon("source", "反例来自最近被打回的 PR")
-table = BeTable(["原文案", "问题", "改成"], [["正在为你加载数据，请稍候…", "状态行只写状态", "加载中"], ["别担心，你的数据很安全", "安心感用标记", "🔒 Secured by Mikka"], ["在这里你可以管理所有成员", "删掉后意思不变", "（删除）"]])`),
-    user('把这三条加进评审清单'),
-    bot('已经加进 `docs/review-checklist.md` 的「文案」一节，并标注了出处 R-40。下次评审我会按这三条过一遍。'),
+icon = AgentIcon("source", "最近 7 天 142 张工单")
+table = BeTable(["问题", "工单数", "建议回复"], [["导出 CSV 乱码", "38", "下个版本修复；临时用 WPS 打开"], ["Mac 登录页空白", "27", "已修复，请刷新或清缓存"], ["重复扣费", "3", "已退款并补偿一个月"], ["如何开发票", "21", "设置 › 发票模板"]])`),
+    user('乱码那个给个统一回复模板'),
+    bot('**模板：导出 CSV 中文乱码**\n\n> 您好，感谢反馈！这是 Windows 版 Excel 的编码兼容问题，我们会在下个版本（预计本周五）修复。在此之前，您可以：\n>\n> 1. 用 WPS 或 Numbers 打开；或\n> 2. 在 Excel 中选择「数据 › 从文本/CSV」，编码选 UTF-8。\n\n已存到客服知识库，标签「导出」。'),
   ],
 }
 
-/** The group chat: humans and bots talking about the Friday release. */
+/** The group chat: people and bots talking about Friday's release. */
 export const GROUP = {
   key: 'g-release',
-  title: '0.9.5 发版群',
-  bots: ['release', 'frontend', 'backend', 'qa'],
-  people: ['lin', 'zhou'],
+  title: 'v2.4 发版群',
+  bots: ['release', 'frontend', 'backend', 'support'],
+  people: ['zhou', 'chen', 'liu'],
   messages: [
-    { by: 'me', body: '周五发 0.9.5 Beta，大家同步一下各自的阻塞', mentions: [] },
-    { by: 'bot:release', body: '目前两个阻塞：登录死循环（APP，紧急）和流式中断不记账。前者由 林晓 跟，后者在评审。' },
-    { by: 'lin', body: '登录死循环我今天下午能提 PR，handoff 拒绝分支已经定位到了' },
-    { by: 'me', body: '@QA 巡检 @Mikka Frontend 修完之后各自回归一遍', mentions: ['bot:qa', 'bot:frontend'] },
-    { by: 'bot:qa', body: '收到。合入后我跑一遍桌面登录相关的 6 个用例，结果发群里。' },
-    { by: 'bot:frontend', body: '收到。我这边看板滚动条的 PR 也会在周四前合，不会影响发版。' },
-    { by: 'zhou', body: '计费那个我再看一眼，迁移顺序没问题的话今晚就合' },
-    { by: 'bot:backend', body: '迁移时间戳我核对过，排在 main 最新一条之后，可以合。' },
+    { by: 'zhou', body: '周五 v2.4 Web 先上，iOS 下周。大家同步一下还剩什么' },
+    { by: 'bot:release', body: '阻塞两个：Stripe webhook 修复（#216 待评审）、多币种迁移的回滚开关。iOS 冷启动崩溃不影响 Web 发版。' },
+    { by: 'chen', body: '#216 今天下午能合，合完我把昨天失败的 186 个事件重放掉' },
+    { by: 'me', body: '@前端助手 @客服助手 CSV 乱码那个修复也跟这次一起发，客服那边准备好说明', mentions: ['bot:frontend', 'bot:support'] },
+    { by: 'bot:frontend', body: '收到，#485 已在评审，周四前合。' },
+    { by: 'bot:support', body: '收到。已准备好回复模板，发版后给 38 位反馈过的客户群发通知。' },
+    { by: 'liu', body: '回归用例我周四上午在 staging 跑一遍，结果发群里' },
+    { by: 'bot:backend', body: '迁移脚本在生产快照上演练了两次，都在 4 分钟内完成，回滚开关已加。' },
   ],
 }

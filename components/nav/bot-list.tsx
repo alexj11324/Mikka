@@ -2,7 +2,6 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
 import { PanelLeft, Plus, Users } from 'lucide-react'
 import { botChatSummaries, getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
@@ -18,7 +17,6 @@ import { WorkspaceMenu } from '@/components/workspace-menu'
 import { cn } from '@/lib/utils'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
-import { SPRING_SIDEBAR } from '@/lib/ease'
 import { chatPreview } from '@/lib/agent-history'
 import { fetchGroups } from '@/lib/group-messages'
 import { namedCitations } from '@/lib/coordinator/citations'
@@ -135,7 +133,7 @@ export function BotList({ bots, workspaceId, threads, issues, active, onOpen, on
   }
   const unread = useUnread(activeId, latest)
   const resize = useResizableWidth(LIST_WIDTH)
-  const { width, dragging, instant, endedDrag } = resize
+  const { width, dragging, endedDrag } = resize
   const foldTimer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(foldTimer.current), [])
   // Enter or a click folds the list; a double-click resets its width instead.
@@ -190,11 +188,10 @@ export function BotList({ bots, workspaceId, threads, issues, active, onOpen, on
   </>
   if (isMobile) return <Sidebar collapsible="offcanvas" mobileTitle={i18nText('Nav.sidebarTitle')} mobileDescription={i18nText('Nav.sidebarDescription')} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>
   // On desktop the list is the first column inside the card; it folds to nothing and the rail stays.
-  // R-37: the width moves on a spring; MotionConfig at the root turns it off for reduced motion.
-  // While dragging the edge the width follows the pointer with no spring.
-  return <motion.div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} initial={false} animate={{ width: open ? width : 0 }} transition={instant ? { duration: 0 } : SPRING_SIDEBAR} className={cn('relative hidden shrink-0 overflow-hidden md:block', open ? 'border-r' : 'border-r-0', dragging && 'select-none')}>
+  // R-37: folding and unfolding are instant, no motion (decision 2026-11-01-2320); dragging the edge follows the pointer.
+  return <div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} className={cn('relative hidden shrink-0 overflow-hidden md:block', open ? 'w-(--bot-list-width) border-r' : 'w-0 border-r-0', dragging && 'select-none')}>
     <Sidebar collapsible="none" className="w-[var(--bot-list-width,16rem)] bg-transparent">{body}</Sidebar>
     {/* Comma's edge strip with a hairline on hover: drag it or use the arrow keys to resize the list, double-click it to reset, click it to fold the list. */}
     <ResizeHandle resize={resize} label={i18nText('Nav.resizeList')} title={i18nText('Nav.collapseList')} edge="end" onClick={onEdgeClick} />
-  </motion.div>
+  </div>
 }

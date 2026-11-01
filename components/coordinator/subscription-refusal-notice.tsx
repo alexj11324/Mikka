@@ -7,6 +7,7 @@ import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
 import { settingsHref } from '@/lib/settings-sections'
+import { COMPOSER_NOTICE } from './composer-notice'
 import type { SubscriptionRefusalNotice as Notice } from '@/lib/subscription-refusal'
 
 /**
@@ -16,10 +17,10 @@ import type { SubscriptionRefusalNotice as Notice } from '@/lib/subscription-ref
  */
 export function SubscriptionRefusalNotice({ notice, retry }: { notice: Notice; retry?: ReactNode }) {
   const t = useTranslations('Coordinator.subscriptionRefusal')
-  return <Alert data-subscription-refusal={notice} role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 pr-1.5">
+  return <Alert data-subscription-refusal={notice} role="status" className={COMPOSER_NOTICE}>
     <Info aria-hidden="true" className="shrink-0" />
-    <AlertTitle className="min-w-0 flex-1 basis-48 font-normal">{t(notice)}</AlertTitle>
-    <span className="ml-auto flex shrink-0 items-center gap-1">
+    <AlertTitle className="min-w-0 flex-1 basis-48">{t(notice)}</AlertTitle>
+    <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
       {retry}
       {notice !== 'retry' && <Button size="sm" nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>{t('open')}</Button>}
     </span>
