@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-step local setup for a cloud Linux session (docs/local-bootstrap.md):
-# PostgreSQL 17 on 127.0.0.1:5433 with mikka_e2e migrated (PGDG, no Docker), Node as in .node-version,
+# PostgreSQL 17 on 127.0.0.1:5432 with mikka_e2e migrated (PGDG, no Docker), Node as in .node-version,
 # pnpm install --frozen-lockfile, bubblewrap/socat/ripgrep, and Playwright on
 # the container's own Chromium. Idempotent: a second run only checks.
 # Prints one line of exports for the session; it holds no secret.
@@ -9,7 +9,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 STATE="${MIKKA_DEV_HOME:-/var/lib/mikka-dev}"
 PGDATA_DIR="${MIKKA_PGDATA:-$STATE/pg17}"
-PG_PORT="${MIKKA_PG_PORT:-5433}"
+# 5432: the port the DB suites and test-account helpers assume.
+PG_PORT="${MIKKA_PG_PORT:-5432}"
 PG_BIN=/usr/lib/postgresql/17/bin
 # The Node version CI uses: .node-version (a major like 24, or an exact 24.22.2), else 24.
 NODE_WANT="$(tr -d ' v\n\r' < "$ROOT/.node-version" 2>/dev/null || true)"; NODE_WANT="${NODE_WANT:-24}"
@@ -45,7 +46,15 @@ if [ ! -s "$PGDATA_DIR/PG_VERSION" ]; then
   # Loopback only, trust auth: a disposable test database with no password to print.
   as_pg "'$PG_BIN/initdb' -D '$PGDATA_DIR' -U postgres --auth=trust >/dev/null"
 fi
+# Already running on another port (an earlier default): restart it on this one.
+if as_pg "'$PG_BIN/pg_ctl' -D '$PGDATA_DIR' status" >/dev/null 2>&1 && [ "$(sed -n 4p "$PGDATA_DIR/postmaster.pid")" != "$PG_PORT" ]; then
+  log "moving PostgreSQL 17 to port $PG_PORT"
+  as_pg "'$PG_BIN/pg_ctl' -D '$PGDATA_DIR' -w -m fast stop" >/dev/null
+fi
 if ! as_pg "'$PG_BIN/pg_ctl' -D '$PGDATA_DIR' status" >/dev/null 2>&1; then
+  if (exec 3<>"/dev/tcp/127.0.0.1/$PG_PORT") 2>/dev/null; then
+    log "127.0.0.1:$PG_PORT is taken by another server; stop it (or set MIKKA_PG_PORT) and run again"; exit 1
+  fi
   log "starting PostgreSQL 17 on 127.0.0.1:$PG_PORT"
   as_pg "'$PG_BIN/pg_ctl' -D '$PGDATA_DIR' -l '$PGDATA_DIR/server.log' -w -o \"-h 127.0.0.1 -p $PG_PORT -k /tmp\" start" >/dev/null
 fi
