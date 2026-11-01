@@ -50,7 +50,17 @@ and creates that computer's repository record automatically.
 
 Repository policy is keyed by `(userId, remoteKey)` in `repository_settings`.
 `verifyCommand`, `setup`, `networkAllow` and `push` start empty; no legacy
-machine approval is carried over implicitly. Local sandbox writes include
+machine approval is carried over implicitly. The signed-in owner configures
+`verifyCommand` in Plugins → GitHub → authorized repositories. Saving an empty
+command disables verification, including an older cloud repository command.
+URL-backed local and cloud claims use the same owner setting; existing cloud
+workspace commands remain applicable when no repository settings row exists.
+The daemon runs the command after submission. Without it, the result stays
+unverified and publication remains a draft PR, even when GitHub CI passed.
+The command editor follows the repository/project command setting used by
+[Vercel Build Command](https://vercel.com/docs/builds/configure-a-build#build-command),
+inside Mikka's existing authorized-repository dialog.
+Local sandbox writes include
 the run's Git administration, its branch ref and shared object store.
 Indirection files and repository configuration stay read-only. Daemon Git
 commands pin both the worktree Git directory and common Git directory.
@@ -70,8 +80,8 @@ enables `mock` and `file://` only with `NODE_ENV=test`, `CI=true`,
 do not set `CI=true` for a local server. `VERCEL_ENV=production` always
 disables them. Production
 deployments must not set this test switch. Vitest sets it for its disposable
-Git fixtures; the Preview E2E job must set it explicitly on both server and
-daemon. A production Next build alone does not enable test behavior.
+Git fixtures; the local acceptance harness (`pnpm test:local-loop`) sets it
+on both server and daemon. A production Next build alone does not enable test behavior.
 
 The daemon integration tests use the existing `mikka daemon login --token`
 path, an in-memory transport, a real daemon and temporary bare Git origins.
@@ -124,8 +134,8 @@ What is fake and what is real:
 | GitHub identity | Synthetic: every local account is linked to GitHub account `4242`, which the fake lets write |
 | Model, a workspace's own key (Settings › API 与订阅) | Real. Saving it needs `WORKSPACE_SECRETS_KEY`; without one, dev:local creates a random local key in `.cache/dev-local/workspace-secrets-key` (git-ignored, mode 0600) and reuses it, so saved keys still open after a restart |
 | The DeepSeek key, added automatically | `DEEPSEEK_API_KEY` comes from the environment or the named Infisical `dev:/vercel` secret. Use the configured `INFISICAL_PROJECT_ID` (or `MIKKA_DEV_INFISICAL_PROJECT`) with an existing `INFISICAL_TOKEN` or Universal Auth identity. The managed HTTP proxy is preserved. Setup runs immediately, then reconciles every 5 seconds; existing keys are reused, new Bots and workspaces receive the Flash choice, and individual failures back off from 30 seconds to 5 minutes. The key stays in process memory and sealed application storage. Missing Flash models never fall back to another real model. Without the key, the scripted substitute below remains available for development; real-model acceptance requires the key. |
-| Mikka 默认 and the Coordinator through the [AI Gateway](https://vercel.com/docs/ai-gateway) | Real with a real `AI_GATEWAY_API_KEY`; otherwise a scripted model: it echoes (`Local model: <text>`), a message `/tool <name> <json>` calls that registered tool for real, and a tool result comes back as JSON |
-| Decisions (AI Gateway Decision API: triage, run outcome, push) | Real with a real `AI_GATEWAY_API_KEY`; otherwise the first choice of each question, `0.5` for a predicate |
+| Mikka 默认 through the [AI Gateway](https://vercel.com/docs/ai-gateway) | Not used locally: local runs set no `AI_GATEWAY_API_KEY`, and the Coordinator and Bots use DS 4.1 Flash through the DeepSeek key (below). Without a key, a scripted model: it echoes (`Local model: <text>`), a message `/tool <name> <json>` calls that registered tool for real, and a tool result comes back as JSON |
+| Decisions (AI Gateway Decision API: triage, run outcome, push) | Local runs set no `AI_GATEWAY_API_KEY`, so the first choice of each question, `0.5` for a predicate |
 | Card verification and credit for Mikka 默认 (Stripe) | Every local workspace gets a verification and a $1000 local allowance, checked every 5 seconds |
 | Verification and password-reset mail ([Resend](https://resend.com/docs/api-reference/emails/send-email)) | Real with a real `RESEND_API_KEY`; otherwise a local outbox at `http://127.0.0.1:3191/mail` (JSON at `/mail.json`), one terminal line per mail |
 | Cron (the production minute Worker, `cloudflare/suggestions-cron`) | `scripts/dev-local/cron.mjs` calls the same `/api/cron/*` endpoints on the same schedule against `next dev`, with `CRON_SECRET` or a local placeholder ([securing cron jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs)) |

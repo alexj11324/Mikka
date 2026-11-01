@@ -1934,6 +1934,11 @@
       "githubRepositoryAccess": "仓库访问",
       "githubRepositoriesDialog": "已授权的仓库",
       "githubRepositorySearch": "搜索仓库",
+      "githubVerification": "验证命令",
+      "githubVerificationFor": "{repository} 的验证命令",
+      "githubVerificationLoadFailed": "验证命令无法加载",
+      "githubVerificationSaveUnconfirmed": "保存未确认，修改已保留",
+      "githubVerificationSaved": "验证命令已保存",
       "githubAbilitiesHeading": "能力",
       "githubAbilitiesSummary": "包含 {count} 个能力（{write} 个写入，{read} 个读取）",
       "githubPermission": {
@@ -2305,7 +2310,6 @@
     },
     "subscriptionShare": {
       "heading": "这个工作区",
-      "share": "在这里使用我的订阅",
       "blocked": "管理员已关闭",
       "others": "分享给团队成员",
       "othersTitle": "分享 {name} 给团队成员？",
@@ -3213,6 +3217,10 @@
       "worktree": "创建工作区",
       "agent_start": "启动 agent",
       "duration": "{seconds}s"
+    },
+    "runInfo": {
+      "paidBy": "{owner} 的 {plan}",
+      "movedTo": "已换到 {machine} 继续"
     }
   },
   "Computer": {
@@ -3430,6 +3438,7 @@
       "offline": "离线",
       "online": "在线",
       "cloud": "Mikka Cloud",
+      "addE2BKey": "填入 E2B Key",
       "contextProject": "项目：{project}",
       "contextSeparator": "，",
       "prompt": "帮我新建一个任务：{text}",
@@ -3705,6 +3714,11 @@
     "failed": "连接失败",
     "enterAgain": "重新输入",
     "retry": "重试"
+  },
+  "Reactions": {
+    "list": "表情回应",
+    "others": "{emoji}：{count} 人",
+    "mine": "{emoji}：{others, plural, =0 {你} other {你和另外 # 人}}"
   },
   "GroupChat": {
     "untitled": "未命名群聊",

@@ -93,11 +93,14 @@ export function OutgoingBubble({ text, photos, failed, onRetry }: { text: string
 }
 
 /** A thread card: status icon and name, outputs as chips; no step line (R-66). Opens the thread's page. */
-export function ThreadCard({ title, status, onPress }: { title: string; status: ThreadStatus; onPress: () => void }) {
+export function ThreadCard({ title, status, info, onPress }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.threadCard, pressed && { backgroundColor: colors.pressed }]}>
       <StatusIcon status={status} size={20} />
-      <Text style={styles.threadTitle} numberOfLines={1}>{title}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.threadTitle} numberOfLines={1}>{title}</Text>
+        {info ? <Text style={styles.threadInfo} numberOfLines={1}>{info}</Text> : null}
+      </View>
     </Pressable>
   )
 }
@@ -218,8 +221,9 @@ const styles = StyleSheet.create({
   outgoing: { alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '78%', gap: 4 },
   retryRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   retry: { fontSize: 12, color: colors.danger },
-  threadCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.bubble, borderRadius: 18, paddingHorizontal: 16, height: 52 },
-  threadTitle: { flex: 1, fontSize: 16, fontWeight: '500' },
+  threadCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.bubble, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 8, minHeight: 52 },
+  threadTitle: { fontSize: 16, fontWeight: '500' },
+  threadInfo: { fontSize: 12, lineHeight: 16, color: colors.secondary },
   event: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 17, color: colors.secondary, marginHorizontal: 24 },
   time: { position: 'absolute', right: -REVEAL + 6, bottom: 4, fontSize: 11, color: colors.tertiary },
   quoteArrow: { position: 'absolute', left: 4, top: 0, bottom: 0, justifyContent: 'center' },

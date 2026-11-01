@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useId } from 'react'
 import { useTranslations } from 'next-intl'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { ChevronRight, Laptop, Paperclip } from 'lucide-react'
+import { ChevronRight, KeyRound, Laptop, Paperclip } from 'lucide-react'
 import { listDevices } from '@/app/actions/agents'
 import { listBots } from '@/app/actions/bots'
 import { issueCreationAvailable } from '@/app/actions/coordinator'
@@ -20,22 +20,30 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { Textarea } from '@/components/ui/textarea'
 import { DeviceIcon } from '@/components/devices/device-icon'
 import { useComputer } from '@/hooks/use-computer'
+import { cn } from '@/lib/utils'
+import { defaultMachine, machineDot, type PickerMachine } from '@/lib/machine-picker'
+import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
+import { usePresence } from '@/lib/use-presence'
 
 const MAX_LENGTH = 8000
 
-type Machine = { value: string; label: string; cloud?: boolean; online?: boolean }
+type Machine = PickerMachine & { label: string }
 
-/** A machine's icon with its state dot. Mikka Cloud stays green asleep, since picking it wakes it; red only when it failed (the workspace has one, so any bot's computer reports it). */
+/** A machine's icon with its state dot (`machineDot`), and the state in words for screen readers. */
 function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
   const t = useTranslations('Shell.newTaskDialog')
   const tStatus = useTranslations('Computer.status')
-  const { data: state } = useComputer(machine.cloud ? cloudBotId : null)
-  if (machine.cloud) return <DeviceIcon kind="cloud" state={state?.machine === 'error' ? 'error' : 'online'} label={state ? tStatus(state.machine === 'error' ? 'failed' : state.machine) : t('cloud')} />
-  return <DeviceIcon kind="personal" state={machine.online ? 'online' : 'offline'} label={machine.online ? t('online') : t('offline')} />
+  const e2b = useTranslations('Settings.secrets.e2b')
+  const { data: state } = useComputer(machine.cloud && machine.usable ? cloudBotId : null)
+  const dot = machineDot(machine, state)
+  if (machine.cloud) return <DeviceIcon kind="cloud" state={dot} label={!machine.usable ? `E2B API Key ${e2b('missing')}` : state ? tStatus(state.machine === 'error' ? 'failed' : state.machine) : t('cloud')} />
+  return <DeviceIcon kind="personal" state={dot} label={machine.usable ? t('online') : t('offline')} />
 }
 
 function MachineLabel({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
-  return <><MachineIcon machine={machine} cloudBotId={cloudBotId} /><span className="min-w-0 flex-1 truncate pr-3">{machine.label}</span></>
+  const t = useTranslations('Shell.newTaskDialog')
+  return <><MachineIcon machine={machine} cloudBotId={cloudBotId} /><span className={cn('min-w-0 flex-1 truncate pr-3', !machine.usable && 'text-muted-foreground')}>{machine.label}</span>
+    {machine.cloud && !machine.usable && <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><KeyRound aria-hidden="true" className="size-3" />{t('addE2BKey')}</span>}</>
 }
 
 /**
@@ -71,16 +79,24 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const { data: bots = [] } = useSWR(open ? 'bots' : null, listBots)
   // The Coordinator takes the task on Mikka Cloud, on its own bot's computer.
   const cloudBotId = (bots.find(bot => bot.coordinator) ?? bots[0])?.id
-  // Mikka Cloud first and by default: there the Coordinator picks the bot, so no bot is named.
-  // Direct daemon devices are 本机, including Linux. OS is not evidence that
-  // a computer is an SSH target reached through another machine (R-23).
-  const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true }
-  const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, online: item.online }))
-  // R-23: the task keeps its chosen destination even when cloud execution is
-  // unavailable; the Coordinator can create it and report the missing setup.
+  // Mikka Cloud first: there the Coordinator picks the bot, so no bot is named. It runs only on the
+  // person's own E2B key; a read that failed leaves that to the server. Direct daemon devices are 本机,
+  // including Linux. OS is not evidence that a computer is an SSH target reached through another machine (R-23).
+  const e2bKey = useOwnE2BKey(open)
+  const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true, usable: e2bKey.configured !== false }
+  const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, usable: item.online }))
   const machines: Machine[] = [cloud, ...own]
+  // R-23: the first machine that can run the task now is the default. A chosen destination is kept even
+  // when it cannot run yet; the Coordinator creates the task and reports the missing setup.
   const [picked, setPicked] = useState<string | null>(null)
-  const device = machines.find(item => item.value === picked) ?? machines[0]
+  const device = machines.find(item => item.value === picked) ?? defaultMachine(machines)!
+  // Picking Mikka Cloud without a key opens 填入 E2B Key; once saved, the task goes to the cloud.
+  const [addingKey, setAddingKey] = useState(false)
+  const keyDialog = usePresence(addingKey)
+  function pick(value: string) {
+    if (value === cloud.value && !cloud.usable) { setAddingKey(true); return }
+    setPicked(value)
+  }
   useEffect(() => { if (open && initialText) setDraft(current => current || initialText) }, [open, initialText])
 
   async function attach(files: File[]) {
@@ -124,7 +140,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
     <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')}>
       <div className="flex items-center gap-2 pr-8 text-sm">
         {device
-          ? <Select value={device.value} onValueChange={value => setPicked(value)} items={machines.map(({ value, label }) => ({ value, label }))}>
+          ? <Select value={device.value} onValueChange={value => { if (value) pick(value) }} items={machines.map(({ value, label }) => ({ value, label }))}>
             <SelectTrigger size="sm" className="h-7 min-w-32 max-w-56 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><MachineIcon machine={device} cloudBotId={cloudBotId} /><SelectValue className="min-w-0 truncate" /></SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-60">
               <SelectGroup><SelectItem value={cloud.value}><MachineLabel machine={cloud} cloudBotId={cloudBotId} /></SelectItem></SelectGroup>
@@ -152,6 +168,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
         <Button variant="outline" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Paperclip data-icon="inline-start" /></Button>
         <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !draft.trim() || sending} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
       </div>
+      {keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />}
     </DialogContent>
   </Dialog>
 }

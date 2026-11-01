@@ -1934,6 +1934,11 @@
       "githubRepositoryAccess": "Repository access",
       "githubRepositoriesDialog": "Authorized repositories",
       "githubRepositorySearch": "Search repositories",
+      "githubVerification": "Verification command",
+      "githubVerificationFor": "Verification command for {repository}",
+      "githubVerificationLoadFailed": "Verification command unavailable",
+      "githubVerificationSaveUnconfirmed": "Save unconfirmed. Changes retained.",
+      "githubVerificationSaved": "Verification command saved",
       "githubAbilitiesHeading": "Abilities",
       "githubAbilitiesSummary": "{count} abilities ({write} write, {read} read)",
       "githubPermission": {
@@ -2305,7 +2310,6 @@
     },
     "subscriptionShare": {
       "heading": "This workspace",
-      "share": "Use my subscriptions here",
       "blocked": "Turned off by an admin",
       "others": "Share with team members",
       "othersTitle": "Share {name} with team members?",
@@ -3213,6 +3217,10 @@
       "worktree": "Worktree",
       "agent_start": "Agent start",
       "duration": "{seconds}s"
+    },
+    "runInfo": {
+      "paidBy": "{owner}'s {plan}",
+      "movedTo": "Moved to {machine} to continue"
     }
   },
   "Computer": {
@@ -3430,6 +3438,7 @@
       "offline": "Offline",
       "online": "Online",
       "cloud": "Mikka Cloud",
+      "addE2BKey": "Add E2B Key",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",
@@ -3705,6 +3714,11 @@
     "failed": "Connection failed",
     "enterAgain": "Enter another code",
     "retry": "Retry"
+  },
+  "Reactions": {
+    "list": "Reactions",
+    "others": "{emoji}: {count, plural, one {# person} other {# people}}",
+    "mine": "{emoji}: {others, plural, =0 {just you} one {you and # other} other {you and # others}}"
   },
   "GroupChat": {
     "untitled": "Untitled group chat",

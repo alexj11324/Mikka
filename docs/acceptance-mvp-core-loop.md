@@ -1,5 +1,10 @@
 # Mikka MVP core-loop acceptance (#181)
 
+> History. The current MVP acceptance is API and CLI only:
+> [acceptance-mvp-cli-2026-11-01.md](acceptance-mvp-cli-2026-11-01.md)
+> (`pnpm test:local-loop`); no browser tests run
+> ([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)).
+
 Ordinary functional acceptance uses the real application, API, PostgreSQL and
 local daemon in the registered isolated cloud Linux CI environment. It acquires
 accounts automatically through the existing account pool. This PR does not

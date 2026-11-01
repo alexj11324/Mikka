@@ -280,7 +280,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const threadContinuation = earlier && run.continuesRunId
     ? { continuesRunId: run.continuesRunId, ...(followUp ? { followUp } : {}), ...(earlier.sessionId && earlier.deviceId === deviceId ? { resumeSessionId: earlier.sessionId } : {}) }
     : {}
-  const settings = device.kind === 'local' && repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
+  const settings = repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
+  const verifyCommand = settings ? settings.verifyCommand : device.kind === 'cloud' ? repo.verifyCommand : null
   // Push authority was decided at admission (the GitHub App grant, decision
   // 2026-11-01-1215), for local and cloud runs alike: `allow` when admitted,
   // `deny` otherwise. `ask` is never forwarded, so no push card can appear.
@@ -309,7 +310,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...(run.baseBranch ? { baseBranch: run.baseBranch } : {}), harness, prompt: current.prompt,
     kind: current.kind, leaseExpiresAt, policyRevision: cliPolicy.revision,
     ...(runTestFixture(harness) ? { fixture: runTestFixture(harness) } : {}),
-    ...((device.kind === 'cloud' ? repo.verifyCommand : settings?.verifyCommand) ? { verifyCommand: (device.kind === 'cloud' ? repo.verifyCommand : settings?.verifyCommand)! } : {}),
+    ...(verifyCommand ? { verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
     ...(mcp && publication?.pushBranch && /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) &&
       ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly && assignmentPolicy.permissions.git_push === 'allow' && harness !== 'mock'
