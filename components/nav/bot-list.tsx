@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
 import { SPRING_SIDEBAR } from '@/lib/ease'
 import { markdownLine, sessionPreview } from '@/lib/agent-history'
+import { namedCitations } from '@/lib/coordinator/citations'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
 
@@ -159,7 +160,7 @@ export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail,
         <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}
           status={coordinator?.working ? 'working' : undefined}
-          preview={lastReply ? <span className="truncate">{coordinatorLine(lastReply.text)}</span> : null} />
+          preview={lastReply ? <span className="truncate">{coordinatorLine(lastReply.from === 'coordinator' ? namedCitations(lastReply.text, coordinator?.sources ?? {}) : lastReply.text)}</span> : null} />
         {ordered.map(bot => {
           const chat = chats[bot.id]
           const mood = botMood(threads, bot.id, chat?.working ?? false)

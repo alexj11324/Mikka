@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { citedIds, remarkCitations, splitCitations } from './citations'
+import { citedIds, namedCitations, remarkCitations, splitCitations, type CitationSource } from './citations'
 
 const ISSUE = '3f6c1a52-8d0e-4b7a-9c3e-1f2a3b4c5d6e'
 const RUN = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
@@ -63,6 +63,19 @@ test('remarkCitations links citations for the chip renderer and keeps line break
 test('remarkCitations leaves code and Markdown links alone', () => {
   const children = [{ type: 'inlineCode', value: ISSUE }, text(' '), link('https://github.com/a/b/pull/1', 'PR')]
   assert.deepEqual(transform(...structuredClone(children)), children)
+})
+
+test('namedCitations writes cited threads and tasks as their names for a preview', () => {
+  const sources: Record<string, CitationSource> = {
+    [RUN]: { kind: 'run', id: RUN, agentName: 'Codex', harness: 'codex', status: 'running', issue: null, name: '修复 daemon 重连', summary: null, steps: 0, createdAt: '2026-11-01T00:00:00.000Z', finishedAt: null },
+    [ISSUE]: { kind: 'issue', id: ISSUE, number: 12, identifier: 'MIK-12', title: '看板横向滚动', status: 'todo', priority: 'normal' },
+  }
+  assert.equal(namedCitations(`线程在这里：${RUN}`, sources), '线程在这里：修复 daemon 重连')
+  assert.equal(namedCitations(`任务 [[issue:${ISSUE}]]，线程 [[run:${RUN}]]`, sources), '任务 看板横向滚动，线程 修复 daemon 重连')
+  const hidden = '00000000-0000-4000-8000-000000000000'
+  assert.equal(namedCitations(`看 [PR](https://github.com/a/b/pull/1)，${hidden} 不可见`, sources), '看 [PR](https://github.com/a/b/pull/1)， 不可见')
+  assert.equal(namedCitations(`[[issue:${RUN}]]`, sources), '')
+  assert.equal(namedCitations(`root = RunChip("${RUN}")`, sources), `root = RunChip("${RUN}")`)
 })
 
 test('remarkCitations cuts a GFM autolink glued to Chinese text', () => {
