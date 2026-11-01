@@ -105,7 +105,7 @@ async function main() {
   await source.commands.run('install -d -m 700 /run/mikka-relay', { user: 'root' })
   await source.files.write('/run/mikka-relay/server.py', await readFile(new URL('./local-api-relay.py', import.meta.url), 'utf8'), { user: 'root' })
   await source.files.write('/run/mikka-relay/config.json', JSON.stringify({ origin: relayOrigin, deviceToken: initialDevice, controlToken, repoToken, bindDeviceOnce: true }), { user: 'root' })
-  await source.commands.run('chmod 600 /run/mikka-relay/config.json; exec python3 /run/mikka-relay/server.py /run/mikka-relay/config.json > /run/mikka-relay/server.log 2>&1', { user: 'root', background: true, timeoutMs: 0 })
+  await source.commands.run('chmod 600 /run/mikka-relay/config.json; exec /usr/bin/python3 /run/mikka-relay/server.py /run/mikka-relay/config.json > /run/mikka-relay/server.log 2>&1', { user: 'root', background: true, timeoutMs: 0 })
   await wait(async () => { try { return (await send(`${relayOrigin}/mikka/v1/probe`, { signal: abort.signal })).status === 401 } catch { return false } })
   relay = await startLocalRelay({ localOrigin, relayOrigin, deviceToken: initialDevice, controlToken, signal: abort.signal, barePath, send, observe: value => { observed.push({ at: new Date().toISOString(), ...value }); if (value.type === 'claim') metric.policyIssuer = value.issuer } })
   void relay.done.catch(error => abort.abort(error))
