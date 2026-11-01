@@ -22,47 +22,51 @@ clone URL when another request registers an alias or a different repository.
 
 Old identity keys, approvals and publication receipts are preserved but are not
 adopted or rewritten. A queued legacy or mismatched binding is refused; schedule
-a new thread and explicitly approve the current repository identity. Only old
+a new thread for the current repository identity. Only old
 GitHub physical-checkout records with a verified equivalent endpoint can reuse
 their record ID, without changing the clone URL. No data migration grants a push.
 
-`repository_settings.push` stores `{ approved, remote: 'origin',
-approvedByUserId, approvedAt }`, keyed by `(userId, remoteKey)`. Only the
-human-session backend action can create that receipt; neither MCP nor native
-Coordinator tools expose it. A bare boolean is insufficient. Alex approved an
-owner-controlled, per-repository approval in that person's conversation. A
-Coordinator can request a confirmation, but only the authenticated person can
-decide it. Revoking a repository approval invalidates its pending confirmations.
-This entry point still requires fixed-Preview and user-interface acceptance.
+Push authority is what the person granted on GitHub
+([decision](design/decisions/2026-11-01-1215-push-by-github-app.md)): the Mikka
+GitHub App's installation on the repository grants `contents: write`, and the
+person's own linked GitHub account may write to it (the App is shared by every
+Mikka user, so their own access keeps one person from pushing to another's
+repository). Mikka asks for no approval of its own and shows no push card.
 
-A push needs two gates, both true. The repository approval above decides
-which repositories may be pushed. The `git_push` action permission decides
-whether a person confirms a push: `allow` drops that confirmation, `ask` keeps
-it, `deny` blocks the push. `git_push: allow` never stands in for the
-repository approval: admission, the run's GitHub token and publication all
-require a valid approval for that owner and repository, and deny on either
-gate denies. An admission receipt records the approval it rests on
-(`authority: 'repository_approval'`, `approvedAt`). Old receipts with
-`authority: 'configured_allow'` and no `approvedAt` still parse but grant
-nothing. See
-[the decision](design/decisions/2026-11-01-0500-push-needs-repository-approval.md).
+Dispatch checks GitHub live before the admission transaction
+(`lib/github/push-grant.ts`) and records the outcome on
+`github_repository_installations.pushGrantedAt` (cleared when GitHub refuses).
+Admission reads that record under a share lock; a host dispatch already inside
+its own transaction (Factory) relies on a check from the last 24 hours, and so
+does a dispatch while GitHub cannot be reached. A workspace policy or read-only
+mode that denies `git_push` still denies; `ask` no longer asks. New admission
+receipts carry `authority: 'github_app'` and the check's time as `approvedAt`.
+Receipts from the earlier per-repository approval (`repository_approval`) still
+match; old `configured_allow` receipts without `approvedAt` grant nothing.
+`repository_settings.push` and its pending cards remain readable history but
+grant and withhold nothing.
+
+When GitHub refuses, dispatch returns `runInvalid` with a `reason`
+(`githubAppNotInstalled`, `githubAppPermissionRequired`, `githubAppSuspended`,
+`githubIdentityRequired`, `githubAccessDenied`, `repositoryNotGithub`, …) and a
+sentence with the GitHub installation link (`lib/run-invalid-reason.ts`); the
+Coordinator sends the person to GitHub. Plugins › GitHub shows 推送分支 as
+「由 GitHub App 授权决定」, with no switch; 创建 Pull Request keeps allow / ask /
+deny.
 
 Claim sends `pushBranch` and `policy.permissions.git_push`; it sends `allow`
-only when both gates hold, and a claim without a publication never forwards a
-configured `allow`. `/repos` does not
-cache push approval. The daemon uses the same policy for fetching the previous
-task branch and pushing the next commit, with local git credentials and no
-force push. Settings revocation blocks subsequent claims and server PR creation.
+only for an admitted receipt, and a claim without a publication never forwards
+a configured `allow`. `/repos` does not cache push authority. The daemon uses
+the same policy for fetching the previous task branch and pushing the next
+commit, with no force push. The run's GitHub token and the pull request check
+the App installation and the person's access on GitHub live.
 
 A read-only run (`dispatch_run` with `readOnly: true`: an investigation or
-review that changes nothing) is admitted without the repository approval,
-because it never pushes. Its frozen definition carries `readOnly`; it gets no
-admission receipt, no publication or push branch, and claim sends the
-read-only policy (`git_push`, writes and scripts denied), whatever the CLI
-policy says. It ends `succeeded` with its report and publishes nothing. A run
-that may commit still needs both gates; when admission refuses it, the error is
-`runInvalid` with a `reason` (for example `repositoryPushApprovalRequired`)
-and a sentence the Coordinator acts on (`lib/run-invalid-reason.ts`).
+review that changes nothing) needs none of this, because it never pushes. Its
+frozen definition carries `readOnly`; it gets no admission receipt, no
+publication or push branch, and claim sends the read-only policy (`git_push`,
+writes and scripts denied), whatever the CLI policy says. It ends `succeeded`
+with its report and publishes nothing.
 
 ## Completion and retries
 

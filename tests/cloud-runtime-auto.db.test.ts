@@ -7,6 +7,7 @@ import test from 'node:test'
 import type { Pool as PgPool } from 'pg'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { recordPushGrant } from './support/github-app-stub'
 
 const harnesses = [{ harness: 'codex', installed: true, subscriptionBroker: true, computerBroker: true }]
 
@@ -58,7 +59,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   const person = async (label: string, e2bKey = true) => {
     const id = await seedUser(pool, label)
     users.push(id)
-    await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
+    // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+    await recordPushGrant(pool, id, normalizeRepository('octo/repo').key)
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
     // Their own workspace: the personal one, where work with no workspace of its own goes.
     await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [ws.id])

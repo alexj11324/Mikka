@@ -10,9 +10,10 @@ import { coordinatorBot, type CoordinatorBot } from '@/lib/coordinator/coordinat
  * GitHub's two writes on Plugins › GitHub, for the person's own Coordinator
  * (agent_kit_heads of its bot row, lib/coordinator/coordinator-bot.ts). Neither has a second store:
  *
- * - 推送分支 is the Coordinator's `git_push` in `cli_run_policy`, the same
- *   setting the daemon applies (ask → approval card), the run admission reads
- *   and the run-token issuer refuses on deny.
+ * - 推送分支 is decided by the GitHub App's own access on the repository
+ *   (contents: write, lib/github/push-grant.ts; decision 2026-11-01-1215). It
+ *   is shown, not set: `push` reads the Coordinator's stored `git_push` only so
+ *   an older deny stays visible, and a PATCH can no longer change it.
  * - 创建 Pull Request is `github_pull_request` in `external_write_permissions`,
  *   read by publishRunResult before it opens the pull request. Unset keeps
  *   today's behaviour: once the push was approved, the pull request opens.
@@ -25,10 +26,8 @@ const decision = z.enum(PERMISSION_DECISIONS)
 const versionSchema = z.string().regex(/^(0|[1-9]\d*):(0|[1-9]\d*)$/)
 export const githubPermissionsPatchSchema = z.strictObject({
   version: versionSchema,
-  // No push-time card exists, so for 推送分支 询问 would act as 允许: only allow / deny are offered.
-  push: z.enum(['allow', 'deny']).optional(),
-  pullRequest: decision.optional(),
-}).refine(value => value.push !== undefined || value.pullRequest !== undefined)
+  pullRequest: decision,
+})
 
 export interface GitHubPermissions { push: PermissionDecision; pullRequest: PermissionDecision; version: string }
 
@@ -75,7 +74,7 @@ export async function setGitHubPermissions(pool: Pick<Pool, 'connect'>, userId: 
   return writeTransaction(pool, async tx => {
     const current = view(await lockHead(tx, userId, coordinator, true))
     if (current.version !== input.version) throw new GitHubPermissionsError('githubPermissionsChanged')
-    const cli = input.push === undefined ? current.cli : cliPolicyValuesSchema.parse({ ...current.cli, permissions: { ...current.cli.permissions, git_push: input.push } })
+    const cli = current.cli
     const external = input.pullRequest === undefined ? current.external : writePolicySettingsSchema.parse({ ...current.external, [PULL_REQUEST_PERMISSION]: input.pullRequest })
     // Both columns version themselves (triggers), only when they change.
     const { rows: [row] } = await tx.query<Head>(`UPDATE agent_kit_heads SET cli_run_policy=$2, external_write_permissions=$3 WHERE owner_id=$1 AND bot_key=$4

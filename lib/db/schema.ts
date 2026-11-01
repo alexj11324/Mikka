@@ -396,6 +396,8 @@ export const githubRepositoryInstallations = pgTable('github_repository_installa
   installationId: bigint('installationId', { mode: 'number' }).notNull(),
   repositoryId: bigint('repositoryId', { mode: 'number' }).notNull(),
   verifiedAt: timestamp('verifiedAt', { withTimezone: true }).notNull().defaultNow(),
+  /** When a live check last found the push granted (App contents:write, the person may write); null once refused (lib/github/push-grant.ts). */
+  pushGrantedAt: timestamp('pushGrantedAt', { withTimezone: true }),
 }, table => [primaryKey({ columns: [table.userId, table.remoteKey] })])
 
 /** Server-issued publication assignment and durable completion receipt (ADR 0024). */

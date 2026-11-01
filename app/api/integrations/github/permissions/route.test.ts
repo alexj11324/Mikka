@@ -64,19 +64,19 @@ test('requires a session, the page origin and only the two decisions', async () 
   sessionUser = 'owner'
   for (const from of ['https://other.example', null]) assert.equal((await patch({ version: '0:0', push: 'allow' }, from)).status, 403)
   for (const body of [
-    { version: '0:0' }, { version: '0:0', push: 'always' }, { version: '0:0', push: 'ask' }, { version: 'x', push: 'allow' }, { push: 'allow' },
+    // 推送分支 is the GitHub App grant (decision 2026-11-01-1215): never written here.
+    { version: '0:0' }, { version: '0:0', push: 'allow' }, { version: '0:0', push: 'deny' }, { version: '0:0', push: 'always' }, { version: 'x', pullRequest: 'allow' }, { pullRequest: 'allow' },
     { version: '0:0', push: 'allow', userId: 'victim' }, { version: '0:0', network: 'allow' }, null,
   ]) assert.equal((await patch(body)).status, 400, JSON.stringify(body))
   assert.ok(!queries.some(query => query.sql.startsWith('UPDATE')), 'nothing was written')
 })
 
-test('writes the Coordinator\'s own git_push and github_pull_request, keeping its other choices', async () => {
+test('writes the Coordinator\'s own github_pull_request only, keeping its other choices; push is never written', async () => {
   rows.set('owner', { cli: { permissions: { network: 'deny' }, approvalMode: 'ask' }, cliVersion: 2, external: { gmail_send_email: 'ask' }, externalVersion: 5 })
-  const first = await patch({ version: '2:5', push: 'deny' })
-  assert.deepEqual(await first.json(), { viewerId: 'owner', push: 'deny', pullRequest: 'allow', version: '3:5' })
-  const second = await patch({ version: '3:5', pullRequest: 'ask' })
-  assert.deepEqual(await second.json(), { viewerId: 'owner', push: 'deny', pullRequest: 'ask', version: '3:6' })
-  assert.deepEqual(rows.get('owner'), { cli: { permissions: { network: 'deny', git_push: 'deny' }, approvalMode: 'ask' }, cliVersion: 3, external: { gmail_send_email: 'ask', github_pull_request: 'ask' }, externalVersion: 6 })
+  assert.equal((await patch({ version: '2:5', push: 'deny' })).status, 400)
+  const second = await patch({ version: '2:5', pullRequest: 'ask' })
+  assert.deepEqual(await second.json(), { viewerId: 'owner', push: 'ask', pullRequest: 'ask', version: '2:6' })
+  assert.deepEqual(rows.get('owner'), { cli: { permissions: { network: 'deny' }, approvalMode: 'ask' }, cliVersion: 2, external: { gmail_send_email: 'ask', github_pull_request: 'ask' }, externalVersion: 6 })
   for (const query of queries.filter(query => /agent_kit_heads/.test(query.sql))) {
     assert.equal(query.params[0], 'owner')
     assert.ok(query.params.includes(coordinatorOf('owner').botId), 'the row is the Coordinator bot\'s own')
@@ -85,7 +85,7 @@ test('writes the Coordinator\'s own git_push and github_pull_request, keeping it
 
 test('a stale version is refused, and one person never reaches another\'s row', async () => {
   rows.set('other', { cli: {}, cliVersion: 0, external: {}, externalVersion: 0 })
-  assert.equal((await patch({ version: '0:0', push: 'allow' })).status, 200)
+  assert.equal((await patch({ version: '0:0', pullRequest: 'ask' })).status, 200)
   const stale = await patch({ version: '0:0', pullRequest: 'deny' })
   assert.equal(stale.status, 409)
   assert.equal((await stale.json()).error, 'githubPermissionsChanged')
@@ -99,5 +99,5 @@ test('a malformed stored setting is unavailable, never a default', async () => {
   const response = await read()
   assert.equal(response.status, 409)
   assert.equal((await response.json()).error, 'githubPermissionsUnavailable')
-  assert.equal((await patch({ version: '1:0', push: 'allow' })).status, 409)
+  assert.equal((await patch({ version: '1:0', pullRequest: 'allow' })).status, 409)
 })

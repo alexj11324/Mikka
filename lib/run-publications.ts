@@ -5,8 +5,7 @@ import { reachesReview, runReport, type RunReport, type RunCompleteRequest } fro
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { remoteKey } from '@mikka/protocol/repository'
 import { db, pool, withDatabaseClient, withDatabaseTransaction } from '@/lib/db'
-import { agentRuns, devices, issues, issueVersions, repositorySettings, runPublications, runTokens, type RunStatus } from '@/lib/db/schema'
-import { readRepositorySettings } from '@/lib/device-repositories'
+import { agentRuns, devices, issues, issueVersions, runPublications, runTokens, type RunStatus } from '@/lib/db/schema'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -15,7 +14,7 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { systemActor } from '@/lib/activity-actor'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
-import { publicationBranch, publicationGate, repositoryPushApproved } from '@/lib/run-publication-policy'
+import { publicationBranch, publicationGate } from '@/lib/run-publication-policy'
 import { linkedGitHubAccountId, saveRepositoryInstallation } from '@/lib/github/repository-installation'
 import { githubRepository, openRunPullRequest, PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/github/run-pull-request'
 import { matchesRepositoryAdmission } from './repository-admission'
@@ -46,14 +45,14 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
   if (!run.issueId) throw new PublicationError('issue_unavailable')
   const issueId = run.issueId
   const key = remoteKey(remoteUrl)
-  const settings = await readRepositorySettings(run.userId, remoteUrl)
   const admission = run.agentDefinition?.repositoryAdmission
   const accepted = admission && run.deviceId && run.agentId && matchesRepositoryAdmission(admission, {
     userId: run.userId, issueId, deviceId: run.deviceId, agentId: run.agentId, remoteKey: key, remoteUrl, targetBranch: admission.targetBranch,
     workspaceId: admission.workspaceId, workspaceLinked: admission.workspaceLinked, requestEventId: admission.requestEventId,
   }) && await (await import('./run-admission-store')).acceptedEventStillMatches(admission, run.botId ?? null)
   if (admission && !accepted) throw new PublicationError('publication_mismatch')
-  const pushApproved = Boolean(accepted) || repositoryPushApproved(settings?.push, run.userId)
+  // Push authority is the accepted receipt (the GitHub App grant at admission); nothing else lends it.
+  const pushApproved = Boolean(accepted)
   const row = await db.transaction(async tx => {
     const [task] = await tx.select().from(issues).where(eq(issues.id, issueId)).for('update')
     if (!task || !await mayCompleteIssue(task, run.userId)) throw new PublicationError('issue_unavailable')
@@ -266,13 +265,11 @@ async function withPublicationAuthority<T>(claim: Publication, work: (value: { p
     }) && await (await import('./run-admission-store')).acceptedEventStillMatches(admission, run.botId, tx)
     if (admission && !accepted) throw new PublicationError('publication_mismatch')
     // 创建 Pull Request (Plugins › GitHub) for the run's own Coordinator or Bot.
-    // It narrows the repository push approval below, never replaces it. Read
-    // before that approval's share lock, which stays the last statement held
-    // through the provider write.
+    // It narrows the push authority below, never replaces it; opening the pull
+    // request checks the GitHub App installation live again.
     let pullRequest: 'allow' | 'ask' | 'deny'
     try { pullRequest = explicitSetting(await readWriteSettingLayers(tx, claim.userId, run.botId), [PULL_REQUEST_PERMISSION]) ?? PULL_REQUEST_DEFAULT } catch { pullRequest = 'ask' }
-    const [settings] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, claim.userId), eq(repositorySettings.remoteKey, publication.remoteKey))).for('share')
-    if (!publication.pushApproved || (!accepted && !repositoryPushApproved(settings?.push, claim.userId))) throw new PublicationError('push_not_approved')
+    if (!publication.pushApproved || !accepted) throw new PublicationError('push_not_approved')
     return work({ publication, run, report, allowCreate: readIssueMetadata(task.content).pullRequests.length < 10, pullRequest })
   })
   if (hint.userId === claim.userId) return apply(false)

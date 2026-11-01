@@ -4,6 +4,7 @@ import test from 'node:test'
 import { seedCoordinator } from './support/coordinator-bot'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { normalizeRepository } from '@mikka/protocol/repository'
+import { recordPushGrant } from './support/github-app-stub'
 
 const connection = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1'
@@ -162,7 +163,8 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     await pool.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,$4,$5)',[repo,device,owner,repository.key,repository.remoteUrl])
     // Only this disposable owner's repository has a synthetic persisted grant.
     // The real dispatch still executes the ordinary admission transaction.
-    await pool.query('INSERT INTO repository_settings("userId","remoteKey",push) VALUES($1,$2,$3)',[owner,repository.key,JSON.stringify({approved:true,remote:'origin',approvedByUserId:owner,approvedAt:new Date().toISOString()})])
+    // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+    await recordPushGrant(pool, owner, repository.key)
     const lifecycleTools=createCoordinatorRegistry(owner,coordinator,undefined,{coordinator:true})
     const first=routed[0];assert.ok('task' in first)
     const {factoryBinding}=await import('../lib/factory/dispatch')

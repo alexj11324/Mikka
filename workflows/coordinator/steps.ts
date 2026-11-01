@@ -35,7 +35,7 @@ import { webSearch } from '@/lib/search'
 import { issueMembers, issues } from '@/lib/db/schema'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
-import { proposeRepositoryPush, writeAccountAction } from '@/lib/pending-action-store'
+import { writeAccountAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -296,13 +296,6 @@ export async function accountWrite(userId: string, action: ApprovalActionName, i
 }
 // A send has no idempotency key: a replayed step could send it twice.
 accountWrite.maxRetries = 0
-
-/** `chat` is the asking chat's bot, with the task request when there is one; the decision goes back to that chat. */
-export async function proposeRepositoryPushApproval(userId: string, input: { repo: string }, scope: NativeToolScope | undefined, chat: { botId: string; eventId?: string }) {
-  'use step'
-  await assertNativeToolScope(userId, scope)
-  return proposeRepositoryPush(userId, input, chat)
-}
 
 export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {
   'use step'

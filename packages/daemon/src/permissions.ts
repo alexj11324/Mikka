@@ -91,10 +91,10 @@ export function runDomains(
 }
 
 /**
- * Whether the daemon pushes a verified run branch. A push needs the owner's
- * repository approval and `git_push` together. The server resolves both at
- * claim and sends `allow` in this run's assignment only when both hold
- * (a configured `allow` without an approved repository arrives as `ask`).
+ * Whether the daemon pushes a verified run branch. The server decides push
+ * authority at admission (the GitHub App grant) and sends `allow` in this
+ * run's assignment only for an admitted run (a configured `allow` without one
+ * arrives as `ask`).
  * `ask` pushes only when the repo was approved ("always for this repo");
  * `deny` never pushes.
  */

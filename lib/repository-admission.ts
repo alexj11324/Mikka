@@ -1,6 +1,5 @@
 import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import { z } from 'zod'
-import { repositoryPushApproved, type RepositoryPushApproval } from './run-publication-policy'
 import { resolveAgentSettings } from '@mikka/protocol/agent-policy'
 
 /** Immutable evidence of one accepted task's repository authority. */
@@ -12,45 +11,41 @@ const receipt = z.object({
   workspaceLinked: z.boolean().optional(),
   requestEventId: z.uuid().optional(),
   approvedAt: z.iso.datetime().optional(), acceptedAt: z.iso.datetime(),
+  // `github_app`: the App's installation granted contents:write and the person
+  // may write (decision 2026-11-01-1215); `approvedAt` is when that was checked.
+  // `repository_approval` receipts came from the earlier per-repository approval.
   // `configured_allow` parses only so old rows stay readable. Such a receipt
   // never carried a repository approval and grants nothing (see matches below).
-  authority: z.enum(['repository_approval', 'configured_allow']).optional(),
+  authority: z.enum(['github_app', 'repository_approval', 'configured_allow']).optional(),
 }).strict()
 export type RepositoryAdmission = z.infer<typeof receipt>
 
 /**
- * Whether a task may be admitted to push this repository. Two gates, both
- * required: the owner's per-repository push approval (which repositories)
- * and the `git_push` action permission (whether a person confirms the push).
- * `git_push: allow` only drops that confirmation; it never stands in for the
- * repository approval. Returns `allow` (admit), `ask` (the repository still
- * needs the owner's approval) or `deny`. Resolves only persisted server
- * settings and a human receipt; malformed settings inherit ask.
+ * Whether policy lets a task push at all. The repository authority itself is
+ * the GitHub App grant (lib/github/push-grant.ts); this only reads the `git_push`
+ * restriction a workspace policy or a read-only mode sets. `deny` on either
+ * layer denies; anything else does not ask the person again.
  */
-export function effectiveRepositoryPush(permissions: unknown, push: RepositoryPushApproval | null | undefined, userId: string, workspacePermissions?: unknown): 'allow' | 'ask' | 'deny' {
+export function effectiveRepositoryPush(permissions: unknown, workspacePermissions?: unknown): 'allow' | 'deny' {
   const workspace = resolveAgentSettings({ permissions: workspacePermissions }).policy.permissions.git_push
   const configured = permissions !== null && typeof permissions === 'object' && Object.hasOwn(permissions, 'git_push')
   const decision = configured ? resolveAgentSettings({ permissions }).policy.permissions.git_push : workspace
-  if (workspace === 'deny') return 'deny'
-  if (decision === 'deny' || push?.approved === false) return 'deny'
-  return repositoryPushApproved(push, userId) ? 'allow' : 'ask'
+  return workspace === 'deny' || decision === 'deny' ? 'deny' : 'allow'
 }
 
-/** Call only under the repository-approval lock, in the admission transaction. */
+/** Call only in the admission transaction, with the recorded GitHub App grant. */
 export function admitRepositoryTask(input: {
   userId: string; issueId: string; deviceId: string; agentId: string; remoteKey: string; remoteUrl: string
-  targetBranch: string; push: RepositoryPushApproval | null | undefined; permissions?: unknown; workspacePermissions?: unknown; workspaceId?: string; workspaceLinked?: boolean; requestEventId?: string; now: Date
+  targetBranch: string; grant: { grantedAt: string } | null; permissions?: unknown; workspacePermissions?: unknown; workspaceId?: string; workspaceLinked?: boolean; requestEventId?: string; now: Date
 }): RepositoryAdmission | null {
-  const decision = effectiveRepositoryPush(input.permissions, input.push, input.userId, input.workspacePermissions)
-  if (decision !== 'allow') return null
-  if (!repositoryPushApproved(input.push, input.userId)) return null
+  if (!input.grant || effectiveRepositoryPush(input.permissions, input.workspacePermissions) !== 'allow') return null
   const candidate = receipt.safeParse({
     userId: input.userId, issueId: input.issueId, deviceId: input.deviceId, agentId: input.agentId, remoteKey: input.remoteKey,
     remoteUrl: input.remoteUrl, targetBranch: input.targetBranch, permission: 'push_to_origin',
     ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
     ...(input.workspaceLinked !== undefined ? { workspaceLinked: input.workspaceLinked } : {}),
     ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}),
-    approvedAt: input.push!.approvedAt, authority: 'repository_approval', acceptedAt: input.now.toISOString(),
+    approvedAt: input.grant.grantedAt, authority: 'github_app', acceptedAt: input.now.toISOString(),
   })
   if (!candidate.success || !repositoryBindingMatches(candidate.data.remoteKey, candidate.data.remoteUrl, { allowFile: true })) return null
   return candidate.data

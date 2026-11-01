@@ -34,15 +34,12 @@ const PERMISSIONS_PATH = withBasePath('/api/integrations/github/permissions')
 /** The Mikka GitHub App's page where a person picks which repositories it may reach. */
 const INSTALL_URL = 'https://github.com/apps/mikka-github/installations/new'
 const DECISIONS: readonly Decision[] = ['allow', 'ask', 'deny']
-/** 推送分支 has no push-time card (that is a later card on the pull request's mechanism), so 询问 would act as 允许. */
-const CHOICES: Record<WriteAbility, readonly Decision[]> = { push: ['allow', 'deny'], pullRequest: DECISIONS }
-/** A stored 询问 for the push behaves as 允许 once the repository is approved, so it shows as 允许. */
-const shown = (setting: WriteAbility, value: Decision): Decision => setting === 'push' && value === 'ask' ? 'allow' : value
 
 /**
  * What an Agent does through this plugin, from the code that does it. Writes:
- * the pushed branch (the daemon's git push, `git_push`) and the pull request
- * (lib/github/run-pull-request.ts), each with its own allow / ask / deny.
+ * the pushed branch, which the GitHub App's own access decides (contents:
+ * write on the repository, lib/github/push-grant.ts; nothing to set here), and
+ * the pull request (lib/github/run-pull-request.ts) with allow / ask / deny.
  * Reads run directly (R-77): cloning, and the readbacks in
  * lib/github/user-access.ts and the run token's checks/actions read.
  * A new ability lands here with its code.
@@ -171,12 +168,15 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
   const status = githubLoading ? null : !userId ? t('githubSignInRequired') : githubState && !githubState.configured ? t('githubNotConfigured') : null
   const login = githubState?.login ? t('githubLogin', { login: githubState.login }) : t('github')
   const errors = [githubError, githubLinkError, permissionError].filter(Boolean)
-  const control = (setting: WriteAbility, name: string) => <ToggleGroup aria-label={name} variant="segment" size="sm" spacing={0.5} disabled={!permissions.data} value={permissions.data ? [shown(setting, permissions.data[setting])] : []} onValueChange={values => {
-    const next = values[0]
-    if (isDecision(next) && CHOICES[setting].includes(next) && next !== shown(setting, permissions.data![setting])) void setPermission(setting, next)
-  }}>
-    {CHOICES[setting].map(value => <ToggleGroupItem key={value} value={value}>{t(`githubPermission.${value}`)}</ToggleGroupItem>)}
-  </ToggleGroup>
+  // 推送分支 is whatever the GitHub App was granted on GitHub: shown, not set (decision 2026-11-01-1215).
+  const control = (setting: WriteAbility, name: string) => setting === 'push'
+    ? <span className="text-xs text-muted-foreground">{t('githubPushByApp')}</span>
+    : <ToggleGroup aria-label={name} variant="segment" size="sm" spacing={0.5} disabled={!permissions.data} value={permissions.data ? [permissions.data[setting]] : []} onValueChange={values => {
+      const next = values[0]
+      if (isDecision(next) && next !== permissions.data![setting]) void setPermission(setting, next)
+    }}>
+      {DECISIONS.map(value => <ToggleGroupItem key={value} value={value}>{t(`githubPermission.${value}`)}</ToggleGroupItem>)}
+    </ToggleGroup>
   const writes = ABILITIES.write.map(({ id, setting }) => ({ slug: setting, name: t(`githubTool.${id}`), description: '' }))
   const reads = ABILITIES.read.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
 

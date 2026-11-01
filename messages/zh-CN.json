@@ -1925,6 +1925,7 @@
         "deny": "拒绝"
       },
       "githubPermissionFailed": "无法保存",
+      "githubPushByApp": "由 GitHub App 授权决定",
       "githubPrivate": "私有",
       "githubTool": {
         "push": "推送分支",

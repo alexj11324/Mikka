@@ -8,6 +8,7 @@ import { createFactoryStore } from '../../../lib/factory/store'
 import { factoryBinding } from '../../../lib/factory/dispatch'
 import { createFactoryQuestions } from '../../../lib/factory/questions/store'
 import { factoryTestLifecycle } from '../../helpers/factory-test-authority'
+import { recordPushGrant } from '../../support/github-app-stub'
 
 const [email, title, prompt, question] = process.argv.slice(2)
 const target = new URL(process.env.DATABASE_URL ?? '')
@@ -30,7 +31,8 @@ async function main() {
       await pool.query(`INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Question device',true,now(),'[{"harness":"codex","installed":true}]')`, [deviceId, user.id])
       await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, deviceId, user.id, remoteKey(remoteUrl), remoteUrl])
       await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,$2,'Question fixture','codex',$3)`, [agentId, user.id, deviceId])
-      await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [user.id, remoteKey(remoteUrl), JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: user.id, approvedAt: new Date().toISOString() })])
+      // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+      await recordPushGrant(pool, user.id, remoteKey(remoteUrl))
       agent = { id: agentId, deviceRepoId: repoId }
     }
     const eventId = randomUUID()

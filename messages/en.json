@@ -1925,6 +1925,7 @@
         "deny": "Deny"
       },
       "githubPermissionFailed": "Could not save",
+      "githubPushByApp": "Set by the GitHub App",
       "githubPrivate": "Private",
       "githubTool": {
         "push": "Push branch",
