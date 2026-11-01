@@ -1716,7 +1716,6 @@
       "saved": "已保存",
       "changeAvatar": "更换",
       "uploading": "上传中…",
-      "sessionHeading": "会话",
       "signOut": "退出登录",
       "signingOut": "正在退出…",
       "deleteAccount": "删除账户",
@@ -1725,7 +1724,10 @@
       "deleteConfirmLabel": "输入 {email} 确认",
       "deleting": "正在删除…",
       "confirmDelete": "删除账户",
-      "cancel": "取消"
+      "cancel": "取消",
+      "currentSession": "当前会话",
+      "danger": "危险操作",
+      "account": "此账户"
     },
     "memory": {
       "enabled": "使用记忆",
@@ -2010,7 +2012,8 @@
       "currentDevice": "当前设备",
       "signOut": "退出",
       "signingOut": "正在退出…",
-      "signOutOthers": "全部退出"
+      "signOutOthers": "全部退出",
+      "otherDevices": "其他设备"
     },
     "privacy": {
       "data": "数据",
