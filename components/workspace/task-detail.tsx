@@ -139,7 +139,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   const [actionRequest, setActionRequest] = useState<IssueActionRequest | null>(null)
   const restoration = useRef<{ resolve: (success: boolean) => void } | null>(null)
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
-  const { data: versions, error: historyError, mutate: refreshVersions } = useSWR(['versions', saved.id], () => listIssueVersions(saved.id), { revalidateOnFocus: false })
+  const { data: versions, error: historyError, mutate: refreshVersions } = useSWR(['versions', saved.id], () => listIssueVersions(saved.id))
   const { data: connections } = useSWR(['issue-connections', saved.id], () => listIssueConnections(saved.id))
   const hasUnsavedChanges = dirty
   useEffect(() => { onDirty(hasUnsavedChanges || pending) }, [hasUnsavedChanges, pending, onDirty])

@@ -36,32 +36,71 @@ const comeBack = async () => {
 }
 
 let reads = 0
-function Reader() {
-  const { data, isLoading } = useSWR('focus-reader', async () => { reads++; return `read ${reads}` }, { dedupingInterval: 0, focusThrottleInterval: 0 })
-  return <p>{isLoading ? 'loading' : data}</p>
+const shown: string[] = []
+let poke: () => Promise<unknown> = async () => undefined
+function Reader({ options = {} }: { options?: Record<string, unknown> }) {
+  const { data, isLoading, mutate } = useSWR('focus-reader', async () => { reads++; return `read ${reads}` }, { dedupingInterval: 0, ...options })
+  poke = mutate
+  const text = isLoading ? 'loading' : data ?? ''
+  shown.push(text)
+  return <p>{text}</p>
 }
 // Each render gets its own cache, so only the configuration differs.
 const fresh = () => new Map()
+const FRESH = 200
+const sleep = async (ms: number) => { await act(async () => { await new Promise(resolve => setTimeout(resolve, ms)) }) }
 
-test('SWR re-reads on focus by default, which is why the site turns it off', async () => {
+test('plain SWR re-reads on every focus, which is why the site gates it', async () => {
   reads = 0
-  await act(async () => { root.render(<SWRConfig value={{ provider: fresh }}><Reader /></SWRConfig>) })
+  await act(async () => { root.render(<SWRConfig value={{ provider: fresh }}><Reader options={{ focusThrottleInterval: 0 }} /></SWRConfig>) })
   await wait()
   assert.equal(reads, 1)
   await comeBack()
   assert.equal(reads, 2)
 })
 
-test('under the site defaults focus and visibility trigger no request and the content stays', async () => {
+test('site defaults: focus within the freshness threshold sends no request', async () => {
   reads = 0
-  await act(async () => { root.render(<SWRDefaults><SWRConfig value={{ provider: fresh }}><Reader /></SWRConfig></SWRDefaults>) })
+  await act(async () => { root.render(<SWRDefaults><SWRConfig value={{ provider: fresh, focusThrottleInterval: FRESH }}><Reader /></SWRConfig></SWRDefaults>) })
   await wait()
-  assert.equal(reads, 1)
   for (let round = 0; round < 3; round++) {
     await comeBack()
     assert.equal(reads, 1)
     assert.equal(container.textContent, 'read 1')
   }
+})
+
+test('site defaults: past the threshold one focus revalidates once, silently', async () => {
+  reads = 0; shown.length = 0
+  await act(async () => { root.render(<SWRDefaults><SWRConfig value={{ provider: fresh, focusThrottleInterval: FRESH }}><Reader /></SWRConfig></SWRDefaults>) })
+  await wait()
+  await sleep(FRESH + 50)
+  await comeBack()
+  await comeBack()
+  assert.equal(reads, 2)
+  assert.equal(container.textContent, 'read 2')
+  // Nothing but the two answers ever reached the screen after the first load.
+  assert.deepEqual([...new Set(shown.slice(shown.indexOf('read 1')))], ['read 1', 'read 2'])
+})
+
+test('site defaults: a fresh answer from a poll or mutate counts, not just the mount', async () => {
+  reads = 0
+  await act(async () => { root.render(<SWRDefaults><SWRConfig value={{ provider: fresh, focusThrottleInterval: FRESH }}><Reader /></SWRConfig></SWRDefaults>) })
+  await wait()
+  await sleep(FRESH + 50)
+  await act(async () => { await poke() })
+  assert.equal(reads, 2)
+  await comeBack()
+  assert.equal(reads, 2)
+})
+
+test('site defaults: a hook that turns focus off is never revalidated on focus', async () => {
+  reads = 0
+  await act(async () => { root.render(<SWRDefaults><SWRConfig value={{ provider: fresh, focusThrottleInterval: FRESH }}><Reader options={{ revalidateOnFocus: false }} /></SWRConfig></SWRDefaults>) })
+  await wait()
+  await sleep(FRESH + 50)
+  await comeBack()
+  assert.equal(reads, 1)
 })
 
 let checks = 0

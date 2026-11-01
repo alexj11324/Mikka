@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
-import { auditFocusRefetch, auditRepository, focusListenerAllowlist } from './focus-refetch-policy.mjs'
+import { auditFocusRefetch, auditRepository, focusListenerAllowlist, thirdPartyStatusFiles } from './focus-refetch-policy.mjs'
 
 const rules = (source, file = 'components/example.tsx') => auditFocusRefetch(file, source).map(d => d.rule)
 
@@ -17,15 +17,24 @@ test('every allowlisted listener exists and says why it is not a re-read', () =>
   }
 })
 
-test('the site turns focus revalidation off for every SWR hook', () => {
-  assert.match(readFileSync('components/swr-defaults.tsx', 'utf8'), /revalidateOnFocus: false/)
+test('every SWR hook gets the site defaults: focus behind the freshness gate, polling only while visible', () => {
+  const defaults = readFileSync('components/swr-defaults.tsx', 'utf8')
+  assert.match(defaults, /use: \[staleOnFocus\]/)
+  assert.match(defaults, /focusThrottleInterval: FRESH_FOR_MS/)
+  assert.match(defaults, /refreshWhenHidden: false/)
+  assert.match(defaults, /FRESH_FOR_MS = 60_000/)
   assert.match(readFileSync('app/[locale]/layout.tsx', 'utf8'), /<SWRDefaults>\{children\}<\/SWRDefaults>/)
-  assert.match(readFileSync('components/workspace-app.tsx', 'utf8'), /\.\.\.swrDefaults, provider/)
+})
+
+test('third-party status files exist and turn focus off', () => {
+  for (const file of thirdPartyStatusFiles) assert.ok(existsSync(file), file)
+  assert.deepEqual(rules("useSWR(key, read, { refreshInterval: 0 })", thirdPartyStatusFiles[0]), ['focus/third-party-status'])
+  assert.deepEqual(rules("useSWR(key, read, { revalidateOnFocus: false })", thirdPartyStatusFiles[0]), [])
 })
 
 for (const [name, source] of [
   ['SWR focus on', "useSWR(key, read, { revalidateOnFocus: true })"],
-  ['SWR focus by condition', "useSWR(key, read, { revalidateOnFocus: !busy })"],
+  ['polling while hidden', "useSWR(key, read, { refreshInterval: 2000, refreshWhenHidden: true })"],
   ['react-query focus refetch', "useQuery({ queryKey, queryFn, refetchOnWindowFocus: true })"],
   ['react-query focus manager', "focusManager.setEventListener(handle)"],
   ['window focus listener', "window.addEventListener('focus', reload)"],
@@ -40,6 +49,7 @@ for (const [name, source] of [
   ['react-query focus off', "useQuery({ queryKey, refetchOnWindowFocus: false })"],
   ['focus inside an element', "node.addEventListener('focusin', open)"],
   ['explicit polling', "useSWR(key, read, { refreshInterval: 15000 })"],
+  ['focus paused by condition', "useSWR(key, read, { revalidateOnFocus: !dragging })"],
 ]) test(`allows ${name}`, () => assert.deepEqual(rules(source), [], source))
 
 test('an allowlisted file may listen, but not turn SWR focus on', () => {

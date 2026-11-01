@@ -140,7 +140,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     window.history.replaceState(null, '', url)
   }, [])
   const [boardBusy, setBoardBusy] = useState(false)
-  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], listIssues, { ...whileSettings, fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy || settingsShown ? 0 : 10000, revalidateOnReconnect: !boardBusy })
+  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], listIssues, { ...whileSettings, fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy || settingsShown ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
   // Keep failed refreshes out of document flow so the board/list never jumps.
   const listErrorMessage = t('listError')
   useEffect(() => {
@@ -152,9 +152,9 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects, whileSettings)
   const { data: teams = [] } = useSWR('teams', listTeams, whileSettings)
   const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams, whileSettings)
-  const { data: bots = [] } = useSWR('bots', listBots, { ...whileSettings, revalidateOnFocus: false })
+  const { data: bots = [] } = useSWR('bots', listBots, { ...whileSettings })
   const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))
-  const { data: threads = [], mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : 15000, revalidateOnFocus: false })
+  const { data: threads = [], mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : 15000 })
   const settingsWereShown = useRef(settingsShown)
   useEffect(() => {
     if (settingsWereShown.current && !settingsShown) {
@@ -165,7 +165,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }, [settingsShown, mutate, refreshThreads])
   const [creatingBot, setCreatingBot] = useState(false)
   const [createdBot, setCreatedBot] = useState<BotView>()
-  const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => getCoordinatorChat(), { ...whileSettings, revalidateOnFocus: false })
+  const { data: coordinatorChat } = useSWR<CoordinatorChatView>('coordinator-chat', () => getCoordinatorChat(), { ...whileSettings })
   const [panelOpen, setPanelOpen] = useState(true)
   useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
   // Below xl the column has no room, so 打开右栏 shows it in a Sheet instead.

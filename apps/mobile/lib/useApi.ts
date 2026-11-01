@@ -5,6 +5,8 @@ import { api, ApiError, onWorkspaceChange } from '@/lib/api'
 // The last answer per path, so a screen opened again draws at once and refreshes behind (a chat is not blank while it loads).
 // Another workspace's answers are dropped.
 const cache = new Map<string, unknown>()
+/** Data younger than this is fresh: coming back to the app leaves it alone (decision 2026-11-01-0400-no-refetch-on-focus). */
+export const FRESH_FOR_MS = 60_000
 onWorkspaceChange(() => cache.clear())
 
 /** Loads `path` ahead of its screen, once, so opening it draws at once (对话 warms the top chats). */
@@ -33,12 +35,13 @@ export function useApi<T>(path: string | null, every = 0) {
   const [error, setError] = useState<ApiError | Error | null>(null)
   const [loading, setLoading] = useState(Boolean(path))
   const alive = useRef(true)
+  const loadedAt = useRef(0)
 
   const load = useCallback(async () => {
     if (!path) return
     try {
       const next = await api<T>(path)
-      if (alive.current) { setData(next); setError(null) }
+      if (alive.current) { setData(next); setError(null); loadedAt.current = Date.now() }
     } catch (failure) {
       if (alive.current) setError(failure as Error)
     } finally {
@@ -57,12 +60,15 @@ export function useApi<T>(path: string | null, every = 0) {
   useEffect(() => onWorkspaceChange(() => void load()), [load])
 
   useEffect(() => {
-    if (!every || !path) return
-    let timer: ReturnType<typeof setInterval> | null = setInterval(load, every)
+    if (!path) return
+    let timer: ReturnType<typeof setInterval> | null = every ? setInterval(load, every) : null
     const sub = AppState.addEventListener('change', state => {
-      // Back in the foreground the poll resumes on its schedule; returning never reads by itself.
-      if (state === 'active' && !timer) timer = setInterval(load, every)
-      if (state !== 'active' && timer) { clearInterval(timer); timer = null }
+      if (state === 'active') {
+        // Stale-while-revalidate: one silent read only when the data is older than
+        // FRESH_FOR_MS; the screen keeps what it shows meanwhile.
+        if (loadedAt.current && Date.now() - loadedAt.current >= FRESH_FOR_MS) void load()
+        if (every && !timer) timer = setInterval(load, every)
+      } else if (timer) { clearInterval(timer); timer = null }
     })
     return () => { if (timer) clearInterval(timer); sub.remove() }
   }, [every, load, path])

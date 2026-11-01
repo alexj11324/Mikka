@@ -178,7 +178,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
  */
 function ThreadArtifacts({ issueId, runId, status }: { issueId: string; runId: string; status: string }) {
   const t = useTranslations('ArtifactsPage')
-  const { data, mutate } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId), { revalidateOnFocus: false })
+  const { data, mutate } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId))
   const [open, setOpen] = useState<string | null>(null)
   // A thread usually hands its artifact over as it finishes.
   useEffect(() => { void mutate() }, [status, mutate])

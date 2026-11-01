@@ -118,11 +118,11 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const openPanel = () => { setSidebar(true); if (!window.matchMedia('(min-width: 64rem)').matches) setSheet(true) }
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const [newTask, setNewTask] = useState(false)
-  const { data: agents } = useSWR('agents', () => listAgents(), { revalidateOnFocus: false })
+  const { data: agents } = useSWR('agents', () => listAgents())
   const { data: linear } = useSWR('linear-board-sync', () => getLinearBoardSync(), { revalidateOnFocus: false })
   // Without a connected Linear team, the button only reloads the board.
   const linearSynced = !!linear && !linear.error && linear.synced
-  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
+  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000 })
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run.status); return state ? [[run.issueId, state] as const] : [] })), [runs])

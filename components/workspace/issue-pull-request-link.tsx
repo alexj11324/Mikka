@@ -41,7 +41,8 @@ function ViewerPullRequestLink({ issueId, pr, compact = false, userId, isPending
   const tSync = useTranslations('Metadata.prSync')
   const [mountedAt] = useState(() => performance.now())
   const { data, isValidating } = useSWR(userId ? ['github-pr-status', userId, issueId, pr.url] : null, fetchStatus, {
-    refreshInterval: compact ? 0 : 60_000, revalidateOnMount: true, dedupingInterval: 0,
+    // A GitHub status check: on mount and on its own poll, never on focus.
+    refreshInterval: compact ? 0 : 60_000, revalidateOnFocus: false, revalidateOnMount: true, dedupingInterval: 0,
   })
   // A refresh rechecks permission; the previous response is not proof of current access.
   const state = userId && !isValidating && data && 'state' in data && data.checkedAt >= mountedAt ? data.state : undefined
