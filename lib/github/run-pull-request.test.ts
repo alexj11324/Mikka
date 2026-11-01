@@ -23,8 +23,8 @@ function stub(options: { title?: string; permission?: string; userId?: number; p
     const body = init?.body ? JSON.parse(String(init.body)) : null
     const authorization = new Headers(init?.headers).get('authorization') ?? ''
     calls.push({ path, method, body, authorization })
-    if (path.endsWith('/installation')) return options.installed === false ? Response.json({}, { status: 404 }) : Response.json({ id: 99, suspended_at: null, permissions: { pull_requests: options.prPermission ?? 'write', contents: 'read' } })
-    if (path.endsWith('/access_tokens')) return Response.json({ token: body?.permissions?.pull_requests === 'write' ? 'synthetic-write-token' : 'synthetic-read-token', expires_at: '2099-01-01T00:00:00Z' })
+    if (path.endsWith('/installation')) return options.installed === false ? Response.json({}, { status: 404 }) : Response.json({ id: 99, suspended_at: null, permissions: { pull_requests: options.prPermission ?? 'write', contents: 'write' } })
+    if (path.endsWith('/access_tokens')) return Response.json({ token: body?.permissions?.contents === 'write' && !body?.permissions?.actions ? 'synthetic-draft-token' : body?.permissions?.pull_requests === 'write' ? 'synthetic-write-token' : 'synthetic-read-token', expires_at: '2099-01-01T00:00:00Z' })
     if (path === '/user/456') return options.forbiddenUser ? Response.json({}, { status: 404 }) : Response.json({ id: options.userId ?? 456, login: 'new-login' })
     if (path.endsWith('/collaborators/new-login/permission')) return Response.json({ permission: options.permission ?? 'write', user: { id: options.userId ?? 456, login: 'new-login' } })
     if (path === '/repos/owner/repo') return Response.json({ id: 789, full_name: 'owner/repo', default_branch: 'trunk' })
@@ -41,7 +41,9 @@ function stub(options: { title?: string; permission?: string; userId?: number; p
       if (options.create === 'malformed') return Response.json({}, { status: 201 })
       return Response.json({ ...pr, ...(options.title ? { title: options.title } : {}), draft: body?.draft === true }, { status: 201 })
     }
-    if (path === '/graphql') return Response.json({ data: { convertPullRequestToDraft: { pullRequest: { id: pr.node_id, isDraft: true } } } })
+    if (path === '/graphql') return authorization === 'Bearer synthetic-draft-token'
+      ? Response.json({ data: { convertPullRequestToDraft: { pullRequest: { id: pr.node_id, isDraft: true } } } })
+      : Response.json({ data: { convertPullRequestToDraft: null }, errors: [{ type: 'FORBIDDEN', message: 'Resource not accessible by integration' }] })
     throw new Error(`Unexpected test request ${method} ${path}`)
   }) as typeof fetch
   return { calls, fetcher }
@@ -108,6 +110,7 @@ test('missing verification opens an explicitly unverified draft PR', async () =>
   const create = calls.find(call => call.path.endsWith('/pulls') && call.method === 'POST')!
   assert.equal(create.body?.draft, true)
   assert.match(String(create.body?.body), /Verification was not run/)
+  assert.ok(!calls.some(call => call.path.endsWith('/access_tokens') && (call.body?.permissions as Record<string, unknown>)?.contents === 'write'), 'creating a draft needs no contents write token')
 })
 
 test('an unverified continuation converts its existing marked open PR to draft', async () => {
@@ -117,6 +120,10 @@ test('an unverified continuation converts its existing marked open PR to draft',
   const convert = calls.find(call => call.path === '/graphql')!
   assert.deepEqual(convert.body?.variables, { id: pr.node_id })
   assert.match(String(convert.body?.query), /convertPullRequestToDraft/)
+  assert.equal(convert.authorization, 'Bearer synthetic-draft-token')
+  const token = calls.find(call => call.path.endsWith('/access_tokens') && (call.body?.permissions as Record<string, unknown>)?.contents === 'write')!
+  assert.deepEqual(token.body, { repository_ids: [789], permissions: { metadata: 'read', pull_requests: 'write', contents: 'write' } })
+  assert.ok(calls.findIndex(call => call.path.endsWith('/pulls') && call.method === 'GET') < calls.indexOf(token), 'only an already matched task PR needs draft conversion authority')
 })
 
 test('a full task output list refuses a new external PR before POST', async () => {

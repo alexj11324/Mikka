@@ -180,7 +180,11 @@ export async function openRunPullRequest(options: Options & {
     // Only a task-marked PR may be converted; never reopen a closed/merged PR.
     if (options.draft && pr.state === 'open' && !pr.draft && !pr.merged_at) {
       if (!pr.node_id) throw new PublicationError('github_request_failed')
-      const converted = parse(z.object({ data: z.object({ convertPullRequestToDraft: z.object({ pullRequest: z.object({ id: z.string(), isDraft: z.literal(true) }) }) }) }), await write(() => request('/graphql', writeToken, {
+      // GitHub's draft conversion also requires contents:write, unlike PR creation.
+      const draftToken = parse(tokenSchema, await request(`/app/installations/${binding.installationId}/access_tokens`, access.jwt, {
+        method: 'POST', body: { repository_ids: [binding.repositoryId], permissions: { metadata: 'read', pull_requests: 'write', contents: 'write' } },
+      })).token
+      const converted = parse(z.object({ data: z.object({ convertPullRequestToDraft: z.object({ pullRequest: z.object({ id: z.string(), isDraft: z.literal(true) }) }) }) }), await write(() => request('/graphql', draftToken, {
         method: 'POST', body: {
           query: 'mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { pullRequest { id isDraft } } }',
           variables: { id: pr.node_id },
