@@ -57,7 +57,7 @@ export function isSchemaOnly(files) {
 //   and any existing spec the pull request edits;
 // - main: every code-bearing push to main runs the functional spec files below
 //   (whole files, including the smoke files) on four shards;
-// - full: nightly, manual runs and integrate/* pull requests run every spec plus
+// - full: nightly, manual runs and integration/* (and older integrate/*) pull requests run every spec plus
 //   performance on four shards. Unsafe modes and unknown ranges also take full.
 // Every spec file belongs to main or to the nightly-only list, so a new spec has
 // to choose its tier; a test is never dropped, only scheduled later.

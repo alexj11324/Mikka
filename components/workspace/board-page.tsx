@@ -133,7 +133,8 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000 })
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
-  const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run.status); return state ? [[run.issueId, state] as const] : [] })), [runs])
+  // listTaskRuns returns each task's newest run once; the card shows that run's group, never its raw status.
+  const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run, issues.find(issue => issue.id === run.issueId)); return state ? [[run.issueId, state] as const] : [] })), [runs, issues])
   const subtasks = useMemo(() => {
     const result = new Map<string, { done: number; total: number }>()
     for (const issue of issues) {

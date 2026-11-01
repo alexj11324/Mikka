@@ -38,7 +38,9 @@ its existing protected status names and real acceptance coverage.
   public and points Vercel Production at it (template id and worker hash in one
   request), then redeploys Production. A `check` job first compares the worker
   hash with Production's and stops when it is unchanged. Pull requests run only
-  its unit tests.
+  its unit tests. Branch testing uses a `-dev` template built from the branch,
+  never the production template or Vercel's production variables
+  (`docs/dev-workflow.md` § 7).
   The build job holds only `E2B_API_KEY` (Infisical `prod:/vercel`) and the
   check and publish jobs only `VERCEL_TEAM_TOKEN` (`prod:/platform`), both read through the
   existing GitHub OIDC identity.

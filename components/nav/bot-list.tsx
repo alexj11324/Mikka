@@ -8,6 +8,8 @@ import { PanelLeft, Plus, Users } from 'lucide-react'
 import { botChatSummaries, getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
 import type { Thread } from '@/app/actions/task-runs'
+import type { listIssues } from '@/app/actions/issues'
+import { botAttention } from '@/lib/bot-mood'
 import { MikkaMark } from '@/components/brand/mikka-mark'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -29,11 +31,15 @@ import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
  */
 export type ChatTarget = { kind: 'coordinator' } | { kind: 'bot'; botId: string } | { kind: 'agent'; sessionId: string | null } | { kind: 'group'; id: string; title: string; workspaceId: string }
 
+type Issue = Awaited<ReturnType<typeof listIssues>>[number]
+
 type ListProps = {
   bots: BotView[]
   /** The workspace whose group chats are listed with the bots (R-01). */
   workspaceId: string | null
   threads: Thread[]
+  /** The tasks the threads work on: a closed task or merged PR settles a thread, as in the right column. */
+  issues: Issue[]
   active: ChatTarget | null
   onOpen: (target: ChatTarget) => void
   onNewBot: () => void
@@ -83,16 +89,6 @@ function useUnread(activeId: string | null, latest: Record<string, string>) {
   return (id: string) => !!seen && id !== activeId && !!latest[id] && latest[id] > (seen.at[id] ?? seen.since)
 }
 
-/** A bot's mood from its chat and threads: waiting on you, then working, then a failed last run, else idle. */
-function botMood(threads: Thread[], botId: string, chatting: boolean): BotMood {
-  const own = threads.filter(thread => thread.botId === botId)
-  if (own.some(thread => thread.status === 'waiting_input')) return 'notify'
-  if (chatting || own.some(thread => ['queued', 'preparing', 'running', 'finishing'].includes(thread.status))) return 'thinking'
-  // Threads arrive newest first: a failure stays on its face until the next run.
-  return own[0]?.status === 'failed' ? 'exclaim' : 'idle'
-}
-
-
 /** Green while the bot is working, orange while it waits on you; otherwise no dot. */
 type RowStatus = 'working' | 'waiting'
 
@@ -124,7 +120,7 @@ export function BotList({ phoneOnly = false, ...props }: ListProps) {
   return phoneOnly && !isMobile ? null : <BotListBody {...props} />
 }
 
-function BotListBody({ bots, workspaceId, threads, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: Omit<ListProps, 'phoneOnly'>) {
+function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: Omit<ListProps, 'phoneOnly'>) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
   const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat())
@@ -192,7 +188,7 @@ function BotListBody({ bots, workspaceId, threads, active, onOpen, onNewBot, rai
           }
           const { bot } = row
           const chat = chats[bot.id]
-          const mood = botMood(threads, bot.id, chat?.working ?? false)
+          const mood: BotMood = botAttention(threads, bot.id, chat?.working ?? false, id => issues.find(issue => issue.id === id))
           const status: RowStatus | undefined = mood === 'notify' ? 'waiting' : mood === 'thinking' ? 'working' : undefined
           return <Row key={bot.id} name={bot.name} label={bot.name} current={active?.kind === 'bot' && active.botId === bot.id} unread={unread(bot.id)} onClick={() => choose({ kind: 'bot', botId: bot.id })}
             avatar={<BotAvatar color={bot.color} shape={bot.shape} mood={mood} />} status={status}

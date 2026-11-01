@@ -19,6 +19,8 @@ export interface TaskRun {
   /** The Agent running the newest thread (Claude Code, Codex): the desktop notification's line (R-78). */
   agentName: string
   status: RunStatus
+  /** How it came out once it ended, as the decision model judged it; null while running or not judged yet (R-52). */
+  outcome: RunOutcome | null
   error: string | null
   finishedAt: string | null
   /** The Bot that owns the task's newest thread, with its own bloub look (R-25); null for the Coordinator's own work. */
@@ -35,12 +37,12 @@ export async function listTaskRuns(): Promise<TaskRun[]> {
   await reclaimLostRuns(session.user.id).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error))
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
     issueId: agentRuns.issueId, issueTitle: issues.title, agentId: agentRuns.agentId, agentName: runAgentName,
-    status: agentRuns.status, error: agentRuns.error, finishedAt: agentRuns.finishedAt,
+    status: agentRuns.status, outcome: agentRuns.outcome, error: agentRuns.error, finishedAt: agentRuns.finishedAt,
     botId: runBotId,
     harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).innerJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(eq(agentRuns.userId, session.user.id), isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
-    .orderBy(agentRuns.issueId, desc(agentRuns.createdAt)).limit(200)
+    .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
   const botIds = [...new Set(rows.flatMap(row => row.botId ? [row.botId] : []))]
   const looks = botIds.length ? await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots).where(and(eq(bots.ownerId, session.user.id), inArray(bots.id, botIds))) : []
   return rows.map(({ botId, ...row }) => ({ ...row, issueId: row.issueId!, finishedAt: row.finishedAt?.toISOString() ?? null, bot: looks.find(look => look.id === botId) ?? null }))

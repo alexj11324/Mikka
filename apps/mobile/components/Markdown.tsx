@@ -1,7 +1,8 @@
 import { type ReactNode } from 'react'
 import { Linking, Pressable, StyleSheet, View } from 'react-native'
 import { CircleDot } from 'lucide-react-native'
-import { StatusIcon, threadStatus } from '@/components/icons'
+import { StatusIcon } from '@/components/icons'
+import { runIcon } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
 import { runTitle, type CitationSource } from '@/lib/types'
 import { colors, font } from '@/lib/theme'
@@ -107,7 +108,7 @@ export function MentionChip({ source, onPress }: { source: CitationSource; onPre
   const label = source.kind === 'issue' ? source.title : runTitle(source)
   return (
     <Pressable accessibilityRole="link" onPress={onPress} style={styles.mention}>
-      {source.kind === 'run' ? <StatusIcon status={threadStatus(source.status)} size={14} /> : <CircleDot size={14} color={colors.secondary} strokeWidth={2} />}
+      {source.kind === 'run' ? <StatusIcon status={runIcon(source)} size={14} /> : <CircleDot size={14} color={colors.secondary} strokeWidth={2} />}
       <Text style={styles.mentionText} numberOfLines={1}>{label}</Text>
     </Pressable>
   )
