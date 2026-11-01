@@ -3211,7 +3211,13 @@
     "retryStop": "重试停止",
     "waiting": "等你回复",
     "chatTab": "对话",
-    "acceptanceTab": "验收"
+    "acceptanceTab": "验收",
+    "stages": {
+      "repository": "准备仓库",
+      "worktree": "创建工作区",
+      "agent_start": "启动 agent",
+      "duration": "{seconds}s"
+    }
   },
   "Computer": {
     "status": {

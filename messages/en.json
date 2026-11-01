@@ -3211,7 +3211,13 @@
     "retryStop": "Try stopping again",
     "waiting": "Waiting for you",
     "chatTab": "Chat",
-    "acceptanceTab": "Acceptance"
+    "acceptanceTab": "Acceptance",
+    "stages": {
+      "repository": "Repository",
+      "worktree": "Worktree",
+      "agent_start": "Agent start",
+      "duration": "{seconds}s"
+    }
   },
   "Computer": {
     "status": {
