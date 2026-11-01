@@ -46,6 +46,21 @@ export async function chatBotId(ownerId: string, botId: string | null | undefine
   return botId ?? (await coordinatorBot(ownerId, options)).botId
 }
 
+/**
+ * The bot list (web left column, mobile home): the person's bots in this
+ * workspace with their Coordinator first, marked `coordinator`. The
+ * Coordinator is one per person, so its row is listed in every workspace they
+ * open, as before it had one; the list draws it as the Coordinator, once.
+ */
+export async function listOwnerBots(ownerId: string, workspaceId: string) {
+  const [{ db }, { bots }, { and, asc, desc, eq, or, sql }] = await Promise.all([import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm')])
+  const { botId } = await coordinatorBot(ownerId)
+  const isCoordinator = sql<boolean>`${bots.id} = ${botId}`
+  return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, coordinator: isCoordinator }).from(bots)
+    .where(and(eq(bots.ownerId, ownerId), or(eq(bots.workspaceId, workspaceId), eq(bots.id, botId))))
+    .orderBy(desc(isCoordinator), asc(bots.createdAt))
+}
+
 /** Whether this bot is the person's Coordinator (in any workspace). */
 export async function isCoordinatorBot(query: Pick<Pool, 'query'>, ownerId: string, botId: string): Promise<boolean> {
   return Boolean((await query.query('SELECT 1 FROM coordinator_bots WHERE "ownerId"=$1 AND "botId"=$2', [ownerId, botId])).rowCount)

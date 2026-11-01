@@ -378,7 +378,9 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const rail: RailDestination | null = section === 'coordinator' || section === 'agent' || section === 'group' ? 'chats' : section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? section : ['all-issues', 'my-issues', 'team-issues'].includes(section) ? 'board' : null
   // The board, 建议 and Artifact keep only the rail on their left (MIK-45, Figma F2/F8).
   const fullPage = rail === 'board' || rail === 'suggestions' || rail === 'artifacts' || rail === 'plugins'
-  const activeBot = section === 'coordinator' && activeBotId ? bots.find(bot => bot.id === activeBotId) ?? (createdBot?.id === activeBotId ? createdBot : undefined) : undefined
+  // The Coordinator's bot row opens as the Coordinator's chat, never as a second bot.
+  const coordinatorBot = bots.find(bot => bot.coordinator)
+  const activeBot = section === 'coordinator' && activeBotId && activeBotId !== coordinatorBot?.id ? bots.find(bot => bot.id === activeBotId) ?? (createdBot?.id === activeBotId ? createdBot : undefined) : undefined
   const activeChat: ChatTarget | null = section === 'coordinator' ? activeBot ? { kind: 'bot', botId: activeBot.id } : { kind: 'coordinator' } : section === 'agent' ? { kind: 'agent', sessionId: activeAgentId } : section === 'group' && groupRequest ? { kind: 'group', ...groupRequest } : null
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
   const openSettings = (href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }
@@ -438,12 +440,12 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     {browserShown && <BrowserPane onClose={() => showBrowser(false)} />}
     {/* The panel springs only when the person opens or closes it; leaving or entering a conversation shows it at its final width. */}
     {isConversation && <AnimatePresence initial={false}>{panelOpen && !browserShown && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenIssue={id => { open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => showPanel(false)}
-      conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}</AnimatePresence>}
+      conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id ?? coordinatorChat?.botId, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}</AnimatePresence>}
     {isConversation && !browserShown && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
       <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>
         <ContextPanel sheet workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenIssue={id => { setPanelSheet(false); open(id) }} onSearch={() => setSearchOpen(true)} onClose={() => setPanelSheet(false)}
-      conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />
+      conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id ?? coordinatorChat?.botId, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />
       </SheetContent>
     </Sheet>}
     {dialogs}

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import type { ModelMessage } from 'ai'
-import { dbUrl, seedAgent, seedIssue, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 const SECRET = 'isolated-ci-coordinator-backfill-fixture-key-0000'
 
@@ -30,7 +30,8 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
       'DELETE FROM agents WHERE "userId" = ANY($1)', 'DELETE FROM issues WHERE "userId" = ANY($1)',
       'DELETE FROM bot_model_choices WHERE "ownerId" = ANY($1)', 'DELETE FROM chat_preferences WHERE "userId" = ANY($1)',
       'DELETE FROM user_schedules WHERE owner_id = ANY($1)', 'DELETE FROM agent_kit_heads WHERE owner_id = ANY($1)',
-      'DELETE FROM coordinator_bots WHERE "ownerId" = ANY($1)', 'DELETE FROM bots WHERE "ownerId" = ANY($1)',
+      'DELETE FROM coordinator_bots WHERE "ownerId" = ANY($1)', 'DELETE FROM bot_desktops WHERE "ownerId" = ANY($1)', 'DELETE FROM bots WHERE "ownerId" = ANY($1)',
+      'DELETE FROM mikka_team_members WHERE "userId" = ANY($1)', 'DELETE FROM mikka_teams WHERE "workspaceId" IN (SELECT id FROM mikka_workspaces WHERE "userId" = ANY($1))',
       'DELETE FROM mikka_workspace_members WHERE "userId" = ANY($1)', 'DELETE FROM mikka_workspaces WHERE "userId" = ANY($1)',
       'DELETE FROM "user" WHERE id = ANY($1)',
     ]) await pool.query(statement, [users])
@@ -147,5 +148,41 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
       assert.equal(await botMayUseApp(botId, 'gmail'), true)
       assert.equal(await botMayUseApp(other, 'gmail'), false)
     } finally { await pool.query('DELETE FROM workspace_app_policies WHERE "workspaceId"=$1', [workspaceId]) }
+  })
+
+  await t.test('the bot list (left column and mobile home) has the Coordinator once, as the Coordinator, in every workspace', async () => {
+    const p = await person('bot-list')
+    // A bot the person named "Coordinator" themselves stays an ordinary bot.
+    const theirs = await seedBot(pool, p.workspaceId, p.id, 'Coordinator')
+    const team = await seedWorkspace(pool, p.id, [{ userId: p.id, role: 'admin' }])
+    const teamBot = await seedBot(pool, team.id, p.id, 'Writer')
+    const { botId } = await bots.coordinatorBot(p.id)
+    const here = await bots.listOwnerBots(p.id, p.workspaceId)
+    assert.deepEqual(here.map(bot => [bot.id, bot.coordinator]), [[botId, true], [theirs, false]], 'first, once, and marked')
+    const there = await bots.listOwnerBots(p.id, team.id)
+    assert.deepEqual(there.map(bot => [bot.id, bot.coordinator]), [[botId, true], [teamBot, false]], 'one per person: listed in the other workspace too')
+    // Its chat summary is under the same id, so the list draws one entry from it.
+    await pool.query(`INSERT INTO coordinator_messages (id,"userId","botId",position,message) VALUES ($1,$2,$3,1,'{"role":"assistant","content":"Morning"}')`, [randomUUID(), p.id, botId])
+    const summaries = await store.botChats(p.id)
+    assert.deepEqual(Object.keys(summaries), [botId])
+    assert.equal(summaries[botId].line, 'Morning')
+  })
+
+  await t.test('a leaving member\'s Coordinator is paused with their bots and never transferred', async () => {
+    const admin = await person('transfer-admin')
+    const leaving = await seedUser(pool, 'transfer-leaving')
+    users.push(leaving)
+    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'member','active')`, [admin.workspaceId, leaving, `${leaving}@example.invalid`])
+    const helper = await seedBot(pool, admin.workspaceId, leaving, 'Helper')
+    const coordinator = await bots.coordinatorBot(leaving)
+    assert.equal(coordinator.workspaceId, admin.workspaceId, 'their only workspace holds their Coordinator')
+    const members = await import('../lib/workspace-admin/members')
+    const removed = await members.removeMember(admin.id, admin.workspaceId, leaving, admin.id)
+    assert.deepEqual(removed.transferred, { bots: 1 }, 'only their own bot is handed over')
+    const rows = Object.fromEntries((await pool.query<{ id: string; ownerId: string; archived: boolean }>('SELECT id,"ownerId","archivedAt" IS NOT NULL AS archived FROM bots WHERE id = ANY($1)', [[helper, coordinator.botId]])).rows.map(row => [row.id, row]))
+    assert.deepEqual([rows[helper].ownerId, rows[helper].archived], [admin.id, false])
+    assert.deepEqual([rows[coordinator.botId].ownerId, rows[coordinator.botId].archived], [leaving, true], 'their Coordinator stays theirs, paused')
+    assert.deepEqual(await members.takeOverBot(admin.id, admin.workspaceId, coordinator.botId), { bots: 0 }, 'an admin cannot take it over')
+    assert.equal((await pool.query('SELECT "ownerId" FROM bots WHERE id=$1', [coordinator.botId])).rows[0].ownerId, leaving)
   })
 })

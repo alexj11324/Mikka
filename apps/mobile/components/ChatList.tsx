@@ -16,7 +16,8 @@ export function useChatRows(needle = '') {
   const groups = useApi<{ conversations: GroupSummary[] }>(home.data ? `/api/conversations?workspaceId=${home.data.workspace.id}` : null, 30_000)
   const match = (name: string) => !needle || name.toLowerCase().includes(needle)
   const rows: ChatRow[] = [
-    ...(home.data?.bots ?? []).filter(bot => match(bot.name)).map(bot => ({ kind: 'bot' as const, bot, at: bot.at ?? '' })),
+    // The Coordinator's bot row is the pinned Coordinator entry, not another row.
+    ...(home.data?.bots ?? []).filter(bot => !bot.coordinator && match(bot.name)).map(bot => ({ kind: 'bot' as const, bot, at: bot.at ?? '' })),
     ...(groups.data?.conversations ?? []).filter(group => match(group.title))
       .map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt })),
   ].sort((a, b) => b.at.localeCompare(a.at))

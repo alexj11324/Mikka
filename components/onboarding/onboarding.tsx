@@ -130,7 +130,8 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
   useEffect(() => {
     if (opened.current || bots === undefined) return
     opened.current = true
-    const existing = bots[0]
+    // The person's first own bot; their Coordinator is not one they made here.
+    const existing = bots.find(bot => !bot.coordinator)
     if (existing) {
       setBot(existing); setColor(existing.color as BotColor); setShape(existing.shape as BotShape); setStage('chat')
       void run(() => afterName(existing))

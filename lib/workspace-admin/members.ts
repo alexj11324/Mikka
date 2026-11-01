@@ -37,7 +37,10 @@ async function requireTransferTarget(tx: WorkspaceTransaction, workspaceId: stri
  * bindings) are removed and recreated for the new owner on first use. The
  * agent-kit history is immutable and keyed by its owner, so it is removed too:
  * the bot continues on the built-in definition for its new owner.
- * Refused while any of those bots is still working.
+ * Refused while any of those bots is still working. The person's Coordinator
+ * (coordinator_bots) is never handed over: every member has their own, so it
+ * is paused with their other bots when they leave (releaseDepartingMember)
+ * and stays theirs.
  */
 export async function transferBots(tx: MainTransaction, workspaceId: string, fromUserId: string, toUserId: string, only?: string[]): Promise<AssetTransfer> {
   const owned = await tx.select({ id: bots.id, name: bots.name }).from(bots)

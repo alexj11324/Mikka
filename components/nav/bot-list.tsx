@@ -120,11 +120,14 @@ export function BotList({ bots, workspaceId, threads, active, onOpen, onNewBot, 
   const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: 15000 })
   // Group chats sit among the bots (R-01), ordered by their latest message.
   const { data: groups = [] } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: 15000 })
-  const rows = [...bots.map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
+  // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots.
+  const rows = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
     .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
   const lastReply = coordinator?.items.findLast(item => item.from !== 'event')
   const latest: Record<string, string> = {}
-  for (const [botId, chat] of Object.entries(chats)) if (chat.at) latest[botId] = chat.at
+  // The Coordinator's row is read as 'coordinator', from its chat's latest reply below.
+  const coordinatorId = bots.find(bot => bot.coordinator)?.id
+  for (const [botId, chat] of Object.entries(chats)) if (chat.at && botId !== coordinatorId) latest[botId] = chat.at
   for (const group of groups) if (group.lastMessage) latest[group.id] = group.lastMessage.createdAt
   if (lastReply?.from === 'coordinator') latest.coordinator = lastReply.createdAt
   const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : active?.kind === 'group' ? active.id : null

@@ -145,7 +145,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const { db } = await import('../lib/db')
     const { eq } = await import('drizzle-orm')
     const [row] = await db.select({ botId: runBotId }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, first.runId))
-    assert.equal(row.botId, null, 'the thread opens in the Coordinator chat')
+    assert.equal(row.botId, coordinator, 'the thread belongs to the Coordinator bot row, which the left column opens as the Coordinator chat')
   })
 
   await t.test('MIKKA_CLOUD_COMPUTER_TASKS=0: no runtime is created and the bot shows the card', async () => {
