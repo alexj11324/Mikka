@@ -7,22 +7,18 @@ import { getIssueThread } from '@/app/actions/agents'
 import { listBots } from '@/app/actions/bots'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
-import { StatusDot } from '@/components/nav/status-dot'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
 import type { ArtifactListItem } from '@/lib/artifacts/types'
-import { runIsActive } from '@/lib/issue-run-conversation'
 
 const ArtifactViewer = dynamic(() => import('./artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
-
-/** A thread's status as the dot in front of its name. */
-const dotStatus = (status: string) => status === 'waiting_input' ? 'waiting' : runIsActive(status) ? 'running' : status === 'succeeded' ? 'done' : status
 
 /**
  * An artifact in the reader window (F4 `395:27525`), from the Artifact page or
  * a thread's 「Artifact · N」. One a thread made sits beside that thread's
- * conversation, headed by its status dot and name (a skeleton while they
- * load); a thread takes no quotes, so the window offers none.
+ * conversation, headed by its name (a skeleton while it loads); its state is
+ * the thread's own badge below, the one source (R-34), so the header has no
+ * second status dot. A thread takes no quotes, so the window offers none.
  *
  * A run without a task has no thread view, so its artifact sits beside the
  * chat of the bot that ran it (`botId`, from the run): what is typed there
@@ -38,7 +34,7 @@ export function ArtifactWindow({ artifact, onChange, onClose, onOpenIssue }: { a
   const { data: bots, error: botsError } = useSWR(botId && !(runId && issueId) ? 'bots' : null, listBots)
   const bot = botId ? bots?.find(item => item.id === botId) : undefined
   if (runId && issueId) return <ArtifactViewer artifactId={artifact.id} onArtifactChange={onChange} onClose={onClose} quotes={[]} canQuote={false}
-    bot={{ name: thread ? thread.thread.detail?.name ?? tThreads('title') : '', avatar: thread ? <StatusDot status={dotStatus(thread.thread.status)} /> : <Skeleton className="size-2 rounded-full" /> }}
+    bot={{ name: thread ? thread.thread.detail?.name ?? tThreads('title') : '', avatar: null }}
     chat={() => <IssueThreadPanel issueId={issueId} runId={runId} onClose={onClose} bare />} />
   // The bot's look and name come with the bot list; a bot that is gone, or a list that failed, falls back to the Coordinator.
   if (botId && !bots && !botsError) return <ArtifactViewer artifactId={artifact.id} onArtifactChange={onChange} onClose={onClose} quotes={[]}
