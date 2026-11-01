@@ -129,7 +129,8 @@ export function groupThreads<T extends GroupedThread>(threads: readonly T[], iss
 export type PrGroup = 'review' | 'running' | 'merged'
 export const PR_GROUPS: readonly PrGroup[] = ['review', 'running', 'merged']
 
-export type PullRequestRow = { url: string; number: number; issueId: string; group: PrGroup }
+/** `state` is GitHub's, for the row's PR icon (R-34: never colour alone). */
+export type PullRequestRow = { url: string; number: number; issueId: string; group: PrGroup; state: Exclude<PrLink['state'], 'closed'> }
 type PrIssue = { id: string; metadata: { pullRequests: readonly PrLink[] } }
 
 /**
@@ -151,7 +152,7 @@ export function pullRequestsOf(threads: readonly Omit<GroupedThread, 'createdAt'
     for (const pr of issue.metadata.pullRequests) {
       const number = Number(/\/pull\/(\d+)\/?$/.exec(pr.url)?.[1])
       if (pr.state === 'closed' || !number || rows.some(row => row.url === pr.url)) continue
-      rows.push({ url: pr.url, number, issueId: issue.id, group: pr.state === 'merged' ? 'merged' : running ? 'running' : 'review' })
+      rows.push({ url: pr.url, number, issueId: issue.id, group: pr.state === 'merged' ? 'merged' : running ? 'running' : 'review', state: pr.state })
     }
   }
   return rows

@@ -3220,6 +3220,11 @@
       "noRoutines": "No routines yet",
       "noLibrary": "No files yet",
       "noPullRequests": "No PRs yet",
+      "noMatches": "No matches",
+      "members": "Members ({count})",
+      "membersLoading": "Members",
+      "membersError": "Members failed to load",
+      "retry": "Retry",
       "prGroup": {
         "review": "Waiting for review ({count})",
         "running": "In progress ({count})",
@@ -3451,6 +3456,7 @@
     "frameTitle": "{title} (web page)",
     "share": "Share",
     "createLink": "Create link",
+    "shareAccess": "Anyone with the link can view",
     "copyLink": "Copy link",
     "linkCopied": "Link copied",
     "stopSharing": "Stop sharing",
@@ -3553,7 +3559,7 @@
   },
   "GroupChat": {
     "untitled": "Untitled group chat",
-    "readOnly": "Group chats are read-only for now; sending isn't open yet.",
+    "composer": "Sending to groups isn't open yet",
     "messages": "Group chat messages",
     "you": "You",
     "member": "Member",

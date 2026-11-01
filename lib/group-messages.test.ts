@@ -46,6 +46,13 @@ test('newest-first pages read oldest first, by bigint position, without duplicat
   assert.deepEqual(group.chronological(huge).map(item => item.position), ['9007199254740992', '9007199254740993'])
 })
 
+test('(mock fetch) members come from the basePath route; a 404 is not_found', async () => {
+  assert.equal(new URL(group.groupMembersUrl(ID), 'https://app.test').pathname, `/mikka/api/conversations/${ID}/members`)
+  const members = [{ id: 'u1', name: '林晓', memberType: 'user' }, { id: 'b1', name: 'QA 巡检', memberType: 'bot', color: 'violet', shape: 'cercle' }]
+  assert.deepEqual(await group.fetchGroupMembers(ID, (async () => Response.json({ members })) as typeof fetch), members)
+  await assert.rejects(group.fetchGroupMembers(ID, (async () => Response.json({}, { status: 404 })) as typeof fetch), (error: unknown) => error instanceof group.GroupMessagesRequestError && error.code === 'not_found')
+})
+
 test('consecutive messages from one author form one run', () => {
   const runs = group.authorRuns([message('1', 'u1'), message('2', 'u1'), message('3', 'a1', 'agent'), message('4', 'u1')])
   assert.deepEqual(runs.map(run => [run.authorType, run.authorId, run.messages.length]), [['user', 'u1', 2], ['agent', 'a1', 1], ['user', 'u1', 1]])

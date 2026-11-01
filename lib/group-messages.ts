@@ -63,3 +63,28 @@ export function authorRuns(messages: GroupMessage[]) {
   }
   return runs
 }
+
+/** One member from GET /api/conversations/{id}/members: a person, or a bot or agent with its look. */
+export type GroupMember = {
+  id: string
+  name: string
+  memberType: 'user' | 'agent' | 'bot'
+  avatarUrl?: string | null
+  role?: string
+  color?: string
+  shape?: string
+}
+
+export function groupMembersUrl(id: string) {
+  return withBasePath(`/api/conversations/${encodeURIComponent(id)}/members`)
+}
+
+/** The group's current members (R-13 详情): people first, then bots and agents. Same errors as the message pages. */
+export async function fetchGroupMembers(id: string, fetcher: typeof fetch = fetch): Promise<GroupMember[]> {
+  let response: Response
+  try { response = await fetcher(groupMembersUrl(id), { cache: 'no-store', credentials: 'same-origin' }) }
+  catch { throw new GroupMessagesRequestError('unavailable') }
+  const body = await response.json().catch(() => null) as { members?: GroupMember[] } | null
+  if (response.ok && body && Array.isArray(body.members)) return body.members
+  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
+}
