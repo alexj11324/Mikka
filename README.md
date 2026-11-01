@@ -331,6 +331,14 @@ daemon. Builds, type checks and end-to-end tests run there or in CI.
 Credentials live in Infisical Cloud; never commit them or store them in a local
 `.env` file.
 
+In a fresh cloud Linux session, one command sets up PostgreSQL 17 with
+`mikka_e2e` migrated, Node 24, dependencies, the sandbox tools and Playwright
+(see [docs/local-bootstrap.md](docs/local-bootstrap.md)):
+
+```sh
+eval "$(scripts/dev/bootstrap-local.sh)"
+```
+
 Install dependencies and run the source checks:
 
 ```sh
