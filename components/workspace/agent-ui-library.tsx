@@ -29,7 +29,7 @@ const renderers = {
   BeCodeBlock: AgentCodeContent,
   BeCard: ({ props, renderNode }) => <BeCard size="compact" className="min-w-0">
     <BeCardHeader><BeCardTitle as="h3">{props.title}</BeCardTitle>{props.description && <BeCardDescription>{props.description}</BeCardDescription>}</BeCardHeader>
-    <BeCardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</BeCardContent>
+    <BeCardContent className="flex min-w-0 flex-col gap-2">{renderNode(props.children)}</BeCardContent>
   </BeCard>,
   BeCardGrid: ({ props, renderNode }) => <div className="@container/agent-cards w-full min-w-0"><div role="group" aria-label={agentCopy.illustratedRecommendationCards} className="grid min-w-0 grid-cols-1 items-stretch gap-4 @min-[26rem]/agent-cards:grid-cols-2 @min-[44rem]/agent-cards:grid-cols-3">{renderNode(props.children)}</div></div>,
   BeImageCard: ({ props }) => <AgentImageCard {...props} />,

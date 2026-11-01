@@ -7,6 +7,7 @@ import { Citations } from '@/components/agents/citations'
 import { FileDiff, type FileDiffLine } from '@/components/agents/file-diff'
 import { FileTree, FileTreeFile, FileTreeFolder } from '@/components/motion/file-tree'
 import { Table, type TableColumn, type TableLabels } from '@/components/motion/table'
+import { useAgentCitations } from './agent-citations'
 
 type Cell = string | number
 const ROW_HEIGHT = 44
@@ -90,10 +91,13 @@ export function AgentFileDiff({ file, diff = '', language }: { file?: string; di
 /** Sources actually read, as beUI Citations. */
 export function AgentCitations({ sources = [] }: { sources?: { title: string; url: string }[] }) {
   const agentCopy = useAgentCopy()
+  // In a chat the reply's folded 「N 个来源」 already lists these links; one sources control per reply (R-39).
+  const inChat = useAgentCitations() !== null
   const citations = sources.map((source, index) => {
     let domain: string | undefined
     try { domain = new URL(source.url).hostname.replace(/^www\./, '') } catch { domain = undefined }
     return { id: String(index), title: source.title, url: source.url, domain }
   })
+  if (inChat) return null
   return <Citations title={agentCopy.sources} citations={citations} defaultOpen />
 }
