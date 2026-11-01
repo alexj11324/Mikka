@@ -11,9 +11,10 @@ const input = { remoteKey: 'v2/github.com/owner/repo', githubAccountId: '456', e
 const marker = `<!-- mikka-issue:${issueId} -->`
 const pr = { number: 77, node_id: 'PR_synthetic_77', html_url: 'https://github.com/owner/repo/pull/77', state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: input.branch, repo: { id: 789 } }, base: { repo: { id: 789 } } }
 
-function stub(options: { title?: string; permission?: string; userId?: number; prPermission?: string; installed?: boolean; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; forbiddenUser?: boolean } = {}) {
+function stub(options: { title?: string; permission?: string; userId?: number; prPermission?: string; contentsPermission?: string; installed?: boolean; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; forbiddenUser?: boolean } = {}) {
   const calls: { path: string; method: string; body: Record<string, unknown> | null; authorization: string }[] = []
   let created = false
+  const installed: Record<string, string> = { metadata: 'read', pull_requests: options.prPermission ?? 'write', contents: options.contentsPermission ?? 'write', checks: 'read', actions: 'write' }
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
     const parsed = new URL(String(url))
     assert.equal(parsed.origin, 'https://api.github.com')
@@ -23,7 +24,12 @@ function stub(options: { title?: string; permission?: string; userId?: number; p
     const body = init?.body ? JSON.parse(String(init.body)) : null
     const authorization = new Headers(init?.headers).get('authorization') ?? ''
     calls.push({ path, method, body, authorization })
-    if (path.endsWith('/installation')) return options.installed === false ? Response.json({}, { status: 404 }) : Response.json({ id: 99, suspended_at: null, permissions: { pull_requests: options.prPermission ?? 'write', contents: 'read' } })
+    if (path.endsWith('/installation')) return options.installed === false ? Response.json({}, { status: 404 }) : Response.json({ id: 99, suspended_at: null, permissions: installed })
+    if (path.endsWith('/access_tokens')) {
+      // GitHub refuses a token asking for more than the installation holds.
+      const rank: Record<string, number> = { read: 1, write: 2 }
+      for (const [name, level] of Object.entries(body?.permissions ?? {})) if ((rank[installed[name]] ?? 0) < rank[String(level)]) return Response.json({ message: 'The permissions requested are not granted to this installation.' }, { status: 422 })
+    }
     if (path.endsWith('/access_tokens')) return Response.json({ token: body?.permissions?.pull_requests === 'write' ? 'synthetic-write-token' : 'synthetic-read-token', expires_at: '2099-01-01T00:00:00Z' })
     if (path === '/user/456') return options.forbiddenUser ? Response.json({}, { status: 404 }) : Response.json({ id: options.userId ?? 456, login: 'new-login' })
     if (path.endsWith('/collaborators/new-login/permission')) return Response.json({ permission: options.permission ?? 'write', user: { id: options.userId ?? 456, login: 'new-login' } })
@@ -55,6 +61,17 @@ test('worker token is limited to the verified repository and can push, create PR
     contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read',
   } })
   assert.ok(calls.findIndex(call => call.path.includes('/permission')) < calls.indexOf(tokens[1]))
+})
+
+test('an installation that can only read code is named as the problem before any worker token is asked for', async () => {
+  const { calls, fetcher } = stub({ contentsPermission: 'read' })
+  await assert.rejects(issueRunGitHubInstallationToken({ ...input, fetcher }), (error: unknown) => error instanceof PublicationError && error.code === 'github_permission_required')
+  assert.equal(calls.filter(call => (call.body?.permissions as Record<string, unknown> | undefined)?.contents === 'write').length, 0)
+})
+
+test('opening a pull request still needs only read access to code', async () => {
+  const { fetcher } = stub({ contentsPermission: 'read' })
+  assert.deepEqual(await verifyGitHubRepositoryAccess({ ...input, fetcher }), { installationId: 99, repositoryId: 789, githubAccountId: '456', defaultBranch: 'trunk' })
 })
 
 test('a connected user without repository write access never receives a worker token', async () => {

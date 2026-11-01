@@ -86,6 +86,11 @@ The server resolves the installation for the repository, checks it is active and
 has `pull_requests: write` and `contents: read`, and uses a read-only repository
 token to resolve the user's stable GitHub account ID and check write/admin access.
 Only then does it mint a PR-write token restricted to the target repository ID.
+A run's own token (push, `gh`, CI) needs more: the installation must also hold
+`contents: write`, `checks: read` and `actions: read`, or the exchange answers 502
+with `github_permission_required`. The App's settings on GitHub must grant these.
+The linked account is the Plugins → GitHub connection; signing in with GitHub
+links nothing.
 Tokens and private keys never enter rows, workflow arguments, logs or responses.
 `github_repository_installations` stores only verified non-secret IDs.
 

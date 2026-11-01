@@ -14,9 +14,8 @@ let actor:string|null=null
 const credential=randomUUID()
 mock.module(new URL('../lib/auth.ts',import.meta.url).href,{namedExports:{auth:{api:{
   getSession:async()=>actor?{user:{id:actor},session:{id:randomUUID()}}:null,
-  listUserAccounts:async()=>[{id:'synthetic-account',userId:actor,providerId:'github',accountId:'42'}],
-  getAccessToken:async()=>({accessToken:credential}),
 }}}})
+mock.module(new URL('../lib/github/connection.ts',import.meta.url).href,{namedExports:{githubConnectionToken:async()=>({token:credential,githubAccountId:'42'})}})
 
 test('monitor mappings use actual owner/scope authorization, GitHub readback and durable local references',{skip:!target},async t=>{
   const pool=new Pool({connectionString:target,max:12})
