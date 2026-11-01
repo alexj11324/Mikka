@@ -88,7 +88,10 @@ export async function seedCoordinatorError(page: Page, error: string) {
   const db = database()
   const { rows: [session] } = await db.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
   if (!session) throw new Error('找不到当前登录会话。')
-  await db.query('INSERT INTO coordinator_sessions ("userId", "botId", "lastError", "lastErrorAt") VALUES ($1, NULL, $2, now()) ON CONFLICT ON CONSTRAINT coordinator_sessions_chat_key DO UPDATE SET "lastError" = $2, "lastErrorAt" = now()', [session.userId, error])
+  // The Coordinator's chat lives on its own bot row (coordinator_bots), created when the app first opens.
+  const { rows: [coordinator] } = await db.query<{ botId: string }>('SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1 LIMIT 1', [session.userId])
+  if (!coordinator) throw new Error('找不到当前登录账号的 Coordinator。')
+  await db.query('INSERT INTO coordinator_sessions ("userId", "botId", "lastError", "lastErrorAt") VALUES ($1, $2, $3, now()) ON CONFLICT ON CONSTRAINT coordinator_sessions_chat_key DO UPDATE SET "lastError" = $3, "lastErrorAt" = now()', [session.userId, coordinator.botId, error])
 }
 
 /** The signed-in person's workspace has a verified card and `remaining` microdollars of Mikka 默认 allowance (#523, #525). */
