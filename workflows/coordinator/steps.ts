@@ -368,15 +368,24 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
  * One task, one thread (lib/thread-dispatch.ts): a task with a thread gets the dispatch as that thread's work; only
  * `newThread`, when the person's own message (`sourceEventId`, host-supplied) explicitly asked for it, starts another.
  */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  const { newThread, sourceEventId, ...request } = input
+  const { newThread, sourceEventId, target, ...request } = input
   const { dispatchToTask, explicitNewThread } = await import('@/lib/thread-dispatch')
-  return asToolResult(() => dispatchToTask(userId, request.issueId, {
+  const { movesThread, runPlacement } = await import('@/lib/dispatch-target')
+  // The result says where the work actually runs, so the reply names that place and no other (decision 2026-11-01-1330).
+  const placed = async <T,>(result: T): Promise<T> => {
+    if (!result || typeof result !== 'object' || !('runId' in result) || typeof result.runId !== 'string') return result
+    return { ...result, placement: await runPlacement(pool, userId, result.runId) }
+  }
+  return asToolResult(async () => placed(await dispatchToTask(userId, request.issueId, {
     note: request.note, newThread,
+    // A named place other than the thread's own is a move, which only the person's explicit request grants.
+    moves: async previous => movesThread(target, await runPlacement(pool, userId, previous.id)),
     explicit: () => explicitNewThread(userId, botId, sourceEventId),
     start: async (previous, note) => {
+      if (!previous) return dispatchByRules(userId, { ...request, note }, scope, botId, execution, requestEventId, approvedRepositoryKey, target)
       // The thread's next run goes where the thread ran, so its session can be resumed; elsewhere it starts fresh with the note's context.
       if (previous?.cloud && (previous.harness === 'codex' || previous.harness === 'claude_code')) {
         const cloud = await dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId: request.issueId, harness: previous.harness, note, ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}) }, `thread:${previous.id}:${request.requestKey ?? requestEventId ?? crypto.randomUUID()}`, scope, execution)
@@ -387,13 +396,23 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
       }
       return dispatchByRules(userId, { ...request, note }, scope, botId, execution, requestEventId, approvedRepositoryKey)
     },
-  }))
+  })))
 }
 
 /** Where a new run goes by the saved label execution rules: the workspace's cloud, else an online device. */
-async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
+  // A computer the person named: theirs, not removed, online; otherwise refused or the card at once, never another computer.
+  if (place && place !== 'cloud') {
+    const { targetDevice } = await import('@/lib/dispatch-target')
+    const device = await targetDevice(pool, userId, place.deviceId)
+    if ('error' in device) return device.error === 'notFound'
+      ? { error: 'deviceNotFound' as const }
+      : { error: 'machineUnavailable' as const, issueId: input.issueId, card: (await import('@/lib/rule-dispatch')).machineUnavailableCard() }
+    const result = await queueRun(userId, { ...input, agentId: device.agentId, model: device.model, pinnedDeviceId: device.deviceId }, botId, execution, requestEventId, null, approvedRepositoryKey)
+    return { ...result, status: 'queued' as const }
+  }
   {
-    const target = await (await import('@/lib/rule-dispatch')).resolveIssueExecution(userId,botId,input.issueId)
+    const target = await (await import('@/lib/rule-dispatch')).resolveIssueExecution(userId,botId,input.issueId,place === 'cloud' ? 'cloud' : undefined)
     // No machine can take it (decision 2026-10-31-2200-run-machine-fallback): an error the person can act on.
     const noMachine = async () => {
       const card = 'card' in target ? target.card : (await import('@/lib/rule-dispatch')).machineUnavailableCard()

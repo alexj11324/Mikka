@@ -99,6 +99,8 @@ export async function resolveIssueExecution(
   ownerId: string,
   botId: string | null,
   issueId: string,
+  /** `cloud`: the person asked for the cloud. No rule device and no fallback computer; without a ready cloud, the card. */
+  only?: "cloud",
 ) {
   const issue = await issueForUser(ownerId, issueId);
   if (!issue) throw new ActionFailureError("issueNotFound");
@@ -115,7 +117,9 @@ export async function resolveIssueExecution(
   );
   // 设备离线时 is gone: a rule whose device is offline follows the same order as
   // any other run (own E2B, then an auto-schedule device, else the card).
-  const resolution = rules ? resolveExecution(labels, rules, devices, { ...DEFAULT_EXECUTION_FALLBACKS, whenDeviceOffline: "cloud" }) : null;
+  const ruled = rules ? resolveExecution(labels, rules, devices, { ...DEFAULT_EXECUTION_FALLBACKS, whenDeviceOffline: "cloud" }) : null;
+  // Asked for the cloud: a rule that names a computer is not followed (its harness and model are kept only for a cloud rule).
+  const resolution = only === "cloud" && ruled && ("waitFor" in ruled || ruled.place !== "cloud") ? null : ruled;
   if (resolution && "waitFor" in resolution) throw new ActionFailureError("agentNoDevice");
   if (resolution && resolution.place !== "cloud") {
     const target = await deviceTarget(ownerId, resolution);
@@ -128,7 +132,7 @@ export async function resolveIssueExecution(
   })();
   // Cloud, by rule or because nothing else matched. A device is the fallback.
   const harness = chosen.harness;
-  const found = await fallbackDevice(pool, ownerId, devices, rules, harness);
+  const found = only === "cloud" ? null : await fallbackDevice(pool, ownerId, devices, rules, harness);
   // A subscription or API-key model on the same Agent goes to the device's run; otherwise the device's own default.
   const fallback = found && !resolution && "subscription" in chosen && chosen.subscription && found.harness === harness
     ? { ...found, model: chosen.model } : found;

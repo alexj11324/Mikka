@@ -149,3 +149,19 @@ test('one task, one thread: dispatch takes newThread from the model but the pers
   await dispatch.execute!({ ...input, sourceEventId: 'forged' } as typeof input, { toolCallId: 'again', messages: [], context: {} })
   assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', { ...input, requestKey: 'dispatch:again', sourceEventId }, undefined, COORDINATOR_BOT, undefined])
 })
+
+test('dispatch takes a named place: one of the person\'s computers by id, or the cloud, and reports where it runs', async () => {
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
+  const dispatch = tools.dispatch_run!
+  const schema = dispatch.inputSchema as { safeParse(input: unknown): { success: boolean } }
+  const base = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository' }
+  assert.equal(schema.safeParse({ ...base, target: { deviceId: 'b4000000-0000-4000-8000-000000000008' } }).success, true)
+  assert.equal(schema.safeParse({ ...base, target: 'cloud' }).success, true)
+  assert.equal(schema.safeParse({ ...base, target: { deviceId: 'e2b.local' } }).success, false, 'a computer is named by its id from list_agents')
+  assert.equal(schema.safeParse({ ...base, target: 'my-mac' }).success, false)
+  assert.match(String(dispatch.description), /result\.placement/)
+  assert.match(String(tools.list_agents!.description), /deviceId as dispatch_run target/)
+  const target = { deviceId: 'b4000000-0000-4000-8000-000000000008' }
+  await dispatch.execute!({ ...base, target }, { toolCallId: 'named', messages: [], context: {} })
+  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', { ...base, target, requestKey: 'dispatch:named' }, undefined, COORDINATOR_BOT, undefined])
+})

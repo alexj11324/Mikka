@@ -32,3 +32,23 @@ alone is not enough.
   used-up quota) already continue their thread and are not affected.
 - Existing threads are left as they are; folding them in 线程 is a separate
   change.
+
+## Naming where it runs (same day)
+
+Alex, on the Coordinator saying it would run work on a named machine it
+could not choose: 「没法指定设备是不是有问题？」
+
+- `dispatch_run` takes an optional `target`: one of the person's own
+  computers (by the id `list_agents` shows next to its name and online
+  state), or the cloud. Without it the saved execution rules decide, as
+  before.
+- The server checks the computer on every dispatch: the person's own, a
+  local computer (never a cloud thread machine), not removed. Anything else
+  is refused (`deviceNotFound`). A named computer that is offline or off
+  gets the 没有可用的电脑 card at once: nothing is queued and no other
+  computer is used. A valid one gets the run pinned to it.
+- Every dispatch result carries `placement`, where the run actually is (a
+  computer by name, or the cloud). The Coordinator says only that place.
+- Naming another place for a task whose thread ran elsewhere is a move,
+  and a move is a new thread: granted only when the Decision API finds the
+  person explicitly asked for it; otherwise the thread goes on where it ran.

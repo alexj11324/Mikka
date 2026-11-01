@@ -236,6 +236,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   session or thread, or another agent, starts a new one; the old thread is
   stopped and marked replaced. The server enforces this at every dispatch
   entry, not the prompt ([decision](decisions/2026-11-01-1330-one-thread-per-task.md)).
+  The person may name where it runs (one of their computers, or the cloud);
+  a named computer that is offline gets the 没有可用的电脑 card, never another
+  computer, and the reply names only where the run actually is.
 
 ## Right panel, 建议, Artifact and browser
 

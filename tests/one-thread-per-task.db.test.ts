@@ -46,14 +46,19 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const issueId = await seedIssue(pool, id)
     // A numbered task gets a publication branch; each person's own number keeps the branches apart.
     await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1000 + users.length } } })])
-    const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"autoSchedule") VALUES ($1,$2,'MacBook','local','laptop',true,now(),$3,true)`, [deviceId, id, JSON.stringify(mac)])
-    await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','codex')`, [randomUUID(), id, deviceId])
+    const deviceId = await computer(id, 'MacBook')
     const botId = await chatBotId(id, null, ws.id)
-    return { id, issueId, botId }
+    return { id, issueId, botId, deviceId }
   }
-  type Dispatched = { runId: string; thread: string; threadId: string; status?: string; continuesRunId?: string; replacedThreadId?: string; error?: string }
-  const dispatch = async (who: { id: string; issueId: string; botId: string }, extra: { note?: string; newThread?: boolean; sourceEventId?: string } = {}) =>
+  async function computer(userId: string, name: string, state: { online?: boolean; autoSchedule?: boolean; removed?: boolean } = {}) {
+    const deviceId = randomUUID()
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"autoSchedule","removedAt") VALUES ($1,$2,$3,'local','laptop',true,$4,$5,$6,$7)`,
+      [deviceId, userId, name, state.online === false ? new Date(Date.now() - 3_600_000) : new Date(), JSON.stringify(mac), state.autoSchedule ?? true, state.removed ? new Date() : null])
+    await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
+    return deviceId
+  }
+  type Dispatched = { runId: string; thread: string; threadId: string; status?: string; continuesRunId?: string; replacedThreadId?: string; error?: string; placement?: unknown; card?: { title: string } }
+  const dispatch = async (who: { id: string; issueId: string; botId: string }, extra: { note?: string; newThread?: boolean; sourceEventId?: string; target?: 'cloud' | { deviceId: string } } = {}) =>
     await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, ...extra }, undefined, who.botId) as unknown as Dispatched
   const runs = async (userId: string) => (await pool.query('SELECT id,status,"continuesRunId","threadReplacedBy" FROM agent_runs WHERE "userId"=$1 ORDER BY "createdAt"', [userId])).rows
   const said = async (who: { id: string; botId: string }, text: string) => {
@@ -72,7 +77,9 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const messages = (await pool.query('SELECT text FROM run_messages WHERE "runId"=$1', [first.runId])).rows
     assert.equal(messages.length, 1)
     assert.match(messages[0].text, /Also cover the empty input\./)
-    assert.deepEqual(await dispatch(a), { thread: 'message', runId: first.runId, threadId: first.runId, status: 'alreadyWorking' })
+    const again = await dispatch(a)
+    assert.deepEqual([again.thread, again.runId, again.threadId, again.status], ['message', first.runId, first.runId, 'alreadyWorking'])
+    assert.deepEqual(again.placement, first.placement, 'it says where the thread runs')
     // Two dispatches at once still find one thread.
     const b = await person()
     const both = await Promise.all([dispatch(b, { note: 'one' }), dispatch(b, { note: 'two' })])
@@ -126,6 +133,47 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.equal(all[1].continuesRunId, null, 'a new thread is its own chain')
     assert.ok((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [first.runId])).rows[0].stopRequestedAt || all[0].status === 'stopped', 'the replaced thread is stopped')
     assert.ok(judgments.every(entry => entry === 'thread-switch:quoted'))
+    judged = null
+  })
+
+  await t.test('a named computer: the run is pinned there and the result says so; offline, not theirs or removed is refused', async () => {
+    const a = await person()
+    // Not picked by the rules (auto-schedule off), but the person named it.
+    const studio = await computer(a.id, 'Mac Studio', { autoSchedule: false })
+    const pinned = await dispatch(a, { target: { deviceId: studio } })
+    assert.equal(pinned.thread, 'new')
+    assert.deepEqual(pinned.placement, { kind: 'device', deviceId: studio, name: 'Mac Studio' })
+    assert.equal((await pool.query('SELECT "deviceId","agentDefinition"->>\'pinnedDeviceId\' AS pinned FROM agent_runs WHERE id=$1', [pinned.runId])).rows[0].pinned, studio)
+    // Offline: the card at once, nothing queued, no other computer used.
+    const b = await person()
+    const asleep = await computer(b.id, 'Old Mac', { online: false })
+    const offline = await dispatch(b, { target: { deviceId: asleep } })
+    assert.equal(offline.error, 'machineUnavailable')
+    assert.ok(offline.card?.title)
+    assert.equal((await runs(b.id)).length, 0)
+    // Someone else's computer, or a removed one: refused.
+    assert.equal((await dispatch(b, { target: { deviceId: a.deviceId } })).error, 'deviceNotFound')
+    assert.equal((await dispatch(b, { target: { deviceId: await computer(b.id, 'Gone', { removed: true }) } })).error, 'deviceNotFound')
+    assert.equal((await runs(b.id)).length, 0)
+    // No target: the saved rules pick (here the auto-schedule MacBook), and the result names it.
+    const ruled = await dispatch(b)
+    assert.deepEqual(ruled.placement, { kind: 'device', deviceId: b.deviceId, name: 'MacBook' })
+  })
+
+  await t.test('naming another computer for a task that has a thread is a move, granted only by the person\'s explicit request', async () => {
+    const a = await person()
+    const first = await dispatch(a)
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    const studio = await computer(a.id, 'Mac Studio')
+    judged = 0.2
+    const kept = await dispatch(a, { target: { deviceId: studio }, sourceEventId: await said(a, '再试一次') })
+    assert.deepEqual([kept.thread, kept.threadId], ['continued', first.runId])
+    assert.deepEqual(kept.placement, { kind: 'device', deviceId: a.deviceId, name: 'MacBook' }, 'the thread stays where it ran')
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [kept.runId])
+    judged = 0.95
+    const moved = await dispatch(a, { target: { deviceId: studio }, sourceEventId: await said(a, '换到我的 Mac Studio 上跑') })
+    assert.equal(moved.thread, 'new')
+    assert.deepEqual(moved.placement, { kind: 'device', deviceId: studio, name: 'Mac Studio' })
     judged = null
   })
 })
