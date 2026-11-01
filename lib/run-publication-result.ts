@@ -25,7 +25,8 @@ export const PUBLICATION_ERRORS = {
 export type PublicationErrorCode = keyof typeof PUBLICATION_ERRORS
 
 export class PublicationError extends Error {
-  constructor(readonly code: PublicationErrorCode, readonly retryable = false) {
+  /** `status` is GitHub's HTTP status when GitHub answered, for server logs only. */
+  constructor(readonly code: PublicationErrorCode, readonly retryable = false, readonly status?: number) {
     super(PUBLICATION_ERRORS[code])
     this.name = 'PublicationError'
   }

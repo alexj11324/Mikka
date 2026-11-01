@@ -71,7 +71,9 @@ function api(fetcher: typeof fetch) {
       throw new PublicationError('github_unavailable', true)
     }
     if (response.status === 404 && init.missing) throw new PublicationError(init.missing, init.missing === 'branch_not_pushed')
-    if (!response.ok) throw new PublicationError('github_request_failed')
+    // GitHub rejected this server's App JWT or the token it just minted: the App ID, key or clock is wrong here, not a GitHub outage.
+    if (response.status === 401) throw new PublicationError('github_not_configured', false, 401)
+    if (!response.ok) throw new PublicationError('github_request_failed', false, response.status)
     try { return await response.json() as unknown }
     catch { throw new PublicationError('github_request_failed') }
   }

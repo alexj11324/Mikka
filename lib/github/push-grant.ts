@@ -56,6 +56,8 @@ export async function verifyPushGrant(userId: string, remoteKey: string, options
   } catch (error) {
     if (!(error instanceof PublicationError)) throw error
     const reason = REFUSALS[error.code] ?? 'githubUnavailable'
+    // An unexpected GitHub answer is still treated as "could not check", but the cause stays visible to whoever runs the server.
+    if (!error.retryable && reason === 'githubUnavailable') console.error('Push grant check failed', { code: error.code, status: error.status })
     if (reason !== 'githubUnavailable' && reason !== 'githubNotConfigured')
       await db.execute(sql`update github_repository_installations set "pushGrantedAt"=null where "userId"=${userId} and "remoteKey"=${remoteKey}`)
     return { granted: false, reason }
