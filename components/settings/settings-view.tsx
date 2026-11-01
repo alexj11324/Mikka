@@ -122,7 +122,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
-    case 'models': return <>{workspaceId && !preview ? <><ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} /><E2BKeySettings key={`e2b-${workspaceId}`} workspaceId={workspaceId} /></> : waiting}</>
+    case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} /> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
@@ -143,6 +143,8 @@ function ApiAndSubscriptions({ workspaceId }: { workspaceId: string }) {
     <SubscriptionSettings workspaceId={workspaceId} extraRows={apiKeys.rows} action={apiKeys.action} />
     {apiKeys.dialogs}
     <ApiKeyFallbackSetting workspaceId={workspaceId} />
+    {/* The person's own E2B key: account-level, so before this workspace's settings. */}
+    <E2BKeySettings key={`e2b-${workspaceId}`} workspaceId={workspaceId} />
     <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />
     <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />
   </>
