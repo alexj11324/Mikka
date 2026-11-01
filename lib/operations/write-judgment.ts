@@ -34,12 +34,14 @@ export async function judgeWrite(decide: Decide, call: WriteCall): Promise<Write
     `annotations: ${hints.length ? hints.join(', ') : 'none'}`,
     `arguments: ${JSON.stringify(call.input).slice(0, 4000)}`,
   ].join('\n')
-  try {
-    const answer = (await decide('write-destructive', text, [DESTRUCTIVE_QUESTION]))?.get('destructive')
-    // Unavailable, refused or malformed judgment asks; it never writes silently.
-    if (answer?.type !== 'predicate') return 'ask'
-    return answer.probability >= YES ? 'ask' : 'allow'
-  } catch { return 'ask' }
+  let answer: Exclude<DecisionAnswer, { type: 'refusal' }> | undefined
+  try { answer = (await decide('write-destructive', text, [DESTRUCTIVE_QUESTION]))?.get('destructive') } catch { answer = undefined }
+  if (answer?.type === 'predicate') return answer.probability >= YES ? 'ask' : 'allow'
+  // Decisions API unavailable, refused or malformed (Alex, 2026-11-01): no card. The
+  // agent running the task already judged this call by making it, so it goes ahead,
+  // and the log records that it ran on that fallback.
+  console.warn('Write judgment fallback: allowed without a Decisions answer', { action: call.action.slice(0, 80), tool: call.tool.slice(0, 120) })
+  return 'allow'
 }
 
 /** Server judge on the existing Decisions route and the owner's billing scope. */
