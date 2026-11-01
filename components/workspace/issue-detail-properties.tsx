@@ -91,7 +91,7 @@ function DelegateLine({ issueId, assignee }: { issueId: string; assignee: IssueM
   if (!name) return null
   return <p className="flex h-7 min-w-0 items-center gap-2 text-xs">
     <span className="sr-only">{t('delegatedTo', { name })}</span>
-    <span aria-hidden="true" className="ml-1 h-3.5 w-2.5 shrink-0 -translate-y-1.5 rounded-bl-md border-b border-l border-rule" />
+    <svg aria-hidden="true" viewBox="0 0 10 14" className="ml-1 h-3.5 w-2.5 shrink-0 -translate-y-1.5 text-rule"><path d="M0.5 0V9.5Q0.5 13.5 4.5 13.5H10" fill="none" stroke="currentColor" /></svg>
     <span aria-hidden="true" className="flex shrink-0">{thread ? <BotAvatar {...(thread.bot ?? COORDINATOR_AVATAR)} size="row" still /> : <AgentSphere name={name} compact />}</span>
     <span aria-hidden="true" className="truncate">{name}</span>
   </p>
