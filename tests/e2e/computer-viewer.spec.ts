@@ -5,16 +5,6 @@ import { test, expect, register } from './fixtures'
 // frame during signed-grant changes; server authority is checked separately by
 // viewer-gateway tests against the real x11vnc sockets.
 test('computer viewer keeps the desktop through handoff and renewal, with full preview and backdrop targets', async ({ page, allowedConsoleErrors }, info) => {
-  // Playwright's routed WebSocket adds an empty subclass; noVNC validates only
-  // own properties and the immediate prototype. Expose its public channel API.
-  await page.addInitScript(() => {
-    const prototype = WebSocket.prototype
-    const inherited = Object.getPrototypeOf(prototype)
-    for (const name of ['send', 'close', 'binaryType', 'onerror', 'onmessage', 'onopen']) {
-      const descriptor = Object.getOwnPropertyDescriptor(inherited, name)
-      if (descriptor) Object.defineProperty(prototype, name, descriptor)
-    }
-  })
   await page.setViewportSize({ width: 1440, height: 960 })
   let controlled = false
   let userId = ''
@@ -69,6 +59,16 @@ test('computer viewer keeps the desktop through handoff and renewal, with full p
   await page.route('**/api/bots/*/computer/takeover', route => { controlled = true; revoke(); return route.fulfill({ json: grant('control') }) })
   await page.route('**/api/bots/*/computer/handback', route => { controlled = false; revoke(); return route.fulfill({ status: 204 }) })
   await register(page)
+  // Playwright's routed WebSocket adds an empty subclass; noVNC validates only
+  // own properties and the immediate prototype. Expose its public channel API.
+  await page.evaluate(() => {
+    const prototype = WebSocket.prototype
+    const inherited = Object.getPrototypeOf(prototype)
+    for (const name of ['send', 'close', 'binaryType', 'onerror', 'onmessage', 'onopen']) {
+      const descriptor = Object.getOwnPropertyDescriptor(inherited, name)
+      if (descriptor) Object.defineProperty(prototype, name, descriptor)
+    }
+  })
   const session = await page.request.get('/mikka/api/auth/get-session')
   userId = (await session.json()).user.id
   await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click()
