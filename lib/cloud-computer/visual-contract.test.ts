@@ -3,11 +3,14 @@ import assert from 'node:assert/strict'
 import { browserPermission, browserMutationSchema, mutationFromStep } from './visual-contract'
 import { browserLoginContinuation } from './login-result'
 
-test('bots act without a human approval step: every effect, payment and sending included, is allowed by default',()=>{
+test('bots act without a human approval step by default: every effect, payment and sending included; an explicit ask is followed',()=>{
  for(const effect of ['browse','edit_draft','write_external','payment','sensitive_delete','security_change'] as const) {
   assert.equal(browserPermission(effect,'allow',{},{}),'allow')
-  // A stored 'ask' (retired per-step approval) is never a human gate.
-  assert.equal(browserPermission(effect,'allow',{[`browser_${effect}`]:'ask'},{[`browser_${effect}`]:'ask'}),'allow')
+  // An explicit ask the person or an admin set is followed, on either layer; it is never read as allow.
+  assert.equal(browserPermission(effect,'allow',{[`browser_${effect}`]:'ask'},{}),'ask')
+  assert.equal(browserPermission(effect,'allow',{},{[`browser_${effect}`]:'ask'}),'ask')
+  // Deny on either layer still wins over ask.
+  assert.equal(browserPermission(effect,'allow',{[`browser_${effect}`]:'ask'},{[`browser_${effect}`]:'deny'}),'deny')
  }
  assert.throws(()=>browserPermission('browse','allow',null,{}))
  assert.throws(()=>browserPermission('browse','allow',{},{browser_browse:'maybe'}))

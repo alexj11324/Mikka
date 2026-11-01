@@ -34,8 +34,9 @@ export async function sweepBrowserMutations(q:Query,userId:string) {
 
 /** Only the workflow holding the real visual-model/Decisions response calls
  * this adapter. Neither HTTP input nor model output provides authorization.
- * The Decisions judgment (within_task) is the only gate before the action;
- * there is no human approval step (Alex, 2026-10-30). Deny still blocks. */
+ * The Decisions judgment (within_task) gates every action; there is no human
+ * approval step unless the person or an admin set this effect to ask, which
+ * leaves the action pending on their card. Deny still blocks. */
 export async function browserAction(pool:Pool,actor:Actor,botId:string,id:string,mutation:BrowserMutation,rawSummary:string,observation:VisualObservation,judgment:Judgment) {
   if (judgment.scope!=='within_task' || judgment.execution.vision!=='image-input-submitted' || judgment.execution.imageDigests[0]!==observationMetadata(observation).imageDigest) throw new ComputerError(409,'Browser judgment unavailable')
   // 4e2 item 4: the summary is persisted (pending_actions, needs, step, subagent_events). The mutation is
@@ -51,6 +52,13 @@ export async function browserAction(pool:Pool,actor:Actor,botId:string,id:string
     if(current.permission==='deny') throw new ComputerError(403,'Browser action denied')
     const body={version:2 as const,actionId:randomUUID(),workspaceId:actor.workspaceId,botId,subagentId:id,epoch:current.row.epoch,loaderId:observation.loaderId,origin:observation.origin,observationId:observation.observationId,observedAt:observation.observedAt,mutation:browserMutationSchema.parse(mutation),summary:summary.slice(0,500),effect:judgment.effect,policyRevision:current.revision,judgment:{executionId:judgment.execution.executionId,requestDigest:judgment.execution.requestDigest,imageDigest:observationMetadata(observation).imageDigest}}
     input=approvedSchema.parse({...body,digest:hash([actor.userId,body])})
+    if(current.permission==='ask') {
+      // The person's own ask: the action waits on their approval card (the existing pending-action decide path runs it).
+      await client.query(`INSERT INTO pending_actions(id,"userId","botId",action,input) VALUES($1,$2,$4,'browser_operation',$3)`,[input.actionId,actor.userId,input,botId])
+      await client.query(`WITH changed AS (UPDATE bot_subagents SET status='needs_you',needs=$2,step='Waiting for your approval',"activeActionId"=NULL WHERE id=$1 RETURNING *) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event) SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`,[id,JSON.stringify({kind:'approval',actionId:input.actionId,summary:input.summary})])
+      await client.query('COMMIT')
+      return {state:'needs_you' as const,actionId:input.actionId}
+    }
     await client.query(`INSERT INTO pending_actions(id,"userId","botId",action,input,status) VALUES($1,$2,$4,'browser_operation',$3,'running')`,[input.actionId,actor.userId,input,botId])
     await client.query(`WITH changed AS (UPDATE bot_subagents SET status='running',needs=NULL,step='Executing authorized action',"activeActionId"=$2 WHERE id=$1 RETURNING *) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event) SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`,[id,input.actionId])
     await client.query('COMMIT')
