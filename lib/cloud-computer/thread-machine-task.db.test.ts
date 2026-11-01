@@ -92,7 +92,6 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
 
     for (const [label, other] of [
       ["another task", async (_issueId: string) => run(await task())],
-      ["another bot on the same task", async (issueId: string) => run(issueId, { bot: otherBot })],
       ["another repository on the same task", async (issueId: string) => run(issueId, { repo: otherRepo })],
       ["a run with no task", async () => run(null)],
     ] as const) {
@@ -107,6 +106,16 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         assert.equal((await machine(before.runId)).state, "paused", "the task's sandbox stays parked for the task");
       });
     }
+
+    await t.test("the same task sent to another bot still resumes the task's sandbox (it belongs to the task, not the bot)", async () => {
+      const issueId = await task();
+      const before = await parked(issueId);
+      const next = await run(issueId, { bot: otherBot });
+      const { calls, provider } = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, provider));
+      assert.deepEqual(calls, [`connect:${before.sandboxId}`]);
+      assert.equal((await machine(next)).sandboxId, before.sandboxId);
+    });
 
     await t.test("a sandbox whose run has not ended is never taken over", async () => {
       const issueId = await task();

@@ -9,7 +9,8 @@ A task's cloud runs share one E2B sandbox. The task's first run starts it
 from the workspace snapshot. When a run of an open task ends, the sandbox is
 paused, not killed, and the task's next run resumes it: the worktree, the
 agent's sessions and the worker are still there. A sandbox is only ever
-resumed for the task, bot and repository it was started for, and never while
+resumed for the task and repository it was started for (whichever bot the
+person sends the task to), and never while
 the run that holds it is still active; no other task can be given it.
 
 Pausing is the only way a sandbox is kept, because it is free and unlimited:
