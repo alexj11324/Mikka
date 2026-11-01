@@ -1,6 +1,6 @@
 import type { AttentionMatterState } from '@/lib/db/schema'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
-import { levelRank, type Assessment, type AttentionLevel } from './judgment'
+import type { Assessment, AttentionLevel } from './judgment'
 
 // What the Coordinator is handed about a matter, and how repeated notices
 // about one matter group. Pure, so the grouping and the prompt are tested
@@ -27,17 +27,15 @@ export function mergeEvidence(previous: ItemEvidence | null, next: Notice, key: 
 }
 
 /**
- * The matter's state after a later notice at `level` (already raised to at
- * least the matter's own level while it is unanswered). Notices that arrive
- * while the matter waits or is in the Coordinator's hands join it without a
- * second handoff. After a decision, a notice hands it over again only when it
- * raises the level; a matter the person answered starts again at any routed
- * level. `null` keeps the state.
+ * The matter's state after a later notice. Notices that arrive while the
+ * matter waits or is in the Coordinator's hands join it without a second
+ * handoff. Otherwise it goes over again exactly when the Decisions API said
+ * `handOver` for this notice (it read the matter's earlier state and level).
+ * `null` keeps the state.
  */
-export function stateAfterNotice(matter: { state: AttentionMatterState; level: AttentionLevel }, level: AttentionLevel, routed: boolean): AttentionMatterState | null {
+export function stateAfterNotice(matter: { state: AttentionMatterState }, handOver: boolean): AttentionMatterState | null {
   if (matter.state === 'waiting' || matter.state === 'handed') return null
-  if (matter.state === 'handled') return routed ? 'waiting' : null
-  return routed && levelRank(level) > levelRank(matter.level) ? 'waiting' : null
+  return handOver ? 'waiting' : null
 }
 
 export interface BudgetView { open: boolean; remaining?: number; nextAt?: string }
@@ -90,7 +88,7 @@ export function handoffPrompt(payload: HandoffPayload): string {
     `${HANDOFF_PREFIX} A matter from the person's connected apps, rated ${payload.level}. Hidden evidence: the person has not seen this message and has not been told.${payload.recheck ? ' It comes back to you now because you snoozed it.' : ''}${payload.personAsked ? ' The person asked to be reminded: tell them unless fresh evidence shows it is resolved.' : ''}`,
     `Matter ${payload.matterId}: ${payload.title}`,
     assessment ? `If the person does nothing: ${assessment.cost ? `there is a cost; it lands ${dueText(assessment)}; it ${assessment.reversible ? 'can' : 'cannot'} be undone.` : 'no cost was found.'}` : null,
-    assessment?.verificationCode ? `This is a login or verification code, ${payload.minutesAgo ?? '?'} minute(s) old. Older than ten minutes: quiet. Otherwise tell them in this chat only, naming the service and the code, and adding that if they were not signing in they should ignore it and check the account.` : null,
+    assessment?.verificationCode ? `This is a login or verification code, ${payload.minutesAgo ?? '?'} minute(s) old. If the person is no longer waiting to type it, quiet. Otherwise tell them in this chat only, naming the service and the code, and adding that if they were not signing in they should ignore it and check the account.` : null,
     ...noticeLines(evidence.latest, 'Latest notice'),
     ...evidence.earlier.map(item => `Earlier notice (${item.source}, ${item.occurredAt}): ${item.title}`),
     payload.previous ? `Your last decision on this matter: ${payload.previous.state}${payload.previous.reason ? ` (${payload.previous.reason})` : ''}.` : null,

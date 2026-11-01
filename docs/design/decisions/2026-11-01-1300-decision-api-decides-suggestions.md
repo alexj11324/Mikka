@@ -23,3 +23,14 @@ What follows for suggestions:
 - Security floors are not rule sets and stay in code: authentication,
   webhook signatures, tenant and recipient matching (whose event it is), the
   person's own source switches in Settings, and cost budgets.
+
+What follows for importance and handoff:
+
+- The level is the model's choice. The code floors (any cost at least high,
+  48 hours or irreversible within a week critical), the ten-minute
+  verification-code cutoff, the 0.5 confidence downgrade of routed levels and
+  the "a later notice never rates below its matter" rule are gone; the floors
+  are guidance in the level question.
+- Whether a matter goes to the Coordinator, the first time or again after a
+  decision, is the model's `handOver` predicate, not a list of routed levels
+  or a level that went up.

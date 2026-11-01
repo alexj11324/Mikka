@@ -6,13 +6,13 @@ import { attentionLog, attentionMatters, attentionSettings, coordinatorEvents, t
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { BUDGET_WINDOW_MS, BUDGETS, budgetState, type BudgetKind } from './budget'
 import { mergeEvidence, notice, stateAfterNotice, type BudgetView, type HandoffPayload, type ItemEvidence } from './handoff'
-import { higherLevel, isRouted, levelRank, type MatterContext } from './judgment'
+import { levelRank, type MatterContext } from './judgment'
 import { onPersonTold } from './push'
 import type { Score } from './score'
 
 // The person's matters from connected apps, their two budgets and the
 // Coordinator's decisions (R-20). Ingest records a notice on its matter; a
-// matter at a routed level waits until the handoff budget allows it and no
+// matter the Decisions API said to hand over waits until the handoff budget allows it and no
 // other matter is in the Coordinator's hands, then goes over as a hidden
 // `matter_handoff` event. The Coordinator records notify, quiet, snooze or
 // handled with record_attention. Nothing is dropped: a matter that cannot go
@@ -70,15 +70,10 @@ export async function judgmentContext(userId: string, key: string, now = new Dat
   return { same: same ? context(same) : null, matters: recent.map((matter, index) => context(matter, `m${index + 1}`)), ids }
 }
 
-/** The matter a judged notice continues, by real id, when the person has not answered it. */
-export async function matterContext(userId: string, id: string): Promise<MatterContext | null> {
-  const [matter] = await db.select().from(attentionMatters).where(and(eq(attentionMatters.id, id), eq(attentionMatters.userId, userId))).limit(1)
-  return matter ? context(matter) : null
-}
-
 /**
  * Records a notice on its matter: the thread's own matter, else the earlier
- * matter the judgment linked, else a new one when the level is routed.
+ * matter the judgment linked, else a new one when the Decisions API said
+ * `handOver`. The matter takes the level the API gave this notice.
  * Returns whether a matter now waits to go over.
  */
 export async function recordNotice(notification: ExternalNotification, suggestionId: string, score: Score, continuesId: string | null): Promise<boolean> {
@@ -89,21 +84,19 @@ export async function recordNotice(notification: ExternalNotification, suggestio
     const [same] = await tx.select().from(attentionMatters).where(byKey(userId, matterKey)).limit(1)
     const [linked] = same || !continuesId ? [] : await tx.select().from(attentionMatters).where(and(eq(attentionMatters.id, continuesId), eq(attentionMatters.userId, userId))).limit(1)
     const target = same ?? linked
-    const routed = isRouted(score.level)
     const now = new Date()
     if (!target) {
-      if (!routed) return false
+      if (!score.handOver) return false
       await tx.insert(attentionMatters).values({
         id: randomUUID(), userId, matterKey, source: notification.source, suggestionId, title: notification.title, url: notification.url,
         level: score.level, assessment: { ...score.assessment }, evidence: { ...mergeEvidence(null, notice(notification), matterKey) }, state: 'waiting',
       }).onConflictDoNothing()
       return true
     }
-    const next = stateAfterNotice(target, score.level, routed)
-    const level = target.state === 'handled' && next ? score.level : higherLevel(score.level, target.level)
+    const next = stateAfterNotice(target, score.handOver)
     await tx.update(attentionMatters).set({
-      suggestionId, url: notification.url ?? target.url, level,
-      // A notice the model judged supersedes the earlier assessment; a rule or fallback keeps it.
+      suggestionId, url: notification.url ?? target.url, level: score.level,
+      // An unclear judgment carries no assessment and keeps the earlier one.
       ...(score.assessment ? { assessment: { ...score.assessment } } : {}),
       evidence: { ...mergeEvidence(target.evidence as unknown as ItemEvidence, notice(notification), matterKey) },
       ...(next ? { state: next, recheck: false, runAt: null } : {}),

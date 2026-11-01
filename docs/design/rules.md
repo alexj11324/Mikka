@@ -83,11 +83,13 @@ source wins in a conflict is in [`README.md`](README.md).
   Slack, GitHub, Linear…) are rated by the decision model (OpenAI Decisions
   API) after Comma's attention model: first the cost if the person does
   nothing, when it lands and whether it can be undone; then one level,
-  critical, high, ask, normal or low (unclear rereads the source). Code floors
-  the level: any cost is at least high; a cost due within 48 hours, or an
-  irreversible one due within a week, is critical. Only the Coordinator speaks to the person about events: no
-  push, chat message or Telegram/Slack message is sent around it. Critical,
-  high and ask go to the Coordinator at once. The daily briefing is posted
+  critical, high, ask, normal or low (unclear rereads the source), and
+  whether the Coordinator takes it up now. The level's guidance (any cost is
+  at least high; a cost due within 48 hours, or an irreversible one due within
+  a week, is critical) is in the question; no code floor, cutoff or rule before
+  the call changes the answer (decision 2026-11-01-1300). Only the Coordinator speaks to the person about events: no
+  push, chat message or Telegram/Slack message is sent around it. What the
+  model says to take up goes to the Coordinator at once. The daily briefing is posted
   by the Coordinator in its chat every day at 08:00 local time (and pushed),
   whatever the bar below says. It tells the person only when they must act before the next
   08:00 briefing, or when a cost that cannot be undone lands within a week;

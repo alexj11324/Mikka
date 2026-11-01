@@ -5,37 +5,30 @@ import { chatItems } from '@/lib/coordinator/context'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { BUDGET_WINDOW_MS, budgetState } from './budget'
 import { handoffPrompt, HANDOFF_PREFIX, mergeEvidence, QUIET_REPLY, stateAfterNotice, type HandoffPayload, type Notice } from './handoff'
-import { attentionQuestions, attentionState, codeLevel, continuedLevel, judgeAttention, readJudgment, ROUTED_LEVEL_CONFIDENCE, withFloor, type Assessment, type AttentionJudge } from './judgment'
+import { attentionQuestions, attentionState, judgeAttention, readJudgment, type Assessment, type AttentionJudge } from './judgment'
 import { githubNotification } from '@/lib/suggestions/notification'
 
 const none: Assessment = { cost: false, due: 'unknown', reversible: true, verificationCode: false }
 const cost = (fields: Partial<Assessment> = {}): Assessment => ({ ...none, cost: true, ...fields })
 
-test('code floors the level under any cost', () => {
-  assert.equal(withFloor('low', cost()), 'high')
-  assert.equal(withFloor('normal', cost({ due: 'later' })), 'high')
-  assert.equal(withFloor('high', cost({ due: 'within48h' })), 'critical')
-  assert.equal(withFloor('normal', cost({ due: 'within7d', reversible: false })), 'critical')
-  assert.equal(withFloor('normal', cost({ due: 'within7d' })), 'high')
-  assert.equal(withFloor('critical', cost({ due: 'later' })), 'critical')
-  // No cost: the model's level stands. Ask and unclear keep their answer.
-  assert.equal(withFloor('normal', none), 'normal')
-  assert.equal(withFloor('ask', cost({ due: 'within48h' })), 'ask')
-  assert.equal(withFloor('unclear', cost()), 'unclear')
+test('the level is the Decisions API\'s answer: no code floor, code-age cutoff or confidence downgrade', () => {
+  const level = (fields: Answer[], choice: string, probabilities?: { value: string; probability: number }[]) =>
+    readJudgment(answers([...fields, { type: 'choice', name: 'level', choice, ...(probabilities ? { probabilities } : {}) }]), [])!.level
+  // A cost due tomorrow that cannot be undone, which code used to lift to critical.
+  assert.equal(level([{ type: 'predicate', name: 'cost', probability: 0.9 }, { type: 'choice', name: 'due', choice: 'within48h' }, { type: 'predicate', name: 'irreversible', probability: 0.9 }], 'normal'), 'normal')
+  // A verification code, which code used to make critical or hide by age.
+  assert.equal(level([{ type: 'predicate', name: 'verificationCode', probability: 1 }], 'normal'), 'normal')
+  // A routed level picked with low confidence, which code used to turn into normal.
+  assert.equal(level([], 'critical', [{ value: 'critical', probability: 0.3 }, { value: 'normal', probability: 0.25 }]), 'critical')
+  assert.equal(level([], 'ask', [{ value: 'ask', probability: 0.4 }]), 'ask')
 })
 
-test('a fresh verification code is critical, an old one is not shown', () => {
-  const code = { ...none, verificationCode: true }
-  assert.equal(codeLevel('normal', code, 3 * 60_000), 'critical')
-  assert.equal(codeLevel('critical', code, 11 * 60_000), 'low')
-  assert.equal(codeLevel('normal', none, 0), 'normal')
-})
-
-test('a later notice on an unanswered matter never rates below it', () => {
-  assert.equal(continuedLevel('normal', { level: 'high', state: 'quiet' }), 'high')
-  assert.equal(continuedLevel('critical', { level: 'high', state: 'notified' }), 'critical')
-  assert.equal(continuedLevel('normal', { level: 'high', state: 'handled' }), 'normal')
-  assert.equal(continuedLevel('low', null), 'low')
+test('handing over is the Decisions API\'s handOver answer, not a level', () => {
+  const judged = (handOver: number, choice: string) => readJudgment(answers([{ type: 'choice', name: 'level', choice }, { type: 'predicate', name: 'handOver', probability: handOver }]), [])!
+  assert.equal(judged(0.9, 'normal').handOver, true)
+  assert.equal(judged(0.1, 'critical').handOver, false)
+  assert.equal(readJudgment(answers([{ type: 'choice', name: 'level', choice: 'high' }]), [])!.handOver, false)
+  assert.ok(attentionQuestions([]).some(question => question.name === 'handOver' && question.type === 'predicate'))
 })
 
 const notification = (fields: Partial<ExternalNotification> = {}): ExternalNotification => ({ userId: 'u', source: 'gmail', externalId: 'x', matterKey: 'gmail:t', action: 'reply', title: 't', url: null, actor: null, occurredAt: new Date('2026-10-27T08:00:00Z'), required: false, direct: false, fromSelf: false, automated: false, excerpt: '', ...fields })
@@ -69,7 +62,7 @@ test('every notification goes to the Decisions API; nothing is ruled out before 
     const score = await judgeAttention(item, [], null, now, judge, noReread, 2)
     assert.equal(calls.length, 1)
     assert.equal(calls[0].notification, item)
-    assert.deepEqual(score, { level: 'normal', decidedBy: 'model', assessment: { cost: false, due: 'unknown', reversible: true, verificationCode: false }, continues: null })
+    assert.deepEqual(score, { level: 'normal', handOver: false, decidedBy: 'model', assessment: { cost: false, due: 'unknown', reversible: true, verificationCode: false }, continues: null })
   }
   // The facts that used to be rules are evidence the model reads.
   const { calls, judge } = spyJudge('low')
@@ -106,7 +99,7 @@ test('an unclear answer rereads the source and asks the Decisions API again', as
 })
 
 
-test('the judgment reads cost, due and reversibility before the level', () => {
+test('the judgment reads cost, due and reversibility as given', () => {
   const judged = readJudgment(answers([
     { type: 'predicate', name: 'cost', probability: 0.9 },
     { type: 'choice', name: 'due', choice: 'within7d' },
@@ -114,8 +107,8 @@ test('the judgment reads cost, due and reversibility before the level', () => {
     { type: 'predicate', name: 'verificationCode', probability: 0.1 },
     { type: 'choice', name: 'level', choice: 'normal' },
     { type: 'choice', name: 'continues', choice: 'm2' },
-  ]), 60_000, ['m1', 'm2'])!
-  assert.equal(judged.level, 'critical')
+  ]), ['m1', 'm2'])!
+  assert.equal(judged.level, 'normal')
   assert.deepEqual(judged.assessment, { cost: true, due: 'within7d', reversible: false, verificationCode: false })
   assert.equal(judged.continues, 'm2')
   // No cost: due and reversibility do not count, and an unknown matter id is ignored.
@@ -125,27 +118,12 @@ test('the judgment reads cost, due and reversibility before the level', () => {
     { type: 'predicate', name: 'irreversible', probability: 0.9 },
     { type: 'choice', name: 'level', choice: 'normal' },
     { type: 'choice', name: 'continues', choice: 'm9' },
-  ]), 0, ['m1'])!
+  ]), ['m1'])!
   assert.equal(quiet.level, 'normal')
   assert.deepEqual(quiet.assessment, none)
   assert.equal(quiet.continues, null)
-  assert.equal(readJudgment(answers([{ type: 'choice', name: 'level', choice: 'unclear' }]), 0, [])!.level, 'unclear')
-  assert.equal(readJudgment(answers([{ type: 'predicate', name: 'cost', probability: 1 }]), 0, []), null)
-})
-
-test('a routed level the model is unsure of stays in 建议 unless a cost lifts it', () => {
-  const level = (choice: string, probability: number, costProbability = 0.1) => readJudgment(answers([
-    { type: 'predicate', name: 'cost', probability: costProbability },
-    { type: 'choice', name: 'due', choice: 'later' },
-    { type: 'choice', name: 'level', choice, probabilities: [{ value: choice, probability }, { value: 'normal', probability: 1 - probability }] },
-  ]), 0, [])!.level
-  assert.equal(level('high', ROUTED_LEVEL_CONFIDENCE), 'high')
-  assert.equal(level('ask', 0.4), 'normal')
-  assert.equal(level('critical', 0.3), 'normal')
-  assert.equal(level('critical', 0.3, 0.8), 'high')
-  assert.equal(level('low', 0.2), 'low')
-  // An answer without probabilities is taken as given.
-  assert.equal(readJudgment(answers([{ type: 'choice', name: 'level', choice: 'ask' }]), 0, [])!.level, 'ask')
+  assert.equal(readJudgment(answers([{ type: 'choice', name: 'level', choice: 'unclear' }]), [])!.level, 'unclear')
+  assert.equal(readJudgment(answers([{ type: 'predicate', name: 'cost', probability: 1 }]), []), null)
 })
 
 test('the continues question is asked only with earlier matters, and the state carries the time', () => {
@@ -175,14 +153,14 @@ test('budgets: 5 notifications a day, 30 minutes apart; critical skips the spaci
   assert.deepEqual(budgetState('handoff', twelve.slice(1), now), { open: true, remaining: 1 })
 })
 
-test('repeated notices join their matter; only a raised level hands it over again', () => {
-  assert.equal(stateAfterNotice({ state: 'handed', level: 'high' }, 'critical', true), null)
-  assert.equal(stateAfterNotice({ state: 'waiting', level: 'high' }, 'high', true), null)
-  assert.equal(stateAfterNotice({ state: 'quiet', level: 'high' }, 'high', true), null)
-  assert.equal(stateAfterNotice({ state: 'quiet', level: 'high' }, 'critical', true), 'waiting')
-  assert.equal(stateAfterNotice({ state: 'snoozed', level: 'ask' }, 'high', true), 'waiting')
-  assert.equal(stateAfterNotice({ state: 'handled', level: 'high' }, 'high', true), 'waiting')
-  assert.equal(stateAfterNotice({ state: 'handled', level: 'high' }, 'normal', false), null)
+test('repeated notices join their matter; the Decisions API\'s handOver sends it over again', () => {
+  assert.equal(stateAfterNotice({ state: 'handed' }, true), null)
+  assert.equal(stateAfterNotice({ state: 'waiting' }, true), null)
+  assert.equal(stateAfterNotice({ state: 'quiet' }, false), null)
+  assert.equal(stateAfterNotice({ state: 'quiet' }, true), 'waiting')
+  assert.equal(stateAfterNotice({ state: 'snoozed' }, true), 'waiting')
+  assert.equal(stateAfterNotice({ state: 'handled' }, true), 'waiting')
+  assert.equal(stateAfterNotice({ state: 'handled' }, false), null)
   const first: Notice = { source: 'github', title: 'CI failed', actor: null, occurredAt: '2026-10-27T08:00:00.000Z', url: null, excerpt: 'x'.repeat(1000) }
   const merged = mergeEvidence(mergeEvidence(null, first, 'github:a/b#1'), { ...first, title: 'CI failed again' }, 'github:a/b#1')
   assert.equal(merged.latest.title, 'CI failed again')
