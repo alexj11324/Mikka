@@ -441,7 +441,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   picture gets a generated gradient avatar (`public/avatars/*.webp`): after
   adopting the unslop skill Alex still requires it (2026-10-31), so it is
   intentional and not a violation. A bot's avatars move through the idle
-  montage on one shared clock, so every copy of one bot shows the same pose.
+  montage on one shared clock, so every animated copy of one bot shows the
+  same pose. Small (`row`) and `still` avatars (group messages, members, the
+  group avatar) hold the bot's own shape and do not play the montage.
 - **R-37** Animate only when the user's action changes a size or position.
   Position and size move with springs; opacity and colour use a duration.
   Springs settle without visible overshoot (no bouncy springs). No hover
