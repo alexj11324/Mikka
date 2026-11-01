@@ -39,9 +39,9 @@ test('Plugins → GitHub connections are per Mikka user and leave the login iden
     assert.notEqual(stored.refreshToken, 'refresh-second')
   })
 
-  await t.test('a GitHub sign-in account linked before connections existed still resolves; a connection wins over it', async () => {
+  await t.test('a GitHub sign-in account is not a connection; only connecting on Plugins links one', async () => {
     await pool.query(`insert into account (id, "accountId", "providerId", "userId", "createdAt", "updatedAt") values ($1, '77', 'github', $2, now(), now())`, [randomUUID(), legacy])
-    assert.equal(await linkedGitHubAccountId(legacy), '77')
+    assert.equal(await linkedGitHubAccountId(legacy), null)
     await connection.saveGitHubConnection(legacy, identity, { access_token: 'token-legacy' })
     assert.equal(await linkedGitHubAccountId(legacy), githubId)
   })
@@ -51,7 +51,7 @@ test('Plugins → GitHub connections are per Mikka user and leave the login iden
     assert.equal(await linkedGitHubAccountId(first), null)
     assert.equal(await linkedGitHubAccountId(second), githubId)
     await connection.disconnectGitHub(legacy)
-    assert.equal(await linkedGitHubAccountId(legacy), '77')
+    assert.equal(await linkedGitHubAccountId(legacy), null, 'disconnecting really disconnects, even with a GitHub sign-in')
   })
 
   await t.test('GitHub sign-in callbacks stay with Better Auth unless the state is this user\'s connect state', async () => {

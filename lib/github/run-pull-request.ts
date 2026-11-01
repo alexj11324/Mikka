@@ -23,7 +23,7 @@ const id = z.number().int().positive().refine(Number.isSafeInteger)
 const repoName = /^[a-z0-9_.-]+$/i
 const installationSchema = z.object({
   id, suspended_at: z.string().nullable(),
-  permissions: z.object({ pull_requests: z.string().optional(), contents: z.string().optional() }),
+  permissions: z.object({ pull_requests: z.string().optional(), contents: z.string().optional(), checks: z.string().optional(), actions: z.string().optional() }),
 })
 const tokenSchema = z.object({ token: z.string().min(1) })
 const repositorySchema = z.object({ id, full_name: z.string(), default_branch: z.string().min(1) })
@@ -101,7 +101,7 @@ async function repositoryAccess(options: Options) {
   const repository = parse(repositorySchema, await request(repo.path, metadataToken, { missing: 'github_not_installed' }))
   if (repository.full_name.toLowerCase() !== `${repo.owner}/${repo.repo}`.toLowerCase()) throw new PublicationError('github_access_denied')
   const binding: GitHubRepositoryBinding = { installationId: installation.id, repositoryId: repository.id, githubAccountId: options.githubAccountId, defaultBranch: repository.default_branch }
-  return { ...repo, request, jwt, metadataToken, binding }
+  return { ...repo, request, jwt, metadataToken, binding, installationPermissions: installation.permissions }
 }
 
 /** A non-secret owner/repository installation receipt; never an access token. */
@@ -112,6 +112,9 @@ export async function verifyGitHubRepositoryAccess(options: Options): Promise<Gi
 /** A worker receives one repository's installation token, never the App key. */
 export async function issueRunGitHubInstallationToken(options: Options) {
   const access = await repositoryAccess(options)
+  // GitHub answers 422 to a token asking for more than the installation holds.
+  const { contents, checks, actions } = access.installationPermissions
+  if (contents !== 'write' || !checks || !actions) throw new PublicationError('github_permission_required')
   const result = parse(z.object({ token: z.string().min(1), expires_at: z.iso.datetime() }),
     await access.request(`/app/installations/${access.binding.installationId}/access_tokens`, access.jwt, {
       method: 'POST', body: {

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { mock } from 'node:test'
+import { PublicationError } from '@/lib/run-publication-result'
 import { createRunGitHubTokenExchange, type RunGitHubScope } from './run-token-exchange'
 
 const scope: RunGitHubScope = { runId: 'run-one', userId: 'owner', remoteKey: 'v2/github.com/owner/repo', branch: 'mikka/mik-1', githubAccountId: '123' }
@@ -46,4 +47,25 @@ test('provider exceptions and failed final authorization do not disclose credent
   assert.equal(response.status, 502)
   assert.equal(revoked, true)
   assert.doesNotMatch(await response.text(), /synthetic/)
+})
+
+test('a failed issuance logs and reports its safe code, nothing from GitHub', async () => {
+  const log = mock.method(console, 'error', () => {})
+  try {
+    const handle = createRunGitHubTokenExchange({ authorize: async () => scope, issue: async () => { throw new PublicationError('github_permission_required') }, revoke: async () => {} })
+    const response = await handle(request())
+    assert.equal(response.status, 502)
+    assert.deepEqual(await response.json(), { error: 'runGitHubUnavailable', reason: 'github_permission_required' })
+    assert.deepEqual(log.mock.calls[0].arguments, ['Run GitHub token failed', { runId: 'run-one', code: 'github_permission_required' }])
+  } finally { log.mock.restore() }
+})
+
+test('an unexpected exception is reported without its message', async () => {
+  const log = mock.method(console, 'error', () => {})
+  try {
+    const handle = createRunGitHubTokenExchange({ authorize: async () => scope, issue: async () => { throw new Error('synthetic-private-detail') }, revoke: async () => {} })
+    const body = await (await handle(request())).text()
+    assert.doesNotMatch(body, /synthetic/)
+    assert.doesNotMatch(JSON.stringify(log.mock.calls[0].arguments), /synthetic/)
+  } finally { log.mock.restore() }
 })

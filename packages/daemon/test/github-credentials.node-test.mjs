@@ -3,7 +3,7 @@ import test from 'node:test'
 import { mkdtemp, readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { getRunGitHubToken, matchesGitRepository, runGh } from '../src/agents/github-credentials.mjs'
+import { getRunGitHubToken, matchesGitRepository, RunGitHubCredentialsError, runGh } from '../src/agents/github-credentials.mjs'
 
 test('git supplies a token only to the exact HTTPS GitHub repository', () => {
   const valid = { protocol: 'https', host: 'github.com', path: 'owner/repo.git' }
@@ -77,4 +77,13 @@ test('normal gh commands run once without watch timers', async () => {
     },
   }), 0)
   assert.equal(calls, 1)
+})
+
+test('a refused token says the status and the fixed code, and drops anything else', async () => {
+  const file = join(await mkdtemp(join(tmpdir(), 'mikka-github-')), 'token')
+  const config = { file, endpoint: 'https://mikka.example/token', runToken: 'run-token', repository: 'owner/repo' }
+  const refuse = body => async () => Response.json(body, { status: 502 })
+  await assert.rejects(getRunGitHubToken(config, { fetcher: refuse({ reason: 'github_permission_required' }) }), error => error instanceof RunGitHubCredentialsError && error.detail === '502 github_permission_required')
+  await assert.rejects(getRunGitHubToken(config, { fetcher: refuse({ reason: 'private body: secret' }) }), error => error.detail === '502')
+  await assert.rejects(getRunGitHubToken(config, { fetcher: async () => new Response('not json', { status: 502 }) }), error => error.detail === '502')
 })

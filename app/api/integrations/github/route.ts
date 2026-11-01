@@ -25,7 +25,7 @@ async function handleGET(request: Request) {
   }
 }
 
-/** Removes only this user's Plugins → GitHub connection; the GitHub sign-in stays. */
+/** Removes this user's Plugins → GitHub connection; a GitHub sign-in stays and grants nothing here. */
 async function handleDELETE(request: Request) {
   const session = await sessionAuth.api.getSession({ headers: request.headers })
   if (!session?.user) return Response.json({ error: 'authRequired' }, { status: 401, headers })

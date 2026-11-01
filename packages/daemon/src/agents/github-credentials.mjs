@@ -12,6 +12,14 @@ export function matchesGitRepository(input, repository) {
     [repository, `${repository}.git`].some(path => input.path?.toLowerCase() === path.toLowerCase())
 }
 
+/** Status and the server's fixed code only, so the agent can say why; never a response body. */
+export class RunGitHubCredentialsError extends Error {
+  constructor(status, reason) {
+    super('Run GitHub credentials unavailable')
+    this.detail = `${status}${typeof reason === 'string' && /^[a-z_]+$/.test(reason) ? ` ${reason}` : ''}`
+  }
+}
+
 export async function getRunGitHubToken(config, { fetcher = fetch, now = Date.now, minValidityMs = 60_000 } = {}) {
   const cachePath = `${config.file}.cache`
   try {
@@ -26,7 +34,10 @@ export async function getRunGitHubToken(config, { fetcher = fetch, now = Date.no
     method: 'POST', redirect: 'error', cache: 'no-store',
     headers: { authorization: `Bearer ${config.runToken}` }, signal: AbortSignal.timeout(15_000),
   })
-  if (!response.ok) throw new Error('Run GitHub credentials unavailable')
+  if (!response.ok) {
+    const reason = await response.json().then(body => body?.reason, () => undefined)
+    throw new RunGitHubCredentialsError(response.status, reason)
+  }
   const result = await response.json()
   if (result.repository?.toLowerCase() !== config.repository.toLowerCase() || typeof result.token !== 'string' || !result.token ||
     !Number.isFinite(Date.parse(result.expiresAt)) || Date.parse(result.expiresAt) - now() <= minValidityMs) throw new Error('Invalid run GitHub credentials')
@@ -90,5 +101,5 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(() => { process.stderr.write('Mikka GitHub credentials or CI status unavailable.\n'); process.exitCode = 1 })
+  main().catch(error => { process.stderr.write(`Mikka GitHub credentials or CI status unavailable${error instanceof RunGitHubCredentialsError ? ` (${error.detail})` : ''}.\n`); process.exitCode = 1 })
 }

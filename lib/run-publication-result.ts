@@ -3,7 +3,7 @@ export const PUBLICATION_ERRORS = {
   github_not_configured: 'The GitHub App is not configured.',
   github_identity_required: 'Connect a GitHub account with write access to this repository.',
   github_not_installed: 'Install the Mikka GitHub App on this repository.',
-  github_permission_required: 'The GitHub App installation needs pull_requests: write and contents: read.',
+  github_permission_required: 'The GitHub App installation is missing a permission: opening a pull request needs pull_requests: write and contents: read; a run pushing its own branch also needs contents: write, checks: read and actions: read.',
   github_suspended: 'The GitHub App installation is suspended.',
   github_access_denied: 'The connected GitHub account does not have write access to this repository.',
   github_unavailable: 'GitHub is temporarily unavailable. The pushed branch is preserved.',

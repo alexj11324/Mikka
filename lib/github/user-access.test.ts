@@ -6,19 +6,18 @@ const originalAppId = process.env.GITHUB_APP_ID
 const requestHeaders = new Headers({ cookie: 'test-session' })
 let user: string | null = 'person-1'
 let sessionUsers: (string | null)[] = []
-let accounts = [{ id: 'internal-account', userId: 'person-1', providerId: 'github', accountId: '42' }]
-const getAccessToken = mock.fn(async (_input: { headers: Headers; body: { accountId: string } }) => ({ accessToken: 'private-test-token' }))
 mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth: { api: {
   getSession: async ({ headers }: { headers: Headers }) => { assert.equal(headers, requestHeaders); const id = sessionUsers.length ? sessionUsers.shift() : user; return id ? { user: { id } } : null },
-  listUserAccounts: async () => accounts,
-  getAccessToken,
+  listUserAccounts: async () => assert.fail('a GitHub sign-in account is not a repository connection'),
+  getAccessToken: async () => assert.fail('a GitHub sign-in token is not a repository connection'),
 } } } })
 let connected: { token: string; githubAccountId: string } | null = null
+let connectionFails = false
 let connectionLogin: string | null = null
 let connectConfigured = true
 mock.module(new URL('./connection.ts', import.meta.url).href, { namedExports: {
   githubConnectConfigured: () => connectConfigured,
-  githubConnectionToken: async () => connected,
+  githubConnectionToken: async () => { if (connectionFails) throw new Error('private provider response'); return connected },
   githubConnection: async () => connectionLogin ? { githubAccountId: '42', githubLogin: connectionLogin } : null,
   disconnectGitHub: async () => {},
 } })
@@ -47,12 +46,10 @@ beforeEach(() => {
   process.env.GITHUB_APP_ID = '4840908'
   user = 'person-1'
   sessionUsers = []
-  accounts = [{ id: 'internal-account', userId: user, providerId: 'github', accountId: '42' }]
-  connected = null
+  connected = { token: 'private-test-token', githubAccountId: '42' }
+  connectionFails = false
   connectionLogin = null
   connectConfigured = true
-  getAccessToken.mock.resetCalls()
-  getAccessToken.mock.mockImplementation(async () => ({ accessToken: 'private-test-token' }))
   fetchMock.mock.resetCalls()
   answer = url => {
     if (url.pathname === '/user') return json({ id: 42 })
@@ -70,20 +67,18 @@ after(() => {
 const paths = () => fetchMock.mock.calls.map(call => new URL(String(call.arguments[0])).pathname)
 const failure = (code: string, status: number) => (error: unknown) => error instanceof access.GitHubAccessError && error.code === code && error.status === status
 
-test('only the current session account is selected, and Better Auth receives its internal id', async () => {
-  accounts.unshift({ id: 'other-account', userId: 'other-person', providerId: 'github', accountId: '50' })
+test('the connection gives the repositories, and the token stays out of the result', async () => {
   const result = await access.listAuthorizedRepositories(requestHeaders)
   assert.deepEqual(result, { userId: 'person-1', githubAccountId: '42', installations: ['11'], repositories: [{ id: '91', installationId: '11', fullName: 'Owner/Project', htmlUrl: 'https://github.com/Owner/Project', private: true }] })
-  assert.deepEqual(getAccessToken.mock.calls[0].arguments, [{ headers: requestHeaders, body: { accountId: 'internal-account' } }])
   assert.equal(JSON.stringify(result).includes('private-test-token'), false)
 })
 
-test('a Plugins → GitHub connection is used before any GitHub sign-in account, even one for another GitHub id', async () => {
-  connected = { token: 'private-test-token', githubAccountId: '42' }
-  accounts = [{ id: 'internal-account', userId: 'person-1', providerId: 'github', accountId: '77' }]
-  const result = await access.listAuthorizedRepositories(requestHeaders)
-  assert.equal(result.githubAccountId, '42')
-  assert.equal(getAccessToken.mock.callCount(), 0)
+test('signing in with GitHub is not a connection: the plugin says not connected and never reads the sign-in account', async () => {
+  connected = null
+  const body = await (await GET({ headers: requestHeaders } as Request)).json()
+  assert.equal(body.connected, false)
+  assert.equal(body.configured, true)
+  assert.equal(fetchMock.mock.callCount(), 0)
 })
 
 test('the integration status names the connected GitHub login', async () => {
@@ -115,7 +110,7 @@ test('all installation and repository pages are read; other apps, suspended inst
 test('session, account and configuration failures do not call GitHub', async () => {
   user = null
   await assert.rejects(access.listAuthorizedRepositories(requestHeaders), failure('authRequired', 401))
-  user = 'person-1'; accounts = []
+  user = 'person-1'; connected = null
   await assert.rejects(access.listAuthorizedRepositories(requestHeaders), failure('githubNotConnected', 409))
   delete process.env.GITHUB_APP_ID
   await assert.rejects(access.listAuthorizedRepositories(requestHeaders), failure('githubNotConfigured', 503))
@@ -123,9 +118,9 @@ test('session, account and configuration failures do not call GitHub', async () 
 })
 
 test('missing or revoked token and token/account identity mismatch require reconnection', async () => {
-  getAccessToken.mock.mockImplementation(async () => { throw new Error('private provider response') })
+  connectionFails = true
   await assert.rejects(access.listAuthorizedRepositories(requestHeaders), failure('githubReconnectRequired', 401))
-  getAccessToken.mock.mockImplementation(async () => ({ accessToken: 'private-test-token' }))
+  connectionFails = false
   answer = () => new Response('private upstream body', { status: 401 })
   await assert.rejects(access.listAuthorizedRepositories(requestHeaders), failure('githubReconnectRequired', 401))
   answer = () => json({ id: 43 })
@@ -158,7 +153,6 @@ test('PR URLs cannot redirect credentials or select another host', async () => {
     await assert.rejects(access.readAuthorizedPullRequest(requestHeaders, url), failure('githubPullRequestInvalid', 400))
   }
   assert.equal(fetchMock.mock.callCount(), 0)
-  assert.equal(getAccessToken.mock.callCount(), 0)
 })
 
 test('unknown repository and repository removed between requests cannot be read', async () => {
@@ -207,7 +201,7 @@ test('settings API exposes connection/install state and never credentials', asyn
   assert.equal(JSON.stringify(result).includes('private-test-token'), false)
   answer = url => url.pathname === '/user' ? json({ id: 42 }) : json({ installations: [] })
   assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: true, login: null, installed: false, repositories: [] })
-  accounts = []
+  connected = null
   assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: false, installed: false, repositories: [] })
   // Link GitHub is offered only when the connect route can start GitHub's authorization.
   connectConfigured = false
@@ -219,7 +213,6 @@ test('settings API exposes connection/install state and never credentials', asyn
 
 test('settings API refuses repository data resolved for a different session viewer', async () => {
   sessionUsers = ['person-1', 'person-2']
-  accounts = [{ id: 'internal-account', userId: 'person-2', providerId: 'github', accountId: '42' }]
   const response = await GET({ headers: requestHeaders } as Request)
   assert.equal(response.status, 401)
   assert.deepEqual(await response.json(), { viewerId: 'person-1', error: 'authRequired' })
@@ -240,7 +233,6 @@ test('settings API returns sanitized auth/provider failures with no-store', asyn
 
 test('settings errors carry the cookie viewer so another displayed account cannot offer reconnection', async () => {
   user = 'person-2'
-  accounts = [{ id: 'second-account', userId: user, providerId: 'github', accountId: '42' }]
   answer = () => new Response('private revoked token response', { status: 401 })
   const response = await GET({ headers: requestHeaders } as Request)
   assert.equal(response.status, 401)
