@@ -70,7 +70,7 @@ test.describe('工作区访问拒绝', () => {
   test.use({ allowedConsoleErrors: async ({}, use) => { await use(['/api/workspace', '/api/teams/directory'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' }))) } })
 
 test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', async ({ page }) => {
-  await register(page, '/settings/members')
+  await registerInTeam(page, '/settings/members')
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
   await page.route('**/api/workspace?workspace=00000000-0000-4000-8000-000000000099', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
   await page.route('**/api/teams/directory?workspace=00000000-0000-4000-8000-000000000099', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
@@ -110,7 +110,7 @@ test('设置页打开并空闲后，每个分区首次打开都不显示骨架�
   await page.waitForLoadState('networkidle')
   const skeleton = page.locator('main [data-slot="skeleton"]')
   const flashed: string[] = []
-  const names = (await sidebar.locator('[data-slot="sidebar-group"]').filter({ hasText: /个人|工作区/ }).getByRole('link').allInnerTexts()).map(name => name.trim())
+  const names = (await sidebar.locator('[data-slot="sidebar-group"]').filter({ hasText: /账号|E2E 团队/ }).getByRole('link').allInnerTexts()).map(name => name.trim())
   expect(names.length).toBeGreaterThan(10)
   for (const name of names) {
     const link = sidebar.getByRole('link', { name, exact: true })
