@@ -9,6 +9,7 @@ import { gmailNotification, notionSearchNotification, type ExternalNotification 
 import { ensureComposioTriggers, linearWebhookNotifications } from './sources'
 import { ingestNotifications } from './store'
 import { linearSyncEnabled } from '@/lib/linear-sync/flags'
+import { clearComposioNeedsReconnect, markComposioNeedsReconnect } from '@/lib/composio-account-store'
 
 // The hourly backfill behind the webhooks (app/api/cron/suggestions-reconcile).
 // It reads what each source holds now and ingests it like a webhook delivery;
@@ -24,14 +25,20 @@ const COMPOSIO_TOOLKITS = ['gmail', 'notion'] as const
 const PEOPLE_CONCURRENCY = 4
 const LINEAR_INBOX_LIMIT = 500
 
+/** A provider read that failed, with the connected account it ran through when it got that far. */
+class ProviderReadError extends Error {
+  constructor(message: string, readonly accountId?: string) { super(message) }
+}
+
 type Json = Record<string, unknown>
 const record = (value: unknown): Json => value && typeof value === 'object' && !Array.isArray(value) ? value as Json : {}
 const list = (value: unknown): Json[] => Array.isArray(value) ? value.map(record) : []
 
-/** The same mail the Gmail trigger delivers, minus what Gmail files as promotions or social. */
-async function recentGmail(userId: string): Promise<ExternalNotification[]> {
-  const result = await runComposioAction(userId, 'fetch_recent_gmail', { query: 'in:inbox newer_than:2d -category:promotions -category:social', max_results: 50 })
-  if ('error' in result) throw new Error(result.error)
+/** The same mail the Gmail trigger delivers; the Decisions API judges every message, Gmail's categories are only evidence. */
+async function recentGmail(userId: string, readThrough: (accountId: string) => void): Promise<ExternalNotification[]> {
+  const result = await runComposioAction(userId, 'fetch_recent_gmail', { query: 'in:inbox newer_than:2d', max_results: 50 })
+  if ('error' in result) throw new ProviderReadError(result.error, result.accountId)
+  readThrough(result.accountId)
   return list(result.data.messages).flatMap(message => ((notification => notification ? { ...notification, connectedAccountId: result.accountId } : [])(gmailNotification(userId, message))))
 }
 
@@ -40,9 +47,10 @@ async function recentGmail(userId: string): Promise<ExternalNotification[]> {
  * skipped: the trigger's edit time may be written differently from search's,
  * and a duplicate would show twice.
  */
-async function recentNotion(userId: string, since: Date): Promise<ExternalNotification[]> {
+async function recentNotion(userId: string, since: Date, readThrough: (accountId: string) => void): Promise<ExternalNotification[]> {
   const result = await runComposioAction(userId, 'list_recent_notion_pages', { page_size: 25 })
-  if ('error' in result) throw new Error(result.error)
+  if ('error' in result) throw new ProviderReadError(result.error, result.accountId)
+  readThrough(result.accountId)
   const pages = list(result.data.results).flatMap(page => notionSearchNotification(userId, page) ?? []).filter(page => page.occurredAt >= since)
   if (!pages.length) return []
   const known = await db.select({ externalId: suggestions.externalId }).from(suggestions)
@@ -73,13 +81,19 @@ export interface ReconcileResult {
 async function reconcilePerson(userId: string, toolkits: readonly string[], since: Date, result: ReconcileResult) {
   // A lost subscription is the likeliest reason deliveries stopped; re-create it (at most hourly).
   await ensureComposioTriggers(userId).catch((error: unknown) => console.error('Composio trigger check failed', error instanceof Error ? error.message : error))
+  let readThroughAccount: string | null = null
+  const readThrough = (accountId: string) => { readThroughAccount = accountId }
   const readers: Record<string, () => Promise<ExternalNotification[]>> = {
-    gmail: () => recentGmail(userId),
-    notion: () => recentNotion(userId, since),
+    gmail: () => recentGmail(userId, readThrough),
+    notion: () => recentNotion(userId, since, readThrough),
   }
   for (const toolkit of toolkits) {
+    readThroughAccount = null
     try {
       const notifications = await readers[toolkit]()
+      // It works again (or was reconnected in place): it no longer needs reconnection.
+      if (readThroughAccount) await clearComposioNeedsReconnect(userId, readThroughAccount)
+        .catch((error: unknown) => console.error('Could not clear a reconnect mark', error instanceof Error ? error.name : 'unknown'))
       await ingestNotifications(notifications)
       result.read[toolkit] = (result.read[toolkit] ?? 0) + notifications.length
     } catch (error) {
@@ -88,6 +102,10 @@ async function reconcilePerson(userId: string, toolkits: readonly string[], sinc
         // The provider's answer is not logged: it is about the person's credentials.
         result.reconnect[toolkit] = (result.reconnect[toolkit] ?? 0) + 1
         console.warn(`Suggestions backfill skipped ${toolkit}: the connection needs reconnecting`)
+        // The connected-apps list then offers the person a reconnect for that account.
+        const accountId = error instanceof ProviderReadError ? error.accountId : undefined
+        if (accountId) await markComposioNeedsReconnect(userId, toolkit, accountId)
+          .catch((markError: unknown) => console.error('Could not mark a connection for reconnecting', markError instanceof Error ? markError.name : 'unknown'))
         continue
       }
       result.failed[toolkit] = (result.failed[toolkit] ?? 0) + 1

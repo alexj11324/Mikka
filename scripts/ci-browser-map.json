@@ -82,6 +82,7 @@
     "browser-pane.spec.ts",
     "desktop-translucent.spec.ts",
     "desktop-update.spec.ts",
+    "rail-tooltips.spec.ts",
     "issue-header-breadcrumb.spec.ts",
     "side-panel-resize.spec.ts",
     "issue-menu-collision.spec.ts",
@@ -351,6 +352,7 @@
       "specs": [
         "workspace-menu.spec.ts",
         "desktop-update.spec.ts",
+        "rail-tooltips.spec.ts",
         "workspace.spec.ts",
         "sign-out.spec.ts",
         "workspace-shortcuts.spec.ts"

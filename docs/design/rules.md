@@ -21,15 +21,20 @@ source wins in a conflict is in [`README.md`](README.md).
   right threads and the computer together.
 - **R-04** Every bot comes with its own computer. There is no 新建云端电脑 entry
   anywhere, and no list of per-bot computers.
-- **R-05** Bots run only on Mikka's own AI SDK harness. The 新建 Bot dialog
-  has a big live preview, a shape grid, colours and a name. It has no machine
-  picker, no harness picker and no 说明 field (instructions are edited in chat).
-  The Coordinator has no runtime switch either: the #312 native Claude Code /
-  Codex runtime is deprecated and stays off (decision 2026-10-27).
+- **R-05** 「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过
+  daemon 把任务派给 Claude Code 或 Codex。」 (Alex, 2026-11-01;
+  [orchestration.md §3](orchestration.md)). GPT/OpenAI models go to Codex,
+  every other model to Claude Code; a person can change this per model in
+  「API 与订阅」. The 新建 Bot dialog has a big live preview, a shape grid,
+  colours and a name. It has no machine picker, no Claude Code / Codex picker
+  and no 说明 field (instructions are edited in chat). A bot's own chat never
+  runs inside Claude Code or Codex: that was an old plan (#312), abandoned.
 - **R-06** The Coordinator has no special UI; it is a normal bot (Alex
   2026-10-24). Its role is coordinating, not looking different: the same
-  bloub avatar with no star or badge, the same row, the same chat, the
-  same empty state as any other bot. Never the letter C.
+  bloub avatar with no badge of its own, the same row, the same chat, the
+  same empty state as any other bot. Never the letter C. 星标 = 置顶标记，所有
+  bot 一致: every pinned bot shows the star, the Coordinator only when pinned,
+  like any other bot (Alex 2026-11-01).
 - **R-07** Action entry points (buttons, menu items, the collapsed sidebar
   toggle, the 新建任务 dialog header) never say "Coordinator". Conversation
   headers keep the centred Coordinator pill.
@@ -83,23 +88,28 @@ source wins in a conflict is in [`README.md`](README.md).
   Slack, GitHub, Linear…) are rated by the decision model (OpenAI Decisions
   API) after Comma's attention model: first the cost if the person does
   nothing, when it lands and whether it can be undone; then one level,
-  critical, high, ask, normal or low (unclear rereads the source). Code floors
-  the level: any cost is at least high; a cost due within 48 hours, or an
-  irreversible one due within a week, is critical. Only the Coordinator speaks to the person about events: no
-  push, chat message or Telegram/Slack message is sent around it. Critical,
-  high and ask go to the Coordinator at once. The daily briefing is posted
+  critical, high, ask, normal or low (unclear rereads the source), and
+  whether the Coordinator takes it up now. The level's guidance (any cost is
+  at least high; a cost due within 48 hours, or an irreversible one due within
+  a week, is critical) is in the question; no code floor, cutoff or rule before
+  the call changes the answer (decision 2026-11-01-1300). Only the Coordinator speaks to the person about events: no
+  push, chat message or Telegram/Slack message is sent around it. What the
+  model says to take up goes to the Coordinator at once. The daily briefing is posted
   by the Coordinator in its chat every day at 08:00 local time (and pushed),
   whatever the bar below says. It tells the person only when they must act before the next
   08:00 briefing, or when a cost that cannot be undone lands within a week;
   everything else waits in 建议 for the briefing. When unsure, it stays
   quiet. It also stays quiet when fresh evidence shows the matter resolved,
-  owned by someone else, or already covered in the chat. When the daily cap
-  is spent, a matter the person must still act on is snoozed until the cap
-  reopens, never dropped. Telling the person is a card in its
+  owned by someone else, or already covered in the chat. When the Decisions
+  API says not now, a matter the person must still act on is snoozed until
+  the time it names, never dropped. Telling the person is a card in its
   own chat that says what happens if nothing is done and offers one next
-  step, pushed on mobile. Normal stays in 建议; low is not shown. Telling the
-  person is capped at 5 a day, 30 minutes apart (critical skips the spacing,
-  not the cap); held items wait, they are not dropped. The Coordinator never
+  step, pushed on mobile. Normal stays in 建议; low is not shown. Whether to
+  interrupt the person now, which waiting matter the Coordinator takes up
+  next, and what happens to a matter it left undecided are Decisions API
+  answers that read how often the person was told today; only runaway caps
+  (24 tellings, 48 handoffs a day) stay in code. Held items wait, they are not
+  dropped. The Coordinator never
   acts on an event before the person says yes. Its own ideas also go in its
   chat.
 - **R-21** 建议 is its own rail page (R-55), not part of the right panel; the
@@ -451,8 +461,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,
   forward, centred search pill that opens ⌘K, the 浏览器 globe toggle at the
-  right, R-57), 72px icon rail with a text label under each icon, in this
-  order: 主页, 建议, 看板, 插件, Artifact; and one rounded content card. Build on
+  right, R-57), 68px icon rail, in this order: 主页, 建议, 看板, 插件,
+  Artifact; and one rounded content card. Rail items are icons only: no text
+  under the icon; the name shows as a tooltip on hover and stays the item's
+  accessible name (Alex, #580; restored 2026-11-01 after #747 brought the
+  labels back). Build on
   `components/app-shell.tsx`; no reUI App Shell blocks. Standing rule: a
   skill audit (unslop, interface-design) never changes the shell layout;
   Alex keeps it as it is (2026-10-31).

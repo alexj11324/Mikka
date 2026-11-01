@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { suggestionMessage } from '../../lib/suggestions/card'
-import { test, expect, register, rail, seedSuggestion } from './fixtures'
+import { test, expect, register, rail, seedSuggestion, app } from './fixtures'
 
 // Writes one Coordinator message straight into CI's isolated disposable database: what a tapped card leaves in the chat.
-async function seedSentCard(email: string, message: string, position = 1) {
+async function seedSentCard(email: string, message: string, position = 1, role: 'user' | 'assistant' = 'user') {
   const connectionString = process.env.E2E_DATABASE_URL
   if (!connectionString) throw new Error('This test requires an isolated E2E_DATABASE_URL')
   const target = new URL(connectionString)
@@ -12,7 +12,7 @@ async function seedSentCard(email: string, message: string, position = 1) {
   const pool = new Pool({ connectionString, max: 1 })
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
-    await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), $4, $3)', [randomUUID(), user.id, JSON.stringify({ role: 'user', content: message }), position])
+    await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), $4, $3)', [randomUUID(), user.id, JSON.stringify(role === 'user' ? { role, content: message } : { role, content: [{ type: 'text', text: message }] }), position])
   } finally { await pool.end() }
 }
 
@@ -88,4 +88,41 @@ test('建议：一条以前存下的 GitHub 原文卡片发进 Coordinator 对�
   await expect(chat).not.toContainText('QUJDREVG')
   await expect(chat).not.toContainText('[pv]')
   await expect(chat).not.toContainText('####')
+})
+
+test('Coordinator 对话：长消息、长链接和代码块在任何宽度下都不让整页横向滚动，气泡和输入框留在屏幕内', async ({ page }) => {
+  const { email } = await register(page)
+  const url = `https://github.com/alexj11324/Mikka/actions/runs/41305611545/job/124845302453?check_suite_focus=true&q=${'abcdef0123456789'.repeat(8)}`
+  await seedSentCard(email, `ZHIX-2：请确认 /home/user/Mikka/packages/daemon/src/worker/cloud-worker-template-manifest-generated-file-name.json 还能用 ${'f3a1c9e7b2d4'.repeat(10)}`, 1)
+  await seedSentCard(email, `报错如下：\n\n\`\`\`\nClaude Code: API Error: Couldn't connect through your proxy (ERR_PROXY_TUNNEL) — ${'the proxy refused the tunnel '.repeat(6)}\n\`\`\`\n\n日志：${url}`, 2, 'assistant')
+  await seedSentCard(email, url, 3)
+  for (const [width, height] of [[960, 545], [1000, 545], [1024, 768], [1440, 900]]) {
+    await page.setViewportSize({ width, height })
+    for (const path of ['/?section=suggestions', '/']) {
+      await page.goto(app(path))
+      const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
+      const last = chat.locator('[data-slot="bubble"]').filter({ hasText: 'github.com' }).last()
+      await expect(last).toBeVisible()
+      // The app's content card (<main>) scrolls sideways when anything in it is wider, so that is what is measured, not the document.
+      const main = page.locator('main')
+      expect(await main.evaluate(element => element.scrollWidth <= element.clientWidth + 1), `${width}px ${path}: the page scrolls sideways`).toBe(true)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${width}px ${path}`).toBe(true)
+      for (const bubble of await chat.locator('[data-slot="bubble"]').all()) {
+        const box = await bubble.boundingBox()
+        expect(box!.x + box!.width, `${width}px ${path}: a bubble ends past the window`).toBeLessThanOrEqual(width)
+      }
+      const composer = chat.getByRole('textbox').last()
+      const box = await composer.boundingBox()
+      expect(box!.x + box!.width, `${width}px ${path}: the composer ends past the window`).toBeLessThanOrEqual(width)
+      // Whatever sits beside the message list (notices, approvals, the composer) is clipped by the chat, never scrolls the page: forced wider here.
+      expect(await composer.evaluate(textarea => {
+        const box = textarea.parentElement!
+        box.style.minWidth = '2000px'
+        const main = document.querySelector('main')!
+        const scrolls = main.scrollWidth > main.clientWidth + 1
+        box.style.minWidth = ''
+        return scrolls
+      }), `${width}px ${path}: a composer wider than the column scrolls the page`).toBe(false)
+    }
+  }
 })

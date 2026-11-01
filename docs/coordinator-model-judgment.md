@@ -38,8 +38,11 @@ interface. `callDecisionRequest` adapts the existing monitor owner's inline
 text/image request and returns its actual Gateway generation ID as invocationId.
 Construction/import does not make a model call.
 
-The model remains `openai/gpt-6-luna-decisions`, authenticated only by the existing
-`DECISION_GATEWAY_API_KEY`. There is no alternate provider/key/model fallback.
+The model remains `openai/gpt-6-luna-decisions`, authenticated by the app's one
+AI Gateway credential (`lib/ai-gateway-auth.ts`): `AI_GATEWAY_API_KEY` where it is
+set, otherwise the Vercel deployment's OIDC token, exactly as the Coordinator's
+model signs in. There is no Decisions-only key and no alternate provider/model
+fallback; with no credential the call is not made and logs `no-gateway-auth`.
 The documented native image format is supported by this model:
 https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-decisions
 

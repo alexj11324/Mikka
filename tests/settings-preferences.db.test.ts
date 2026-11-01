@@ -157,7 +157,7 @@ dbTest('time zone: a picked zone survives browser and IP reports until 自动', 
 dbTest('提醒: notified counts the notify budget\'s spends in the last 24 hours', async () => {
   as(people.alex)
   const { preferences, db, schema } = m
-  assert.deepEqual(await preferences.getAttentionToday(), { notified: 0, limit: 5 })
+  assert.deepEqual(await preferences.getAttentionToday(), { notified: 0, limit: 24 }) // the runaway cap; whether to interrupt is the Decisions API's answer
   const matterId = randomUUID()
   await db.insert(schema.attentionMatters).values({ id: matterId, userId: people.alex, matterKey: `test:${matterId}`, source: 'gmail', title: 't', level: 'high', assessment: {}, evidence: {}, state: 'notified' })
   const now = Date.now()
@@ -168,9 +168,9 @@ dbTest('提醒: notified counts the notify budget\'s spends in the last 24 hours
     { id: randomUUID(), userId: people.alex, matterId, action: 'notify', spends: false, createdAt: new Date(now - 60_000) },
     { id: randomUUID(), userId: people.alex, matterId, action: 'handoff', spends: true, createdAt: new Date(now - 60_000) },
   ])
-  assert.deepEqual(await preferences.getAttentionToday(), { notified: 2, limit: 5 })
+  assert.deepEqual(await preferences.getAttentionToday(), { notified: 2, limit: 24 })
   as(people.dana)
-  assert.deepEqual(await preferences.getAttentionToday(), { notified: 0, limit: 5 })
+  assert.deepEqual(await preferences.getAttentionToday(), { notified: 0, limit: 24 }) // the runaway cap; whether to interrupt is the Decisions API's answer
 })
 
 dbTest('删除全部记忆 removes only the person\'s facts and getMemory counts them', async () => {

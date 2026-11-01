@@ -8,7 +8,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 
 | Job | Use | Notes |
 | --- | --- | --- |
-| App shell (window, top bar, rail, content card) | `components/app-shell.tsx`, `components/nav/icon-rail.tsx` | Comma structure, R-35 |
+| App shell (window, top bar, rail, content card) | `components/app-shell.tsx`, `components/nav/icon-rail.tsx` | Comma structure, R-35. Rail items are icon buttons with a tooltip (`Tooltip` + `Button size="icon"`), never a label under the icon |
 | Bot list (left) | `components/nav/bot-list.tsx` | Coordinator and bots, R-01 |
 | Centre chat title | `components/nav/conversation-pill.tsx` | Borderless, centred |
 | Right panel | `components/nav/context-panel.tsx` | No input box in the thread list or under a screen; an open thread ends in the composer, R-10 |
