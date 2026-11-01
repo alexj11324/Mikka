@@ -42,7 +42,7 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
       await seed('suspended', suspended, [['suspended', 'suspended']])
       await seed('accepted', accepted, [['accepted', 'active']])
       await scoped.query(`INSERT INTO mikka_workspace_invitations VALUES ($1,$2,'accepted')`, [randomUUID(), accepted])
-      const migration = await readFile(new URL('../drizzle/20261031213104_personal_workspace_kind.sql', import.meta.url), 'utf8')
+      const migration = await readFile(new URL('../drizzle/20261101002001_personal_workspace_kind.sql', import.meta.url), 'utf8')
       await scoped.query(migration)
       await scoped.query(migration)
       const kinds = Object.fromEntries((await scoped.query('SELECT id,kind FROM mikka_workspaces')).rows.map(row => [row.id, row.kind]))
