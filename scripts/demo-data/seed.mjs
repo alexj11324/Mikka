@@ -77,7 +77,8 @@ function plan(owner) {
     const startedAt = new Date(createdAt.getTime() + 40_000)
     const finished = ['succeeded', 'failed', 'stopped', 'cancelled'].includes(run.status)
     const finishedAt = finished ? new Date(startedAt.getTime() + run.minutes * 60_000) : null
-    const lastReplyAt = finishedAt ?? ago(Math.max(16, Math.round(run.minutesAgo / 3)))
+    // Live threads replied a few minutes ago, staggered so the list does not read as one batch.
+    const lastReplyAt = finishedAt ?? ago(1 + [...run.key].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 14)
     return { ...run, id: id(`run:${run.key}`), issueId: run.issue ? id(`issue:${run.issue}`) : null, botId: botOf(run.bot).id,
       agentId: id(`agent:${run.agent}`), deviceId: agents.find(agent => agent.key === run.agent).deviceId,
       createdAt, startedAt, finishedAt, lastReplyAt, chunks: fillDeep(run.chunks) }
