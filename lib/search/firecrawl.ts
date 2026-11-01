@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { SearchProviderError, type SearchProvider } from './types'
+import { SearchProviderError, type SearchOptions, type SearchProvider } from './types'
 import { abortable, assertPublicWebUrl, webUrlSchema, type ResolveHost } from './url-policy'
 
 const ENDPOINT = 'https://api.firecrawl.dev/v2/'
@@ -66,7 +66,7 @@ export function createFirecrawlProvider(fetchImpl: typeof fetch = fetch, options
   }
   return {
     name: 'firecrawl',
-    search(query, { limit = 5, signal } = {}) {
+    search(query, { limit = 5, signal }: SearchOptions = {}) {
       return request('search', signal, async (_signal, post) => {
         const safeQuery = z.string().trim().min(1).max(500).parse(query)
         const safeLimit = z.number().int().min(1).max(10).parse(limit)
@@ -76,7 +76,7 @@ export function createFirecrawlProvider(fetchImpl: typeof fetch = fetch, options
           .map(item => ({ url: item.url, title: (item.title ?? item.url).slice(0, 300), snippet: (item.description ?? '').slice(0, 7000) }))
       })
     },
-    scrape(url, { signal } = {}) {
+    scrape(url, { signal }: SearchOptions = {}) {
       return request('scrape', signal, async (combined, post) => {
         await assertPublicWebUrl(url, combined, options.resolve)
         const body = scrapeBody.parse(await post({ url, formats: ['markdown'], onlyMainContent: true,
