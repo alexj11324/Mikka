@@ -2,6 +2,7 @@
 // trusted daemon code; model-facing request data never supplies authority.
 import { randomUUID } from 'node:crypto'
 import type { PermissionDecision } from '@mikka/protocol/agent-policy'
+import { decisionFallback } from '../decision-judgments'
 
 export interface ToolApprovalRequest {
   runId: string
@@ -17,6 +18,10 @@ export interface ToolApprovalHost {
   ask(request: Readonly<ToolApprovalRequest>, signal: AbortSignal): Promise<'allow' | 'deny'>
   /** Must reflect current run lease, owner, and revocation state. */
   isLive(runId: string): boolean | Promise<boolean>
+  /** Under network `ask`, the Decisions API's call on one destination the
+   * ceiling already admits: true goes ahead, false asks the person, null (no
+   * answer) goes ahead and is logged. Absent: every such destination is asked. */
+  preauthorizeNetwork?(request: Readonly<ToolApprovalRequest>, signal: AbortSignal): Promise<boolean | null>
 }
 
 async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -66,13 +71,27 @@ export class ToolApprovalGate {
         let granted = this.networkApprovals.get(key)
         if (!granted) {
           if (this.networkApprovals.size >= 1024 || lifetime.aborted) return false
-          granted = this.request({ ...request, requestId: `network:${randomUUID()}` }, lifetime)
+          granted = this.networkGrant(request, lifetime)
           this.networkApprovals.set(key, granted)
         }
         if (await abortable(granted, lifetime) !== 'allow' || this.networkApprovals.get(key) !== granted) return false
       }
       return await abortable(Promise.resolve(this.host.isLive(this.runId)), lifetime) && !lifetime.aborted && !this.revoked
     } catch { return false }
+  }
+
+  private async networkGrant(request: ToolApprovalRequest, signal: AbortSignal): Promise<'allow' | 'deny'> {
+    if (this.host.preauthorizeNetwork) {
+      let judged: boolean | null
+      try { judged = await abortable(this.host.preauthorizeNetwork(request, signal), signal) }
+      catch { return 'deny' }
+      if (judged === null) {
+        const { host, port } = request.input as { host: string; port: number }
+        decisionFallback(`network ${host}:${port} allowed without a judgment`)
+      }
+      if (judged !== false) return 'allow'
+    }
+    return this.request({ ...request, requestId: `network:${randomUUID()}` }, signal)
   }
 
   async request(request: ToolApprovalRequest, signal?: AbortSignal): Promise<'allow' | 'deny'> {

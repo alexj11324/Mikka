@@ -78,6 +78,8 @@ import { Outbox } from "./outbox"
 import { QuotaPoller, type QuotaSource } from "./quota/poller"
 import { DAEMON_VERSION, daemonPaths, type DaemonPaths } from "./paths"
 import { decide, pushDecision, runPolicy } from "./permissions"
+import { judgeComputerAction, noServerDecision } from "./decision-judgments"
+import type { ServerDecide } from "./server-decision"
 import { RpcServer, type RpcHandlers } from "./rpc/server"
 import { RunJournal } from "./runs/journal"
 import {
@@ -315,6 +317,7 @@ export class Daemon {
         driver: this.localComputerDriver,
         socketPath: join(paths.dataDir, 'local-computer.sock'),
         transport: 'tcp',
+        needsPerson: this.computerNeedsPerson(),
         permitted: runId => {
           const assignment = this.journal.get(runId)?.assignment
           return Boolean(!this.stopped && this.registered && assignment?.localComputer && !assignment.computer &&
@@ -356,6 +359,7 @@ export class Daemon {
         return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId, policyVersion: computer.policyVersion }, assertLive)
       }
       this.cloudComputerBroker = new ComputerBroker({ driver, socketPath: join(paths.dataDir, 'computer.sock'),
+        needsPerson: this.computerNeedsPerson(),
         permitted: runId => {
           const entry = this.journal.get(runId)
           return Boolean(!this.stopped && this.registered && entry?.assignment.computer && this.supervisor?.computerRunAllowed(runId))
@@ -927,6 +931,18 @@ export class Daemon {
     ]
   }
 
+  /** The server's Decisions API for this daemon's runs; no answer until the link provides one. */
+  private serverDecide(): ServerDecide {
+    const link = this.options.link
+    return link.decide ? link.decide.bind(link) : noServerDecision
+  }
+
+  /** Under computer `ask`: whether one action needs the person, judged with the run's task. */
+  private computerNeedsPerson() {
+    return (runId: string, evidence: { call: unknown; recent: string[] }, signal?: AbortSignal) =>
+      judgeComputerAction(this.serverDecide(), runId, { ...evidence, task: this.journal.get(runId)?.assignment.prompt }, signal)
+  }
+
   /** What every real adapter of this daemon is built with, subscription runs included. */
   private adapterOptions() {
     const sandbox = this.agentSandbox()
@@ -947,7 +963,7 @@ export class Daemon {
     return {
       claude: { sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), openContainer, computerProvider },
       codex: { sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), openContainer, computerProvider },
-      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider },
+      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider, decide: this.serverDecide() },
     }
   }
 

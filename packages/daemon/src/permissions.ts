@@ -28,6 +28,8 @@ import {
   type RunPolicy,
 } from "@mikka/protocol/agent-policy"
 
+import { decisionFallback } from "./decision-judgments"
+
 export { PERMISSION_ACTIONS, PERMISSION_DEFAULTS }
 export type { PermissionAction, PermissionDecision, RunPolicy }
 
@@ -54,6 +56,28 @@ export function decide(
     return context.policy.permissions[typed] ?? "ask"
   }
   return PERMISSION_DEFAULTS[typed]
+}
+
+/**
+ * `decide`, with the Decisions API in place of the fixed `ask` for an action
+ * the person set nothing for: an unknown action, or a setup recipe nobody
+ * approved. A read-only run still denies, and an approved recipe or a
+ * configured action never asks. No answer lets the agent's call go ahead.
+ */
+export async function decideWithJudgment(
+  action: string,
+  context: PermissionContext,
+  judge: (evidence: { action: string; subject?: string }) => Promise<"allow" | "ask" | null>,
+  subject?: string
+): Promise<PermissionDecision> {
+  const fixed = decide(action, context)
+  const unknown = !Object.hasOwn(PERMISSION_DEFAULTS, action)
+  const unapprovedRecipe = action === "run_setup_recipe" && !context.setupRecipeApproved
+  if (fixed === "deny" || !(unknown || unapprovedRecipe)) return fixed
+  const judged = await judge({ action, subject })
+  if (judged) return judged
+  decisionFallback(`${action} allowed without a judgment`)
+  return "allow"
 }
 
 /** The policy a run applies: what the server sent, or the defaults. */
@@ -113,7 +137,8 @@ export function pushDecision(
   return { push: false, note: "Push needs approval for this repo" }
 }
 
-/** Shell commands that add or install dependencies (first word, verb). */
+/** Shell commands that add or install dependencies (first word, verb), named
+ * only in Claude Code's own CLI rules below; Cursor's commands are judged. */
 const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
   ["npm", ["install", "i", "add", "ci"]],
   ["pnpm", ["install", "i", "add"]],
@@ -130,8 +155,10 @@ const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
 ]
 
 /**
- * The policy action a shell command line falls under, for CLIs that ask
- * before running a command (Cursor). Each `&&`, `;` or `|` segment counts.
+ * The hard-boundary action a shell command line falls under, for CLIs that
+ * ask before running a command (Cursor): only `git push`, which the daemon
+ * owns (ADR 0017). Every other command is judged by the Decisions API
+ * (`judgeCommandAction`), never by a list here. Each `&&`, `;` or `|` segment counts.
  * Wrappers (`sudo`, `env`, `command`, `xargs`, `sh -c …`) are unwrapped so
  * `env git push` and `/usr/bin/git push` cannot slip past the git rule.
  */
@@ -170,7 +197,7 @@ function classifySegment(segment: string, depth: number): PermissionAction | nul
     }
     break
   }
-  const [tool, verb] = words
+  const [tool] = words
   if (!tool) return null
   const name = basename(tool)
   // `sh -c "git push"` keeps the real command in the argument string.
@@ -183,8 +210,6 @@ function classifySegment(segment: string, depth: number): PermissionAction | nul
     }
   }
   if (name === "git" && words.slice(1).some((word) => word === "push")) return "git_push"
-  const entry = INSTALL_COMMANDS.find(([command]) => command === name)
-  if (entry && verb && entry[1].includes(verb)) return "install_dependency"
   return null
 }
 
