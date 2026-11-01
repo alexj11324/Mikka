@@ -5,7 +5,6 @@ import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { AgentApproval, AgentQuestions, useAgentDecision } from './agent-decision'
 import { AgentCodeContent, AgentContent, AgentStatusIcon, AgentTasks, AgentTextContent } from './agent-content'
 import { AgentImage } from './agent-image'
-import { AgentFollowUps } from './agent-follow-ups'
 import { AgentImageCard } from './agent-image-card'
 import { CitationChip, WebCitation } from './agent-citations'
 import { ComputerCard } from '@/components/computer/computer-card'
@@ -53,7 +52,8 @@ const renderers = {
       </p></BeCardContent>
     </BeCard>
   },
-  BeFollowUps: AgentFollowUps,
+  // No suggestion cards in a chat (R-12): saved follow-ups draw nothing; agent-follow-ups.tsx stays in the library.
+  BeFollowUps: () => null,
   BeResponse: AgentContent,
   BeApproval: AgentApproval,
   BeQuestions: AgentQuestions,

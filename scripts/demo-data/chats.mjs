@@ -21,10 +21,9 @@ export const CHATS = {
     user([{ type: 'text', text: '这是我这边的截图，「已完成」那列' }, { type: 'file', mediaType: 'image/png', data: PIXEL }]),
     bot('收到截图，和我复现的一致。改动是这一处：\n\n```tsx\n// components/blocks/kanban-board-1/components/kanban-board.tsx\n<KanbanColumnContent\n  value={column.value}\n  className="min-h-0 flex-1 gap-1.5 overflow-y-auto overscroll-y-contain p-0.5 pb-[var(--scrollbar-size)]"\n/>\n```\n\n`--scrollbar-size` 在 `globals.css` 里按平台给值，macOS 叠加滚动条时是 0，不会多出空白。'),
     user('顺便把这周前端相关的 PR 状态列一下'),
-    bot(`root = Stack([title, table, follow])
+    bot(`root = Stack([title, table])
 title = TextContent("前端相关 PR（本周）", "large-heavy")
-table = BeTable(["PR", "标题", "状态", "评审"], [["#845", "看板最后一张卡避开滚动条", "Open", "等 CI"], ["#851", "引用保留 Artifact 版本", "Open", "1 条意见"], ["#790", "半透明窗口去掉对话框模糊", "Merged", "通过"], ["#781", "旧组件名继续解析", "Merged", "通过"]])
-follow = BeFollowUps([{label: "#851 的意见是什么？", prompt: "把 #851 的评审意见贴出来，并说说你打算怎么改。"}, {label: "哪些可以今天合？", prompt: "这些 PR 里哪些今天就能合？给出理由。"}])`),
+table = BeTable(["PR", "标题", "状态", "评审"], [["#845", "看板最后一张卡避开滚动条", "Open", "等 CI"], ["#851", "引用保留 Artifact 版本", "Open", "1 条意见"], ["#790", "半透明窗口去掉对话框模糊", "Merged", "通过"], ["#781", "旧组件名继续解析", "Merged", "通过"]])`),
     user('#851 的意见是什么？'),
     bot(`root = Stack([intro, diff, alert])
 intro = InlineText(["评审在 ", SourceChip("https://github.com/mikka-demo/web/pull/851", "PR #851"), " 里指出：引用对象里的 version 用的是字符串，", TaskChip("{{issue:i-quote-artifact}}"), " 的根因其实在序列化那一层。"])

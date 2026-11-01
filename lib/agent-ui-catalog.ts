@@ -216,6 +216,7 @@ const MODEL_HIDDEN_NAMES = new Set<string>([
   // OpenUI charts lack the selected theme colours and progressive rendering.
   'RadarChart', 'HorizontalBarChart', 'Series', 'PieChart', 'SingleStackedBarChart', 'Slice', 'ScatterChart', 'ScatterSeries', 'Point',
   'ComputerCard', // Task state and approval UI belong to the host.
+  'BeFollowUps', // No suggestion cards in a chat (R-12); saved replies still parse and draw nothing.
 ])
 
 export const agentComponentGroups: { name: string; components: AgentComponentName[]; notes: string[] }[] = [
