@@ -225,7 +225,7 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
   card in a chat; a later change of state is a sentence from the Coordinator,
   not a second card. The card has no log, input box or buttons. Clicking it
-  opens the thread conversation as R-80 says for every thread: on desktop in
+  opens the thread conversation as R-82 says for every thread: on desktop in
   the right column beside the chat, which stays; on a phone it pushes in full
   screen ([decision](decisions/2026-11-01-1320-navigation-model.md)).
   Figma: page 「线程卡片 · 聊天里派出线程」.
@@ -293,7 +293,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 
 ## Navigation
 
-- **R-80** One address says what is on screen, and every click goes through
+- **R-82** One address says what is on screen, and every click goes through
   `components/workspace/workspace-navigation.ts`; nothing else writes the
   browser history or builds a workspace link (`scripts/navigation-policy.mjs`).
   A move the person makes (another bot or group chat, a rail page, a task, a

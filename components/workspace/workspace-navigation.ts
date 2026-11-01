@@ -3,7 +3,7 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
 /**
  * The workspace's address. One URL describes what is on screen, and every
  * change a person makes goes through here, so the browser's back and forward
- * step through it one place at a time (rules.md R-80,
+ * step through it one place at a time (rules.md R-82,
  * decisions/2026-11-01-1320-navigation-model.md).
  *
  * Nothing outside this file and lib/settings-navigation.ts writes the

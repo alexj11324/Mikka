@@ -5,7 +5,7 @@
   by the coordinating session): 「整个网页的设计里面，路径和跳转是有问题的…
   严查页面跳转的问题：到底哪个路径应该在哪里，页面应该怎么样去跳转。」 On the
   audit's four questions: 「那你就按照建议的来」.
-- Rule: R-80 (new), R-66 (desktop half rewritten)
+- Rule: R-82 (new), R-66 (desktop half rewritten)
 - Replaces: decisions.md 2026-10-25 「clicking it opens the thread conversation
   in the centre, ‹ Coordinator goes back」; R-66's 「on desktop the centre
   column switches to it」
@@ -56,7 +56,7 @@ Every one of them pushes a side pane in full screen on a phone.
 ## Order of work
 
 PR 1 (this file): the address module, back and forward for sections, bots and
-tasks, the CI guard, R-80. Then the thread column (`thread=`), addresses for
+tasks, the CI guard, R-82. Then the thread column (`thread=`), addresses for
 Artifacts, group chats, projects and teams, the task page's origin and
 notifications, and the phone web's ways in and out, each with browser tests
-for its rows of R-80.
+for its rows of R-82.
