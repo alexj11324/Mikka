@@ -28,7 +28,8 @@ test(
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now());
-      CREATE TABLE workspace_e2b_keys ("workspaceId" uuid PRIMARY KEY);
+      CREATE TABLE workspace_e2b_keys ("workspaceId" uuid PRIMARY KEY,"createdBy" text);
+      CREATE TABLE user_e2b_keys ("userId" text PRIMARY KEY);
       CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
       CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY,"bindingId" uuid)`);
       await pool.query(
@@ -238,10 +239,18 @@ test(
       await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",epoch,state,provider) VALUES ($1,'alice',$2,1,'connected','claude')`,[claudeConnection,alice.workspaceId]);
       await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision","modelId",route) VALUES ($1,'alice',$2,$3,$4,1,'reported-opus','claude_cpa')`,[claudeBinding,alice.workspaceId,bot,claudeConnection]);
       assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:server,harness:'claude_code',model:'opus',position:2147483647});
-      // The workspace's own E2B key puts the cloud ahead of the online device.
-      await pool.query('INSERT INTO workspace_e2b_keys ("workspaceId") VALUES ($1)',[alice.workspaceId]);
-      assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:'cloud',harness:'claude_code',model:'reported-opus',position:2147483647});
-      await pool.query('DELETE FROM workspace_e2b_keys');
+      // A teammate's E2B key is theirs alone: it never puts Alice's cloud first (keys are personal).
+      await pool.query('INSERT INTO user_e2b_keys ("userId") VALUES ($1)',['bob']);
+      assert.equal((await settings.suggested(alice)).place,server);
+      // Alice's own E2B key puts the cloud ahead of the online device, and so does one she saved
+      // for the workspace before keys were personal, until it is adopted.
+      for (const key of ['INSERT INTO user_e2b_keys ("userId") VALUES ($1)', 'INSERT INTO workspace_e2b_keys ("workspaceId","createdBy") VALUES (gen_random_uuid(),$1)']) {
+        await pool.query(key,['alice']);
+        assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:'cloud',harness:'claude_code',model:'reported-opus',position:2147483647});
+        await pool.query('DELETE FROM user_e2b_keys WHERE "userId"=$1',['alice']);
+        await pool.query('DELETE FROM workspace_e2b_keys');
+      }
+      await pool.query('DELETE FROM user_e2b_keys');
       await pool.query(`UPDATE byos_connections SET state='disconnected' WHERE id=$1`,[claudeConnection]);
       assert.equal((await settings.suggested(alice)).harness,'codex');
       assert.equal((await settings.suggested(alice)).model,'default');

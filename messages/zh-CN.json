@@ -3992,7 +3992,6 @@
     "computerYes": "开通",
     "computerNo": "暂不开通",
     "computerLater": "好的。之后可以在设置中填写 E2B API Key 开通。",
-    "computerMember": "工作区管理员在设置中填写 E2B API Key 后，我就能用云电脑了。",
     "keyLabel": "E2B API Key",
     "keyLink": "去 E2B 拿 Key",
     "keyConnect": "连接",

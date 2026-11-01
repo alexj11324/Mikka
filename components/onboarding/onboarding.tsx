@@ -27,7 +27,7 @@ import { useActionError } from '@/lib/use-action-error'
  * only an admin can, so the Bot says so and moves on. `none`: the computer
  * needs nothing from them.
  */
-export type OnboardingComputer = 'ask' | 'member' | 'none'
+export type OnboardingComputer = 'ask' | 'none'
 
 /** What saving an E2B key came to; the key itself never comes back. */
 export type E2BKeyResult = 'ok' | 'invalid' | 'unavailable'
@@ -200,7 +200,6 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
       setCard('computer')
       return
     }
-    if (computer === 'member') await say(t('computerMember'))
     await askApps(current)
   }
 

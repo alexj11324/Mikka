@@ -14,6 +14,7 @@ import { defaultAgentCopy } from "./agent-copy";
 import { harnessForModel } from "@mikka/protocol/harness";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
 import { COORDINATOR_MODEL } from "./coordinator/model";
+import { ownE2BKeySql } from "./secrets/e2b-owner-sql";
 
 type Query = Pick<Pool, "query">;
 type DeviceRow = ExecutionDevice & { lastSeenAt: Date | null; deviceType?: string | null; autoSchedule?: boolean | null };
@@ -26,7 +27,7 @@ export type DeviceTarget = {
 };
 
 /**
- * Cloud means the workspace's own E2B key on the dispatching bot's own cloud
+ * Cloud means the person's own E2B key (keys are personal) on the dispatching bot's own cloud
  * runtime (MVP: no Mikka-hosted sandboxes). The key is enough: a bot with no
  * runtime yet gets one when the run is dispatched (`ensureBotCloudRuntime`).
  * The kill switch and a workspace's 「电脑」 policy set to deny turn it off. A
@@ -39,10 +40,9 @@ export async function cloudReady(
 ) {
   if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== "1") return false;
   const { rowCount } = await query.query(
-    `SELECT 1 FROM workspace_e2b_keys k
-      WHERE k."workspaceId"=$1
-        AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$2 AND b."workspaceId"=k."workspaceId" AND b."ownerId"=$3 AND b."archivedAt" IS NULL))
-        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=k."workspaceId" AND p.permission='deny') LIMIT 1`,
+    `SELECT 1 WHERE ${ownE2BKeySql('$3::text')}
+        AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$2 AND b."workspaceId"=$1::uuid AND b."ownerId"=$3 AND b."archivedAt" IS NULL))
+        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=$1::uuid AND p.permission='deny')`,
     [scope.workspaceId, scope.botId, scope.ownerId],
   );
   return Boolean(rowCount);
