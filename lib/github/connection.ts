@@ -6,8 +6,7 @@ import { decryptOAuthToken, setTokenUtil } from 'better-auth/oauth2'
 import { db } from '@/lib/db'
 import { githubConnections } from '@/lib/db/schema'
 import { auth } from '@/lib/auth'
-import { authOAuthProxyOptions } from '@/lib/auth-config'
-import { appOrigin } from '@/lib/mcp/resource'
+import { authOAuthProxyOptions, resolveAppOrigin } from '@/lib/auth-config'
 import { withBasePath } from '@/lib/base-path'
 
 // Plugins → GitHub connects a GitHub account for repository access without
@@ -22,7 +21,7 @@ export type GitHubConnection = { githubAccountId: string; githubLogin: string }
 type TokenResponse = { access_token: string; expires_in?: number; refresh_token?: string; refresh_token_expires_in?: number }
 
 // The same origin Better Auth registers its GitHub callback on (lib/auth.ts).
-const callbackBase = () => authOAuthProxyOptions(process.env)?.productionURL ?? appOrigin
+const callbackBase = () => authOAuthProxyOptions(process.env)?.productionURL ?? resolveAppOrigin(process.env)
 
 function callbackURL() {
   const base = callbackBase()

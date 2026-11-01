@@ -1,7 +1,7 @@
 import 'server-only'
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { appOrigin } from '@/lib/mcp/resource'
+import { resolveAppOrigin } from '@/lib/auth-config'
 import { withBasePath } from '@/lib/base-path'
 import { completeGitHubConnect, GITHUB_CALLBACK_PATH, GITHUB_CONNECT_COOKIE, githubConnectUser } from './connection'
 
@@ -24,7 +24,7 @@ export async function handleGitHubConnectCallback(request: Request): Promise<Res
   const starter = githubConnectUser(url.searchParams.get('state'), cookieValue(request, GITHUB_CONNECT_COOKIE))
   if (!starter) return null
   const done = (result: 'connected' | 'link-failed') => {
-    const destination = new URL(GITHUB_PLUGIN_PATH, appOrigin ?? url.origin)
+    const destination = new URL(GITHUB_PLUGIN_PATH, resolveAppOrigin(process.env) ?? url.origin)
     if (result === 'link-failed') destination.searchParams.set('github', 'link-failed')
     const response = NextResponse.redirect(destination)
     response.cookies.set(GITHUB_CONNECT_COOKIE, '', { httpOnly: true, sameSite: 'lax', secure: url.protocol === 'https:', path: GITHUB_CALLBACK_PATH, maxAge: 0 })
