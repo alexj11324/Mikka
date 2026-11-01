@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { pairEnv, publish } from './publish-template-env.mjs'
+import { currentWorkerSha, pairEnv, publish } from './publish-template-env.mjs'
 
 const SHA = 'a'.repeat(40)
 
@@ -57,4 +57,9 @@ test('a failed redeploy fails the run', async () => {
 test('refuses a short SHA or an odd template id before any write', () => {
   assert.throws(() => pairEnv({ templateId: 'tpl1', sourceSha: 'abc1234' }), /source_sha_invalid/)
   assert.throws(() => pairEnv({ templateId: 'a/b', sourceSha: SHA }), /template_id_invalid/)
+})
+
+test('reads production\'s current worker hash, empty when unset', async () => {
+  assert.equal(await currentWorkerSha({ token: 't', fetchImpl: fakeVercel().fetchImpl }), SHA)
+  assert.equal(await currentWorkerSha({ token: 't', fetchImpl: fakeVercel({ stored: {} }).fetchImpl }), '')
 })

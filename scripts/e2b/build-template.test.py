@@ -45,11 +45,35 @@ class Publish(unittest.TestCase):
         import tarfile, tempfile
         with tempfile.TemporaryDirectory() as temp:
             sha = bt.source_context(Path(temp), 'HEAD')
-            self.assertEqual(Path(temp, 'source-sha').read_text(), sha + '\n')
+            self.assertEqual(Path(temp, 'source-sha').read_text(), bt.worker_hash(sha) + '\n')
             with tarfile.open(Path(temp, 'worker.tar')) as tar:
                 names = [m.name for m in tar.getmembers() if m.isfile()]
             self.assertTrue(names)
             self.assertTrue(all(n in bt.WORKER_PATHS or n.split('/', 2)[0] in bt.WORKER_PATHS or '/'.join(n.split('/')[:2]) in bt.WORKER_PATHS for n in names))
+
+class WorkerHash(unittest.TestCase):
+    def test_changes_only_with_what_the_template_packages(self):
+        import subprocess, tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            git = lambda *args: subprocess.run(['git', '-c', 'user.email=t@t', '-c', 'user.name=t', *args], cwd=temp, check=True, capture_output=True)
+            write = lambda path, text: (Path(temp, path).parent.mkdir(parents=True, exist_ok=True), Path(temp, path).write_text(text))
+            git('init', '-q')
+            for path in ('package.json', 'packages/daemon/a.ts', 'scripts/e2b/bootstrap.sh', 'scripts/e2b/build-template.py', 'app/page.tsx'):
+                write(path, 'one')
+            git('add', '-A'); git('commit', '-qm', 'one')
+            root, bt.ROOT = bt.ROOT, Path(temp)
+            try:
+                first = bt.worker_hash('HEAD')
+                self.assertRegex(first, r'^[0-9a-f]{40}$')
+                write('app/page.tsx', 'two'); git('commit', '-qam', 'app only')
+                self.assertEqual(bt.worker_hash('HEAD'), first)
+                write('packages/daemon/a.ts', 'two'); git('commit', '-qam', 'daemon')
+                second = bt.worker_hash('HEAD')
+                self.assertNotEqual(second, first)
+                write('scripts/e2b/bootstrap.sh', 'two'); git('commit', '-qam', 'recipe')
+                self.assertNotEqual(bt.worker_hash('HEAD'), second)
+            finally:
+                bt.ROOT = root
 
 if __name__ == '__main__':
     unittest.main()
