@@ -81,7 +81,7 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     const r = await person('readonly')
     await pool.query('DELETE FROM repository_settings WHERE "userId"=$1', [r.id])
     const deviceId = await onlineMac(r.id)
-    const botId = await chatBotId(r.id, null)
+    const botId = await chatBotId(r.id, null, await ownWorkspace(r.id))
     const refused = await steps.dispatchRun(r.id, { issueId: r.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { error: string; reason: string; detail: string }
     assert.equal(refused.error, 'runInvalid')
     assert.equal(refused.reason, 'repositoryPushApprovalRequired', 'the Coordinator is told the real cause, not left to guess one')
