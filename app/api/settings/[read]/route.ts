@@ -12,6 +12,7 @@ import { cardVerificationStatus, getBilling, getCreditBilling } from '@/app/acti
 import { listAuditLog } from '@/app/actions/audit-log'
 import { getExecutionFallbacks, listBotModels, listExecutionPlaces, listExecutionRules } from '@/app/actions/execution-settings'
 import { listBots } from '@/app/actions/bots'
+import { getApiKeys } from '@/app/actions/model-api-keys'
 import type { AuditFilter } from '@/lib/audit/cursor'
 import type { SettingsRead } from '@/lib/settings-read'
 
@@ -45,6 +46,7 @@ const READS: Record<SettingsRead, (query: URLSearchParams) => Promise<unknown>> 
   'execution-places': () => listExecutionPlaces(),
   'bot-models': () => listBotModels(),
   bots: () => listBots(),
+  'api-keys': query => getApiKeys(workspace(query)),
   audit: query => listAuditLog({ filter: (query.get('filter') ?? undefined) as AuditFilter | undefined, cursor: query.get('cursor') }, workspace(query)),
 }
 
