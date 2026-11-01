@@ -32,6 +32,7 @@
     "bot-list-groups.spec.ts",
     "invalid-issue-content.spec.ts",
     "issue-threads.spec.ts",
+    "issue-page-overlap.spec.ts",
     "linear-sync-disabled.spec.ts",
     "members.spec.ts",
     "mobile-handoff.spec.ts",
@@ -304,6 +305,17 @@
       ],
       "specs": [
         "side-panel-resize.spec.ts"
+      ]
+    },
+    {
+      "area": "task page",
+      "paths": [
+        "^components\\/workspace\\/(?:issue-threads|thread-steps)\\.tsx$",
+        "^components\\/blocks\\/rich-text-editor-2\\/components\\/rich-text-block-gutter\\.tsx$"
+      ],
+      "specs": [
+        "issue-page-overlap.spec.ts",
+        "thread-cards.spec.ts"
       ]
     },
     {

@@ -2314,9 +2314,13 @@
     "paymentDesignation": {
       "heading": "Payment",
       "mine": "Pay for this team with my card",
+      "payerTitle": "Paying card",
       "payer": "{name}'s card",
-      "active": "Paying",
-      "until": "Stops paying on {date}"
+      "until": "{name}'s card · stops on {date}"
+    },
+    "creditShare": {
+      "mine": "My credits also pay for this team",
+      "sharers": "Members sharing credits"
     },
     "personalPolicy": {
       "loading": "Loading personal subscription settings",
@@ -3463,8 +3467,6 @@
       },
       "columns": "Board columns",
       "hiddenLane": "Hidden",
-      "expandColumn": "Expand the {status} column",
-      "foldColumn": "Fold to a strip",
       "hideColumn": "Hide column",
       "showColumn": "Show {status} column",
       "columnMenu": "{status} column options",

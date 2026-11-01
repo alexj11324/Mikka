@@ -13,7 +13,7 @@ import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { botChats, chatView, retryFailedTurn, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import { and, eq, sql } from 'drizzle-orm'
-import { coordinatorBot } from '@/lib/coordinator/coordinator-bot'
+import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
 import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
@@ -24,10 +24,14 @@ import { claimSuggestion, readClaimedSuggestion } from '@/lib/suggestions/store'
 import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 
-async function getUserId(): Promise<string> {
+async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
+  return session.user
+}
+
+async function getUserId(): Promise<string> {
+  return (await getUser()).id
 }
 
 /** `botId` is the chat's bot row, the Coordinator's included. */
@@ -40,10 +44,12 @@ const botIdSchema = z.uuid().nullable()
  * Coordinator's bot row when the caller names none (the Coordinator's entry
  * in the bot list).
  */
-async function ownBot(userId: string, botId: string | null | undefined): Promise<{ id: string; name: string; coordinator: boolean }> {
+async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string | null | undefined): Promise<{ id: string; name: string; coordinator: boolean }> {
+  const userId = user.id
   const parsed = botIdSchema.safeParse(botId ?? null)
   if (!parsed.success) throw new ActionFailureError('validationGeneric')
-  const id = parsed.data ?? (await coordinatorBot(userId)).botId
+  // No bot named: the Coordinator of the workspace the person has open.
+  const id = await openChatBotId(user, parsed.data)
   const [bot] = await db.select({ id: bots.id, name: bots.name, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
     .from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, userId))).limit(1)
   if (!bot) throw new ActionFailureError('validationGeneric')
@@ -52,8 +58,9 @@ async function ownBot(userId: string, botId: string | null | undefined): Promise
 
 /** The person's chat with their Coordinator, or with one of their bots: every bot runs on the same harness. */
 export async function getCoordinatorChat(botId: string | null = null): Promise<CoordinatorChat> {
-  const userId = await getUserId()
-  const bot = await ownBot(userId, botId)
+  const user = await getUser()
+  const userId = user.id
+  const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()
   const chat = await chatView(userId, 200, bot.id)
   // Without a Coordinator here nothing is coming, so do not show one working.
@@ -90,7 +97,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
         if(['http:','https:'].includes(origin.protocol)&&origin.host===host)humanSessionId=session.session.id
       }catch{/* Missing/malformed origin is no approval provenance. */}
     }
-    const bot = await ownBot(userId, botId)
+    const bot = await ownBot(session.user, botId)
     const parsed = personalSubmissionInput.safeParse({ text, submissionId, ...(images?.length ? { images } : {}) })
     if (!parsed.success) throw new ActionFailureError('messageRequired')
     const quoted = quote ? quoteSchema.safeParse(quote) : null
@@ -129,7 +136,7 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
   return runAction(async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
-    const bot = await ownBot(session.user.id, botId)
+    const bot = await ownBot(session.user, botId)
     if (!coordinatorEnabled()) return { queued: false }
     const chat = await chatView(session.user.id, 1, bot.id)
     if (chat.items.length || chat.working || chat.error) return { queued: false }
@@ -155,7 +162,7 @@ export async function retryCoordinatorTurn(botId: string | null = null): Promise
   return runAction(async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
-    const bot = await ownBot(session.user.id, botId)
+    const bot = await ownBot(session.user, botId)
     if (!coordinatorEnabled()) return { queued: false }
     const queued = await retryFailedTurn(session.user.id, bot.id)
     if (queued) after(() => wakeCoordinator(session.user.id))

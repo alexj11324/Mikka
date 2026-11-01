@@ -112,8 +112,9 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     const observedScopeVersion = existing?.scopeVersion ?? null
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
     let doneEvent = false
-    // Marking a task done tells its owner's Coordinator; its bot row is resolved here, before the transaction.
-    const coordinator = existing && existing.status !== 'done' && parsed.data.status === 'done' ? (await coordinatorBot(ownerId, { backfill: false })).botId : null
+    // Marking a task done tells its owner's Coordinator; its bot row is resolved here, before the transaction. A task
+    // names no workspace, so it is the personal workspace's Coordinator.
+    const coordinator = existing && existing.status !== 'done' && parsed.data.status === 'done' ? (await coordinatorBot(ownerId, null, { backfill: false })).botId : null
     try {
       const result = await db.transaction(async tx => {
         if (!id) {

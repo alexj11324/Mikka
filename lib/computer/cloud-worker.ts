@@ -5,6 +5,7 @@ import type { Pool } from 'pg'
 import { provisionCloudDevice } from './cloud-device'
 import { claimWorkerLease, releaseWorkerLease, renewWorkerLease } from './worker-lease'
 import * as provider from './e2b-provider'
+import { CloudWorkerError } from './worker-error'
 
 type Actor = { userId: string; workspaceId: string }
 
@@ -20,7 +21,7 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
   const temporary = `/run/mikka-viewer/worker-${leaseId}.next`
   try {
     const pinned = await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })
-    if (pinned.trim() !== sourceSha) throw new Error('Cloud worker version mismatch')
+    if (pinned.trim() !== sourceSha) throw new CloudWorkerError('worker_version_mismatch', sandbox.sandboxId)
     const existing = await pool.query(`SELECT d.id FROM cloud_machines m JOIN devices d ON d.id=m."deviceId"
       JOIN device_tokens t ON t."boundDeviceId"=d.id AND t."boundWorkspaceId"=m."workspaceId" AND t."userId"=m."ownerId"
       WHERE m."workspaceId"=$1 AND m."ownerId"=$2 AND m."sandboxId"=$3 AND d."ownerId"=$2 AND d.kind='cloud'
@@ -48,7 +49,7 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
       if (ready.rowCount) return { deviceId: credential.deviceId }
       await new Promise(resolve => setTimeout(resolve, 500))
     } while (Date.now() < deadline)
-    throw new Error('Cloud worker did not register')
+    throw new CloudWorkerError('worker_not_registered', sandbox.sandboxId)
   } finally {
     // A generation-specific path prevents a stale handoff deleting a newer one.
     await sandbox.commands.run(`if test -f ${temporary}; then unlink ${temporary}; fi`, { user: 'root', timeoutMs: 10_000 }).catch(() => undefined)

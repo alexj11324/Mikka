@@ -26,7 +26,7 @@ async function seedDispatch(email: string, title: string) {
     await pool.query('INSERT INTO artifacts (id, "userId", kind, title, "runId", "issueId") VALUES ($1, $2, $3, $4, $5, $6)', [artifactId, user.id, 'markdown', 'Home page timing', runId, issue.id])
     await pool.query('INSERT INTO artifact_versions (id, "artifactId", version, "storageKey", "inlineContent", sha256, size, "authorName") VALUES ($1, $2, 1, $3, $4, $5, $6, $7)', [randomUUID(), artifactId, `e2e/${artifactId}.md`, '# Home page timing\n\n3.8s', 'e2e', 25, 'Mikka Frontend'])
     let seq = 0
-    for (const chunk of [{ type: 'text-delta', id: 't1', delta: 'Home page loads in 3.8s.' }, { type: 'tool-input-available', toolCallId: 'a' }, { type: 'tool-input-available', toolCallId: 'b' }]) {
+    for (const chunk of [{ type: 'text-delta', id: 't1', delta: 'Home page loads in 3.8s.' }, { type: 'tool-input-available', toolCallId: 'a', toolName: 'bash', input: { command: 'pnpm build --profile' } }, { type: 'tool-input-available', toolCallId: 'b', toolName: 'apply_patch', input: { files: ['app/page.tsx'] } }]) {
       await pool.query('INSERT INTO run_chunks (id, "runId", seq, chunk) VALUES ($1, $2, $3, $4)', [randomUUID(), runId, ++seq, JSON.stringify(chunk)])
     }
     const messages = [
@@ -98,6 +98,20 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await expect(thread.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })).toBeVisible()
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息' })).toHaveCount(0)
   await testInfo.attach('thread-open', { body: await page.screenshot(), contentType: 'image/png' })
+
+  // The folded harness steps open to each call and close again, by pointer and by keyboard.
+  const steps = thread.getByRole('button', { name: '交给 Codex · 执行了 2 步', exact: true })
+  await expect(steps).toHaveAttribute('aria-expanded', 'false')
+  await steps.click()
+  await expect(steps).toHaveAttribute('aria-expanded', 'true')
+  const calls = thread.locator(`[id="${await steps.getAttribute('aria-controls')}"]`)
+  await expect(calls).toContainText('pnpm build --profile')
+  await expect(calls).toContainText('app/page.tsx')
+  await testInfo.attach('thread-steps-open', { body: await page.screenshot(), contentType: 'image/png' })
+  await steps.press('Enter')
+  await expect(steps).toHaveAttribute('aria-expanded', 'false')
+  await steps.press('Space')
+  await expect(steps).toHaveAttribute('aria-expanded', 'true')
 
   // 「Artifact · 1」 opens the Artifact window with this thread's conversation beside it (F3, F4).
   await thread.getByRole('button', { name: 'Artifact · 1', exact: true }).click()

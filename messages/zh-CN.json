@@ -2314,9 +2314,13 @@
     "paymentDesignation": {
       "heading": "付款",
       "mine": "由我的卡支付这个团队",
-      "payer": "{name} 的卡",
-      "active": "正在支付",
-      "until": "{date} 停止支付"
+      "payerTitle": "付款卡",
+      "payer": "{name}的卡",
+      "until": "{name}的卡 · {date} 停止支付"
+    },
+    "creditShare": {
+      "mine": "我的点数也可用于这个团队",
+      "sharers": "分享点数的成员"
     },
     "personalPolicy": {
       "loading": "正在加载个人订阅设置",
@@ -3463,8 +3467,6 @@
       },
       "columns": "看板列",
       "hiddenLane": "已隐藏",
-      "expandColumn": "展开{status}列",
-      "foldColumn": "收起成窄条",
       "hideColumn": "隐藏此列",
       "showColumn": "显示{status}列",
       "columnMenu": "{status}列选项",
