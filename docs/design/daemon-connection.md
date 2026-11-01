@@ -24,7 +24,7 @@ dialog is no longer the Settings entry point.
 ## Layout and states
 
 Reuse the existing dialog, buttons, code block, input and authentication page
-components with the accepted Mikka neutral tokens and Geist typography. The
+components with the accepted Mikka neutral tokens and R-32 typography. The
 dialog has three ordered commands, each copyable; no subtitle or SSH form.
 Use the current origin and base path in Preview commands. The production
 default can omit `--server`.

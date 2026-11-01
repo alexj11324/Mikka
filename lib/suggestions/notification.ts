@@ -1,4 +1,5 @@
 import type { SuggestionAction, SuggestionSource } from '@/lib/db/schema'
+import { readableText } from './card'
 
 // Every connected app's event becomes one ExternalNotification for one person
 // before the rules and the decision model look at it. The title is the
@@ -47,27 +48,6 @@ function str(...values: unknown[]): string {
 function oneLine(text: string, max = TITLE_MAX) {
   const line = text.replace(/\s+/g, ' ').trim()
   return line.length > max ? `${line.slice(0, max - 1)}…` : line
-}
-
-/**
- * A comment's words as a person reads them: Markdown and HTML markup, link
- * reference definitions (a bot's hidden metadata such as `[vc]: #…`) and
- * comments taken out, one line. Empty when nothing readable is left.
- */
-export function readableText(markdown: string): string {
-  return markdown
-    .replace(/<!--[\s\S]*?(-->|$)/g, ' ')
-    .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*$/gm, ' ')
-    .replace(/^ {0,3}(```|~~~)[^\n]*$/gm, ' ')
-    .replace(/<\/?[a-z][^>]*>/gi, ' ')
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/\[([^\]]+)\]\[[^\]]*\]/g, '$1')
-    .replace(/^ {0,3}(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/gm, '')
-    .replace(/(\*\*|__|~~|`)/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
 }
 
 function date(...values: unknown[]): Date {
