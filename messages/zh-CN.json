@@ -2885,7 +2885,7 @@
       "run": "线程",
       "runOf": "{agent} 的线程",
       "openIssue": "打开任务：{title}",
-      "openRunIssue": "{agent} 的线程，打开任务：{title}",
+      "openThread": "打开线程：{name}",
       "noIssue": "没有关联的任务",
       "runStatus": {
         "queued": "排队中",
