@@ -219,8 +219,8 @@ uniqueness/rate limits. It is registered in the required DB inventory.
 DB tests, including replayed events, refunds, tenant isolation, spent/reserved
 balances, and the one-time gift.
 Tests never use a production database, create a live Stripe charge or start an
-E2B sandbox. Required PR CI supplies the production build, full functionality
-and integration-branch performance acceptance.
+E2B sandbox. Functional acceptance runs locally ([dev workflow](../dev-workflow.md));
+CI runs the source and database checks as the final gate.
 
 ## Hosted verification
 

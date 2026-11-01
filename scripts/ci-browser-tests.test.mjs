@@ -362,7 +362,7 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   assert(!pr.includes('pnpm lint') && !pr.includes('pnpm build'), 'lint runs once, in ui-policy.yml')
   assert(!pr.includes('TURNSTILE_SECRET_KEY'), 'the secret reaches only the keyed run')
   assert(source.includes('shard: [1, 2, 3, 4]'))
-  assert(source.includes("BROWSER_SHARDS: '4'"))
+  assert(source.includes("BROWSER_SHARDS: '8'"))
   assert(source.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/$BROWSER_SHARDS'))
   const selection = source.split('\n  browser-selection:\n')[1].split('\n  browser-build:\n')[0]
   assert(selection.includes('name: Browser selection validation (${{ matrix.shard }}/4)\n'))
@@ -400,7 +400,7 @@ test('pnpm store cache is restored everywhere and saved only on main', () => {
   assert(!readFileSync('.github/workflows/ui-policy.yml', 'utf8').includes('cache: pnpm'))
 })
 
-test('each browser build restores only compiler cache; only a successful main build can save it', () => {
+test('each browser build restores only compiler cache; any build without an exact hit saves it', () => {
   const source = workflow()
   const job = name => source.split(`\n  ${name}:\n`)[1].split(/\n  [\w-]+:\n/)[0]
   const key = "next-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}"
@@ -419,8 +419,10 @@ test('each browser build restores only compiler cache; only a successful main bu
     assert(build.includes('pnpm exec next build') && !build.includes('if:'), 'cache hits must still build this checkout')
   }
   assert(!job('browser-pr').includes('actions/cache/save@'))
-  const save = job('browser-build').split('\n      - ').find(step => step.startsWith('name: Save the Next.js build cache (main only)\n'))
-  assert(save.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.next-cache.outputs.cache-hit != 'true'\n"))
+  // Main pushes no longer run browser CI (decision 2026-11-01-0230), so a main-only
+  // save never refreshed the cache. Branch caches are readable only by that branch.
+  const save = job('browser-build').split('\n      - ').find(step => step.startsWith('name: Save the Next.js build cache\n'))
+  assert(save.includes("if: steps.next-cache.outputs.cache-hit != 'true'\n"))
   assert(save.includes(`uses: actions/cache/save@${pin}`))
   assert(save.includes('path: .next/cache\n'))
   assert(save.includes('key: ${{ steps.next-cache.outputs.cache-primary-key }}'))

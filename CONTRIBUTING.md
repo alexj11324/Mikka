@@ -14,7 +14,9 @@ Thank you for helping improve Mikka.
 
 ## Pull requests
 
-- Branch from `main` and keep each pull request to one change.
+- Branch from `main` and keep each pull request to one change. How work moves
+  from a branch to `main` (local first, hot reload, merge batches, numbers,
+  E2B dev templates) is in [`docs/dev-workflow.md`](docs/dev-workflow.md).
 - Write commit messages in English, in the form `<type>: <description>`, where
   the type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`
   or `ci`.
@@ -25,7 +27,9 @@ Thank you for helping improve Mikka.
   pnpm check
   ```
 
-- A pull request merges once the required checks pass. CI evaluates GitHub's
+- Pull requests merge in batches of five through an `integration/<date>-<n>`
+  branch that the coordinator squash-merges ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 5). The
+  required checks must pass on it. CI evaluates GitHub's
   synthetic PR merge commit (the PR combined with its target branch) rather
   than just the standalone PR head. An unrelated merge to `main` does not
   require rebasing a still-mergeable PR; a real conflict must be resolved and
@@ -44,9 +48,12 @@ Thank you for helping improve Mikka.
 Slow checks run less often and later. Each layer catches what the one before
 cannot.
 
-1. **While writing** (seconds, on your machine or the agent's container):
-   `pnpm typecheck`, `pnpm lint` and the unit tests for what you changed. Run a
-   browser test only for the flow you changed, and only if you can.
+1. **While writing, locally** (the agent's cloud Linux container): `pnpm
+   typecheck`, `pnpm lint`, the unit tests for what you changed, and the
+   end-to-end acceptance of the flow you changed against `pnpm dev`, the
+   daemon from source and the local database ([`docs/dev-workflow.md`](docs/dev-workflow.md)). CI is the
+   final gate; do not wait on it, a merge or a deploy to check what you can
+   check here.
 2. **Every pull request and push to main** (minutes, CI, `ui-policy.yml`):
    unit tests, lint, type checks (in "Source checks"), daemon checks,
    database migrations and integration tests such as thread privacy. PR checks
@@ -61,8 +68,9 @@ cannot.
 3. **Browser tests, by hand only** (Actions → Browser tests → Run workflow):
    CI runs no browser tests on pull requests, on pushes to `main` or nightly.
    `browser-gate.yml` reports the protected check "Browser tests (before
-   merge)" and passes at once. Start `browser-tests.yml` by hand when a change
-   needs browser acceptance; the specs, their `@smoke` tags and the tier lists
+   merge)" and passes at once. Browser acceptance runs locally first; start
+   `browser-tests.yml` by hand only for a suite that needs a GitHub-hosted
+   runner; the specs, their `@smoke` tags and the tier lists
    in `scripts/ci-browser-map.json` are unchanged. Each sharded job has its own
    PostgreSQL service, test-account directory and artifact name, and the
    evidence scanner audits every log and report before any upload. Decision:
@@ -107,8 +115,10 @@ The cloud worker's E2B template is released by CI, not by hand: a push to `main`
 changes a path the template packages (`WORKER_PATHS` in `scripts/e2b/build-template.py`)
 or `scripts/e2b/` runs `.github/workflows/e2b-template.yml`, which builds the template,
 makes it public, sets `E2B_BYO_COMPUTER_TEMPLATE` and `MIKKA_CLOUD_WORKER_SHA` together
-in Vercel Production and redeploys. A manual build uses the same script with
-`--public --json`.
+in Vercel Production and redeploys. To test worker changes before that, build a
+`-dev` template from the branch with the same script and point only your local
+or test environment at it; never overwrite the production template or Vercel's
+production variables ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 7).
 
 ## License
 

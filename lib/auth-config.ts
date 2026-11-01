@@ -1,3 +1,5 @@
+import { localTestAccountsMode } from '@/scripts/test-accounts/database-target.mjs'
+
 type AuthEnvironment = Record<string, string | undefined>
 
 export function resolveAppOrigin(env: AuthEnvironment) {
@@ -16,6 +18,15 @@ function httpsOrigin(value: string, allowLoopback = false) {
   return url.origin
 }
 
+/**
+ * HTTP loopback origins are allowed in development, hosted CI, and a production
+ * build serving the local test-account mode (docs/test-accounts.md): its switch
+ * is on and every configured database is a loopback *_e2e database.
+ */
+function loopbackAllowed(env: AuthEnvironment) {
+  return env.NODE_ENV === 'development' || env.CI === 'true' || localTestAccountsMode(env)
+}
+
 export function authTrustedOrigins(env: AuthEnvironment) {
   return [...new Set([
     resolveAppOrigin(env),
@@ -24,7 +35,7 @@ export function authTrustedOrigins(env: AuthEnvironment) {
     env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined,
     env.V0_RUNTIME_URL, env.V0_DEV_APP_URL, env.V0_BUILD_URL, env.V0_SANDBOX_URL, env.CF_PAGES_URL,
     ...(env.AUTH_TRUSTED_ORIGINS ?? '').split(',').map(value => value.trim()),
-  ].filter((value): value is string => Boolean(value)).map(value => httpsOrigin(value, env.NODE_ENV === 'development' || env.CI === 'true')))]
+  ].filter((value): value is string => Boolean(value)).map(value => httpsOrigin(value, loopbackAllowed(env))))]
 }
 
 export function authOAuthProxyOptions(env: AuthEnvironment) {
