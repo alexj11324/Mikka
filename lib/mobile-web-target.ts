@@ -13,6 +13,9 @@ export function mobileWebTarget(value: string | null): string {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/'
   const url = new URL(value, 'https://mikka.invalid')
   if (url.origin === 'https://mikka.invalid' && url.pathname === '/settings' && !url.search && !url.hash) return '/settings'
+  // Settings › 电脑 and › 模型 (the E2B key): where a 没有可用的电脑 card's rows lead.
+  const settingsSection = url.searchParams.get('section')
+  if (url.origin === 'https://mikka.invalid' && url.pathname === '/settings' && !url.hash && [...url.searchParams.keys()].length === 1 && (settingsSection === 'computers' || settingsSection === 'models')) return `/settings?section=${settingsSection}`
   // An HTML artifact's page (资料库 on a bot's page): the viewer's sandboxed frame.
   const frame = /^\/api\/artifacts\/([0-9a-f-]{36})\/versions\/([1-9][0-9]{0,5})\/frame$/i.exec(url.pathname)
   if (url.origin === 'https://mikka.invalid' && frame && UUID.test(frame[1]) && !url.search && !url.hash) return `/api/artifacts/${frame[1].toLowerCase()}/versions/${frame[2]}/frame`

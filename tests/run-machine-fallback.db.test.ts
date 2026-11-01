@@ -63,15 +63,19 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     const result = await dispatch(a.id, a.issueId) as unknown as NoMachine
     assert.equal(result.error, 'machineUnavailable')
     assert.equal(result.card.title, '没有可用的电脑')
-    assert.equal(result.card.description, '先连接或开启一台电脑，任务才能开始运行。')
-    assert.deepEqual(actions(result), ['enableThisMac', 'e2bKey', 'connectServer'])
+    assert.equal(result.card.description, '先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。')
+    // Two rows only (Alex): 连接电脑 opens Settings › 电脑, 填入 E2B Key the person's own key; never Mikka's cloud.
+    assert.deepEqual(result.card.options, [
+      { value: 'computer', label: '连接电脑', action: 'connectServer' },
+      { value: 'e2b', label: '填入 E2B Key', action: 'e2bKey' },
+    ])
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [a.id])).rows[0].n, 0, 'nothing is queued')
 
-    // A personal computer comes online: off by default, so it is offered, not picked.
+    // A personal computer comes online: off by default, so it is not picked; the card is the same two rows.
     const deviceId = await onlineMac(a.id, null)
     const offered = await dispatch(a.id, a.issueId) as unknown as NoMachine
     assert.equal(offered.error, 'machineUnavailable')
-    assert.deepEqual(offered.card.options[0], { value: deviceId, label: '允许这台电脑自动调度', action: 'allowAutoSchedule' })
+    assert.deepEqual(actions(offered), ['connectServer', 'e2bKey'])
     await pool.query('UPDATE devices SET "autoSchedule"=true WHERE id=$1', [deviceId])
     const queued = await dispatch(a.id, a.issueId) as unknown as { runId: string; status: string }
     assert.equal(queued.status, 'queued')
@@ -121,7 +125,7 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [c.id])).rows[0].n, 0, 'no cloud run on the bot computer')
     const refused = await dispatch(c.id, c.issueId, botId) as unknown as NoMachine
     assert.equal(refused.error, 'machineUnavailable', 'no device: an error the person can act on')
-    assert.deepEqual(actions(refused), ['enableThisMac', 'e2bKey', 'connectServer'])
+    assert.deepEqual(actions(refused), ['connectServer', 'e2bKey'])
     const cloudRuns = (await pool.query(`SELECT r.status,m.state FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows
     assert.deepEqual(cloudRuns, [{ status: 'stopped', state: 'ended' }], 'the refused cloud run was queued, then ended instead of left stuck')
     const frozen = (await pool.query(`SELECT r."agentDefinition"->>'harness' AS harness FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows[0]
@@ -187,8 +191,7 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     const mac = await onlineMac(e.id, false)
     await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), e.id, e.workspaceId])
     const off = await dispatch(e.id, e.issueId) as unknown as NoMachine
-    assert.deepEqual(actions(off), ['allowAutoSchedule', 'e2bKey', 'connectServer'])
-    assert.equal(off.card.options[0].value, mac)
+    assert.deepEqual(actions(off), ['connectServer', 'e2bKey'])
     // A rule that names the Mac still runs there: a device the person picks is used as asked.
     await pool.query('UPDATE execution_rules SET place=$2 WHERE "ownerId"=$1', [e.id, mac])
     const asked = await dispatch(e.id, e.issueId) as unknown as { runId: string }

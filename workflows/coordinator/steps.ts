@@ -352,7 +352,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
     const target = await (await import('@/lib/rule-dispatch')).resolveIssueExecution(userId,botId,input.issueId)
     // No machine can take it (decision 2026-10-31-2200-run-machine-fallback): an error the person can act on.
     const noMachine = async () => {
-      const card = 'card' in target ? target.card : await (await import('@/lib/rule-dispatch')).machineUnavailableCardFor(userId)
+      const card = 'card' in target ? target.card : (await import('@/lib/rule-dispatch')).machineUnavailableCard()
       return { error: 'machineUnavailable' as const, issueId: input.issueId, card }
     }
     const queueOnDevice = async (device: { agentId: string; model?: string; pinnedDeviceId?: string }) => {

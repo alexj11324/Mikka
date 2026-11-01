@@ -209,7 +209,7 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
   const answered = sent || answer !== null
   // Dispatch options are localized by value (BE-13 sends English labels); anything else shows as written.
   const copy = (option: { value: string; label: string; action?: ChoiceAction }) => option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup
-    : option.action === 'enableThisMac' ? agentCopy.needsMachineMac : option.action === 'connectServer' ? agentCopy.needsMachineServer : option.action === 'e2bKey' ? agentCopy.needsMachineE2B
+    : option.action === 'enableThisMac' ? agentCopy.needsMachineMac : option.action === 'connectServer' ? agentCopy.needsMachineConnect : option.action === 'e2bKey' ? agentCopy.needsMachineE2B
     : option.action === 'allowAutoSchedule' ? agentCopy.needsMachineAuto : option.action === 'serverOnline' ? agentCopy.needsMachineServerOnline
     : option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : option.label
   return <div role="group" aria-label={title} data-slot="choice-card" className="flex w-full max-w-sm min-w-0 flex-col gap-2">

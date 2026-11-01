@@ -135,7 +135,7 @@ export async function resolveIssueExecution(
   if (await cloudReady(pool, { ownerId, workspaceId, botId, harness }))
     return { place: "cloud" as const, harness, model: chosen.model, workspaceId, issue, ...("apiKey" in chosen && chosen.apiKey ? { apiKey: true as const } : {}), ...(fallback ? { fallback } : {}) };
   if (fallback) return { ...fallback, workspaceId, issue };
-  return { needsMachine: true as const, workspaceId, issue, card: machineUnavailableCard(devices) };
+  return { needsMachine: true as const, workspaceId, issue, card: machineUnavailableCard() };
 }
 
 /**
@@ -180,22 +180,22 @@ async function deviceTarget(ownerId: string, selected: { place: string; harness:
 }
 
 /**
- * 没有可用的电脑: what the person can do when no machine can take a new
- * run. The host handles each row by its action; the value of an
- * `allowAutoSchedule` row is the device it switches on.
+ * 没有可用的电脑 (Alex, 2026-11-01): what the person can do when no machine can
+ * take a new run, as two rows: 连接电脑 opens Settings › 电脑, where a computer
+ * is connected or switched on (and picked automatically); 填入 E2B Key opens
+ * where the person's own E2B key is set, the only way to run in the cloud. No
+ * row offers Mikka's own cloud.
  */
-export function machineUnavailableCard(devices: readonly DeviceRow[]) {
+export function machineUnavailableCard() {
   const copy = defaultAgentCopy;
-  const personal = devices.find((d) => d.online && d.enabled && !autoScheduleOn(d));
-  const servers = devices.filter((d) => d.deviceType === "server");
-  const options: { value: string; label: string; action: string }[] = [];
-  if (personal) options.push({ value: personal.id, label: copy.needsMachineAuto, action: "allowAutoSchedule" });
-  else if (!devices.length) options.push({ value: "computer", label: copy.needsMachineMac, action: "enableThisMac" });
-  options.push({ value: "e2b", label: copy.needsMachineE2B, action: "e2bKey" });
-  options.push(servers.length
-    ? { value: "server", label: copy.needsMachineServerOnline, action: "serverOnline" }
-    : { value: "server", label: copy.needsMachineServer, action: "connectServer" });
-  return { title: copy.needsMachineTitle, description: copy.needsMachineDescription, options };
+  return {
+    title: copy.needsMachineTitle,
+    description: copy.needsMachineDescription,
+    options: [
+      { value: "computer", label: copy.needsMachineConnect, action: "connectServer" },
+      { value: "e2b", label: copy.needsMachineE2B, action: "e2bKey" },
+    ],
+  };
 }
 
 /** The person's local devices, most recently seen first. */
@@ -207,7 +207,3 @@ async function ownDevices(ownerId: string): Promise<DeviceRow[]> {
   return rows.map((row) => ({ ...row, online: isDeviceOnline(row.lastSeenAt) }));
 }
 
-/** The card for a person whose cloud refused and who has no device to fall back to. */
-export async function machineUnavailableCardFor(ownerId: string) {
-  return machineUnavailableCard(await ownDevices(ownerId));
-}
