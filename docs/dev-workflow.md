@@ -17,10 +17,11 @@ locally. Push, open the PR and keep working; read CI when it reports.
 
 Ordinary acceptance follows [`acceptance.md`](acceptance.md): a local
 application, a real isolated database and, when the flow uses one, a real
-daemon. CI runs no browser tests at all
-([decision 2026-11-01-1520](design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md)):
-browser specs run locally, and a UI change is checked with screenshots of a
-local production build.
+daemon. No browser tests run, in CI or locally
+([1520](design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md),
+[2026-11-01-2225](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)): acceptance goes through the API and the CLI
+(`pnpm test:local-loop`, [local-runtime.md](local-runtime.md)), and a UI change
+is checked with screenshots of a local production build.
 
 ## 2. Hot reload
 
@@ -32,11 +33,8 @@ Debugging and pipeline runs use source, not builds:
 | Daemon | `pnpm daemon` (`tsx` on `packages/daemon` source) |
 
 Use a production build (`next build` then `next start`) only for production
-screenshots of a UI change, or for a spec that requires one. Run `next build`
+screenshots of a UI change. Run `next build`
 directly (`pnpm exec next build`): `pnpm build` also runs lint and migrations.
-
-现状（非决定）：`playwright.config.ts` and `scripts/start-mvp-e2e.mjs` still
-start `next start`, so those specs need a build until they move to `next dev`.
 
 ## 3. Environment
 
@@ -51,9 +49,8 @@ provides:
   `pnpm migrate` (it runs by itself when every target is a loopback database;
   a remote database off Vercel still needs `MIGRATE=1` and `--allow-remote`).
 - **bubblewrap, socat and ripgrep** for the daemon's sandbox and tools.
-- **Playwright** on the container's Chromium: set
-  `executablePath: '/opt/pw-browsers/chromium'`. Never run
-  `playwright install`.
+- **Chromium** for UI screenshots: the container's
+  `/opt/pw-browsers/chromium`. Never run `playwright install`.
 
 Local runs use DeepSeek DS 4.1 Flash through the workspace's own key
 (`DEEPSEEK_API_KEY` in Infisical, `dev:/vercel`), never Mikka 默认 or the AI
@@ -77,9 +74,9 @@ GitHub-hosted runner is left to CI.
 Database suites decide by the database, not the runner: they run wherever every
 application database URL is a loopback `*_e2e` database
 (`disposableDatabase` in `tests/helpers/e2e-target.mjs`) and skip or refuse
-otherwise. 现状（非决定）：browser suites, the shared test-account pool
+otherwise. 现状（非决定）：the shared test-account pool
 (`scripts/test-accounts/bootstrap.mjs`) and a few hosted-service suites still
-require `GITHUB_ACTIONS`; those run in CI.
+require `GITHUB_ACTIONS`; those run in CI. Browser suites run nowhere.
 
 Local test accounts: the local mode (`MIKKA_LOCAL_TEST_ACCOUNTS=1` with a
 loopback `*_e2e` database) is described in
@@ -104,7 +101,8 @@ its owner first.
 | --- | --- | --- |
 | Local development environment and fake services | `scripts/dev/bootstrap-local.sh`, local stand-ins for external services | LSV4 session |
 | Local test-mode rules | Local test accounts and the guards that decide where a suite may run | PFe3 session |
-| MVP acceptance | The MVP end-to-end acceptance and its record | QUe session |
+| MVP acceptance | The MVP API/CLI acceptance (`pnpm test:local-loop`) and its record ([`acceptance-mvp-cli-2026-11-01.md`](acceptance-mvp-cli-2026-11-01.md)) | QUe session |
+| Backend | Server, API, database and daemon changes; start from [`handoff-codex-to-cc-2026-11-01.md`](handoff-codex-to-cc-2026-11-01.md) | Codex ([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)) |
 
 ## 6. Numbers
 

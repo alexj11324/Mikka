@@ -8,7 +8,7 @@
 - Rule: —
 - Replaces, in part: the 「Accepted Figma frames」 table in `decisions.md`
   where it names pages that are now in 归档.
-- Superseded in part by: [2026-11-01-1440-dev-workflow-local-first](2026-11-01-1440-dev-workflow-local-first.md) (merging through integration batches)
+- Superseded in part by: [2026-11-01-1440-dev-workflow-local-first](2026-11-01-1440-dev-workflow-local-first.md) (merging through integration batches, itself replaced by [2026-11-01-1545-trunk-based](2026-11-01-1545-trunk-based.md))
 
 ## Rule
 

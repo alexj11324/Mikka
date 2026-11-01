@@ -7,7 +7,7 @@
   做实现」
 - Rule: —
 - Builds on: `2026-11-01-0015-main-is-the-design.md`
-- Superseded in part by: [2026-11-01-1440-dev-workflow-local-first](2026-11-01-1440-dev-workflow-local-first.md) (screenshots from a local production build; merging through integration batches)
+- Superseded in part by: [2026-11-01-1440-dev-workflow-local-first](2026-11-01-1440-dev-workflow-local-first.md) (screenshots from a local production build; merging through integration batches, itself replaced by [2026-11-01-1545-trunk-based](2026-11-01-1545-trunk-based.md))
 
 ## Rule
 

@@ -111,14 +111,14 @@ more than once.
 
 1. The checklist above passes.
 2. Alex accepted the review page.
-3. Then e2e tests are written or updated and pass locally (not before
-   acceptance).
+3. Then the flow passes local API/CLI acceptance (not before acceptance of
+   the screens).
 4. CI is green as the final gate (`CONTRIBUTING.md` § How changes are
    tested); do not run builds on the Mac.
 5. Docs updated in the same PR: `rules.md`, `components.md`, `decisions.md`,
    `glossary.md` or the feature spec, whichever the change touches.
-6. Merged to main in the next integration batch ([dev workflow](dev-workflow.md) § 5),
-   after the coordinator reviews the screenshots.
+6. Squash-merged to main by the coordinator on green CI, after the screenshots
+   are reviewed ([dev workflow](dev-workflow.md) § 5).
 
 ## Pull requests
 

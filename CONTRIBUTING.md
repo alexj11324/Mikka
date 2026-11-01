@@ -15,7 +15,7 @@ Thank you for helping improve Mikka.
 ## Pull requests
 
 - Branch from `main` and keep each pull request to one change. How work moves
-  from a branch to `main` (local first, hot reload, merge batches, numbers,
+  from a branch to `main` (local first, hot reload, trunk-based merging, module owners, numbers,
   E2B dev templates) is in [`docs/dev-workflow.md`](docs/dev-workflow.md).
 - Write commit messages in English, in the form `<type>: <description>`, where
   the type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`
@@ -27,9 +27,10 @@ Thank you for helping improve Mikka.
   pnpm check
   ```
 
-- Pull requests merge in batches of five through an `integration/<date>-<n>`
-  branch that the coordinator squash-merges ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 5). The
-  required checks must pass on it. CI evaluates GitHub's
+- Each pull request branches from `main`, changes one thing, and is
+  squash-merged by the coordinator once CI is green
+  ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 5). Backend changes are
+  Codex's; others ask first (the module owners table there). CI evaluates GitHub's
   synthetic PR merge commit (the PR combined with its target branch) rather
   than just the standalone PR head. An unrelated merge to `main` does not
   require rebasing a still-mergeable PR; a real conflict must be resolved and
@@ -65,12 +66,12 @@ cannot.
    succeed. CI runs no production build: Vercel builds `main`, and a failed
    build there leaves production on the last good deployment and is fixed
    forward. Vercel does not build pull requests.
-3. **No browser tests in CI**, not even by hand. Browser and UI acceptance
-   run locally: the specs under `tests/e2e/` against the local application,
-   and UI changes checked with screenshots of a local production build
-   (`next build`, `next start`). `browser-gate.yml` only keeps the protected
+3. **No browser tests**, in CI or locally. Acceptance runs locally through
+   the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
+   with screenshots of a local production build (`next build`, `next start`). `browser-gate.yml` only keeps the protected
    check name "Browser tests (before merge)" and passes at once. Decision:
-   [`design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md`](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md).
+   [`design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md`](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md),
+   [`design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md`](docs/design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
 
 A pull request that only changes documentation — non-executable Markdown in
 `docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`,

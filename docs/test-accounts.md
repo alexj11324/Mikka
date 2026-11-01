@@ -7,11 +7,11 @@ not create product roles or a separate authentication system.
 
 ## Supported environment and side effects
 
-The first adapter supports an isolated cloud Linux CI process with one
-disposable PostgreSQL database. Application, workspace and pool metadata must
+The adapter supports one disposable loopback PostgreSQL database, in CI or in
+local test-account mode (below). Application, workspace and pool metadata must
 all address that exact database. A multi-database or deployed Preview adapter
 needs independent registration and approval; the current adapter rejects it.
-A production build in CI is supported. A production deployment is not.
+A production deployment is not supported.
 
 The owning harness creates the disposable resource and initializes the normal
 application schema. Before any users exist, it installs a random environment
@@ -87,32 +87,21 @@ The rule is one function, `localTestAccountsMode` in
 `VERCEL` or `VERCEL_ENV`, `E2E_DATABASE_URL` set, and every configured database
 URL a loopback `*_e2e` database. The bootstrap, auth origins
 (`lib/auth-config.ts`), signup limits (`lib/abuse/signup.ts`), the daemon's
-`MIKKA_TEST_MODE` (`daemonTestMode`) and the MVP fixture all use it. The MVP
-specs (`pnpm test:e2e:mvp`) run locally with it plus `MIKKA_TEST_MODE=1` and
-`MIKKA_MVP_E2E=1`, still only against the loopback `mikka_e2e` database at
-`http://localhost:3100`.
+`MIKKA_TEST_MODE` (`daemonTestMode`) and the MVP acceptance all use it. MVP
+acceptance runs through the API and the CLI: `pnpm test:local-loop`
+([local-runtime.md](local-runtime.md)). No browser tests run, locally or in CI
+([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)); the `pnpm test:e2e:mvp` specs
+are not an acceptance entry point.
 
-Browser specs then run against a server you started (`E2E_BASE_URL`), with the
-preinstalled Chromium as `launchOptions.executablePath` when the pinned
-Playwright browser is not installed.
+Do not set `CI` for a local server.
 
-- Prefer a production build (`next build`, then `next start`), with
-  `MIKKA_LOCAL_TEST_ACCOUNTS=1` and the same loopback `_e2e` database URLs in
-  the server's environment: that is what lets a production build accept the
-  `http://localhost` auth origin (`lib/auth-config.ts`). Do not set `CI`. The fixtures
-  fail a test on any `console.error`, and `next dev` prints React
-  development-only checks (for example `useInsertionEffect must not schedule
-  updates`) that a production build never logs.
-- With `next dev`, warm it first: open every route the spec visits once before
-  the run. A first compile takes 10–35 seconds and lands inside the specs'
-  15-second assertions; the run then fails on timing, not on the code.
-- Every test registers a new account. In local test-account mode the sign-up
+- Every acceptance run registers new accounts. In local test-account mode the sign-up
   and verification limits default to 1000 per address and 10000 overall each
   hour, and Better Auth's sign-up rule to 100 per ten seconds
   (`lib/abuse/signup.ts`); outside it they stay at five sign-ups per address
   an hour and Better Auth's three per ten seconds. An explicitly set
   `MIKKA_SIGNUP_*_HOURLY` or `MIKKA_VERIFICATION_*_HOURLY` still wins. Run one
-  spec process at a time and do not register by hand during a run.
+  acceptance process at a time and do not register by hand during a run.
 
 The environment binding is immutable for its lifetime. A new SHA or origin
 requires a new disposable environment and descriptor; changing an alias while
@@ -121,7 +110,7 @@ an acceptance run is active cannot redirect its sessions.
 ## Shared module and CLI
 
 `acquireTestAccounts` in `scripts/test-accounts/session.mjs` is the authenticated
-entry point used by browser and HTTP acceptance. It returns owner/peer request
+entry point used by HTTP/API acceptance. It returns owner/peer request
 clients and private storage-state references. `withTestAccounts` adds automatic
 release around an awaited callback.
 
@@ -180,8 +169,7 @@ secret-scanning material remain only for the owning disposable environment's
 lifetime, then leave with that resource. Never upload the `.cache/e2e` directory
 or its private account/session files. CI may upload only its explicitly allowlisted
 summaries and logs: `.cache/e2e/http-acceptance-summary.json`,
-`.cache/e2e/account-http-evidence.json`, `.cache/e2e/playwright-performance.log`
-and `.cache/e2e/playwright-browser.log`, after the evidence scan passes.
+and `.cache/e2e/account-http-evidence.json`, after the evidence scan passes.
 
 Account cleanliness includes ordinary owned rows and their descendants through
 actual PostgreSQL foreign keys, plus reviewed logical links for legacy E2E
@@ -203,7 +191,11 @@ verified lifecycle action.
 
 ## Browser and HTTP integration
 
-The existing settings-surface browser test now acquires its two accounts through
+History: no browser tests run any more
+([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)); the browser adapter below is
+kept for reference. HTTP acceptance is current.
+
+The settings-surface browser test acquired its two accounts through
 `tests/e2e/test-account-fixtures.ts`. Cookie storage is bound to an environment,
 account and origin. The first adapter uses Chromium: `context.newPage()` waits
 for its CDP request gate before returning. Initial routing and that gate validate

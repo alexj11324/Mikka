@@ -25,9 +25,9 @@ origin and actual database identity. These checks remain in force. This is an
 implementation boundary, not a user policy prohibiting deployed or other test
 environments. Where that adapter is not implemented, use an existing supported
 automatic test-identity fixture or authorized session for that environment and
-record the actual capability gap. The MVP CI's existing `register()` fixture is
-one such automatic normal-registration path; it does not establish shared-pool
-lease reuse or provider OAuth acceptance.
+record the actual capability gap. Acceptance runs through the API and the CLI
+(`pnpm test:local-loop`); no browser tests run, locally or in CI
+([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)).
 
 ## Record the version and environment
 
