@@ -124,6 +124,14 @@ is printed in the Changed files job and its summary. The browser environment
 remains an isolated PostgreSQL service and the built application on the GitHub
 Linux runner's localhost; this workflow does not test a Vercel Preview.
 
+### Before asking Alex: look at how leading products do it
+
+A choice goes to Alex only when leading products (Linear, Slack, GitHub, Figma,
+Claude, ChatGPT, Cursor, Devin and the like) disagree or the choice is about
+Mikka's own strategy, money or brand. When they agree, follow them and record
+which products in the PR. Details:
+`docs/design/decisions/2026-11-01-0400-research-before-asking-alex.md`.
+
 ### UI changes: Figma, then skill review, then code
 
 A change a person can see is drawn in Figma first, reviewed with the
