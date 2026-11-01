@@ -7,7 +7,8 @@
 // - no coordinator_events (nothing wakes a model), no group_turns, no schedules;
 // - threads are finished, or running/waiting with no lease on a disabled demo
 //   device that has no token, and all are older than 15 minutes, so no daemon,
-//   run recovery or ops alert acts on them;
+//   run recovery or ops alert acts on them; ended threads carry an outcome, so
+//   the outcome sweep never asks the decision model about them;
 // - tasks are workspace tasks with linearSyncBlocked, so the Linear outbox
 //   trigger drops them;
 // - no pending_actions, billing, usage, Composio or Linear rows.
@@ -24,6 +25,8 @@ const now = Date.now()
 const ago = minutes => new Date(now - minutes * 60_000)
 const day = offset => new Date(now + offset * 86_400_000).toISOString().slice(0, 10)
 const sha = text => createHash('sha256').update(text).digest('hex')
+/** The outcome an ended demo run carries (lib/db/schema.ts RUN_OUTCOMES). */
+const OUTCOME_OF_STATUS = { succeeded: 'done', failed: 'failed', stopped: 'idle', cancelled: 'idle' }
 const json = value => JSON.stringify(value)
 /** The gradient avatar sign-up gives a new account (lib/default-avatar.ts `newUserAvatar`, R-36); seeded people skip sign-up. */
 function defaultAvatar(key) {
@@ -165,9 +168,12 @@ async function writeMain(client, owner, p, workspaceId) {
     await client.query('INSERT INTO agents (id, "userId", harness, name, description, "deviceId") VALUES ($1, $2, $3, $4, $5, $6)', [agent.id, owner.id, agent.harness, agent.name, '', agent.deviceId])
   }
   for (const run of p.runs) {
-    await client.query(`INSERT INTO agent_runs (id, "userId", "issueId", "agentId", "botId", "deviceId", status, kind, prompt, error, "lastReply", "lastReplyPart", "lastReplyAt", "startedAt", "finishedAt", "createdAt", "updatedAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'implement', $8, $9, $10, 'demo', $11, $12, $13, $14, $15)`,
-    [run.id, owner.id, run.issueId, run.agentId, run.botId, run.deviceId, run.status, run.prompt, run.error ?? null, run.lastReply, run.lastReplyAt, run.startedAt, run.finishedAt, run.createdAt, run.lastReplyAt])
+    // An ended run without an outcome is judged by the decision model in the minute sweep
+    // (lib/run-outcome-judge.ts), so every ended demo run carries one.
+    const outcome = run.finishedAt ? run.outcome ?? OUTCOME_OF_STATUS[run.status] : null
+    await client.query(`INSERT INTO agent_runs (id, "userId", "issueId", "agentId", "botId", "deviceId", status, kind, prompt, error, "lastReply", "lastReplyPart", "lastReplyAt", "startedAt", "finishedAt", "createdAt", "updatedAt", outcome, "outcomeAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'implement', $8, $9, $10, 'demo', $11, $12, $13, $14, $15, $16, $17)`,
+    [run.id, owner.id, run.issueId, run.agentId, run.botId, run.deviceId, run.status, run.prompt, run.error ?? null, run.lastReply, run.lastReplyAt, run.startedAt, run.finishedAt, run.createdAt, run.lastReplyAt, outcome, run.finishedAt])
     for (const [index, chunk] of run.chunks.entries()) {
       await client.query('INSERT INTO run_chunks (id, "runId", seq, chunk, "createdAt") VALUES ($1, $2, $3, $4, $5)', [p.id(`chunk:${run.key}:${index}`), run.id, index + 1, json(chunk), new Date(run.startedAt.getTime() + index * 45_000)])
     }
