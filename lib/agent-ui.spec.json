@@ -303,8 +303,8 @@
         "description": "堆叠面积图（ReUI c-chart-14），用于累计或构成随时间的变化。labels 为时间点，series 为 1–5 组 {name, values}，values 与 labels 等长，最多 24 个点；第一组画在最上层；unit 为数值单位。数字只能来自用户或工具数据，示例数据须标明。"
       },
       "DonutChart": {
-        "signature": "DonutChart(slices: {name: string, value: number}[], unit?: string, total?: string)",
-        "description": "环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。"
+        "signature": "DonutChart(slices: {name: string, value: number, status?: \"success\" | \"destructive\" | \"warning\" | \"neutral\"}[], unit?: string, total?: string)",
+        "description": "环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value, status?}，value 不能为负；切片是结果状态（通过、失败、跳过等）时给每项 status：success、destructive、warning、neutral，失败用 destructive，跳过用 neutral，颜色取状态色而不是图表色；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。"
       },
       "RadialChart": {
         "signature": "RadialChart(label: string, used: number, limit: number, unit?: string)",
@@ -6270,6 +6270,15 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1000000000000
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "success",
+                      "destructive",
+                      "warning",
+                      "neutral"
+                    ]
                   }
                 },
                 "required": [
@@ -6292,7 +6301,7 @@
             "slices"
           ],
           "additionalProperties": false,
-          "description": "环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。"
+          "description": "环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value, status?}，value 不能为负；切片是结果状态（通过、失败、跳过等）时给每项 status：success、destructive、warning、neutral，失败用 destructive，跳过用 neutral，颜色取状态色而不是图表色；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。"
         },
         "RadialChart": {
           "type": "object",
