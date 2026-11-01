@@ -3218,6 +3218,10 @@
       "worktree": "创建工作区",
       "agent_start": "启动 agent",
       "duration": "{seconds}s"
+    },
+    "runInfo": {
+      "paidBy": "{owner} 的 {plan}",
+      "movedTo": "已换到 {machine} 继续"
     }
   },
   "Computer": {

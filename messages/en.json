@@ -3218,6 +3218,10 @@
       "worktree": "Worktree",
       "agent_start": "Agent start",
       "duration": "{seconds}s"
+    },
+    "runInfo": {
+      "paidBy": "{owner}'s {plan}",
+      "movedTo": "Moved to {machine} to continue"
     }
   },
   "Computer": {
