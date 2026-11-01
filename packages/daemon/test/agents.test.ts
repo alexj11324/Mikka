@@ -195,6 +195,8 @@ describe("run context", () => {
       extraWrite: ["/tmp/codex-auth.json"],
       runDir: tempDir(),
       privateDir: tempDir("orvp-"),
+      // A person limited the network; the run still reaches its harness API.
+      policy: { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, network: "ask" } },
     })
     const policy = ctx.policy()
     expect(policy).toMatchObject({

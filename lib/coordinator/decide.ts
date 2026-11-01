@@ -1,5 +1,6 @@
 import { gatewayCost,gatewayGenerationId } from '@/lib/abuse/policy'
 import 'server-only'
+import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { createHash, randomUUID } from 'node:crypto'
 import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_URL, type DecisionInput, type DecisionQuestion } from './decision'
 
@@ -18,11 +19,13 @@ export interface DecisionExecution {
   imageDigests: string[]
   vision: 'image-input-submitted' | 'no-image-input'
 }
-/** Existing key/budget only. No alternate provider, program judgment or human-approval fallback. */
+/** Existing gateway/budget only. No alternate provider, program judgment or human-approval fallback. */
 export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal) {
   'use step'
-  const key = process.env.DECISION_GATEWAY_API_KEY
-  if (!key || signal?.aborted) return null
+  if (signal?.aborted) return null
+  // The app's one gateway credential (lib/ai-gateway-auth.ts), the same the Coordinator's model uses.
+  const key = (await gatewayAuth())?.token
+  if (!key) { console.error('Decision unavailable', { purpose: 'no-gateway-auth' }); return null }
   const { hostedBillingScope } = await import('@/lib/abuse/context')
   const scope = hostedBillingScope.getStore()
   if (!scope) return null

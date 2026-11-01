@@ -25,4 +25,4 @@
   - Reactions show under the message as chips, with a count past one. Tapping
     the person's own chip removes it.
   - They work in bot chats and group chats. The server keeps them
-    (`message_reactions`). The web does not show them yet.
+    (`message_reactions`). 现状（非决定）：the web does not show them yet.

@@ -28,7 +28,8 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
     getTool: slug => client.tools.getRawComposioToolBySlug(slug) as Promise<AppTool>,
     execute: (call, accountId) => executeAppToolCall(client, userId, call, accountId),
     setting: async (tool, toolkit) => {
-      try { return explicitSetting(await readWriteSettingLayers(db, userId, botId), [tool, toolkit]) } catch { return 'ask' }
+      // Unreadable settings name nothing; the Decisions judge then decides, not a fixed ask.
+      try { return explicitSetting(await readWriteSettingLayers(db, userId, botId), [tool, toolkit]) } catch { return null }
     },
     judge: serverWriteJudge(userId, botId),
     recordStart: async (call, accountId) => {

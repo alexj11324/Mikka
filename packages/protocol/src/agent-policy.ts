@@ -62,7 +62,9 @@ export const PERMISSION_DEFAULTS: Readonly<
   install_dependency: "allow",
   write_outside_repo: "ask",
   git_push: "ask",
-  network: "ask",
+  // Agents reach the open internet unless a person restricts it in settings
+  // (decision 2026-11-01-1230-network-open-by-default).
+  network: "allow",
   computer_use: "ask",
 }
 
@@ -368,7 +370,7 @@ export function resolvePermissions(stored: unknown, environment: ExecutionEnviro
     out[action] =
       typeof value === "string" && permissionChoiceAllowed(action, value)
         ? value
-        : (environment === 'cloud' && action === 'network' ? 'allow' : PERMISSION_DEFAULTS[action] as PermissionDecision)
+        : PERMISSION_DEFAULTS[action] as PermissionDecision
   }
   return out
 }

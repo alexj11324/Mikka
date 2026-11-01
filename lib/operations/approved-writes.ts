@@ -199,7 +199,8 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         const first = await transaction(tx => lockWritePolicy(tx, { ...run, action }))
         if (first.decision === 'deny') throw new OperationError('writeDenied')
         const selected = await bounded(() => provider.prepare(run.ownerId, input), context.signal)
-        const approvalDefault = first.defaulted && context.judgeWrite && selected.tool ? await context.judgeWrite({ action, tool: selected.tool, annotations: selected.annotations, input }) : 'ask'
+        // A provider without a tool slug is judged under the action name; only a caller with no judge at all (no Decisions route) asks.
+        const approvalDefault = first.defaulted && context.judgeWrite ? await context.judgeWrite({ action, tool: selected.tool || action, annotations: selected.annotations, input }) : 'ask'
         proposal = await locked(async tx => {
           const existing = await prior(tx)
           if (existing) return existing

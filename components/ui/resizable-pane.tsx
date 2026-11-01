@@ -61,6 +61,7 @@ const FROM = {
  * and goes back to `defaultWidth` on a double-click. A null `defaultWidth`
  * leaves the width to the column's own classes (a 50/50 split) until the edge
  * is moved. The column keeps its own border: that line is where the handle sits.
+ * Anything wider than the column is clipped, so it never scrolls the page sideways.
  */
 function ResizablePane({
   storageKey,
@@ -88,7 +89,8 @@ function ResizablePane({
       data-slot="resizable-pane"
       data-sized={sized ? "" : undefined}
       style={sized ? ({ ...style, "--pane-width": `${resize.width}px` } as CSSProperties) : style}
-      className={cn("relative", FROM[from].pane, resize.dragging && "select-none", className)}
+      // A column never widens its neighbour or scrolls the page sideways: what is wider than it is clipped here.
+      className={cn("relative min-w-0 overflow-x-clip", FROM[from].pane, resize.dragging && "select-none", className)}
       {...props}
     >
       {children}

@@ -77,7 +77,7 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
   }
 
   // min-w-0 on both halves: one long unbroken line in a card must not widen its half and push the chat off screen.
-  return <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
+  return <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip md:flex-row">
     <section aria-labelledby="suggestions-title" className="flex min-h-0 min-w-0 flex-1 flex-col md:basis-1/2">
       <header className="flex items-center justify-between gap-3 px-6 pt-6 pb-4">
         <h1 id="suggestions-title" className="text-2xl font-semibold">{t('title')}</h1>

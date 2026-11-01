@@ -50,8 +50,7 @@ export function validateEnvironment(value, env = process.env) {
   if (!value.database || !LOOPBACK.has(value.database.host) || !Number.isInteger(value.database.port) || value.database.port < 1 || value.database.port > 65535 || !IDENTIFIER.test(value.database.name ?? '') || !value.database.name.endsWith('_e2e') || value.database.schema !== 'public' || !IDENTIFIER.test(value.database.user ?? '')) fail('ENVIRONMENT_DATABASE_FORBIDDEN')
   if (typeof value.capabilities?.provision !== 'boolean' || value.capabilities.mail !== 'disabled' || typeof value.capabilities.reset !== 'boolean') fail('ENVIRONMENT_CAPABILITIES_INVALID')
   if (env.RESEND_API_KEY) fail('EXTERNAL_MAIL_FORBIDDEN')
-  if (['AI_GATEWAY_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY'].some(name => Boolean(env[name])) || env.MIKKA_NATIVE_COORDINATOR === '1' ||
-      (env.DECISION_GATEWAY_API_KEY && !(env.DECISION_GATEWAY_API_KEY === MVP_DECISION_KEY && hasBoundMvpTransport(env)))) fail('EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN')
+  if ((env.AI_GATEWAY_API_KEY && !(env.AI_GATEWAY_API_KEY === MVP_DECISION_KEY && hasBoundMvpTransport(env))) || ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY'].some(name => Boolean(env[name])) || env.MIKKA_NATIVE_COORDINATOR === '1') fail('EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN')
   if (!env.E2E_DATABASE_URL || !env.MIKKA_DATABASE_URL || !env.DATABASE_URL) fail('DATABASE_TARGET_CONFIGURATION_REQUIRED')
   if (env.MIKKA_DATABASE_URL !== env.E2E_DATABASE_URL || env.DATABASE_URL !== env.E2E_DATABASE_URL || (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL)) fail('DATABASE_FALLBACK_MISMATCH')
   const target = databaseTarget(env.E2E_DATABASE_URL)
@@ -68,11 +67,11 @@ export async function loadEnvironment(env = process.env) {
     const stat = await lstat(resolve(path))
     if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0 || stat.size > 16384) fail('ENVIRONMENT_FILE_UNSAFE')
     const descriptor = JSON.parse(await readFile(resolve(path), 'utf8'))
-    if (env.DECISION_GATEWAY_API_KEY === MVP_DECISION_KEY) {
+    if (env.AI_GATEWAY_API_KEY === MVP_DECISION_KEY) {
       // Check every ordinary isolation/credential guard before even the local
       // challenge. Final validation still requires the actual current fetch
       // path to reach the isolated MVP preload; a key or flag is not proof.
-      validateEnvironment(descriptor, { ...env, DECISION_GATEWAY_API_KEY: undefined })
+      validateEnvironment(descriptor, { ...env, AI_GATEWAY_API_KEY: undefined })
       await verifyMvpTransport(env)
     }
     return validateEnvironment(descriptor, env)

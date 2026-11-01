@@ -24,7 +24,7 @@ import { threadName } from '@/lib/issue-threads'
 import { coordinatorChatState } from './chat-state'
 import { coordinatorLeaseActive } from './lease'
 import { readPreferences } from '@/lib/preferences'
-import { pushReasons, type PushReason } from '@/lib/push-reasons'
+import type { InboxEvent } from '@/lib/push-reasons'
 import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
 import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
@@ -89,8 +89,8 @@ export interface InboxTake {
   handoffMatterIds: string[]
   /** Every event in the take is a handoff: a reply can only be telling the person about one. */
   handoffOnly: boolean
-  /** Why the reply may go to the person's phones (lib/push-reasons.ts); empty when it answers the person. */
-  pushReasons: PushReason[]
+  /** The events the reply answers; the Decisions API decides whether it goes to the person's phones (lib/push-reasons.ts). */
+  pushEvents: InboxEvent[]
   /** A handed-over verification code: the push says only that one came, the code stays in the app chat. */
   pushHidesText: boolean
   taskEventId?: string
@@ -99,7 +99,7 @@ export interface InboxTake {
   approvedRepositoryKey?: string
 }
 
-const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushReasons: [], pushHidesText: false }
+const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushEvents: [], pushHidesText: false }
 
 export async function takeInbox(userId: string, holder: string, botId: string): Promise<InboxTake> {
   return db.transaction(async tx => {
@@ -175,7 +175,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
       handoffOnly: handoffs.length === events.length,
-      pushReasons: pushReasons(events),
+      pushEvents: events.map(event => ({ kind: event.kind, tier: event.tier })),
       pushHidesText: handoffs.some(carriesCode),
     }
   })

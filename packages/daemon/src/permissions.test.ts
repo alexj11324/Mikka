@@ -33,7 +33,7 @@ describe("permission policy (ADR 0009)", () => {
     ["install_dependency", "allow"],
     ["write_outside_repo", "ask"],
     ["git_push", "ask"],
-    ["network", "ask"],
+    ["network", "allow"],
     ["computer_use", "ask"],
   ] as const)("%s -> %s", (action, expected) => {
     expect(PERMISSION_DEFAULTS[action]).toBe(expected)
@@ -97,7 +97,9 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     const p = policy({ install_dependency: "deny", git_push: "allow" })
     expect(decide("install_dependency", { policy: p })).toBe("deny")
     expect(decide("git_push", { policy: p })).toBe("allow")
-    expect(decide("network", { policy: p })).toBe("ask")
+    // Open by default (decision 2026-11-01-1230); a person's choice still holds.
+    expect(decide("network", { policy: p })).toBe("allow")
+    expect(decide("network", { policy: policy({ network: "ask" }) })).toBe("ask")
     expect(decide("write_in_worktree", { policy: p })).toBe("allow")
     expect(decide("run_setup_recipe", { policy: p })).toBe("ask")
   })
@@ -115,7 +117,9 @@ describe("applying the workspace's policy (ADR 0028)", () => {
   })
 
   it("builds the run's domain list from network and install choices", () => {
-    expect(runDomains(policy({}), ["npmjs.org"])).toEqual([
+    // Unrestricted unless a person chose otherwise.
+    expect(runDomains(policy({}), ["npmjs.org"])).toEqual(["*"])
+    expect(runDomains(policy({ network: "ask" }), ["npmjs.org"])).toEqual([
       "github.com",
       "npmjs.org",
       ...PACKAGE_REGISTRY_DOMAINS,
@@ -127,7 +131,7 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(
       runDomains(policy({ network: "deny", install_dependency: "allow" }))
     ).toEqual([])
-    expect(runDomains(policy({ install_dependency: "allow" }))).toEqual([
+    expect(runDomains(policy({ network: "ask", install_dependency: "allow" }))).toEqual([
       "github.com",
       ...PACKAGE_REGISTRY_DOMAINS,
     ])
@@ -304,9 +308,11 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(strict).toContain("Do not install or add dependencies")
     expect(strict).toContain("Writing outside it is not allowed")
     const defaults = runInstructions("/wt")
-    expect(defaults).toContain("limited to the workspace ceiling")
-    expect(defaults).toContain("pre-authorized")
+    expect(defaults).toContain("Network access is open")
     expect(defaults).not.toContain("Native shell execution is unavailable")
+    const asked = runInstructions("/wt", policy({ network: "ask" }))
+    expect(asked).toContain("limited to the workspace ceiling")
+    expect(asked).toContain("pre-authorized")
   })
   it('keeps project shell execution independent of daemon publication permission', () => {
     for (const install of ['allow','ask','deny'] as const) for (const push of ['allow','ask','deny'] as const) {
