@@ -1,5 +1,5 @@
-import { type ReactNode, useState } from 'react'
-import { Image, Platform, Pressable, StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from 'react-native'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { Image, Platform, Pressable, StyleSheet, TextInput, View, type StyleProp, type TextInputInstance, type ViewStyle } from 'react-native'
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -67,7 +67,7 @@ export function Header({ left, title, right, subtitle, style }: { left?: ReactNo
  * them), so a failed send loses nothing. Controlled when `value` and
  * `onChangeText` are passed.
  */
-export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false }: {
+export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory }: {
   placeholder: string
   onSend?: (text: string, attachments: Attachment[]) => boolean | void | Promise<boolean | void>
   initial?: string
@@ -80,7 +80,15 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   onHeight?: (height: number) => void
   /** Open the keyboard on arrival (新线程, 新建, a 建议 draft). */
   autoFocus?: boolean
+  /** A message being quoted (swiped right in the chat): shown above the words and sent ahead of them as a Markdown quote. */
+  quote?: string | null
+  onClearQuote?: () => void
+  /** Beside 「+」 in the field's bottom row (the model menu). */
+  accessory?: ReactNode
 }) {
+  const input = useRef<TextInputInstance>(null)
+  // A new quote is something to answer: the keyboard comes up.
+  useEffect(() => { if (quote) input.current?.focus() }, [quote])
   const insets = useSafeAreaInsets()
   const [own, setOwn] = useState(initial)
   const [sending, setSending] = useState(false)
@@ -91,13 +99,14 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   const blocked = disabled || sending
   const images = files.filter(file => file.kind === 'image').length
   const empty = !text.trim() && !files.length
+  const quoted = (words: string) => quote ? `${quote.split('\n').map(line => `> ${line}`).join('\n')}\n\n${words}` : words
   const send = async () => {
     if (empty || blocked) return
     setSending(true)
     tap()
     try {
-      const ok = await onSend?.(text.trim(), files)
-      if (ok !== false) { setText(''); setFiles([]) }
+      const ok = await onSend?.(quoted(text.trim()), files)
+      if (ok !== false) { setText(''); setFiles([]); onClearQuote?.() }
     } finally {
       setSending(false)
     }
@@ -136,17 +145,28 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
             {problem ? <Text style={styles.problem}>{problem}</Text> : null}
           </View>
         ) : null}
-        <View style={styles.composerRow}>
-          {attach ? <AttachMenu images={images < MAX_IMAGES} onPick={source => void pick(source)} /> : null}
-          <Field style={styles.field}>
-            <TextInput value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
-              placeholderTextColor={colors.tertiary} style={[styles.input, sending && { color: colors.secondary }]} />
+        {/* One field, as in the Claude app: the quote, the words, then 「+」 and send. */}
+        <Field style={styles.field}>
+          {quote ? (
+            <View style={styles.quote}>
+              <Text style={styles.quoteText} numberOfLines={1}>{quote.replace(/\s+/g, ' ')}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="取消引用" hitSlop={10} onPress={onClearQuote}>
+                <X size={16} color={colors.secondary} strokeWidth={2.2} />
+              </Pressable>
+            </View>
+          ) : null}
+          <TextInput ref={input} value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
+            placeholderTextColor={colors.tertiary} style={[styles.input, sending && { color: colors.secondary }]} />
+          <View style={styles.fieldRow}>
+            {attach ? <AttachMenu images={images < MAX_IMAGES} onPick={source => void pick(source)} /> : null}
+            {accessory}
+            <View style={{ flex: 1 }} />
             <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: blocked || empty }} onPress={() => void send()} disabled={blocked}
               style={[styles.send, (blocked || empty) && { backgroundColor: colors.tertiary }]}>
               <ArrowUp size={20} color="#fff" strokeWidth={2.4} />
             </Pressable>
-          </Field>
-        </View>
+          </View>
+        </Field>
       </View>
     </KeyboardStickyView>
   )
@@ -200,10 +220,12 @@ const styles = StyleSheet.create({
   // What scrolls under the composer fades out, as under the iOS bar at the top.
   fade: { paddingTop: 28, backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 45%, rgba(255,255,255,0.97) 100%)' },
   capsule: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, paddingHorizontal: 16, borderRadius: 20, maxWidth: 220 },
-  composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
-  field: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', minHeight: 52, borderRadius: 26, backgroundColor: '#fff', paddingLeft: 18, paddingRight: 6, paddingVertical: 6, gap: 10 },
+  field: { borderRadius: 26, backgroundColor: '#fff', paddingHorizontal: 8, paddingTop: 8, paddingBottom: 8, gap: 4 },
+  fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  quote: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 4, paddingLeft: 14, paddingRight: 10, height: 36, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator },
+  quoteText: { flex: 1, minWidth: 0, fontSize: 14, color: colors.secondary },
   // Six lines of 22, then it scrolls.
-  input: { flex: 1, minWidth: 0, width: 0, maxHeight: 6 * 22 + 16, fontFamily: font, fontSize: 16, lineHeight: 22, color: colors.text, paddingTop: 9, paddingBottom: 9, outlineStyle: 'none' } as never,
+  input: { minHeight: 40, maxHeight: 6 * 22 + 16, paddingHorizontal: 10, fontFamily: font, fontSize: 16, lineHeight: 22, color: colors.text, paddingTop: 9, paddingBottom: 9, outlineStyle: 'none' } as never,
   tray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   thumb: { width: 64, height: 64, borderRadius: 14 },
   thumbImage: { width: 64, height: 64, borderRadius: 14, backgroundColor: colors.bubble },

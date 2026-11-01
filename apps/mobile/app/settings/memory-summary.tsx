@@ -6,7 +6,7 @@ import { Markdown } from '@/components/Markdown'
 import { SettingsPage } from '@/components/settings'
 import { Text } from '@/components/Text'
 import { api } from '@/lib/api'
-import { switchTo } from '@/lib/navigate'
+import { openChat } from '@/lib/navigate'
 import { useSettings } from '@/lib/settings'
 import { colors, font, lift } from '@/lib/theme'
 
@@ -24,7 +24,7 @@ export default function MemorySummaryScreen() {
     // The words stay until the server takes them.
     try { await api('/api/mobile/chat', { method: 'POST', body: { text: `关于你记住的事：${value}` } }) } catch { setFailed(true); return }
     setText('')
-    switchTo('/')
+    openChat('/bots/coordinator')
   }
   return (
     <SettingsPage

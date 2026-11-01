@@ -30,33 +30,25 @@ briefing in the morning and see what is waiting on me.
 
 ## Where it lives
 
-A side drawer, like the ChatGPT iOS app; no bottom tabs. The app opens on the
-Coordinator chat. The menu button (top left), or a swipe right anywhere on a
-drawer screen, slides the drawer in from the left and pushes the current
-screen right; it follows the finger and settles by position and speed. A swipe
-left or a tap on the pushed screen closes it. Pushed pages (a thread, 设置)
-keep the system's swipe back instead.
+The system tab bar holds **对话** and **线程**
+([decision](decisions/2026-10-31-2345-mobile-bot-home.md)); the app opens on
+对话. A chat, a thread, 设置, 插件, 建议 and 任务 open over the tabs, with
+the system back button and edge swipe.
+
+**对话**: the Coordinator pinned on top (a star on its avatar), then every
+bot and group chat with its last line and time, newest first (the web bot
+list, R-01). The system search field filters by name. The bar's left menu
+opens 设置, 插件, 建议 and 任务. 「重启以更新」 sits at the top once an
+update has downloaded ([decision](decisions/2026-10-31-2010-ota-updates.md)).
+The Coordinator gets no other special UI (R-06).
 
 Controls are the system's where iOS has one
 ([decision](decisions/2026-10-31-2200-mobile-native-ios.md)): the top bar is
 the iOS navigation bar with its own bar buttons, menus and back button;
-round buttons and the composer are Liquid Glass on iOS 26.
+the tab bar, capsules and the composer are Liquid Glass on iOS 26.
 
-Drawer, top to bottom:
-
-| Part | 中文 | What it holds |
-| --- | --- | --- |
-| Top | 搜索 · 新建 | A Liquid Glass search field that filters the drawer, and a compose button (new chat) |
-| Fixed rows | Coordinator · 建议 · 线程 · 任务 · 插件 | Coordinator chat (first row, unread dot; the 08:00 briefing arrives here); 建议 (normal items, R-21); 线程 (every thread); 任务 (list only, no board); 插件 (the web's plugins page: 应用 and 技能) |
-| 置顶 | 置顶 | Pinned bots and group chats |
-| 最近 | 最近 | The other bots and group chats, newest first (the web bot list, R-01) |
-| 重启以更新 | 重启以更新 | Only once an update has downloaded; tapping restarts into it ([decision](decisions/2026-10-31-2010-ota-updates.md)) |
-| Bottom | Avatar · name | The person; opens Settings (as in ChatGPT and Claude on iOS) |
-
-The Coordinator is the first ordinary row in the drawer and the default
-screen; it gets no other special UI (R-06).
-
-**线程 screen** (like the Claude app's Code screen):
+**线程** (the tab; like the Claude app's Code screen): grouped by state,
+等你回复 · 进行中 · 失败 · 已完成; 新线程 and the filter menu sit in the bar.
 
 - A thread row is a status icon, the thread name, and one grey line: the
   bot's name and a machine icon (cloud, laptop, server), never the machine
@@ -69,12 +61,16 @@ screen; it gets no other special UI (R-06).
   dot (R-24). Tapping one filters the list.
 - The filter button (top right) opens a menu: 全部 · 等你回复 · 待审阅 ·
   进行中 · 已完成 · 已归档.
-- Bottom: a search button and a 「新线程」 pill, which opens the composer to
-  dispatch work through the Coordinator.
+- 新线程 (top right, beside the filter) opens the Coordinator's composer to
+  dispatch work through it.
 
-**Chat** (like the Claude app): the header is the bot's name in a pill; the
-right button opens that bot's threads and carries a blue dot when one waits
-on the person. The bot's replies sit in the grey bubble and the person's
+**Chat** (like the Claude app): the header is the bot's name in a glass
+capsule, which opens the bot's page; 「…」 (top right) opens 资料 and that
+bot's 线程. Dragging a message from left to right quotes it in the composer
+(a reply arrow follows the finger; letting go past the mark quotes it, with a
+tick); only a swipe from the screen's edge goes back. A bot's reply has 复制
+under it. A long press on any message opens a system sheet: 回复 (quote it),
+复制, and 选择文本 (the words, to select any part). The bot's replies sit in the grey bubble and the person's
 in the blue one, as on the web (R-14). The
 thread card is a status icon and the thread name, with outputs as chips
 (R-66); no step line.
@@ -89,7 +85,7 @@ red only for failure; green for a finished thread and an online machine; PR
 states use GitHub's colours.
 
 Things waiting on the person have no screen of their own: proactive cards sit
-in the Coordinator chat (unread dot on its drawer row), and waiting threads
+in the Coordinator chat, and waiting threads
 sort first on 线程.
 
 A thread card in any chat (R-15) pushes the thread's own page (back button top
@@ -121,7 +117,7 @@ What reaches the person and when is R-20. On mobile:
 
 ## Settings
 
-Opened from the avatar at the bottom of the drawer. A hierarchy (R-70): the
+Opened from 设置 in 对话's left menu. A hierarchy (R-70): the
 top screen holds categories, each opens its own page. Every row cites its
 precedent. Figma frames 07, 07a–07e.
 
@@ -154,7 +150,7 @@ large Dynamic Type. Plus:
 - Coordinator chat: streaming reply, proactive card (unanswered / answered /
   snoozed), thread card (running / waiting / failed / done).
 - Push: lock screen and banner, one per kind (mail, CI, run finished,
-  briefing, verification code).
+- 对话: the bot list with the Coordinator pinned, search, and 重启以更新.
 - Drawer: open over the Coordinator chat, with unread dots.
 - 线程: each filter, running / waiting / failed / done rows.
 - 建议: no apps connected (connect CTA), nothing today, briefing generating.
@@ -164,7 +160,7 @@ large Dynamic Type. Plus:
 
 R-06, R-14, R-15, R-20, R-21, R-36, R-40. New rules this spec needs once Alex
 accepts the frames: proactive card with buttons, push without buttons,
-mobile drawer.
+mobile tabs.
 
 ## Engineering
 
@@ -173,7 +169,7 @@ mobile drawer.
   browser; email and password work too. The session cookie lives in the
   keychain and goes with every request. Still to check on a device: that the
   OAuth proxy hub (`BETTER_AUTH_OAUTH_PROXY_URL`) returns to `mikka://`.
-- **API:** `app/api/mobile/*`, one route per screen: `home` (drawer),
+- **API:** `app/api/mobile/*`, one route per screen: `home` (对话),
   `chat` (Coordinator or a bot; `?bot=`), `threads`, `threads/:id`, `tasks`,
   `settings`, `preferences`, `push-tokens`. 建议 uses `/api/suggestions`.
   Writes refuse a browser Origin other than the site's own. The chosen
@@ -205,12 +201,16 @@ mobile drawer.
   following the link alone never changes its signed-in account. Proposals from
   `/api/pending-actions` sit at the end of every chat with 不要 and
   发送/保存到日历 (`POST /api/mobile/pending-actions/:id`).
-- **Navigation:** picking anything in the drawer, 新建, 新线程, a 建议 item or
-  a push about a chat starts the stack over on that screen (`lib/navigate.ts`),
-  so Back never returns to a screen left through the drawer. A chat's 线程
-  button pushes that bot's threads over the chat (Back returns to it); a thread
-  card or a push about a thread pushes the thread. The drawer's swipe works
-  only where nothing is pushed, so the system's swipe back always wins.
+- **Navigation:** routes are `/chats` and `/threads` (the tabs), `/bots/:id`
+  (a chat; `coordinator` for the Coordinator's), `/bots/:id/info`,
+  `/bots/:id/threads`, `/thread/:id`. 新线程, a 建议 item and a push about a
+  chat open the chat over 对话 with the stack started over there
+  (`lib/navigate.ts`), so Back returns to the bot list; a thread card or a push
+  about a thread pushes the thread over what is open.
+- **Composer:** one field: the quote (when one is set), the words, then a row
+  with 「+」, a slot beside it (the model menu) and send. A quote is sent ahead
+  of the words as Markdown quote lines and drawn dimmed above them in the
+  person's bubble.
 - **插件:** a system segmented control switches 应用 and 技能, as the web's
   tabs. 应用 lists what the person connected, then 热门 (Mikka's own GitHub,
   Linear and Telegram first) and 新品推荐 from the store
@@ -223,8 +223,7 @@ mobile drawer.
   the skill on skills.sh.
 - **Workspace:** switching it in 设置 reloads every screen's data at once.
 - **任务:** a row opens the task on the web, signed in (`/?issue=<id>`).
-- **Lists:** 线程, 任务 and 建议 pull to refresh; message text can be selected
-  and copied by long press.
+- **Lists:** 线程, 任务 and 建议 pull to refresh.
 - **Lost session:** a 401 signs the app out locally and shows sign-in with
   「登录已失效，请重新登录。」.
 - **Sending:** a message that fails stays as its bubble with

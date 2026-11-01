@@ -2,8 +2,7 @@ import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import { FlatList, Image, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 import { Puzzle, Search } from 'lucide-react-native'
-import { useDrawer } from '@/components/Drawer'
-import { MenuIcon, SourceIcon, Spinner } from '@/components/icons'
+import { SourceIcon, Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Segmented } from '@/components/Segmented'
 import { Symbol } from '@/components/Symbol'
@@ -33,12 +32,11 @@ const OWN: Entry[] = [
  * runs in the browser, which holds the flow, and the list reloads on return.
  */
 export default function PluginsScreen() {
-  const drawer = useDrawer()
   const [tab, setTab] = useState<Tab>('apps')
   const [query, setQuery] = useState('')
   return (
     <View style={styles.screen}>
-      <NavBar left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }} title="插件" />
+      <NavBar title="插件" />
       {tab === 'apps' ? <Apps query={query} header={<Header tab={tab} setTab={setTab} query={query} setQuery={setQuery} />} />
         : <Skills query={query} header={<Header tab={tab} setTab={setTab} query={query} setQuery={setQuery} />} />}
     </View>
