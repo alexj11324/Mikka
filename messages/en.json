@@ -86,8 +86,7 @@
       "emptyTitle": "No tasks yet",
       "newTask": "New task"
     },
-    "createdAtDate": "Created {date}",
-    "unassignedNumber": "Assigning number"
+    "createdAtDate": "Created {date}"
   },
   "Nav": {
     "switchLanguage": "Switch language",

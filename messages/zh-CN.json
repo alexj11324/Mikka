@@ -86,8 +86,7 @@
       "emptyTitle": "这里还没有任务",
       "newTask": "新建任务"
     },
-    "createdAtDate": "创建于 {date}",
-    "unassignedNumber": "正在分配编号"
+    "createdAtDate": "创建于 {date}"
   },
   "Nav": {
     "switchLanguage": "切换语言",

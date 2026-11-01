@@ -12,7 +12,6 @@ import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, Comman
 import { Spinner } from '@/components/ui/spinner'
 import { statusTone, type StatusTone } from '@/lib/status-appearance'
 import { ShortcutKeys } from '@/components/shortcut-keys'
-import { issueIdentifier } from '@/components/workspace/issue-properties'
 import type { SavedAgentSession } from '@/lib/agent-history'
 import { matchesQuery, mergeById, type SiteSearchItem } from '@/lib/site-search'
 import { useSiteSearch, type ListedSource } from '@/hooks/use-site-search'
@@ -86,7 +85,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
   )
   const groupRows = search.state.groups.items.filter((item): item is GroupHit => item.type === 'group')
   const taskRows: (Issue | TaskHit)[] = mergeById(
-    issues.filter(issue => shown(`${issueIdentifier(issue)} ${issue.title}`)),
+    issues.filter(issue => shown(`${issue.identifier ?? ''} ${issue.title}`)),
     search.state.tasks.items.filter((item): item is TaskHit => item.type === 'task'),
   )
   const projectRows = projects.filter(project => shown(`${project.name} ${project.summary}`))
@@ -153,7 +152,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
             return <CommandItem key={`task:${row.id}`} value={`issue ${row.id}`} onSelect={() => { if (onIssue(row.id)) onOpenChange(false) }} className="gap-3 py-2">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><ListTodo /></span>
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium"><span className="text-muted-foreground tabular-nums">{issueIdentifier(row, tIssue('unassignedNumber'))}</span> {row.title}</span>
+                <span className="truncate font-medium">{row.identifier && <><span className="text-muted-foreground tabular-nums">{row.identifier}</span> </>}{row.title}</span>
                 {assignee && <span className="truncate text-xs text-muted-foreground">{assignee}</span>}
               </span>
               <CommandShortcut className="tracking-normal"><Badge variant={STATUS_BADGES[statusTone(row.status)]} size="sm">{statusLabel(row.status)}</Badge></CommandShortcut>
