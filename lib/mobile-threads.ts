@@ -118,7 +118,8 @@ export type MobileArtifact = { id: string; title: string; kind: 'markdown' | 'ht
  * panel shows them. The Coordinator is one of the bots: its threads carry its bot row's id.
  */
 export async function mobileBot(userId: string, workspaceId: string, botId: string): Promise<{ threads: MobileThread[]; pullRequests: MobilePullRequest[]; schedules: MobileSchedule[]; library: MobileArtifact[]; pinned: boolean; muted: boolean }> {
-  const own = eq(agentRuns.botId, botId)
+  // An MCP client's runs are the Coordinator's too, but its page lists only the threads it dispatched, as before.
+  const own = and(eq(agentRuns.botId, botId), sql`${agentRuns.source} IS DISTINCT FROM 'mcp'`)
   const [rows, schedules] = await Promise.all([
     runRows(userId, own, 60),
     pool.query<{ id: string; title: string; status: 'active' | 'paused'; next_at: Date | null }>(

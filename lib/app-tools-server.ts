@@ -33,13 +33,13 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
     judge: serverWriteJudge(userId, botId),
     recordStart: async (call, accountId) => {
       const id = crypto.randomUUID()
-      await db.insert(pendingActions).values({ id, userId, action: 'app_tool_call', input: call, connectedAccountId: accountId, status: 'running' })
+      await db.insert(pendingActions).values({ id, userId, botId, action: 'app_tool_call', input: call, connectedAccountId: accountId, status: 'running' })
       return id
     },
     recordEnd: async (id, outcome) => {
       await db.update(pendingActions).set({ status: outcome.status, error: outcome.error ?? null, result: outcome.result ?? null }).where(eq(pendingActions.id, id))
     },
-    propose: (call, accountId) => proposeAppToolCall(userId, call, accountId),
+    propose: (call, accountId) => proposeAppToolCall(userId, call, accountId, botId),
   }
 }
 

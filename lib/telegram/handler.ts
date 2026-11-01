@@ -9,6 +9,7 @@ import type { TelegramMessage } from '@chat-adapter/telegram'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
+import { coordinatorBot } from '@/lib/coordinator/coordinator-bot'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { issueMembers, issues, linearIssueLinks, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
@@ -278,6 +279,8 @@ async function handleTelegramMessage(input: {
     await input.post(t('connect'))
     return
   }
+  // A Telegram message enters the person's Coordinator chat: its bot row is resolved here, before the transaction.
+  const coordinator = command ? null : (await coordinatorBot(link.userId)).botId
   const result = await db.transaction(async tx => {
     const conversation = await ensureConversation(tx, input.threadId, link.userId)
     if (command) return handleCommand(tx, conversation, link.userId, command, t)
@@ -295,6 +298,7 @@ async function handleTelegramMessage(input: {
     if (!coordinatorEnabled()) return t('coordinatorUnavailable')
     if (input.messageId === null) return t('messageUnavailable')
     await recordCoordinatorEvent(tx, userMessageEvent(link.userId, detail, {
+      botId: coordinator!,
       issueId: conversation.issueId,
       telegram: { threadId: conversation.threadId, telegramUserId, messageId: input.messageId },
     }))

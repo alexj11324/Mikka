@@ -12,13 +12,13 @@ import { makeSnapshot } from "../../lib/agent-kit/definition";
 import { DEFAULT_AGENT_DEFINITION } from "../../lib/agent-kit/builtin";
 import { NativeCoordinatorError } from "../../lib/coordinator/native-store";
 import type { AgentExecution } from "../../lib/agent-kit/store";
-/** The person's Coordinator: an ordinary bot row, marked as the Coordinator. */
-const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
 
 export async function exerciseFactoryRecoveryEntry(
   t: TestContext,
   fixture: {
     db: Pool;
+    /** The person's Coordinator bot row, which the review's factory task belongs to. */
+    botId: string;
     failedReview: () => Promise<{ snapshot: FactorySnapshot; runId: string }>;
     png: string;
     sha: string;
@@ -150,7 +150,7 @@ export async function exerciseFactoryRecoveryEntry(
         { harness: "ai_sdk", model: "synthetic-planning-fixture" },
       ),
     };
-    const tools = registry.coordinatorTools("owner", COORDINATOR_BOT, scope, { coordinator: true, 
+    const tools = registry.coordinatorTools("owner", fixture.botId, scope, { coordinator: true, 
       execution,
     });
     assert.deepEqual(Object.keys(tools), ["recover_factory_check"]);

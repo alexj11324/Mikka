@@ -169,7 +169,8 @@ export async function listAgents(userId: string) {
 }
 
 export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string }) {
-  return attempt(async () => ({ status: 'queued', ...(await queueRun(userId, input, null, undefined, undefined, 'mcp')) }))
+  // A run an MCP client dispatches is the person's Coordinator's: its bot row is resolved here, where the run is created.
+  return attempt(async () => ({ status: 'queued', ...(await queueRun(userId, input, await chatBotId(userId, null), undefined, undefined, 'mcp')) }))
 }
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {

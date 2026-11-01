@@ -37,7 +37,7 @@ async function lastPosition(userId: string): Promise<number> {
  */
 export async function sendToCoordinator(userId: string, text: string) {
   const after = await lastPosition(userId)
-  await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, text))
+  await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, await coordinatorChat(userId), text))
   await wakeCoordinator(userId)
   return { queued: true, coordinatorRunning: coordinatorEnabled(), after }
 }

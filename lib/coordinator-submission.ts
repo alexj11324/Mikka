@@ -8,7 +8,6 @@ import { coordinatorEvents } from './db/schema'
 import type { db } from './db'
 import { MESSAGE_MAX } from './message-limits'
 import { taskDestinationSchema, type TaskDestination } from './task-destination'
-import { chatBotId } from './coordinator/coordinator-bot'
 
 /** Personal Coordinator HTTP contract. Question/approval fields are not supported. */
 export const personalSubmissionInput = z.object({
@@ -23,14 +22,13 @@ export class SubmissionConflictError extends Error {
 
 type Executor = Pick<typeof db, 'insert' | 'select'>
 
-function submissionKey(userId: string, botId: string, submissionId: string) {
+function submissionKey(userId: string, botId: string | null, submissionId: string) {
   return `personal_submission:v1:${createHash('sha256').update(JSON.stringify([userId, botId, submissionId])).digest('hex')}`
 }
 
 /** Read an existing receipt without inserting an event for an already-dismissed suggestion. */
-export async function personalSubmissionRecorded(executor: Pick<typeof db, 'select'>, userId: string, text: string, submissionId: string): Promise<boolean> {
+export async function personalSubmissionRecorded(executor: Pick<typeof db, 'select'>, userId: string, text: string, submissionId: string, botId: string | null): Promise<boolean> {
   const id = personalSubmissionInput.shape.submissionId.parse(submissionId)!
-  const botId = await chatBotId(userId, null, { backfill: false })
   const [prior] = await executor.select({ userId: coordinatorEvents.userId, botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, issueId: coordinatorEvents.issueId, runId: coordinatorEvents.runId, payload: coordinatorEvents.payload })
     .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, submissionKey(userId, botId, id))).limit(1)
   if (!prior) return false
@@ -38,10 +36,15 @@ export async function personalSubmissionRecorded(executor: Pick<typeof db, 'sele
   return true
 }
 
-/** Caller authenticates the person and validates any Bot ownership before calling. No bot: the person's Coordinator. */
-export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId?: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; humanSessionId?: string } = {}) {
+/**
+ * Caller authenticates the person, validates the bot's ownership and names
+ * the chat's bot: the one the person wrote to, their Coordinator's bot row
+ * included (resolved where the message enters), or a suggestion's stored one
+ * (null only on a suggestion from before it stored one).
+ */
+export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; humanSessionId?: string }) {
   const submissionId = personalSubmissionInput.shape.submissionId.parse(options.submissionId)
-  const botId = await chatBotId(userId, options.botId, { backfill: false })
+  const botId = options.botId
   const images = normalizeUserImages(options.images)
   const taskDestination = options.taskDestination ? taskDestinationSchema.parse(options.taskDestination) : undefined
   const dedupeKey = submissionId

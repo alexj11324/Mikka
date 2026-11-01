@@ -6,8 +6,8 @@ const issue = { id: 'issue-1', userId: 'user-1', title: 'Fix login', status: 'do
 
 test('Telegram messages keep their linked issue and dedupe by source message', () => {
   const telegram = { threadId: 'telegram:thread-1', telegramUserId: 'telegram-user-1', messageId: 42 }
-  const first = userMessageEvent('user-1', 'Please check this', { issueId: 'issue-1', telegram })
-  const duplicate = userMessageEvent('user-1', 'Please check this', { issueId: 'issue-1', telegram })
+  const first = userMessageEvent('user-1', 'Please check this', { issueId: 'issue-1', telegram, botId: 'c0000000-0000-4000-8000-0000000c0de9' })
+  const duplicate = userMessageEvent('user-1', 'Please check this', { issueId: 'issue-1', telegram, botId: 'c0000000-0000-4000-8000-0000000c0de9' })
 
   assert.equal(first.dedupeKey, 'telegram:telegram:thread-1:42')
   assert.equal(duplicate.dedupeKey, first.dedupeKey)
@@ -28,13 +28,13 @@ test('Telegram reply targets are validated and unique per chat', () => {
 })
 
 test('a move to done is an event, keyed by the revision that made it', () => {
-  const event = issueDoneEvent({ status: 'review' }, issue)
-  assert.deepEqual(event, { userId: 'user-1', kind: 'issue_done', dedupeKey: 'issue_done:issue-1:4', issueId: 'issue-1', runId: null, payload: { title: 'Fix login', previousStatus: 'review' } })
+  const event = issueDoneEvent({ status: 'review' }, issue, 'c0000000-0000-4000-8000-0000000c0de9')
+  assert.deepEqual(event, { userId: 'user-1', botId: 'c0000000-0000-4000-8000-0000000c0de9', kind: 'issue_done', dedupeKey: 'issue_done:issue-1:4', issueId: 'issue-1', runId: null, payload: { title: 'Fix login', previousStatus: 'review' } })
 })
 
 test('saves that do not move the issue to done are not events', () => {
-  assert.equal(issueDoneEvent({ status: 'done' }, issue), null)
-  assert.equal(issueDoneEvent({ status: 'todo' }, { ...issue, status: 'doing' }), null)
+  assert.equal(issueDoneEvent({ status: 'done' }, issue, 'c0000000-0000-4000-8000-0000000c0de9'), null)
+  assert.equal(issueDoneEvent({ status: 'todo' }, { ...issue, status: 'doing' }, 'c0000000-0000-4000-8000-0000000c0de9'), null)
 })
 
 test('a finished run is one event per run, with its summary', () => {
@@ -45,7 +45,8 @@ test('a finished run is one event per run, with its summary', () => {
   assert.equal(runFinishedEvent(run).payload.summary, null)
 })
 
-const workerRun = { id: 'run-1', userId: 'user-1', issueId: 'issue-1' }
+// A run carries the bot that dispatched it; its events record that bot.
+const workerRun = { id: 'run-1', userId: 'user-1', issueId: 'issue-1', botId: 'c0000000-0000-4000-8000-0000000c0de9' }
 
 test('a finished run includes server-verified PR output in the same deduplicated event', () => {
   const publication = { pullRequest: { url: 'https://github.com/owner/repo/pull/7', state: 'draft' as const }, branch: 'mikka/mik-42' }
@@ -56,7 +57,7 @@ test('a finished run includes server-verified PR output in the same deduplicated
 
 test('a retry after the device went offline is one event per lost run', () => {
   const event = runRetriedEvent(workerRun, { runId: 'run-2', attempt: 2, maxAttempts: 3 })
-  assert.deepEqual(event, { userId: 'user-1', kind: 'run_retried', dedupeKey: 'run_retried:run-1', issueId: 'issue-1', runId: 'run-1', payload: { retryRunId: 'run-2', attempt: 2, maxAttempts: 3 } })
+  assert.deepEqual(event, { userId: 'user-1', botId: 'c0000000-0000-4000-8000-0000000c0de9', kind: 'run_retried', dedupeKey: 'run_retried:run-1', issueId: 'issue-1', runId: 'run-1', payload: { retryRunId: 'run-2', attempt: 2, maxAttempts: 3 } })
 })
 
 test('worker tool calls become events on the run, each one new', () => {
@@ -64,7 +65,7 @@ test('worker tool calls become events on the run, each one new', () => {
   assert.equal(first.kind, 'run_report')
   assert.match(first.dedupeKey, /^run_report:run-1:/)
   assert.notEqual(first.dedupeKey, runReportEvent(workerRun, 'Tests pass').dedupeKey)
-  assert.deepEqual({ ...first, dedupeKey: '' }, { userId: 'user-1', kind: 'run_report', dedupeKey: '', issueId: 'issue-1', runId: 'run-1', payload: { text: 'Tests pass' } })
+  assert.deepEqual({ ...first, dedupeKey: '' }, { userId: 'user-1', botId: 'c0000000-0000-4000-8000-0000000c0de9', kind: 'run_report', dedupeKey: '', issueId: 'issue-1', runId: 'run-1', payload: { text: 'Tests pass' } })
   assert.deepEqual(runBlockedEvent(workerRun, 'No access').payload, { reason: 'No access' })
 })
 

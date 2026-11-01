@@ -173,8 +173,9 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
         const item = claimed ?? await readClaimedSuggestion(userId, id.data, tx)
         if (!item) throw new ActionFailureError('suggestionNotFound')
         const text = suggestionMessage({ source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, actor: item.actor, url: item.url })
-        if (claimed) await recordPersonalSubmission(tx, userId, text, { submissionId: item.id })
-        else if (!await personalSubmissionRecorded(tx, userId, text, item.id)) throw new ActionFailureError('suggestionNotFound')
+        // The suggestion stored its Coordinator bot row when it was made (null only on an older one).
+        if (claimed) await recordPersonalSubmission(tx, userId, text, { submissionId: item.id, botId: item.botId })
+        else if (!await personalSubmissionRecorded(tx, userId, text, item.id, item.botId)) throw new ActionFailureError('suggestionNotFound')
       })
     } catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')

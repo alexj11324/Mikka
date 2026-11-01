@@ -31,7 +31,9 @@ async function handlePOST(request: Request) {
   const parsed = personalSubmissionInput.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'messageRequired' }, { status: 400 })
   const userId = session.user.id
-  try { await recordPersonalSubmission(db, userId, parsed.data.text, { submissionId: parsed.data.submissionId, images:parsed.data.images, ...(!request.headers.has('authorization')&&request.headers.get('cookie')&&request.headers.get('origin')===new URL(request.url).origin?{humanSessionId:session.session.id}:{}) }) }
+  // A message enters the person's Coordinator chat: its bot row is resolved here.
+  const botId = await chatBotId(userId, null)
+  try { await recordPersonalSubmission(db, userId, parsed.data.text, { botId, submissionId: parsed.data.submissionId, images:parsed.data.images, ...(!request.headers.has('authorization')&&request.headers.get('cookie')&&request.headers.get('origin')===new URL(request.url).origin?{humanSessionId:session.session.id}:{}) }) }
   catch (error) {
     if (error instanceof SubmissionConflictError) return NextResponse.json({ error: 'submissionConflict' }, { status: 409 })
     throw error

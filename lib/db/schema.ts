@@ -547,6 +547,8 @@ export type SuggestionDecider = 'rule' | 'model' | 'fallback'
 
 export const suggestions = pgTable('suggestions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** The person's Coordinator bot row, stored when the suggestion is made: sending it writes to that chat (drizzle/20261101160000). Null on older rows. */
+  botId: uuid('botId'),
   source: text('source').$type<SuggestionSource>().notNull(),
   externalId: text('externalId').notNull(),
   action: text('action').$type<SuggestionAction>().notNull(),
@@ -974,6 +976,8 @@ export const PENDING_ACTION_STATUSES = ['pending', 'running', 'done', 'failed', 
 export type PendingActionStatus = (typeof PENDING_ACTION_STATUSES)[number]
 export const pendingActions = pgTable('pending_actions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** The bot whose chat proposed it (the Coordinator's bot row too): the decision goes back there (drizzle/20261101160000). Null on older rows. */
+  botId: uuid('botId'),
   action: text('action').notNull(),
   connectedAccountId: text('connectedAccountId'),
   input: jsonb('input').$type<Record<string, unknown>>().notNull(),

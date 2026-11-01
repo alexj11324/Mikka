@@ -19,7 +19,8 @@ function fixture() {
   const queries: string[] = []
   const q = { async query(sql: string, params: unknown[] = []) {
     queries.push(sql)
-    if (sql.startsWith('select e.bot_key')) return { rows: params[0] === state.owner && params[1] === state.executionId ? [{ bot_key: state.key, coordinator: state.coordinator }] : [] }
+    if (sql.startsWith('select bot_key from')) return { rows: params[0] === state.owner && params[1] === state.executionId ? [{ bot_key: state.key }] : [] }
+    if (sql.startsWith('select 1 from coordinator_bots')) return { rowCount: state.coordinator && params[0] === state.owner && params[1] === state.key ? 1 : 0, rows: [] }
     if (sql.startsWith('select active_version')) { if (sql.includes('for share')) state.headLocked = true; return { rows: params[0] === state.owner && params[1] === state.key ? [{ active_version: state.version, workspace_id: state.namespace }] : [] } }
     if (sql.startsWith('select snapshot')) return { rows: params[0] === state.owner && params[1] === state.key && params[2] === state.executionId ? [{ snapshot: state.snapshot, status: state.status, version_id: state.rowVersion }] : [] }
     if (sql.startsWith('select definition')) return { rows: [{ definition: state.current, digest: digest(state.current) }] }

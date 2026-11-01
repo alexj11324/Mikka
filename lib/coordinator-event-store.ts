@@ -9,14 +9,14 @@ import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 type Executor = Pick<typeof db, 'insert'>
 
 /**
- * Writes the event once; a repeat with the same dedupe key is ignored. An
- * event with no bot of its own (a run started outside any bot's chat, an
- * app's matter, a reminder) goes to the person's Coordinator.
+ * Writes the event once; a repeat with the same dedupe key is ignored. The
+ * event names its chat's bot itself (CoordinatorEventInput.botId); nothing is
+ * resolved here, so run completion, recovery and publication never depend on
+ * the Coordinator lookup.
  */
 export async function recordCoordinatorEvent(executor: Executor, event: CoordinatorEventInput) {
   await assertCredentialSafeChat(event.userId, event.payload)
-  const botId = await chatBotId(event.userId, event.botId, { backfill: false })
-  await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event, botId }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey })
+  await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey })
 }
 
 /** The person's events their Coordinator (not another bot) has not taken yet, oldest first. */

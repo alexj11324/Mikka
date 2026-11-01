@@ -161,9 +161,8 @@ async function lastDecision(tx: Tx, matterId: string): Promise<HandoffPayload['p
  * Coordinator.
  */
 export async function releaseAttention(userId: string, now = new Date()): Promise<boolean> {
-  // Matters from connected apps go to the person's Coordinator.
-  const { chatBotId } = await import('@/lib/coordinator/coordinator-bot')
-  const botId = await chatBotId(userId, null)
+  // Matters from connected apps enter the person's Coordinator chat: its bot row is resolved here, before the transaction.
+  const { botId } = await (await import('@/lib/coordinator/coordinator-bot')).coordinatorBot(userId)
   return db.transaction(async tx => {
     await lock(tx, userId)
     if (!await attentionEnabled(userId, tx)) return false

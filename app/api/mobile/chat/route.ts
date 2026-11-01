@@ -63,8 +63,9 @@ async function handlePOST(request: Request) {
   if (!parsed.success) return json({ error: 'messageRequired' }, 400)
   const images = parsed.data.images?.length ? parsed.data.images : undefined
   if (typeof user[tokenWorkspace] === 'string') {
-    const botId = parsed.data.botId ?? null
-    if (!await tokenBotAllowed(user, botId)) return json({ error: 'botNotFound' }, 404)
+    if (!await tokenBotAllowed(user, parsed.data.botId ?? null)) return json({ error: 'botNotFound' }, 404)
+    // No bot named: the person's Coordinator, resolved here where the message enters.
+    const botId = await chatBotId(user.id, parsed.data.botId)
     try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId, images }) }
     catch (error) {
       if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)

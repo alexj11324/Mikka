@@ -2,8 +2,9 @@ import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 
 // The route and lib/github/plugin-permissions.ts run as written; only the
-// session and the transaction are replaced. Rows are kept per owner, as
-// agent_kit_heads keeps them per (owner_id, 'coordinator').
+// session, the transaction and the Coordinator lookup are replaced. Rows are
+// kept per owner, as agent_kit_heads keeps them per (owner_id, the owner's
+// Coordinator bot row).
 type Row = { cli: Record<string, unknown>; cliVersion: number; external: Record<string, unknown>; externalVersion: number }
 const rows = new Map<string, Row>()
 const queries: { sql: string; params: unknown[] }[] = []
@@ -28,6 +29,9 @@ const client = {
 }
 mock.module(new URL('../../../../../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser } } : null } } } })
 mock.module(new URL('../../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: {}, db: {} } })
+// Each person's Coordinator is an ordinary bot row (lib/coordinator/coordinator-bot.ts).
+const coordinatorOf = (owner: string) => ({ botId: `coordinator-bot-of-${owner}`, workspaceId: `workspace-of-${owner}` })
+mock.module(new URL('../../../../../lib/coordinator/coordinator-bot.ts', import.meta.url).href, { namedExports: { coordinatorBot: async (owner: string) => coordinatorOf(owner) } })
 mock.module(new URL('../../../../../lib/request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_route: string, handler: unknown) => handler, noteLogUser: () => {} } })
 mock.module(new URL('../../../../../lib/operations/write-transaction.ts', import.meta.url).href, { namedExports: { writeTransaction: async (_pool: unknown, work: (tx: typeof client) => Promise<unknown>) => work(client) } })
 
@@ -68,7 +72,10 @@ test('writes the Coordinator\'s own git_push and github_pull_request, keeping it
   const second = await patch({ version: '3:5', pullRequest: 'ask' })
   assert.deepEqual(await second.json(), { viewerId: 'owner', push: 'deny', pullRequest: 'ask', version: '3:6' })
   assert.deepEqual(rows.get('owner'), { cli: { permissions: { network: 'deny', git_push: 'deny' }, approvalMode: 'ask' }, cliVersion: 3, external: { gmail_send_email: 'ask', github_pull_request: 'ask' }, externalVersion: 6 })
-  for (const query of queries.filter(query => /agent_kit_heads/.test(query.sql))) assert.equal(query.params[0], 'owner')
+  for (const query of queries.filter(query => /agent_kit_heads/.test(query.sql))) {
+    assert.equal(query.params[0], 'owner')
+    assert.ok(query.params.includes(coordinatorOf('owner').botId), 'the row is the Coordinator bot\'s own')
+  }
 })
 
 test('a stale version is refused, and one person never reaches another\'s row', async () => {

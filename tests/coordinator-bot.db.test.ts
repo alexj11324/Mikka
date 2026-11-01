@@ -83,7 +83,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [event])).rows, [{ botId: coordinator.botId }])
     assert.deepEqual(await store.wakingChats(p.id), [coordinator.botId])
     const runs = (await pool.query<{ id: string; botId: string | null }>('SELECT id,"botId" FROM agent_runs WHERE "userId"=$1 ORDER BY id', [p.id])).rows
-    assert.deepEqual(Object.fromEntries(runs.map(row => [row.id, row.botId])), { [dispatched]: coordinator.botId, [mcp]: null }, 'its threads are the bot row\'s; an MCP client\'s run stays its own')
+    assert.deepEqual(Object.fromEntries(runs.map(row => [row.id, row.botId])), { [dispatched]: coordinator.botId, [mcp]: coordinator.botId }, 'every bot-less run of the person\'s (an MCP client\'s too) is the bot row\'s')
     assert.deepEqual((await pool.query('SELECT "botKey","bindingId" FROM bot_model_choices WHERE "ownerId"=$1', [p.id])).rows, [{ botKey: coordinator.botId, bindingId: null }])
     assert.deepEqual((await pool.query('SELECT "chatKey",muted FROM chat_preferences WHERE "userId"=$1', [p.id])).rows, [{ chatKey: coordinator.botId, muted: true }])
     assert.deepEqual((await pool.query('SELECT bot_id,workspace_id FROM user_schedules WHERE id=$1', [schedule])).rows, [{ bot_id: coordinator.botId, workspace_id: p.workspaceId }])
@@ -109,14 +109,19 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     assert.equal(Number((await pool.query('SELECT count(*) FROM coordinator_messages WHERE "userId"=$1 AND "botId" IS NULL', [p.id])).rows[0].count), 0)
   })
 
-  await t.test('a new Coordinator message and a run with no bot of its own use the real bot id', async () => {
+  await t.test('a new Coordinator message and a run use the real bot id, stored where they enter', async () => {
     const p = await person('new-message')
     const { recordPersonalSubmission } = await import('../lib/coordinator-submission')
     const { recordCoordinatorEvent } = await import('../lib/coordinator-event-store')
+    const { runFinishedEvent } = await import('../lib/coordinator-events')
     const { db } = await import('../lib/db')
-    const { botId } = await bots.coordinatorBot(p.id)
-    await recordPersonalSubmission(db, p.id, 'Hello Coordinator')
-    await recordCoordinatorEvent(db, { userId: p.id, kind: 'run_report', dedupeKey: `report:${randomUUID()}`, issueId: null, runId: null, payload: { text: 'a run with no bot finished' } })
+    // A message enters the Coordinator chat: the entry point resolves its bot row once.
+    const botId = await bots.chatBotId(p.id, null)
+    await recordPersonalSubmission(db, p.id, 'Hello Coordinator', { botId })
+    // A run carries the bot that dispatched it; its end reads that and resolves nothing.
+    const agent = await seedAgent(pool, p.id)
+    const run = await seedRun(pool, { userId: p.id, agentId: agent, botId, status: 'succeeded' })
+    await recordCoordinatorEvent(db, runFinishedEvent({ id: run, userId: p.id, botId, issueId: null, kind: 'implement', status: 'succeeded', stopReason: 'completed' }))
     assert.deepEqual((await pool.query('SELECT DISTINCT "botId" FROM coordinator_events WHERE "userId"=$1', [p.id])).rows, [{ botId }])
     const take = await store.takeInbox(p.id, 'coordinator-turn', botId)
     assert.equal(take.added, 1, 'the run report waits for triage; the message is taken')
@@ -124,6 +129,26 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const view = await store.chatView(p.id, 200, botId)
     assert.deepEqual(view.items.map(item => [item.from, item.text]), [['person', 'Hello Coordinator'], ['coordinator', 'Hi']])
     assert.equal(Number((await pool.query('SELECT count(*) FROM coordinator_messages WHERE "userId"=$1 AND "botId" IS NULL', [p.id])).rows[0].count), 0)
+  })
+
+  await t.test('a legacy run with no bot finishes for an owner with no workspace; its event is kept, and moved once the Coordinator resolves', async () => {
+    const owner = await seedUser(pool, 'legacy-run')
+    users.push(owner)
+    const { recordCoordinatorEvent } = await import('../lib/coordinator-event-store')
+    const { runFinishedEvent } = await import('../lib/coordinator-events')
+    const { db } = await import('../lib/db')
+    const { executionWorkspace } = await import('../lib/execution-settings')
+    await assert.rejects(executionWorkspace(owner, null), { code: 'workspaceAccessDenied' }, 'no workspace to resolve')
+    const agent = await seedAgent(pool, owner)
+    const run = await seedRun(pool, { userId: owner, agentId: agent, botId: null, status: 'succeeded' })
+    // Run end records with the run's own (legacy, null) bot: nothing to resolve, nothing to fail.
+    await recordCoordinatorEvent(db, runFinishedEvent({ id: run, userId: owner, botId: null, issueId: null, kind: 'implement', status: 'succeeded', stopReason: 'completed' }))
+    assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE "runId"=$1', [run])).rows, [{ botId: null }])
+    // Resolving the Coordinator gives the person their personal workspace, as the app does, and moves the legacy rows.
+    const coordinator = await bots.coordinatorBot(owner)
+    assert.equal((await pool.query('SELECT kind FROM mikka_workspaces WHERE id=$1', [coordinator.workspaceId])).rows[0].kind, 'personal')
+    assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE "runId"=$1', [run])).rows, [{ botId: coordinator.botId }])
+    assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [run])).rows, [{ botId: coordinator.botId }])
   })
 
   await t.test('model choice goes through the ordinary bot path', async () => {

@@ -291,10 +291,11 @@ export async function accountWrite(userId: string, action: ApprovalActionName, i
 // A send has no idempotency key: a replayed step could send it twice.
 accountWrite.maxRetries = 0
 
-export async function proposeRepositoryPushApproval(userId: string, input: { repo: string }, scope?: NativeToolScope, task?: { eventId: string; botId: string }) {
+/** `chat` is the asking chat's bot, with the task request when there is one; the decision goes back to that chat. */
+export async function proposeRepositoryPushApproval(userId: string, input: { repo: string }, scope: NativeToolScope | undefined, chat: { botId: string; eventId?: string }) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  return proposeRepositoryPush(userId, input, task)
+  return proposeRepositoryPush(userId, input, chat)
 }
 
 export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {

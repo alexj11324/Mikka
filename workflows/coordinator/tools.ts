@@ -94,7 +94,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       inputSchema: z.object({ repo: z.string().trim().min(1).max(4000) }).strict(),
       execute: input => options.taskEventId
         ? steps.proposeRepositoryPushApproval(userId, input, scope, { eventId: options.taskEventId, botId })
-        : steps.proposeRepositoryPushApproval(userId, input, scope),
+        : steps.proposeRepositoryPushApproval(userId, input, scope, { botId }),
     }),
     ...(issueMutationsEnabled() && process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? {
       dispatch_factory_task: tool({description:'Dispatch an authorized pending Factory attempt through its current binding. No permission is granted by dispatch.',inputSchema:factoryDispatchSchema,execute:input=>steps.dispatchFactoryTask(userId,input,scope,botId)}),

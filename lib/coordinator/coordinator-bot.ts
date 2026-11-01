@@ -7,6 +7,11 @@ import type { Pool, PoolClient } from 'pg'
  * runs in (`executionWorkspace(owner, null)`, the first active workspace).
  * Its chat, memory, inbox, runs, model choice and settings are keyed by that
  * row's id like any bot's. One per person in the bot list, as before.
+ *
+ * It is resolved only where Coordinator work enters (a message, a run with
+ * no bot, a briefing, a matter, a suggestion, an issue done) and stored on
+ * that row; later paths (run end, recovery, publication, events) read the
+ * stored id and never resolve it again.
  */
 export interface CoordinatorBot { botId: string; workspaceId: string }
 
@@ -29,7 +34,14 @@ export async function coordinatorBot(ownerId: string, options: { backfill?: bool
   const [{ pool }, { executionWorkspace }, { ensureCoordinatorBot }] = await Promise.all([
     import('@/lib/db'), import('@/lib/execution-settings'), import('@/lib/computer/auto-runtime'),
   ])
-  const workspaceId = await executionWorkspace(ownerId, null)
+  const workspaceId = await executionWorkspace(ownerId, null).catch(async error => {
+    // A person with no active workspace yet gets their personal one, as the app does on their first page.
+    if ((error as { code?: string }).code !== 'workspaceAccessDenied') throw error
+    const [person] = (await pool.query<{ id: string; email: string; name: string }>('SELECT id,email,name FROM "user" WHERE id=$1', [ownerId])).rows
+    if (!person) throw error
+    await (await import('@/lib/personal-workspace')).ensurePersonalWorkspace(person, 'zh-CN')
+    return executionWorkspace(ownerId, null)
+  })
   const bot = { botId: await ensureCoordinatorBot(pool, { userId: ownerId, workspaceId }), workspaceId }
   const key = `${ownerId}:${bot.botId}`
   if (options.backfill !== false && !backfillFresh(key)) {
@@ -76,7 +88,7 @@ export function forgetCoordinatorBots() {
  * Moves the person's Coordinator data still stored the old way (no bot: botId
  * NULL, or the key 'coordinator') onto their Coordinator row: chat messages,
  * session (memory, summary), inbox events, runs, model choice, chat settings,
- * schedules, factory tasks and the agent definition's head. One transaction
+ * schedules, factory tasks, suggestions, cards and the agent definition's head. One transaction
  * per person under an advisory lock, so it is safe to run twice and while
  * the chat is in use: rows already moved are not touched again, and a late
  * row written the old way (an older instance during a rolling deploy) is
@@ -127,9 +139,9 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
     }
   }
   await client.query('UPDATE coordinator_events SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
-  // The Coordinator's threads: every run of the person's with no bot, except an MCP client's and a group chat's own.
+  // The Coordinator's threads: every run of the person's with no bot (an MCP client's too), except a group chat's own.
   await client.query(`UPDATE agent_runs r SET "botId"=$2 WHERE r."userId"=$1 AND r."botId" IS NULL
-      AND r.source IS DISTINCT FROM 'mcp' AND r.kind <> 'group_chat'
+      AND r.kind <> 'group_chat'
       AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId])
 }
 
@@ -157,6 +169,8 @@ async function moveKeyedRows(client: PoolClient, ownerId: string, { botId, works
   await client.query(`UPDATE user_schedules s SET bot_id=$2, workspace_id=$3 WHERE s.owner_id=$1 AND s.bot_id IS NULL
       AND NOT EXISTS (SELECT 1 FROM user_schedules o WHERE o.owner_id=$1 AND o.bot_id=$2 AND o.request_id=s.request_id)`, [ownerId, botId, workspaceId])
   await client.query('UPDATE factory_tasks SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
+  await client.query('UPDATE suggestions SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
+  await client.query('UPDATE pending_actions SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
   await copyAgentHead(client, ownerId, botId, workspaceId)
 }
 

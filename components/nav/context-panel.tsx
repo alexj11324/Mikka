@@ -118,7 +118,8 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   const coordinator = conversation.kind === 'coordinator'
   // The chat's bot row, the Coordinator's included: its threads and its computer are that row's.
   const chatBotId = botId ?? (coordinator ? conversation.id ?? null : null)
-  const ownThreads = chatBotId ? threads.filter(thread => thread.botId === chatBotId) : []
+  // An MCP client's runs are the Coordinator's too, but its panel lists only the threads it dispatched, as before.
+  const ownThreads = chatBotId ? threads.filter(thread => thread.botId === chatBotId && thread.source !== 'mcp') : []
   // An older chat without a bot learns its thread from the 电脑 cards in it.
   const cloudComputer = useCloudComputer()
   const registered = useConversationThread(cloudComputer && conversation.kind === 'agent' ? conversation.id : null)

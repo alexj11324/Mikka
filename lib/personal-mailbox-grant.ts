@@ -18,9 +18,11 @@ export async function mailboxGrantTools(q: Pick<Pool, 'query'>, identity: {
     // The built-in Coordinator can explicitly dispatch an owned Bot's cloud
     // run. Resolve its parent scope from the stored execution, not the model
     // or the target Bot. A named Bot can only delegate to its own namespace.
-    const { rows: [origin] } = await q.query(`select e.bot_key, exists (select 1 from coordinator_bots cb where cb."ownerId"=e.owner_id and cb."botId"::text=e.bot_key) as coordinator
-      from agent_kit_executions e where e.owner_id=$1 and e.id=$2`, [identity.userId, identity.executionId])
-    if (!origin || (!origin.coordinator && origin.bot_key !== 'coordinator' && origin.bot_key !== identity.botId)) throw new MailboxError('Mailbox parent scope mismatch', 403)
+    const { rows: [origin] } = await q.query('select bot_key from agent_kit_executions where owner_id=$1 and id=$2', [identity.userId, identity.executionId])
+    // The Coordinator is now its bot row (coordinator_bots), so its executions carry that row's id as their key.
+    const delegated = Boolean(origin) && origin.bot_key !== 'coordinator' && origin.bot_key !== identity.botId
+      && Boolean((await q.query('select 1 from coordinator_bots where "ownerId"=$1 and "botId"::text=$2', [identity.userId, origin.bot_key])).rowCount)
+    if (!origin || (origin.bot_key !== 'coordinator' && origin.bot_key !== identity.botId && !delegated)) throw new MailboxError('Mailbox parent scope mismatch', 403)
     key = origin.bot_key
   }
   const args = [identity.userId, key]
