@@ -135,7 +135,8 @@ test('real POST MCP schema and producer keep forged owner/source data inside pee
   assert.equal(events.length, 1)
   assert.equal(events[0].userId, owner); assert.equal(events[0].kind, 'run_report')
   assert.equal(events[0].botId, coordinator)
-  assert.equal(events[0].tier, 'result')
+  // No preset tier: triage (the Decisions API) classifies it; forged text cannot pick one either.
+  assert.equal(events[0].tier, undefined)
   assert.equal((events[0].payload as { text: string }).text, text)
 })
 

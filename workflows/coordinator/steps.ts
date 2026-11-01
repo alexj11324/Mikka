@@ -43,7 +43,7 @@ import type { PendingTelegramTarget } from '@/lib/coordinator/telegram-pending'
 import { createTelegramReplies } from '@/lib/coordinator/telegram-replies'
 import { workspacePool } from '@/lib/workspace-db'
 import { postTelegramText } from '@/lib/telegram/client'
-import type { PushReason } from '@/lib/push-reasons'
+import { pushInput, pushQuestions, readPush, type InboxEvent } from '@/lib/push-reasons'
 import { queueCloudRun } from '@/lib/computer/queue-run'
 import { ComputerStore } from '@/lib/computer/store'
 import { bindBotSubscription } from '@/lib/computer/bot-subscription'
@@ -167,11 +167,16 @@ export async function acknowledgeTelegramReply(userId: string, botId: string, ho
 }
 
 /** Pushes a reply the Coordinator raised on its own to the person's phones, as their 通知 settings allow (lib/mobile-push.ts). */
-export async function pushToPhones(userId: string, botId: string, text: string | null, reasons: PushReason[]) {
+export async function pushToPhones(userId: string, botId: string, text: string | null, events: InboxEvent[]) {
   'use step'
-  // Loaded here, not at the top: only this step needs the push sender and its settings.
-  const { pushReply } = await import('@/lib/mobile-push')
-  await pushReply(userId, botId, text, reasons)
+  // Loaded here, not at the top: only this step needs the push sender, its settings and the Decisions call.
+  const [{ pushReply }, { decide }, { hostedBillingScope }, { executionWorkspace }] = await Promise.all([import('@/lib/mobile-push'), import('@/lib/coordinator/decide'), import('@/lib/abuse/context'), import('@/lib/execution-settings')])
+  let answers = null
+  try { answers = await hostedBillingScope.run({ workspaceId: await executionWorkspace(userId, botId), ownerId: userId }, () => decide('push-reply', pushInput(events, text), pushQuestions())) } catch { answers = null }
+  const reason = readPush(answers)
+  // No answer pushes nothing: the reply is in the chat either way.
+  if (reason === null) { console.warn('Phone push skipped: no Decisions answer'); return }
+  if (reason !== 'none') await pushReply(userId, botId, text, [reason])
 }
 
 /**

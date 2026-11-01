@@ -80,3 +80,19 @@ test('a finished thread stays silent on the desktop when 线程完成 is off', (
 test('the launch snapshot never replays finished threads', () => {
   assert.deepEqual(desktopRunUpdate(null, [run({ issueId: 'a', status: 'succeeded' })], 2_000, true).notifications, [])
 })
+
+test('whether a transition raises a notification is the Decisions API\'s answer, per candidate', async () => {
+  const { desktopNotifyQuestions, readDesktopNotify } = await import('./desktop-notifications')
+  const candidates = [
+    { id: 'run:a:awaiting:1', kind: 'awaiting' as const, title: 'Ship the desktop app', agent: 'Coordinator' },
+    { id: 'run:b:failed:1', kind: 'failed' as const, title: 'Retry flaky job', agent: 'Coordinator' },
+  ]
+  const questions = desktopNotifyQuestions(candidates)
+  assert.deepEqual(questions.map(question => question.name), ['show0', 'show1'])
+  assert.match(questions[0].instructions, /is waiting for the person/)
+  const answers = new Map([['show0', { type: 'predicate' as const, name: 'show0', probability: 0.2 }], ['show1', { type: 'predicate' as const, name: 'show1', probability: 0.9 }]])
+  // A run waiting on the person is not shown just because of its state; a failure the model flags is.
+  assert.deepEqual(readDesktopNotify(answers, candidates), ['run:b:failed:1'])
+  // No answer shows nothing.
+  assert.deepEqual(readDesktopNotify(null, candidates), [])
+})
