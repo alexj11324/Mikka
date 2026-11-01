@@ -65,7 +65,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(policyMigration); await pool.query(policyMigration)
     const policyAllowMigration = await readFile(new URL('../../drizzle/20261029010447_workspace_computer_policy_allow.sql', import.meta.url), 'utf8')
     await pool.query(policyAllowMigration); await pool.query(policyAllowMigration)
-    const personalPolicyMigration = await readFile(new URL('../../drizzle/20261101002002_workspace_personal_policies.sql', import.meta.url), 'utf8')
+    const personalPolicyMigration = await readFile(new URL('../../drizzle/20261101020201_workspace_personal_policies.sql', import.meta.url), 'utf8')
     await pool.query(personalPolicyMigration); await pool.query(personalPolicyMigration)
     const policyDefaultAllowMigration = await readFile(new URL('../../drizzle/20261030204751_workspace_computer_policy_default_allow.sql', import.meta.url), 'utf8')
     await pool.query(policyDefaultAllowMigration); await pool.query(policyDefaultAllowMigration)
