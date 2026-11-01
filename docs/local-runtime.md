@@ -88,3 +88,42 @@ production databases for verification.
 No-origin local repositories and uncommitted checkout visibility are recorded
 in `docs/design/decisions.md` as **待 Alex 确认**. Push approval and PR creation
 are the following MVP deliverable; this change grants no push approval.
+
+## Local development without GitHub (`pnpm dev:local`)
+
+`pnpm dev:local` runs the whole loop on your own machine: Coordinator dispatch,
+the push-grant check, the daemon's push, the GitHub App's pull request and the
+thread showing it, with no request to api.github.com. One command, hot reload,
+no `next build`:
+
+- the local fake services from `tests/mvp/services.mjs` on `127.0.0.1:3191`
+  (GitHub API, Decisions), with a bare `file://` origin for the repository
+  `mikka-e2e/core-loop` (default branch `trunk`);
+- `next dev` on `MIKKA_DEV_PORT` (3000) with `scripts/dev-local/preload.mjs`,
+  which sends only `https://api.github.com` to the fake (and the Decisions
+  endpoint when no real `AI_GATEWAY_API_KEY` is set);
+- the daemon from source with `tsx`. Only the daemon's git sees a rewrite of
+  the repository URL to the local origin.
+
+It runs only in local test-account mode (`localTestAccountsMode`,
+`scripts/test-accounts/database-target.mjs`): `MIKKA_LOCAL_TEST_ACCOUNTS=1`,
+`E2E_DATABASE_URL` set, and every database URL a loopback PostgreSQL with a
+user and password and a name ending in `_e2e`. Any `VERCEL` or `VERCEL_ENV`, or
+`NODE_ENV=production`, refuses it. Put the variables in `.env.development.local`
+(git-ignored); the script loads it.
+
+What is fake and what is real:
+
+| Part | dev:local |
+| --- | --- |
+| GitHub App, installation, push grant, pull requests | Fake (`tests/mvp/services.mjs`); a fresh App key is generated at start |
+| Repository | A local bare `file://` origin seeded with `README.md` |
+| GitHub identity | Synthetic: every local account is linked to GitHub account `4242`, which the fake lets write |
+| Decisions | Real with a real `AI_GATEWAY_API_KEY`; otherwise the fake |
+| Model | Real: the workspace's own API key (Settings › API 与订阅) |
+| Database, auth, daemon, git clone/worktree/commit/push | Real |
+
+First run: sign up at `http://localhost:3000/mikka`, then approve the device
+with the code the script prints. Ask the Coordinator to change
+`mikka-e2e/core-loop`. Running as root, set `MIKKA_DEV_DAEMON_USER` to an
+unprivileged user for the daemon (bubblewrap).
