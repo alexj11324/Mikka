@@ -26,20 +26,22 @@ export type DeviceTarget = {
 };
 
 /**
- * Cloud means the workspace's own E2B key on this bot's own cloud runtime
- * (MVP: no Mikka-hosted sandboxes). It is on by default: a bot with no runtime
- * yet gets one when the run is dispatched (`ensureBotCloudRuntime`). The
- * kill switch and a workspace's 「电脑」 policy set to deny turn it off. A run
- * with no bot (the Coordinator) never borrows another bot's runtime.
+ * Cloud means the workspace's own E2B key on the dispatching bot's own cloud
+ * runtime (MVP: no Mikka-hosted sandboxes). The key is enough: a bot with no
+ * runtime yet gets one when the run is dispatched (`ensureBotCloudRuntime`).
+ * The kill switch and a workspace's 「电脑」 policy set to deny turn it off. A
+ * run with no bot (the Coordinator) uses the owner's hidden Coordinator bot
+ * (`ensureCoordinatorBot`) and never borrows another bot's runtime.
  */
 export async function cloudReady(
   query: Query,
   scope: { ownerId: string; workspaceId: string; botId: string | null; harness: string },
 ) {
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== "1" || !scope.botId) return false;
+  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== "1") return false;
   const { rowCount } = await query.query(
-    `SELECT 1 FROM workspace_e2b_keys k JOIN bots b ON b."workspaceId"=k."workspaceId"
-      WHERE k."workspaceId"=$1 AND b.id=$2 AND b."ownerId"=$3 AND b."archivedAt" IS NULL
+    `SELECT 1 FROM workspace_e2b_keys k
+      WHERE k."workspaceId"=$1
+        AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$2 AND b."workspaceId"=k."workspaceId" AND b."ownerId"=$3 AND b."archivedAt" IS NULL))
         AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=k."workspaceId" AND p.permission='deny') LIMIT 1`,
     [scope.workspaceId, scope.botId, scope.ownerId],
   );
