@@ -20,6 +20,7 @@ import {
   realpathSync,
 } from "node:fs"
 import { arch, hostname, platform } from "node:os"
+import { classifySandboxFailure, type SandboxFailure } from "./sandbox-issue"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -202,7 +203,9 @@ function credentialOwner(assignment: RunAssignment): string | undefined {
 const SANDBOX_REPAIR_RETRY_MS = 60 * 60_000
 
 /** A person may install a missing tool themselves; that alone is worth a new attempt. */
-function missingToolsUnchanged(issue: { missing: string[] } | null) {
+type SandboxIssue = { missing: string[] } & SandboxFailure
+
+function missingToolsUnchanged(issue: SandboxIssue | null) {
   return !issue?.missing.length || missingSandboxTools().length === issue.missing.length
 }
 
@@ -785,7 +788,8 @@ export class Daemon {
     const issue = this.sandboxIssue
     if (!issue) return []
     return detected.filter(info => info.installed && !this.adapters.has(info.harness)).map(info => ({
-      harness: info.harness, installed: false, version: info.version, sandboxBlocked: { missing: issue.missing },
+      harness: info.harness, installed: false, version: info.version,
+      sandboxBlocked: { missing: issue.missing, ...(issue.reason ? { reason: issue.reason } : {}), ...(issue.detail ? { detail: issue.detail } : {}) },
     }))
   }
 
@@ -838,7 +842,7 @@ export class Daemon {
   private lastHarnessScan = Date.now()
   private lastSandboxRepair = Date.now()
   private rescanning = false
-  private sandboxIssue: { missing: string[] } | null = null
+  private sandboxIssue: SandboxIssue | null = null
   private sandbox: AgentSandbox | null = null
   private ownedSandbox: SandboxRuntime | null = null
 
@@ -873,7 +877,8 @@ export class Daemon {
       return sandbox
     } catch (err) {
       this.log.warn({ err }, "agent sandbox unavailable")
-      this.sandboxIssue = { missing: [] }
+      // The device page says why and what the person can do (sandbox-issue.ts).
+      this.sandboxIssue = { missing: [], ...classifySandboxFailure(err) }
       if (!this.options.retainResources) await sandbox.reset().catch((resetError: unknown) => {
         this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
       })
