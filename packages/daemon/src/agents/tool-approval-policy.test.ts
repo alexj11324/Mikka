@@ -11,6 +11,21 @@ it('uses the trusted network setting for host proxy requests without inspecting 
   expect(toolApprovalDecision({...request,method:'cli/sandbox/network'},base)).toBe('unavailable')
 })
 
+it('pre-authorizes the repo allow list and the run endpoints under ask, and asks for anything else', () => {
+  const base = defaultRunPolicy()
+  const policy = {...base,networkAllow:['github.com','*.githubusercontent.com'],permissions:{...base.permissions,network:'ask' as const}}
+  const to = (host: string, port = 443) => ({runId:'r',requestId:'i',harness:'claude_code' as const,method:'sandbox/network',input:{host,port}})
+  expect(toolApprovalDecision(to('github.com'),policy)).toBe('allow')
+  expect(toolApprovalDecision(to('raw.githubusercontent.com'),policy)).toBe('allow')
+  expect(toolApprovalDecision(to('example.com'),policy)).toBe('ask')
+  expect(toolApprovalDecision(to('api.github.com'),policy)).toBe('ask')
+  // The run's own Mikka endpoint (e.g. the GitHub token exchange), host and port exact.
+  expect(toolApprovalDecision(to('mikka.example'),policy,undefined,[],['mikka.example'])).toBe('allow')
+  expect(toolApprovalDecision(to('mikka.example',8443),policy,undefined,[],['mikka.example:443'])).toBe('ask')
+  // `deny` stays deny, even for the allow list.
+  expect(toolApprovalDecision(to('github.com'),{...policy,permissions:{...policy.permissions,network:'deny'}})).toBe('deny')
+})
+
 it('does not infer action authority from callback text or automatically ask', () => {
   const request: ToolApprovalRequest = { runId:'r', requestId:'i', harness:'codex', method:'item/commandExecution/requestApproval', input:{ command:'npm install example' } }
   const base = defaultRunPolicy()
