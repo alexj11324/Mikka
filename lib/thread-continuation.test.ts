@@ -14,9 +14,9 @@ test('a thread\'s next run carries the note and how the thread last ended; a res
   assert.match(note, /Summary: Added the parser; two tests fail\./)
   assert.match(note, /do not repeat a push/)
   assert.match(continuationNote(undefined, { ...failed, summary: null, error: null, lastReply: null }), /What to do now: continue the task\./)
-  const prompt = runPrompt('Parser', 'Write the parser.', null, note)
+  const prompt = runPrompt('Parser', 'Write the parser.', '', note)
   assert.equal(continuationFollowUp(prompt), note)
-  assert.equal(continuationFollowUp(runPrompt('Parser', 'Write the parser.', null, 'plain note')), null)
+  assert.equal(continuationFollowUp(runPrompt('Parser', 'Write the parser.', '', 'plain note')), null)
 })
 
 test('only a confident Decision API judgment of an explicit request starts a new thread', async () => {

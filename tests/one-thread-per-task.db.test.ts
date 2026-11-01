@@ -1,4 +1,4 @@
-// One task, one thread (decision 2026-11-01-1330-one-thread-per-task, R-87),
+// One task, one thread (decision 2026-11-01-1330-one-thread-per-task, R-81),
 // against a real PostgreSQL: dispatching a task that has a thread never starts
 // a second one. A working thread gets the note as a message; an ended one runs
 // again in the same thread (same chain root); only the person's explicit

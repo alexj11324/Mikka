@@ -8,7 +8,7 @@ import { sendOwnedRunMessage } from '@/lib/run-control'
 import { continuationNote } from '@/lib/thread-continuation'
 export { continuationNote } from '@/lib/thread-continuation'
 
-// One task, one thread (decision 2026-11-01-1330-one-thread-per-task, R-87).
+// One task, one thread (decision 2026-11-01-1330-one-thread-per-task, R-81).
 // Every dispatch entry (the Coordinator's and any bot's dispatch tools, the
 // Bot computer API, MCP) goes through `dispatchToTask`: a task that already
 // has a thread of this person's gets the dispatch as more work for that
