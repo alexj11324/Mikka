@@ -47,7 +47,8 @@ export function NotificationSettings() {
   ]
 
   return <div className="flex flex-col gap-6">
-    <SettingsSection title={t('heading')}>
+    {/* One group under the page title 通知: no group title repeating it (R-40). */}
+    <SettingsSection>
       {switches.map(({ key, title }) => <SettingRow key={key} title={title}>
         <Switch checked={data[key]} aria-label={title} onCheckedChange={checked => { void set({ [key]: checked }) }} />
       </SettingRow>)}
