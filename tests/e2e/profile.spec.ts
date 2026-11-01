@@ -21,7 +21,9 @@ test('个人资料名称可以编辑，保存后刷新仍然生效', { tag: '@sm
   const name = page.getByRole('textbox', { name: '名称', exact: true })
   await expect(name).toHaveValue('回归测试成员')
   await name.fill('新的显示名')
-  await page.getByRole('button', { name: '保存', exact: true }).click()
+  // Saves on Enter or when the field is left, like the workspace name; there is no 保存 button.
+  await expect(page.getByRole('button', { name: '保存', exact: true })).toHaveCount(0)
+  await name.press('Enter')
   await expect(page.getByText('已保存', { exact: true })).toBeVisible()
 
   await page.reload()
