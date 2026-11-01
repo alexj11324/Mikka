@@ -2153,7 +2153,6 @@
         "all": "全部",
         "security": "安全"
       },
-      "export": "导出",
       "exportCsv": "导出 CSV",
       "empty": "最近 90 天没有记录。",
       "loadMore": "加载更多",
