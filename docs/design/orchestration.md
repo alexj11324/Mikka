@@ -73,7 +73,11 @@ Rules that hold everywhere:
   the admin switch is turned off.
 - **Quota exhausted.** The run that hit the limit stops; it never switches.
   - When 「订阅额度用完后，自动改用 API Key」 is on (the default) and the owner has
-    an API key for that provider, the next run uses that API key.
+    an API key of their own, the next run uses that API key. The chat says so
+    in one line before the reply: 「Claude Max 额度用完，已改用 DeepSeek API Key
+    继续（按 token 计费）· 改回」; 改回 opens the model picker. Before sending,
+    the composer names the used-up subscription and the key the next message
+    moves to, or when the quota resets.
   - When nothing is left, the stopped run opens a popup. The person picks the
     model or credential themselves, and 重试 runs the turn on that choice.
     重试 never re-resolves on its own.
