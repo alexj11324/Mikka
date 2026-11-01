@@ -23,7 +23,9 @@ WHERE w.kind = 'team'
   )
   AND EXISTS (SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId" = w.id AND m."userId" = w."userId" AND m.status = 'active')
   AND NOT EXISTS (SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId" = w.id AND m."userId" <> w."userId")
-  AND NOT EXISTS (SELECT 1 FROM mikka_workspace_invitations i WHERE i."workspaceId" = w.id AND i.status = 'pending');
+  AND NOT EXISTS (SELECT 1 FROM mikka_workspace_invitations i WHERE i."workspaceId" = w.id AND i.status = 'pending')
+  -- Re-runs: an owner who already has a personal workspace (made lazily) keeps it.
+  AND NOT EXISTS (SELECT 1 FROM mikka_workspaces p WHERE p."userId" = w."userId" AND p.kind = 'personal');
 -- One personal workspace per person.
 CREATE UNIQUE INDEX IF NOT EXISTS mikka_workspaces_personal_owner_unique ON mikka_workspaces ("userId") WHERE kind = 'personal';
 COMMIT;

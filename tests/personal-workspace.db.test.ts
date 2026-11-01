@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 const uuidFrom = (seed: string) => {
   const hash = createHash('sha256').update(seed).digest('hex')
@@ -41,16 +41,25 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
       await seed('created', created, [['created', 'active']])
       await seed('suspended', suspended, [['suspended', 'suspended']])
       await seed('accepted', accepted, [['accepted', 'active']])
+      const regrown = uuidFrom('orvilo-default:regrown')
+      await seed('regrown', regrown, [['regrown', 'active'], ['peer', 'active']])
       await scoped.query(`INSERT INTO mikka_workspace_invitations VALUES ($1,$2,'accepted')`, [randomUUID(), accepted])
-      const migration = await readFile(new URL('../drizzle/20261031213104_personal_workspace_kind.sql', import.meta.url), 'utf8')
+      const migration = await readFile(new URL('../drizzle/20261101002001_personal_workspace_kind.sql', import.meta.url), 'utf8')
       await scoped.query(migration)
       await scoped.query(migration)
       const kinds = Object.fromEntries((await scoped.query('SELECT id,kind FROM mikka_workspaces')).rows.map(row => [row.id, row.kind]))
       assert.deepEqual(kinds, {
         [alone]: 'personal', [accepted]: 'personal',
-        [grown]: 'team', [inviting]: 'team', [created]: 'team', [suspended]: 'team',
+        [grown]: 'team', [inviting]: 'team', [created]: 'team', [suspended]: 'team', [regrown]: 'team',
       })
-      assert.equal((await scoped.query('SELECT count(*)::int AS n FROM mikka_workspaces')).rows[0].n, 6, 'no row added or removed')
+      assert.equal((await scoped.query('SELECT count(*)::int AS n FROM mikka_workspaces')).rows[0].n, 7, 'no row added or removed')
+      // A later re-run (the file was renamed): 'regrown' got a personal workspace lazily, then the peer
+      // left its default one. The default stays a team; the person keeps the personal one they have.
+      const lazy = randomUUID()
+      await scoped.query(`INSERT INTO mikka_workspaces (id,"userId",name,kind) VALUES ($1,'regrown','regrown','personal')`, [lazy])
+      await scoped.query(`DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"='peer'`, [regrown])
+      await scoped.query(migration)
+      assert.deepEqual((await scoped.query(`SELECT id,kind FROM mikka_workspaces WHERE "userId"='regrown' ORDER BY kind`)).rows, [{ id: lazy, kind: 'personal' }, { id: regrown, kind: 'team' }])
       await assert.rejects(scoped.query(`INSERT INTO mikka_workspaces (id,"userId",name,kind) VALUES ($1,'alone','x','personal')`, [randomUUID()]), { code: '23505' }, 'one personal workspace per person')
       await assert.rejects(scoped.query(`UPDATE mikka_workspaces SET kind='shared' WHERE id=$1`, [grown]), { code: '23514' })
     } finally {
@@ -172,6 +181,45 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.deepEqual((await pool.query('SELECT "ownerId","archivedAt" FROM bots WHERE id=$1', [bot])).rows[0], { ownerId: admin, archivedAt: null }, 'it now runs on the admin\'s own resources')
     assert.equal(await executionWorkspace(admin, bot), team.id)
     await assert.rejects(members.takeOverBot(admin, team.id, bot), (error: unknown) => (error as { code?: string }).code === 'botNotFound', 'only a paused bot can be taken over')
+  })
+
+  await t.test('withdrawing a credential stops the runs using it at once; credential access then refuses them', async () => {
+    const policy = await import('../lib/personal-policy-server')
+    const members = await import('../lib/workspace-admin/members')
+    const { stopRunsUsingSubscriptions } = await import('../lib/personal-policy')
+    const owner = await seedUser(pool, 'sharer'), peer = await seedUser(pool, 'peer'), admin = await seedUser(pool, 'admin')
+    const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: owner, role: 'member' }, { userId: peer, role: 'member' }])
+    const connection = randomUUID()
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,"secretName","secretDigest","providerSubject") VALUES ($1,$2,$3,'claude','connected',$4,$5,'synthetic-subject')`,
+      [connection, owner, team.id, `synthetic-${randomUUID()}`, 'b'.repeat(64)])
+    // A run on the device of whoever's bot it is, holding a short-lived credential from the owner's connection.
+    const runOn = async (runner: string) => {
+      const agent = await seedAgent(pool, runner, 'claude_code'), binding = randomUUID()
+      await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,1,'claude_code_cli','synthetic-model')`, [binding, owner, team.id, agent, connection])
+      const run = await seedRun(pool, { userId: runner, agentId: agent, status: 'running' })
+      await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [run])
+      await pool.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [run, binding])
+      return run
+    }
+    // The predicate every credential access and renewal applies (subscription-access-snapshot, subscription-service).
+    const usable = async (run: string) => Boolean((await pool.query(`SELECT 1 FROM agent_runs WHERE id=$1 AND status IN ('preparing','running','paused','waiting_input') AND "leaseExpiresAt">now() AND "stopRequestedAt" IS NULL`, [run])).rowCount)
+    await policy.setOwnSubscriptionShare(owner, team.id, { shared: true, allowOthers: true })
+    const peersRun = await runOn(peer), ownRun = await runOn(owner)
+    assert.equal(await usable(peersRun), true)
+    await policy.setOwnSubscriptionShare(owner, team.id, { shared: true, allowOthers: false })
+    assert.equal(await usable(peersRun), false, '分享给团队成员 off: the other member\'s run stops and its credential is refused')
+    assert.ok((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [peersRun])).rows[0].stopRequestedAt)
+    assert.equal(await usable(ownRun), true, 'the owner\'s own run keeps going')
+    await policy.setOwnSubscriptionShare(owner, team.id, { shared: false })
+    assert.equal(await usable(ownRun), false, 'un-sharing stops the owner\'s runs there too')
+    await policy.setOwnSubscriptionShare(owner, team.id, { shared: true, allowOthers: true })
+    const beforeLeaving = await runOn(peer)
+    await members.removeMember(admin, team.id, owner)
+    assert.equal(await usable(beforeLeaving), false, 'leaving stops what ran on their subscription')
+    const afterDisconnect = await runOn(owner)
+    assert.equal(await stopRunsUsingSubscriptions(pool, { ownerId: owner, connectionId: connection }), 1, '断开连接 stops runs on that connection')
+    assert.equal(await usable(afterDisconnect), false)
+    await assert.rejects(stopRunsUsingSubscriptions(pool, { ownerId: owner }), /workspace or a connection/, 'never everything at once')
   })
 
   await t.test('every model call re-checks a shared subscription: another member\'s bot stops when the owner un-shares or leaves', async () => {
