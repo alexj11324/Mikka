@@ -1862,7 +1862,7 @@
       "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
       "removeFailed": "The connection could not be removed.",
       "loading": "Loading model subscriptions…",
-      "serviceOff": "Model subscriptions aren't turned on for this deployment. Bots use the workspace's default model quota.",
+      "serviceOff": "Model subscriptions are off.",
       "startFailed": "{provider} sign-in could not start",
       "finishFailed": "{provider} sign-in did not finish",
       "signedOut": "Your session expired. Sign in again, then connect.",
@@ -2351,7 +2351,8 @@
       "offlineCloud": "Run in the cloud",
       "labels": "By label",
       "pickModel": "Choose a model"
-    }
+    },
+    "searchEmpty": "No matching settings"
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",

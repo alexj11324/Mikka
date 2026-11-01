@@ -454,6 +454,17 @@ async function paintedAt(page: Page, x: number, y: number) {
   }, { png, x, y })
 }
 
+test('设置搜索没有结果时显示一行提示，不留下团队分组', async ({ page }) => {
+  await register(page, '/settings?section=preferences')
+  const sidebar = page.locator('[data-slot="settings-list"]')
+  await sidebar.getByRole('textbox', { name: '搜索设置', exact: true }).fill('不存在的设置项')
+  await expect(sidebar.getByRole('status')).toHaveText('没有匹配的设置')
+  await expect(sidebar.locator('[data-slot="sidebar-group"]')).toHaveCount(0)
+  await sidebar.getByRole('textbox', { name: '搜索设置', exact: true }).fill('账户')
+  await expect(sidebar.getByRole('status')).toHaveCount(0)
+  await expect(sidebar.getByRole('link', { name: '账户', exact: true })).toBeVisible()
+})
+
 test('设置侧栏的搜索框在浅色、深色和半透明窗口里都与侧栏底色区分开', async ({ page }) => {
   await register(page, '/settings?section=preferences')
   const field = page.locator('[data-slot="settings-list"] [data-slot="search-input"]')

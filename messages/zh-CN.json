@@ -1862,7 +1862,7 @@
       "extraUsageUnverified": "没确认额外用量已关闭，Bot 暂不会使用这个订阅",
       "removeFailed": "无法移除这个连接。",
       "loading": "正在读取模型订阅…",
-      "serviceOff": "这个部署还没有开启模型订阅，Bot 会使用工作区默认的模型额度。",
+      "serviceOff": "模型订阅未开启。",
       "startFailed": "{provider} 授权启动失败",
       "finishFailed": "{provider} 授权未完成",
       "signedOut": "登录已过期，请重新登录后再连接。",
@@ -2351,7 +2351,8 @@
       "offlineCloud": "改到云端运行",
       "labels": "按标签",
       "pickModel": "选择模型"
-    }
+    },
+    "searchEmpty": "没有匹配的设置"
   },
   "TelegramBot": {
     "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
