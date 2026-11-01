@@ -16,18 +16,22 @@ async function seed(page: Page) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   if (!cookie) throw new Error('需要已登录的页面。')
   const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
-  const ids = { laptop: randomUUID(), server: randomUUID(), bare: randomUUID(), offline: randomUUID(), blocked: randomUUID() }
+  const ids = { laptop: randomUUID(), server: randomUUID(), bare: randomUUID(), offline: randomUUID(), blocked: randomUUID(), userns: randomUUID() }
   // A heartbeat in the future keeps a device online for the whole test.
   await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses) VALUES
     ($1, $5, 'E2E MacBook', 'local', true, 'laptop', now() + interval '1 hour', $6),
     ($2, $5, 'build-01', 'local', true, 'server', now() + interval '1 hour', $7),
     ($3, $5, 'dev-vps', 'local', true, 'server', now() + interval '1 hour', '[]'),
     ($4, $5, 'gpu-box', 'local', false, 'server', now() - interval '3 days', '[]'),
-    ($8, $5, 'no-sandbox', 'local', true, 'server', now() + interval '1 hour', $9)`, [ids.laptop, ids.server, ids.bare, ids.offline, session.userId,
+    ($8, $5, 'no-sandbox', 'local', true, 'server', now() + interval '1 hour', $9),
+    ($10, $5, 'ubuntu-2404', 'local', true, 'server', now() + interval '1 hour', $11)`, [ids.laptop, ids.server, ids.bare, ids.offline, session.userId,
     JSON.stringify([{ harness: 'claude_code', installed: true, version: '1.0.0' }, { harness: 'codex', installed: true, version: '1.0.0' }]),
     JSON.stringify([{ harness: 'claude_code', installed: true, version: '1.0.0' }, { harness: 'cursor', installed: false, version: null }]),
     ids.blocked,
-    JSON.stringify([{ harness: 'claude_code', installed: false, version: '1.0.0', sandboxBlocked: { missing: ['socat', 'ripgrep'] } }])])
+    JSON.stringify([{ harness: 'claude_code', installed: false, version: '1.0.0', sandboxBlocked: { missing: ['socat', 'ripgrep'] } }]),
+    ids.userns,
+    // What a stock Ubuntu 24.04 daemon reports (bwrap's line from CI run 41313960870).
+    JSON.stringify([{ harness: 'codex', installed: false, version: '1.0.0', sandboxBlocked: { missing: [], reason: 'userns_restricted', detail: 'sandbox probe failed: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted' } }])])
   return { ...ids, userId: session.userId }
 }
 
@@ -57,6 +61,15 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await expect(row(page, 'no-sandbox')).toContainText('已检测到 Claude Code，但沙箱不可用')
   await row(page, 'no-sandbox').getByRole('button', { name: '修复方法' }).click()
   await expect(page.getByText('这台设备无法自动安装 socat, ripgrep', { exact: false })).toBeVisible()
+  await expect(page.getByText('user namespace 限制', { exact: false })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  // Ubuntu's AppArmor user namespace restriction: the commands that lift it, Ubuntu's spec, and the probe's own error.
+  await row(page, 'ubuntu-2404').getByRole('button', { name: '修复方法' }).click()
+  await expect(page.getByText('sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0', { exact: true })).toBeVisible()
+  await expect(page.getByText("echo 'kernel.apparmor_restrict_unprivileged_userns=0' | sudo tee /etc/sysctl.d/20-apparmor.conf", { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Ubuntu 对这项设置的说明' })).toHaveAttribute('href', /discourse\.ubuntu\.com\/t\/spec-unprivileged-user-namespace-restrictions/)
+  await expect(page.getByText('错误：sandbox probe failed: bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted')).toBeVisible()
+  await expect(page.getByText('需要管理员开启 user namespace', { exact: false })).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
   await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许调度到 gpu-box' })).not.toBeChecked()

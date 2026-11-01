@@ -77,7 +77,8 @@ function api(fetcher: typeof fetch) {
   }
 }
 
-async function repositoryAccess(options: Options) {
+/** `push`: the installation must grant contents:write (the push itself). `pull_request`: pull_requests:write, contents at least read. */
+async function repositoryAccess(options: Options, need: 'push' | 'pull_request' = 'pull_request') {
   const repo = githubRepository(options.remoteKey)
   if (!options.githubAccountId || !/^[1-9][0-9]*$/.test(options.githubAccountId)) throw new PublicationError('github_identity_required')
   const env = options.env ?? process.env
@@ -88,7 +89,8 @@ async function repositoryAccess(options: Options) {
   const request = api(options.fetcher ?? fetch)
   const installation = parse(installationSchema, await request(`${repo.path}/installation`, jwt, { missing: 'github_not_installed' }))
   if (installation.suspended_at) throw new PublicationError('github_suspended')
-  if (installation.permissions.pull_requests !== 'write' || !['read', 'write'].includes(installation.permissions.contents ?? '')) throw new PublicationError('github_permission_required')
+  if (need === 'push' ? installation.permissions.contents !== 'write'
+    : installation.permissions.pull_requests !== 'write' || !['read', 'write'].includes(installation.permissions.contents ?? '')) throw new PublicationError('github_permission_required')
   // Verify the person's durable GitHub identity with a read-only token first.
   // Only after that check may the server issue a token that can open a PR.
   const metadataToken = parse(tokenSchema, await request(`/app/installations/${installation.id}/access_tokens`, jwt, {
@@ -107,6 +109,15 @@ async function repositoryAccess(options: Options) {
 /** A non-secret owner/repository installation receipt; never an access token. */
 export async function verifyGitHubRepositoryAccess(options: Options): Promise<GitHubRepositoryBinding> {
   return (await repositoryAccess(options)).binding
+}
+
+/**
+ * Push authority (decision 2026-11-01-1215): the Mikka GitHub App's installation
+ * on this repository grants contents:write, and the person's own linked GitHub
+ * account may write to it. No second approval is asked in Mikka.
+ */
+export async function verifyGitHubPushAccess(options: Options): Promise<GitHubRepositoryBinding> {
+  return (await repositoryAccess(options, 'push')).binding
 }
 
 /** A worker receives one repository's installation token, never the App key. */

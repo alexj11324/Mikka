@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
-import { PERMISSION_DECISIONS, PERMISSION_DEFAULTS, type PermissionDecision } from '@mikka/protocol/agent-policy'
+import { gitPushRestriction, type PermissionDecision } from '@mikka/protocol/agent-policy'
 import { cliPolicyValuesSchema } from '@/lib/agent-tool-approval/policy-store'
 import { writePolicySettingsSchema } from '@/lib/operations/write-policy-settings'
 import { writeTransaction } from '@/lib/operations/write-transaction'
@@ -10,27 +10,26 @@ import { coordinatorBot, type CoordinatorBot } from '@/lib/coordinator/coordinat
  * GitHub's two writes on Plugins › GitHub, for the person's own Coordinator
  * (agent_kit_heads of its bot row, lib/coordinator/coordinator-bot.ts). Neither has a second store:
  *
- * - 推送分支 is the Coordinator's `git_push` in `cli_run_policy`, the same
- *   setting the daemon applies (ask → approval card), the run admission reads
- *   and the run-token issuer refuses on deny.
+ * - 推送分支 is decided by the GitHub App's own access on the repository
+ *   (contents: write, lib/github/push-grant.ts; decision 2026-11-01-1215). It
+ *   is shown, not set: `push` reads the Coordinator's stored `git_push` only so
+ *   an older deny stays visible, and a PATCH can no longer change it.
  * - 创建 Pull Request is `github_pull_request` in `external_write_permissions`,
- *   read by publishRunResult before it opens the pull request. Unset keeps
- *   today's behaviour: once the push was approved, the pull request opens.
+ *   read by publishRunResult before it opens the pull request: allow or deny,
+ *   never asked (decision 2026-11-01-1215). Unset, or an ask stored before
+ *   that decision, opens it.
  */
 export const PULL_REQUEST_PERMISSION = 'github_pull_request'
 export const PULL_REQUEST_DEFAULT: PermissionDecision = 'allow'
 
-const decision = z.enum(PERMISSION_DECISIONS)
 /** One version over both columns, so a stale page cannot overwrite either. */
 const versionSchema = z.string().regex(/^(0|[1-9]\d*):(0|[1-9]\d*)$/)
 export const githubPermissionsPatchSchema = z.strictObject({
   version: versionSchema,
-  // No push-time card exists, so for 推送分支 询问 would act as 允许: only allow / deny are offered.
-  push: z.enum(['allow', 'deny']).optional(),
-  pullRequest: decision.optional(),
-}).refine(value => value.push !== undefined || value.pullRequest !== undefined)
+  pullRequest: z.enum(['allow', 'deny']),
+})
 
-export interface GitHubPermissions { push: PermissionDecision; pullRequest: PermissionDecision; version: string }
+export interface GitHubPermissions { push: PermissionDecision; pullRequest: 'allow' | 'deny'; version: string }
 
 export class GitHubPermissionsError extends Error {
   constructor(readonly code: 'githubPermissionsChanged' | 'githubPermissionsUnavailable') { super(code); this.name = 'GitHubPermissionsError' }
@@ -46,8 +45,8 @@ function view(row: Head | undefined): GitHubPermissions & { cli: z.infer<typeof 
   if (!cli.success || !external.success || !versionSchema.safeParse(version).success) throw new GitHubPermissionsError('githubPermissionsUnavailable')
   return {
     cli: cli.data, external: external.data, version,
-    push: cli.data.permissions?.git_push ?? PERMISSION_DEFAULTS.git_push,
-    pullRequest: external.data[PULL_REQUEST_PERMISSION] ?? PULL_REQUEST_DEFAULT,
+    push: gitPushRestriction(cli.data.permissions),
+    pullRequest: (external.data[PULL_REQUEST_PERMISSION] ?? PULL_REQUEST_DEFAULT) === 'deny' ? 'deny' : 'allow',
   }
 }
 
@@ -75,7 +74,7 @@ export async function setGitHubPermissions(pool: Pick<Pool, 'connect'>, userId: 
   return writeTransaction(pool, async tx => {
     const current = view(await lockHead(tx, userId, coordinator, true))
     if (current.version !== input.version) throw new GitHubPermissionsError('githubPermissionsChanged')
-    const cli = input.push === undefined ? current.cli : cliPolicyValuesSchema.parse({ ...current.cli, permissions: { ...current.cli.permissions, git_push: input.push } })
+    const cli = current.cli
     const external = input.pullRequest === undefined ? current.external : writePolicySettingsSchema.parse({ ...current.external, [PULL_REQUEST_PERMISSION]: input.pullRequest })
     // Both columns version themselves (triggers), only when they change.
     const { rows: [row] } = await tx.query<Head>(`UPDATE agent_kit_heads SET cli_run_policy=$2, external_write_permissions=$3 WHERE owner_id=$1 AND bot_key=$4

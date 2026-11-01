@@ -20,9 +20,9 @@ import { HostedUsageStore } from '../../lib/abuse/store'
 const execute = promisify(execFile)
 type Device = { id: string; name: string; protocolVersion: number }
 type Run = { id: string; issueId: string; deviceId: string; deviceRepoId: string; baseBranch: string | null; status: string; stopReason: string | null; error: string | null; report: { summary: string; verify: { status: string }; publish?: { pushed: boolean; commit: string; branch: string } } | null; worktreePath: string | null; stopRequestedAt: string | null }
-type Observation = { kind: string; toolName?: string; deviceId?: string; runId?: string; issueId?: string; url?: string; commit?: string; branch?: string; requestId?: string }
+type Observation = { kind: string; toolName?: string; deviceId?: string; runId?: string; issueId?: string; url?: string; commit?: string; branch?: string; requestId?: string; path?: string }
 type ServiceEvidence = { observations: Observation[]; errors: unknown[]; pullRequests: { number: number; url: string; branch: string; draft: boolean }[] }
-type MvpCheckpoint = 'accounts-active' | 'home-open' | 'fixture-ready' | 'push-proposal-created' | 'push-approved' | 'daemon-started' | 'daemon-registered' | 'task-submitted' | 'event-bound' | 'run-dispatched' | 'worktree-ready' | 'reply-delivered' | 'published' | 'favicon-decoded' | 'chat-result-verified' | 'stop-completed'
+type MvpCheckpoint = 'accounts-active' | 'home-open' | 'fixture-ready' | 'daemon-started' | 'daemon-registered' | 'task-submitted' | 'event-bound' | 'run-dispatched' | 'worktree-ready' | 'reply-delivered' | 'published' | 'favicon-decoded' | 'chat-result-verified' | 'stop-completed'
 
 assertMvpEnvironment()
 const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 2 })
@@ -70,26 +70,11 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
   await indexMvpResource('daemon-directory', dataDir)
   await indexMvpResource('token-id', tokenId)
   await pool.query('INSERT INTO device_tokens (id, "userId", name, "tokenHash") VALUES ($1, $2, $3, $4)', [tokenId, user.id, 'Disposable MVP daemon', createHash('sha256').update(token).digest('hex')])
-  // The GitHub identity is synthetic; repository approval must go through the
-  // real proposal store and the authenticated browser decision below.
+  // The GitHub identity is synthetic. Push is what the (synthetic) GitHub App
+  // grants on the repository: contents: write and this account's own write
+  // access, checked live at dispatch. Mikka shows no approval card for it.
   await pool.query('INSERT INTO account (id, "accountId", "providerId", "userId", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, now(), now())', [randomUUID(), githubAccountId, 'github', user.id])
   await pool.query('INSERT INTO repository_settings ("userId", "remoteKey", "verifyCommand") VALUES ($1, $2, $3)', [user.id, REPOSITORY_KEY, 'test -f MIKKA_MOCK.md'])
-  const proposalId = (await execute(process.execPath, ['--import', './scripts/server-test.mjs', '--import', 'tsx', 'tests/mvp/propose-push.mts', user.id])).stdout.trim()
-  expect(proposalId).toMatch(/^[a-f0-9-]{36}$/)
-  const before = (await pool.query('SELECT status, input FROM pending_actions WHERE id = $1 AND "userId" = $2', [proposalId, user.id])).rows[0]
-  expect(before.status).toBe('pending')
-  expect(before.input).toMatchObject({ remoteKey: REPOSITORY_KEY, permission: 'push_to_origin' })
-  expect((await pool.query('SELECT push FROM repository_settings WHERE "userId" = $1 AND "remoteKey" = $2', [user.id, REPOSITORY_KEY])).rows[0].push?.approved).not.toBe(true)
-  checkpoint('push-proposal-created', 'Real repository proposal is pending and has not granted push')
-  const approvalCard = page.getByRole('list', { name: '等你确认' }).getByRole('listitem').filter({ hasText: REPOSITORY })
-  await expect(approvalCard).toHaveCount(1, { timeout: 30_000 })
-  await expect(approvalCard).toContainText('向此仓库的 origin 推送')
-  await approvalCard.getByRole('button', { name: '允许推送', exact: true }).click()
-  await expect.poll(async () => (await pool.query('SELECT status FROM pending_actions WHERE id = $1', [proposalId])).rows[0]?.status).toBe('done')
-  const push = (await pool.query('SELECT push FROM repository_settings WHERE "userId" = $1 AND "remoteKey" = $2', [user.id, REPOSITORY_KEY])).rows[0].push
-  expect(push).toMatchObject({ approved: true, approvedByUserId: user.id, remote: 'origin' })
-  await expect(approvalCard).toHaveCount(0)
-  checkpoint('push-approved', 'Authenticated browser approved the real repository proposal')
   const daemon = spawn(process.execPath, ['--import', 'tsx', 'tests/mvp/start-daemon.mts'], {
     cwd: resolve('.'), stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, MIKKA_E2E_DEVICE_TOKEN: token, MIKKA_E2E_DAEMON_DIR: dataDir,
@@ -234,7 +219,9 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     expect(evidence.pullRequests).toEqual([{ number: 41, url: pr, branch: completed.report!.publish!.branch, draft: false }])
     expect(evidence.observations.filter(item => item.kind === 'pull-request-created')).toEqual([expect.objectContaining({ runId: loop.runId, issueId: completed.issueId, commit: completed.report!.publish!.commit })])
     expect(evidence.observations.filter(item => item.kind === 'tool').map(item => item.toolName)).toEqual(expect.arrayContaining(['create_issue', 'list_agents', 'dispatch_run']))
-    expect(Number((await pool.query('SELECT count(*) FROM pending_actions WHERE "userId" = $1 AND action = $2', [loop.userId, 'approve_repository_push'])).rows[0].count)).toBe(1)
+    expect(Number((await pool.query('SELECT count(*) FROM pending_actions WHERE "userId" = $1 AND action = $2', [loop.userId, 'approve_repository_push'])).rows[0].count), 'the GitHub App grant pushes without a card in Mikka').toBe(0)
+    expect((await pool.query('SELECT "pushGrantedAt" FROM github_repository_installations WHERE "userId" = $1 AND "remoteKey" = $2', [loop.userId, REPOSITORY_KEY])).rows[0]?.pushGrantedAt).toBeTruthy()
+    expect(evidence.observations.filter(item => item.kind === 'github-request' && item.path === '/repos/mikka-e2e/core-loop/installation').length, 'dispatch checked the App installation on GitHub').toBeGreaterThan(0)
     loop.checkpoint('published', 'Real verification and push completed; GitHub stub confirmed the commit and stored PR on the task')
     // The thread sits beside the chat (R-82); closing it leaves the chat as it was.
     await loop.thread.getByRole('button', { name: '关闭线程', exact: true }).click()

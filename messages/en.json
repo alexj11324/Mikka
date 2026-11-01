@@ -837,6 +837,11 @@
     "sandboxBlocked": "{agents} found, sandbox unavailable",
     "sandboxMissing": "This device could not install {packages}. Install them with the system package manager and it recovers on its own.",
     "sandboxRefused": "This machine does not let regular users create a sandbox. An administrator needs to enable user namespaces.",
+    "sandboxUserns": "Ubuntu stops regular users from creating the sandbox here (AppArmor's user namespace restriction). Lift it on this device and the agents come back on their own.",
+    "sandboxUsernsNow": "Now:",
+    "sandboxUsernsPersist": "After restarts too:",
+    "sandboxUsernsSpec": "Ubuntu's description of this setting",
+    "sandboxDetail": "Error: {detail}",
     "sandboxFix": "How to fix",
     "installAgent": "How to install",
     "copyInstall": "Copy {command}",
@@ -1184,6 +1189,7 @@
     "accountEmailMismatch": "The email doesn’t match this account.",
     "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
     "runChainEnded": "Every attempt of this thread has already ended; there is nothing left to stop.",
+    "threadStopping": "The thread is stopping",
     "secretNotFound": "That secret or variable no longer exists.",
     "secretNameReserved": "This name is reserved by the runtime (for example PATH, HOME, proxy, TLS, loader, git, E2B or MIKKA variables). Choose another name.",
     "secretPermissionDenied": "Only workspace admins can do this. Members can add and edit repository secrets and variables.",
@@ -1936,6 +1942,7 @@
         "deny": "Deny"
       },
       "githubPermissionFailed": "Could not save",
+      "githubPushByApp": "Set by the GitHub App",
       "githubPrivate": "Private",
       "githubTool": {
         "push": "Push branch",
@@ -2802,16 +2809,6 @@
     "usedTools": "Used {count, plural, one {# tool} other {# tools}}",
     "pendingActions": {
       "label": "Waiting for your approval",
-      "approve_repository_push": "Allow repository push",
-      "repository": "Repository",
-      "permission": "Permission",
-      "pushToOrigin": "Push to this repository's origin",
-      "approvePush": "Allow push",
-      "pushApproved": "Repository push approved",
-      "approve_pull_request": "Open pull request",
-      "branch": "Branch",
-      "approvePullRequest": "Open",
-      "pullRequestApproved": "Pull request allowed",
       "send_email": "Send email",
       "create_calendar_event": "New event",
       "update_calendar_event": "Change event",
@@ -3210,7 +3207,13 @@
     "retryStop": "Try stopping again",
     "waiting": "Waiting for you",
     "chatTab": "Chat",
-    "acceptanceTab": "Acceptance"
+    "acceptanceTab": "Acceptance",
+    "stages": {
+      "repository": "Repository",
+      "worktree": "Worktree",
+      "agent_start": "Agent start",
+      "duration": "{seconds}s"
+    }
   },
   "Computer": {
     "status": {
@@ -3273,10 +3276,19 @@
       "justNow": "just now",
       "yesterday": "yesterday",
       "group": {
-        "waiting": "Waiting on you ({count})",
-        "running": "In progress ({count})",
+        "running": "Running ({count})",
+        "blocked": "Blocked ({count})",
+        "waiting": "Waiting for you ({count})",
         "idle": "Idle ({count})",
         "resolved": "Resolved ({count})"
+      },
+      "attempt": "Attempt {count}",
+      "state": {
+        "running": "Running",
+        "blocked": "Blocked",
+        "waiting": "Waiting for you",
+        "idle": "Idle",
+        "resolved": "Resolved"
       },
       "waitingFor": "Waiting for {device} to come online"
     },

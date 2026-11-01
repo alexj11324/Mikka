@@ -38,6 +38,7 @@ import type { CaptureUploadRequest, CaptureUploadResponse, CaptureView, ScreenCa
 import type { RunChunk } from "./chunks"
 import type { ToolApprovalGate } from "./agents/tool-approval"
 import type { RunMailbox } from './run-mailbox'
+import type { ServerDecide } from './server-decision'
 import type { NativeBrokerContext, NativeBrokerRequest, NativeLease } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
 
@@ -68,6 +69,8 @@ export interface ServerLink {
   /** Authenticated policy validation before repository/setup effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
+  /** The server's Decisions API on behalf of one run (server-decision.ts). */
+  decide?: ServerDecide
   /** Optional host-only adapter for the claimed run; never model-supplied. */
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   claimCoordinator?(deviceId: string, signal: AbortSignal): Promise<NativeCoordinatorJob | null>
