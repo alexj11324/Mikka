@@ -375,7 +375,7 @@ export function MembersSettings({
                   {t("exportCsv")}
                 </Button>
                 <Button
-                  className="rounded-full bg-workspace-accent text-workspace-accent-foreground hover:bg-workspace-accent/90"
+                  className="rounded-full"
                   disabled={!canManage}
                   onClick={() => setInviteOpen(true)}
                 >
@@ -406,10 +406,11 @@ export function MembersSettings({
                 {notice}
               </p>
             )}
-            <Table className="min-w-xl">
+            {/* Fixed columns: the email cell truncates so role and actions always stay on screen. */}
+            <Table className="min-w-xl table-fixed">
               <TableHeader>
                 <TableRow className="border-0 hover:bg-transparent">
-                  <TableHead className="w-2/5">
+                  <TableHead className="w-[38%]">
                     <Button
                       size="sm"
                       variant="ghost"
@@ -428,11 +429,11 @@ export function MembersSettings({
                     </Button>
                   </TableHead>
                   <TableHead>{t("table.email")}</TableHead>
-                  <TableHead>{t("table.statusRole")}</TableHead>
-                  <TableHead className="hidden lg:table-cell">
+                  <TableHead className="w-24">{t("table.statusRole")}</TableHead>
+                  <TableHead className="hidden w-28 lg:table-cell">
                     {t("table.joined")}
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="w-12">
                     <span className="sr-only">{t("table.actions")}</span>
                   </TableHead>
                 </TableRow>
@@ -458,24 +459,19 @@ export function MembersSettings({
                             <TableCell className="py-4">
                               <div className="flex items-center gap-3">
                                 <UserAvatar user={member} size="md" />
-                                <div className="flex min-w-0 flex-col gap-0.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">
-                                      {member.name || member.email}
-                                    </span>
-                                    {member.userId === data.currentUserId && (
-                                      <span className="text-xs text-muted-foreground">
-                                        {t("you")}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    {member.email.split("@")[0]}
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <span className="truncate font-medium">
+                                    {member.name || member.email}
                                   </span>
+                                  {member.userId === data.currentUserId && (
+                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                      {t("you")}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
+                            <TableCell className="truncate text-xs text-muted-foreground" title={member.email}>
                               {member.email}
                             </TableCell>
                             <TableCell>
@@ -580,8 +576,8 @@ export function MembersSettings({
                         <TableCell className="py-4">
                           <div className="flex items-center gap-3">
                             <UserAvatar user={invite} size="md" />
-                            <div className="flex flex-col gap-0.5">
-                              <span>{invite.email.split("@")[0]}</span>
+                            <div className="flex min-w-0 flex-col gap-0.5">
+                              <span className="truncate">{invite.email.split("@")[0]}</span>
                               <span className="text-xs text-muted-foreground">
                                 {new Date(invite.expiresAt).getTime() >
                                 Date.now()
@@ -591,7 +587,7 @@ export function MembersSettings({
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
+                        <TableCell className="truncate text-xs text-muted-foreground" title={invite.email}>
                           {invite.email}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">

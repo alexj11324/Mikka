@@ -25,6 +25,12 @@ const ago = minutes => new Date(now - minutes * 60_000)
 const day = offset => new Date(now + offset * 86_400_000).toISOString().slice(0, 10)
 const sha = text => createHash('sha256').update(text).digest('hex')
 const json = value => JSON.stringify(value)
+/** The gradient avatar sign-up gives a new account (lib/default-avatar.ts `newUserAvatar`, R-36); seeded people skip sign-up. */
+function defaultAvatar(key) {
+  let hash = 0
+  for (const char of key.trim().toLowerCase()) hash = (hash * 31 + char.codePointAt(0)) | 0
+  return `/avatars/${['blue', 'green', 'purple', 'orange', 'red'][Math.abs(hash) % 5]}.webp`
+}
 
 function plan(owner) {
   const id = key => demoId(owner.id, key)
@@ -129,7 +135,7 @@ async function writeWorkspace(client, owner, p) {
 }
 
 async function writeMain(client, owner, p, workspaceId) {
-  for (const person of p.people) await client.query('INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1, $2, $3, false, $4, $4)', [person.id, person.name, person.email, ago(60 * 24 * 20)])
+  for (const person of p.people) await client.query('INSERT INTO "user" (id, name, email, image, "emailVerified", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, false, $5, $5)', [person.id, person.name, person.email, defaultAvatar(person.name || person.email), ago(60 * 24 * 20)])
   for (const bot of p.bots) {
     await client.query('INSERT INTO bots (id, "ownerId", "workspaceId", name, color, shape, model, repository, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [bot.id, owner.id, workspaceId, bot.name, bot.color, bot.shape, bot.model, bot.repository, ago(60 * 24 * 10)])
   }
