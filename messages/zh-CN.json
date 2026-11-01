@@ -2318,6 +2318,10 @@
       "active": "正在支付",
       "until": "{date} 停止支付"
     },
+    "creditShare": {
+      "mine": "我的点数也可用于这个团队",
+      "sharers": "分享点数的成员"
+    },
     "personalPolicy": {
       "loading": "正在加载个人订阅设置",
       "heading": "个人订阅",

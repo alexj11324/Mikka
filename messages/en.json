@@ -2318,6 +2318,10 @@
       "active": "Paying",
       "until": "Stops paying on {date}"
     },
+    "creditShare": {
+      "mine": "My credits also pay for this team",
+      "sharers": "Members sharing credits"
+    },
     "personalPolicy": {
       "loading": "Loading personal subscription settings",
       "heading": "Personal subscriptions",
