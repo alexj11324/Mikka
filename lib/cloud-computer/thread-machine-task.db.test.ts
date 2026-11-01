@@ -82,6 +82,42 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     };
     const machine = async (runId: string) => (await pool.query('SELECT state,"sandboxId","deviceId","issueId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
 
+    await t.test('moving a queued repository task binds its existing authority to the owned thread device', async () => {
+      const { admitRepositoryTask, matchesRepositoryAdmission } = await import('../repository-admission');
+      const savedWorker = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA };
+      process.env.MIKKA_CLOUD_WORKER_URL = 'https://worker.example.invalid/mikka';
+      process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40);
+      try {
+        for (const corrupt of [false, true]) {
+          const issueId = await task(), runId = await run(issueId);
+          const scope = { userId: owner, issueId, agentId, deviceId: botDevice, workspaceId, remoteKey: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git', targetBranch: `mikka/fixture-${number}` };
+          const admission = admitRepositoryTask({ ...scope, grant: { grantedAt: new Date().toISOString() }, now: new Date() })!;
+          assert.ok(admission);
+          if (corrupt) admission.deviceId = randomUUID();
+          await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [runId, { repositoryAdmission: admission }]);
+          const { provider } = fake();
+          provider.create = async (_source, op) => ({
+            sandboxId: `sandbox-${op}`,
+            files: { read: async () => 'a'.repeat(40), write: async () => { throw new Error('fixture reached worker handoff'); } },
+            commands: { run: async () => ({ stdout: '', stderr: '', exitCode: 0 }) },
+          }) as never;
+          await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), corrupt ? /Repository authority unavailable/ : /fixture reached worker handoff/);
+          const current = (await pool.query('SELECT "deviceId","agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0];
+          if (corrupt) {
+            assert.equal(current.deviceId, botDevice, 'an invalid source receipt cannot be repaired into authority');
+            assert.deepEqual(current.agentDefinition.repositoryAdmission, admission);
+          } else {
+            assert.notEqual(current.deviceId, botDevice);
+            assert.deepEqual(current.agentDefinition.repositoryAdmission, { ...admission, deviceId: current.deviceId });
+            assert.ok(matchesRepositoryAdmission(current.agentDefinition.repositoryAdmission, { ...scope, deviceId: current.deviceId }));
+          }
+        }
+      } finally {
+        if (savedWorker.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = savedWorker.url;
+        if (savedWorker.sha === undefined) delete process.env.MIKKA_CLOUD_WORKER_SHA; else process.env.MIKKA_CLOUD_WORKER_SHA = savedWorker.sha;
+      }
+    });
+
     await t.test("the task's next run resumes the paused sandbox: no snapshot, no new sandbox, same device", async () => {
       const issueId = await task();
       const before = await parked(issueId);

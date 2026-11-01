@@ -63,9 +63,15 @@ async function withTaskLock<T>(userId: string, issueId: string, work: () => Prom
   const key = JSON.stringify(['task-thread', userId, issueId])
   let discard = false
   try {
-    await client.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [key])
-    try { return await work() }
-    finally { try { await client.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [key]) } catch { discard = true } }
+    // PgBouncer transaction pooling cannot preserve session advisory locks.
+    await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [key])
+    const result = await work()
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    try { await client.query('ROLLBACK') } catch { discard = true }
+    throw error
   } finally { client.release(discard) }
 }
 
