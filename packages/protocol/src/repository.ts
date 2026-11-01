@@ -15,10 +15,29 @@ export function repositoryBindingMatches(key: string, url: string | null, option
   try { return url !== null && normalizeRepository(url, options).key === key } catch { return false }
 }
 
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
+
+/**
+ * Local test mode (MIKKA_LOCAL_TEST_ACCOUNTS=1): a developer's own disposable
+ * stack on this machine, without pretending to be CI. It holds only off any
+ * deployment and only while every database URL that is set is a loopback
+ * PostgreSQL whose name ends in _e2e, with MIKKA_DATABASE_URL set.
+ */
+export function localTestEnvironment(env: Record<string, string | undefined>): boolean {
+  if (env.MIKKA_LOCAL_TEST_ACCOUNTS !== '1' || env.VERCEL || env.VERCEL_ENV || !env.MIKKA_DATABASE_URL) return false
+  return [env.E2E_DATABASE_URL, env.MIKKA_DATABASE_URL, env.DATABASE_URL].every(value => {
+    if (value === undefined) return true
+    try {
+      const url = new URL(value)
+      return (url.protocol === 'postgres:' || url.protocol === 'postgresql:') && LOOPBACK_HOSTS.has(url.hostname) && /^\/[A-Za-z0-9_]+_e2e$/.test(url.pathname)
+    } catch { return false }
+  })
+}
+
 /** The explicit test switch can never enable mock/local origins in production. */
 export function daemonTestMode(env: Record<string, string | undefined>): boolean {
   return env.VERCEL_ENV !== 'production' && env.MIKKA_TEST_MODE === '1'
-    && (env.NODE_ENV === 'test' || env.CI === 'true' || env.VERCEL_ENV === 'preview')
+    && (env.NODE_ENV === 'test' || env.CI === 'true' || env.VERCEL_ENV === 'preview' || localTestEnvironment(env))
 }
 
 /**
