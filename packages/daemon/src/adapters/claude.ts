@@ -183,10 +183,11 @@ export function claudeSandboxSettings(
 export function claudeSettings(
   policy: SandboxPolicy,
   workspace?: RunPolicy,
+  agentDelivers = false,
 ): Settings {
   return {
     sandbox: claudeSandboxSettings(policy),
-    permissions: claudePermissionRules(runPolicy(workspace)),
+    permissions: claudePermissionRules(runPolicy(workspace), agentDelivers),
   }
 }
 
@@ -592,7 +593,7 @@ export class ClaudeAdapter implements AgentAdapter {
         },
         settingSources: [],
         settings: {
-          ...claudeSettings(ctx.policy(), options.policy),
+          ...claudeSettings(ctx.policy(), options.policy, ctx.agentDelivers),
           // The official runtime launcher encloses the entire CLI. Nesting
           // the CLI's Bash-only sandbox is unsupported on macOS.
           ...(outerLocal ? {sandbox:{enabled:false,allowUnsandboxedCommands:true,autoAllowBashIfSandboxed:false}} : {}),

@@ -66,11 +66,12 @@ type PermissionResponse = Awaited<ReturnType<acp.Client["requestPermission"]>>
  * the workspace's policy does not allow: installing dependencies under
  * `ask` or `deny` (nobody can be asked mid-run, so `ask` is refused and the
  * agent is told to call `ask_human`) and `git push`, which only the daemon
- * does (ADR 0017).
+ * does (ADR 0017) unless the agent delivers the run itself.
  */
 export function acpPermissionResponse(
   params: PermissionRequest,
-  policy: RunPolicy | undefined
+  policy: RunPolicy | undefined,
+  agentDelivers = false
 ): { response: PermissionResponse; refused: boolean } {
   const pick = (kinds: readonly string[]): PermissionResponse => {
     for (const kind of kinds) {
@@ -88,7 +89,7 @@ export function acpPermissionResponse(
       : (params.toolCall.title ?? "")
   const action = classifyCommand(command)
   const refused =
-    action === "git_push" ||
+    (action === "git_push" && !agentDelivers) ||
     (action !== null &&
       decide(action, { policy: runPolicy(policy) }) !== "allow")
   if (refused)
@@ -307,7 +308,8 @@ export class CursorAdapter implements AgentAdapter {
         async requestPermission(params) {
           const { response, refused } = acpPermissionResponse(
             params,
-            options.policy
+            options.policy,
+            ctx.agentDelivers
           )
           if (refused)
             log.info(
