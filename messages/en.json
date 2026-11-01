@@ -2863,7 +2863,8 @@
       "revert": "Switch back",
       "addKey": "Add API key to continue",
       "useKey": "Continue with API key",
-      "retryAfterReset": "Retry after reset"
+      "retryAfterReset": "Retry after reset",
+      "continueFailed": "Could not continue"
     },
     "wakeErrors": {
       "wake_failed": "Reply pending retry",
@@ -2891,7 +2892,8 @@
         "succeeded": "Succeeded",
         "stopped": "Stopped",
         "failed": "Failed",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "paused": "Paused"
       },
       "sources": "{count, plural, one {# source} other {# sources}}"
     },

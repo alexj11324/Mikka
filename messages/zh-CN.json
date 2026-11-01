@@ -2863,7 +2863,8 @@
       "revert": "改回",
       "addKey": "添加 API Key 继续",
       "useKey": "用 API Key 继续",
-      "retryAfterReset": "重置后重试"
+      "retryAfterReset": "重置后重试",
+      "continueFailed": "未能继续"
     },
     "wakeErrors": {
       "wake_failed": "回复等待重试",
@@ -2891,7 +2892,8 @@
         "succeeded": "已完成",
         "stopped": "已停止",
         "failed": "失败",
-        "cancelled": "已取消"
+        "cancelled": "已取消",
+        "paused": "已暂停"
       },
       "sources": "{count} 个来源"
     },

@@ -15,6 +15,7 @@ import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { ThreadStatus, harnessLabel } from './issue-threads'
 import { ThreadStatusIcon } from './thread-status-icon'
+import { ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
 import { listRunArtifacts } from '@/app/actions/artifacts'
@@ -157,9 +158,14 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
                 </>)}
             </li>)}
           </ol>
+          {/* The subscription ran out and the run went on on the person's key (lib/run-quota.ts). */}
+          {data.thread.quota?.switched.map(item => <ThreadQuotaSwitchLine key={item.runId} switched={item} />)}
           {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
         </>}
     </div>
+    {data?.thread.quota?.paused && <div className={cn('shrink-0 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')}>
+      <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />
+    </div>}
     {(active || question) && detail && <div className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')}>
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
