@@ -102,6 +102,15 @@ export const nativeBrokerContextSchema = z.object({
   expiresAt: z.iso.datetime(),
 }).strict()
 export type NativeBrokerContext = z.infer<typeof nativeBrokerContextSchema>
+/**
+ * One device run's short-lived access lease (orchestration.md §6): the
+ * access token only, never a refresh grant. The daemon asks again before
+ * `expiresAt`; each request is checked anew.
+ */
+export const nativeLeaseSchema = nativeBrokerContextSchema.extend({
+  accessToken: z.string().min(1).max(32768).regex(/^[^\r\n\0]+$/),
+}).strict()
+export type NativeLease = z.infer<typeof nativeLeaseSchema>
 export interface NativeBrokerRequest { path: string; headers: Record<string,string>; body: unknown }
 
 /** A trusted backend's account boundary, never an attestation from a browser. */

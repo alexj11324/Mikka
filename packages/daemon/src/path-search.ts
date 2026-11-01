@@ -1,4 +1,4 @@
-// PATH lookups and additions shared by harness detection and the sandbox tools.
+// PATH lookups and additions for the sandbox tools.
 import { accessSync, constants, statSync } from "node:fs"
 import { delimiter, isAbsolute, join } from "node:path"
 

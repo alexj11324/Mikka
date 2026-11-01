@@ -38,7 +38,10 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None):
                     .run_cmd('bash /tmp/mikka-bootstrap.sh', user='root')
                     .copy('worker.tar', '/tmp/mikka-worker.tar')
                     .copy('source-sha', '/opt/mikka/worker-source-sha')
-                    .run_cmd('mkdir -p /opt/mikka/worker && tar -xf /tmp/mikka-worker.tar -C /opt/mikka/worker && rm /tmp/mikka-worker.tar && cd /opt/mikka/worker && HOME=/tmp corepack pnpm install --filter @mikka/daemon... --frozen-lockfile && chown -R root:root /opt/mikka/worker && chmod -R go-w /opt/mikka/worker && chown root:root /opt/mikka/worker-source-sha && chmod 0444 /opt/mikka/worker-source-sha', user='root'))
+                    .run_cmd('mkdir -p /opt/mikka/worker && tar -xf /tmp/mikka-worker.tar -C /opt/mikka/worker && rm /tmp/mikka-worker.tar && cd /opt/mikka/worker && HOME=/tmp corepack pnpm install --filter @mikka/daemon... --frozen-lockfile && chown -R root:root /opt/mikka/worker && chmod -R go-w /opt/mikka/worker && chown root:root /opt/mikka/worker-source-sha && chmod 0444 /opt/mikka/worker-source-sha', user='root')
+                    # The official, version-pinned native Codex CLI, from the daemon's own pins and
+                    # installer. Its authentication comes later from the owner-bound broker.
+                    .run_cmd('ln -sf "$(node /opt/mikka/worker/packages/daemon/harness/cli.mjs /opt/mikka/harness codex)" /usr/local/bin/codex && chmod -R go+rX,go-w /opt/mikka/harness && /usr/local/bin/codex --version', user='root'))
         return sha, Template.build(template, name=name, cpu_count=2, memory_mb=4096,
                                    min_free_disk_mb=16384, skip_cache=True, api_key=api_key, on_build_logs=on_build_logs)
 

@@ -6,7 +6,7 @@ import type { SubscriptionWorkerClient, WorkerMetadata } from '../packages/daemo
 import { readSubscriptionQuota } from '../packages/daemon/src/subscription-quota'
 import { SubscriptionRepository } from './subscription-repository'
 import { resolveSubscriptionModel } from './subscription-model'
-import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { accountLabel, failedUsage, parseSubscriptionUsage, type SubscriptionUsage, type WorkerUsage } from './subscription-usage'
 
 export interface SubscriptionCapabilities {
@@ -120,6 +120,14 @@ export class SubscriptionService {
     await client.call('prepare',{revision:authorized.binding.connectionRevision},signal)
     const info=await client.call<{accountId:string;plan?:string;expiresAt:string}>('nativeContext',{revision:authorized.binding.connectionRevision},signal)
     return nativeBrokerContextSchema.parse({...info,route:binding.route,modelId:binding.modelId,revision:authorized.binding.connectionRevision})
+  }
+  /** A device run's access lease: the same checks as nativeContext, then the access token only. */
+  async nativeLease(use: SubscriptionUse, signal?: AbortSignal) {
+    const context=await this.nativeContext(use,signal)
+    const binding=await this.repository.binding(use.ownerId,use.bindingId)
+    const row=await this.repository.connection(use.ownerId,binding.connectionId)
+    const lease=await this.worker(this.repository.scope(row)).forUse(use).call<{accessToken?:unknown;expiresAt?:unknown}>('nativeAuth',{revision:context.revision},signal)
+    return nativeLeaseSchema.parse({...context,accessToken:lease.accessToken,...(typeof lease.expiresAt==='string'?{expiresAt:new Date(lease.expiresAt).toISOString()}:{})})
   }
   async nativeRequest(use: SubscriptionUse, request: NativeBrokerRequest, signal?: AbortSignal) {
     const binding=await this.repository.binding(use.ownerId,use.bindingId)

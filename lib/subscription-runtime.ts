@@ -27,7 +27,7 @@ export async function authorizeSubscriptionUse(userId: string, workspaceId: stri
     if (bot && bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
   }
 }
-export function subscriptionRuntime(nativeBroker = false, custodyOnly = false): SubscriptionService {
+export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean } = {}): SubscriptionService {
   if (process.env.MIKKA_BYOS_ENABLED !== '1' && !(custodyOnly && process.env.MIKKA_BYOS_ENROLLMENT_ENABLED === '1')) throw new SubscriptionRefusal('backend_unavailable')
   const binary = process.env.MIKKA_BYOS_WORKER_BINARY ?? join(process.cwd(), 'packages/subscription-worker/bin/mikka-subscription-worker')
   // pool is request-scoped; never send a preview worker to the production DB.
@@ -66,7 +66,7 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false): 
       const name = await authorizedAccessName(database, scope, use, revision)
       return { accessSnapshot: await subscriptionAccessSnapshot({ origin: infisicalOrigin, clientId: custodyId!, clientSecret: custodySecret!, project: accessProject ?? project, environment, path: accessPath, name, signal }) }
     } : resolveIdentity
-    return new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken: sharedCustodyIdentity ? '' : workloadToken ?? '', accessPath, accessProject, accessToken: custodyOnly || sharedCustodyIdentity ? undefined : accessToken, retainEnrollmentSources: retainEnrollmentSourcesForAcceptance(), enrollmentAttemptPath: process.env.MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH, enrollmentClaimPath: process.env.MIKKA_BYOS_ENROLLMENT_CLAIM_PATH, enrollmentGrantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH, enableRuntime: !custodyOnly, enablePlainModels: !custodyOnly && modelRoutes.has(scope.provider === 'codex' ? 'codex_cpa' : 'claude_cpa'), enableCodexOAuth: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', enableClaudeOAuth: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' }, resolve)
+    return new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken: sharedCustodyIdentity ? '' : workloadToken ?? '', accessPath, accessProject, accessToken: custodyOnly || sharedCustodyIdentity ? undefined : accessToken, retainEnrollmentSources: retainEnrollmentSourcesForAcceptance(), enrollmentAttemptPath: process.env.MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH, enrollmentClaimPath: process.env.MIKKA_BYOS_ENROLLMENT_CLAIM_PATH, enrollmentGrantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH, enableRuntime: !custodyOnly, enablePlainModels: !custodyOnly && modelRoutes.has(scope.provider === 'codex' ? 'codex_cpa' : 'claude_cpa'), enableCodexOAuth: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', enableClaudeOAuth: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1', ...(options.exportAccessLease && !custodyOnly ? { exportAccessLease: true } : {}) }, resolve)
   }, {
     ready: (route: SubscriptionRoute) => !custodyOnly && (ready.has(route) || modelRoutes.has(route)),
     oauth: { codex: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', claude: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' },
