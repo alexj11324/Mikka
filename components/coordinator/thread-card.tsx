@@ -49,12 +49,16 @@ function ThreadOutputs({ pullRequests }: { pullRequests: IssuePullRequest[] }) {
   </div>
 }
 
-/** R-66 review frame 356:4750: status, title and outputs; one card per thread. */
-export function ThreadCard({ run, onOpen }: { run: RunSource; onOpen: (thread: { issueId: string; runId: string }) => void }) {
+/** A thread as a card (R-66 frame 356:4750), shared by the chat and the thread list: the whole card opens it. */
+export const THREAD_CARD = 'relative flex w-full items-center gap-3 rounded-xl bg-muted/60 px-3.5 py-3'
+/** The card's full-size button; content above it does not take clicks. */
+export const THREAD_CARD_BUTTON = 'absolute inset-0 size-full rounded-xl'
+
+/** R-66 review frame 356:4750: status, title and outputs; one card per thread. A thread with no task opens too. */
+export function ThreadCard({ run, onOpen }: { run: RunSource; onOpen: (thread: { issueId: string | null; runId: string }) => void }) {
   const t = useTranslations('IssueThreads')
-  const issue = run.issue
-  return <div data-slot="thread-card" className="relative flex w-full max-w-md items-center gap-3 rounded-xl bg-muted/60 px-3.5 py-3">
-    <Button variant="ghost" className="absolute inset-0 size-full rounded-xl" aria-label={t('open', { name: run.name })} disabled={!issue} onClick={issue ? () => onOpen({ issueId: issue.id, runId: run.id }) : undefined} />
+  return <div data-slot="thread-card" className={cn(THREAD_CARD, 'max-w-md')}>
+    <Button variant="ghost" className={THREAD_CARD_BUTTON} aria-label={t('open', { name: run.name })} onClick={() => onOpen({ issueId: run.issue?.id ?? null, runId: run.id })} />
     <ThreadStatusIcon status={run.status} outcome={run.outcome} />
     <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-2">
       <span className="truncate text-sm leading-5 font-medium">{run.name}</span>
