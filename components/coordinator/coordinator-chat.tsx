@@ -38,7 +38,7 @@ import { UnreadDivider } from '@/components/chat/unread-divider'
 import { UnreadPill } from '@/components/chat/unread-pill'
 import { MESSAGE_POSITION_ATTR, useUnreadIndicators } from '@/lib/hooks/use-unread-indicators'
 import { useArrivals } from '@/lib/hooks/use-arrivals'
-import dynamic from 'next/dynamic'
+import { openArtifact as openArtifactWindow } from '@/components/workspace/workspace-navigation'
 import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'
 import { ArtifactQuoteChip, ArtifactQuoteLine } from '@/components/artifacts/artifact-quote'
 import type { ArtifactChatSlot } from '@/components/artifacts/artifact-viewer'
@@ -63,7 +63,6 @@ const ENTER = 'animate-in fade-in-0 duration-200 motion-reduce:animate-none'
  */
 const HEADER_FADE = 'md:[--scroll-fade-mask:linear-gradient(to_bottom,transparent_3.5rem,#000_6rem,#000_calc(100%_-_var(--scroll-fade-b,0px)),transparent)]'
 
-const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
 
 /** Text put into the composer from elsewhere; `suggestionId` when it came from a 建议 item. */
 export type CoordinatorPrefill = { text: string; nonce: number; suggestionId?: string }
@@ -108,7 +107,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const botId = bot?.id ?? null
   const name = bot?.name ?? t('label')
   const avatar = (size: 'pill' | 'profile', mood?: 'thinking') => <BotAvatar {...(bot ? { color: bot.color, shape: bot.shape } : COORDINATOR_AVATAR)} size={size} mood={mood} />
-  const [viewing, setViewing] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
   const reconnectStream = useRef<() => void>(() => {})
@@ -215,14 +213,14 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     }
     return next
   }, [items])
-  const quotes = useMemo(() => items.flatMap(item => item.quote ? [item.quote] : []), [items])
   // An artifact handed over shows here first; the Artifact page and a thread's 「Artifact · N」 refresh with it.
   const artifactIds = useMemo(() => items.flatMap(item => item.artifacts).join(','), [items])
   useEffect(() => {
     if (!artifactIds) return
     void mutateAll(key => key === 'artifacts' || (Array.isArray(key) && key[0] === 'run-artifacts'))
   }, [artifactIds, mutateAll])
-  const openArtifact = embedded?.openArtifact ?? setViewing
+  // Not inside a reader: the card opens the Artifact window over the page, with its own address (R-82).
+  const openArtifact = embedded?.openArtifact ?? openArtifactWindow
   // A quote just picked in the reader: put the cursor where the request goes.
   useEffect(() => { if (embedded?.quote) inputRef.current?.focus() }, [embedded?.quote])
 
@@ -383,9 +381,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
           {browser?.notes.map(note => <BrowserNoteChip key={note.n} note={note} onRemove={() => browser.remove(note.n)} />)}
         </div> : undefined} />
     </div>
-    {!embedded && viewing && <ArtifactViewer artifactId={viewing} onArtifactChange={setViewing} onClose={() => setViewing(null)}
-      bot={{ name, avatar: avatar('pill') }} quotes={quotes}
-      chat={slot => <CoordinatorChat onOpenIssue={onOpenIssue} compact embedded={slot} bot={bot} />} />}
   </section>
   </AgentInteractionContext></AgentThemeProvider>
 }

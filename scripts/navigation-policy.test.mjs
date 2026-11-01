@@ -26,6 +26,15 @@ test('direct history writes, router moves and hand-built addresses fail', () => 
   assert.deepEqual(rules("url.searchParams.set('bot', id)"), ['navigation/address'])
   assert.deepEqual(rules("<Link href=\"/?section=artifacts\" />"), ['navigation/address'])
   assert.deepEqual(rules("url.searchParams.set('section', 'all-issues')"), ['navigation/address'])
+  assert.deepEqual(rules('const href = `/?team=${id}`'), ['navigation/address'])
+  assert.deepEqual(rules('const href = `/?ref=1&project=${id}`'), ['navigation/address'])
+  assert.deepEqual(rules("const href = '/?group=' + id"), ['navigation/address'])
+  assert.deepEqual(rules("url.searchParams.set('artifact', id)"), ['navigation/address'])
+})
+
+test('the same keys in Settings and API links pass', () => {
+  assert.deepEqual(rules('const href = `/settings/teams?workspace=${w}&team=${id}`'), [])
+  assert.deepEqual(rules('await request(`/api/factory/tasks/${id}/approval?artifact=${name}`)'), [])
 })
 
 test('the navigation module itself, comments and Settings sections pass', () => {

@@ -19,7 +19,6 @@ import { ThreadStatus, harnessLabel } from './issue-threads'
 import { ThreadStatusIcon } from './thread-status-icon'
 import { ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
-import dynamic from 'next/dynamic'
 import { listRunArtifacts } from '@/app/actions/artifacts'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactKindIcon } from '@/components/artifacts/artifact-card'
@@ -28,8 +27,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AcceptanceStateBadge, useThreadAcceptance } from './factory-acceptance'
 import { FactoryAcceptancePane } from './factory-acceptance-pane'
 
-// Loaded on demand: the window itself shows this panel, bare, on its right.
-const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
+import { openArtifact } from './workspace-navigation'
 import { ThreadFeedback } from './self-improvement'
 import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
@@ -122,7 +120,7 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
       {detail && view && <ThreadStatusIcon status={view.status} waiting={view.waiting} />}
       <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{detail?.name ?? t('title')}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
-      <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />
+      <ThreadArtifacts runId={runId} status={data?.thread.status ?? ''} />
       {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}
       {/* Frame 06 draws the machine in the wide centre-column header; the side panel has no room for it. */}
       {acceptance && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
@@ -182,10 +180,9 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
  * thread handed over. One opens straight in the Artifact window, with this
  * thread's conversation on its right (F4); several open a list first.
  */
-function ThreadArtifacts({ issueId, runId, status }: { issueId: string; runId: string; status: string }) {
+function ThreadArtifacts({ runId, status }: { runId: string; status: string }) {
   const t = useTranslations('ArtifactsPage')
   const { data, mutate } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId))
-  const [open, setOpen] = useState<string | null>(null)
   // A thread usually hands its artifact over as it finishes.
   useEffect(() => { void mutate() }, [status, mutate])
   const mine = data ?? []
@@ -193,13 +190,12 @@ function ThreadArtifacts({ issueId, runId, status }: { issueId: string; runId: s
   const label = t('threadEntry', { count: mine.length })
   return <>
     {mine.length === 1
-      ? <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={() => setOpen(mine[0].id)}><ArtifactIcon data-icon="inline-start" />{label}</Button>
+      ? <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={() => openArtifact(mine[0].id)}><ArtifactIcon data-icon="inline-start" />{label}</Button>
       : <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" />}><ArtifactIcon data-icon="inline-start" />{label}</DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuGroup>{mine.map(item => <DropdownMenuItem key={item.id} onClick={() => setOpen(item.id)}><ArtifactKindIcon kind={item.kind} /><span className="truncate">{item.title}</span></DropdownMenuItem>)}</DropdownMenuGroup>
+          <DropdownMenuGroup>{mine.map(item => <DropdownMenuItem key={item.id} onClick={() => openArtifact(item.id)}><ArtifactKindIcon kind={item.kind} /><span className="truncate">{item.title}</span></DropdownMenuItem>)}</DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>}
-    {open && <ArtifactWindow artifact={{ id: open, runId, issueId }} onChange={setOpen} onClose={() => setOpen(null)} />}
   </>
 }

@@ -304,8 +304,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   in the right column beside what is in the centre (the chat, or a task with
   its properties), a thread of another bot included, its header naming the
   bot that dispatched it; a task as its own page in the centre, as Linear; an
-  Artifact in its window over the page (R-56); PRs and web pages in a new
-  tab. Projects and teams live under 看板, with no rail item of their own. On
+  Artifact in its window over the page (R-56), which a move from inside it
+  closes; PRs and web pages in a new tab. Projects and teams live under 看板,
+  with no rail item of their own: on them 看板 is the current rail item and no
+  bot list sits beside the page. On
   a phone the right column is a page pushed over the chat. Source: Alex,
   2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)).
 

@@ -49,27 +49,59 @@ export type WorkspaceLocation = {
   section: WorkspaceSection
   /** The bot whose chat is in the centre; null for the Coordinator. */
   bot: string | null
+  /** The group chat in the centre (`group=<id>`; its section is implied). */
+  group: string | null
+  /** The saved chat in the centre (`section=agent&session=<id>`); null opens the latest. */
+  session: string | null
+  /** The team whose page is in the centre; its 主页 is `team=<id>` alone. */
+  team: string | null
+  /** The project open on the projects page. */
+  project: string | null
   /** The task open in the centre. */
   issue: string | null
   /** The thread (its run id) open in the right column, beside whatever is in the centre (R-82). */
   thread: string | null
+  /** The Artifact open in its window over the page (R-56, R-82). */
+  artifact: string | null
+}
+
+/** Team pages, under 看板 (R-82); each needs its team. */
+const TEAM_SECTIONS: readonly string[] = ['team-home', 'team-issues', 'team-projects'] satisfies readonly WorkspaceSection[]
+/** Pages that can show one project. */
+const PROJECT_SECTIONS: readonly string[] = ['projects', 'team-projects'] satisfies readonly WorkspaceSection[]
+/** Keys this file owns besides `section`, in the order a new address writes them. */
+const PLACE_KEYS = ['bot', 'group', 'session', 'team', 'project', 'issue', 'thread', 'artifact'] as const satisfies readonly (keyof WorkspaceLocation)[]
+/** What is in the centre; the thread sits beside it and the Artifact window over it. */
+const CENTRE_KEYS = ['section', 'bot', 'group', 'session', 'team', 'project', 'issue'] as const satisfies readonly (keyof WorkspaceLocation)[]
+
+/** A team page without a team is the workspace-wide page it would scope. */
+export function sectionFor(section: WorkspaceSection, team: string | null): WorkspaceSection {
+  if (!TEAM_SECTIONS.includes(section) || team) return section
+  return section === 'team-projects' ? 'projects' : section === 'team-issues' ? 'all-issues' : 'coordinator'
 }
 
 export function readLocation(params: URLSearchParams): WorkspaceLocation {
-  const section = sectionFromQuery(params.get('section') ?? undefined)
-  const bot = params.get('bot')
-  const issue = params.get('issue')
-  const thread = params.get('thread')
+  const id = (key: string) => { const value = params.get(key); return value && UUID.test(value) ? value : null }
+  const asked = params.get('section') ?? undefined
+  const team = id('team')
+  let section = sectionFromQuery(asked)
+  if (team && (asked === undefined || TEAM_SECTIONS.includes(asked))) section = (asked ?? 'team-home') as WorkspaceSection
+  else if (section === 'coordinator' && id('group')) section = 'group'
   return {
     section,
-    bot: section === 'coordinator' && bot && UUID.test(bot) ? bot : null,
-    issue: issue && UUID.test(issue) ? issue : null,
-    thread: thread && UUID.test(thread) ? thread : null,
+    bot: section === 'coordinator' ? id('bot') : null,
+    group: section === 'group' ? id('group') : null,
+    session: section === 'agent' ? id('session') : null,
+    team: TEAM_SECTIONS.includes(section) ? team : null,
+    project: PROJECT_SECTIONS.includes(section) ? id('project') : null,
+    issue: id('issue'),
+    thread: id('thread'),
+    artifact: id('artifact'),
   }
 }
 
 export function sameLocation(a: WorkspaceLocation, b: WorkspaceLocation) {
-  return a.section === b.section && a.bot === b.bot && a.issue === b.issue && a.thread === b.thread
+  return a.section === b.section && PLACE_KEYS.every(key => a[key] === b[key])
 }
 
 /** The address with `change` applied to `current`; query keys this file does not own are kept. */
@@ -78,18 +110,25 @@ export function workspaceHref(current: URL, change: Partial<WorkspaceLocation>):
   const params = url.searchParams
   const before = readLocation(params)
   const next = { ...before, ...change }
+  next.section = sectionFor(next.section, next.team)
   if (next.section !== 'coordinator') next.bot = null
-  const centreMoved = next.section !== before.section || next.bot !== before.bot || next.issue !== before.issue
+  if (next.section !== 'group') next.group = null
+  if (next.section !== 'agent') next.session = null
+  if (!TEAM_SECTIONS.includes(next.section)) next.team = null
+  if (!PROJECT_SECTIONS.includes(next.section)) next.project = null
+  const centreMoved = CENTRE_KEYS.some(key => next[key] !== before[key])
   // A thread sits beside the centre it was opened from; a new centre closes it unless the move names one.
   if (centreMoved && !('thread' in change)) next.thread = null
+  // The Artifact window sits over the page it was opened from: another place, or another thread, closes it unless the move names one.
+  if ((centreMoved || next.thread !== before.thread) && !('artifact' in change)) next.artifact = null
   if (next.section !== before.section || next.bot !== before.bot) for (const key of PAGE_KEYS) params.delete(key)
   writeSectionQuery(params, next.section)
-  if (next.bot) params.set('bot', next.bot)
-  else params.delete('bot')
-  if (next.issue) params.set('issue', next.issue)
-  else params.delete('issue')
-  if (next.thread) params.set('thread', next.thread)
-  else params.delete('thread')
+  if (next.team && next.section !== 'team-home') params.set('section', next.section)
+  for (const key of PLACE_KEYS) {
+    const value = next[key]
+    if (value) params.set(key, value)
+    else params.delete(key)
+  }
   return `${url.pathname}${url.search}${url.hash}`
 }
 
@@ -185,4 +224,14 @@ export function openThread(runId: string) {
 /** Closes the open thread; the right column shows 概览 again. */
 export function closeThread() {
   navigate({ thread: null })
+}
+
+/** Opens an Artifact in its window over the page (R-56); the centre and the thread under it stay. */
+export function openArtifact(id: string) {
+  navigate({ artifact: id })
+}
+
+/** Closes the Artifact window; the page under it is as it was. */
+export function closeArtifact() {
+  navigate({ artifact: null })
 }

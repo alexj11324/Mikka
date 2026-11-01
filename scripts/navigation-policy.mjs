@@ -4,7 +4,8 @@
 //
 // - Only components/workspace/workspace-navigation.ts and
 //   lib/settings-navigation.ts write the browser history.
-// - A workspace address (?issue=, ?bot=, ?section=<workspace page>) is built
+// - A workspace address (?issue=, ?bot=, ?thread=, ?section=<workspace page>,
+//   /?group= /?team= /?project= /?artifact= /?session=) is built
 //   with workspaceLink / workspaceSearch / goTo, never by hand.
 // - router.push / router.replace are for leaving the window (sign-in, a new
 //   locale) and Settings' own fallback.
@@ -45,11 +46,13 @@ export const navigationAllowlist = {
   'lib/github/connect-callback.ts': { 'navigation/address': { count: 1, reason: 'the GitHub app page (section=plugins&app=github) after its install callback' } },
 }
 
-const WORKSPACE_SECTIONS = 'coordinator|agent|plugins|suggestions|artifacts|all-issues|projects'
+const WORKSPACE_SECTIONS = 'coordinator|agent|plugins|suggestions|artifacts|all-issues|projects|team-home|team-issues|team-projects'
+const PLACE_KEYS = 'group|session|team|project|artifact'
 const rules = [
   { rule: 'navigation/history', pattern: /\bhistory\.(?:pushState|replaceState)\s*\(/g, message: '不要直接写浏览器历史：用 components/workspace/workspace-navigation.ts 的 goTo / goToHref / dropQueryKeys（R-82）。' },
   { rule: 'navigation/router', pattern: /\brouter\.(?:push|replace)\s*\(/g, message: '应用窗口内的跳转不用 router.push / replace：用 goTo，或从外部入口用 openAppLink（R-82）。' },
-  { rule: 'navigation/address', pattern: new RegExp(String.raw`[?&](?:issue|bot|thread)=(?!=)|searchParams\.(?:set|append)\(\s*['"](?:issue|bot|thread)['"]|[?&]section=(?:${WORKSPACE_SECTIONS})\b|searchParams\.(?:set|append)\(\s*['"]section['"]\s*,\s*['"](?:${WORKSPACE_SECTIONS})['"]`, 'g'), message: '不要手拼工作区地址（?issue= / ?bot= / ?section=…）：用 workspaceLink / workspaceSearch / goTo（R-82）。' },
+  // group / session / team / project / artifact also name other things in Settings and API links, so only an app-root link (`/?…`) or a searchParams write counts.
+  { rule: 'navigation/address', pattern: new RegExp(String.raw`[?&](?:issue|bot|thread)=(?!=)|searchParams\.(?:set|append)\(\s*['"](?:issue|bot|thread|${PLACE_KEYS})['"]|[?&]section=(?:${WORKSPACE_SECTIONS})\b|searchParams\.(?:set|append)\(\s*['"]section['"]\s*,\s*['"](?:${WORKSPACE_SECTIONS})['"]|['"\x60]\/\?(?:[^'"\x60\s]*&)?(?:${PLACE_KEYS})=`, 'g'), message: '不要手拼工作区地址（?issue= / ?bot= / ?section= / /?group= …）：用 workspaceLink / workspaceSearch / goTo（R-82）。' },
 ]
 
 /** Blanks comments so a doc line that names an address is not a finding; offsets stay put. */

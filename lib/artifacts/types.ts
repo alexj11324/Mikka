@@ -24,6 +24,8 @@ export interface ArtifactDetail extends ArtifactSummary {
   runId: string | null
   issueId: string | null
   versions: ArtifactVersionInfo[]
+  /** The bot whose run made it; only the owner's read says, as `shared` below. */
+  botId?: string | null
   /** A share link is live. Only the owner's reads say; tokens are stored hashed, so a link can't be shown again. */
   shared?: boolean
 }
