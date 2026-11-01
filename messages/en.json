@@ -3333,6 +3333,7 @@
       "discussPrefill": "Let's talk about {id} {title}: ",
       "card": {
         "personal": "Personal task",
+        "personalHint": "Personal task · only you can see it",
         "status": "Status",
         "priority": "Priority",
         "subtasks": "Subtasks",
