@@ -1,12 +1,12 @@
 import 'server-only'
-import { and, asc, desc, eq, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, lt, ne, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { db } from '@/lib/db'
 import { proactiveUsage, userFactConsolidations, userFacts, userPreferences, userTimeZones } from '@/lib/db/schema'
 import { personLocale } from '@/lib/suggestions/action-title-server'
 import { localClock, safeTimeZone } from '@/lib/suggestions/briefing'
 import type { UserFactKind } from './kinds'
-import { clampSubject, mergedEvidence, mergedValue, planConsolidation, raisedConfidence, subjectKey, type FactInput } from './facts'
+import { clampSubject, mergedEvidence, mergedValue, planConsolidation, raisedConfidence, subjectKey, type ConsolidationDecider, type FactInput } from './facts'
 
 // Each person's profile (R-73). Every read and write is keyed by the person's
 // own user id; nothing here takes a workspace, so teammates never see each
@@ -150,18 +150,44 @@ export async function correctFact(userId: string, id: string, subjectText: strin
   })
 }
 
-/** Runs one night's merge for the person (lib/profile/facts.ts planConsolidation). */
-export async function consolidateFacts(userId: string, timeZone: string, now = new Date()) {
+/** The real Decision API for one person's nightly merge, billed to their execution workspace. */
+export function consolidationDecider(userId: string): ConsolidationDecider {
+  return async (input, questions) => {
+    try {
+      const [{ hostedBillingScope }, { executionWorkspace }, { decide }] = await Promise.all([
+        import('@/lib/abuse/context'), import('@/lib/execution-settings'), import('@/lib/coordinator/decide'),
+      ])
+      const workspaceId = await executionWorkspace(userId, null)
+      return await hostedBillingScope.run({ workspaceId, ownerId: userId }, () => decide('profile-consolidation', input, questions))
+    } catch {
+      // decide() never throws; a budget or workspace lookup failure is also no answer.
+      return null
+    }
+  }
+}
+
+/**
+ * Runs one night's merge for the person (lib/profile/facts.ts planConsolidation).
+ * Reads, asks the Decision API with nothing locked, then writes each judged
+ * change only if the fact is still active, uncorrected and not seen since.
+ */
+export async function consolidateFacts(userId: string, timeZone: string, now = new Date(), decide: ConsolidationDecider = consolidationDecider(userId)) {
   const facts = await db.select({
     id: userFacts.id, kind: userFacts.kind, subject: userFacts.subject, subjectKey: userFacts.subjectKey, value: userFacts.value, confidence: userFacts.confidence,
     lastSeenAt: userFacts.lastSeenAt, expiresAt: userFacts.expiresAt, state: userFacts.state, userEdited: userFacts.userEdited,
   }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active')))
-  const { updates, patterns } = planConsolidation(facts, { now, timeZone: safeTimeZone(timeZone), locale: await personLocale(userId) })
-  for (const change of updates) {
-    await db.update(userFacts).set({ ...change, updatedAt: now }).where(and(eq(userFacts.id, change.id), eq(userFacts.userId, userId)))
+  const { updates, patterns } = await planConsolidation(facts, { now, timeZone: safeTimeZone(timeZone), locale: await personLocale(userId) }, decide)
+  let changed = 0
+  for (const { id, unchangedSince, ...change } of updates) {
+    const rows = await db.update(userFacts).set({ ...change, updatedAt: now }).where(and(
+      eq(userFacts.id, id), eq(userFacts.userId, userId), eq(userFacts.state, 'active'),
+      // Timestamps are stored to the microsecond and read to the millisecond.
+      ...(unchangedSince ? [eq(userFacts.userEdited, false), lt(userFacts.lastSeenAt, new Date(unchangedSince.getTime() + 1))] : []),
+    )).returning({ id: userFacts.id })
+    changed += rows.length
   }
   const merged = await recordFacts(userId, patterns, { pattern: true })
-  return { changed: updates.length, merged }
+  return { changed, merged }
 }
 
 /** The nightly merge runs from this local hour, before the 05:00 research run and the 08:00 briefing. */
@@ -176,7 +202,7 @@ const CONSOLIDATION_CONCURRENCY = 8
  * person without a stored time zone is merged on UTC dates. Claiming the date
  * first keeps overlapping runs to one merge per person and day.
  */
-export async function consolidateDueFacts({ entitled, now = new Date(), limit = 500, deadline = Infinity }: { entitled: (userId: string) => Promise<boolean>; now?: Date; limit?: number; deadline?: number }) {
+export async function consolidateDueFacts({ entitled, now = new Date(), limit = 500, deadline = Infinity, decider = consolidationDecider }: { entitled: (userId: string) => Promise<boolean>; now?: Date; limit?: number; deadline?: number; decider?: (userId: string) => ConsolidationDecider }) {
   const people = await db.selectDistinct({ userId: userFacts.userId, timeZone: userTimeZones.timeZone, enabled: userPreferences.memoryEnabled, consolidatedOn: userFactConsolidations.consolidatedOn })
     .from(userFacts)
     .leftJoin(userTimeZones, eq(userTimeZones.userId, userFacts.userId))
@@ -200,7 +226,7 @@ export async function consolidateDueFacts({ entitled, now = new Date(), limit = 
           .onConflictDoUpdate({ target: userFactConsolidations.userId, set: { consolidatedOn: person.date, updatedAt: now }, setWhere: sql`${userFactConsolidations.consolidatedOn} is distinct from ${person.date}` })
           .returning({ userId: userFactConsolidations.userId })
         if (!claimed) { result.skipped++; return }
-        await consolidateFacts(person.userId, person.timeZone, now)
+        await consolidateFacts(person.userId, person.timeZone, now, decider(person.userId))
         result.written++
       } catch (error) {
         result.failed++
