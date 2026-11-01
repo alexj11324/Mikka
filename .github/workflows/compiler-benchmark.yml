@@ -27,10 +27,35 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/compiler-tsrs" --no-save --package-lock=false tsrs@0.20.1-ts7.1.0-beta
       - name: Generate route types once
         run: pnpm exec next typegen
+      - name: Verify the existing search and scrape contracts
+        run: node --import tsx --test lib/search/search.test.ts lib/search/firecrawl.test.ts tests/bot-web-tools.test.mjs
       - name: Verify benchmark self-checks
         run: node scripts/compiler-benchmark.mjs --self-test
       - name: Compare cold checks and deliberate diagnostic probes
         run: node scripts/compiler-benchmark.mjs
+      - name: Prepare and verify an integration candidate only after clean parity
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process'
+          import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          const results = join(process.env.RUNNER_TEMP, 'compiler-benchmark-results')
+          const report = JSON.parse(readFileSync(join(results, 'report.json'), 'utf8'))
+          if (!report.tsrsBetaParity || !report.compatibility.every(row => row.allChecksPassed && row.diagnosticsStable) || !report.probes.every(row => row.detectedAll)) {
+            console.log('Compiler compatibility is not clean; preserve diagnostics without preparing integration')
+            process.exit(0)
+          }
+          execFileSync('pnpm', ['add', '--workspace-root', '--save-dev', '--save-exact', '--lockfile-only', '--ignore-scripts', 'tsrs@0.20.1-ts7.1.0-beta'], { stdio: 'inherit' })
+          const manifest = JSON.parse(readFileSync('package.json', 'utf8'))
+          manifest.scripts.typecheck = 'tsrs --noEmit'
+          writeFileSync('package.json', `${JSON.stringify(manifest, null, 2)}\n`)
+          execFileSync('pnpm', ['install', '--frozen-lockfile', '--ignore-scripts'], { stdio: 'inherit' })
+          execFileSync('pnpm', ['typecheck'], { stdio: 'inherit' })
+          execFileSync('pnpm', ['typecheck'], { stdio: 'inherit' })
+          const candidate = join(results, 'integration-candidate')
+          mkdirSync(candidate)
+          for (const file of ['package.json', 'pnpm-lock.yaml']) copyFileSync(file, join(candidate, file))
+          JS
       - name: Preserve measurements and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

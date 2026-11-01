@@ -53,7 +53,7 @@ const args = ['--project', join(root, 'tsconfig.json'), '--noEmit', '--increment
 const sourceRouteTypesHash = routeTypesHash(root)
 const report = {
   revision: process.env.GITHUB_SHA,
-  sourceRevision: 'ca1a9c6d51bbdb9442254a5d9ff6c1c1fb63ec52',
+  baseRevision: 'ca1a9c6d51bbdb9442254a5d9ff6c1c1fb63ec52',
   runUrl: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
   node: process.version,
   platform: process.platform,
