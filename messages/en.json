@@ -1789,8 +1789,7 @@
       "allow": "Allow",
       "deny": "Deny",
       "error": "Could not update or load the computer setting.",
-      "loading": "Loading computer setting…",
-      "unavailable": "Cloud computers are off"
+      "loading": "Loading computer setting…"
     },
     "issuePrefix": {
       "title": "Personal task ids",
@@ -1989,7 +1988,6 @@
       "userName": "Preview user"
     },
     "notifications": {
-      "heading": "Notifications",
       "proactive": "Proactive messages",
       "pushDecide": "Needs your decision",
       "pushReview": "Ready for review",

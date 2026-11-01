@@ -1789,7 +1789,6 @@
       "deny": "禁止",
       "error": "无法读取或更新电脑设置。",
       "loading": "正在读取电脑设置…",
-      "unavailable": "云电脑未开启",
       "allow": "允许"
     },
     "issuePrefix": {
@@ -1989,7 +1988,6 @@
       "userName": "预览用户"
     },
     "notifications": {
-      "heading": "通知",
       "proactive": "主动消息",
       "pushDecide": "需要你决策",
       "pushReview": "待审阅",
