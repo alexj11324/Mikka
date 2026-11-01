@@ -436,8 +436,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,
   forward, centred search pill that opens ⌘K, the 浏览器 globe toggle at the
-  right, R-57), 72px icon rail with a text label under each icon, in this
-  order: 主页, 建议, 看板, 插件, Artifact; and one rounded content card. Build on
+  right, R-57), 68px icon rail, in this order: 主页, 建议, 看板, 插件,
+  Artifact; and one rounded content card. Rail items are icons only: no text
+  under the icon; the name shows as a tooltip on hover and stays the item's
+  accessible name (Alex, #580; restored 2026-11-01 after #747 brought the
+  labels back). Build on
   `components/app-shell.tsx`; no reUI App Shell blocks. Standing rule: a
   skill audit (unslop, interface-design) never changes the shell layout;
   Alex keeps it as it is (2026-10-31).
