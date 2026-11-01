@@ -3,8 +3,7 @@ import type { getPasswordStatus, listSessions } from '@/app/actions/account'
 import type { getPreferences } from '@/app/actions/preferences'
 import type { listSavedLogins } from '@/app/actions/settings-activity'
 import type { getWorkspaceDeletionImpact, getWorkspaceGeneral, getWorkspaceTransferTargets } from '@/app/actions/workspace-settings'
-import { apiKeysKey } from '@/components/settings/api-key-settings'
-import { getApiKeys } from '@/app/actions/model-api-keys'
+import { apiKeysKey, readApiKeys } from '@/components/settings/api-key-settings'
 import type { getAppPolicy } from '@/app/actions/app-policy'
 import type { getPersonalPolicy } from '@/app/actions/personal-policy'
 import type { getE2BKeyCapability, listSecrets } from '@/app/actions/workspace-secrets'
@@ -44,7 +43,7 @@ const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: un
   usage: id => { const month = currentMonth(); return [[['settings:usage', id, month], () => settingsRead<Result<typeof getUsage>>('usage', { month, workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)]] },
   billing: id => [[['settings:billing', id], () => settingsRead<Result<typeof getBilling>>('billing', { workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)], [cardVerificationKey(id), () => readCardVerification(id)]],
   bots: () => botAgentsReads(),
-  models: id => [[apiKeysKey(id), () => getApiKeys(id)]],
+  models: id => [[apiKeysKey(id), () => readApiKeys(id)]],
   // useSWRInfinite takes a preloaded page by the page's own key: page one of 全部.
   audit: id => [[['settings:audit', id, 'all', null], () => settingsRead<Result<typeof listAuditLog>>('audit', { workspace: id, filter: 'all' })]],
 }

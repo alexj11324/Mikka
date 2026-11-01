@@ -59,6 +59,39 @@ test('通知设置可以关闭主动消息，刷新后保持', async ({ page }) 
   await expect(page.getByRole('switch', { name: '主动消息', exact: true })).not.toBeChecked()
 })
 
+// A save never waits behind Settings' idle prefetch: the reads are GETs, not server actions, which Next runs one at a time.
+// The API key read is held open; the switch must still save, and stay off after a reload.
+test('设置预取未返回时，开关仍立即保存', async ({ page }) => {
+  const held: import('@playwright/test').Route[] = []
+  let started: () => void = () => {}
+  const prefetching = new Promise<void>(resolve => { started = resolve })
+  // The API key read as a GET, or as the server action it used to be (its one argument is the workspace id).
+  const isKeyRead = (request: import('@playwright/test').Request) => {
+    if (new URL(request.url()).pathname.endsWith('/api/settings/api-keys')) return true
+    if (!request.headers()['next-action']) return false
+    try { const args: unknown = JSON.parse(request.postData() ?? ''); return Array.isArray(args) && args.length === 1 && typeof args[0] === 'string' } catch { return false }
+  }
+  await page.context().route('**/*', route => {
+    if (!isKeyRead(route.request())) return route.fallback()
+    held.push(route)
+    started()
+  })
+  await register(page, '/settings?section=notifications')
+  const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
+  await expect(proactive).toBeChecked()
+  await prefetching
+  const saved = page.waitForResponse(response => {
+    const request = response.request()
+    try { return Boolean(request.headers()['next-action']) && request.postData() === JSON.stringify([{ proactive: false }]) } catch { return false }
+  })
+  await proactive.click()
+  expect((await saved).ok()).toBe(true)
+  await page.context().unroute('**/*')
+  for (const route of held) await route.fallback()
+  await page.reload()
+  await expect(page.getByRole('switch', { name: '主动消息', exact: true })).not.toBeChecked()
+})
+
 // S-O: a refused save puts the switch back and offers a retry that sends the same change.
 test.describe('通知保存失败', () => {
   // The test aborts the save itself; Chromium logs that aborted server-action POST once.
