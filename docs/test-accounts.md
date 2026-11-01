@@ -71,7 +71,8 @@ CI flags. Ordinary shared or production databases have no bootstrap path here.
 ### Local mode (a developer's own disposable database)
 
 `MIKKA_LOCAL_TEST_ACCOUNTS=1 node scripts/test-accounts/bootstrap.mjs --output <file>`
-is that path for a PostgreSQL you started yourself on this machine. It reads no
+is that path for a PostgreSQL 17 you started yourself on this machine (the
+version CI uses). It reads no
 CI variable and sets none. Before connecting it refuses any database that is
 not on `127.0.0.1`, `localhost` or `[::1]` or whose name does not end in `_e2e`;
 after that it applies the CI checks unchanged (a database with no users and no
