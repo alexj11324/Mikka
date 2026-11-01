@@ -92,13 +92,13 @@ Decision: [`2026-11-01-1545-trunk-based`](design/decisions/2026-11-01-1545-trunk
    documents directly.
 
 Each of these modules has an owner. Anyone else who needs to change one asks
-its owner first; the coordinator names the owners.
+its owner first.
 
-| Module | Covers |
-| --- | --- |
-| Local development environment and fake services | `scripts/dev/bootstrap-local.sh`, local stand-ins for external services |
-| Local test-mode rules | Local test accounts and the guards that decide where a suite may run |
-| MVP acceptance | The MVP end-to-end acceptance and its record |
+| Module | Covers | Owner |
+| --- | --- | --- |
+| Local development environment and fake services | `scripts/dev/bootstrap-local.sh`, local stand-ins for external services | LSV4 session |
+| Local test-mode rules | Local test accounts and the guards that decide where a suite may run | PFe3 session |
+| MVP acceptance | The MVP end-to-end acceptance and its record | QUe session |
 
 ## 6. Numbers
 

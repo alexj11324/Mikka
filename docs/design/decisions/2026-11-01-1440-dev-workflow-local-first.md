@@ -5,6 +5,7 @@
   speed-up rules into the docs as standing rules and change every old rule
   that conflicts with them.
 - Rule: — (process, not product)
+- Superseded in part by: [2026-11-01-1545-trunk-based](2026-11-01-1545-trunk-based.md) (rule 5: trunk-based merging replaces integration batches)
 - Replaces, in part:
   - [2026-11-01-0230-browser-tests-manual-only](2026-11-01-0230-browser-tests-manual-only.md): browser acceptance runs locally first; the manual Actions run is only for suites that need a GitHub-hosted runner.
   - [2026-11-01-0330-ui-figma-and-skill-review-before-code](2026-11-01-0330-ui-figma-and-skill-review-before-code.md) step 4–5: screenshots come from a local production build, and "merge" means the next integration batch.
