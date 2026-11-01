@@ -6,7 +6,7 @@ import * as native from './native-steps'
 import type { NativeToolScope } from './tool-scope'
 
 /** A durable transport relay, not an additional LLM/agent loop. Native harness chooses tools. */
-export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, createTools: (scope?: NativeToolScope) => ToolSet, botId: string, snapshot?: DefinitionSnapshot) {
+export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, createTools: (scope?: NativeToolScope) => ToolSet, botId: string, snapshot?: DefinitionSnapshot, signal?: AbortSignal) {
   const tools = createTools()
   const definitions: NativeCoordinatorJob['tools'] = []
   for (const [name, definition] of Object.entries(tools)) {
@@ -20,6 +20,8 @@ export async function nativeCoordinatorTurn(userId: string, holder: string, roun
   const completed = new Map<string, unknown>()
   try {
     for (let attempt = 0; attempt < 180; attempt++) {
+      // 停止: closing the turn below refuses the device's later tool calls and reply.
+      if (signal?.aborted) return { text: '', responseMessages, finishReason: 'stop' }
       const state = await native.poll(userId,holder,turnId)
       if (state.status === 'failed' || state.status === 'closed') throw new Error('nativeCoordinatorFailed: check the selected device and CLI login')
       for (const call of state.calls) {
