@@ -30,8 +30,14 @@ class Publish(unittest.TestCase):
                 called['base_template'] = name
                 return self
             def copy(self, *_): return self
+            def set_workdir(self, path):
+                called.setdefault('workdirs', []).append(path)
+                self.workdir = path
+                return self
             def run_cmd(self, command, **__):
                 called.setdefault('commands', []).append(command)
+                if command == bt.NPM_RUNTIME_CHECK:
+                    called['npm_workdir'] = self.workdir
                 return self
             def set_user(self, user):
                 self.user = user
@@ -52,6 +58,8 @@ class Publish(unittest.TestCase):
             sha, result = bt.build('mikka-versioned-worker', api_key='fixture-key')
         self.assertEqual(called['name'], 'mikka-versioned-worker')
         self.assertEqual(called.get('base_template'), 'desktop')
+        self.assertEqual(called['npm_workdir'], '/tmp')
+        self.assertEqual(called['workdirs'], ['/tmp', '/home/user'])
         self.assertEqual(sha, 'a' * 40)
         self.assertEqual(result.template_id, 'tpl1')
         self.assertIn('systemctl start mikka-preload.service mikka-viewer.service', called['start'])
