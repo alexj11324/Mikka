@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
-import { enqueueGroupTurn } from './coordinator/group-turns'
+import { enqueueGroupTurn, GROUP_TURN_STOPPED, stopGroupTurns } from './coordinator/group-turns'
 import { groupParticipants, type GroupParticipant } from './group-participants'
 
 const member = z.object({ memberType: z.enum(['user', 'agent', 'bot']), memberId: z.string().min(1).max(256) }).strict()
@@ -11,7 +11,7 @@ const message = z.object({ body: z.string().trim().min(1).max(32000), mentions: 
 const read = z.object({ messageId: z.string().min(1).max(64) }).strict()
 export type Member = z.infer<typeof member>
 export type Directory = (workspaceId: string, userId: string, members: Member[]) => Promise<boolean>
-export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members' | 'read' | 'links'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; limit?: string | null; workspaceId?: string | null }
+export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members' | 'read' | 'links' | 'stop'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; limit?: string | null; workspaceId?: string | null }
 class Failure extends Error { constructor(readonly status: number) { super(String(status)) } }
 const fail = (status: number): never => { throw new Failure(status) }
 function parse<T>(schema: z.ZodType<T>, body?: string): T {
@@ -133,6 +133,10 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         }
         await q('UPDATE conversations SET "leadAgentId"=$2,"leadBotId"=$3 WHERE id=$1', [req.id, bot ? null : id, bot ? id : null])
         result = { id: req.id, leadAgentId: bot ? null : id, leadBotId: bot ? id : null }
+      } else if (req.resource === 'stop' && req.method === 'POST') {
+        // 停止: any member may stop the reply the group is waiting on; what was already posted stays.
+        if (!queueAgents) return fail(405)
+        result = { stopped: await stopGroupTurns(client, req.id!) }
       } else if (req.resource === 'messages' && req.method === 'GET') {
         const before = req.before == null ? null : decimal(req.before, '')
         const limit = Number(decimal(req.limit, '50'))
@@ -160,7 +164,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const active = queueAgents ? await q(`SELECT "agentId","botId",status,"updatedAt" FROM group_turns WHERE "conversationId"=$1 AND status IN ('queued','running') ORDER BY "createdAt" LIMIT 1`, [req.id]) : { rows: [] }
         const failed = queueAgents ? await q(`SELECT error FROM group_turns WHERE "conversationId"=$1 ORDER BY "createdAt" DESC,"messageId" DESC LIMIT 1`, [req.id]) : { rows: [] }
         result = { messages, timeline, nextBefore: more ? messages.at(-1)?.position : null, agentStatus: active.rows[0] ?? null,
-          ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, leadBotId: group.leadBotId ?? null, routingError: ['group_judgment_pending','group_lead_required'].includes(failed.rows[0]?.error) ? { code: 'group_judgment_pending' } : null } : {}) }
+          ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, leadBotId: group.leadBotId ?? null, routingError: ['group_judgment_pending','group_lead_required'].includes(failed.rows[0]?.error) ? { code: 'group_judgment_pending' } : null, stopped: failed.rows[0]?.error === GROUP_TURN_STOPPED } : {}) }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
         // Group-selected agents belong to the creator, not necessarily this sender.

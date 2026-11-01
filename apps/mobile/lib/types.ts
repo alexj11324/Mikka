@@ -74,6 +74,8 @@ export interface GroupPage {
   nextBefore: string | null
   agentStatus: { agentId: string | null; botId: string | null; status: string } | null
   routingError: { code: string } | null
+  /** The latest reply was stopped (停止) by a member. */
+  stopped?: boolean
 }
 
 export interface Thread {

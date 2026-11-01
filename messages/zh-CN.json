@@ -3698,7 +3698,8 @@
     "loadingOlder": "正在加载…",
     "notSent": "未发送",
     "answering": "正在回复",
-    "noTaker": "没有 Bot 接这条，@ 它的名字"
+    "noTaker": "没有 Bot 接这条，@ 它的名字",
+    "stopped": "已停止"
   },
   "DeviceSetup": {
     "title": "设置 {device}",

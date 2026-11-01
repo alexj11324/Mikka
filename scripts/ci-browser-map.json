@@ -31,6 +31,7 @@
     "global-search-scope.spec.ts",
     "bot-list-groups.spec.ts",
     "group-chat-send.spec.ts",
+    "group-chat-stop.spec.ts",
     "invalid-issue-content.spec.ts",
     "issue-threads.spec.ts",
     "issue-page-overlap.spec.ts",
@@ -376,7 +377,8 @@
       ],
       "specs": [
         "group-chat-send.spec.ts",
-        "bot-list-groups.spec.ts"
+        "bot-list-groups.spec.ts",
+        "group-chat-stop.spec.ts"
       ]
     }
   ]

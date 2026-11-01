@@ -17,8 +17,22 @@ export type GroupRuntime = {
   authorized(workspaceId: string, userId: string): Promise<boolean>
   route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[]): Promise<GroupRoute>
   correction(input: CorrectionInput): Promise<CorrectionJudgment>
-  generate(agent: GroupAgent, input: { message: GroupMessage; earlier: { author: string; text: string }[]; followUp: string; members: RoutingMember[]; ask?: string; privatePeer?: RoutingMember; modelRuntime?: HostedRuntimeSnapshot }): Promise<GroupReply>
+  generate(agent: GroupAgent, input: { message: GroupMessage; earlier: { author: string; text: string }[]; followUp: string; members: RoutingMember[]; ask?: string; privatePeer?: RoutingMember; modelRuntime?: HostedRuntimeSnapshot; signal?: AbortSignal }): Promise<GroupReply>
 }
+/** 停止 in a group: the turn's error once a member stopped it; it keeps the replies already posted and is never replayed. */
+export const GROUP_TURN_STOPPED = 'stopped'
+/** How often a generation checks whether the turn was stopped. */
+const STOP_POLL_MS = 1000
+
+/** 停止: ends the group's running and queued turns. The worker sees it, aborts the reply in flight and posts nothing more. */
+export async function stopGroupTurns(client: Pick<PoolClient, 'query'>, conversationId: string): Promise<number> {
+  const { rows } = await client.query<{ activeRunId: string | null }>(`UPDATE group_turns SET status='failed',error=$2,"agentId"=NULL,"botId"=NULL,"updatedAt"=now()
+    WHERE "conversationId"=$1 AND status IN ('queued','running') RETURNING "activeRunId"`, [conversationId, GROUP_TURN_STOPPED])
+  const runs = rows.flatMap(row => row.activeRunId ? [row.activeRunId] : [])
+  if (runs.length) await client.query(`UPDATE agent_runs SET status='stopped',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id=ANY($1::uuid[]) AND kind='group_chat' AND status='running'`, [runs])
+  return rows.length
+}
+
 export async function enqueueGroupTurn(client: PoolClient, conversationId: string, messageId: string, userId: string) {
   await client.query('INSERT INTO group_turns ("messageId","conversationId","userId") VALUES ($1,$2,$3)', [messageId, conversationId, userId])
 }
@@ -43,6 +57,8 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       WHERE t."conversationId"=$1 AND t.status='queued' ORDER BY m.position LIMIT 1`, [conversationId])
     const root = rows[0]
     if (!root) return false
+    // 停止 (stopGroupTurns) moves the turn off 'running'; the worker checks before each step and while a reply generates.
+    const stopped = async () => (await client.query(`SELECT status FROM group_turns WHERE "messageId"=$1`, [root.messageId])).rows[0]?.status !== 'running'
     const modelScope = <T>(work: () => Promise<T>) => hostedBillingScope.run({ workspaceId: root.workspaceId, ownerId: root.createdBy }, work)
     messageId = root.messageId
     await client.query(`UPDATE group_turns SET status='running',"updatedAt"=now() WHERE "messageId"=$1`, [messageId])
@@ -96,7 +112,9 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       const selections = new Map<string, HostedRuntimeSnapshot>()
       await runGroupRounds(route, input, {
         eligible,
-        async generate(agent, input) {
+        stopped,
+        generate: (agent, input) => untilStopped(stopped, async signal => {
+          input = { ...input, signal }
           if (agent.memberType !== 'bot') return modelScope(() => runtime.generate(agent, input))
           const { withDatabaseClient } = await import('@/lib/db')
           return withDatabaseClient(client, async () => {
@@ -110,7 +128,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
             }
             return modelScope(() => runtime.generate(agent, { ...input, modelRuntime: selected }))
           })
-        },
+        }),
         async status(id, outcome = 'succeeded') {
           await client.query('BEGIN')
           try {
@@ -130,7 +148,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
               await client.query(`INSERT INTO agent_runs (id,"userId","agentId",kind,status,"startedAt","leaseExpiresAt") VALUES ($1,$2,$3,'group_chat','running',now(),now()+interval '60 seconds')`, [runId, root.createdBy, id])
               await client.query('UPDATE group_turns SET "agentId"=$2,"activeRunId"=$3,"botId"=NULL,"updatedAt"=now() WHERE "messageId"=$1', [messageId, id, runId])
             } else {
-              await client.query(`UPDATE agent_runs SET status=$2,"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id=(SELECT "activeRunId" FROM group_turns WHERE "messageId"=$1) AND kind='group_chat' AND "userId"=$3`, [messageId, outcome, root.createdBy])
+              await client.query(`UPDATE agent_runs SET status=$2,"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id=(SELECT "activeRunId" FROM group_turns WHERE "messageId"=$1) AND kind='group_chat' AND "userId"=$3 AND status='running'`, [messageId, outcome, root.createdBy])
               await client.query('UPDATE group_turns SET "agentId"=NULL,"activeRunId"=NULL,"botId"=NULL,"updatedAt"=now() WHERE "messageId"=$1', [messageId])
             }
             await client.query('COMMIT')
@@ -155,6 +173,8 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
           await client.query('BEGIN')
           try {
             await client.query('SELECT id FROM conversations WHERE id=$1 FOR UPDATE', [conversationId])
+            // A reply that finished as the person pressed 停止 is not posted.
+            if ((await client.query(`SELECT status FROM group_turns WHERE "messageId"=$1 FOR UPDATE`, [messageId])).rows[0]?.status !== 'running') { await client.query('ROLLBACK'); return false }
             const current = await eligible()
             const actor = current.find(a => a.id === id)
             if (!actor) { await client.query('ROLLBACK'); return false }
@@ -168,11 +188,13 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
         },
       }, deadline)
     }
-    await client.query(`UPDATE group_turns SET status='complete',"updatedAt"=now() WHERE "messageId"=$1`, [messageId])
+    await client.query(`UPDATE group_turns SET status='complete',"updatedAt"=now() WHERE "messageId"=$1 AND status='running'`, [messageId])
     return true
   } catch (error) {
     if (!messageId) throw error
-    await client.query(`UPDATE group_turns SET status='failed',"agentId"=NULL,"botId"=NULL,error=$2,"updatedAt"=now() WHERE "messageId"=$1`, [messageId, error instanceof GroupJudgmentPendingError ? 'group_judgment_pending' : error instanceof UnknownMentionError ? 'unknown_mention' : 'generation_failed_not_replayed'])
+    // Stopped: the abort it caused is the stop, not a failure.
+    if ((await client.query(`SELECT error FROM group_turns WHERE "messageId"=$1`, [messageId])).rows[0]?.error === GROUP_TURN_STOPPED) return true
+    await client.query(`UPDATE group_turns SET status='failed',"agentId"=NULL,"botId"=NULL,error=$2,"updatedAt"=now() WHERE "messageId"=$1 AND status='running'`, [messageId, error instanceof GroupJudgmentPendingError ? 'group_judgment_pending' : error instanceof UnknownMentionError ? 'unknown_mention' : 'generation_failed_not_replayed'])
     throw error
   } finally {
     try { if (locked) await client.query(`SELECT pg_advisory_unlock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0))`, [conversationId]) }
@@ -182,8 +204,22 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
 }
 
 /** Pure serial round engine, shared by the real adapter and scripted CI. */
+/** Runs `work` with a signal that aborts once `stopped()` says the turn was stopped (polled while it runs). */
+export async function untilStopped<T>(stopped: () => Promise<boolean>, work: (signal: AbortSignal) => Promise<T>, every = STOP_POLL_MS): Promise<T> {
+  const controller = new AbortController()
+  let polling = false
+  const timer = setInterval(() => {
+    if (polling) return
+    polling = true
+    void stopped().then(yes => { if (yes) controller.abort(new Error(GROUP_TURN_STOPPED)) }, () => undefined).finally(() => { polling = false })
+  }, every)
+  try { return await work(controller.signal) } finally { clearInterval(timer) }
+}
+
 export async function runGroupRounds(route: GroupRoute, message: GroupMessage, io: {
   eligible(): Promise<GroupAgent[]>
+  /** 停止: true once the turn was stopped; no further reply is generated. */
+  stopped?(): Promise<boolean>
   generate: GroupRuntime['generate']
   publish(id: string, reply: GroupReply): Promise<boolean>
   publishPrivate?(senderId: string, recipientId: string, reply: GroupReply): Promise<boolean>
@@ -194,6 +230,7 @@ export async function runGroupRounds(route: GroupRoute, message: GroupMessage, i
   for (let round = 0; round < GROUP_MAX_ROUNDS && next.length; round++) {
     const follow = new Set<string>()
     for (const id of new Set(next)) {
+      if (await io.stopped?.()) return
       if (Date.now() > deadline) throw new Error('group_generation_budget_exceeded')
       const current = await io.eligible()
       const agent = current.find(a => a.id === id)
@@ -219,6 +256,7 @@ export async function runGroupRounds(route: GroupRoute, message: GroupMessage, i
           privateEarlier.push({ author: sender.name, text: privateReply.text })
           if (privateRound + 1 >= GROUP_MAX_ROUNDS - round) break
           if (Date.now() > deadline) throw new Error('group_generation_budget_exceeded')
+          if (await io.stopped?.()) return
           await io.status(recipientId)
           let privateOutcome: 'succeeded' | 'failed' = 'failed'
           try {
