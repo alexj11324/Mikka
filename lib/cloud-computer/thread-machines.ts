@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg'
 import { NotFoundError, Sandbox, SandboxNotFoundError } from 'e2b'
 import { z } from 'zod'
 import { repositoryBindingMatches } from '@mikka/protocol/repository'
+import { matchesRepositoryAdmission } from '@/lib/repository-admission'
 import { ComputerError } from '@/lib/computer/store'
 import { computerPermission } from '@/lib/computer/permission'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant } from '@/lib/computer/e2b-provider'
@@ -286,16 +287,28 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (!expectedSha || sourceSha !== expectedSha) throw new Error('Worker version mismatch')
     await client.query('BEGIN')
     // Provision, end and desktop all lock the parent run before its machine.
-    await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])
+    const current = (await client.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
     const activeLease = await client.query('SELECT 1 FROM thread_machines WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' FOR UPDATE', [runId, leaseId])
     if (!activeLease.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
+    const definition = current.agentDefinition
+    const admission = definition?.repositoryAdmission
+    if (current.status === 'queued' && admission) {
+      if (!matchesRepositoryAdmission(admission, {
+        userId: actor.userId, issueId: current.issueId, deviceId: current.deviceId, agentId: current.agentId,
+        remoteKey: run.repoPath, remoteUrl: run.remoteUrl, targetBranch: admission.targetBranch,
+        ...(current.botId ? { workspaceId: actor.workspaceId } : {}),
+        workspaceLinked: admission.workspaceLinked, requestEventId: admission.requestEventId,
+      })) throw new ComputerError(409, 'Repository authority unavailable')
+      // Host-owned relocation changes the executor, never the admitted repository or branch.
+      definition.repositoryAdmission = { ...admission, deviceId }
+    }
     // The sandbox's hostname (e2b.local) never renames it; a re-provisioned machine is live again.
     await client.query('INSERT INTO devices (id,"ownerId",name,kind,"nameLocked") VALUES ($1,$2,$3,\'cloud\',true) ON CONFLICT(id) DO UPDATE SET "removedAt"=NULL', [deviceId, actor.userId, 'Thread computer'])
     await client.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch","verifyCommand","remoteUrl") VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING', [repoId, deviceId, actor.userId, run.repoPath, run.baseBranch, run.verifyCommand,run.remoteUrl])
     await client.query('UPDATE thread_machines SET "deviceId"=$2,"repoId"=$3 WHERE "runId"=$1', [runId, deviceId, repoId])
     await client.query('UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=$1', [deviceId])
     await client.query('INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,now()+interval \'24 hours\')', [randomUUID(), actor.userId, 'Thread worker', createHash('sha256').update(credential).digest('hex'), deviceId, actor.workspaceId])
-    await client.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3 WHERE id=$1 AND "userId"=$4 AND status=\'queued\'', [runId, deviceId, repoId, actor.userId])
+    await client.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=COALESCE($5::jsonb,"agentDefinition") WHERE id=$1 AND "userId"=$4 AND status=\'queued\'', [runId, deviceId, repoId, actor.userId, admission ? JSON.stringify(definition) : null])
     await client.query('COMMIT')
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     await sandbox.files.write(handoff, JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) }), { user: 'root' })
