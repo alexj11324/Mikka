@@ -5,15 +5,15 @@ import { useTranslations } from 'next-intl'
 import { ArrowDown, ArrowUp, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Breadcrumb, BreadcrumbEllipsis, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export type IssueDetailNavigation = { index: number; total: number; onOpen: (offset: -1 | 1) => void }
 
-export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel, saved, pending, navigation, actions, onClose }: {
-  workspaceName: string; identifier: string | null; title: string; saveLabel: string; saved: boolean; pending: boolean
+export function IssueDetailHeader({ identifier, title, saveLabel, saved, pending, navigation, actions, onClose }: {
+  identifier: string | null; title: string; saveLabel: string; saved: boolean; pending: boolean
   navigation: IssueDetailNavigation; actions: ReactNode
   onClose: () => void
 }) {
@@ -22,7 +22,9 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
   const tWorkspaceDetail = useTranslations('Workspace.detail')
   const { isMobile, openMobile, open } = useSidebar()
   // The header lays itself out by its own width (the sidebar changes it, the viewport doesn't).
-  // Narrowing order: the title truncates, then the workspace name; then both fold into the ellipsis; then the save
+  // No workspace name: it cannot be clicked here, and the workspace is switched only from the avatar menu
+  // (decision 2026-11-01-1300-no-workspace-name-in-breadcrumbs, R-79).
+  // Narrowing order: the title truncates, then 看板 folds into the ellipsis; then the save
   // label text and the previous/next arrows go (the list still opens any task). The ID never truncates.
   return <header className="@container/header sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-rule bg-background px-3 sm:px-4">
     <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
@@ -34,14 +36,11 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label={tDetail('breadcrumbMore')} />}><BreadcrumbEllipsis /></DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuGroup>
-                <DropdownMenuLabel>{workspaceName}</DropdownMenuLabel>
                 <DropdownMenuItem disabled={pending} onClick={onClose}>{tDetail('breadcrumbBoard')}</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </BreadcrumbItem>
-        <BreadcrumbItem className="hidden @2xl/header:inline-flex"><span className="min-w-0 max-w-40 truncate" title={workspaceName}>{workspaceName}</span></BreadcrumbItem>
-        <BreadcrumbSeparator className="hidden @2xl/header:block" />
         {/* At the list's own size, colour and weight like the crumbs beside it: no button size of its own shrinks the text. */}
         <BreadcrumbItem className="hidden @2xl/header:inline-flex"><Button variant="ghost" className="h-6 px-2 font-normal" disabled={pending} onClick={onClose}>{tDetail('breadcrumbBoard')}</Button></BreadcrumbItem>
         <BreadcrumbSeparator />
