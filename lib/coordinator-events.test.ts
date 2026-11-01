@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { issueDoneEvent, runBlockedEvent, runFinishedEvent, runQuestionEvent, runReportEvent, runRetriedEvent, telegramReplyTargets, userMessageEvent } from './coordinator-events'
+import { issueStatusEvent, runBlockedEvent, runFinishedEvent, runQuestionEvent, runReportEvent, runRetriedEvent, telegramReplyTargets, userMessageEvent } from './coordinator-events'
 
 const issue = { id: 'issue-1', userId: 'user-1', title: 'Fix login', status: 'done', revision: 4 }
 
@@ -28,13 +28,19 @@ test('Telegram reply targets are validated and unique per chat', () => {
 })
 
 test('a move to done is an event, keyed by the revision that made it', () => {
-  const event = issueDoneEvent({ status: 'review' }, issue, 'c0000000-0000-4000-8000-0000000c0de9')
+  const event = issueStatusEvent({ status: 'review' }, issue, 'c0000000-0000-4000-8000-0000000c0de9')
   assert.deepEqual(event, { userId: 'user-1', botId: 'c0000000-0000-4000-8000-0000000c0de9', kind: 'issue_done', dedupeKey: 'issue_done:issue-1:4', issueId: 'issue-1', runId: null, payload: { title: 'Fix login', previousStatus: 'review' } })
 })
 
-test('saves that do not move the issue to done are not events', () => {
-  assert.equal(issueDoneEvent({ status: 'done' }, issue, 'c0000000-0000-4000-8000-0000000c0de9'), null)
-  assert.equal(issueDoneEvent({ status: 'todo' }, { ...issue, status: 'doing' }, 'c0000000-0000-4000-8000-0000000c0de9'), null)
+test('every other status move is an event too, untiered for triage; a save that keeps the status is not', () => {
+  const bot = 'c0000000-0000-4000-8000-0000000c0de9'
+  // Canceled, blocked or reopened used to wake nobody; now triage (the Decisions API) decides whether they matter.
+  const moved = issueStatusEvent({ status: 'todo' }, { ...issue, status: 'canceled' }, bot)!
+  assert.deepEqual(moved, { userId: 'user-1', botId: bot, kind: 'issue_status_changed', dedupeKey: 'issue_status:issue-1:4', issueId: 'issue-1', runId: null, payload: { title: 'Fix login', previousStatus: 'todo', status: 'canceled' } })
+  assert.equal('tier' in moved, false)
+  assert.equal(issueStatusEvent({ status: 'done' }, { ...issue, status: 'todo' }, bot)!.kind, 'issue_status_changed')
+  assert.equal(issueStatusEvent({ status: 'done' }, issue, bot), null)
+  assert.equal(issueStatusEvent({ status: 'doing' }, { ...issue, status: 'doing' }, bot), null)
 })
 
 test('a finished run is one event per run, with its summary', () => {
