@@ -24,6 +24,14 @@ shipped that inference. This corrects it.
   accent (`--object-chip-foreground`) with no underline. The chip does not
   break across lines; a long title truncates. The whole chip is the click
   target and opens the object.
+- A thread chip leads with the thread's status icon and colour (running
+  spins, failed is red, waiting on you, succeeded), the same set as the thread
+  card and the Threads list; the coding agent's mark (Claude Code, Codex) is in
+  the hover card only. Alex: 「前面应该加个状态呀，或者加个颜色啊。」
+- Clicking a thread chip, or a thread in the reply's sources list, opens that
+  thread's conversation the way a thread card does (R-66, R-50), not the task
+  page. Alex: 「这明明是个 thread，怎么会跳转到这个详情界面？理所应当应该在右边，
+  应该是这个 thread 的 chat 界面。」 Only a task chip opens the task.
 - The hover card stays (Mikka · number, title, status, priority). The chip
   carries only the title; the number moved to the hover card.
 

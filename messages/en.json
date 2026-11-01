@@ -2885,7 +2885,7 @@
       "run": "Thread",
       "runOf": "{agent} thread",
       "openIssue": "Open task: {title}",
-      "openRunIssue": "{agent} thread, open task: {title}",
+      "openThread": "Open thread: {name}",
       "noIssue": "No linked task",
       "runStatus": {
         "queued": "Queued",

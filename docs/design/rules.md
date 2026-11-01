@@ -70,8 +70,10 @@ source wins in a conflict is in [`README.md`](README.md).
   are boxed: a faint accent fill (`--object-chip`), small radius, the status or
   type icon, then the title in the accent with no underline; the chip never
   breaks across lines and a long title truncates. The task number is in the
-  hover card, not the chip. Web sources and links keep the unboxed source chip
-  (R-14). A thread the reply
+  hover card, not the chip. A thread chip leads with the thread's status icon
+  (the same marks and colours as the thread card and Threads list) and opens
+  the thread's own conversation, as a thread card does (R-66); only a task chip
+  opens the task. Web sources and links keep the unboxed source chip (R-14). A thread the reply
   dispatches is different: it is a thread card under that reply (R-66). An
   Artifact waiting for acceptance is a bordered card under the reply (icon,
   name, state such as 待你确认); clicking it opens the Artifact window (R-56).
