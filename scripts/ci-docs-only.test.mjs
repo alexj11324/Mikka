@@ -181,7 +181,7 @@ test('real git diffs retain all fixtures while testing rename, deletion and even
 test('the workflow-extracted trusted classifier executes as an ES module', () => {
   const dir = mkdtempSync(join(tmpdir(), 'docs-gate-loader-retained-'))
   console.log(`Retained docs gate loader evidence: ${dir}`)
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml', '.github/workflows/analytics-ssr.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/analytics-ssr.yml']) {
     const workflow = readFileSync(file, 'utf8')
     const allocation = workflow.match(/trusted_dir="\$\((mktemp[^\n]*)\)"/)
     assert.ok(allocation, file)
@@ -195,7 +195,7 @@ test('the workflow-extracted trusted classifier executes as an ES module', () =>
 })
 
 test('trusted workflow classifier executes as an ES module from its retained temporary file', () => {
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml', '.github/workflows/analytics-ssr.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/analytics-ssr.yml']) {
     const workflow = readFileSync(file, 'utf8')
     const command = /trusted_dir="\$\((mktemp[^)]+)\)"/.exec(workflow)?.[1]
     assert.equal(command, 'mktemp -d')
@@ -236,7 +236,7 @@ test('all required gates reject failed classification and skipped full jobs', ()
 })
 
 test('each actual workflow temp-file command produces a classifier Node can load outside the package', () => {
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml', '.github/workflows/analytics-ssr.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/analytics-ssr.yml']) {
     const source = readFileSync(file, 'utf8')
     const command = source.match(/^          (trusted_dir="\$\(mktemp -d\)"\n          trusted="\$trusted_dir\/ci-docs-only\.mjs")$/m)?.[1]
     assert.ok(command, 'Exercise the actual workflow temporary-file command')
@@ -266,7 +266,7 @@ case "$1" in
 esac
 `, { flag: 'wx' })
   chmodSync(git, 0o700)
-  for (const name of ['ui-policy', 'browser-tests', 'analytics-ssr']) {
+  for (const name of ['ui-policy', 'analytics-ssr']) {
     const source = readFileSync(`.github/workflows/${name}.yml`, 'utf8')
     const block = /      - id: docs[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:)/.exec(source)
     assert.ok(block, 'trusted classifier step must be present')
@@ -284,7 +284,7 @@ esac
 })
 
 test('actual workflow classifier launches trusted ESM from its retained temporary file', () => {
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml', '.github/workflows/analytics-ssr.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/analytics-ssr.yml']) {
     const source = readFileSync(file, 'utf8')
     const block = source.match(/      - id: docs[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:)/)?.[1]
     assert.ok(block, file)
@@ -365,7 +365,7 @@ test('the actual workflow bootstrap executes its trusted temporary ESM module', 
   git(['add', 'code.js'])
   git(['commit', '-m', 'code change'])
   const code = git(['rev-parse', 'HEAD'])
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/browser-tests.yml', '.github/workflows/analytics-ssr.yml']) {
+  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/analytics-ssr.yml']) {
     const workflow = readFileSync(file, 'utf8')
     const block = workflow.split('      - id: docs\n')[1]?.split('        run: |\n')[1]
     assert.ok(block, file)
@@ -399,14 +399,11 @@ test('blocking CI checks synthetic PR merge candidates once and preserves every 
   assert.match(source, /name: UI policy \(strict\)/)
   assert.match(source, /name: Production build and browser interactions\n/)
   assert.doesNotMatch(source, /run: pnpm build\n/)
-  for (const workflow of ['ui-policy.yml', 'browser-tests.yml']) {
+  for (const workflow of ['ui-policy.yml']) {
     const text = readFileSync(`.github/workflows/${workflow}`, 'utf8')
     assert.match(text, /github\.ref == 'refs\/heads\/main' && format\('-\{0\}', github\.run_id\)/)
     assert.match(text, /cancel-in-progress: \$\{\{ github\.ref != 'refs\/heads\/main' \}\}/)
   }
-  const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
-  assert.match(browser, /name: Browser tests \(before merge\)/)
-  assert.doesNotMatch(browser, /push:\n    branches: \[main\]/)
   assert.match(readFileSync('.github/workflows/browser-gate.yml', 'utf8'), /name: Browser tests \(before merge\)\n/)
 })
 
@@ -567,8 +564,6 @@ test('trusted mapping schema rejects invalid fields, duplicate entries and malfo
 })
 
 test('integration branches take the full tier under both the integration/ and the older integrate/ prefix', () => {
-  const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
-  assert.match(browser, /INTEGRATION_ACCEPTANCE: \$\{\{ startsWith\(github\.head_ref, 'integration\/'\) \|\| startsWith\(github\.head_ref, 'integrate\/'\) \}\}/)
   const subagents = readFileSync('.github/workflows/subagents.yml', 'utf8')
   assert.match(subagents, /branches: \[[^\]]*'integration\/\*\*'[^\]]*'integrate\/\*\*'\]/)
 })

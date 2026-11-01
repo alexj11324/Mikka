@@ -17,7 +17,10 @@ locally. Push, open the PR and keep working; read CI when it reports.
 
 Ordinary acceptance follows [`acceptance.md`](acceptance.md): a local
 application, a real isolated database and, when the flow uses one, a real
-daemon.
+daemon. CI runs no browser tests at all
+([decision 2026-11-01-1520](design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md)):
+browser specs run locally, and a UI change is checked with screenshots of a
+local production build.
 
 ## 2. Hot reload
 
@@ -97,7 +100,7 @@ Several small fixes go to an integration branch together and are pushed once,
 instead of a full CI round for each fix.
 
 `integration/` replaces the older `integrate/` prefix; CI accepts both
-(`browser-tests.yml`, `subagents.yml`).
+(`subagents.yml`).
 
 ## 6. Numbers
 

@@ -1,10 +1,9 @@
 # Browser CI execution budget
 
-Since 2026-11-01 browser tests run only when started by hand (Actions →
-Browser tests → Run workflow); CI runs none on pull requests, main pushes or
-nightly ([decision](../design/decisions/2026-11-01-0230-browser-tests-manual-only.md)).
-The budgets below apply to that manual run. The PR, main and nightly tiers
-this page described earlier are history.
+History. CI runs no browser tests at all since 2026-11-01
+([decision](../design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md));
+`browser-tests.yml` is deleted. The budgets below describe the removed CI
+browser job.
 See [CONTRIBUTING.md](../../CONTRIBUTING.md#how-changes-are-tested) for the gate policy.
 
 The original full browser job has a 45-minute total budget. Its official Chromium/system

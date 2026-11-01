@@ -1,8 +1,9 @@
 name: Browser gate
 
-# Browser tests are manual only (decision 2026-11-01-0230): Actions →
-# Browser tests → Run workflow. This job keeps the protected check name so
-# pull requests are not blocked waiting for it.
+# Browser tests are removed from CI (decision 2026-11-01-1520). This job only
+# keeps the protected check name "Browser tests (before merge)"; delete this
+# file once Alex removes that name from the required checks in the repository
+# settings.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -16,4 +17,4 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - run: echo "Browser tests are manual only; run Actions → Browser tests when needed."
+      - run: echo "Browser tests are not run in CI (decision 2026-11-01-1520)."
