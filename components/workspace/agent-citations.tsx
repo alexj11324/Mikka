@@ -24,9 +24,6 @@ export const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destru
   succeeded: 'info-light', stopped: 'secondary', failed: 'destructive-light', cancelled: 'secondary',
 }
 
-/** A task chip is wider than a source chip: it carries the title too. */
-const TASK_CHIP = 'max-w-72'
-
 export type LinkPreviews = Record<string, LinkPreview | null>
 
 /**
@@ -96,7 +93,7 @@ export function CitationSources({ text }: { text: string }) {
   </div>
 }
 
-/** A task mentioned in a reply: status dot, number and title, inline with the text. */
+/** A task mentioned in a reply: a boxed chip with its status icon and title; the number is in the hover card. */
 export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const tIssue = useTranslations('Issue')
@@ -104,10 +101,9 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const identifier = issue.identifier
   return <InlineCitation>
-    <InlineCitationTrigger aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)} className={TASK_CHIP}>
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)}>
       <status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />
-      {identifier && <span className="shrink-0">{identifier}</span>}
-      <InlineCitationLabel className="font-sans">{issue.title}</InlineCitationLabel>
+      <InlineCitationLabel>{issue.title}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
@@ -149,10 +145,11 @@ export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: stri
   const status = t.has(`runStatus.${run.status}` as never) ? t(`runStatus.${run.status}` as never) : run.status
   return <InlineCitation>
     <InlineCitationTrigger
+      variant="object"
       aria-label={issue ? t('openRunIssue', { agent: run.agentName, title: issue.title }) : t('runOf', { agent: run.agentName })}
       onClick={issue ? () => onOpen(issue.id) : undefined}
     >
-      <SourceAvatar source={{ name: run.agentName, domain: run.agentName, icon: <HarnessMark harness={run.harness} /> }} className="size-4 rounded-full" />
+      <SourceAvatar source={{ name: run.agentName, domain: run.agentName, icon: <HarnessMark harness={run.harness} /> }} className="size-3.5 rounded-full" />
       <InlineCitationLabel>{run.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>

@@ -66,7 +66,12 @@ source wins in a conflict is in [`README.md`](README.md).
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
 - **R-15** A task or thread mentioned in chat is an inline chip, not a large
-  card (a task chip carries the board's status icon). A thread the reply
+  card (a task chip carries the board's status icon). Internal object chips
+  are boxed: a faint accent fill (`--object-chip`), small radius, the status or
+  type icon, then the title in the accent with no underline; the chip never
+  breaks across lines and a long title truncates. The task number is in the
+  hover card, not the chip. Web sources and links keep the unboxed source chip
+  (R-14). A thread the reply
   dispatches is different: it is a thread card under that reply (R-66). An
   Artifact waiting for acceptance is a bordered card under the reply (icon,
   name, state such as 待你确认); clicking it opens the Artifact window (R-56).
