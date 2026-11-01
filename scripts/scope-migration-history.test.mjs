@@ -79,7 +79,7 @@ const fixtureFiles = new Map(sources.map(file => [file.name, file.sql]))
 fixtureFiles.set(APPLICATION_BASELINE, readFileSync(new URL(`../drizzle/${APPLICATION_BASELINE}`, import.meta.url), 'utf8'))
 let invocation = 0
 async function runEntrypoint(model) {
-  const environment = { MIGRATE: '1', VERCEL_ENV: '', MIKKA_DATABASE_URL: 'scope-memory-app', DATABASE_URL: 'scope-memory-workspace' }
+  const environment = { MIGRATE: '1', VERCEL_ENV: '', MIKKA_DATABASE_URL: 'postgres://127.0.0.1/scope-memory-app', DATABASE_URL: 'postgres://127.0.0.1/scope-memory-workspace' }
   const saved = Object.fromEntries(Object.keys(environment).map(key => [key, process.env[key]]))
   const oldLog = console.log
   const hook = registerHooks({
@@ -117,8 +117,8 @@ async function runEntrypoint(model) {
 function modelFor(app = [], workspace = [], fault = {}) {
   const model = { files: fixtureFiles, logs: [], commits: [], ddl: [], app: new Set([APPLICATION_BASELINE, ...app]), workspace: new Set(workspace), fault }
   model.pool = target => {
-    assert.ok(['scope-memory-app', 'scope-memory-workspace'].includes(target))
-    const ledger = target === 'scope-memory-app' ? model.app : model.workspace
+    assert.ok(['postgres://127.0.0.1/scope-memory-app', 'postgres://127.0.0.1/scope-memory-workspace'].includes(target))
+    const ledger = target === 'postgres://127.0.0.1/scope-memory-app' ? model.app : model.workspace
     return {
       async query(sql) {
         if (sql.startsWith('create table if not exists schema_migrations')) return {}
