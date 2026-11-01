@@ -55,7 +55,7 @@ lines.on("line", async (line) => {
   if (typeof text !== "string") return
   if (text === 'COMPUTER') {
     const config = JSON.parse(flag('--mcp-config') ?? '{}').mcpServers?.mikka_computer
-    if (!config || config.command !== 'node') process.exit(2)
+    if (!config || !/(^|\/)node$/.test(config.command)) process.exit(2)
     const proxy = spawn(config.command, config.args, { stdio: ['pipe', 'pipe', 'ignore'] })
     const reply = new Promise((resolve, reject) => {
       const reader = createInterface({ input: proxy.stdout })
@@ -69,6 +69,9 @@ lines.on("line", async (line) => {
     if (answer.result?.isError) process.exit(2)
   }
   if(text==='PROBE_GIT') {
+    // A host file the run's sandbox must hide (the worker's device credential).
+    // The run's home is <data dir>/adapters/runs/<run>/<home>; the worker's device.json is in <data dir>.
+    if (process.env.HOME) { let content = ""; try { content = readFileSync(join(process.env.HOME, "..", "..", "..", "..", "device.json"), "utf8") } catch {} if (content.includes("fixture-device-credential")) process.exit(2) }
     if (process.env.GH_REPO && !execFileSync('gh', ['--version'], { encoding: 'utf8' }).startsWith('gh version')) process.exit(2)
     const target=lstatSync('.git').isFile()?'.git':'.git/guard'
     try{writeFileSync(target,'synthetic metadata mutation');process.exit(2)}catch(error){if(!['EROFS','EBUSY','EACCES'].includes(error.code))process.exit(2)}
