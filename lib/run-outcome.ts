@@ -60,12 +60,4 @@ export function readOutcome(answers: ReadonlyMap<string, DecisionAnswer> | null 
   return answer?.type === 'choice' && (RUN_OUTCOMES as readonly string[]).includes(answer.choice) ? answer.choice as RunOutcome : null
 }
 
-/** The agent-model judge answers with one of the outcomes as JSON; anything else is no answer. */
-export function parseOutcome(value: unknown): { outcome: RunOutcome; reason: string } | null {
-  if (!value || typeof value !== 'object') return null
-  const { outcome, reason } = value as { outcome?: unknown; reason?: unknown }
-  if (typeof outcome !== 'string' || !(RUN_OUTCOMES as readonly string[]).includes(outcome)) return null
-  return { outcome: outcome as RunOutcome, reason: typeof reason === 'string' ? clip(reason, 300) : '' }
-}
-
 export { OUTCOME_CHOICES }

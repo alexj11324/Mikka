@@ -369,10 +369,11 @@ export const agentRuns = pgTable('agent_runs', {
   lastReplyAt: timestamp('lastReplyAt', { withTimezone: true }),
   /** How the run came out once it ended (lib/run-outcome.ts); null until judged. The right column groups by it. */
   outcome: text('outcome').$type<RunOutcome | null>(),
-  /** Who judged the outcome: the decision model, or the agent model when the decision model is unavailable. */
-  outcomeDecidedBy: text('outcomeDecidedBy').$type<'decision' | 'agent_model' | null>(),
+  /** Who judged the outcome: the decision model (`decision`). */
+  outcomeDecidedBy: text('outcomeDecidedBy').$type<'decision' | null>(),
   /** The judge's one-line reason, for review. */
   outcomeReason: text('outcomeReason'),
+  /** When it was judged, or last asked without an answer (asked again an hour later). */
   outcomeAt: timestamp('outcomeAt', { withTimezone: true }),
   /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
   source: text('source').$type<'mcp' | null>(),

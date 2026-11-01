@@ -16,13 +16,16 @@ Thread lists, on the web and the phone, group as 进行中 · 受阻 · 等待�
 
 - 进行中 follows the run's state. Every other group follows the run's judged
   outcome: when a run ends, the decision model reads its last reply, status,
-  task and PRs and answers done, blocked, needs_input, failed or idle; when it
-  gives no answer the agent model judges. The outcome, who judged it and why
-  are stored on the run.
+  task and PRs and answers done, blocked, needs_input, failed or idle. The
+  outcome, who judged it and why are stored on the run. When it gives no
+  answer nothing is guessed: the outcome stays empty and it is asked again an
+  hour later, as other non-write judgments do.
 - 已解决 only for a done outcome, a closed task or a merged PR. Blocked, failed
-  and needs_input never resolve. A run no judge answered sits under 受阻 or
-  等待你.
-- A task's retries fold into its newest thread (「第 N 次尝试」), which stays out
-  of 已解决 while the task is unresolved; the task's page lists every attempt.
+  and needs_input never resolve. A run not judged yet sits under 受阻 (it
+  failed) or 等待你, never 已解决.
+- A task's existing threads fold into its newest (「第 N 次尝试」), which stays
+  out of 已解决 while the task is unresolved; the task's page lists every
+  attempt. New work keeps one thread per task (retries continue in it), so the
+  fold is for threads that already exist.
 - Runs that ended in the last 7 days before this change are judged by the
   same sweep; older ones keep no outcome.
