@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { ConversationPill } from '@/components/nav/conversation-pill'
+import { GroupAvatar, useGroupMembers } from '@/components/nav/group-avatar'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { UserMessageText } from '@/components/workspace/user-message-text'
 import { cn } from '@/lib/utils'
@@ -37,6 +38,8 @@ export function GroupChatView({ group, userId, people }: {
     ([, id, before]: [string, string, string | null]) => fetchGroupMessages(id, before),
     { revalidateOnFocus: false, revalidateFirstPage: false },
   )
+  // The pill's avatar is the members' bloubs (R-36); the right column's 详情 reads the same request.
+  const { data: members } = useGroupMembers(group.id)
   const messages = pages ? chronological(pages) : []
   const older = pages?.at(-1)?.nextBefore ?? null
   const loadingOlder = isValidating && !!pages && size > pages.length
@@ -46,7 +49,7 @@ export function GroupChatView({ group, userId, people }: {
     : bots.find(bot => bot.id === id)?.name ?? t('bot')
 
   return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className="relative flex size-full min-h-0 flex-col">
-    <ConversationPill name={group.title || t('untitled')} />
+    <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6">
