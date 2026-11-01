@@ -8,31 +8,50 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useComputer, useViewerGrant } from '@/hooks/use-computer'
 import { withBasePath } from '@/lib/base-path'
-import { computerApi } from '@/lib/computer/client'
+import { ComputerRequestError, computerApi } from '@/lib/computer/client'
 import { MOCK_SCREEN_URL } from '@/lib/computer/mock'
 import { SCREEN_HEIGHT, SCREEN_WIDTH, type ScreenRect, type ViewerMode } from '@/lib/computer/types'
 import { cn } from '@/lib/utils'
 
-type RFBInstance = { viewOnly: boolean; scaleViewport: boolean; resizeSession: boolean; background: string; disconnect: () => void; focus: () => void }
+type RFBInstance = EventTarget & { viewOnly: boolean; scaleViewport: boolean; resizeSession: boolean; background: string; disconnect: () => void; focus: () => void }
 
-/** The noVNC canvas. The URL already carries the short-lived token for this mode. */
-function NoVncView({ url, mode, label }: { url: string; mode: ViewerMode; label: string }) {
+/** Each grant gets its own authorized connection; the last frame survives the handoff. */
+function NoVncView({ url, mode, label }: { url?: string; mode: ViewerMode; label: string }) {
   const host = useRef<HTMLDivElement>(null)
-  const rfb = useRef<RFBInstance | null>(null)
+  const picture = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
+    if (!url) return
     let alive = true
+    let client: RFBInstance | undefined
+    let canvas: HTMLCanvasElement | null = null
+    function retainFrame() {
+      const saved = picture.current
+      if (!saved || !canvas || !canvas.width || !canvas.height) return
+      if (saved.width !== canvas.width) saved.width = canvas.width
+      if (saved.height !== canvas.height) saved.height = canvas.height
+      saved.getContext('2d')?.drawImage(canvas, 0, 0)
+    }
     void import('@novnc/novnc/lib/rfb.js').then(({ default: RFB }) => {
       if (!alive || !host.current) return
-      const client = new RFB(host.current, url, { shared: true }) as RFBInstance
+      client = new RFB(host.current, url, { shared: true }) as RFBInstance
       client.scaleViewport = true
       client.resizeSession = false
       client.background = 'transparent'
       client.viewOnly = mode === 'view'
-      rfb.current = client
+      canvas = host.current.querySelector('canvas')
+      client.addEventListener('disconnect', retainFrame)
     })
-    return () => { alive = false; rfb.current?.disconnect(); rfb.current = null }
+    return () => {
+      alive = false
+      retainFrame()
+      client?.removeEventListener('disconnect', retainFrame)
+      client?.disconnect()
+    }
   }, [url, mode])
-  return <div ref={host} role="img" aria-label={label} className="absolute inset-0" />
+  return <div role="img" aria-label={label} className="absolute inset-0">
+    <canvas ref={picture} aria-hidden="true" className="pointer-events-none absolute inset-0 size-full" />
+    <div ref={host} className="absolute inset-0" />
+  </div>
 }
 
 /** Places an overlay on the 1280×800 desktop; positions are percentages so every size lines up. */
@@ -85,6 +104,9 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
   const waking = wakePending || state?.machine === 'waking'
   const running = state?.machine === 'running'
   const { data: grant, error: grantError, mutate: renewGrant } = useViewerGrant(botId, mode, running && live)
+  const unauthorized = [error, grantError].some(failure => failure instanceof ComputerRequestError && [401, 403, 404].includes(failure.status))
+  const [grantedBotId, setGrantedBotId] = useState<string | null>(null)
+  useEffect(() => { if (grant) setGrantedBotId(botId) }, [botId, grant])
   const approval = state?.pendingApproval
   const target = approval?.action.rect ?? (state?.control === 'agent' ? state.lastAction?.rect : undefined)
   const point = approval ? { x: approval.action.x, y: approval.action.y } : state?.control === 'agent' ? { x: state.lastAction?.x, y: state.lastAction?.y } : null
@@ -97,9 +119,9 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
   }
   const label = t('screenOf', { name })
   return <div className={cn('@container/screen relative aspect-[16/10] w-full overflow-hidden bg-screen text-screen-foreground', frame === 'rounded' ? 'rounded-lg' : 'rounded-xl')}>
-    {running && grant && (grant.url === MOCK_SCREEN_URL
+    {running && !unauthorized && (grant?.url === MOCK_SCREEN_URL
       ? <img src={withBasePath('/computer/mock-desktop.svg')} alt={label} draggable={false} className="absolute inset-0 size-full select-none" />
-      : <NoVncView url={grant.url} mode={mode} label={label} />)}
+      : <NoVncView key={botId} url={grant?.url} mode={mode} label={label} />)}
     {running && live && showTarget && target && <TargetRing rect={target} tone={approval ? 'approval' : 'agent'} />}
     {running && live && showTarget && point?.x !== undefined && point.y !== undefined && <Cursor x={point.x} y={point.y} />}
     {state && !running && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-[inherit] bg-screen/80 backdrop-blur-sm">
@@ -112,7 +134,7 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
       </>}
     </div>}
     {/* Never a blank screen: the state or the picture is still on its way, or its read failed. */}
-    {(!state || (running && live && !grant)) && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+    {(!state || unauthorized || (running && live && !grant && (grantError || grantedBotId !== botId))) && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
       {(state ? grantError : error)
         ? <Button size="sm" variant="secondary" className="rounded-lg" onClick={() => { void (state ? renewGrant() : mutate()) }}><Power data-icon="inline-start" />{t('retry')}</Button>
         : <Progress aria-label={t('loading')} value={null} className="w-1/3 max-w-40" />}
