@@ -558,6 +558,81 @@ test('run result publication commits one owner-scoped result through retries and
       }
       assert.equal(Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n), before + 2, 'only the admitted execution and the explicit legacy fixture were added')
     })
+
+    await t.test('Plugins › GitHub: 推送分支 is the run policy the token issuer reads; 创建 Pull Request deny blocks, ask waits on one card, allow opens', async () => {
+      const { readGitHubPermissions, setGitHubPermissions } = await import('../lib/github/plugin-permissions')
+      const { readCliRunPolicy } = await import('../lib/agent-tool-approval/policy-store')
+      const { decidePendingAction } = await import('../lib/pending-actions')
+      const ready = async () => {
+        const f = await fixture({ approved: true })
+        await prepareRunPublication(assignment(f), f.remoteUrl)
+        assert.equal((await persistRunCompletion(f.userId, f.runId, completion(f)))?.publicationPending, true)
+        return f
+      }
+      const never: OpenPullRequest = async () => { throw new Error('A denied or unanswered pull request must never reach GitHub') }
+      const cards = async (f: Fixture) => (await pool.query(`select id,status,input from pending_actions where "userId"=$1 and action='approve_pull_request'`, [f.userId])).rows
+
+      // 推送分支: the Coordinator's own git_push, the value authorizeRunGitHubToken refuses on deny.
+      const pushed = await ready()
+      assert.equal((await readCliRunPolicy(pool, pushed.runId, pushed.userId)).policy.permissions.git_push, 'ask')
+      let settings = await setGitHubPermissions(pool, pushed.userId, { version: (await readGitHubPermissions(pool, pushed.userId)).version, push: 'deny' })
+      assert.equal((await readCliRunPolicy(pool, pushed.runId, pushed.userId)).policy.permissions.git_push, 'deny')
+      settings = await setGitHubPermissions(pool, pushed.userId, { version: settings.version, push: 'allow' })
+      assert.equal((await readCliRunPolicy(pool, pushed.runId, pushed.userId)).policy.permissions.git_push, 'allow')
+      await assert.rejects(setGitHubPermissions(pool, pushed.userId, { version: '0:0', push: 'deny' }), { code: 'githubPermissionsChanged' })
+      // Unset 创建 Pull Request keeps today's behaviour: the approved push opens it.
+      assert.deepEqual(await publishRunResult(pushed.runId, async () => prFor(pushed)), { done: true })
+      assert.equal((await receipt(pushed)).status, 'published')
+
+      const denied = await ready()
+      await setGitHubPermissions(pool, denied.userId, { version: '0:0', pullRequest: 'deny' })
+      assert.deepEqual(await publishRunResult(denied.runId, never), { done: true })
+      assert.equal((await receipt(denied)).status, 'blocked')
+      assert.equal((await receipt(denied)).errorCode, 'pull_request_denied')
+      assert.equal((await event(denied)).payload.publication.errorCode, 'pull_request_denied')
+      assert.deepEqual(await cards(denied), [])
+
+      const asked = await ready()
+      await setGitHubPermissions(pool, asked.userId, { version: '0:0', pullRequest: 'ask' })
+      assert.deepEqual(await publishRunResult(asked.runId, never), { done: true })
+      assert.equal((await receipt(asked)).status, 'awaiting_approval')
+      assert.deepEqual(await publishRunResult(asked.runId, never), { done: true }, 'a duplicate workflow stops while the card waits')
+      const [card, ...extra] = await cards(asked)
+      assert.equal(extra.length, 0)
+      assert.equal(card.status, 'pending')
+      assert.deepEqual(card.input, { runId: asked.runId, repo: asked.remoteKey.split('/').slice(2).join('/'), branch: asked.branch, title: 'Fix redirect' })
+      assert.deepEqual(await counts(asked), { versions: 0, events: 0 }, 'nothing is reported done while the card waits')
+      const other = await fixture()
+      await assert.rejects(decidePendingAction(other.userId, card.id, true, async () => {}))
+      const restarted: string[] = []
+      assert.deepEqual(await decidePendingAction(asked.userId, card.id, true, async runId => { restarted.push(runId) }), { status: 'done', error: null })
+      assert.deepEqual(restarted, [asked.runId])
+      assert.equal((await receipt(asked)).status, 'pending')
+      let opened = 0
+      assert.deepEqual(await publishRunResult(asked.runId, async () => { opened++; return prFor(asked) }), { done: true })
+      assert.equal(opened, 1)
+      assert.equal((await receipt(asked)).status, 'published')
+      assert.deepEqual((await event(asked)).payload.publication.pullRequest, prFor(asked))
+      await assert.rejects(decidePendingAction(asked.userId, card.id, false, async () => {}), 'a decided card cannot be decided again')
+
+      const declined = await ready()
+      await setGitHubPermissions(pool, declined.userId, { version: '0:0', pullRequest: 'ask' })
+      await publishRunResult(declined.runId, never)
+      const [declinedCard] = await cards(declined)
+      await decidePendingAction(declined.userId, declinedCard.id, false, async () => {})
+      assert.deepEqual(await publishRunResult(declined.runId, never), { done: true })
+      assert.equal((await receipt(declined)).errorCode, 'pull_request_declined')
+
+      // Approved, then turned to deny before the restart: deny wins.
+      const revoked = await ready()
+      let revokedSettings = await setGitHubPermissions(pool, revoked.userId, { version: '0:0', pullRequest: 'ask' })
+      await publishRunResult(revoked.runId, never)
+      const [revokedCard] = await cards(revoked)
+      await decidePendingAction(revoked.userId, revokedCard.id, true, async () => {})
+      revokedSettings = await setGitHubPermissions(pool, revoked.userId, { version: revokedSettings.version, pullRequest: 'deny' })
+      assert.deepEqual(await publishRunResult(revoked.runId, never), { done: true })
+      assert.equal((await receipt(revoked)).errorCode, 'pull_request_denied')
+    })
   } finally {
     // Fixture rows and audit history remain; credential invalidation is non-deleting.
     if (fixtures.length) await pool.query('update run_tokens set "revokedAt"=coalesce("revokedAt",now()) where "userId"=any($1::text[])', [fixtures.map(row => row.userId)])

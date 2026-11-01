@@ -4,22 +4,30 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Sandbox } from 'e2b'
 import { HOSTED_NATIVE_IMAGE } from '@mikka/protocol/subscription'
-import { computerTemplate, e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { computerTemplate, e2bApiKey, sandboxKeyOwner, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { E2BKeyError } from '@/lib/secrets/flag'
 
 const lifetime = 15 * 60_000
 export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number; computerAllowed: boolean; policyVersion: number }
-// The sandbox belongs to the E2B team whose key created it, so every call for a workspace's
-// sandbox resolves that workspace's key (flag on) or the platform key (flag off, unchanged).
-const options = async (workspaceId: string) => ({ apiKey: await e2bApiKey(workspaceId, 'Cloud computer is not configured'), timeoutMs: lifetime, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy })
+// A sandbox belongs to the E2B team whose key created it: its owner's own key (orchestration § 2).
+// Every call resolves the owner from the machine's record, never from whoever is asking.
+const options = async (ownerId: string) => ({ apiKey: await e2bApiKey(ownerId, 'Cloud computer is not configured'), timeoutMs: lifetime, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy })
+const ownerOf = async (workspaceId: string, id: string) => {
+  const owner = await sandboxKeyOwner(workspaceId, id)
+  if (!owner) throw new E2BKeyError('e2b_unavailable', 'sandbox has no owner record')
+  return owner
+}
 
 export async function connectComputer(workspaceId: string, id: string, signal?: AbortSignal) {
-  const base = await options(workspaceId)
-  return withE2BErrors(workspaceId, false, () => Sandbox.connect(id, { ...base, ...(signal ? { signal, retries: 0 } : {}) }))
+  const owner = await ownerOf(workspaceId, id)
+  const base = await options(owner)
+  return withE2BErrors(owner, false, () => Sandbox.connect(id, { ...base, ...(signal ? { signal, retries: 0 } : {}) }))
 }
 
 export async function computerState(workspaceId: string, id: string) {
-  const base = await options(workspaceId)
-  const info = await withE2BErrors(workspaceId, false, () => Sandbox.getInfo(id, base))
+  const owner = await ownerOf(workspaceId, id)
+  const base = await options(owner)
+  const info = await withE2BErrors(owner, false, () => Sandbox.getInfo(id, base))
   return info.state === 'paused' ? 'sleeping' : 'running'
 }
 
@@ -27,8 +35,12 @@ export async function computerState(workspaceId: string, id: string) {
 export async function createComputer(workspaceId: string, operationId: string) {
   // Flag on: only the public template from E2B_BYO_COMPUTER_TEMPLATE; a 404 becomes e2b_template_unavailable.
   const template = computerTemplate()
-  const base = await options(workspaceId)
-  return withE2BErrors(workspaceId, true, () => Sandbox.create(template, { ...base, idempotencyKey: operationId,
+  // The machine row is written before provisioning; its owner's key creates the sandbox.
+  const { pool } = await import('@/lib/db')
+  const owner = (await pool.query<{ ownerId: string }>('SELECT "ownerId" FROM cloud_machines WHERE "workspaceId"=$1 AND "operationId"=$2', [workspaceId, operationId])).rows[0]?.ownerId
+  if (!owner) throw new E2BKeyError('e2b_unavailable', 'cloud machine has no owner record')
+  const base = await options(owner)
+  return withE2BErrors(owner, true, () => Sandbox.create(template, { ...base, idempotencyKey: operationId,
     metadata: { application: 'mikka', workspaceId },
     lifecycle: { onTimeout: 'pause', autoResume: false },
   }))

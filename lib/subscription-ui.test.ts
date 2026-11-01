@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { InvalidAuthorization, parseSubscriptionStart } from './subscription-ui'
+import { InvalidAuthorization, parseSubscriptionStart, planName } from './subscription-ui'
 
 test('subscription consent opens only the fixed provider page for its own flow', () => {
   const state = 'a'.repeat(43)
@@ -18,4 +18,10 @@ test('subscription consent opens only the fixed provider page for its own flow',
   assert.equal(parseSubscriptionStart(claude, 'claude').flow, 'callback_handoff')
   assert.throws(() => parseSubscriptionStart({ ...claude, state: 'b'.repeat(43) }, 'claude'), InvalidAuthorization)
   assert.throws(() => parseSubscriptionStart({ ...claude, authorizationUrl: claude.authorizationUrl.replace('claude.ai', 'claude.ai.evil.test') }, 'claude'), InvalidAuthorization)
+})
+
+test('plan names read as the providers write them', () => {
+  assert.equal(planName('pro'), 'Pro')
+  assert.equal(planName('plus'), 'Plus')
+  assert.equal(planName('Max'), 'Max')
 })

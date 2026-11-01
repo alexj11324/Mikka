@@ -97,13 +97,10 @@ export async function taskSecretEnv(workspaceId: string, repository: string | nu
   return (await taskSecretInjection(workspaceId, repository, env, skipped)).env
 }
 
-/** #438 C: the workspace's own E2B key is masked like a secret. Absent key = nothing to add. */
+/** #438 C: E2B keys are masked like secrets: every member's own key (keys are personal). */
 async function workspaceE2BKeySecret(workspaceId: string, env: Env): Promise<{ name: string; value: string }[]> {
   if (!byoE2BKeyEnabled(env)) return []
-  try { return [{ name: 'E2B_API_KEY', value: await (await import('./e2b')).getWorkspaceE2BApiKey(workspaceId, env) }] } catch (error) {
-    if (error instanceof E2BKeyError && error.code === 'e2b_key_missing') return []
-    throw error
-  }
+  return (await (await import('./e2b')).maskableE2BKeys(workspaceId, env)).map(value => ({ name: 'E2B_API_KEY', value }))
 }
 
 /** Masker for persisted output. Identity when no encryption key is configured or the workspace has no maskable secret. Env vars (kind='env') are not masked: they are plain config shown in settings. */

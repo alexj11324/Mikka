@@ -155,6 +155,13 @@ third-party site under Alex's identity (a GitHub App install, an OAuth consent)
 or a session permission prompt may be asked of him. Details and the current
 test accounts: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
 
+The cloud worker's E2B template is released by CI, not by hand: a push to `main` that
+changes a path the template packages (`WORKER_PATHS` in `scripts/e2b/build-template.py`)
+or `scripts/e2b/` runs `.github/workflows/e2b-template.yml`, which builds the template,
+makes it public, sets `E2B_BYO_COMPUTER_TEMPLATE` and `MIKKA_CLOUD_WORKER_SHA` together
+in Vercel Production and redeploys. A manual build uses the same script with
+`--public --json`.
+
 ## License
 
 Mikka is licensed under [AGPL-3.0-only](LICENSE). Contributions are submitted

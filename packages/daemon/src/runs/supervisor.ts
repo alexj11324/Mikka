@@ -28,6 +28,7 @@
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. An explicitly approved, pushed submission can finish unverified;
 // its report keeps `not_run`, and the server may open only a draft PR.
+import { quotaStopApplies } from "./quota-exhausted"
 import { runApps } from '../agents/run-apps'
 import { fixedCheckSnapshot } from "./check"
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
@@ -106,6 +107,8 @@ export interface SupervisorDeps {
   adapters: ReadonlyMap<Harness, AgentAdapter>
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
+  /** A hosted (cloud) worker's API-key runs: the key stays behind the worker's broker, out of the task container. */
+  startCredential?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   /** Authenticated policy validation before repository/setup effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
@@ -476,10 +479,10 @@ export class RunSupervisor {
     const existing = this.deps.journal.get(assignment.runId)
     if (existing) return this.summary(existing)
     // 4e3: mask the task's injected secrets (names from the server, values from taskEnv) before upload.
-    const masker = createRunMasker((assignment.taskSecretNames ?? []).flatMap(name => {
+    const masker = createRunMasker([...(assignment.taskSecretNames ?? []).flatMap(name => {
       const value = assignment.taskEnv?.[name]
       return typeof value === "string" ? [{ name, value }] : []
-    }))
+    }), ...(assignment.modelCredential ? [{ name: "MODEL_API_KEY", value: assignment.modelCredential.key }] : [])])
     if (masker) this.maskers.set(assignment.runId, masker)
     let repo: DeviceRepo
     try { repo = this.deps.repository(assignment) } catch (error) {
@@ -578,6 +581,11 @@ export class RunSupervisor {
           this.blockedSkillResumes.add(entry.assignment.runId)
           this.deps.journal.update(entry.assignment.runId,{error:'Skill resume blocked: current online source, authorization and lease required.'})
         }
+        continue
+      }
+      // The run's API key was never written down; it does not go on without it.
+      if (entry.credentialWithheld && !entry.assignment.modelCredential) {
+        this.finish(entry.assignment.runId, 'error', 'The run stopped with the daemon; its API key is not kept. Retry the thread.')
         continue
       }
       // The old lease is stale; give the first heartbeat time to renew it.
@@ -1275,6 +1283,8 @@ export class RunSupervisor {
       fixture: assignment.fixture,
       model: assignment.model,
       mailbox,
+      // In memory only: the adapter hands it to the run's CLI environment.
+      credential: assignment.modelCredential,
     }
     const resuming =
       entry.sessionId !== null && adapter.capabilities.supportsResume
@@ -1320,8 +1330,11 @@ export class RunSupervisor {
     const previousExecution = entry.execution
     const previousRuntime = entry.runtime
     let session: AgentSession
+    if (assignment.subscriptionBinding && assignment.modelCredential) throw new Error("A run has one model credential")
     try {
-      session = assignment.subscriptionBinding
+      session = assignment.modelCredential && this.deps.startCredential
+      ? await this.deps.startCredential(assignment,{...options,prompt:assignment.prompt})
+      : assignment.subscriptionBinding
       ? this.deps.startSubscription
         ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})
         : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()
@@ -1443,7 +1456,7 @@ export class RunSupervisor {
           continue
         }
         await this.closeMailbox(run)
-        const stopReason = stopReasonOf(event, run)
+        const stopReason = stopReasonOf(event, run, assignment)
         const error =
           event.error ??
           (stopReason === "turn_ended"
@@ -1469,7 +1482,9 @@ export class RunSupervisor {
         )
         if (this.stopping) return
         const { verifyError, tree } = outcome
-        let report = outcome.report
+        let report = stopReason === "quota_exhausted"
+          ? { ...outcome.report, resetsAt: event.quota?.resetsAt ?? null }
+          : outcome.report
         const policy = runPolicy(assignment.policy)
         if (
           stopReason === "submitted" &&
@@ -1621,12 +1636,14 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
  * other ended run, except a verified hand-in, is cleaned up when it left no
  * commit and no change.
  */
-const KEEP_WORKTREE: readonly StopReason[] = ["turn_ended", "asked_human"]
+const KEEP_WORKTREE: readonly StopReason[] = ["turn_ended", "asked_human", "quota_exhausted"]
 
-function stopReasonOf(event: ExitEvent, run: ActiveRun): StopReason {
+function stopReasonOf(event: ExitEvent, run: ActiveRun, assignment: RunAssignment): StopReason {
   if (run.forcedStop) return run.forcedStop
   if (event.outcome === "cancelled" || run.cancelRequested) return "cancelled"
   if (event.stopReason) return event.stopReason
+  // The continuation goes on in this worktree, on a key or after the reset.
+  if (event.outcome === "failed" && event.quota && quotaStopApplies(assignment)) return "quota_exhausted"
   return event.outcome === "failed" ? "error" : "turn_ended"
 }
 

@@ -53,8 +53,9 @@ export async function authorizeRunGitHubToken(request: Request): Promise<RunGitH
     workspaceId: admission.workspaceId, workspaceLinked: admission.workspaceLinked, requestEventId: admission.requestEventId,
   }) && await acceptedEventStillMatches(admission, run.botId)
   const settings = await readRepositorySettings(worker.userId, publication.remoteUrl)
-  if (settings?.push?.approved === false || (admission && !accepted) ||
-    (!accepted && !repositoryPushApproved(settings?.push, worker.userId))) return null
+  // Both gates: the owner's live repository approval is required even when
+  // git_push is allow or an accepted admission exists.
+  if (!repositoryPushApproved(settings?.push, worker.userId) || (admission && !accepted)) return null
   const githubAccountId = await linkedGitHubAccountId(worker.userId)
   if (!githubAccountId) return null
   // Policy/membership/provider-account reads above may overlap STOP or expiry.

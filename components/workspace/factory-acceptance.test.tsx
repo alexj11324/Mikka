@@ -138,6 +138,14 @@ test('pending shows 退回修改 only when a reject handler is passed', () => {
   assert.match(withReject, /variant="secondary"[^<]*<?[^<]*退回修改|退回修改/)
 })
 
+test('a refused merge leads with 在 GitHub 打开 and offers merging again as secondary, two actions at most', () => {
+  const html = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} canApprove onReject={() => {}} onAccept={() => {}} refusal="githubMergeBlocked" pullRequestUrl="https://github.com/o/r/pull/1" />)
+  assert.equal((html.match(/data-slot="button"/g) ?? []).length, 2)
+  assert.match(html, /data-button-variant="default"[^>]*>(<svg[^>]*>.*?<\/svg>)?在 GitHub 打开/)
+  assert.match(html, /data-button-variant="secondary"[^>]*>.*?验收并合并/)
+  assert.doesNotMatch(html, /退回修改/)
+})
+
 test('publish failed keeps revoke and offers publish again', () => {
   const html = renderToStaticMarkup(<ApprovalBar state="failed" isSkill={false} />)
   assert.match(html, /撤销/)

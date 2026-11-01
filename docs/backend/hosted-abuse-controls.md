@@ -103,7 +103,7 @@ unscoped user-facing consumer in this revision.
 
 `claimCloudRun` does not create an E2B sandbox. All sandbox create/connect
 paths (`lib/computer/e2b-provider.ts`, thread machines and desktop access) now
-resolve a workspace-owned key. There is no remaining production read of the
+resolve the sandbox owner's own key (`user_e2b_keys`; keys are personal). There is no remaining production read of the
 platform `E2B_API_KEY` for sandbox provisioning. Missing keys retain the existing
 `e2b_key_missing` code; changing the old BYO flag cannot restore the fallback.
 

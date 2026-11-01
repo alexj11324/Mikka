@@ -53,7 +53,10 @@ test('real Factory admission preserves host scope, policy and transaction owners
       options.delivered === false ? null : new Date()])
     return id
   }
-  async function fixture(options: { permission?: 'allow' | 'ask' | 'deny'; destination?: unknown | 'selected'; delivered?: boolean } = {}): Promise<Fixture> {
+  // Factory's repositories are authorized: by default the fixture records the
+  // owner's repository push approval, as the human decision would. A push
+  // needs it and git_push together (`approved: false` leaves it unrecorded).
+  async function fixture(options: { permission?: 'allow' | 'ask' | 'deny'; destination?: unknown | 'selected'; delivered?: boolean; approved?: boolean } = {}): Promise<Fixture> {
     const id = randomUUID(), userId = `factory-admission-${id}`
     const remoteUrl = `https://github.com/mikka-ci/admission-${id}.git`
     const identity = { userId, issueId: randomUUID(), deviceId: randomUUID(), agentId: randomUUID(), repoId: randomUUID(), remoteUrl, remoteKey: remoteKey(remoteUrl) }
@@ -68,6 +71,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
     const f = { ...identity, eventId, task: routed.task }
     fixtures.push(f)
     await policy(f, options.permission ?? 'allow')
+    if (options.approved !== false) await writeRepositoryPushApproval(userId, identity.remoteKey, true)
     return f
   }
   const dispatch = (f: Fixture, tx?: PoolClient) => dispatchFactoryRun(f.userId, { binding: factoryBinding(f.task), agentId: f.agentId, deviceRepoId: f.repoId }, tx)
@@ -104,13 +108,14 @@ test('real Factory admission preserves host scope, policy and transaction owners
   try {
     assert.equal(String((await pool.query('SHOW server_version_num')).rows[0].server_version_num).slice(0, 2), '17')
 
-    await t.test('configured allow queues a NULL-issue Factory source through the real public admission store', async () => {
+    await t.test('configured allow with the repository approval queues a NULL-issue Factory source through the real public admission store', async () => {
       const f = await fixture()
       assert.equal((await pool.query('SELECT "issueId" FROM coordinator_events WHERE id=$1', [f.eventId])).rows[0].issueId, null)
       const admitted = await dispatch(f)
       const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [admitted.runId])).rows[0]
       const publication = (await pool.query('SELECT * FROM run_publications WHERE "runId"=$1', [admitted.runId])).rows[0]
-      assert.equal(run.agentDefinition.repositoryAdmission.authority, 'configured_allow')
+      assert.equal(run.agentDefinition.repositoryAdmission.authority, 'repository_approval')
+      assert.equal(run.agentDefinition.repositoryAdmission.approvedAt, (await pool.query('SELECT push FROM repository_settings WHERE "userId"=$1 AND "remoteKey"=$2', [f.userId, f.remoteKey])).rows[0].push.approvedAt)
       assert.equal(run.agentDefinition.repositoryAdmission.remoteKey, f.remoteKey)
       assert.equal(run.dispatchKey, `factory:${f.task.attemptId}`)
       assert.equal(publication.scopeVersion, 1)
@@ -120,7 +125,16 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await dispatch(f)).runId, admitted.runId)
       assert.deepEqual(await rowsFor(f), before)
       await assert.rejects(queueRun(f.userId, publicInput(f, `another:${randomUUID()}`)), /runAlreadyActive/, 'an internal Factory run still participates in the ordinary active-task gate')
-      assert.equal((await pool.query('SELECT count(*)::int AS n FROM repository_settings WHERE "userId"=$1', [f.userId])).rows[0].n, 0, 'configured allow needs no synthetic human grant')
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM repository_settings WHERE "userId"=$1', [f.userId])).rows[0].n, 1, 'the admission rests on the one recorded repository approval')
+    })
+
+    await t.test('configured allow without a repository approval admits nothing', async () => {
+      const f = await fixture({ approved: false })
+      const before = await rowsFor(f)
+      await assert.rejects(dispatch(f), /runInvalid/)
+      await assert.rejects(queueRun(f.userId, publicInput(f, `allow:${randomUUID()}`)), /runInvalid/)
+      assert.deepEqual(await rowsFor(f), before)
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM repository_settings WHERE "userId"=$1', [f.userId])).rows[0].n, 0, 'nothing granted a repository approval on the owner\'s behalf')
     })
 
     await t.test('caller-owned rollback removes queue, publication, binding and dispatch receipt together', async () => {
@@ -167,7 +181,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       await writeRepositoryPushApproval(denied.userId, denied.remoteKey, true)
       await assert.rejects(dispatch(denied), /runInvalid/)
       assert.equal((await rowsFor(denied)).runs, 0)
-      const ask = await fixture({ permission: 'ask' })
+      const ask = await fixture({ permission: 'ask', approved: false })
       await assert.rejects(dispatch(ask), /runInvalid/)
       await writeRepositoryPushApproval(ask.userId, ask.remoteKey, true)
       const allowed = await dispatch(ask)

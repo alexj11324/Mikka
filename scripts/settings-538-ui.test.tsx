@@ -37,7 +37,7 @@ let container: HTMLDivElement
 let root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
 let WorkspaceSettings: typeof import('../components/settings/workspace-settings')['WorkspaceSettings']
-let SecretsSettings: typeof import('../components/settings/secrets-settings')['SecretsSettings']
+let E2BKeySettings: typeof import('../components/settings/secrets-settings')['E2BKeySettings']
 
 before(async () => {
   Object.defineProperty(browser.location, 'assign', { configurable: true, value: (url: string) => { assigned.push(url) } })
@@ -47,7 +47,7 @@ before(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, HTMLElement: browser.HTMLElement, Element: browser.Element })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ WorkspaceSettings } = await import('../components/settings/workspace-settings'))
-  ;({ SecretsSettings } = await import('../components/settings/secrets-settings'))
+  ;({ E2BKeySettings } = await import('../components/settings/secrets-settings'))
 })
 beforeEach(() => {
   general = { id: 'w1', name: 'Acme', slug: 'acme', icon: null, canEdit: false, canTransfer: false }
@@ -83,15 +83,16 @@ test('a failed reset stays on the page with 重试', async () => {
   assert.deepEqual(assigned, ['/'])
 })
 
+// The E2B row is the person's own key, under 账号 › API 与订阅 (keys are personal).
 test('the E2B row shows the key state', async () => {
-  await act(async () => root.render(<SecretsSettings workspaceId="w1" />))
+  await act(async () => root.render(<E2BKeySettings workspaceId="w1" />))
   assert.equal(status(), '已设置')
   assert.ok(button('更换'))
 })
 
 test('someone who may not set the key sees its state without 设置', async () => {
   capability = { canEdit: false, byoEnabled: true, configured: false, lastErrorCode: null, lastErrorAt: null }
-  await act(async () => root.render(<SecretsSettings workspaceId="w1" />))
+  await act(async () => root.render(<E2BKeySettings workspaceId="w1" />))
   assert.equal(status(), '未设置')
   assert.equal(button('设置'), undefined)
 })

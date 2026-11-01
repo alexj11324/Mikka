@@ -1,13 +1,24 @@
 import 'server-only'
-// User-triggered cloud computers always use the workspace's own E2B key.
+// Every sandbox runs on its owner's own E2B key (orchestration § 2): never a teammate's, never the platform's.
 import { AuthenticationError, NotFoundError, RateLimitError, SandboxNotFoundError } from 'e2b'
 import { E2BKeyError, type E2BKeyErrorCode } from './flag'
 
 type Env = Record<string, string | undefined>
 
-/** Resolves the API key for a workspace. the unused argument keeps the existing caller signature. */
-export async function e2bApiKey(workspaceId: string, _platformMissing: string, env: Env = process.env): Promise<string> {
-  return (await import('./e2b')).getWorkspaceE2BApiKey(workspaceId, env)
+/** The sandbox owner's own key; the unused argument keeps the existing caller signature. */
+export async function e2bApiKey(ownerId: string, _platformMissing: string, env: Env = process.env): Promise<string> {
+  return (await import('./e2b')).getUserE2BApiKey(ownerId, env)
+}
+
+/**
+ * Who owns a sandbox, from its own record (a bot's cloud computer or a thread machine), so a
+ * person opening it never lends their key to someone else's sandbox. Null when it is not ours.
+ */
+export async function sandboxKeyOwner(workspaceId: string, sandboxId: string): Promise<string | null> {
+  const { pool } = await import('@/lib/db')
+  const { rows } = await pool.query<{ ownerId: string }>(`SELECT "ownerId" FROM cloud_machines WHERE "sandboxId"=$1 AND "workspaceId"=$2
+    UNION ALL SELECT "ownerId" FROM thread_machines WHERE "sandboxId"=$1 AND "workspaceId"=$2 LIMIT 1`, [sandboxId, workspaceId])
+  return rows[0]?.ownerId ?? null
 }
 
 /** Base desktop template: E2B_BYO_COMPUTER_TEMPLATE (must be a public template); unset → e2b_template_unavailable. */
@@ -38,12 +49,12 @@ const CARD_CODE = { e2b_key_invalid: 'invalid', e2b_limit_reached: 'rate_limited
  * failure on the settings card (lastErrorCode). Never logs the key or the response body.
  * Unclassified failures are rethrown.
  */
-export async function withE2BErrors<T>(workspaceId: string, creating: boolean, run: () => Promise<T>, _env: Env = process.env): Promise<T> {
+export async function withE2BErrors<T>(ownerId: string, creating: boolean, run: () => Promise<T>, _env: Env = process.env): Promise<T> {
   try { return await run() } catch (error) {
     if (error instanceof E2BKeyError) throw error
     const code = classifyE2BError(error, creating)
     if (!code) throw error
-    if (code in CARD_CODE) await (await import('./e2b')).recordE2BKeyError(workspaceId, CARD_CODE[code as keyof typeof CARD_CODE]).catch(() => undefined)
+    if (code in CARD_CODE) await (await import('./e2b')).recordE2BKeyError(ownerId, CARD_CODE[code as keyof typeof CARD_CODE]).catch(() => undefined)
     throw new E2BKeyError(code)
   }
 }

@@ -175,6 +175,38 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
       harness: "ai_sdk", model: "deepseek-chat",
       modelSelection: { coordinator: true, type: "api_key", keyId: key.id, ownerId: "alice", workspaceId: workspace, modelId: "deepseek-chat" },
     });
+    // 订阅额度用完后，自动改用 API Key: bot A's Claude subscription is out of quota. The composer names the reset and
+    // the key the next turn moves to; that turn is frozen on Alice's own key, marked, and a frozen one never changes.
+    await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [claude, quota(1, FUTURE)]);
+    const out = await botModelMenu(pool, settings, alice, botA);
+    // The chip names the key's model the next turn runs on.
+    assert.deepEqual([out.current.id, out.current.modelId, out.current.kind, out.current.available], [apiKeyOptionId(key.id, "deepseek-chat"), "deepseek-chat", "apiKey", true]);
+    assert.deepEqual(out.current.quota, { subscription: "claude", plan: "Max", resetsAt: FUTURE, fallback: { keyProvider: "deepseek", keyName: null, model: "deepseek-chat" } });
+    const switched = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
+    assert.deepEqual(switched, {
+      harness: "ai_sdk", model: "deepseek-chat",
+      modelSelection: { consumerId: botA, type: "api_key", keyId: key.id, ownerId: "alice", workspaceId: workspace, modelId: "deepseek-chat",
+        afterQuota: { subscription: "claude", plan: "Max", keyProvider: "deepseek", keyName: null } },
+    });
+    // Turned off: the turn stays on the subscription and stops there; the composer offers 添加 API Key 继续 instead.
+    await pool.query(`UPDATE "user" SET "apiKeyAfterQuota"=false WHERE id='alice'`);
+    const off = await botModelMenu(pool, settings, alice, botA);
+    assert.deepEqual([off.current.modelId, off.current.available, off.current.quota?.fallback], ["claude-opus-fixture", false, null]);
+    const stays = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
+    assert.equal(stays.modelSelection?.type, "subscription");
+    // A teammate's key is never spent this way: Alice shares hers with the team, Bob can pick it, but his bot on his
+    // exhausted subscription does not move to it.
+    await pool.query(`UPDATE "user" SET "apiKeyAfterQuota"=true`);
+    const { setApiKeyShare, usableApiKeys } = await import("./model-api-keys");
+    await setApiKeyShare(pool, "alice", { id: workspace, kind: "team" }, key.id, true);
+    assert.ok((await usableApiKeys(pool, "bob", workspace)).some((row) => row.id === key.id && !row.mine));
+    await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [bobs, quota(1, FUTURE)]);
+    const bobsTurn = await freezeBotModel({ ownerId: "bob", botId: bobBot, workspaceId: workspace }, dependencies);
+    assert.notEqual(bobsTurn.modelSelection?.type, "api_key");
+    // Reset: the subscription runs again.
+    await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [claude, quota(1, PAST)]);
+    assert.equal((await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies)).modelSelection?.type, "subscription");
+
     // Bob's bots do not see Alice's key until she shares it with 分享给团队成员.
     assert.equal((await botModelMenu(pool, settings, { ownerId: "bob", workspaceId: workspace }, bobBot)).groups.some((group) => group.kind === "shared"), false);
   } finally {

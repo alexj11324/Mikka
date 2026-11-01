@@ -19,6 +19,9 @@ export const PUBLICATION_ERRORS = {
   publication_mismatch: 'The reported push does not match the server-issued issue branch.',
   issue_unavailable: 'The task is no longer available to this thread.',
   pull_request_limit: 'The task already has the maximum number of pull request links.',
+  pull_request_denied: 'Opening pull requests is set to deny in Plugins › GitHub. The pushed branch is preserved.',
+  pull_request_approval_changed: 'Opening pull requests now asks first; the person decides on a card.',
+  pull_request_declined: 'The person declined opening this pull request. The pushed branch is preserved.',
 } as const
 export type PublicationErrorCode = keyof typeof PUBLICATION_ERRORS
 

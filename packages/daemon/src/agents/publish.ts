@@ -17,7 +17,7 @@ import {
   rmSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { assertSafeId } from "../ids"
 
 import type { RunPublish } from "@mikka/protocol"
@@ -44,7 +44,8 @@ export interface PublishOptions {
   baseBranch?: string
   /**
    * Push only when allowed: the repo approved it ("always for this repo")
-   * or the workspace allows pushes (`pushDecision` in ../permissions).
+   * or the run's assignment, after the server checked that approval,
+   * allows pushes (`pushDecision` in ../permissions).
    * `note` says why not otherwise.
    */
   push: { approved: boolean; remote: string; note?: string }
@@ -119,7 +120,12 @@ export async function worktreeGitWritePaths(repoPath: string, worktree: string, 
   const common = resolve(gitDir, '..', '..')
   const branch = `mikka/run-${assertSafeId('run id', runId)}`
   const ref = join(common, 'refs', 'heads', branch)
-  return [gitDir, join(common, 'objects'), ref, `${ref}.lock`, join(common, 'logs', 'refs', 'heads', branch)]
+  const logsRef = join(common, 'logs', 'refs', 'heads', branch)
+  // Git creates `<branch>.lock` beside the ref (and appends the reflog) when it
+  // updates the branch, so the ref's directory must be writable in the sandbox,
+  // not just the ref file — binding only the leaf leaves the containing
+  // `refs/heads/mikka/` read-only and `git commit` fails with EROFS.
+  return [gitDir, join(common, 'objects'), dirname(ref), ref, `${ref}.lock`, dirname(logsRef), logsRef]
 }
 
 function safeRealpath(path: string) {

@@ -23,6 +23,13 @@ type T = ReturnType<typeof useTranslations<'Coordinator.modelPicker'>>
 /** The SWR key of a chat's model menu. */
 export const botModelMenuKey = (botId: string | null) => ['bot-model-menu', botId ?? 'coordinator'] as const
 
+const OPEN_EVENT = 'mikka:open-model-picker'
+
+/** Opens a chat's model picker from elsewhere in the chat, e.g. 改回 on a quota switch line. */
+export function openModelPicker(botId: string | null) {
+  window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: botId ?? 'coordinator' }))
+}
+
 function providerName(provider: string | undefined) {
   return provider === 'claude' ? 'Claude' : 'ChatGPT'
 }
@@ -77,6 +84,12 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshFailed, setRefreshFailed] = useState(false)
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    const listener = (event: Event) => { if ((event as CustomEvent<string>).detail === (botId ?? 'coordinator')) { setOpen(true); void refresh() } }
+    window.addEventListener(OPEN_EVENT, listener)
+    return () => window.removeEventListener(OPEN_EVENT, listener)
+  })
   const [last, setLast] = useState<ChipModel | null>(null)
   const shown = menu.data?.current
   useEffect(() => {
@@ -87,7 +100,7 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
       else setLast(readChip(window.localStorage.getItem(key)))
     } catch { /* storage unavailable: the chip waits for the menu */ }
   }, [botId, shown, menu.error])
-  // While the menu loads, the chip keeps the model it showed last time instead of popping in later (state completeness).
+  // Someone else's bot gets no chip; while the menu loads, the chip keeps the model it showed last time (state completeness).
   // It is the chip's look only, not a control, until the menu it opens has arrived.
   if (!menu.data) return last && !menu.error ? <span role="status" aria-busy="true" data-testid="bot-model-chip-pending" aria-label={t('label', { name: last.id === HOSTED_CHOICE ? t('hosted') : last.modelId || t('unknownModel') })}
     className="inline-flex h-6 max-w-56 shrink-0 items-center gap-1 rounded-full bg-control px-2 text-sm whitespace-nowrap text-foreground [&_svg]:shrink-0 [&>svg]:size-3.5">
@@ -122,7 +135,7 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
   }
 
   const name = current.id === HOSTED_CHOICE ? t('hosted') : current.modelId || t('unknownModel')
-  return <DropdownMenu onOpenChange={open => { if (open) void refresh() }}>
+  return <DropdownMenu open={open} onOpenChange={next => { setOpen(next); if (next) void refresh() }}>
     <DropdownMenuTrigger render={<InputGroupButton type="button" variant="secondary" size="xs" data-testid="bot-model-chip" data-unavailable={!current.available || undefined}
       className={cn('max-w-56 rounded-full px-2 font-normal', current.available ? 'text-foreground' : 'text-muted-foreground')}
       aria-label={current.available ? t('label', { name }) : t('labelUnavailable', { name })} />}>
