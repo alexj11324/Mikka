@@ -56,7 +56,7 @@ test('Issue threads open on the right as a conversation; comments are cards with
   // A running thread ends in the composer; what is said there goes to the agent and stays in the thread.
   await threads.getByRole('button', { name: '打开线程 Route group replies', exact: true }).click()
   panel = page.getByRole('region', { name: 'Route group replies', exact: true })
-  await panel.getByRole('textbox', { name: '告诉 Coordinator 下一步做什么…' }).fill('Check the fallback timer')
+  await panel.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' }).fill('Check the fallback timer')
   await panel.getByRole('button', { name: '发送', exact: true }).click()
   await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('Check the fallback timer')
   expect(feedbackRequests).toEqual([])
@@ -137,7 +137,7 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
 
   await threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true }).click()
   panel = page.getByRole('region', { name: 'Trim the bundle', exact: true })
-  const composer = panel.getByRole('textbox', { name: '告诉 Coordinator 下一步做什么…' })
+  const composer = panel.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })
   const stop = panel.getByRole('button', { name: '停止', exact: true })
   // Typing turns stop into send; clearing the draft brings stop back.
   await composer.fill('Keep the polyfills')
