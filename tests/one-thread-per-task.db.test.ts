@@ -115,6 +115,14 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.deepEqual([look.thread, look.threadId], ['continued', first.runId])
     const definition = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [look.runId])).rows[0].agentDefinition
     assert.equal(definition.readOnly, true)
+    // A read-only thread stays read-only when it continues, even when the request does not say so.
+    const b = await person()
+    const looking = await dispatch(b, { readOnly: true })
+    assert.equal(looking.thread, 'new')
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [looking.runId])
+    const more = await dispatch(b, { note: 'Look further.' })
+    assert.deepEqual([more.thread, more.threadId], ['continued', looking.runId])
+    assert.equal((await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [more.runId])).rows[0].agentDefinition.readOnly, true)
   })
 
   await t.test('a new thread only when the person explicitly asked for one; the old one is marked replaced', async () => {
