@@ -110,6 +110,7 @@ it('supplies a private run-local helper to each real harness without modifying t
     expect(git(f.worktree, 'status', '--porcelain')).toBe('')
     expect(ctx.instructions()).toContain('gh pr checks <PR URL> --watch')
     expect(ctx.instructions()).not.toContain('Do not commit, push')
+    expect(ctx.agentDelivers).toBe(true)
   }
 })
 
@@ -139,6 +140,7 @@ it('does not supply credentials to plan or read-only sessions and respects netwo
       GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'maintenance.auto', GIT_CONFIG_VALUE_0: 'false', GIT_CONFIG_KEY_1: 'gc.auto', GIT_CONFIG_VALUE_1: '0',
     })
     expect(ctx.instructions()).toContain('Do not commit, push')
+    expect(ctx.agentDelivers).toBe(false)
   }
   const denied = new RunContext({ harness: 'codex', worktree: f.worktree, runDir: tempDir(), privateDir: tempDir(), github, childPath: f.path,
     policy: { ...policy, permissions: { ...policy.permissions, network: 'deny' } } })

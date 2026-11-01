@@ -392,6 +392,15 @@ export class RunContext {
     return { TMPDIR: this.tmpDir, TMPPREFIX: join(this.tmpDir, "zsh"), ...withGitConfig(this.githubEnv, RUN_GIT_CONFIG), ...(this.options.policyHash ? { MIKKA_POLICY_HASH: this.options.policyHash } : {}) }
   }
 
+  /**
+   * The agent delivers this run itself: it commits, pushes to the issue
+   * branch and opens the pull request with run-scoped GitHub credentials. The
+   * server sends GitHub delivery only for a run whose push is allowed.
+   */
+  get agentDelivers(): boolean {
+    return Object.keys(this.githubEnv).length > 0
+  }
+
   /** A hand-in from an earlier session would end this one at once. */
   clearHandoff() {
     rmSync(this.handoffFile, { force: true })
