@@ -201,7 +201,9 @@ export interface UsableApiKey extends ApiKeyView {
  * first. The model picker's 「API Key」 group reads this.
  */
 export async function usableApiKeys(query: Query, userId: string, workspaceId: string): Promise<UsableApiKey[]> {
-  const [own, allowed] = await Promise.all([subscriptionsUsable(query, userId, workspaceId), memberSubscriptionsAllowed(query, workspaceId)])
+  // One after the other: a dispatch reads this on its transaction's client.
+  const own = await subscriptionsUsable(query, userId, workspaceId)
+  const allowed = await memberSubscriptionsAllowed(query, workspaceId)
   const mine = own ? (await query.query<Row>(`SELECT ${COLUMNS} FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`, [userId])).rows : []
   const others = allowed ? (await query.query<Row>(`SELECT ${COLUMNS.split(',').map(column => `k.${column}`).join(',')} FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
     WHERE s."workspaceId"=$1 AND k."ownerId"<>$2 ORDER BY s."createdAt",k.id`, [workspaceId, userId])).rows : []

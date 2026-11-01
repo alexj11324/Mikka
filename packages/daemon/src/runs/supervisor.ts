@@ -106,6 +106,8 @@ export interface SupervisorDeps {
   adapters: ReadonlyMap<Harness, AgentAdapter>
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
+  /** A hosted (cloud) worker's API-key runs: the key stays behind the worker's broker, out of the task container. */
+  startCredential?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   /** Authenticated policy validation before repository/setup effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
@@ -476,10 +478,10 @@ export class RunSupervisor {
     const existing = this.deps.journal.get(assignment.runId)
     if (existing) return this.summary(existing)
     // 4e3: mask the task's injected secrets (names from the server, values from taskEnv) before upload.
-    const masker = createRunMasker((assignment.taskSecretNames ?? []).flatMap(name => {
+    const masker = createRunMasker([...(assignment.taskSecretNames ?? []).flatMap(name => {
       const value = assignment.taskEnv?.[name]
       return typeof value === "string" ? [{ name, value }] : []
-    }))
+    }), ...(assignment.modelCredential ? [{ name: "MODEL_API_KEY", value: assignment.modelCredential.key }] : [])])
     if (masker) this.maskers.set(assignment.runId, masker)
     let repo: DeviceRepo
     try { repo = this.deps.repository(assignment) } catch (error) {
@@ -578,6 +580,11 @@ export class RunSupervisor {
           this.blockedSkillResumes.add(entry.assignment.runId)
           this.deps.journal.update(entry.assignment.runId,{error:'Skill resume blocked: current online source, authorization and lease required.'})
         }
+        continue
+      }
+      // The run's API key was never written down; it does not go on without it.
+      if (entry.credentialWithheld && !entry.assignment.modelCredential) {
+        this.finish(entry.assignment.runId, 'error', 'The run stopped with the daemon; its API key is not kept. Retry the thread.')
         continue
       }
       // The old lease is stale; give the first heartbeat time to renew it.
@@ -1275,6 +1282,8 @@ export class RunSupervisor {
       fixture: assignment.fixture,
       model: assignment.model,
       mailbox,
+      // In memory only: the adapter hands it to the run's CLI environment.
+      credential: assignment.modelCredential,
     }
     const resuming =
       entry.sessionId !== null && adapter.capabilities.supportsResume
@@ -1320,8 +1329,11 @@ export class RunSupervisor {
     const previousExecution = entry.execution
     const previousRuntime = entry.runtime
     let session: AgentSession
+    if (assignment.subscriptionBinding && assignment.modelCredential) throw new Error("A run has one model credential")
     try {
-      session = assignment.subscriptionBinding
+      session = assignment.modelCredential && this.deps.startCredential
+      ? await this.deps.startCredential(assignment,{...options,prompt:assignment.prompt})
+      : assignment.subscriptionBinding
       ? this.deps.startSubscription
         ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})
         : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()

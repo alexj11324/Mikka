@@ -7,7 +7,7 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
-import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER } from '@mikka/protocol/device'
+import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { issuePolicySnapshot, policyDistributionContext, requestPolicyIssuer } from '@/lib/agent-tool-approval/policy-distribution'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
@@ -121,6 +121,10 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   } catch { return NextResponse.json({ error:'Subscription unavailable.' },{ status:409 }) }
   if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id || subscription.ownerId !== caller.userId)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
+  // A run frozen on the person's API key goes only to a daemon that injects it; nothing is opened yet.
+  const frozenKey = run.agentDefinition?.apiKey
+  if (frozenKey && (subscription || pinned)) return NextResponse.json({ error: 'Run credential unavailable.' }, { status: 409 })
+  if (frozenKey && request.headers.get(MODEL_CREDENTIAL_HEADER) !== '1') return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION }, { status: 409 })
   let cliPolicy: Awaited<ReturnType<typeof readCliRunPolicy>>
   try {
     cliPolicy = await readCliRunPolicy(pool, runId, caller.userId)
@@ -155,19 +159,48 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       factoryToken = await withDatabaseClient(tx, () => issueRunToken(run))
     }
   }
+  // The key is opened here, at claim, for this run only (orchestration.md § 6): `apiKeyForRun` checks the
+  // run is active and the key still usable by its owner in its workspace, and records the run so
+  // withdrawing the key stops it. A key that is gone ends the run; it never switches credential.
+  let modelCredential: RunModelCredential | undefined
+  const openRunKey = async (): Promise<NextResponse | null> => {
+    if (!frozenKey) return null
+    const [{ apiKeyForRun }, { WorkspaceError }] = await Promise.all([import('@/lib/model-api-keys'), import('@/lib/workspace-error')])
+    const refuse = async () => {
+      const { persistRunCompletion } = await import('@/lib/run-publications')
+      await persistRunCompletion(caller.userId, runId, { stopReason: 'blocked', report: { summary: 'API key unavailable.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } }, caller.scopeDeviceId)
+      after(async () => { const { wakeCoordinator } = await import('@/lib/coordinator/wake'); await wakeCoordinator(caller.userId) })
+      return NextResponse.json({ error: 'API key unavailable.', code: 'apiKeyUnavailable' }, { status: 409 })
+    }
+    let opened: Awaited<ReturnType<typeof apiKeyForRun>>
+    try { opened = await apiKeyForRun(pool, runId, frozenKey.keyId) }
+    catch (error) {
+      // Secrets briefly unreadable: the run stays queued. A key that is gone, or no longer usable here: the run ends.
+      if (!(error instanceof WorkspaceError) || error.code !== 'apiKeyNotFound') return NextResponse.json({ error: 'API key unavailable.' }, { status: 409 })
+      return refuse()
+    }
+    const parsed = opened.harness === harness ? runModelCredentialSchema.safeParse(opened.harness === 'claude_code'
+      ? { kind: 'provider', protocol: 'anthropic', baseUrl: opened.env.ANTHROPIC_BASE_URL, key: opened.env.ANTHROPIC_API_KEY }
+      : { kind: 'provider', protocol: 'openai', baseUrl: opened.codex.model_providers.mikka.base_url, key: opened.env.MIKKA_MODEL_API_KEY }) : null
+    if (!parsed?.success) return refuse()
+    modelCredential = parsed.data
+    return null
+  }
   let computer: Awaited<ReturnType<typeof claimCloudRun>> = null
   let publication: Awaited<ReturnType<typeof import('@/lib/run-publications')['prepareRunPublication']>> | null = null
   let localComputer: Awaited<ReturnType<typeof localComputerAuthority>> = null
   let taskEnv: Record<string, string> = {}
   let taskSecretNames: string[] = []
   if (device.kind === 'cloud') {
-    if (!cloudComputerTasksEnabled() || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
+    if (!cloudComputerTasksEnabled() || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !(subscription ? subscription.workspaceId === caller.scopeWorkspaceId : frozenKey) || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
     // claim so a decrypt failure leaves the run queued. The injection helper returns an empty
     // assignment without an encryption key; platform versus BYO billing does not change it.
     try { ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl))) }
     catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
-    computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription.id, beforeClaim, afterClaim)
+    const refused = await openRunKey()
+    if (refused) return refused
+    computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
   } else {
     const { prepareRunPublication } = await import('@/lib/run-publications')
@@ -176,6 +209,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       if (!(error instanceof PublicationError)) throw error
       return rejectPublication(error)
     }
+    const refused = await openRunKey()
+    if (refused) return refused
     const claim = await claimLocalRun(pool, runId, deviceId, new Date(leaseExpiresAt), subscription?.id, beforeClaim, afterClaim)
     if (claim !== 'claimed') return NextResponse.json({ error: claim === 'cloud-required' ? 'Cloud computer worker required.' : 'Run is no longer queued for this device.' }, { status: 409 })
   }
@@ -251,6 +286,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly && assignmentPolicy.permissions.git_push === 'allow' && harness !== 'mock'
       ? { github: { endpoint: mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), repository: repo.repoPath.slice('v2/github.com/'.length), branch: publication.pushBranch } } : {}),
     ...(run.agentDefinition?.model ? {model:run.agentDefinition.model} : {}),
+    ...(modelCredential ? { modelCredential } : {}),
     ...(subscription ? { ...(run.agentDefinition?.cliModelSelection ? {} : {model:subscription.modelId}), subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
     ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
     ...(localComputer ? { localComputer } : {}),

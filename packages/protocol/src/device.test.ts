@@ -75,6 +75,27 @@ describe("device link schemas", () => {
     ).toBe(false)
   })
 
+  it("takes one strict model credential, never with a subscription binding", () => {
+    const base = { runId: "r1", issueId: "i1", deviceId: "d1", repoId: "repo", harness: "claude_code", prompt: "p" }
+    const provider = { kind: "provider", protocol: "anthropic", baseUrl: "https://api.deepseek.com/anthropic", key: "sk-test-0000" }
+    expect(runAssignmentSchema.parse({ ...base, modelCredential: provider }).modelCredential).toEqual(provider)
+    expect(runAssignmentSchema.safeParse({ ...base, modelCredential: { kind: "api_key", key: "sk-test-0000" } }).success).toBe(true)
+    for (const modelCredential of [
+      { ...provider, baseUrl: "http://api.deepseek.com/anthropic" },
+      { ...provider, baseUrl: "https://user:pass@api.deepseek.com" },
+      { ...provider, baseUrl: "https://api.deepseek.com/?x=1" },
+      { ...provider, key: "sk-test\nX-Injected: 1" },
+      { ...provider, key: "sk-test\0" },
+      { ...provider, key: "" },
+      { ...provider, key: "k".repeat(4_097) },
+      { ...provider, protocol: "gemini" },
+      { ...provider, extra: true },
+    ]) expect(runAssignmentSchema.safeParse({ ...base, modelCredential }).success).toBe(false)
+    const subscriptionBinding = { bindingId: "00000000-0000-4000-8000-000000000001", ownerId: "o", workspaceId: "00000000-0000-4000-8000-000000000002", consumerId: "00000000-0000-4000-8000-000000000003", route: "claude_code_cli" }
+    expect(runAssignmentSchema.safeParse({ ...base, subscriptionBinding }).success).toBe(true)
+    expect(runAssignmentSchema.safeParse({ ...base, subscriptionBinding, modelCredential: provider }).success).toBe(false)
+  })
+
   it("accepts every daemon-local state in a patch, including stopped", () => {
     expect(
       runPatchSchema.parse({ state: "stopped", stopReason: "turn_ended" })
