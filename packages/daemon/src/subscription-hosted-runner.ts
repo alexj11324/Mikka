@@ -202,6 +202,11 @@ export async function createHostedBotRunner(host: {
         },
       );
       const safeGit = join(gitCopy, "repo", ".git");
+      // --no-checkout leaves no index; verification uses the existing worktree.
+      await exec("git", ["--git-dir", safeGit, "read-tree", "HEAD"], {
+        env: { ...bareEnv, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
+        timeout: 30000, signal, maxBuffer: 1024 * 1024,
+      });
       const home = join(gitCopy, "home");
       mkdirSync(home, { mode: 0o700 });
       wrapped = await sandboxRuntime().wrap(["/bin/sh", "-c", script], {
@@ -383,7 +388,7 @@ export async function createHostedBotRunner(host: {
         const shadow = join(paths.runDir, "runtime-git");
         const emptyHome = join(paths.runDir, "git-bootstrap-home");
         mkdirSync(emptyHome, { recursive: true, mode: 0o700 });
-        if (!existsSync(shadow))
+        if (!existsSync(shadow)) {
           await exec(
             "git",
             [
@@ -411,6 +416,12 @@ export async function createHostedBotRunner(host: {
               maxBuffer: 1024 * 1024,
             },
           );
+          // Initialize only a new shadow, preserving staged changes on resume.
+          await exec("git", ["--git-dir", join(shadow, ".git"), "read-tree", "HEAD"], {
+            env: { ...bareEnv, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
+            timeout: 30000, signal: lifetime.signal, maxBuffer: 1024 * 1024,
+          });
+        }
         await live();
         if (
           !lstatSync(shadow).isDirectory() ||
