@@ -30,7 +30,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   botRuntimeProvisioner.provision = async (appDb: PgPool, actor: { userId: string; workspaceId: string }, botId: string) => {
     provisioned++
     const deviceId = randomUUID(), sandboxId = `sbx-${randomUUID()}`
-    await appDb.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses) VALUES ($1,$2,'Cloud computer','cloud',true,$3)`, [deviceId, actor.userId, JSON.stringify(harnesses)])
+    await appDb.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt") VALUES ($1,$2,'Cloud computer','cloud',true,$3,now())`, [deviceId, actor.userId, JSON.stringify(harnesses)])
     await appDb.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [actor.workspaceId, actor.userId, randomUUID(), sandboxId, deviceId])
     await appDb.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [botId, actor.workspaceId, actor.userId])
     const sandbox = { sandboxId, commands: { run: async () => ({ stdout: '', stderr: '', exitCode: 0 }) } }
@@ -104,6 +104,34 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [a.botId]), 1, 'no duplicate runtime')
     assert.equal(await count('SELECT count(*)::int AS n FROM byos_bindings WHERE "consumerId"=$1', [runtime[0].agentId]), 1, 'no duplicate binding')
     assert.equal(await count('SELECT count(*)::int AS n FROM cloud_machines WHERE "ownerId"=$1', [a.id]), 1)
+  })
+
+  await t.test('an existing sleeping or disconnected worker is woken before dispatch', async () => {
+    const a = await person('sleeping-runtime')
+    await dispatch(a.id, a.issueId, a.botId)
+    const { ensureBotCloudRuntime } = await import('../lib/computer/auto-runtime')
+    let wakes = 0
+    const wake = { provision: async () => {
+      wakes++
+      await pool.query(`UPDATE cloud_machines SET state='running' WHERE "ownerId"=$1`, [a.id])
+      await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE "ownerId"=$1', [a.id])
+    } }
+    for (const state of ['sleeping', 'running']) {
+      await pool.query('UPDATE cloud_machines SET state=$2 WHERE "ownerId"=$1', [a.id, state])
+      await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '2 minutes' WHERE "ownerId"=$1`, [a.id])
+      assert.ok(await ensureBotCloudRuntime(pool, { userId: a.id, workspaceId: a.workspaceId }, a.botId, { harness: 'codex' }, wake))
+    }
+    assert.equal(wakes, 2)
+    const result = await dispatch(a.id, await anotherTask(a.id, 8), a.botId) as unknown as { status: string }
+    assert.equal(result.status, 'queued')
+  })
+
+  await t.test('concurrent dispatches of one task create only one thread', async () => {
+    const a = await person('concurrent-runtime')
+    const results = await Promise.all([dispatch(a.id, a.issueId, a.botId), dispatch(a.id, a.issueId, a.botId)]) as unknown as { runId: string; thread: string }[]
+    assert.deepEqual(results.map(result => result.thread).sort(), ['message', 'new'])
+    assert.equal(results[0].runId, results[1].runId)
+    assert.equal(await count('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [a.issueId]), 1)
   })
 
   await t.test('a cloud run pushes on the GitHub App grant like a local run; without it, or read-only, it cannot push', async () => {
