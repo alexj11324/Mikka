@@ -1,4 +1,5 @@
 import "server-only";
+import { autoScheduleOn } from "./device-auto-schedule";
 import { ActionFailureError } from "./action-error";
 import { readIssueMetadata } from "./issue-metadata";
 import type { JSONContent } from "@tiptap/core";
@@ -67,8 +68,23 @@ export class ExecutionSettings {
       : providers.some((m) => m.provider === "codex")
         ? "codex"
         : undefined;
+    const model = models.find(
+      (m) =>
+        !preferred ||
+        m.provider === (preferred === "claude_code" ? "claude" : "codex"),
+    );
+    const cloud = model && {
+      id: "default",
+      label: null,
+      place: "cloud",
+      harness: model.provider === "claude" ? "claude_code" : "codex",
+      model: model.modelId,
+      position: 2147483647,
+    };
+    // Cloud first when the workspace has its own E2B key (decision 2026-10-31-2200-run-machine-fallback).
+    if (cloud && (await query.query('SELECT 1 FROM workspace_e2b_keys WHERE "workspaceId"=$1', [scope.workspaceId])).rowCount) return cloud;
     const devices = places
-      .filter((p) => p.id !== "cloud" && p.enabled && p.online)
+      .filter((p) => p.id !== "cloud" && p.enabled && p.online && autoScheduleOn(p))
       .sort(
         (a, b) =>
           Number(b.deviceType === "server") - Number(a.deviceType === "server"),
@@ -101,20 +117,8 @@ export class ExecutionSettings {
           position: 2147483647,
         };
     }
-    const model = models.find(
-      (m) =>
-        !preferred ||
-        m.provider === (preferred === "claude_code" ? "claude" : "codex"),
-    );
-    if (!model) throw new ActionFailureError("executionModelUnknown");
-    return {
-      id: "default",
-      label: null,
-      place: "cloud",
-      harness: model.provider === "claude" ? "claude_code" : "codex",
-      model: model.modelId,
-      position: 2147483647,
-    };
+    if (!cloud) throw new ActionFailureError("executionModelUnknown");
+    return cloud;
   }
   async list(scope: ExecutionSettingsScope): Promise<ExecutionRule[]> {
     const client = await this.pool.connect();
@@ -142,7 +146,7 @@ export class ExecutionSettings {
           const chosen =
             row.place === "auto"
               ? places
-                  .filter((p) => p.id !== "cloud" && p.enabled && p.online)
+                  .filter((p) => p.id !== "cloud" && p.enabled && p.online && autoScheduleOn(p))
                   .sort(
                     (a, b) =>
                       Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt),
@@ -378,7 +382,7 @@ export class ExecutionSettings {
     query: Pick<PoolClient, "query"> = this.pool,
   ) {
     const { rows } = await query.query(
-      `SELECT id,name,"deviceType",enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "createdAt",id`,
+      `SELECT id,name,"deviceType",enabled,"autoSchedule","lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "createdAt",id`,
       [scope.ownerId],
     );
     return [

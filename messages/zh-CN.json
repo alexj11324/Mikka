@@ -751,6 +751,8 @@
     "thisMachine": "本机",
     "allowScheduling": "允许调度",
     "allowSchedulingTo": "允许调度到 {name}",
+    "autoSchedule": "自动调度",
+    "autoScheduleTo": "允许 {name} 自动调度",
     "recheck": "重新检查",
     "agent": "可用工具",
     "toggleSidebar": "展开或收起侧栏",
@@ -3021,7 +3023,13 @@
     "sendingChoice": "发送中",
     "cloudKeySetup": "去设置 E2B 密钥",
     "dispatchWait": "等它上线",
-    "dispatchCloud": "在 Mikka Cloud 上运行"
+    "dispatchCloud": "在 Mikka Cloud 上运行",
+    "needsMachineTitle": "这个任务需要一台电脑来跑",
+    "needsMachineAuto": "允许这台电脑自动调度",
+    "needsMachineServerOnline": "让服务器重新上线",
+    "needsMachineMac": "在这台电脑上启用",
+    "needsMachineServer": "连接我的服务器",
+    "needsMachineE2B": "填入 E2B Key"
   },
   "IssueThreads": {
     "title": "线程",
