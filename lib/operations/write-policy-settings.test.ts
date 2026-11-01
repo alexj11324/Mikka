@@ -31,3 +31,11 @@ test('settings are scoped, versioned, and acquire membership before commit',asyn
  assert.deepEqual(f.state.permissions,{write_document:'allow'})
  await assert.rejects(f.settings.read({...f.scope,ownerId:'other'}),/agentScopeNotFound/)
 })
+
+test('browser actions have no ask: the settings schema rejects it, allow and deny stay valid', async () => {
+ const { writePolicySettingsSchema } = await import('./write-policy-settings')
+ assert.equal(writePolicySettingsSchema.safeParse({ browser_payment:'ask' }).success, false)
+ assert.equal(writePolicySettingsSchema.safeParse({ browser_browse:'allow', browser_payment:'deny' }).success, true)
+ // Other write actions keep ask.
+ assert.equal(writePolicySettingsSchema.safeParse({ send_slack_message:'ask' }).success, true)
+})

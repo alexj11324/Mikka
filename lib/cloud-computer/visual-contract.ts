@@ -40,16 +40,15 @@ export function observationMetadata(observation: VisualObservation) {
   return { ...metadata, imageDigest: createHash('sha256').update(Buffer.from(screenshot.slice(screenshot.indexOf(',')+1),'base64')).digest('hex') }
 }
 const scopedDecisions = z.record(z.string(), z.enum(['allow','ask','deny']))
-/** Bots operate their browsers without asking by default (Alex, 2026-10-30,
- * as ChatGPT agent and Claude for Chrome act until the person takes over): the
- * gate before an action is the Decisions judgment that it serves the person's
- * task. What the person or an admin set explicitly is followed: a workspace
- * computer deny or an explicit deny blocks it, and an explicit ask for this
- * effect waits for their approval card (2026-11-01: a setting the person chose
- * is never read as allow). */
-export function browserPermission(effect: BrowserEffect, computer: 'allow'|'deny', agent: unknown, workspace: unknown): 'allow'|'ask'|'deny' {
+/** Bots operate their browsers without asking (Alex, 2026-10-30, as ChatGPT
+ * agent and Claude for Chrome act until the person takes over). The only gate
+ * before an action is the Decisions judgment that it serves the person's task;
+ * no effect, payment and sending included, waits for a human click. A workspace
+ * computer deny, or an explicit deny for this effect, still blocks it. "ask" is
+ * not a browser option: settings reject it and the 2026-11-01 migration turned
+ * stored ones into allow; one that slipped through reads as allow. */
+export function browserPermission(effect: BrowserEffect, computer: 'allow'|'deny', agent: unknown, workspace: unknown): 'allow'|'deny' {
   const action = `browser_${effect}`
   const layers = [scopedDecisions.parse(agent), scopedDecisions.parse(workspace)]
-  if (computer === 'deny' || layers.some(layer => layer[action] === 'deny')) return 'deny'
-  return layers.some(layer => layer[action] === 'ask') ? 'ask' : 'allow'
+  return computer === 'deny' || layers.some(layer => layer[action] === 'deny') ? 'deny' : 'allow'
 }

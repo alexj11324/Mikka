@@ -3,14 +3,11 @@ import assert from 'node:assert/strict'
 import { browserPermission, browserMutationSchema, mutationFromStep } from './visual-contract'
 import { browserLoginContinuation } from './login-result'
 
-test('bots act without a human approval step by default: every effect, payment and sending included; an explicit ask is followed',()=>{
+test('bots act without a human approval step: every effect, payment and sending included, is allowed by default',()=>{
  for(const effect of ['browse','edit_draft','write_external','payment','sensitive_delete','security_change'] as const) {
   assert.equal(browserPermission(effect,'allow',{},{}),'allow')
-  // An explicit ask the person or an admin set is followed, on either layer; it is never read as allow.
-  assert.equal(browserPermission(effect,'allow',{[`browser_${effect}`]:'ask'},{}),'ask')
-  assert.equal(browserPermission(effect,'allow',{},{[`browser_${effect}`]:'ask'}),'ask')
-  // Deny on either layer still wins over ask.
-  assert.equal(browserPermission(effect,'allow',{[`browser_${effect}`]:'ask'},{[`browser_${effect}`]:'deny'}),'deny')
+  // A stored 'ask' (retired per-step approval) is never a human gate.
+  assert.equal(browserPermission(effect,'allow',{[`browser_${effect}`]:'ask'},{[`browser_${effect}`]:'ask'}),'allow')
  }
  assert.throws(()=>browserPermission('browse','allow',null,{}))
  assert.throws(()=>browserPermission('browse','allow',{},{browser_browse:'maybe'}))
@@ -29,4 +26,11 @@ test('login continuation resumes observation, never turns guarded or unknown res
  for(const status of ['resumed','session_applied','submitted']) assert.equal(browserLoginContinuation(status),'running')
  assert.equal(browserLoginContinuation('guarded'),'guarded')
  for(const status of ['needs_login','outcome_unknown','failed','authenticated']) assert.equal(browserLoginContinuation(status),'needs_login')
+})
+test('the browser ask migration turns stored ask into allow and touches nothing else',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const sql=await readFile(new URL('../../drizzle/20261101190000_browser_ask_retired.sql',import.meta.url),'utf8')
+ for(const table of ['agent_kit_heads','workspace_computer_policies']) assert.match(sql,new RegExp(`UPDATE ${table}`))
+ assert.match(sql,/key LIKE 'browser\\_%' AND e\.value = '"ask"'::jsonb THEN '"allow"'::jsonb ELSE e\.value END/)
+ assert.doesNotMatch(sql,/'"deny"'/)
 })
