@@ -7,15 +7,22 @@
 /** The menu's id for Mikka 默认; `bot_model_choices` stores it as a row with no binding. */
 export const HOSTED_CHOICE = '00000000-0000-0000-0000-000000000000'
 
+/** The menu's id for a model an API key or custom provider serves (C22): `apikey:<keyId>:<model>`. */
+export const apiKeyOptionId = (keyId: string, model: string) => `apikey:${keyId}:${model}`
+export function parseApiKeyOption(id: string): { keyId: string; model: string } | null {
+  const match = /^apikey:([0-9a-f-]{36}):(.+)$/i.exec(id)
+  return match ? { keyId: match[1], model: match[2] } : null
+}
+
 /** The menu's groups, in the order they appear. */
 export type BotModelGroupKind = 'hosted' | 'subscription' | 'apiKey' | 'shared'
 
 export interface BotModelMenuOption {
-  /** What `setBotModel` saves: a binding id, or HOSTED_CHOICE. */
+  /** What `chooseBotModel` saves: a binding id, HOSTED_CHOICE, or an API key model (`apiKeyOptionId`). */
   id: string
   /** The model's id as its provider names it; empty for Mikka 默认. */
   modelId: string
-  /** `claude`, `codex`, or `mikka` for the hosted model. */
+  /** `claude`, `codex`, `mikka` for the hosted model, or an API key's provider (`anthropic`, `deepseek`, `custom`…). */
   provider: string
 }
 

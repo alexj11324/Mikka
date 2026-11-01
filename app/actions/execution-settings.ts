@@ -6,6 +6,9 @@ import { loadWorkspaceContext } from "@/lib/workspace-access";
 import { pool } from "@/lib/db";
 import { ExecutionSettings } from "@/lib/execution-settings";
 import { botModelMenu, botModelScope, refreshBotModelMenu } from "@/lib/bot-model-menu";
+import { parseApiKeyOption } from "@/lib/bot-model-menu-view";
+import { setBotApiKeyChoice } from "@/lib/model-api-keys";
+import { WorkspaceError } from "@/lib/workspace-error";
 async function context(workspaceId?: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ActionFailureError("authRequired");
@@ -83,11 +86,22 @@ export async function refreshBotModelMenuAction(botId: string | null) {
   const scope = await chatScope(botId);
   return refreshBotModelMenu(pool, new ExecutionSettings(pool), scope, botId);
 }
-/** Saves the composer's pick for the bot's next runs; a run already going keeps its model. */
+/**
+ * Saves the composer's pick for the bot's next runs; a run already going keeps its model.
+ * An API key model (`apikey:<keyId>:<model>`, C22) is saved as that key's choice.
+ */
 export async function chooseBotModel(botId: string | null, id: string) {
   const scope = await chatScope(botId);
   const settings = new ExecutionSettings(pool);
-  await settings.setBotModel(scope, botId, id);
+  const apiKey = parseApiKeyOption(id);
+  if (apiKey) {
+    try {
+      await setBotApiKeyChoice(pool, scope, botId, apiKey.keyId, apiKey.model);
+    } catch (error) {
+      if (error instanceof WorkspaceError) throw new ActionFailureError(error.code === "botNotFound" ? "botNotFound" : "executionModelUnknown");
+      throw error;
+    }
+  } else await settings.setBotModel(scope, botId, id);
   return botModelMenu(pool, settings, scope, botId);
 }
 

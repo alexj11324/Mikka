@@ -49,6 +49,13 @@ test(
       );
       await pool.query(migration);
       await pool.query(migration);
+      // Un-sharing also stops runs on the owner's API keys (lib/model-api-key-runs.ts).
+      await pool.query(
+        await readFile(new URL("../drizzle/20261101021000_model_api_keys.sql", import.meta.url), "utf8"),
+      );
+      await pool.query(
+        await readFile(new URL("../drizzle/20261101021100_bot_api_key_choice.sql", import.meta.url), "utf8"),
+      );
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const personalPolicyMigration = await readFile(new URL("../drizzle/20261101020201_workspace_personal_policies.sql",import.meta.url),"utf8");
@@ -344,7 +351,7 @@ test(
       const { SubscriptionRepository } = await import('./subscription-repository');
       const dependencies = {service:()=>({repository:new SubscriptionRepository(pool)}) as never, workspace:async () => {}};
       const frozen = await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:secondBot},dependencies);
-      assert.equal(frozen.modelSelection?.bindingId,copiedBinding,'execution uses its stored hidden binding after model list deduplication');
+      assert.equal((frozen.modelSelection as { bindingId?: string } | undefined)?.bindingId,copiedBinding,'execution uses its stored hidden binding after model list deduplication');
       const catalogue = (await settings.botModels(alice))[0];
       await settings.setBotModel(alice,null,catalogue.bindingId);
       const coordinator = await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies);
@@ -374,7 +381,7 @@ test(
       const inTeam = await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies);
       assert.equal(inTeam.modelSelection?.workspaceId,teamB.workspaceId,'the run and its binding belong to team B');
       assert.equal(inTeam.modelSelection?.consumerId,teamBot);
-      const { rows: [teamBinding] } = await pool.query('SELECT b."workspaceId",c."workspaceId" AS "connectionWorkspace" FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" WHERE b.id=$1',[inTeam.modelSelection!.bindingId]);
+      const { rows: [teamBinding] } = await pool.query('SELECT b."workspaceId",c."workspaceId" AS "connectionWorkspace" FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" WHERE b.id=$1',[(inTeam.modelSelection as { bindingId: string }).bindingId]);
       assert.deepEqual(teamBinding,{workspaceId:teamB.workspaceId,connectionWorkspace:alice.workspaceId},'the connection keeps the workspace it was made in; nothing is re-issued');
       const teamCoordinator = await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:null},dependencies);
       assert.equal(teamCoordinator.modelSelection?.workspaceId,teamB.workspaceId,'her Coordinator in team B uses her shared subscription too');
@@ -400,7 +407,7 @@ test(
       await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, true, true);
       const pooled = await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies);
       assert.equal(pooled.modelSelection?.ownerId,alice.ownerId,'the subscription is hers');
-      assert.equal(pooled.modelSelection?.runOwnerId,'bob','the run is bob\'s');
+      assert.equal((pooled.modelSelection as { runOwnerId?: string } | undefined)?.runOwnerId,'bob','the run is bob\'s');
       assert.equal(pooled.modelSelection?.consumerId,bobBot,'for bob\'s bot only');
       assert.equal(pooled.modelSelection?.workspaceId,teamB.workspaceId);
       assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'bob\'s Coordinator never uses another member\'s subscription');

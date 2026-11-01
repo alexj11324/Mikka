@@ -56,7 +56,7 @@ flowchart TD
    revoked or paused, quota left) and allowed in this workspace. In the
    personal workspace it is always allowed. In a team it is allowed when the
    owner shared it there and the admin has not turned off
-   「允许成员使用个人订阅」. If several qualify, the bot's saved choice wins;
+   「允许成员使用个人订阅和 API Key」. If several qualify, the bot's saved choice wins;
    after that a subscription comes before an API key, and Claude comes before
    ChatGPT/Codex.
 2. **Otherwise another member's credential** shared in this workspace with
@@ -72,7 +72,7 @@ Rules that hold everywhere:
   disconnected, revoked, paused, its share is withdrawn, its owner leaves, or
   the admin switch is turned off.
 - **Quota exhausted.** The run that hit the limit stops; it never switches.
-  - When 「订阅额度用完时改用 API Key」 is on (the default) and the owner has
+  - When 「订阅额度用完后，自动改用 API Key」 is on (the default) and the owner has
     an API key for that provider, the next run uses that API key.
   - When nothing is left, the stopped run opens a popup. The person picks the
     model or credential themselves, and 重试 runs the turn on that choice.
@@ -260,7 +260,7 @@ The workspace where the work happens pays.
 | --- | --- |
 | A personal workspace for everyone; team workspaces beside it | — |
 | Account-level subscriptions, API keys and custom providers on 「API 与订阅」; per-workspace shares; 「分享给团队成员」; the admin switch | Per-member spend caps |
-| Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完时改用 API Key」; a popup when nothing is left | — |
+| Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完后，自动改用 API Key」; a popup when nothing is left | — |
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
 | Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a container where Docker exists, otherwise a worktree plus a temporary config dir, one multi-arch image | — |

@@ -52,6 +52,7 @@
     "settings-billing.spec.ts",
     "settings-general.spec.ts",
     "settings-secrets.spec.ts",
+    "settings-api-keys.spec.ts",
     "settings-team-permissions.spec.ts",
     "settings-tokens.spec.ts",
     "settings-usage.spec.ts",
@@ -123,7 +124,9 @@
         "^lib\\/workspace-admin\\/",
         "^components\\/teams\\/",
         "^components\\/workspace-menu\\.tsx$",
-        "^components\\/workspace\\/members-settings\\.tsx$"
+        "^components\\/workspace\\/members-settings\\.tsx$",
+        "^lib\\/model-api-key",
+        "^app\\/actions\\/model-api-keys\\.ts$"
       ],
       "specs": [
         "settings.spec.ts",
@@ -145,7 +148,8 @@
         "settings-usage.spec.ts",
         "segmented-control.spec.ts",
         "bot-computer-tab.spec.ts",
-        "bot-agents-settings.spec.ts"
+        "bot-agents-settings.spec.ts",
+        "settings-api-keys.spec.ts"
       ]
     },
     {

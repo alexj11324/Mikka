@@ -9,6 +9,7 @@ import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/l
 import { workspaceDb } from '@/lib/workspace-db'
 import { releasePaymentDesignation } from '@/lib/payment-designation'
 import { stopRunsUsingSubscriptions } from '@/lib/personal-policy'
+import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/delivery'
 import type { MainTransaction } from './general'
@@ -61,7 +62,7 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
 
 /**
  * §8.3 (decision 2026-10-31-2225): when someone leaves a team or is suspended,
- * their subscription share leaves with them and their bots there pause until an
+ * their subscription share and API key shares leave with them and their bots there pause until an
  * admin takes one over. Runs on that subscription are stopped at once, and
  * model calls check the share and the membership on every call.
  */
@@ -70,11 +71,13 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
   await releasePaymentDesignation(workspaceId, userId)
   await db.transaction(async main => {
     await main.execute(sql`delete from workspace_subscription_shares where "ownerId" = ${userId} and "workspaceId" = ${workspaceId}`)
+    await main.execute(sql`delete from model_api_key_shares s using model_api_keys k where k.id = s."keyId" and k."ownerId" = ${userId} and s."workspaceId" = ${workspaceId}`)
     await main.update(bots).set({ archivedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, userId), isNull(bots.archivedAt)))
   })
   // Runs there on their subscription stop now, including other members' bots they had shared it with.
   await stopRunsUsingSubscriptions(pool, { ownerId: userId, workspaceId })
+  await stopRunsUsingApiKeys(pool, { ownerId: userId, workspaceId })
 }
 
 /** Reactivation brings a suspended member's own bots back; their subscription stays unshared until they share it again. */

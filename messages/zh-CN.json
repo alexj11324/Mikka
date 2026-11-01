@@ -1185,7 +1185,11 @@
     "tokenNotFound": "令牌不存在或已被撤销。",
     "tokenLimitReached": "你在当前工作区的有效令牌已达 50 个上限，请先撤销一个。",
     "accountDeletionPending": "账户删除等待清理完成。",
-    "SESSION_NOT_FRESH": "请重新登录后删除账户。"
+    "SESSION_NOT_FRESH": "请重新登录后删除账户。",
+    "apiKeyInvalid": "Key 无效或已被撤销。",
+    "apiKeyUnverifiable": "暂时无法验证这个 Key，请稍后重试。",
+    "apiKeyBaseUrlInvalid": "Base URL 需要是公网上的 https 地址。",
+    "apiKeyNotFound": "这个 API Key 已不存在。"
   },
   "Overview": {
     "sections": {
@@ -1657,8 +1661,8 @@
         "title": "连接"
       },
       "models": {
-        "title": "模型与额度",
-        "keywords": "模型订阅 订阅 额度 用量"
+        "title": "API 与订阅",
+        "keywords": "模型订阅 订阅 额度 用量 API Key 服务商 模型"
       },
       "logins": {
         "title": "登录与密钥"
@@ -2273,7 +2277,6 @@
         "codex": "ChatGPT"
       }
     },
-
     "archivedBots": {
       "heading": "已暂停的 Bot",
       "takeOver": "接管"
@@ -2288,7 +2291,7 @@
     "personalPolicy": {
       "loading": "正在加载个人订阅设置",
       "heading": "个人订阅",
-      "subscriptions": "允许成员使用个人订阅"
+      "subscriptions": "允许成员使用个人订阅和 API Key"
     },
     "appPolicy": {
       "loading": "正在加载应用权限",
@@ -2385,14 +2388,38 @@
       "hostedDefault": "Mikka 默认",
       "defaults": "任务默认",
       "fallbacks": "出问题时",
-      "whenQuotaExhausted": "额度用完时",
-      "quotaStop": "停下等我",
-      "quotaSwitch": "换用另一个账号",
       "setting": "{name}：{value}",
       "whenDeviceOffline": "设备离线时",
       "offlineWait": "等它上线",
       "offlineCloud": "改到云端运行",
       "labels": "按标签"
+    },
+    "apiKeys": {
+      "add": "添加 API Key",
+      "addConfirm": "添加",
+      "verifying": "正在验证…",
+      "apiKey": "API Key",
+      "providerLabel": "服务商",
+      "name": "名称",
+      "protocolLabel": "协议",
+      "models": "模型（可选）",
+      "provider": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "deepseek": "DeepSeek",
+        "kimi": "Kimi",
+        "custom": "自定义服务商"
+      },
+      "protocol": {
+        "openai": "OpenAI 兼容",
+        "anthropic": "Anthropic 兼容"
+      },
+      "shareLabel": "分享 {name} 给团队成员",
+      "removeLabel": "删除 {name}",
+      "removeTitle": "删除 {name}？",
+      "othersUsage": "团队成员可以用它跑自己的 Bot，用量算在你的 API 账单上。",
+      "afterQuota": "订阅额度用完后，自动改用 API Key",
+      "afterQuotaBilling": "会按 API 服务商的价格计费"
     }
   },
   "TelegramBot": {

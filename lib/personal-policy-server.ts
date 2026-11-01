@@ -7,6 +7,7 @@ import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { and, eq, inArray } from 'drizzle-orm'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
+import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { memberSubscriptionsAllowed, pooledOwners, setSubscriptionShare, stopRunsUsingSubscriptions } from '@/lib/personal-policy'
 
 /** 团队权限 › 允许成员使用个人订阅. */
@@ -32,7 +33,7 @@ export async function setMemberSubscriptionPolicy(actor: { id: string; name: str
     await recordAudit(tx, { workspaceId, actor: { type: 'user', id: actor.id, name: actor.name }, action: 'integration.permission_changed', target: { type: 'personal', id: 'subscriptions', label: 'subscriptions' }, metadata: { integration: 'personal_subscriptions', capability: 'use', from: previous ? 'allow' : 'deny', to: allowed ? 'allow' : 'deny' } , ...request })
   })
   // Off: every run here on a member's own subscription stops now.
-  if (!allowed) await stopRunsUsingSubscriptions(pool, { workspaceId })
+  if (!allowed) { await stopRunsUsingSubscriptions(pool, { workspaceId }); await stopRunsUsingApiKeys(pool, { workspaceId }) }
   return getMemberSubscriptionPolicy(actor.id, workspaceId)
 }
 

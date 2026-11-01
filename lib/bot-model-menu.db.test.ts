@@ -1,6 +1,6 @@
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 
@@ -32,7 +32,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
-    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql"])
+    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql"])
       await pool.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), "utf8"));
 
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
@@ -113,7 +113,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const dependencies = { service: () => ({ repository: new SubscriptionRepository(pool) }) as never, workspace: async () => {} };
     const runA = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.equal(runA.model, "gpt-fixture");
-    assert.equal(runA.modelSelection?.connectionId, codex);
+    assert.equal((runA.modelSelection as { connectionId?: string } | undefined)?.connectionId, codex);
     assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), { harness: "ai_sdk", model: COORDINATOR_MODEL });
     await settings.setBotModel(alice, botA, opus);
     assert.equal(runA.model, "gpt-fixture", "the frozen run is not switched");
@@ -158,6 +158,25 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     // A provider that refuses (signed out, backend down) is skipped the same way.
     const refusing = { ...discovering, refreshBotModels: async () => { throw new Error("provider down"); } };
     assert.ok((await refreshBotModelMenu(pool, refusing, alice, botA)).groups.length > 1);
+
+    // C22: an API key's models are a menu group, and the Coordinator saved on one runs on it.
+    const { addApiKey, setBotApiKeyChoice } = await import("./model-api-keys");
+    const { apiKeyOptionId } = await import("./bot-model-menu-view");
+    const env = { WORKSPACE_SECRETS_KEY: randomBytes(32).toString("hex") };
+    const listing = (async () => new Response(JSON.stringify({ data: [{ id: "deepseek-chat" }] }), { status: 200 })) as unknown as typeof fetch;
+    const key = await addApiKey(pool, "alice", { provider: "deepseek", apiKey: `test-${randomUUID()}` }, { env, fetch: listing });
+    const keyOption = apiKeyOptionId(key.id, "deepseek-chat");
+    let keyMenu = await botModelMenu(pool, settings, alice, null);
+    assert.deepEqual(keyMenu.groups.find((group) => group.kind === "apiKey")?.options, [{ id: keyOption, modelId: "deepseek-chat", provider: "deepseek" }]);
+    await setBotApiKeyChoice(pool, alice, null, key.id, "deepseek-chat");
+    keyMenu = await botModelMenu(pool, settings, alice, null);
+    assert.deepEqual([keyMenu.current.id, keyMenu.current.kind, keyMenu.current.chosen, keyMenu.current.available], [keyOption, "apiKey", true, true]);
+    assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), {
+      harness: "ai_sdk", model: "deepseek-chat",
+      modelSelection: { coordinator: true, type: "api_key", keyId: key.id, ownerId: "alice", workspaceId: workspace, modelId: "deepseek-chat" },
+    });
+    // Bob's bots do not see Alice's key until she shares it with 分享给团队成员.
+    assert.equal((await botModelMenu(pool, settings, { ownerId: "bob", workspaceId: workspace }, bobBot)).groups.some((group) => group.kind === "shared"), false);
   } finally {
     await pool.end();
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);

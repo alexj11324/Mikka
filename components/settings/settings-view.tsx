@@ -17,6 +17,7 @@ import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
 import { SubscriptionShareSettings } from '@/components/settings/subscription-share-settings'
+import { ApiKeyFallbackSetting, useApiKeyList } from '@/components/settings/api-key-settings'
 import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
@@ -34,7 +35,6 @@ import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
 import { BotAgentsSettings } from '@/components/settings/bot-agents-settings'
 import { ArchivedBotsSettings } from '@/components/settings/archived-bots-settings'
-import { ExecutionFallbackSettings } from '@/components/settings/execution-fallback-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { settingsHref, TEAM_ONLY_SECTIONS, type SettingsSectionId } from '@/lib/settings-sections'
@@ -122,7 +122,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
-    case 'models': return <>{workspaceId && !preview ? <><SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /><SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} /><PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} /></> : waiting}{!preview && <ExecutionFallbackSettings />}</>
+    case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} /> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
@@ -134,6 +134,18 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return null
   }
+}
+
+/** 「API 与订阅」: subscriptions, API keys and custom providers in one list (orchestration.md § 1). */
+function ApiAndSubscriptions({ workspaceId }: { workspaceId: string }) {
+  const apiKeys = useApiKeyList(workspaceId)
+  return <>
+    <SubscriptionSettings workspaceId={workspaceId} extraRows={apiKeys.rows} action={apiKeys.action} />
+    {apiKeys.dialogs}
+    <ApiKeyFallbackSetting workspaceId={workspaceId} />
+    <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />
+    <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />
+  </>
 }
 
 function AppearanceSection() {

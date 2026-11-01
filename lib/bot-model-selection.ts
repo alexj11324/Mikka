@@ -4,8 +4,11 @@ import { ActionFailureError } from "./action-error";
 import { ExecutionSettings, executionWorkspace } from "./execution-settings";
 import { COORDINATOR_MODEL } from "./coordinator/model";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
+import { botApiKeyChoice, usableApiKeys } from "./model-api-keys";
+import { apiKeyChatBaseUrl } from "./model-api-key-providers";
 import {
   freezeHostedModelSelection,
+  hostedApiKeySnapshotSchema,
   type HostedModelDependencies,
   type HostedModelScope,
   type HostedRuntimeSnapshot,
@@ -23,6 +26,20 @@ export async function freezeBotModel(
   if (scope.botId && !(await settings.botActive(scope.ownerId, scope.botId)))
     throw new ActionFailureError("botNotFound");
   const settingsScope = { ownerId: scope.ownerId, workspaceId };
+  // A saved API key model (C22) runs while that key is still usable here; otherwise the usual order below.
+  const keyChoice = await botApiKeyChoice(pool, settingsScope, scope.botId);
+  if (keyChoice) {
+    const key = (await usableApiKeys(pool, scope.ownerId, workspaceId)).find((row) => row.id === keyChoice.keyId);
+    if (key && apiKeyChatBaseUrl(key))
+      return {
+        harness: "ai_sdk",
+        model: keyChoice.model,
+        modelSelection: hostedApiKeySnapshotSchema.parse({
+          ...(scope.botId === null ? { coordinator: true } : { consumerId: scope.botId }),
+          type: "api_key", keyId: key.id, ownerId: scope.ownerId, workspaceId, modelId: keyChoice.model,
+        }),
+      };
+  }
   const selected = await settings.botModel(settingsScope, scope.botId);
   // Mikka 默认 picked in the composer: the hosted model, whatever else is connected.
   if (selected === HOSTED_CHOICE) return { harness: "ai_sdk", model: COORDINATOR_MODEL };
