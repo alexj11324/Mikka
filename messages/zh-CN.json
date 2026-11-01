@@ -2781,7 +2781,7 @@
       },
       "sources": "{count} 个来源"
     },
-    "sendUncertain": "未能确认消息是否送达。在这个输入框里原样重发不会产生重复；关闭或切换输入框、刷新页面或更换账号后再发，则可能重复。",
+    "sendUncertain": "未确认送达",
     "lengthCount": "{count} / {max}",
     "modelPicker": {
       "label": "模型：{name}",
@@ -2798,7 +2798,8 @@
       "unknownModel": "未知模型",
       "refresh": "刷新模型列表",
       "refreshFailed": "刷新失败，重试"
-    }
+    },
+    "empty": "告诉 {name} 你要做什么"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "请先登录。",
