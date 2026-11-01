@@ -7,13 +7,15 @@
 - Replaces: —
 
 - The right panel stays read-only except for this: in 概览 › 详情 › 资料库,
-  each of the person's own files has 删除.
-  - The button shows on hover or keyboard focus, and always on touch.
+  and in the phone's bot page 资料库, each of the person's own files has 删除.
+  The two stay alike (coordinator session, 2026-11-01).
+  - On the web the button shows on hover or keyboard focus, and always on
+    touch. On the phone's bot page a long press on the row deletes it, after
+    the system's confirmation (same words).
   - It asks first (「删除「名字」？」 · 取消 / 删除); nothing brings a file back.
   - A failed delete keeps the row and says so.
 - 资料库 lists what the bot's threads handed over (decision
   2026-11-01-0050-mobile-chat-settings); the web reads the same list as the
   phone.
 - 现状（非决定）：the server has no delete for these files yet (backend,
-  open); until it does, 删除 reports that the file was not deleted. The phone's
-  bot page does not offer 删除 yet.
+  open); until it does, 删除 reports that the file was not deleted, on both.
