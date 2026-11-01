@@ -1,0 +1,5 @@
+{"t":0,"chunk":{"type":"start","messageId":"msg-quota-exhausted-1"}}
+{"t":100,"chunk":{"type":"text-start","id":"txt-1"}}
+{"t":160,"chunk":{"type":"text-delta","id":"txt-1","delta":"Updating the parser."}}
+{"t":200,"chunk":{"type":"text-end","id":"txt-1"}}
+{"t":300,"exit":{"outcome":"failed","error":"Claude Code: Claude AI usage limit reached|1762016400","quota":{"resetsAt":"2025-11-01T17:00:00.000Z"}}}

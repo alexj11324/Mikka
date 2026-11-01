@@ -28,6 +28,7 @@
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. An explicitly approved, pushed submission can finish unverified;
 // its report keeps `not_run`, and the server may open only a draft PR.
+import { quotaStopApplies } from "./quota-exhausted"
 import { runApps } from '../agents/run-apps'
 import { fixedCheckSnapshot } from "./check"
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
@@ -1455,7 +1456,7 @@ export class RunSupervisor {
           continue
         }
         await this.closeMailbox(run)
-        const stopReason = stopReasonOf(event, run)
+        const stopReason = stopReasonOf(event, run, assignment)
         const error =
           event.error ??
           (stopReason === "turn_ended"
@@ -1481,7 +1482,9 @@ export class RunSupervisor {
         )
         if (this.stopping) return
         const { verifyError, tree } = outcome
-        let report = outcome.report
+        let report = stopReason === "quota_exhausted"
+          ? { ...outcome.report, resetsAt: event.quota?.resetsAt ?? null }
+          : outcome.report
         const policy = runPolicy(assignment.policy)
         if (
           stopReason === "submitted" &&
@@ -1633,12 +1636,14 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
  * other ended run, except a verified hand-in, is cleaned up when it left no
  * commit and no change.
  */
-const KEEP_WORKTREE: readonly StopReason[] = ["turn_ended", "asked_human"]
+const KEEP_WORKTREE: readonly StopReason[] = ["turn_ended", "asked_human", "quota_exhausted"]
 
-function stopReasonOf(event: ExitEvent, run: ActiveRun): StopReason {
+function stopReasonOf(event: ExitEvent, run: ActiveRun, assignment: RunAssignment): StopReason {
   if (run.forcedStop) return run.forcedStop
   if (event.outcome === "cancelled" || run.cancelRequested) return "cancelled"
   if (event.stopReason) return event.stopReason
+  // The continuation goes on in this worktree, on a key or after the reset.
+  if (event.outcome === "failed" && event.quota && quotaStopApplies(assignment)) return "quota_exhausted"
   return event.outcome === "failed" ? "error" : "turn_ended"
 }
 

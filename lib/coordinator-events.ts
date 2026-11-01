@@ -94,6 +94,46 @@ export function runRetriedEvent(run: { id: string; userId: string; botId?: strin
   }
 }
 
+/** Which subscription a run was on: its byos_connections id, or null for a device's own CLI login. */
+export interface QuotaSubscription { provider: 'claude' | 'codex'; connectionId: string | null }
+
+/** The API key a quota continuation runs on, without the key itself. */
+export interface QuotaApiKey { keyId: string; provider: string; name: string | null; last4: string; model: string }
+
+/** A subscription's quota ran out mid-run and the run went on as `retryRunId` on the person's API key. */
+export function runCredentialSwitchedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null }, from: QuotaSubscription, to: QuotaApiKey, retryRunId: string, resetsAt: string | null): CoordinatorEventInput {
+  return {
+    userId: run.userId,
+    ...(run.botId ? { botId: run.botId } : {}),
+    kind: 'run_credential_switched',
+    dedupeKey: `run_credential_switched:${run.id}`,
+    issueId: run.issueId,
+    runId: run.id,
+    payload: {
+      reason: 'quota_exhausted',
+      from: { kind: 'subscription', provider: from.provider, connectionId: from.connectionId },
+      to: { kind: 'api_key', keyId: to.keyId, provider: to.provider, name: to.name, last4: to.last4, model: to.model },
+      retryRunId, resetsAt,
+    },
+  }
+}
+
+/** A subscription's quota ran out mid-run and nothing could go on with it: the run is paused for the person. */
+export function runQuotaPausedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null }, from: QuotaSubscription, resetsAt: string | null, why: 'apiKeyAfterQuotaOff' | 'noApiKey'): CoordinatorEventInput {
+  return {
+    userId: run.userId,
+    ...(run.botId ? { botId: run.botId } : {}),
+    kind: 'run_quota_paused',
+    dedupeKey: `run_quota_paused:${run.id}`,
+    issueId: run.issueId,
+    runId: run.id,
+    payload: {
+      reason: 'quota_exhausted', provider: from.provider, connectionId: from.connectionId, resetsAt, why,
+      actions: [{ action: 'addApiKey' }, { action: 'retryAfterReset', at: resetsAt }],
+    },
+  }
+}
+
 /**
  * An issue moved to done, or null when this save is not that move. Keyed by
  * the revision that made the move, so reopening and finishing again is a new

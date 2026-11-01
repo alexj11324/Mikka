@@ -37,6 +37,8 @@ export const RUN_STOP_REASONS = [
   "error",
   "timeout",
   "device_lost",
+  /** The subscription's quota or rate limit ran out mid-run (see `resetsAt`). */
+  "quota_exhausted",
 ] as const
 export const runStopReason = z.enum(RUN_STOP_REASONS)
 export type RunStopReason = z.infer<typeof runStopReason>
@@ -136,6 +138,11 @@ export const runReport = z.object({
   nextStep: z.string().max(2_000).nullable(),
   /** For `blocked`: the external condition, e.g. `quota_exhausted`. */
   blockedOn: z.string().max(500).optional(),
+  /**
+   * For `quota_exhausted`: when the subscription's quota resets, as the CLI
+   * reported it; null when it gave no time. Set by the daemon only.
+   */
+  resetsAt: z.iso.datetime({ offset: true }).nullable().optional(),
   /** Daemon-owned receipt for an exact, unchanged read-only candidate. */
   check: z.object({
     sha: z.string().regex(/^[a-f0-9]{40}$/),

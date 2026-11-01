@@ -8,18 +8,20 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { actionDecidedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { db, pool } from '@/lib/db'
-import { coordinatorEvents, pendingActions, repositorySettings } from '@/lib/db/schema'
+import { coordinatorEvents, pendingActions, repositorySettings, runPublications } from '@/lib/db/schema'
 import { z } from 'zod'
 import { taskDestinationSchema } from './task-destination'
 import { validateRepositoryApproval } from '@/lib/repository-approval-proposal'
 import { actionOutcome, PENDING_ACTION_TTL_MS } from '@/lib/pending-action-view'
+import { PULL_REQUEST_APPROVAL, pullRequestApprovalInput } from '@/lib/github/pull-request-approval'
 
 /**
  * The person approves or declines one proposal. Approving runs exactly the
  * input they saw; the status moves off `pending` first, so a double click or a
  * second tab cannot run it twice. The Coordinator hears the outcome.
  */
-export async function decidePendingAction(userId: string, id: string, approve: boolean) {
+/** `restartPublication` is the workflow start; tests pass their own. */
+export async function decidePendingAction(userId: string, id: string, approve: boolean, restartPublication?: (runId: string) => Promise<void>) {
   const [candidate] = await db.select({ action: pendingActions.action }).from(pendingActions)
     .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId))).limit(1)
   if (candidate?.action === 'approve_repository_push') {
@@ -61,6 +63,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     await wakeCoordinator(userId)
     return { status, error: null }
   }
+  if (candidate?.action === PULL_REQUEST_APPROVAL) return decidePullRequest(userId, id, approve, restartPublication)
   const [row] = await db.update(pendingActions)
     .set({ status: approve ? 'running' : 'declined', decidedAt: new Date() })
     .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
@@ -116,4 +119,30 @@ async function runApprovedAppToolCall(userId: string, input: unknown, accountId:
   } catch {
     return { error: 'operationUncertain' }
   }
+}
+
+/**
+ * 创建 Pull Request asked for this run. The decision is recorded on the card;
+ * only that run's publication, waiting for this card, goes back to the
+ * workflow, which reads the answer again under its own authority checks and
+ * opens the pull request (approved) or reports it declined.
+ */
+async function decidePullRequest(userId: string, id: string, approve: boolean, restart?: (runId: string) => Promise<void>) {
+  const status = approve ? 'done' as const : 'declined' as const
+  const runId = await db.transaction(async tx => {
+    const [request] = await tx.update(pendingActions)
+      .set({ status, decidedAt: new Date() })
+      .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId), eq(pendingActions.action, PULL_REQUEST_APPROVAL), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
+      .returning()
+    const input = pullRequestApprovalInput.safeParse(request?.input)
+    if (!request || !input.success) throw new ActionFailureError('pendingActionUnavailable')
+    await tx.update(runPublications).set({ status: 'pending', workflowRunId: null, updatedAt: new Date() })
+      .where(and(eq(runPublications.runId, input.data.runId), eq(runPublications.userId, userId), eq(runPublications.status, 'awaiting_approval')))
+    await recordCoordinatorEvent(tx, actionDecidedEvent({ id: request.id, userId, action: request.action, input: request.input }, { status, error: null, outcome: {} }))
+    return input.data.runId
+  })
+  // A publication that is not waiting (already settled) is left alone.
+  await (restart ?? (await import('@/lib/run-publication-workflow')).startRunPublication)(runId)
+  await wakeCoordinator(userId)
+  return { status, error: null }
 }

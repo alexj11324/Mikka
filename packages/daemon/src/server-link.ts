@@ -253,6 +253,8 @@ export class MemoryServer {
         return retry("retry", MAX_CRASH_RETRIES)
       case "device_lost":
         return { owner: "external", reason: "device_offline" }
+      case "quota_exhausted":
+        return { owner: "external", reason: "quota_exhausted" }
       case "cancelled":
         return { owner: "human", reason: "cancelled" }
     }

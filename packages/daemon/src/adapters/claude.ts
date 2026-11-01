@@ -15,6 +15,7 @@
 // MCP servers out too. The session store lives in that run home, so `resume`
 // works after a daemon restart; a follow-up run copies the earlier run's
 // `projects` store first.
+import { claudeQuotaSignal, mergeQuota, type QuotaSignal } from "../runs/quota-exhausted"
 import { spawn } from "node:child_process"
 import { computerDomain, computerSandboxPolicy, sandboxComputerSpec } from '../computer/transport'
 import { randomUUID } from "node:crypto"
@@ -531,6 +532,8 @@ export class ClaudeAdapter implements AgentAdapter {
     let runtimeModel: string | null = null
     let ending = false
     let lastError: string | undefined
+    /** The CLI's quota or rate-limit failure seen this turn, if any. */
+    let quota: QuotaSignal | undefined
     let graceTimer: NodeJS.Timeout | undefined
     let authTimer: NodeJS.Timeout | undefined
     let stderr = ""
@@ -650,7 +653,7 @@ export class ClaudeAdapter implements AgentAdapter {
       if (handoff) return void end(handoff)
       void end(
         lastError
-          ? { outcome: "failed", error: lastError }
+          ? { outcome: "failed", error: lastError, ...(quota ? { quota } : {}) }
           : { outcome: "succeeded" },
       )
     }
@@ -662,7 +665,8 @@ export class ClaudeAdapter implements AgentAdapter {
           outcome: "failed",
           error: externalAuth
             ? SUBSCRIPTION_EXECUTION_ERROR
-            : `claude exited before the turn ended: ${error}`
+            : `claude exited before the turn ended: ${error}`,
+          ...(quota ? { quota } : {}),
         }
       )
     }
@@ -689,6 +693,7 @@ export class ClaudeAdapter implements AgentAdapter {
           if (message.type === "assistant" || message.type === "user")
             clearTimeout(graceTimer)
           if (ending) continue
+          quota = mergeQuota(quota, claudeQuotaSignal(message))
           if (message.type === 'tool_progress' && message.session_id === sessionId) queue.progress()
           // Authentication errors can contain provider diagnostics. Do not
           // turn those diagnostics into model/UI text in external-auth mode.
@@ -696,6 +701,7 @@ export class ClaudeAdapter implements AgentAdapter {
             for (const chunk of claudeChunks(message)) queue.chunk(chunk)
           if (message.type !== "result") continue
           results++
+          if (!message.is_error) quota = undefined
           lastError = message.is_error
             ? externalAuth
               ? SUBSCRIPTION_EXECUTION_ERROR
