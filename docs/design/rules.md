@@ -42,8 +42,11 @@ source wins in a conflict is in [`README.md`](README.md).
   and a bot's computer screen send instructions through the centre composer.
   An open thread is a conversation with the agent running it, so its detail
   ends in that composer and what is typed there goes to that agent.
-- **R-11** The composer has no model picker. The model is our default;
-  BYOK users will choose it in Settings later.
+- **R-11** A bot's composer, the Coordinator's included, has one model chip
+  (`BotModelPicker`) beside 「+」, saved per bot; it picks a model only, never
+  an Agent. Settings has no per-bot model rows
+  ([decision](decisions/2026-10-31-2330-bot-model-picker.md)). A thread's
+  composer has none.
 - **R-12** No starter or suggestion cards in any chat ("试试从这些事情开始").
   Suggestions live only on the 建议 page (R-55). A new bot greets with one
   bubble and an A–D choice card.

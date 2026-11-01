@@ -2,6 +2,7 @@ import "server-only";
 import { pool } from "./db";
 import { ExecutionSettings, executionWorkspace } from "./execution-settings";
 import { COORDINATOR_MODEL } from "./coordinator/model";
+import { HOSTED_CHOICE } from "./bot-model-menu-view";
 import {
   freezeHostedModelSelection,
   type HostedModelDependencies,
@@ -19,6 +20,8 @@ export async function freezeBotModel(
   const settings = new ExecutionSettings(pool);
   const settingsScope = { ownerId: scope.ownerId, workspaceId };
   const selected = await settings.botModel(settingsScope, scope.botId);
+  // Mikka 默认 picked in the composer: the hosted model, whatever else is connected.
+  if (selected === HOSTED_CHOICE) return { harness: "ai_sdk", model: COORDINATOR_MODEL };
   const available = await settings.botModels(settingsScope);
   // A saved choice whose account was disconnected or signed in again is no longer bound:
   // take a bound subscription (Claude first), otherwise Mikka 默认, the hosted model (decision 2026-10-31-2110).
