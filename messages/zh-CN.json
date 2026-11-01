@@ -4013,7 +4013,7 @@
       "free_allowance_used": "免费额度已用完",
       "points_exhausted": "点数已用完",
       "platform_paused": "免费额度暂时停用",
-      "unavailable": "Mikka 默认暂不可用，请稍后重试。",
+      "unavailable": "Mikka 默认暂时不可用",
       "verifyCard": "验证银行卡",
       "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅"
     }

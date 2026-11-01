@@ -20,6 +20,8 @@ export interface HostedUsage {
   balance: HostedBalance
   /** A personal workspace: card verification (the person's, C19) lands here. */
   personal?: boolean
+  /** The person has a Claude / ChatGPT subscription connected; it serves them in any workspace (#838). */
+  subscribed?: boolean
 }
 
 /** #558 `cardVerificationStatus`. */
@@ -61,6 +63,22 @@ export function hostedRefusal(message: string | null | undefined): HostedRefusal
   if (!message) return null
   const match = /\b(verification_required|free_allowance_used|points_exhausted|platform_paused|usage_in_progress|usage_concurrency_limit|usage_cost_unavailable)\b/.exec(message)
   return match ? match[1] as HostedRefusal : null
+}
+
+/**
+ * What the refusal line above the composer offers, from the person's real
+ * state (`usage`, null until read). With a subscription connected it serves
+ * them in every workspace (#838), so a refusal is a moment's outage: 暂时不可用
+ * and 重试. 连接订阅 only with none connected; 验证银行卡 in a personal workspace
+ * with no verified card (C19). Nothing until the state is read.
+ */
+export function refusalOffer(code: HostedRefusal, usage: HostedUsage | null) {
+  const transient = code === 'usage_in_progress' || code === 'usage_concurrency_limit' || code === 'usage_cost_unavailable' || Boolean(usage?.subscribed)
+  return {
+    transient,
+    card: !transient && Boolean(usage?.personal) && (code === 'verification_required' || (usage?.balance.verified === false && (code === 'free_allowance_used' || code === 'points_exhausted'))),
+    connect: !transient && usage?.subscribed === false,
+  }
 }
 
 /** Allowance and purchased points as one balance, rounded down so the screen never shows more than is left. */
