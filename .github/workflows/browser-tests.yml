@@ -7,7 +7,7 @@ name: Browser tests
 # - push to main: the functional spec files on eight shards. A red run opens or
 #   updates one issue that names the merged pull request's author.
 # - nightly and manual runs: every spec, including visual, crawler and slower
-#   specs, plus performance, on eight shards. integrate/* pull requests run this
+#   specs, plus performance, on eight shards. integration/* (and older integrate/*) pull requests run this
 #   tier before merge. Docs-only changes keep only the small gate jobs.
 on:
   # Manual only (decision 2026-11-01-0230). Pull requests get the required
@@ -56,7 +56,7 @@ jobs:
           fetch-depth: 0
       - id: docs
         env:
-          INTEGRATION_ACCEPTANCE: ${{ startsWith(github.head_ref, 'integrate/') }}
+          INTEGRATION_ACCEPTANCE: ${{ startsWith(github.head_ref, 'integration/') || startsWith(github.head_ref, 'integrate/') }}
         # Run the classifier from main, never from this checkout: a pull
         # request must not be able to rewrite the script that skips its own
         # required checks.

@@ -565,3 +565,10 @@ test('trusted mapping schema rejects invalid fields, duplicate entries and malfo
     assert.throws(() => fixture.run())
   }
 })
+
+test('integration branches take the full tier under both the integration/ and the older integrate/ prefix', () => {
+  const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
+  assert.match(browser, /INTEGRATION_ACCEPTANCE: \$\{\{ startsWith\(github\.head_ref, 'integration\/'\) \|\| startsWith\(github\.head_ref, 'integrate\/'\) \}\}/)
+  const subagents = readFileSync('.github/workflows/subagents.yml', 'utf8')
+  assert.match(subagents, /branches: \[[^\]]*'integration\/\*\*'[^\]]*'integrate\/\*\*'\]/)
+})
