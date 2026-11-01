@@ -73,6 +73,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       if(!await guard(tx))return 'unavailable';calls.push('claim');run.status='preparing';await after(tx);return 'claimed'
     }},
     '@/lib/subscription-runtime':{},
+    '@/lib/thread-continuation':{continuationFollowUp:()=>null},
     '@/lib/computer/native-run-binding':{},
     '@/lib/personal-policy':{sharedNativeBinding:async()=>null},
     '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
