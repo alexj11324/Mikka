@@ -1723,7 +1723,6 @@
       "saved": "Saved",
       "changeAvatar": "Change",
       "uploading": "Uploading…",
-      "sessionHeading": "Session",
       "signOut": "Sign out",
       "signingOut": "Signing out…",
       "deleteAccount": "Delete account",
@@ -1732,7 +1731,10 @@
       "deleteConfirmLabel": "Type {email} to confirm",
       "deleting": "Deleting…",
       "confirmDelete": "Delete account",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "currentSession": "This session",
+      "danger": "Danger zone",
+      "account": "This account"
     },
     "memory": {
       "enabled": "Use memory",
@@ -2023,7 +2025,8 @@
       "currentDevice": "This device",
       "signOut": "Sign out",
       "signingOut": "Signing out…",
-      "signOutOthers": "Sign out all"
+      "signOutOthers": "Sign out all",
+      "otherDevices": "Other devices"
     },
     "privacy": {
       "data": "Data",
