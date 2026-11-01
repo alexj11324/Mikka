@@ -60,7 +60,8 @@ export function useApi<T>(path: string | null, every = 0) {
     if (!every || !path) return
     let timer: ReturnType<typeof setInterval> | null = setInterval(load, every)
     const sub = AppState.addEventListener('change', state => {
-      if (state === 'active' && !timer) { void load(); timer = setInterval(load, every) }
+      // Back in the foreground the poll resumes on its schedule; returning never reads by itself.
+      if (state === 'active' && !timer) timer = setInterval(load, every)
       if (state !== 'active' && timer) { clearInterval(timer); timer = null }
     })
     return () => { if (timer) clearInterval(timer); sub.remove() }

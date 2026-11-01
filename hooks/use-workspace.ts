@@ -18,5 +18,5 @@ export function useWorkspace(userKey: string, workspaceId?: string) {
   // it shows) does not blink away and back. A different workspace never borrows it.
   const unscoped = workspaceId ? cache.get(unstable_serialize(['/api/workspace', userKey]))?.data as WorkspaceSettings | undefined : undefined
   const fallbackData = unscoped?.workspace.id === workspaceId ? unscoped : undefined
-  return useSWR([url, userKey] as const, fetchWorkspace, { dedupingInterval: 15000, revalidateOnFocus: true, keepPreviousData: false, fallbackData })
+  return useSWR([url, userKey] as const, fetchWorkspace, { dedupingInterval: 15000, keepPreviousData: false, fallbackData })
 }

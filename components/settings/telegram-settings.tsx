@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { createTelegramConnectLink, disconnectTelegram, getTelegramIntegrationStatus } from '@/app/actions/telegram'
 import { FieldError } from '@/components/ui/field'
+import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
 
 type TelegramStatus = Awaited<ReturnType<typeof getTelegramIntegrationStatus>>
 
@@ -39,11 +40,10 @@ export function TelegramSettings() {
     }).finally(() => {
       if (active) setBusy(false)
     })
-    // Coming back from Telegram after Start re-reads the state.
-    const onFocus = () => { void getTelegramIntegrationStatus().then(value => { if (active) setStatus(value) }).catch(() => {}) }
-    window.addEventListener('focus', onFocus)
-    return () => { active = false; window.removeEventListener('focus', onFocus) }
+    return () => { active = false }
   }, [])
+  // Opening Telegram to press Start: read once when the person comes back, never on plain focus.
+  const checkOnReturn = useCheckOnReturn(() => { void getTelegramIntegrationStatus().then(setStatus).catch(() => {}) })
 
   async function connect() {
     setBusy(true)
@@ -86,7 +86,7 @@ export function TelegramSettings() {
           : <span role="status" className="text-muted-foreground">{status.configured ? t('notConnected') : t('notConfigured')}</span>}
     </SettingRow>
     {connectLink && <SettingRow title={t('linkTitle')}>
-      <Button render={<a href={connectLink} target="_blank" rel="noreferrer" />}>{t('openTelegram')}</Button>
+      <Button render={<a href={connectLink} target="_blank" rel="noreferrer" onClick={checkOnReturn} />}>{t('openTelegram')}</Button>
     </SettingRow>}
     {error && <FieldError className="px-5 py-3">{t(error)}</FieldError>}
     {status?.configured && <SettingRow title={status.connected ? t('connected') : t('connectTitle')}>

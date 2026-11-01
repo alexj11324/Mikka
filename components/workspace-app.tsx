@@ -12,6 +12,7 @@ import { DesktopIntegration } from '@/components/desktop/desktop-integration'
 import { IssueWorkspace } from '@/components/workspace/issue-workspace'
 import { sectionFromQuery } from '@/components/workspace/workspace-navigation'
 import { SettingsShell } from '@/components/settings/settings-shell'
+import { swrDefaults } from '@/components/swr-defaults'
 import { SettingsDataPreloader } from '@/components/settings/settings-data-preloader'
 import { memberSettingsKey, teamDirectoryKey } from '@/lib/settings-data'
 
@@ -35,7 +36,7 @@ export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers
     const fallback: Record<string, unknown> = {}
     if (initialTeams) fallback[unstable_serialize(teamDirectoryKey(initialTeams.workspace.id))] = initialTeams
     if (initialMembers) fallback[memberSettingsKey(initialMembers.workspace.id)] = initialMembers
-    return { provider: () => new Map(), fallback }
+    return { ...swrDefaults, provider: () => new Map(), fallback }
   })
   return <SWRConfig value={cacheConfig}>
     <DesktopIntegration />

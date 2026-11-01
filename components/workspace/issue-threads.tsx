@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { InlineLoadError } from '@/components/load-error'
 
 export function useIssueThreads(issueId: string) {
-  return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: threads => runListRefreshInterval(threads?.map(threadQuestionView)), revalidateOnFocus: true, revalidateOnReconnect: true })
+  return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: threads => runListRefreshInterval(threads?.map(threadQuestionView)), revalidateOnReconnect: true })
 }
 
 export function harnessLabel(harness: string) {
