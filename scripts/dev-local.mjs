@@ -1,0 +1,81 @@
+// pnpm dev:local (docs/local-runtime.md): the whole loop on this machine with no
+// GitHub. Starts the local fake services (tests/mvp/services.mjs), `next dev`
+// (hot reload) with a preload that sends GitHub's API to the fake, and the
+// daemon from source with tsx. The model is real: the workspace's own API key.
+import { spawn, execFileSync } from 'node:child_process'
+import { generateKeyPairSync, randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { pathToFileURL, fileURLToPath } from 'node:url'
+import pg from 'pg'
+import { assertDevLocal } from './dev-local/guard.mjs'
+import { startMvpServices } from '../tests/mvp/services.mjs'
+import { MVP_SERVICES, REPOSITORY } from '../tests/mvp/isolated-env.mjs'
+import { MVP_DECISION_KEY } from '../tests/mvp/transport.mjs'
+
+const root = fileURLToPath(new URL('..', import.meta.url))
+for (const file of ['.env.development.local', '.env.local']) if (existsSync(join(root, file))) process.loadEnvFile(join(root, file))
+assertDevLocal(process.env)
+
+const port = Number(process.env.MIKKA_DEV_PORT ?? 3000)
+const server = `http://localhost:${port}/mikka`
+// One synthetic GitHub identity for every local account; the fake grants it write.
+const GITHUB_ACCOUNT_ID = '4242'
+const daemonUser = process.getuid?.() === 0 ? process.env.MIKKA_DEV_DAEMON_USER : undefined
+const children = []
+const log = message => console.log(`dev:local ${message}`)
+
+await startMvpServices(3191)
+const scenario = await (await fetch(`${MVP_SERVICES}/scenario`, {
+  method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ marker: `mvp-${randomUUID()}`, title: 'dev:local', githubAccountId: GITHUB_ACCOUNT_ID, harness: 'any' }),
+})).json()
+// Root containers run the daemon as another user (bubblewrap); it must reach the origin.
+if (daemonUser) execFileSync('chown', ['-R', daemonUser, dirname(dirname(scenario.barePath))])
+log(`fake GitHub on ${MVP_SERVICES}; repository ${REPOSITORY} → ${scenario.barePath} (branch ${scenario.baseBranch})`)
+
+const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+const preload = pathToFileURL(join(root, 'scripts/dev-local/preload.mjs')).href
+children.push(spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '--port', String(port)], {
+  cwd: root, stdio: 'inherit',
+  env: { ...process.env, NODE_ENV: 'development', NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import ${preload}`.trim(),
+    // A real gateway key keeps real Decisions; without one the fake answers them.
+    AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY || MVP_DECISION_KEY,
+    GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString() },
+}))
+
+// Plugins › GitHub signs in on github.com; locally each account gets the synthetic identity.
+const db = new pg.Pool({ connectionString: process.env.MIKKA_DATABASE_URL ?? process.env.DATABASE_URL, max: 1 })
+const linkAccounts = async () => {
+  const { rowCount } = await db.query(`INSERT INTO account (id, "accountId", "providerId", "userId", "createdAt", "updatedAt")
+    SELECT gen_random_uuid()::text, $1, 'github', u.id, now(), now() FROM "user" u
+    WHERE NOT EXISTS (SELECT 1 FROM account a WHERE a."userId" = u.id AND a."providerId" = 'github')`, [GITHUB_ACCOUNT_ID])
+  if (rowCount) log(`linked ${rowCount} local account(s) to the synthetic GitHub identity`)
+}
+const linking = setInterval(() => { linkAccounts().catch(error => log(`link failed: ${error.message}`)) }, 5000)
+
+for (let i = 0; i < 120; i++) {
+  if (await fetch(`${server}/sign-in`).then(r => r.ok, () => false)) break
+  await new Promise(r => setTimeout(r, 1000))
+}
+const dataDir = resolve(process.env.MIKKA_DEV_DAEMON_DIR ?? join(root, '.cache/dev-local/daemon'))
+const tsx = join(root, 'packages/daemon/node_modules/.bin/tsx')
+const daemon = args => spawn(daemonUser ? 'setpriv' : tsx,
+  daemonUser ? ['--reuid', daemonUser, '--regid', daemonUser, '--init-groups', tsx, ...args] : args, {
+    cwd: join(root, 'packages/daemon'), stdio: 'inherit',
+    env: { ...process.env, ...(daemonUser ? { HOME: `/home/${daemonUser}` } : {}),
+      // Only the daemon sees this rewrite: the GitHub-shaped repository clones and pushes the local origin.
+      GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: `url.${pathToFileURL(scenario.barePath).href}.insteadOf`, GIT_CONFIG_VALUE_0: REPOSITORY,
+      GIT_CONFIG_KEY_1: 'protocol.file.allow', GIT_CONFIG_VALUE_1: 'always', GIT_TERMINAL_PROMPT: '0' },
+  })
+if (!existsSync(join(dataDir, 'device.json'))) {
+  log(`sign up at ${server}, then approve this device with the code below`)
+  const login = daemon(['bin/mikka.ts', 'daemon', 'login', '--server', server, '--data-dir', dataDir])
+  children.push(login)
+  await new Promise(r => login.once('exit', r))
+}
+children.push(daemon(['bin/mikka.ts', 'daemon', '--no-auto-update', '--server', server, '--data-dir', dataDir]))
+log(`ready: ${server} — ask the Coordinator to change ${REPOSITORY.replace('https://github.com/', '').replace('.git', '')}`)
+
+const stop = () => { clearInterval(linking); for (const child of children) child.kill('SIGTERM'); void db.end(); process.exit(0) }
+process.on('SIGINT', stop); process.on('SIGTERM', stop)

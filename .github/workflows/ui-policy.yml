@@ -56,10 +56,6 @@ jobs:
           git fetch origin main --no-tags
           trusted_dir="$(mktemp -d)"
           trusted="$trusted_dir/ci-docs-only.mjs"
-          # Older trusted classifiers predate the data file; updated ones require it.
-          if git cat-file -e origin/main:scripts/ci-browser-map.json 2>/dev/null; then
-            git show origin/main:scripts/ci-browser-map.json > "$trusted_dir/ci-browser-map.json"
-          fi
           echo "Retained trusted classifier: $trusted"
           if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
             echo "docs_only=false (classifier is not on main yet)"

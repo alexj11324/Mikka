@@ -99,13 +99,12 @@ mergeable. Details: `docs/design/decisions/2026-11-01-0330-ui-figma-and-skill-re
 ### Test logins: never ask for a password
 
 Sessions never ask Alex for an account, password or login step. To test
-signed in, create the login yourself: hash a random password with
-`better-auth/crypto`'s `hashPassword`, insert a `credential` row into `account`,
-store the email and password in Infisical (the database's environment), and
-check it through `POST <base>/api/auth/sign-in/email`. Only a click on a
-third-party site under Alex's identity (a GitHub App install, an OAuth consent)
-or a session permission prompt may be asked of him. Details and the current
-test accounts: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
+signed in, take an account from the test-account lease pool
+(`scripts/test-accounts/session.mjs`; `docs/test-accounts.md`), which signs up
+or signs in through the normal email flow. Only a click on a third-party site
+under Alex's identity (a GitHub App install, an OAuth consent) or a session
+permission prompt may be asked of him. The named accounts set up outside the
+pool: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
 
 The cloud worker's E2B template is released by CI, not by hand: a push to `main` that
 changes a path the template packages (`WORKER_PATHS` in `scripts/e2b/build-template.py`)

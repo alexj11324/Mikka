@@ -106,7 +106,7 @@ export function signupLimits(
     const n = Number(value)
     return Number.isSafeInteger(n) && n > 0 ? n : fallback
   }
-  // Locally, the limits scripts/dev/bootstrap-local.sh exports unless set explicitly.
+  // Local test-account mode raises the defaults; an explicit value still wins.
   const local = localTestSignups(env)
   return {
     signupIp: positive(env.MIKKA_SIGNUP_IP_HOURLY, local ? 1000 : 5),
