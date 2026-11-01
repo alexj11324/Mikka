@@ -34,8 +34,8 @@ export function SettingsPage({ title, children, footer }: { title: string; child
   )
 }
 
-export function Row({ icon, label, detail, value, onPress, trailing, destructive }: {
-  icon?: ReactNode; label: string; detail?: string; value?: string; onPress?: () => void; trailing?: ReactNode; destructive?: boolean
+export function Row({ icon, label, detail, value, onPress, onLongPress, trailing, destructive }: {
+  icon?: ReactNode; label: string; detail?: string; value?: string; onPress?: () => void; onLongPress?: () => void; trailing?: ReactNode; destructive?: boolean
 }) {
   const content = (
     <>
@@ -51,7 +51,7 @@ export function Row({ icon, label, detail, value, onPress, trailing, destructive
   // A row without its own action stays a View, so a button in `trailing` is not nested in another button.
   if (!onPress) return <View style={styles.row}>{content}</View>
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
+    <Pressable accessibilityRole="button" onPress={onPress} onLongPress={onLongPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       {content}
     </Pressable>
   )

@@ -277,7 +277,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   cancels) and clicking the avatar opens the 新建 Bot shape and colour picker
   (2026-10-31). The Coordinator's header stays read-only. 详情 holds two lists, 例行 (routines)
   and 资料库 (library). The bot creates routines when asked in chat; files are
-  uploaded with the composer's 「+」.
+  uploaded with the composer's 「+」. 资料库 can delete the person's own files:
+  each row has 删除, shown on hover or focus, and confirms first (Alex,
+  2026-11-01: 「自己上传的文件，在资料库里可以删除」;
+  [decision](decisions/2026-11-01-2255-library-delete-own-files.md)).
 - **R-52** Every thread list, web and phone, groups its rows in this order:
   进行中（N）, 受阻（N）, 等待你（N）, 空闲（N）, 已解决（N）
   (Running, Blocked, Waiting for you, Idle, Resolved). A group header is
