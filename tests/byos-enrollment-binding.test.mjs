@@ -116,7 +116,7 @@ test('source cleanup migration backfills legacy published transfers and replays 
   const client = await pool.connect(), schema = `escrow_migration_${randomUUID().replaceAll('-','')}`
   try {
     await client.query(`create schema ${schema}`);await client.query(`set search_path to ${schema}`)
-    await client.query('create table byos_connections(paused boolean NOT NULL DEFAULT false, id uuid primary key); create table byos_enrollment_transfers("enrollmentId" uuid primary key,"connectionId" uuid references byos_connections(id),"boundAt" timestamptz)')
+    await client.query('create table byos_connections(id uuid primary key, paused boolean NOT NULL DEFAULT false); create table byos_enrollment_transfers("enrollmentId" uuid primary key,"connectionId" uuid references byos_connections(id),"boundAt" timestamptz)')
     const connected=randomUUID(), pending=randomUUID()
     await client.query('insert into byos_connections values($1),($2)',[connected,pending])
     await client.query('insert into byos_enrollment_transfers values($1,$2,now()),($3,$4,null)',[randomUUID(),connected,randomUUID(),pending])
