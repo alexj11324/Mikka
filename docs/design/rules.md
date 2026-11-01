@@ -174,9 +174,11 @@ source wins in a conflict is in [`README.md`](README.md).
   no column folds to a strip
   ([decision](decisions/2026-11-01-1144-board-done-keeps-its-width.md)). Figma: page 「看板卡片 v1 · 定稿 2026-10-31」
   (`714:5283`).
-- **R-26** Workspace tasks sync with Linear (`MIK-xx`); personal tasks stay in
-  Mikka. A task can move both ways: a workspace task can be turned back into
-  a personal one (its Linear issue is archived; issue #184). Teammates see agent runs on workspace issues only, never left-column
+- **R-26** Team workspace tasks sync with Linear (`MIK-xx`); tasks in the
+  personal workspace stay in Mikka. Personal and team workspaces are kept
+  apart: a task or chat never moves between them
+  ([decision 2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md), which replaces turning a
+  workspace task back into a personal one, issue #184). Teammates see agent runs on workspace issues only, never left-column
   chats or private memory.
 
 ## Issue detail
