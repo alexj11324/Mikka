@@ -73,7 +73,7 @@ list = BeTodoList("待跟进", [{id: "1", title: "登录死循环：等 handoff 
     user('哪些页面最近改动最大，巡检要加重'),
     bot(`root = Stack([area, cards])
 area = AreaChart(["第 41 周", "第 42 周", "第 43 周", "第 44 周"], [{name: "看板", values: [3, 8, 12, 9]}, {name: "聊天", values: [6, 7, 15, 18]}, {name: "设置", values: [2, 4, 3, 6]}], "个 PR")
-cards = BeCard("建议加重", [TextContent("聊天（OpenUI 卡片、引用、图片）和看板（R-25 卡片）。设置页改动小，保持冒烟即可。"), Separator(), Tag("聊天", null, "sm", "info"), Tag("看板", null, "sm", "success")], "按最近四周合入的 PR 数")`),
+cards = BeCard("建议加重", [TextContent("聊天（OpenUI 卡片、引用、图片）和看板（R-25 卡片）。设置页改动小，保持冒烟即可。"), Separator(), Stack([Tag("聊天", null, "sm", "neutral"), Tag("看板", null, "sm", "neutral")], "row", "xs")], "按最近四周合入的 PR 数")`),
   ],
 
   release: [
