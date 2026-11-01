@@ -44,18 +44,13 @@ Checked with a real key on 2026-11-01 (each sandbox killed right after):
 
 ## What follows
 
-- **The worker's secrets stay out of the agent's reach by Unix users, not a
-  wrapper** (coordinator, confirmed for Alex 2026-11-01): the worker and
-  everything it holds (device credential, RPC secret, journal, logs, session
-  ledgers, the broker's model key) belong to the worker's user with 0600/0700
-  modes; the agent runs as its own unprivileged user with no sudo, reaching
-  only the run's worktree and the broker and egress sockets. The templates'
-  default `user` has passwordless sudo, so the agent never runs as `user`.
-  A test reads the worker's credential file as the agent user and must fail.
-- **The model key stays with the broker**: it never goes into the agent's
-  environment, even though E2B's examples pass `ANTHROPIC_API_KEY` /
-  `CODEX_API_KEY` as envs. Credentials keep the existing path (subscription or
-  API key through Mikka's gateway or BYOK); nothing new is stored or logged.
+- **Everything runs as the template's default `user`.** No extra users, no
+  wrapper inside the machine. The agent can read the worker's files, including
+  its device credential; Alex accepts this (2026-11-01: 「我完全接受 Agent 能够读到
+  worker 凭证的这个风险……哪怕就是 Claude Code，Agent 也是能够看到凭证的」). The E2B
+  sandbox, one per task, is the only boundary.
+- **Credentials keep the existing path** (subscription or API key through
+  Mikka's gateway or BYOK); nothing new is stored or logged.
 - **`--dangerously-skip-permissions` and `--full-auto` only on E2B.** A run on
   a person's own computer or server keeps the daemon's current isolation and
   permission modes unchanged.
