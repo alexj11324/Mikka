@@ -19,7 +19,9 @@ mock.module(new URL('../workspace-db.ts', import.meta.url).href, {
 mock.module(new URL('../workspace-access.ts', import.meta.url).href, {
   namedExports: { WorkspaceError: class extends Error {}, requireWorkspace: async () => { if (!admin) throw Error('workspaceAccessDenied') } },
 })
-mock.module(new URL('./runtime.ts', import.meta.url).href, { namedExports: { hostedUsage: { verify: async (...args: unknown[]) => { verified.push(args) } } } })
+// Verification is the person's (C19): status reads their personal workspace, whichever workspace asks.
+mock.module(new URL('./card-checkout.ts', import.meta.url).href, { namedExports: { personalBillingWorkspace: async () => 'workspace', createCardSetup: async () => { throw new Error('not in this test') } } })
+mock.module(new URL('./runtime.ts', import.meta.url).href, { namedExports: { ensureLegacyVerification: async () => {}, hostedUsage: { verify: async (...args: unknown[]) => { verified.push(args) } } } })
 let card: typeof import('./card')
 before(async () => { card = await import('./card') })
 after(() => {
@@ -68,7 +70,7 @@ test('foreign intent/customer, non-card methods and missing fingerprint never ve
   assert.equal(verified.length, 0)
 })
 
-test('status is admin-only, unavailable when unconfigured, and unverified before any setup', async () => {
+test('status is for members only, unavailable when unconfigured, and unverified before any setup', async () => {
   admin = false
   await assert.rejects(card.cardVerificationStatus('actor', 'workspace', fake), /workspaceAccessDenied/)
   admin = true

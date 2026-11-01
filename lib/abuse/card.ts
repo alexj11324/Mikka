@@ -51,10 +51,24 @@ export interface CardVerificationStatus {
   remainingAllowancePoints: number
 }
 
-/** Admin-only, read-only return-page state. Fingerprints never leave the backend. */
-export async function cardVerificationStatus(actorId: string, workspaceId: string, fetchImpl: typeof fetch = fetch): Promise<CardVerificationStatus> {
-  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
-  const empty = { last4: null, allowance: null, remainingAllowanceMicroUsd: 0, remainingAllowancePoints: 0 }
+const EMPTY = { last4: null, allowance: null, remainingAllowanceMicroUsd: 0, remainingAllowancePoints: 0 }
+
+/** The person's own verification (it lives on their personal workspace), read-only. Fingerprints never leave the backend. */
+export async function cardVerificationStatus(actorId: string, currentWorkspaceId: string, fetchImpl: typeof fetch = fetch): Promise<CardVerificationStatus> {
+  await workspaceDb.transaction(tx => requireWorkspace(tx, currentWorkspaceId, actorId))
+  if (!stripeConfig()?.webhookSecret) return { status: 'unavailable', ...EMPTY }
+  const { personalBillingWorkspace } = await import('./card-checkout')
+  const personal = await personalBillingWorkspace(actorId)
+  // A card verified before this was the person's on a workspace they own: it counts here too (decision 2026-10-31-2225).
+  const { ensureLegacyVerification } = await import('./runtime')
+  await ensureLegacyVerification(personal)
+  return workspaceCardStatus(personal, fetchImpl)
+}
+
+
+/** One workspace's verification record and its latest setup session. No access check: callers resolve whose it is. */
+export async function workspaceCardStatus(workspaceId: string, fetchImpl: typeof fetch = fetch): Promise<CardVerificationStatus> {
+  const empty = EMPTY
   const config = stripeConfig()
   if (!config?.webhookSecret) return { status: 'unavailable', ...empty }
   const row = (await pool.query(`SELECT v.last4,v.fingerprint IS NOT NULL AS "hasCard",a."workspaceId" IS NOT NULL AS granted,COALESCE(a.remaining,0)::float8 AS remaining,

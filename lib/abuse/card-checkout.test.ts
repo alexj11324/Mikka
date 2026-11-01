@@ -3,6 +3,8 @@ import { before, beforeEach, mock, test } from 'node:test'
 import { BASE_PATH } from '../base-path'
 
 const workspaceId = '11111111-1111-4111-8111-111111111111'
+// The person's own workspace: verification is theirs, whichever workspace they start it from (C19).
+const teamId = '22222222-2222-4222-8222-222222222222'
 const env = { STRIPE_SECRET_KEY: 'sk_test_fixture', STRIPE_WEBHOOK_SECRET: 'whsec_fixture', BETTER_AUTH_URL: 'https://app.example' }
 let admin = true
 let customerId: string | undefined
@@ -15,12 +17,14 @@ class WorkspaceError extends Error { constructor(readonly code: string) { super(
 
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: {
   query: async (sql: string, values: string[]) => {
+    if (sql.includes('FROM "user"')) return { rows: values[0] === 'stranger' ? [] : [{ id: values[0], email: `${values[0]}@example.com`, name: values[0] }] }
     queries.push({ sql, values })
     if (sql.includes('INSERT INTO workspace_billing')) customerId ??= values[1]
     return { rows: customerId ? [{ id: customerId }] : [] }
   },
 } } })
 mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspaceDb: { transaction: async (fn: (tx: unknown) => Promise<void>) => fn({}) } } })
+mock.module(new URL('../personal-workspace.ts', import.meta.url).href, { namedExports: { ensurePersonalWorkspace: async () => workspaceId } })
 mock.module(new URL('../workspace-access.ts', import.meta.url).href, { namedExports: {
   WorkspaceError,
   requireWorkspace: async (...args: unknown[]) => {
@@ -44,9 +48,10 @@ const fake = (async (url: string, init?: RequestInit) => {
   return Response.json(url.endsWith('/customers') ? { id: 'cus_new' } : { id: `cs_fixture_${requests.length}`, url: sessionUrl }, { status: providerStatus })
 }) as typeof fetch
 
-test('admin receives hosted setup Checkout with workspace metadata, no charge or Payment Element data', async () => {
-  assert.deepEqual(await createCardSetup('actor', workspaceId, fake, 'zh-CN', env), { url: sessionUrl })
-  assert.deepEqual(authorizations, [[workspaceId, 'actor', true]])
+test('any member, from a team, gets hosted setup Checkout for their own personal workspace; no charge or Payment Element data', async () => {
+  assert.deepEqual(await createCardSetup('actor', teamId, fake, 'zh-CN', env), { url: sessionUrl })
+  // Membership of the workspace it starts from, not its admin role.
+  assert.deepEqual(authorizations, [[teamId, 'actor']])
   assert.equal(requests.length, 1)
   assert.equal(requests[0].url, 'https://api.stripe.com/v1/checkout/sessions')
   const body = requests[0].body
@@ -73,9 +78,9 @@ test('admin receives hosted setup Checkout with workspace metadata, no charge or
   assert.deepEqual(queries.at(-1)?.values, ['cs_fixture_1', workspaceId, 'cus_existing'])
 })
 
-test('members cannot create a Stripe customer or a verification session', async () => {
+test('someone outside the workspace cannot create a Stripe customer or a verification session', async () => {
   admin = false
-  await assert.rejects(createCardSetup('member', workspaceId, fake, 'en', env), /workspaceAccessDenied/)
+  await assert.rejects(createCardSetup('outsider', teamId, fake, 'en', env), /workspaceAccessDenied/)
   assert.equal(requests.length, 0)
   assert.equal(queries.length, 0)
 })
