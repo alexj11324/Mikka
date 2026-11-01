@@ -21,7 +21,8 @@ it shows only as a card in the chat, never in the thread list, and the bot
 reports the result itself (R-72). Every thread belongs to exactly one bot but
 is never drawn with the bot's avatar; it shows a status icon (decisions
 2026-10-27), except in the right panel's 全部线程, where each row carries
-its bot's 16px avatar (R-50). A cloud thread runs on its own thread machine,
+the 16px mark of the Agent running it (R-50, R-78). A bot does no coding
+work itself: an Agent (Claude Code, Codex) runs every thread. A cloud thread runs on its own thread machine,
 not on its bot's machine (`cloud-computer-backend.md` § 2).
 
 ## Rules for designs

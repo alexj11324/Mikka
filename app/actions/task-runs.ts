@@ -66,6 +66,8 @@ export interface Thread {
   lastReplyAt: string | null
   /** A retry of this run exists (it went offline and was queued again), so it no longer waits on anyone. */
   superseded: boolean
+  /** The coding agent running it (claude_code, codex…); its mark is the thread's icon (R-78). */
+  harness: string | null
   waitingFor?: { deviceId: string; deviceName: string; deviceType: 'laptop' | 'server'; harness: string }
 }
 
@@ -87,7 +89,7 @@ export async function listThreads(): Promise<Thread[]> {
   return rows.map(({ ownerId, deviceId, deviceName, deviceType, deviceEnabled, lastSeenAt, harness, ...row }) => ({
     ...(runWaitingDeviceId(session.user.id, { ownerId, status: row.status, deviceId, deviceEnabled, lastSeenAt }) && deviceId && deviceName !== null && deviceType
       ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
-    ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+    ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
     lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null, superseded: Boolean(row.superseded),
   }))
 }
