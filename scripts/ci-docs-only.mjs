@@ -98,8 +98,8 @@ export const BROWSER_MAIN_SPECS = Object.freeze(BROWSER_MAP.main)
 export const BROWSER_NIGHTLY_SPECS = Object.freeze(BROWSER_MAP.nightly)
 // Only the paired trusted map's expressions are compiled; PR paths remain data.
 const SCOPED_BROWSER = BROWSER_MAP.areas.map(area => ({ ...area, paths: area.paths.map(path => new RegExp(path)) }))
-export const BROWSER_INFRA_FILES = Object.freeze([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/workflows/analytics-ssr.yml", ".github/actions/pnpm-install/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-browser-map.json", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "CONTRIBUTING.md"])
-const SELECTION_POLICY_FILES = new Set([".github/workflows/browser-tests.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/test-accounts/evidence.mjs"])
+export const BROWSER_INFRA_FILES = Object.freeze([".github/workflows/ui-policy.yml", ".github/workflows/analytics-ssr.yml", ".github/actions/pnpm-install/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-browser-map.json", "scripts/ci-docs-only.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "CONTRIBUTING.md"])
+const SELECTION_POLICY_FILES = new Set(["scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/test-accounts/evidence.mjs"])
 export const needsSelectionValidation = files => files.some(file => SELECTION_POLICY_FILES.has(file))
 export const BROWSER_SCOPED_SPECS = Object.freeze([...new Set(SCOPED_BROWSER.flatMap(rule => rule.specs))].sort())
 const PERFORMANCE_SPECS = ['tests/e2e/navigation-performance.spec.ts', 'tests/e2e/agent-performance.spec.ts']

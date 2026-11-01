@@ -362,8 +362,8 @@ pnpm desktop:dev
 
 While working, run `pnpm typecheck`, `pnpm lint`, the unit tests for what you
 changed and the one browser test for a flow you changed. CI runs source,
-daemon and database checks; browser tests run only when started by hand
-(Actions → Browser tests), and Vercel, not CI, builds `main`. See
+daemon and database checks and no browser tests; browser specs run locally,
+and Vercel, not CI, builds `main`. See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) ("How changes are tested").
 
 Start with these documents:

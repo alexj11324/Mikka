@@ -65,16 +65,12 @@ cannot.
    succeed. CI runs no production build: Vercel builds `main`, and a failed
    build there leaves production on the last good deployment and is fixed
    forward. Vercel does not build pull requests.
-3. **Browser tests, by hand only** (Actions → Browser tests → Run workflow):
-   CI runs no browser tests on pull requests, on pushes to `main` or nightly.
-   `browser-gate.yml` reports the protected check "Browser tests (before
-   merge)" and passes at once. Browser acceptance runs locally first; start
-   `browser-tests.yml` by hand only for a suite that needs a GitHub-hosted
-   runner; the specs, their `@smoke` tags and the tier lists
-   in `scripts/ci-browser-map.json` are unchanged. Each sharded job has its own
-   PostgreSQL service, test-account directory and artifact name, and the
-   evidence scanner audits every log and report before any upload. Decision:
-   [`docs/design/decisions/2026-11-01-0230-browser-tests-manual-only.md`](docs/design/decisions/2026-11-01-0230-browser-tests-manual-only.md).
+3. **No browser tests in CI**, not even by hand. Browser and UI acceptance
+   run locally: the specs under `tests/e2e/` against the local application,
+   and UI changes checked with screenshots of a local production build
+   (`next build`, `next start`). `browser-gate.yml` only keeps the protected
+   check name "Browser tests (before merge)" and passes at once. Decision:
+   [`design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md`](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md).
 
 A pull request that only changes documentation — non-executable Markdown in
 `docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`,

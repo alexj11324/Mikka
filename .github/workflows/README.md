@@ -13,10 +13,10 @@ its existing protected status names and real acceptance coverage.
   successful for non-documentation PRs; the latter is the gate over the four
   isolated PostgreSQL DB/migration integration shards. Despite its name, CI
   runs no production build (decision 2026-11-01-0230); Vercel builds `main`.
-- Browser tests are manual only: `browser-gate.yml` reports
-  `Browser tests (before merge)` and passes at once. `browser-tests.yml` runs
-  only from Actions → Browser tests → Run workflow, with a real isolated
-  PostgreSQL database and the applicable Factory/daemon/browser acceptance.
+- CI runs no browser tests, not even by hand (decision 2026-11-01-1520).
+  `browser-gate.yml` only keeps the protected check name
+  `Browser tests (before merge)` and passes at once; delete it once that name
+  is removed from the required checks in the repository settings.
 - `GitGuardian Security Checks` is a separate external required check.
 - All four existing required names remain intact. Do not silently replace
   them with a new aggregate check until the GitHub branch-protection settings
