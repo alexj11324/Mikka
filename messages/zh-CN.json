@@ -3375,6 +3375,7 @@
       "discussPrefill": "我们聊聊 {id} {title}：",
       "card": {
         "personal": "个人任务",
+        "personalHint": "个人任务 · 只有你能看到",
         "status": "状态",
         "priority": "优先级",
         "subtasks": "子任务",
