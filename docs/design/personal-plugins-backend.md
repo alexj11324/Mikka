@@ -85,9 +85,9 @@ Literal saved authentication values are masked from remote results.
 
 The 插件 store lists every Composio toolkit a person can connect with
 Composio-managed auth, read from Composio v3 `GET /toolkits?sort_by=usage`
-and cached for an hour per server (`lib/plugins/catalog.ts`). Toolkits that
-need the person's own credentials (no managed auth), no-auth and local
-toolkits are left out for now. Composio's copies of GitHub and Linear are left
+and cached for an hour per server (`lib/plugins/catalog.ts`). 现状（非决定）：toolkits
+that need the person's own credentials (no managed auth), no-auth and local
+toolkits are left out. Composio's copies of GitHub and Linear are left
 out: Mikka's own GitHub, Linear and Telegram connections keep their native
 paths. 热门 is the first twelve in Composio's usage order, 新品推荐 the twelve
 with the newest `meta.created_at`, and categories are Composio's own; Mikka

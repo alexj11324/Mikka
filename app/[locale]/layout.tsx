@@ -14,7 +14,10 @@ import { posthogConfig } from "@/lib/posthog-config";
 
 import "../globals.css";
 
-const fontSans = localFont({ src: '../fonts/Geist-Variable.woff2', variable: '--font-geist', weight: '100 900' });
+// Type as Comma sets it: Inter for text, Geist Mono for code, no metric fallback, held until loaded.
+// Neither font has Chinese, so Chinese falls through --font-sans to the system font (PingFang on a Mac).
+const fontSans = localFont({ src: [{ path: '../fonts/InterVariable.woff2', style: 'normal' }, { path: '../fonts/InterVariable-Italic.woff2', style: 'italic' }], variable: '--font-inter', weight: '100 900', display: 'block', adjustFontFallback: false });
+const fontMono = localFont({ src: '../fonts/GeistMono-Variable.woff2', variable: '--font-geist-mono', weight: '100 900', display: 'block', adjustFontFallback: false });
 
 type LocaleParams = { params: Promise<{ locale: string }> };
 
@@ -48,7 +51,7 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} suppressHydrationWarning className={fontSans.variable}>
+    <html lang={locale} suppressHydrationWarning className={`${fontSans.variable} ${fontMono.variable}`}>
       <head>
         {/* OpenUI 1.0.1 has no public opt-out; claim its bootstrap guard before imports run. */}
         {process.env.NODE_ENV === 'development' && <Script id="disable-openui-devtools" strategy="beforeInteractive">{'globalThis[Symbol.for("openui.devtools.autoMount")] = true;'}</Script>}

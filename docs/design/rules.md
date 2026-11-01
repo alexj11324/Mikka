@@ -21,15 +21,20 @@ source wins in a conflict is in [`README.md`](README.md).
   right threads and the computer together.
 - **R-04** Every bot comes with its own computer. There is no 新建云端电脑 entry
   anywhere, and no list of per-bot computers.
-- **R-05** Bots run only on Mikka's own AI SDK harness. The 新建 Bot dialog
-  has a big live preview, a shape grid, colours and a name. It has no machine
-  picker, no harness picker and no 说明 field (instructions are edited in chat).
-  The Coordinator has no runtime switch either: the #312 native Claude Code /
-  Codex runtime is deprecated and stays off (decision 2026-10-27).
+- **R-05** 「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过
+  daemon 把任务派给 Claude Code 或 Codex。」 (Alex, 2026-11-01;
+  [orchestration.md §3](orchestration.md)). GPT/OpenAI models go to Codex,
+  every other model to Claude Code; a person can change this per model in
+  「API 与订阅」. The 新建 Bot dialog has a big live preview, a shape grid,
+  colours and a name. It has no machine picker, no Claude Code / Codex picker
+  and no 说明 field (instructions are edited in chat). A bot's own chat never
+  runs inside Claude Code or Codex: that was an old plan (#312), abandoned.
 - **R-06** The Coordinator has no special UI; it is a normal bot (Alex
   2026-10-24). Its role is coordinating, not looking different: the same
-  bloub avatar with no star or badge, the same row, the same chat, the
-  same empty state as any other bot. Never the letter C.
+  bloub avatar with no badge of its own, the same row, the same chat, the
+  same empty state as any other bot. Never the letter C. 星标 = 置顶标记，所有
+  bot 一致: every pinned bot shows the star, the Coordinator only when pinned,
+  like any other bot (Alex 2026-11-01).
 - **R-07** Action entry points (buttons, menu items, the collapsed sidebar
   toggle, the 新建任务 dialog header) never say "Coordinator". Conversation
   headers keep the centred Coordinator pill.
@@ -398,20 +403,27 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `--control` fill, no stroke, the magnifier on the left and a light focus ring.
   ui-policy fails an outlined `Input`, `InputGroup` or `SidebarInput` used for
   search as `style/search-input`.
-- **R-32** Font Geist, self-hosted from `app/fonts/Geist-Variable.woff2` through
-  `next/font/local` (no runtime font CDN). A local font is only allowed after
+- **R-32** Type follows Comma (decision `2026-11-01-1204-type-follows-comma`):
+  Inter Variable for text and Geist Mono for code, self-hosted from
+  `app/fonts/` through `next/font/local` (no runtime font CDN, no metric
+  fallback, `font-display: block`), then the system stack `"SF Pro Display",
+  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, …, sans-serif`. No
+  Chinese font is named: Chinese takes the system font (PingFang on a Mac), and
+  no self-hosted text font may draw a CJK code point (`ui-policy.test.mjs`).
+  Regular is 450 (`font-normal`); `font-synthesis: none`,
+  `text-rendering: optimizeLegibility`, `-webkit-font-smoothing: antialiased`.
+  A local font is only allowed after
   its file and CSS variable are registered in `ui-policy.json` →
-  `typography.localFonts`. Chinese falls back to the system font. Only these text
-  styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
-  (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium
-  (group title), 11/14 Medium (badge), and 24/32 SemiBold for the 建议 page
-  title only (R-55). Documents people read (a task's title and description,
-  the Artifact reader, comments) use four steps, as Linear and Notion do:
-  24/32 SemiBold title (`text-2xl`), 18/28 SemiBold section heading
-  (`text-lg`), 15/24 Regular body (`text-md`, the one theme token, pinned in
-  `ui-policy.json`), 12/16 meta (`text-xs`); a smaller heading is the body
-  size in SemiBold. Chat, the thread pane included, stays 14/22 (Alex,
-  2026-11-01, decision `2026-11-01-0140-document-type-scale`). Nothing is smaller than 11px. Labels are sentence case:
+  `typography.localFonts`. The size tokens are Comma's, set in
+  `app/globals.css` and pinned in `ui-policy.json`: `text-xs` 12/18,
+  `text-sm` 13/20, `text-md` 15/24, `text-lg` 18/28 and `text-xl` 20/30 at
+  -0.01em, `text-2xl` 24/32. UI body is 13/20 (list titles in Medium), meta
+  and group titles 12/18, badges 11/14 Medium, and 24/32 SemiBold for the
+  建议 page title only (R-55). Documents people read (a task's title and
+  description, the Artifact reader, comments) use 24/32 SemiBold title,
+  18/28 SemiBold section heading, 15/24 Regular body and 12/18 meta; a
+  smaller heading is the body size in SemiBold. Chat, the thread pane
+  included, is 13/21 (`text-sm leading-5.25`, Comma's message text). Nothing is smaller than 11px. Labels are sentence case:
   no uppercase label with wide tracking (unslop; ui-policy
   `typography/uppercase-label`). Weights stop at SemiBold, never Bold.
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
@@ -434,7 +446,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   picture gets a generated gradient avatar (`public/avatars/*.webp`): after
   adopting the unslop skill Alex still requires it (2026-10-31), so it is
   intentional and not a violation. A bot's avatars move through the idle
-  montage on one shared clock, so every copy of one bot shows the same pose.
+  montage on one shared clock, so every animated copy of one bot shows the
+  same pose. Small (`row`) and `still` avatars (group messages, members, the
+  group avatar) hold the bot's own shape and do not play the montage.
 - **R-37** Animate only when the user's action changes a size or position.
   Position and size move with springs; opacity and colour use a duration.
   Springs settle without visible overshoot (no bouncy springs). No hover

@@ -2784,6 +2784,7 @@
   },
   "Coordinator": {
     "stop": "Stop",
+    "stopped": "Stopped",
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
     "conversationWith": "Conversation with {name}",
@@ -3683,7 +3684,7 @@
   },
   "GroupChat": {
     "untitled": "Untitled group chat",
-    "composer": "Sending to groups isn't open yet",
+    "composer": "Message {name}",
     "messages": "Group chat messages",
     "you": "You",
     "member": "Member",
@@ -3694,7 +3695,10 @@
     "loadError": "Couldn't load group chat messages.",
     "retry": "Retry",
     "older": "Load earlier messages",
-    "loadingOlder": "Loading…"
+    "loadingOlder": "Loading…",
+    "notSent": "Not sent",
+    "answering": "Replying",
+    "noTaker": "No bot took this. @ one by name"
   },
   "DeviceSetup": {
     "title": "Set up {device}",

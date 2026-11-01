@@ -110,7 +110,8 @@ attention decisions carry the server-owned workspace billing context.
 Subscription-model snapshots retain their existing model seam and never debit
 hosted credit. Own-device work and BYO E2B do not require a card or debit points.
 Unscoped internal decision transport is exempt for the host's own judgments;
-it retains the separate existing `DECISION_GATEWAY_API_KEY` provider budget.
+it signs in with the app's one gateway credential (`lib/ai-gateway-auth.ts`)
+under the team's AI Gateway budget; there is no Decisions-only key.
 The standalone `routeGroupMessage`/`callDecisionRequest` helpers have no active
 unscoped user-facing consumer in this revision.
 

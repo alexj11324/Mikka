@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
+import { chatLine } from '@/lib/chat-line'
 import { shortWhen } from '@/lib/clock'
 import { useHome } from '@/lib/home'
 import type { GroupSummary, HomeBot } from '@/lib/types'
@@ -31,8 +32,7 @@ export const rowKey = (row: ChatRow) => row.kind === 'bot' ? row.bot.id : row.gr
 export function ChatRowView({ row, onPress }: { row: ChatRow; onPress: () => void }) {
   const bot = row.kind === 'bot' ? row.bot : null
   const group = row.kind === 'group' ? row.group : null
-  // A bot's line is plain text from the server; an empty one is a card with no words.
-  const line = bot ? (bot.line === '' ? '[卡片]' : bot.line) : group?.lastMessage?.body ?? null
+  const line = chatLine(bot ? { bot } : { group: group! })
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={52} />

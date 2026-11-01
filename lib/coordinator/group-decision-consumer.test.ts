@@ -28,9 +28,9 @@ const a = '00000000-0000-4000-8000-000000000001', b = '00000000-0000-4000-8000-0
 const members = [{id:a,name:'A',description:'role A'},{id:b,name:'B',description:'role B'}]
 
 test('group consumer uses actual host receipt from synthetic REST response, not model prose', async () => {
-  const oldFetch = globalThis.fetch, oldKey = process.env.DECISION_GATEWAY_API_KEY
+  const oldFetch = globalThis.fetch, oldKey = process.env.AI_GATEWAY_API_KEY
   let requestBody = '', calls = 0
-  process.env.DECISION_GATEWAY_API_KEY = 'synthetic-test-only'
+  process.env.AI_GATEWAY_API_KEY = 'synthetic-test-only'
   globalThis.fetch = async (_url, init) => {
     calls++
     requestBody = String(init?.body)
@@ -82,8 +82,8 @@ test('group consumer uses actual host receipt from synthetic REST response, not 
     assert.deepEqual(await judge.correction({previous:{message:'hello',responderId:a},current:{text:'x',mentions:[]},members}),{kind:'uncertain'})
   } finally {
     globalThis.fetch = oldFetch
-    if (oldKey === undefined) delete process.env.DECISION_GATEWAY_API_KEY
-    else process.env.DECISION_GATEWAY_API_KEY = oldKey
+    if (oldKey === undefined) delete process.env.AI_GATEWAY_API_KEY
+    else process.env.AI_GATEWAY_API_KEY = oldKey
   }
 })
 

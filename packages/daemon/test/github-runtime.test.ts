@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process'
 import { execa } from 'execa'
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join, delimiter } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
-import { agentPublishedReceipt, githubReceiptEnvironment, prepareGitHubEnvironment } from '../src/agents/github-runtime'
+import { agentPublishedReceipt, githubReceiptEnvironment, prepareGitHubEnvironment, withRunGitCredentials } from '../src/agents/github-runtime'
 import { RunContext } from '../src/agents/run-context'
 import { EventQueue } from '../src/agents/child'
 import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
@@ -89,6 +89,39 @@ it('exchanges fresh credentials through the sandbox HTTP proxy in real helper ch
     await expect(execa(wrapper, ['--version'], { env: directEnv, extendEnv: false, cwd: f.worktree })).rejects.toThrow('GitHub credentials')
     expect(requests).toBe(2)
   } finally { await new Promise<void>((resolve, reject) => proxy.close(error => error ? reject(error) : resolve())) }
+})
+
+it("gives the daemon's own clone and fetch the run's repository token, and nothing else", async () => {
+  const f = await fixture()
+  const seen: string[] = []
+  const server = createServer((request, response) => {
+    seen.push(String(request.headers.authorization))
+    response.setHeader('content-type', 'application/json')
+    response.end(JSON.stringify({ repository: github.repository, token: 'synthetic-run-repository-token', expiresAt: new Date(Date.now() + 3600_000).toISOString() }))
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('Missing server address')
+  const endpoint = `http://127.0.0.1:${address.port}/api/runs/github-token`
+  const privateDir = join(f.root, 'private')
+  const assignment = { github: { endpoint, repository: github.repository, branch: github.branch }, mcp: { token: 'synthetic-run-token' }, issueId: github.issueId }
+  const fill = (env: Record<string, string>, path: string) => execa('git', ['credential', 'fill'], {
+    env: { PATH: f.path, HOME: f.root, GIT_CONFIG_NOSYSTEM: '1', NO_PROXY: '127.0.0.1', no_proxy: '127.0.0.1', ...env }, extendEnv: false,
+    input: `protocol=https\nhost=github.com\npath=${path}\n\n`, cwd: f.worktree, reject: false })
+  try {
+    await withRunGitCredentials(assignment, privateDir, async env => {
+      expect(Object.keys(env).every(key => key.startsWith('GIT_CONFIG_') || key === 'GIT_TERMINAL_PROMPT')).toBe(true)
+      // The run's own repository, in any case the remote spells it.
+      expect((await fill(env, 'OWNER/Repo.git')).stdout).toContain('password=synthetic-run-repository-token')
+      // Any other repository gets nothing from it.
+      expect((await fill({ ...env, GIT_TERMINAL_PROMPT: '0' }, 'owner/other.git')).stdout).not.toContain('synthetic-run-repository-token')
+    })
+    expect(seen).toEqual(['Bearer synthetic-run-token'])
+    // The run token and the exchanged token leave nothing behind.
+    expect(readdirSync(privateDir)).toEqual([])
+    // Without GitHub delivery the machine's own git credentials apply, as before.
+    expect(await withRunGitCredentials({ issueId: github.issueId }, privateDir, async env => env)).toEqual({})
+  } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
 })
 
 it('supplies a private run-local helper to each real harness without modifying the repository', async () => {

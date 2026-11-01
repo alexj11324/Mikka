@@ -185,7 +185,7 @@ function actionArguments(actionName: ComposioActionName, input: Record<string, u
   return 'toArguments' in action ? (action.toArguments as (value: Record<string, unknown>) => Record<string, unknown>)(input) : input
 }
 export type ComposioAccountChoice = { id: string; alias: string | null }
-export type ComposioActionResult = { data: Record<string, unknown>; accountId: string } | { error: string; logId?: string; accounts?: ComposioAccountChoice[] }
+export type ComposioActionResult = { data: Record<string, unknown>; accountId: string } | { error: string; logId?: string; accounts?: ComposioAccountChoice[]; /** The account the action ran through, when it ran. */ accountId?: string }
 
 /** Resolve an explicit model/user choice against the signed-in person's usable accounts. */
 export async function resolveComposioAccount(userId: string, toolkit: string, client: ComposioActionClient, chosenDefault: (toolkit: string) => Promise<string | null>, selected?: string): Promise<{ accountId: string | null; accounts: ComposioAccountChoice[] }> {
@@ -237,7 +237,7 @@ export async function executeComposioAction(
     })
     return result.successful
       ? { data: result.data, accountId, ...(result.logId ? { logId: result.logId } : {}) }
-      : { error: isApprovalAction(actionName) ? 'operationUncertain' : result.error ?? 'integrationActionFailed', ...(result.logId ? { logId: result.logId } : {}) }
+      : { error: isApprovalAction(actionName) ? 'operationUncertain' : result.error ?? 'integrationActionFailed', accountId, ...(result.logId ? { logId: result.logId } : {}) }
   } catch (error) {
     console.error('Composio action failed', {
       action: action.slug,

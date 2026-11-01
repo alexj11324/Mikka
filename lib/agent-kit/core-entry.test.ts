@@ -13,10 +13,21 @@ let taskEventId:string|undefined
 const record=(name:string)=>(...args:unknown[])=>{calls.push({name,args})}
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
 const writable=new WritableStream()
-mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'synthetic-workflow'}),getWritable:()=>writable}})
+// 停止 reaches the workflow through its hook; `stopNow` delivers one stop to it.
+let stopNow=()=>{}
+let stopDuringTurn=false
+mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'synthetic-workflow'}),getWritable:()=>writable,
+  createHook:()=>({[Symbol.asyncIterator]:()=>({next:()=>new Promise(resolve=>{stopNow=()=>resolve({value:{},done:false})})})})}})
 stub('../coordinator/model.ts',{COORDINATOR_MODEL:'current-default',coordinatorStep:()=>({}),turnWarning:(_reason:string,text:string)=>text})
 stub('../attention/handoff.ts',{QUIET_REPLY:'__quiet__'})
-stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unknown[])=>{record('hosted')(...args);return {text:'grounded reply',finishReason:'stop',responseMessages:[]}}})
+stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unknown[])=>{
+  record('hosted')(...args)
+  if(!stopDuringTurn)return {text:'grounded reply',finishReason:'stop',responseMessages:[]}
+  // The person presses 停止 while the second model call streams; the agent ends with the first call only.
+  stopNow();await new Promise(resolve=>setImmediate(resolve))
+  assert.equal((args[2] as {abortSignal?:AbortSignal}).abortSignal?.aborted,true)
+  return {text:'Looking it up.',finishReason:'tool-calls',responseMessages:[{role:'assistant',content:'Looking it up.'}]}
+}})
 stub('../../workflows/coordinator/native-steps.ts',{runtime:async()=>({harness:'ai_sdk'})})
 stub('../../workflows/coordinator/native-turn.ts',{nativeCoordinatorTurn:()=>{throw new Error('unexpected native dispatch')}})
 stub('../../workflows/coordinator/tools.ts',{coordinatorTools:(...args:unknown[])=>{record('tools')(...args);return {}}})
@@ -37,6 +48,7 @@ stub('../../workflows/coordinator/steps.ts',{
   appendMessages:async(...args:unknown[])=>{record('append')(...args);return 3},
   noteQuotaSwitch:async(...args:unknown[])=>{record('quotaSwitch')(...args)},
   writeStreamPart:async(...args:unknown[])=>{record('stream')(...args)},
+  stoppedStepText:async(...args:unknown[])=>{record('stoppedText')(...args);return 'The task is'},
   settleAttention:async()=>{throw new Error('unexpected attention action')},
   telegramReplyThreads:async()=>{throw new Error('unexpected external message')},
   sendTelegramChunk:async()=>{throw new Error('unexpected external message')},
@@ -45,7 +57,7 @@ stub('../../workflows/coordinator/steps.ts',{
 let coordinatorTurn:typeof import('../../workflows/coordinator/workflow').coordinatorTurn
 before(async()=>{({coordinatorTurn}=await import('../../workflows/coordinator/workflow'))})
 function reset(harness?:string){
-  calls.length=0;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined
+  calls.length=0;stopDuringTurn=false;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined
   execution=harness?{id:'10000000-0000-4000-8000-000000000002',status:'running',snapshot:makeSnapshot('10000000-0000-4000-8000-000000000003',1,DEFAULT_AGENT_DEFINITION,'saved host',{harness,model:'saved-model'})}:null
 }
 test('real workflow entry uses the returned execution snapshot for model, prompt and tool registry',async()=>{
@@ -94,4 +106,14 @@ test('real workflow forwards a host task event without changing the frozen execu
   await coordinatorTurn(owner,bot)
   assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{coordinator:false,execution,writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[],taskEventId}])
   assert.equal(JSON.stringify(execution!.snapshot),before)
+})
+
+test('停止 aborts the model call in flight and keeps what the reply had said, marked stopped',async()=>{
+  reset('ai_sdk');stopDuringTurn=true
+  await coordinatorTurn(owner,bot)
+  assert.deepEqual(calls.find(c=>c.name==='stoppedText')?.args,['synthetic-workflow','synthetic-workflow:0'])
+  assert.deepEqual(calls.find(c=>c.name==='append')?.args,[owner,'synthetic-workflow',[{role:'assistant',content:'Looking it up.'},{role:'assistant',content:'The task is'}],null,bot,'synthetic-workflow:0',true])
+  assert.deepEqual(calls.filter(c=>c.name==='stream').map(c=>(c.args[1] as {type:string}).type),['coordinator-turn-start','coordinator-turn-stopped','coordinator-turn-committed'])
+  assert.deepEqual(calls.find(c=>c.name==='finish')?.args,[owner,bot,execution!.id])
+  assert.equal(calls.filter(c=>c.name==='failed').length,0,'a stop is not a failed turn')
 })
