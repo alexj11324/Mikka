@@ -83,12 +83,16 @@ export function AgentAreaChart(chart: Chart) {
   </ChartContainer>
 }
 
-type Donut = { slices?: { name: string; value: number }[]; unit?: string; total?: string }
+type SliceStatus = 'success' | 'destructive' | 'warning' | 'neutral'
+type Donut = { slices?: { name: string; value: number; status?: SliceStatus }[]; unit?: string; total?: string }
+
+// A slice that is an outcome takes its StatusBadge colour (R-34); skipped or unknown is the neutral grey.
+const statusColor: Record<SliceStatus, string> = { success: 'var(--success)', destructive: 'var(--destructive)', warning: 'var(--warning)', neutral: 'var(--muted-foreground)' }
 
 /** ReUI c-chart-19 (donut with the total in the centre) with the slices passed in. */
 export function AgentDonutChart({ slices = [], unit, total }: Donut) {
   const reduce = useReducedMotion() ?? false
-  const config = Object.fromEntries(slices.map((slice, index) => [`s${index}`, { label: slice.name, color: token(index) }])) satisfies ChartConfig
+  const config = Object.fromEntries(slices.map((slice, index) => [`s${index}`, { label: slice.name, color: slice.status ? statusColor[slice.status] : token(index) }])) satisfies ChartConfig
   const data = slices.map((slice, index) => ({ key: `s${index}`, value: slice.value }))
   const sum = slices.reduce((all, slice) => all + slice.value, 0)
   return <ChartContainer config={config} role="img" aria-label={slices.map(slice => slice.name).join(', ')} className="mx-auto aspect-square max-h-70 w-full min-w-0">

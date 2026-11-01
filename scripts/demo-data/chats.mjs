@@ -65,7 +65,7 @@ approve = BeApproval("合并 #61 到 main？", "改动只有一行 await，外�
     user('今天的回归巡检结果？'),
     bot(`root = Stack([alert, donut, radial, list])
 alert = BeAlert("2 个失败", "登录死循环仍可复现；iOS 冷启动白屏 2 秒。", "destructive")
-donut = DonutChart([{name: "通过", value: 46}, {name: "失败", value: 2}, {name: "跳过", value: 3}], "个", "用例")
+donut = DonutChart([{name: "通过", value: 46, status: "success"}, {name: "失败", value: 2, status: "destructive"}, {name: "跳过", value: 3, status: "neutral"}], "个", "用例")
 radial = RadialChart("本月 E2E 时长额度", 312, 500, "分钟")
 list = BeTodoList("待跟进", [{id: "1", title: "登录死循环：等 handoff 修复", status: "pending", detail: "APP 任务，紧急"}, {id: "2", title: "冷启动白屏：已有线程在跑", status: "in-progress", progress: 40}, {id: "3", title: "离线横幅：无法稳定复现", status: "cancelled"}])`),
     user('登录死循环那个能给我复现步骤吗'),
