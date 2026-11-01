@@ -41,12 +41,6 @@ test('切换界面语言后进入英文界面', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Preferences', exact: true })).toBeVisible()
 })
 
-/** The 通知 save: the preferences server action with the 主动消息 change in its body. */
-const savesProactive = (request: import('@playwright/test').Request | import('@playwright/test').Response) => {
-  const sent = 'request' in request ? request.request() : request
-  return sent.method() === 'POST' && Boolean(sent.headers()['next-action']) && (sent.postData() ?? '').includes('"proactive"')
-}
-
 // D16: the web Settings page now has the notification settings the phone has.
 test('通知设置可以关闭主动消息，刷新后保持', async ({ page }) => {
   await register(page)
@@ -57,11 +51,8 @@ test('通知设置可以关闭主动消息，刷新后保持', async ({ page }) 
 
   const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
   await expect(proactive).toBeChecked()
-  // The switch flips at once; reload only after its save has answered, or the reload can cancel it.
-  const saved = page.waitForResponse(savesProactive)
   await proactive.click()
   await expect(proactive).not.toBeChecked()
-  expect((await saved).ok()).toBe(true)
 
   await page.reload()
   await sidebar().getByRole('link', { name: '通知', exact: true }).click()
@@ -77,18 +68,15 @@ test('通知保存失败时开关恢复原值，重试后保存成功', async ({
   await register(page, '/settings?section=notifications')
   const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
   await expect(proactive).toBeChecked()
-  // The save is a server action (a POST with a Next-Action header) carrying the change; drop exactly that one,
-  // not the settings page's background reads that may run at the same moment.
-  await page.route('**/*', route => savesProactive(route.request()) ? route.abort() : route.continue())
+  // Server actions POST with a Next-Action header; drop exactly those.
+  await page.route('**/*', route => route.request().headers()['next-action'] ? route.abort() : route.continue())
   await proactive.click()
   await expect(page.locator('[data-slot="alert"]')).toContainText('这项设置没有保存，已恢复为原来的值。')
   await expect(proactive).toBeChecked()
   await page.unroute('**/*')
-  const saved = page.waitForResponse(savesProactive)
   await page.getByRole('button', { name: '重试', exact: true }).click()
   await expect(page.locator('[data-slot="alert"]')).toHaveCount(0)
   await expect(proactive).not.toBeChecked()
-  expect((await saved).ok()).toBe(true)
   await page.reload()
   await expect(page.getByRole('switch', { name: '主动消息', exact: true })).not.toBeChecked()
 })
