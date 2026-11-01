@@ -248,12 +248,14 @@ async function withPublicationAuthority<T>(claim: Publication, work: (value: { p
       workspaceId: admission.workspaceId, workspaceLinked: admission.workspaceLinked, requestEventId: admission.requestEventId,
     }) && await (await import('./run-admission-store')).acceptedEventStillMatches(admission, run.botId, tx)
     if (admission && !accepted) throw new PublicationError('publication_mismatch')
-    const [settings] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, claim.userId), eq(repositorySettings.remoteKey, publication.remoteKey))).for('share')
-    if (!publication.pushApproved || (!accepted && !repositoryPushApproved(settings?.push, claim.userId))) throw new PublicationError('push_not_approved')
     // 创建 Pull Request (Plugins › GitHub) for the run's own Coordinator or Bot.
-    // It narrows the repository push approval above, never replaces it.
+    // It narrows the repository push approval below, never replaces it. Read
+    // before that approval's share lock, which stays the last statement held
+    // through the provider write.
     let pullRequest: 'allow' | 'ask' | 'deny'
     try { pullRequest = explicitSetting(await readWriteSettingLayers(tx, claim.userId, run.botId), [PULL_REQUEST_PERMISSION]) ?? PULL_REQUEST_DEFAULT } catch { pullRequest = 'ask' }
+    const [settings] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, claim.userId), eq(repositorySettings.remoteKey, publication.remoteKey))).for('share')
+    if (!publication.pushApproved || (!accepted && !repositoryPushApproved(settings?.push, claim.userId))) throw new PublicationError('push_not_approved')
     return work({ publication, run, report, allowCreate: readIssueMetadata(task.content).pullRequests.length < 10, pullRequest })
   })
   if (hint.userId === claim.userId) return apply(false)
