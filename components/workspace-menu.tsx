@@ -61,7 +61,18 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
   const [menuOpen, setMenuOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const settingsShortcut = useShortcutLabel(['mod', ','])
-  const workspaceName = data?.workspace.name ?? i18nText("Settings.groups.workspace")
+  // While the switcher loads or fails, the avatar keeps the workspace's last known initial, never the placeholder
+  // word's first character (「工」 from 工作区); with none known, the avatar stays blank.
+  const nameKey = `mikka:workspace-name:${user.email}`
+  const [lastName, setLastName] = useState<string | null>(null)
+  useEffect(() => {
+    try {
+      if (data) window.localStorage.setItem(nameKey, data.workspace.name)
+      else setLastName(window.localStorage.getItem(nameKey))
+    } catch { /* storage unavailable */ }
+  }, [data, nameKey])
+  const knownName = data?.workspace.name ?? lastName ?? ''
+  const workspaceName = knownName || i18nText("Settings.groups.workspace")
   const busy = pending || signingOut
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
@@ -111,10 +122,10 @@ export function WorkspaceMenu({ user, onSettings, onSignOut, signingOut, onBefor
   }
   return <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
     {compact ? <DropdownMenuTrigger render={<Button variant="ghost" size="icon-lg" aria-label={i18nText("Nav.workspaceMenu")} title={workspaceName} />}>
-      <WorkspaceAvatar name={workspaceName} large />
+      <WorkspaceAvatar name={knownName} large />
       <span className="sr-only">{workspaceName}</span>
     </DropdownMenuTrigger> : <DropdownMenuTrigger render={<SidebarMenuButton aria-label={i18nText("Nav.workspaceMenu")} className="h-10" />}>
-      <WorkspaceAvatar name={workspaceName} />
+      <WorkspaceAvatar name={knownName} />
       <span className="flex-1 truncate font-semibold">{workspaceName}</span>
       <ChevronDown />
     </DropdownMenuTrigger>}

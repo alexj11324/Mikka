@@ -18,7 +18,7 @@ export function WorkspaceLoading() {
   return <div className="flex h-svh flex-col overflow-hidden bg-shell-chrome text-foreground in-data-desktop-translucent:bg-transparent">
     <div aria-hidden="true" className="hidden h-11 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center gap-3 pr-2 pl-3 md:grid"><span /><Skeleton className="h-7 w-full rounded-full" /><span /></div>
     <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">
-      <div aria-hidden="true" className="hidden w-17 shrink-0 flex-col items-center gap-1 pt-1 md:flex">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="size-9 rounded-lg" />)}</div>
+      <div aria-hidden="true" className="hidden w-18 shrink-0 flex-col items-center gap-2 pt-1 md:flex">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-13 w-16 rounded-lg" />)}</div>
       <div className="flex min-w-0 flex-1 overflow-hidden bg-background in-data-desktop-translucent:bg-transparent md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">
         <aside aria-hidden="true" className="hidden w-64 shrink-0 flex-col gap-3 border-r p-3 md:flex">
           <Skeleton className="h-8 w-24" />

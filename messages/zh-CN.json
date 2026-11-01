@@ -12,7 +12,9 @@
     "search": "搜索",
     "selected": "已选中",
     "propertyValue": "{label}：{value}",
-    "avatarLabel": "{email} 的头像"
+    "avatarLabel": "{email} 的头像",
+    "scrollToEnd": "滚动到底部",
+    "scrollToStart": "滚动到顶部"
   },
   "Issue": {
     "scope": {
@@ -2784,7 +2786,7 @@
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
     "conversationWith": "与 {name} 的对话",
-    "usedTools": "调用了 {tools}",
+    "usedTools": "用了 {count} 个工具",
     "pendingActions": {
       "label": "等你确认",
       "approve_repository_push": "允许推送仓库",
@@ -2897,7 +2899,7 @@
       },
       "sources": "{count} 个来源"
     },
-    "sendUncertain": "未能确认消息是否送达。在这个输入框里原样重发不会产生重复；关闭或切换输入框、刷新页面或更换账号后再发，则可能重复。",
+    "sendUncertain": "未确认送达",
     "lengthCount": "{count} / {max}",
     "modelPicker": {
       "label": "模型：{name}",
@@ -2914,7 +2916,8 @@
       "unknownModel": "未知模型",
       "refresh": "刷新模型列表",
       "refreshFailed": "刷新失败，重试"
-    }
+    },
+    "empty": "告诉 {name} 你要做什么"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "请先登录。",

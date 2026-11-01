@@ -12,7 +12,9 @@
     "search": "Search",
     "selected": "Selected",
     "propertyValue": "{label}: {value}",
-    "avatarLabel": "Avatar for {email}"
+    "avatarLabel": "Avatar for {email}",
+    "scrollToEnd": "Scroll to end",
+    "scrollToStart": "Scroll to start"
   },
   "Issue": {
     "scope": {
@@ -2784,7 +2786,7 @@
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
     "conversationWith": "Conversation with {name}",
-    "usedTools": "Used {tools}",
+    "usedTools": "Used {count, plural, one {# tool} other {# tools}}",
     "pendingActions": {
       "label": "Waiting for your approval",
       "approve_repository_push": "Allow repository push",
@@ -2897,7 +2899,7 @@
       },
       "sources": "{count, plural, one {# source} other {# sources}}"
     },
-    "sendUncertain": "Could not confirm the message was delivered. Resending it unchanged from this box will not duplicate it; after closing or switching boxes, reloading the page or changing accounts, a resend may.",
+    "sendUncertain": "Delivery not confirmed",
     "lengthCount": "{count} / {max}",
     "modelPicker": {
       "label": "Model: {name}",
@@ -2914,7 +2916,8 @@
       "unknownModel": "Unknown model",
       "refresh": "Refresh models",
       "refreshFailed": "Refresh failed. Try again"
-    }
+    },
+    "empty": "Tell {name} what you need"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "Please sign in first.",
