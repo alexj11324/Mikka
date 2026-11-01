@@ -95,13 +95,16 @@ source wins in a conflict is in [`README.md`](README.md).
   08:00 briefing, or when a cost that cannot be undone lands within a week;
   everything else waits in 建议 for the briefing. When unsure, it stays
   quiet. It also stays quiet when fresh evidence shows the matter resolved,
-  owned by someone else, or already covered in the chat. When the daily cap
-  is spent, a matter the person must still act on is snoozed until the cap
-  reopens, never dropped. Telling the person is a card in its
+  owned by someone else, or already covered in the chat. When the Decisions
+  API says not now, a matter the person must still act on is snoozed until
+  the time it names, never dropped. Telling the person is a card in its
   own chat that says what happens if nothing is done and offers one next
-  step, pushed on mobile. Normal stays in 建议; low is not shown. Telling the
-  person is capped at 5 a day, 30 minutes apart (critical skips the spacing,
-  not the cap); held items wait, they are not dropped. The Coordinator never
+  step, pushed on mobile. Normal stays in 建议; low is not shown. Whether to
+  interrupt the person now, which waiting matter the Coordinator takes up
+  next, and what happens to a matter it left undecided are Decisions API
+  answers that read how often the person was told today; only runaway caps
+  (24 tellings, 48 handoffs a day) stay in code. Held items wait, they are not
+  dropped. The Coordinator never
   acts on an event before the person says yes. Its own ideas also go in its
   chat.
 - **R-21** 建议 is its own rail page (R-55), not part of the right panel; the

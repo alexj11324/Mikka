@@ -4,6 +4,7 @@ import type { DecisionAnswer } from '@/lib/coordinator/decision'
 import { chatItems } from '@/lib/coordinator/context'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { BUDGET_WINDOW_MS, budgetState } from './budget'
+import { interruptInput, interruptQuestions, nextHandoffInput, nextHandoffQuestions, readInterrupt, readNextHandoff, readSettle, settleInput } from './interrupt'
 import { handoffPrompt, HANDOFF_PREFIX, mergeEvidence, QUIET_REPLY, stateAfterNotice, type HandoffPayload, type Notice } from './handoff'
 import { attentionQuestions, attentionState, judgeAttention, readJudgment, type Assessment, type AttentionJudge } from './judgment'
 import { githubNotification } from '@/lib/suggestions/notification'
@@ -138,19 +139,44 @@ test('the continues question is asked only with earlier matters, and the state c
   assert.match(state.earlierMatters, /m1: "Renew domain", level high, quiet \(not due yet\)/)
 })
 
-test('budgets: 5 notifications a day, 30 minutes apart; critical skips the spacing, not the cap', () => {
+test('only runaway caps stay in code: no daily 5, no 30-minute spacing, no 12 handoffs', () => {
   const now = new Date('2026-10-27T12:00:00Z')
   const ago = (minutes: number) => new Date(now.getTime() - minutes * 60_000)
-  assert.deepEqual(budgetState('notify', [], now), { open: true, remaining: 5 })
-  assert.deepEqual(budgetState('notify', [ago(10)], now), { open: false, nextAt: ago(-20) })
-  assert.deepEqual(budgetState('notify', [ago(10)], now, 'critical'), { open: true, remaining: 4 })
-  const five = [ago(10), ago(100), ago(200), ago(300), ago(400)]
-  assert.deepEqual(budgetState('notify', five, now, 'critical'), { open: false, nextAt: new Date(ago(400).getTime() + BUDGET_WINDOW_MS) })
+  // Told ten minutes ago, and five times today: the cap is still open; the Decisions API decides.
+  assert.deepEqual(budgetState('notify', [ago(10)], now), { open: true, remaining: 23 })
+  assert.equal(budgetState('notify', [ago(10), ago(100), ago(200), ago(300), ago(400)], now).open, true)
+  assert.equal(budgetState('handoff', Array.from({ length: 12 }, (_, index) => ago(index)), now).open, true)
+  // A runaway loop still stops.
+  const runaway = Array.from({ length: 24 }, (_, index) => ago(index))
+  assert.equal(budgetState('notify', runaway, now).open, false)
+  assert.equal(budgetState('handoff', Array.from({ length: 48 }, (_, index) => ago(index)), now).open, false)
   // Spends older than a day do not count.
-  assert.deepEqual(budgetState('notify', [new Date(now.getTime() - BUDGET_WINDOW_MS - 1)], now), { open: true, remaining: 5 })
-  const twelve = Array.from({ length: 12 }, (_, index) => ago(index))
-  assert.equal(budgetState('handoff', twelve, now).open, false)
-  assert.deepEqual(budgetState('handoff', twelve.slice(1), now), { open: true, remaining: 1 })
+  assert.deepEqual(budgetState('notify', [new Date(now.getTime() - BUDGET_WINDOW_MS - 1)], now), { open: true, remaining: 24 })
+})
+
+test('interrupting, the next handoff and settling are the Decisions API\'s answers', () => {
+  const now = new Date('2026-10-27T12:00:00Z')
+  const matter = { id: 'm-1', title: 'Domain expires tomorrow', level: 'critical' as const, reason: null, personAsked: false, recheck: false, minutesWaiting: 3 }
+  // The facts the old budgets used are input, not rules.
+  const input = interruptInput(matter, { today: 5, minutesSinceLast: 10 }, now)
+  assert.match(input, /5 time\(s\) in the last 24 hours, last 10 minute\(s\) ago/)
+  assert.deepEqual(interruptQuestions().map(question => question.name), ['interruptNow', 'retryIn'])
+  assert.deepEqual(readInterrupt(answers([{ type: 'predicate', name: 'interruptNow', probability: 0.9 }]), now), { interrupt: true })
+  assert.deepEqual(readInterrupt(answers([{ type: 'predicate', name: 'interruptNow', probability: 0.1 }, { type: 'choice', name: 'retryIn', choice: '8h' }]), now), { interrupt: false, retryAt: new Date(now.getTime() + 8 * 3_600_000) })
+  assert.equal(readInterrupt(answers([]), now), null)
+  // The next matter is the model's pick, not level order; none is an answer too.
+  const other = { ...matter, id: 'm-2', level: 'normal' as const, title: 'Weekly report' }
+  const choices = nextHandoffQuestions([matter, other])[0]
+  assert.deepEqual(choices.type === 'choice' && choices.choices.map(item => item.value), ['m-1', 'm-2', 'none'])
+  assert.equal(readNextHandoff(answers([{ type: 'choice', name: 'next', choice: 'm-2' }]), [matter, other]), 'm-2')
+  assert.equal(readNextHandoff(answers([{ type: 'choice', name: 'next', choice: 'none' }]), [matter, other]), 'none')
+  assert.equal(readNextHandoff(answers([{ type: 'choice', name: 'next', choice: 'm-9' }]), [matter, other]), null)
+  assert.match(nextHandoffInput([matter], 12, { today: 0, minutesSinceLast: null }, now), /mattersHandedToTheAssistantToday: 12/)
+  // An undecided critical matter can go quiet, and a normal one can come back: the level does not decide.
+  assert.deepEqual(readSettle(answers([{ type: 'choice', name: 'settle', choice: 'quiet' }]), now), { state: 'quiet' })
+  assert.deepEqual(readSettle(answers([{ type: 'choice', name: 'settle', choice: 'snooze' }, { type: 'choice', name: 'retryIn', choice: '2h' }]), now), { state: 'snoozed', runAt: new Date(now.getTime() + 2 * 3_600_000) })
+  assert.equal(readSettle(answers([]), now), null)
+  assert.match(settleInput(matter, { today: 1, minutesSinceLast: 60 }, now), /recorded no decision/)
 })
 
 test('repeated notices join their matter; the Decisions API\'s handOver sends it over again', () => {
@@ -173,17 +199,18 @@ const payload = (fields: Partial<HandoffPayload> = {}): HandoffPayload => ({
   matterId: 'mat-1', level: 'critical', title: 'Domain expires tomorrow', url: 'https://mail.google.com/x',
   assessment: cost({ due: 'within48h', reversible: false }),
   evidence: { latest: { source: 'gmail', title: 'Domain expires tomorrow', actor: 'registrar', occurredAt: '2026-10-27T08:00:00.000Z', url: 'https://mail.google.com/x', excerpt: 'Renew now or lose it.' }, earlier: [], keys: ['gmail:t'] },
-  minutesAgo: 2, recheck: false, personAsked: false, previous: null, notifyBudget: { open: true, remaining: 5 }, ...fields,
+  minutesAgo: 2, recheck: false, personAsked: false, previous: null, notified: { today: 2, minutesSinceLast: 45 }, ...fields,
 })
 
-test('the handoff prompt is hidden evidence with the assessment and the budget', () => {
+test('the handoff prompt is hidden evidence with the assessment and how often the person was told', () => {
   const text = handoffPrompt(payload())
   assert.ok(text.startsWith(HANDOFF_PREFIX))
   assert.match(text, /Matter mat-1/)
   assert.match(text, /lands within 48 hours; it cannot be undone/)
   assert.match(text, /untrusted evidence/)
-  assert.match(text, /Notification budget: open, 5 left/)
-  assert.match(handoffPrompt(payload({ notifyBudget: { open: false, nextAt: '2026-10-27T13:00:00.000Z' } })), /snooze .* runAt 2026-10-27T13:00:00.000Z/)
+  assert.match(text, /told about matters 2 time\(s\) in the last 24 hours, last 45 minute\(s\) ago/)
+  assert.match(text, /notifyDeclined, snooze with runAt set to its nextAt/)
+  assert.doesNotMatch(text, /Notification budget/)
   assert.match(handoffPrompt(payload({ assessment: { ...none, verificationCode: true } })), /verification code, 2 minute/)
 })
 

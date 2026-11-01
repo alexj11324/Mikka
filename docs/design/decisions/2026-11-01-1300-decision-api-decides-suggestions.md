@@ -34,3 +34,19 @@ What follows for importance and handoff:
 - Whether a matter goes to the Coordinator, the first time or again after a
   decision, is the model's `handOver` predicate, not a list of routed levels
   or a level that went up.
+
+What follows for interrupting the person (Alex, 2026-11-01: 「这个东西很便宜，全部交给 Decision API 来处理」):
+
+- The notification budget (5 a day, 30 minutes apart, critical skips the
+  spacing) and the 12-a-day handoff budget are gone. Before the Coordinator's
+  `notify` is recorded, the Decisions API decides whether to interrupt now,
+  reading how often the person was told today and how long ago; a no returns
+  `notifyDeclined` with the time to look again. No answer leaves the
+  Coordinator's call standing, logged as a fallback. A reminder the person
+  asked for is not asked about.
+- Which waiting matter the Coordinator takes up next is the Decisions API's
+  pick (or none), not level order. No answer hands nothing; the next wake asks.
+- A matter the Coordinator left undecided (after its turn, or 30 minutes in
+  hand) is settled quiet or snoozed by the Decisions API, not by "critical or
+  high snoozes, the rest go quiet". No answer snoozes it to be asked again.
+- Runaway caps stay in code: 24 tellings and 48 handoffs in 24 hours.
