@@ -14,7 +14,7 @@
 // Every row id starts with de300000- (shared.mjs); cleanup.mjs removes exactly those.
 // Re-running replaces the previous demo rows of the account in one transaction.
 import { connect, countDemoRows, deleteDemoRows, demoId, findOwner, inTransaction, MAIN_TABLES, parseArgs, WORKSPACE_TABLES } from './shared.mjs'
-import { AGENTS, ARTIFACTS, BOT_MEMORY, BOTS, DEVICES, FACTS, ISSUES, PEOPLE, PERSONAL_ISSUES, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG } from './content.mjs'
+import { AGENTS, ARTIFACTS, BOT_MEMORY, BOT_THREADS, BOTS, DEVICES, FACTS, ISSUES, PEOPLE, PERSONAL_ISSUES, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG } from './content.mjs'
 import { CHATS, GROUP } from './chats.mjs'
 import { createHash } from 'node:crypto'
 
@@ -64,7 +64,15 @@ function plan(owner) {
   const devices = DEVICES.map(device => ({ ...device, id: id(`device:${device.key}`),
     lastSeenAt: device.online ? new Date(now + 10 * 365 * 86_400_000) : new Date(now - device.lastSeenMinutes * 60_000) }))
   const agents = AGENTS.map(agent => ({ ...agent, id: id(`agent:${agent.key}`), deviceId: id(`device:${agent.device}`) }))
-  const runs = RUNS.map(run => {
+  // Each bot's extra threads alternate between the two coding agents; running ones stay over 15 minutes old.
+  const threads = Object.entries(BOT_THREADS).flatMap(([bot, list]) => list.map(([title, status, hoursAgo, lastReply], index) => ({
+    key: `t-${bot}-${index}`, issue: null, bot, agent: index % 2 ? 'ag-codex' : 'ag-claude', status,
+    minutesAgo: Math.max(20, Math.round(hoursAgo * 60)), minutes: 6 + (index * 7) % 40, prompt: title, lastReply,
+    error: status === 'failed' ? lastReply : undefined,
+    chunks: [{ type: 'text-delta', id: 't1', delta: `开始：${title}。` }, { type: 'tool-input-available', toolCallId: 'a' }, { type: 'tool-input-available', toolCallId: 'b' },
+      status === 'failed' ? { type: 'error', errorText: lastReply } : { type: 'text-delta', id: 't2', delta: lastReply }],
+  })))
+  const runs = [...RUNS, ...threads].map(run => {
     const createdAt = ago(run.minutesAgo)
     const startedAt = new Date(createdAt.getTime() + 40_000)
     const finished = ['succeeded', 'failed', 'stopped', 'cancelled'].includes(run.status)
