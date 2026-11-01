@@ -4,10 +4,10 @@ name: Browser tests
 # - pull requests: the @smoke set plus the complete specs of the areas the change
 #   touches, in directly started browser/runtime lanes with independent builds.
 #   Performance runs when a change touches what the budgets measure.
-# - push to main: the functional spec files on four shards. A red run opens or
+# - push to main: the functional spec files on eight shards. A red run opens or
 #   updates one issue that names the merged pull request's author.
 # - nightly and manual runs: every spec, including visual, crawler and slower
-#   specs, plus performance, on four shards. integrate/* pull requests run this
+#   specs, plus performance, on eight shards. integrate/* pull requests run this
 #   tier before merge. Docs-only changes keep only the small gate jobs.
 on:
   # Manual only (decision 2026-11-01-0230). Pull requests get the required
@@ -526,7 +526,7 @@ jobs:
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
       # Only compiler cache crosses revisions. Every run still builds its own
-      # application; the source commit hash gives each main build a fresh entry.
+      # application; the source commit hash gives each build a fresh entry.
       - name: Restore the Next.js build cache
         id: next-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -540,8 +540,12 @@ jobs:
           node scripts/build-subscription-worker.mjs
           pnpm generate:agent-ui
           pnpm exec next build
-      - name: Save the Next.js build cache (main only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.next-cache.outputs.cache-hit != 'true'
+      # Save on every run without an exact hit. Main pushes no longer run this
+      # workflow (decision 2026-11-01-0230), so a main-only save left every run
+      # on an old compiler cache. A branch's cache serves that branch's reruns;
+      # a run on main refreshes the cache every branch falls back to.
+      - name: Save the Next.js build cache
+        if: steps.next-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .next/cache
@@ -718,13 +722,14 @@ jobs:
     needs: [changes, browser-build]
     if: needs.changes.result == 'success' && needs.browser-build.result == 'success' && (needs.changes.outputs.browser_tier == 'main' || needs.changes.outputs.browser_tier == 'full')
     runs-on: ubuntu-latest
-    # Four independent shards for main and full: each matrix job gets its
+    # Eight independent shards for main and full: each matrix job gets its
     # own PostgreSQL service and test-account directory, so no fixture or lease
-    # is shared across shards.
+    # is shared across shards. Specs run one worker per shard; four shards took
+    # 8–10 minutes each (run 41310831485), eight take about half.
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     timeout-minutes: 45
     services:
       postgres:
@@ -756,7 +761,7 @@ jobs:
       SLACK_BOT_USER_ID: U123
       SLACK_USER_BINDINGS: '{"U456":"ci-only-mikka-user"}'
       NEXT_TELEMETRY_DISABLED: '1'
-      BROWSER_SHARDS: '4'
+      BROWSER_SHARDS: '8'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
