@@ -1934,6 +1934,11 @@
       "githubRepositoryAccess": "Repository access",
       "githubRepositoriesDialog": "Authorized repositories",
       "githubRepositorySearch": "Search repositories",
+      "githubVerification": "Verification command",
+      "githubVerificationFor": "Verification command for {repository}",
+      "githubVerificationLoadFailed": "Verification command unavailable",
+      "githubVerificationSaveUnconfirmed": "Save unconfirmed. Changes retained.",
+      "githubVerificationSaved": "Verification command saved",
       "githubAbilitiesHeading": "Abilities",
       "githubAbilitiesSummary": "{count} abilities ({write} write, {read} read)",
       "githubPermission": {

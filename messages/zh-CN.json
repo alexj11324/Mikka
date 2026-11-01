@@ -1934,6 +1934,11 @@
       "githubRepositoryAccess": "仓库访问",
       "githubRepositoriesDialog": "已授权的仓库",
       "githubRepositorySearch": "搜索仓库",
+      "githubVerification": "验证命令",
+      "githubVerificationFor": "{repository} 的验证命令",
+      "githubVerificationLoadFailed": "验证命令无法加载",
+      "githubVerificationSaveUnconfirmed": "保存未确认，修改已保留",
+      "githubVerificationSaved": "验证命令已保存",
       "githubAbilitiesHeading": "能力",
       "githubAbilitiesSummary": "包含 {count} 个能力（{write} 个写入，{read} 个读取）",
       "githubPermission": {

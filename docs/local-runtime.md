@@ -50,7 +50,17 @@ and creates that computer's repository record automatically.
 
 Repository policy is keyed by `(userId, remoteKey)` in `repository_settings`.
 `verifyCommand`, `setup`, `networkAllow` and `push` start empty; no legacy
-machine approval is carried over implicitly. Local sandbox writes include
+machine approval is carried over implicitly. The signed-in owner configures
+`verifyCommand` in Plugins → GitHub → authorized repositories. Saving an empty
+command disables verification, including an older cloud repository command.
+URL-backed local and cloud claims use the same owner setting; existing cloud
+workspace commands remain applicable when no repository settings row exists.
+The daemon runs the command after submission. Without it, the result stays
+unverified and publication remains a draft PR, even when GitHub CI passed.
+The command editor follows the repository/project command setting used by
+[Vercel Build Command](https://vercel.com/docs/builds/configure-a-build#build-command),
+inside Mikka's existing authorized-repository dialog.
+Local sandbox writes include
 the run's Git administration, its branch ref and shared object store.
 Indirection files and repository configuration stay read-only. Daemon Git
 commands pin both the worktree Git directory and common Git directory.
