@@ -1,4 +1,5 @@
-import { test, expect, register } from './fixtures'
+import { Pool } from 'pg'
+import { test, expect, register, registerInTeam } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
 // N5 密钥与环境 (Figma 554:9120) against the real secrets store (ephemeral WORKSPACE_SECRETS_KEY in CI).
@@ -6,13 +7,8 @@ test('管理员添加、编辑和删除密钥，值不回显', async ({ page }, 
   await register(page, '/settings?section=secrets')
   await expect(page.getByRole('heading', { level: 1, name: '密钥与环境' })).toBeVisible()
   await expect(page.getByText('还没有密钥。')).toBeVisible()
-  // BYO E2B: write-only, the row names its state only.
-  const e2b = page.getByRole('region', { name: '云电脑' })
-  await expect(e2b.getByRole('status')).toHaveText('未设置')
-  await e2b.getByRole('button', { name: '设置', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: 'E2B API Key' }).getByLabel('API Key')).toHaveValue('')
-  await attachLightDark(page, testInfo, 'secrets-e2b-dialog')
-  await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
+  // The E2B key is personal now: it is under 账号 › API 与订阅, not the workspace's 密钥与环境.
+  await expect(page.getByRole('region', { name: '云电脑' })).toHaveCount(0)
   await attachLightDark(page, testInfo, 'secrets-empty')
 
   const value = `e2e-${Date.now()}-value`
@@ -48,4 +44,20 @@ test('管理员添加、编辑和删除密钥，值不回显', async ({ page }, 
   await attachLightDark(page, testInfo, 'secrets-edit')
   await dialog.getByRole('button', { name: '删除', exact: true }).click()
   await expect(page.getByText('VERCEL_TOKEN')).toHaveCount(0)
+})
+
+// Keys are personal (orchestration § 2): every member, admin or not, sets their own E2B key
+// under 账号 › API 与订阅, and the team's 密钥与环境 no longer holds one.
+test('团队成员在 API 与订阅 里设置自己的 E2B Key', async ({ page }, testInfo) => {
+  const { workspaceId } = await registerInTeam(page, '/settings?section=models')
+  // A plain member, not an admin, still edits their own key.
+  const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL })
+  try { await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1`, [workspaceId]) } finally { await pool.end() }
+  await page.reload()
+  const e2b = page.getByRole('region', { name: '云电脑' })
+  await expect(e2b.getByRole('status')).toHaveText('未设置')
+  await attachLightDark(page, testInfo, 'models-e2b')
+  await e2b.getByRole('button', { name: '设置', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'E2B API Key' }).getByLabel('API Key')).toHaveValue('')
+  await attachLightDark(page, testInfo, 'models-e2b-dialog')
 })

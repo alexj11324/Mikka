@@ -41,7 +41,7 @@ async function requireTransferTarget(tx: WorkspaceTransaction, workspaceId: stri
  */
 export async function transferBots(tx: MainTransaction, workspaceId: string, fromUserId: string, toUserId: string, only?: string[]): Promise<AssetTransfer> {
   const owned = await tx.select({ id: bots.id, name: bots.name }).from(bots)
-    .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, fromUserId), ...(only ? [inArray(bots.id, only)] : []))).for('update')
+    .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, fromUserId), sql`not exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})`, ...(only ? [inArray(bots.id, only)] : []))).for('update')
   if (!owned.length) return { bots: 0 }
   const ids = owned.map(bot => bot.id)
   const [busyRun] = await tx.select({ id: agentRuns.id }).from(agentRuns)

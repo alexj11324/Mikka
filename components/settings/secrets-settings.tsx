@@ -58,12 +58,11 @@ export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
       if (saved?.warning === 'shortValueNotMasked') setWarning(t('shortValueNotMasked', { name: saved.name }))
       if (saved) void list.mutate()
     }} />}
-    <E2BKeySettings workspaceId={workspaceId} />
   </>
 }
 
-/** BYO E2B: the workspace's own E2B API key for cloud computers. Write-only; the row shows its state only. */
-function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
+/** BYO E2B: the person's own E2B API key for cloud computers (keys are personal; shown under 账号 › API 与订阅). Write-only; the row shows its state only. */
+export function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.secrets.e2b')
   const actionError = useActionError()
   const status = useE2BKeyStatus(workspaceId)
