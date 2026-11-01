@@ -194,12 +194,10 @@
   },
   "Auth": {
     "haveAccount": "已经有账号？",
-    "noAccount": "还没有工作账号？",
     "noAccountShort": "还没有账号？",
     "signIn": "去登录",
     "createAccount": "创建账号",
     "addAccountTitle": "添加账户",
-    "addAccountDescription": "登录或创建另一个 Mikka 账户，同时保留当前账户以便切换。",
     "returnToCurrentAccount": "取消，返回当前账户",
     "addAccountLabel": "添加账户",
     "signUpLabel": "注册账号",
@@ -208,15 +206,9 @@
     "home": "Mikka 首页",
     "createTitle": "创建你的工作账号",
     "welcome": "登录 Mikka",
-    "createDescription": "从第一个任务开始，把想法变成可追踪的进展。",
-    "welcomeDescription": "登录 Mikka，继续你的任务与文档。",
     "continueGoogle": "使用 Google 继续",
     "googleLinkHint": "如果此邮箱已注册 Mikka，请先用邮箱密码登录，再到「设置 → 账户」关联 Google。",
-    "googleNotConfigured": "Google 登录暂未配置，请使用邮箱继续。",
-    "viewGoogleCallback": "查看 Google OAuth 回调地址",
     "continueGithub": "使用 GitHub 继续",
-    "githubNotConfigured": "GitHub 登录暂未配置，请使用邮箱继续。",
-    "viewCallback": "查看 GitHub App 回调地址",
     "orEmail": "或",
     "name": "称呼",
     "namePlaceholder": "怎么称呼你",
@@ -275,7 +267,12 @@
       "turnstileFailed": "人机验证未通过",
       "turnstileUnavailable": "人机验证暂不可用，请稍后重试。",
       "emailRegistered": "该邮箱已注册，请直接登录。"
-    }
+    },
+    "nameRequired": "称呼不能为空",
+    "emailRequired": "邮箱不能为空",
+    "emailInvalid": "邮箱格式无效",
+    "passwordRequired": "密码不能为空",
+    "passwordTooShort": "密码至少 8 位字符"
   },
   "Metadata": {
     "title": "Mikka · 任务与文档工作台",
@@ -890,7 +887,8 @@
       "retry": "重试",
       "done": "完成",
       "cancelled": "已取消"
-    }
+    },
+    "autoScheduleNeedsAllow": "需先开启「允许调度」"
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
@@ -1721,11 +1719,9 @@
       "email": "电子邮箱",
       "notSet": "未设置",
       "readOnly": "账户信息为只读，当前版本暂不支持在此修改。",
-      "save": "保存",
       "saved": "已保存",
       "changeAvatar": "更换",
       "uploading": "上传中…",
-      "sessionHeading": "会话",
       "signOut": "退出登录",
       "signingOut": "正在退出…",
       "deleteAccount": "删除账户",
@@ -1734,7 +1730,10 @@
       "deleteConfirmLabel": "输入 {email} 确认",
       "deleting": "正在删除…",
       "confirmDelete": "删除账户",
-      "cancel": "取消"
+      "cancel": "取消",
+      "currentSession": "当前会话",
+      "danger": "危险操作",
+      "account": "此账户"
     },
     "memory": {
       "enabled": "使用记忆",
@@ -1780,7 +1779,8 @@
       "transferred": "已转让给 {name}",
       "replayOnboarding": "重新播放引导",
       "replay": "重新播放",
-      "replaying": "正在重新播放…"
+      "replaying": "正在重新播放…",
+      "transferPick": "选择成员"
     },
     "computerPolicy": {
       "heading": "电脑操作",
@@ -1788,7 +1788,6 @@
       "deny": "禁止",
       "error": "无法读取或更新电脑设置。",
       "loading": "正在读取电脑设置…",
-      "unavailable": "云电脑未开启",
       "allow": "允许"
     },
     "issuePrefix": {
@@ -1796,7 +1795,6 @@
       "label": "前缀",
       "current": "个人任务显示为 {example}。",
       "needsChoice": "还没有可用的前缀：邮箱里的字母不够 4 个，或和已连接的 Linear 团队重名。请填 4 个字母。",
-      "save": "保存",
       "saved": "已保存，个人任务现在显示为 {example}。",
       "invalid": "请填 4 个英文字母。",
       "taken": "和已连接的 Linear 团队 key 重名，请换一个。",
@@ -1865,7 +1863,7 @@
       "extraUsageUnverified": "没确认额外用量已关闭，Bot 暂不会使用这个订阅",
       "removeFailed": "无法移除这个连接。",
       "loading": "正在读取模型订阅…",
-      "serviceOff": "这个部署还没有开启模型订阅，Bot 会使用工作区默认的模型额度。",
+      "serviceOff": "模型订阅未开启。",
       "startFailed": "{provider} 授权启动失败",
       "finishFailed": "{provider} 授权未完成",
       "signedOut": "登录已过期，请重新登录后再连接。",
@@ -2014,7 +2012,6 @@
       "userName": "预览用户"
     },
     "notifications": {
-      "heading": "通知",
       "proactive": "主动消息",
       "pushDecide": "需要你决策",
       "pushReview": "待审阅",
@@ -2050,7 +2047,8 @@
       "currentDevice": "当前设备",
       "signOut": "退出",
       "signingOut": "正在退出…",
-      "signOutOthers": "全部退出"
+      "signOutOthers": "全部退出",
+      "otherDevices": "其他设备"
     },
     "privacy": {
       "data": "数据",
@@ -2179,7 +2177,6 @@
         "all": "全部",
         "security": "安全"
       },
-      "export": "导出",
       "exportCsv": "导出 CSV",
       "empty": "最近 90 天没有记录。",
       "loadMore": "加载更多",
@@ -2425,8 +2422,10 @@
       "whenDeviceOffline": "设备离线时",
       "offlineWait": "等它上线",
       "offlineCloud": "改到云端运行",
-      "labels": "按标签"
+      "labels": "按标签",
+      "pickModel": "选择模型"
     },
+    "searchEmpty": "没有匹配的设置",
     "apiKeys": {
       "add": "添加 API Key",
       "addConfirm": "添加",
@@ -2507,7 +2506,6 @@
     "description": "邀请同事加入{workspace}，可输入邮箱或拖入 CSV 批量导入。",
     "done": "完成",
     "emailLabel": "邮箱地址",
-    "emailHelp": "用逗号或换行分隔，一次最多 {max} 人。",
     "csv": {
       "label": "上传 CSV 文件",
       "dropNow": "松开即可导入 CSV",
@@ -2522,7 +2520,6 @@
       "member": "成员",
       "admin": "管理员"
     },
-    "noEmailService": "当前未接入邮件服务，将生成邮箱专属邀请链接，不会自动发送邮件。",
     "pendingCount": "{count} 位待邀请",
     "creating": "正在创建…",
     "createLinks": "创建邀请链接",
@@ -4042,7 +4039,7 @@
     "computerAsk": "开通云电脑后，我可以浏览网页，线程也能在云端运行。现在开通吗？",
     "computerYes": "开通",
     "computerNo": "暂不开通",
-    "computerLater": "好的。之后可以在设置中填写 E2B API Key 开通。",
+    "computerLater": "以后可以在设置里开通云电脑。",
     "keyLabel": "E2B API Key",
     "keyLink": "去 E2B 拿 Key",
     "keyConnect": "连接",

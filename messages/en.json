@@ -194,12 +194,10 @@
   },
   "Auth": {
     "haveAccount": "Already have an account?",
-    "noAccount": "No work account yet?",
     "noAccountShort": "No account yet?",
     "signIn": "Sign in",
     "createAccount": "Create account",
     "addAccountTitle": "Add an account",
-    "addAccountDescription": "Sign in or create another Mikka account while keeping your current account available to switch back to.",
     "returnToCurrentAccount": "Cancel and return to current account",
     "addAccountLabel": "Add an account",
     "signUpLabel": "Create account",
@@ -208,15 +206,9 @@
     "home": "Mikka home",
     "createTitle": "Create your work account",
     "welcome": "Sign in to Mikka",
-    "createDescription": "Start with your first task and turn ideas into traceable progress.",
-    "welcomeDescription": "Sign in to Mikka and continue with your tasks and documents.",
     "continueGoogle": "Continue with Google",
     "googleLinkHint": "If this email already has a Mikka account, sign in with your password and link Google under Settings → Account.",
-    "googleNotConfigured": "Google sign-in is not configured yet. Continue with email.",
-    "viewGoogleCallback": "View the Google OAuth callback URL",
     "continueGithub": "Continue with GitHub",
-    "githubNotConfigured": "GitHub sign-in is not configured yet. Continue with email.",
-    "viewCallback": "View the GitHub App callback URL",
     "orEmail": "or",
     "name": "Name",
     "namePlaceholder": "What should we call you?",
@@ -275,7 +267,12 @@
       "turnstileFailed": "Human verification failed",
       "turnstileUnavailable": "Human verification is unavailable. Please try again later.",
       "emailRegistered": "This email is already registered. Please sign in."
-    }
+    },
+    "nameRequired": "Name is required",
+    "emailRequired": "Email is required",
+    "emailInvalid": "Enter a valid email address",
+    "passwordRequired": "Password is required",
+    "passwordTooShort": "Password must be at least 8 characters"
   },
   "Metadata": {
     "title": "Mikka · Tasks and documents workspace",
@@ -890,7 +887,8 @@
       "retry": "Retry",
       "done": "Done",
       "cancelled": "Cancelled"
-    }
+    },
+    "autoScheduleNeedsAllow": "Turn on Allow scheduling first"
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -1721,11 +1719,9 @@
       "email": "Email",
       "notSet": "Not set",
       "readOnly": "Account details are read-only; this version does not support editing them here.",
-      "save": "Save",
       "saved": "Saved",
       "changeAvatar": "Change",
       "uploading": "Uploading…",
-      "sessionHeading": "Session",
       "signOut": "Sign out",
       "signingOut": "Signing out…",
       "deleteAccount": "Delete account",
@@ -1734,7 +1730,10 @@
       "deleteConfirmLabel": "Type {email} to confirm",
       "deleting": "Deleting…",
       "confirmDelete": "Delete account",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "currentSession": "This session",
+      "danger": "Danger zone",
+      "account": "This account"
     },
     "memory": {
       "enabled": "Use memory",
@@ -1780,7 +1779,8 @@
       "transferred": "Transferred to {name}",
       "replayOnboarding": "Replay onboarding",
       "replay": "Replay",
-      "replaying": "Replaying…"
+      "replaying": "Replaying…",
+      "transferPick": "Choose a member"
     },
     "computerPolicy": {
       "heading": "Computer use",
@@ -1788,15 +1788,13 @@
       "allow": "Allow",
       "deny": "Deny",
       "error": "Could not update or load the computer setting.",
-      "loading": "Loading computer setting…",
-      "unavailable": "Cloud computers are off"
+      "loading": "Loading computer setting…"
     },
     "issuePrefix": {
       "title": "Personal task ids",
       "label": "Prefix",
       "current": "Personal tasks show as {example}.",
       "needsChoice": "No usable prefix yet: your email has fewer than four letters, or it matches a connected Linear team. Enter four letters.",
-      "save": "Save",
       "saved": "Saved. Personal tasks now show as {example}.",
       "invalid": "Enter four letters A–Z.",
       "taken": "That matches a connected Linear team key. Choose another.",
@@ -1865,7 +1863,7 @@
       "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
       "removeFailed": "The connection could not be removed.",
       "loading": "Loading model subscriptions…",
-      "serviceOff": "Model subscriptions aren't turned on for this deployment. Bots use the workspace's default model quota.",
+      "serviceOff": "Model subscriptions are off.",
       "startFailed": "{provider} sign-in could not start",
       "finishFailed": "{provider} sign-in did not finish",
       "signedOut": "Your session expired. Sign in again, then connect.",
@@ -2014,7 +2012,6 @@
       "userName": "Preview user"
     },
     "notifications": {
-      "heading": "Notifications",
       "proactive": "Proactive messages",
       "pushDecide": "Needs your decision",
       "pushReview": "Ready for review",
@@ -2050,7 +2047,8 @@
       "currentDevice": "This device",
       "signOut": "Sign out",
       "signingOut": "Signing out…",
-      "signOutOthers": "Sign out all"
+      "signOutOthers": "Sign out all",
+      "otherDevices": "Other devices"
     },
     "privacy": {
       "data": "Data",
@@ -2179,7 +2177,6 @@
         "all": "All",
         "security": "Security"
       },
-      "export": "Export",
       "exportCsv": "Export CSV",
       "empty": "Nothing in the last 90 days.",
       "loadMore": "Load more",
@@ -2425,8 +2422,10 @@
       "whenDeviceOffline": "When the device is offline",
       "offlineWait": "Wait for it",
       "offlineCloud": "Run in the cloud",
-      "labels": "By label"
+      "labels": "By label",
+      "pickModel": "Choose a model"
     },
+    "searchEmpty": "No matching settings",
     "apiKeys": {
       "add": "Add API key",
       "addConfirm": "Add",
@@ -2507,7 +2506,6 @@
     "description": "Invite teammates to {workspace} by entering emails or dropping in a CSV.",
     "done": "Done",
     "emailLabel": "Email addresses",
-    "emailHelp": "Separate with commas or new lines; up to {max} people at a time.",
     "csv": {
       "label": "Upload a CSV file",
       "dropNow": "Drop to import the CSV",
@@ -2522,7 +2520,6 @@
       "member": "Member",
       "admin": "Admin"
     },
-    "noEmailService": "Email delivery is not connected, so each invite becomes a link for that address; no email is sent.",
     "pendingCount": "{count, plural, =1 {1 person} other {# people}} to invite",
     "creating": "Creating…",
     "createLinks": "Create invite links",
@@ -4042,7 +4039,7 @@
     "computerAsk": "With a cloud computer I can browse the web, and threads can run in the cloud. Turn it on now?",
     "computerYes": "Turn on",
     "computerNo": "Not now",
-    "computerLater": "OK. You can add an E2B API key in Settings later.",
+    "computerLater": "You can turn on the cloud computer later in Settings.",
     "keyLabel": "E2B API key",
     "keyLink": "Get a key from E2B",
     "keyConnect": "Connect",

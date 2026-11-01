@@ -52,8 +52,9 @@ export function BillingSettings({ workspaceId }: { workspaceId: string }) {
 
   if (!billing.data && !billing.error) return <SettingsLoading label={t('loading')} rows={3} />
   if (!data) return <FieldError>{actionError(billing.data?.error)}</FieldError>
+  // No Stripe: card verification and 充值 cannot work, so only the state shows (and a balance already granted, read-only).
   if (!data.configured) return <>
-    {credits}
+    <BalanceSection workspaceId={workspaceId} purchasable={false} />
     <p role="status" className="text-sm text-muted-foreground">{actionError('billingNotConfigured')}</p>
   </>
 

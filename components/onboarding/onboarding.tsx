@@ -130,6 +130,7 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
   useEffect(() => {
     if (opened.current || bots === undefined) return
     opened.current = true
+    // listBots is the person's own Bots in this workspace, oldest first: a replay uses the first and creates none (onboarding.md §3).
     const existing = bots[0]
     if (existing) {
       setBot(existing); setColor(existing.color as BotColor); setShape(existing.shape as BotShape); setStage('chat')
@@ -288,8 +289,9 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
     <div className="relative flex justify-end p-4">
       {card !== 'welcome' && <Button variant="ghost" size="sm" disabled={busy && closing.current} onClick={() => { void close() }}>{t('skip')}</Button>}
     </div>
-    {/* The Bot, the conversation and the current card sit together in the middle; a long conversation pushes the Bot up and then scrolls. */}
-    <div className="relative mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col justify-center gap-8 px-4 pb-16">
+    {/* The Bot, the conversation and the current card sit together in the middle; a long conversation pushes the Bot up and then scrolls.
+        One 600px column: the Bot's lines start at its left edge and the person's bubbles end at its right edge (R-39). */}
+    <div className="relative mx-auto flex min-h-0 w-full max-w-[632px] flex-1 flex-col justify-center gap-8 px-4 pb-16">
       <motion.div layout={reduce ? false : 'position'} transition={travel} className="flex shrink-0 flex-col items-center gap-2">
         <motion.div className="flex items-center justify-center" initial={false} animate={{ height: avatarPx }} transition={travel}>
           <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: avatarPx / 144 }} transition={travel}>
@@ -301,7 +303,7 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
         </AnimatePresence>
       </motion.div>
 
-      {stage !== 'welcome' && lines.length > 0 && <div ref={thread} aria-live="polite" className="flex min-h-0 flex-col gap-4 overflow-y-auto">
+      {stage !== 'welcome' && lines.length > 0 && <div ref={thread} aria-live="polite" className="flex min-h-0 w-full flex-col gap-4 overflow-y-auto">
         <AnimatePresence initial={false}>
           {lines.map(line => line.from === 'bot'
             ? <motion.p key={line.id} className="text-base" initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduce ? 0 : PACE.rise / 1000, ease: EASE_OUT }}>{line.text}</motion.p>

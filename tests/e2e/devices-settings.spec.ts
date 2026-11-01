@@ -60,6 +60,9 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
   await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许调度到 gpu-box' })).not.toBeChecked()
+  // 自动调度 needs 允许调度: a server defaults to auto, but with scheduling off it reads off and is locked.
+  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许 gpu-box 自动调度' })).not.toBeChecked()
+  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许 gpu-box 自动调度' })).toBeDisabled()
   // 允许自动调度: servers on and personal computers off by default; turning it on is saved.
   await expect(row(page, 'build-01').getByRole('switch', { name: '允许 build-01 自动调度' })).toBeChecked()
   const auto = row(page, 'E2E MacBook').getByRole('switch', { name: '允许 E2E MacBook 自动调度' })

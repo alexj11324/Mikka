@@ -8,5 +8,9 @@ test('计费在未配置 Stripe 时只显示状态，不渲染卡片或税务表
   await expect(page.getByRole('heading', { level: 1, name: '计费' })).toBeVisible()
   await expect(page.getByRole('status').filter({ hasText: '计费尚未开通。' })).toBeVisible()
   await expect(page.getByRole('textbox')).toHaveCount(1) // the sidebar search only
+  // ST3: nothing to buy or verify while billing is off, and an empty balance is not shown.
+  await expect(page.getByRole('button', { name: '充值', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: '免费额度' })).toHaveCount(0)
+  await expect(page.locator('[data-slot="balance"]')).toHaveCount(0)
   await attachLightDark(page, testInfo, 'billing-not-configured')
 })
