@@ -2310,7 +2310,6 @@
     },
     "subscriptionShare": {
       "heading": "这个工作区",
-      "share": "在这里使用我的订阅",
       "blocked": "管理员已关闭",
       "others": "分享给团队成员",
       "othersTitle": "分享 {name} 给团队成员？",
