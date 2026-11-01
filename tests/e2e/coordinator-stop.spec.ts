@@ -48,7 +48,7 @@ const composer = (page: Page) => page.getByRole('textbox', { name: '给 Coordina
 async function openWorkingChat(page: Page) {
   const chat = await mockChat(page)
   await register(page)
-  await page.getByRole('button', { name: 'Coordinator', exact: true }).first().click()
+  await page.getByRole('button', { name: /^Coordinator(，正在工作)?$/ }).first().click()
   await expect(conversation(page).getByText('Coordinator 正在处理…')).toBeVisible()
   return chat
 }

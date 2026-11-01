@@ -5,7 +5,7 @@ import { chatItems, promptMessages } from './context'
 import { coordinatorStopToken, stoppedMessages, stoppedStepText } from './stop'
 import type { CoordinatorWorkflowStreamPart } from './stream'
 
-async function* parts(...list: unknown[]) { for (const part of list) yield part as CoordinatorWorkflowStreamPart }
+const parts = (...list: unknown[]) => new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) { for (const part of list) controller.enqueue(part as CoordinatorWorkflowStreamPart); controller.close() } })
 const at = new Date('2026-11-01T12:00:00Z')
 
 test('the stop hook is named for the run that holds the chat', () => {

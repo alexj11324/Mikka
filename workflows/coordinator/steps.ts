@@ -125,8 +125,7 @@ export async function stoppedStepText(holder: string, streamId: string) {
   'use step'
   const { getRun } = await import('workflow/api')
   const { stoppedStepText: read } = await import('@/lib/coordinator/stop')
-  const readable = getRun(holder).getReadable<CoordinatorWorkflowStreamPart>()
-  try { return await read(readable, streamId) } finally { await readable.cancel().catch(() => undefined) }
+  return read(getRun(holder).getReadable<CoordinatorWorkflowStreamPart>(), streamId)
 }
 
 /**

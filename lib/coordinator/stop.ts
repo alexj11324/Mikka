@@ -18,22 +18,28 @@ export function coordinatorStopToken(holder: string) {
  * Completed model calls are already in the turn's response messages; only the
  * call in flight is lost when it aborts, so only its text is returned.
  */
-export async function stoppedStepText(parts: AsyncIterable<CoordinatorWorkflowStreamPart>, id: string): Promise<string> {
+export async function stoppedStepText(stream: ReadableStream<CoordinatorWorkflowStreamPart>, id: string): Promise<string> {
   let inTurn = false
   let quietEligible = false
   let text = ''
-  for await (const part of parts) {
-    const type: string = part.type
-    if (part.type === 'coordinator-turn-start') {
-      inTurn = part.id === id
-      quietEligible = part.quietEligible
-      text = ''
-    } else if (part.type === 'coordinator-turn-stopped') {
-      if (part.id === id) break
-    } else if (!inTurn) continue
-    else if (type === 'start-step' || part.type === 'reset-step') text = ''
-    else if (part.type === 'text-delta') text += part.text
-  }
+  const reader = stream.getReader()
+  try {
+    for (;;) {
+      const next = await reader.read()
+      if (next.done) break
+      const part = next.value
+      const type: string = part.type
+      if (part.type === 'coordinator-turn-start') {
+        inTurn = part.id === id
+        quietEligible = part.quietEligible
+        text = ''
+      } else if (part.type === 'coordinator-turn-stopped') {
+        if (part.id === id) break
+      } else if (!inTurn) continue
+      else if (type === 'start-step' || part.type === 'reset-step') text = ''
+      else if (part.type === 'text-delta') text += part.text
+    }
+  } finally { await reader.cancel().catch(() => undefined) }
   // A handoff turn may decline with the quiet sentinel; a partial one is not a reply.
   return quietEligible && QUIET_REPLY.startsWith(text.trim()) ? '' : text.trim()
 }
