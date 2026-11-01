@@ -326,7 +326,9 @@ const LABELS_KEY = 'workspace-labels'
 function LabelPicker({ t, mode, label = '', disabled, onSubmit }: { t: T; mode: 'add' | 'edit'; label?: string; disabled?: boolean; onSubmit: (label: string) => void }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(label)
-  const labels = useSWR(mode === 'edit' ? LABELS_KEY : null, listWorkspaceLabels).data ?? []
+  // 添加规则 lists the workspace's labels too: picking one adds the rule at once, and its row
+  // shows the 运行位置 / Agent / 模型 selects right away (ST20).
+  const labels = useSWR(mode === 'edit' || open ? LABELS_KEY : null, listWorkspaceLabels).data ?? []
   const trimmed = draft.trim()
   const current = findLabel(labels, label)
   // The saved name lists everything; typing narrows it.

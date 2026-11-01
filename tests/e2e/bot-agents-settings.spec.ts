@@ -127,6 +127,8 @@ test('Bot 与 Agents：规则标签从工作区已有标签中选，标签带颜
   await page.reload()
 
   await page.getByRole('button', { name: '添加规则', exact: true }).click()
+  // 添加规则 offers the workspace's labels to pick, as the label cell does.
+  await expect(page.getByRole('group', { name: '标签', exact: true }).getByRole('button', { name: '后端', exact: true })).toBeVisible()
   await page.getByRole('textbox', { name: '标签', exact: true }).fill('前端')
   await page.getByRole('button', { name: '添加', exact: true }).click()
   const cell = page.locator('[data-rule="前端"]').getByRole('button', { name: '前端 标签：前端', exact: true })
