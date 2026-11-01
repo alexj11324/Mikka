@@ -6,6 +6,7 @@ The key is sent only to the E2B API (by the SDK, and in the X-API-Key header of
 the publish call); it is never printed, logged or written to disk.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -20,19 +21,32 @@ E2B_API = 'https://api.e2b.app'
 # Everything the template packages. .github/workflows/e2b-template.yml triggers on these paths too.
 WORKER_PATHS = ('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
                 'packages/daemon', 'packages/protocol', 'packages/config', 'patches')
+# What else decides the template's contents: its bootstrap and the build steps below.
+RECIPE_PATHS = ('scripts/e2b/bootstrap.sh', 'scripts/e2b/build-template.py')
 
-def source_context(directory, ref):
-    """Copy only selected files from an immutable Git commit, never the worktree."""
+def commit(ref):
     sha = subprocess.check_output(['git', 'rev-parse', '--verify', f'{ref}^{{commit}}'], cwd=ROOT, text=True).strip()
     if not re.fullmatch(r'[0-9a-f]{40}', sha):
         raise ValueError('Invalid source commit')
+    return sha
+
+def worker_hash(ref):
+    """A 40-hex digest of the template's inputs at a commit: Git object ids of WORKER_PATHS and
+    RECIPE_PATHS. Commits that leave them alone give the same hash, so nothing is rebuilt."""
+    listing = subprocess.check_output(['git', 'ls-tree', '-r', commit(ref), '--', *WORKER_PATHS, *RECIPE_PATHS], cwd=ROOT)
+    return hashlib.sha1(listing).hexdigest()
+
+def source_context(directory, ref):
+    """Copy only selected files from an immutable Git commit, never the worktree."""
+    sha = commit(ref)
     files = subprocess.check_output(['git', 'ls-tree', '-r', '--name-only', sha, '--', *WORKER_PATHS], cwd=ROOT, text=True).splitlines()
     if any(re.search(r'(^|/)(\.env(?:\.|$)|\.npmrc$|\.git-credentials$)', path) for path in files):
         raise ValueError('Worker archive contains a credential configuration file')
     subprocess.run(['git', 'archive', '--format=tar', f'--output={directory / "worker.tar"}', sha, '--', *WORKER_PATHS], cwd=ROOT, check=True)
     bootstrap = subprocess.check_output(['git', 'show', f'{sha}:scripts/e2b/bootstrap.sh'], cwd=ROOT)
     (directory / 'bootstrap.sh').write_bytes(bootstrap)
-    (directory / 'source-sha').write_text(sha + '\n')
+    # The worker checks this against MIKKA_CLOUD_WORKER_SHA before it starts.
+    (directory / 'source-sha').write_text(worker_hash(sha) + '\n')
     return sha
 
 def build(name, ref='HEAD', api_key=None, on_build_logs=None):
@@ -77,17 +91,23 @@ def publish(template_id, build_id, api_key, opener=urllib.request.urlopen):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Build a versioned Mikka E2B template')
-    parser.add_argument('--name', required=True, help='New versioned template name; do not reuse the production alias')
+    parser.add_argument('--name', help='New versioned template name; do not reuse the production alias')
     parser.add_argument('--source-ref', default='HEAD', help='Git commit to package; defaults to HEAD')
     parser.add_argument('--public', action='store_true', help='Make the built template public and verify it is public and ready')
     parser.add_argument('--json', action='store_true', help='Print one JSON object on stdout; build logs go to stderr')
+    parser.add_argument('--worker-hash', action='store_true', help='Only print the worker hash of --source-ref; builds nothing')
     args = parser.parse_args(argv)
+    if args.worker_hash:
+        print(worker_hash(args.source_ref))
+        return
+    if not args.name:
+        parser.error('--name is required to build')
     api_key = os.environ.get('E2B_API_KEY')
     if not api_key:
         raise SystemExit('E2B_API_KEY is not set')
     logs = (lambda entry: print(entry, file=sys.stderr, flush=True)) if args.json else None
     sha, result = build(args.name, args.source_ref, api_key=api_key, on_build_logs=logs)
-    out = {'sourceCommit': sha, 'templateId': result.template_id, 'buildId': result.build_id, 'name': args.name}
+    out = {'sourceCommit': sha, 'workerSha': worker_hash(sha), 'templateId': result.template_id, 'buildId': result.build_id, 'name': args.name}
     if args.public:
         out.update(publish(result.template_id, result.build_id, api_key))
     if args.json:
