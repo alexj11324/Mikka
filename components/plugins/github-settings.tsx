@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
-import { openSettingsInBrowser } from '@/lib/platform/open-settings'
+import { openPathInBrowser } from '@/lib/platform/open-settings'
 import { FieldError } from '@/components/ui/field'
 
 type GitHubState = { viewerId: string; configured: boolean; connected: boolean; login?: string | null; installed: boolean; repositories: { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }[] }
@@ -16,6 +16,7 @@ type GitHubState = { viewerId: string; configured: boolean; connected: boolean; 
 type GitHubRead = { state: GitHubState; reconnect: false } | { state: null; reconnect: true }
 
 const githubKey = (userId: string) => ['integrations:github', userId] as const
+const CONNECT_PATH = withBasePath('/api/integrations/github/connect')
 
 async function readGitHub([, userId]: ReturnType<typeof githubKey>): Promise<GitHubRead> {
   const response = await fetch(withBasePath('/api/integrations/github'), { cache: 'no-store' })
@@ -75,11 +76,13 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
   async function linkGitHub() {
     setGithubLinking(true); setGithubLinkError('')
     try {
-      const handoff = await openSettingsInBrowser('integrations')
+      // The authorization has to finish in a real browser: the desktop hands it
+      // the GitHub start itself, which goes straight on to github.com.
+      const handoff = await openPathInBrowser(CONNECT_PATH)
       if (handoff === 'desktop') return
       if (handoff === 'unsupported') { setGithubLinkError(t('browserUpdateRequired')); return }
       // A plugin connection, not a sign-in link: it never touches the login identity.
-      window.location.assign(withBasePath('/api/integrations/github/connect'))
+      window.location.assign(CONNECT_PATH)
     } catch {
       setGithubLinkError(t('githubLinkFailed'))
     } finally {

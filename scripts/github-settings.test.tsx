@@ -53,6 +53,9 @@ const render = async () => { await act(async () => { root.render(<GitHubSettings
 const respond = async (index: number, viewerId: string, fullName: string) => {
   await act(async () => { requests[index].resolve(Response.json({ viewerId, configured: true, connected: true, installed: true, repositories: [{ id: fullName, fullName }] })) })
 }
+const respondNotConnected = async (index: number, viewerId: string) => {
+  await act(async () => { requests[index].resolve(Response.json({ viewerId, configured: true, connected: false, installed: false, repositories: [] })) })
+}
 const focus = async () => { await act(async () => { browser.dispatchEvent(new browser.Event('focus')) }) }
 
 test('unconfirmed and signed-out sessions neither request nor display GitHub repositories', async () => {
@@ -139,4 +142,35 @@ test('OAuth callback errors survive initial session confirmation and the keyed r
   await render()
   assert.ok(container.textContent?.includes('githubLinkFailed'))
   assert.equal(new URL(browser.location.href).searchParams.get('github'), null)
+})
+
+test('linking goes straight to the GitHub connect route, which redirects to github.com', async () => {
+  const assigned: string[] = []
+  const location = browser.location as unknown as { assign: (url: string) => void }
+  const original = location.assign
+  location.assign = url => { assigned.push(url) }
+  try {
+    userId = 'viewer-link'
+    await render()
+    await respondNotConnected(0, 'viewer-link')
+    const link = [...container.querySelectorAll('button')].find(button => button.textContent === 'githubLink')
+    assert.ok(link)
+    await act(async () => { link.click() })
+    assert.deepEqual(assigned, [`${process.env.MIKKA_BASE_PATH ?? ''}/api/integrations/github/connect`])
+    assert.ok(!assigned.some(url => url.includes('settings=')))
+  } finally { location.assign = original }
+})
+
+test('the desktop shell opens the GitHub connect route in the system browser, not a settings page', async () => {
+  const opened: string[] = []
+  Object.assign(browser, { mikka: { app: { version: '0.1.1', flavor: 'prod', runtime: 'electron', openExternal: async (url: string) => { opened.push(url) } } } })
+  try {
+    userId = 'viewer-desktop'
+    await render()
+    await respondNotConnected(0, 'viewer-desktop')
+    const link = [...container.querySelectorAll('button')].find(button => button.textContent === 'githubLink')
+    await act(async () => { link!.click() })
+    assert.equal(opened.length, 1)
+    assert.equal(new URL(opened[0]).pathname, `${process.env.MIKKA_BASE_PATH ?? ''}/api/integrations/github/connect`)
+  } finally { delete (browser as unknown as { mikka?: unknown }).mikka }
 })

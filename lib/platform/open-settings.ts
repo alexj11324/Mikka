@@ -24,7 +24,11 @@ export async function openCurrentPageInBrowser(
   return openPathInBrowser(`${pathname}${search}${hash}`, target)
 }
 
-async function openPathInBrowser(path: string, target: MikkaWindow | null | undefined): Promise<SettingsHandoff> {
+/** Opens one app path (an OAuth start, say) in the system browser from the desktop shell. */
+export async function openPathInBrowser(
+  path: string,
+  target: MikkaWindow | null | undefined = typeof window === 'undefined' ? null : window as MikkaWindow,
+): Promise<SettingsHandoff> {
   if (!target) return 'browser'
   const bridge = bridgeFromWindow(target)
   if (!bridge) return 'browser'
