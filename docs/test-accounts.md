@@ -81,6 +81,16 @@ external service keys). Start from an empty database: migrate, run
 outside the session scratchpad, whose permissions can change under a running
 server.
 
+The rule is one function, `localTestAccountsMode` in
+`packages/protocol/src/local-test-mode.ts`: `MIKKA_LOCAL_TEST_ACCOUNTS=1`, no
+`VERCEL` or `VERCEL_ENV`, `E2E_DATABASE_URL` set, and every configured database
+URL a loopback `*_e2e` database. The bootstrap, auth origins
+(`lib/auth-config.ts`), signup limits (`lib/abuse/signup.ts`), the daemon's
+`MIKKA_TEST_MODE` (`daemonTestMode`) and the MVP fixture all use it. The MVP
+specs (`pnpm test:e2e:mvp`) run locally with it plus `MIKKA_TEST_MODE=1` and
+`MIKKA_MVP_E2E=1`, still only against the loopback `mikka_e2e` database at
+`http://localhost:3100`.
+
 Browser specs then run against a server you started (`E2E_BASE_URL`), with the
 preinstalled Chromium as `launchOptions.executablePath` when the pinned
 Playwright browser is not installed.

@@ -106,7 +106,8 @@ test('signup IP uses the trusted Vercel header and finite overrides never mean u
 })
 
 test('local test mode defaults to CI\'s limits; production, Vercel and other databases keep 5 an hour', () => {
-  const local = { NODE_ENV: 'development', MIKKA_LOCAL_TEST_ACCOUNTS: '1', MIKKA_DATABASE_URL: 'postgresql://e2e@127.0.0.1:5432/mikka_e2e' }
+  const db = 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e'
+  const local = { NODE_ENV: 'development', MIKKA_LOCAL_TEST_ACCOUNTS: '1', E2E_DATABASE_URL: db, MIKKA_DATABASE_URL: db }
   assert.deepEqual(signupLimits(local), { signupIp: 1000, signupGlobal: 10000, verificationIp: 1000, verificationGlobal: 10000 })
   // An explicit limit still wins, so rate-limit tests set their own low ones.
   assert.equal(signupLimits({ ...local, MIKKA_SIGNUP_IP_HOURLY: '2' }).signupIp, 2)

@@ -19,11 +19,10 @@ test('a test-mode flag alone cannot enable the browser fixture on a deployment o
   ]) assert.equal(runTestFixture('mock', { ...isolated, ...patch }), undefined)
 })
 
-test('local mode (MIKKA_LOCAL_TEST_ACCOUNTS=1) assigns the recording only on the loopback mikka_e2e database', () => {
+test('local test mode stands in for the CI job only on the loopback mikka_e2e database (the rule: scripts/test-accounts/local-test-mode.test.mjs)', () => {
   const local = { ...isolated, CI: undefined, GITHUB_ACTIONS: undefined, MIKKA_LOCAL_TEST_ACCOUNTS: '1' }
   assert.equal(runTestFixture('mock', local), 'mvp-core-loop')
-  for (const remote of ['postgresql://u:p@db.example.com:5432/mikka_e2e', 'postgresql://u:p@ep-autumn-fire.neon.tech/mikka_e2e', 'postgresql://u:p@10.0.0.5/mikka_e2e', 'postgresql://u:p@127.0.0.1.example.com/mikka_e2e', 'postgresql://u:p@127.0.0.1/orvilo_mvp'])
-    assert.equal(runTestFixture('mock', { ...local, E2E_DATABASE_URL: remote, MIKKA_DATABASE_URL: remote, DATABASE_URL: remote }), undefined)
-  for (const patch of [{ MIKKA_LOCAL_TEST_ACCOUNTS: undefined }, { VERCEL: '1' }, { VERCEL_ENV: 'preview' }, { DATABASE_URL: 'postgresql://localhost/business' }])
+  const remote = 'postgresql://u:p@db.example.com:5432/mikka_e2e'
+  for (const patch of [{ MIKKA_LOCAL_TEST_ACCOUNTS: undefined }, { VERCEL_ENV: 'preview' }, { MIKKA_DATABASE_URL: remote }, { E2E_DATABASE_URL: remote, MIKKA_DATABASE_URL: remote, DATABASE_URL: remote }])
     assert.equal(runTestFixture('mock', { ...local, ...patch }), undefined)
 })

@@ -19,13 +19,12 @@ test('fixture refuses remote targets, split databases, native runtime and every 
   }
 })
 
-test('local mode replaces only the GitHub Actions requirement and refuses every non-local database', () => {
+test('local test mode replaces only the GitHub Actions requirement (the rule: scripts/test-accounts/local-test-mode.test.mjs)', () => {
   const local = { ...isolated, CI: undefined, GITHUB_ACTIONS: undefined, MIKKA_LOCAL_TEST_ACCOUNTS: '1' }
   assert.doesNotThrow(() => assertMvpEnvironment(local))
-  assert.throws(() => assertMvpEnvironment({ ...local, MIKKA_LOCAL_TEST_ACCOUNTS: undefined }))
-  for (const remote of ['postgresql://u:p@db.example.com:5432/mikka_e2e', 'postgresql://u:p@ep-autumn-fire.neon.tech/mikka_e2e', 'postgresql://u:p@10.0.0.5/mikka_e2e', 'postgresql://u:p@127.0.0.1/orvilo_mvp'])
-    assert.throws(() => assertMvpEnvironment({ ...local, E2E_DATABASE_URL: remote, MIKKA_DATABASE_URL: remote, DATABASE_URL: remote }), /loopback mikka_e2e/)
-  for (const patch of [{ MIKKA_TEST_MODE: '' }, { MIKKA_MVP_E2E: '' }, { VERCEL_ENV: 'preview' }, { VERCEL: '1' }, { E2E_BASE_URL: 'https://example.com' }])
+  const remote = 'postgresql://u:p@db.example.com:5432/mikka_e2e'
+  for (const patch of [{ MIKKA_LOCAL_TEST_ACCOUNTS: undefined }, { MIKKA_TEST_MODE: '' }, { VERCEL_ENV: 'preview' }, { E2E_DATABASE_URL: remote, MIKKA_DATABASE_URL: remote, DATABASE_URL: remote },
+    { E2E_DATABASE_URL: 'postgresql://ci:fixture@127.0.0.1:5432/other_e2e', MIKKA_DATABASE_URL: 'postgresql://ci:fixture@127.0.0.1:5432/other_e2e', DATABASE_URL: 'postgresql://ci:fixture@127.0.0.1:5432/other_e2e' }])
     assert.throws(() => assertMvpEnvironment({ ...local, ...patch }))
 })
 
