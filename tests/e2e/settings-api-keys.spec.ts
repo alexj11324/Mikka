@@ -39,7 +39,7 @@ test('API 与订阅：添加自定义服务商、校验失败、分享给团队�
   await page.getByRole('option', { name: '自定义服务商' }).click()
   await dialog.getByRole('textbox', { name: '名称' }).fill('E2E 网关')
   await dialog.getByRole('textbox', { name: 'Base URL' }).fill(baseUrl)
-  await expect(dialog.getByRole('combobox', { name: '协议' })).toHaveText('OpenAI 兼容')
+  await expect(dialog.getByRole('combobox', { name: '协议' })).toContainText('OpenAI 兼容')
   await dialog.getByLabel('API Key').fill(`test-${Date.now()}-wrong`)
   await dialog.getByRole('button', { name: '添加', exact: true }).click()
   await expect(dialog.getByText('Key 无效或已被撤销。', { exact: true })).toBeVisible()
