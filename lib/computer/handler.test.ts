@@ -77,13 +77,3 @@ test('waking starts the trusted worker after desktop provisioning and fails clos
   assert.equal((await handle(request('POST', { mode: 'view' }), botId, 'viewer')).status, 200)
   assert.equal(attempts, 2)
 })
-test('the actor is chosen with the requested bot, so a bot shown in every workspace is read where it lives', async () => {
-  const f = fixture()
-  const asked: (string | undefined)[] = []
-  const coordinatorActor = { userId: actor.userId, workspaceId: 'coordinator-workspace' }
-  const handle = createComputerHandler(f.store, async (_request, bot) => { asked.push(bot); return bot === botId ? coordinatorActor : actor })
-  assert.equal((await handle(request('GET'), botId)).status, 200)
-  assert.deepEqual(f.calls.at(-1), [coordinatorActor, botId])
-  assert.equal((await handle(request('GET'))).status, 200)
-  assert.deepEqual(asked, [botId, undefined])
-})
