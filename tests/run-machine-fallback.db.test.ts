@@ -50,9 +50,10 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
     return deviceId
   }
-  // No bot named: the person's Coordinator, an ordinary bot row the app resolves.
+  // No bot named: the Coordinator of the person's own workspace (each person here has one), as the app resolves it.
   const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
-  const dispatch = async (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, await chatBotId(userId, botId))
+  const ownWorkspace = async (userId: string) => (await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId"=$1 AND status=\'active\' LIMIT 1', [userId])).rows[0].workspaceId
+  const dispatch = async (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId ?? await chatBotId(userId, null, await ownWorkspace(userId)))
   type NoMachine = { error: string; card: { title: string; options: { value: string; action: string }[] } }
   const actions = (result: NoMachine) => result.card.options.map(option => option.action)
   const runOf = async (runId: string) => (await pool.query('SELECT "deviceId",status FROM agent_runs WHERE id=$1', [runId])).rows[0]

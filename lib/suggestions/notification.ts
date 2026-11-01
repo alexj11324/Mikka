@@ -49,6 +49,27 @@ function oneLine(text: string, max = TITLE_MAX) {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line
 }
 
+/**
+ * A comment's words as a person reads them: Markdown and HTML markup, link
+ * reference definitions (a bot's hidden metadata such as `[vc]: #…`) and
+ * comments taken out, one line. Empty when nothing readable is left.
+ */
+export function readableText(markdown: string): string {
+  return markdown
+    .replace(/<!--[\s\S]*?(-->|$)/g, ' ')
+    .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*$/gm, ' ')
+    .replace(/^ {0,3}(```|~~~)[^\n]*$/gm, ' ')
+    .replace(/<\/?[a-z][^>]*>/gi, ' ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\[[^\]]*\]/g, '$1')
+    .replace(/^ {0,3}(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/gm, '')
+    .replace(/(\*\*|__|~~|`)/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function date(...values: unknown[]): Date {
   for (const value of values) {
     if (value === undefined || value === null || value === '') continue
@@ -207,7 +228,7 @@ export function linearCommentNotification(recipient: LinearRecipient, payload: J
   const data = record(payload.data)
   if (payload.type !== 'Comment' || payload.action !== 'create') return null
   const id = str(data.id)
-  const body = str(data.body)
+  const body = readableText(str(data.body))
   if (!id || !body) return null
   const issue = record(data.issue)
   const actor = record(payload.actor)
@@ -246,10 +267,12 @@ export function githubCandidateIds(event: string, payload: Json): string[] {
 export function githubNotification(recipient: GitHubRecipient, event: string, payload: Json): ExternalNotification | null {
   const sender = record(payload.sender)
   const repo = str(record(payload.repository).full_name)
+  // A GitHub App posts as a Bot user named `<app>[bot]` (Vercel, GitGuardian, CI).
+  const bot = str(sender.type) === 'Bot' || str(sender.login).endsWith('[bot]')
   const common = {
     actor: str(sender.login) || null,
     fromSelf: str(sender.id) === recipient.githubId,
-    automated: str(sender.type) === 'Bot',
+    automated: bot,
   }
   const pr = record(payload.pull_request)
   const issue = record(payload.issue)
@@ -264,13 +287,19 @@ export function githubNotification(recipient: GitHubRecipient, event: string, pa
     const item = event === 'pull_request' ? pr : issue
     return base(recipient.userId, 'github', { ...common, matterKey: matter(item), externalId: `${repo}#${str(item.number)}:assigned:${str(item.updated_at)}`, action: 'handle', title: str(item.title), url: str(item.html_url) || null, occurredAt: date(item.updated_at), required: true, excerpt: `${repo}#${str(item.number)} ${str(item.title)}\n${str(item.body)}` })
   }
+  // A bot's comment or review is nobody to reply to.
+  if (bot && (event === 'issue_comment' || event === 'pull_request_review_comment' || event === 'pull_request_review')) return null
   if (event === 'issue_comment' && action === 'created' && isMe(issue.user)) {
     const comment = record(payload.comment)
-    return base(recipient.userId, 'github', { ...common, matterKey: matter(issue), externalId: `comment:${str(comment.id)}`, action: 'reply', title: str(comment.body), url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(issue.number)} ${str(issue.title)}\n${str(comment.body)}` })
+    const text = readableText(str(comment.body))
+    if (!text) return null
+    return base(recipient.userId, 'github', { ...common, matterKey: matter(issue), externalId: `comment:${str(comment.id)}`, action: 'reply', title: text, url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(issue.number)} ${str(issue.title)}\n${str(comment.body)}` })
   }
   if (event === 'pull_request_review_comment' && action === 'created' && isMe(pr.user)) {
     const comment = record(payload.comment)
-    return base(recipient.userId, 'github', { ...common, matterKey: matter(pr), externalId: `review_comment:${str(comment.id)}`, action: 'reply', title: str(comment.body), url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(pr.number)} ${str(pr.title)}\n${str(comment.body)}` })
+    const text = readableText(str(comment.body))
+    if (!text) return null
+    return base(recipient.userId, 'github', { ...common, matterKey: matter(pr), externalId: `review_comment:${str(comment.id)}`, action: 'reply', title: text, url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(pr.number)} ${str(pr.title)}\n${str(comment.body)}` })
   }
   if (event === 'pull_request_review' && action === 'submitted' && isMe(pr.user)) {
     const review = record(payload.review)

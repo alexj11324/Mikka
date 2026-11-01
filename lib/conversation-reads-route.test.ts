@@ -35,7 +35,7 @@ before(async () => {
   mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { pool: pool ?? stubPool, db: null } })
   // The route names the signed-in person's Coordinator bot; these people have none, so their chat is bot-less.
   mock.module(new URL('./coordinator/coordinator-bot.ts', import.meta.url).href, {
-    namedExports: { chatBotId: async (owner: string, botId: string | null) => { coordinatorLookups.push([owner, botId]); return null } },
+    namedExports: { openChatBotId: async (user: { id: string }, botId: string | null) => { coordinatorLookups.push([user.id, botId]); return null } },
   })
   route = await import('../app/api/conversations/[id]/read/route')
 })

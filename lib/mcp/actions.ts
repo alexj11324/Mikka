@@ -168,9 +168,12 @@ export async function listAgents(userId: string) {
   }))
 }
 
+/** An MCP client's OAuth grant names no workspace, so its work is the personal workspace's Coordinator's. */
+const MCP_WORKSPACE = null
+
 export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string }) {
   // A run an MCP client dispatches is the person's Coordinator's: its bot row is resolved here, where the run is created.
-  return attempt(async () => ({ status: 'queued', ...(await queueRun(userId, input, await chatBotId(userId, null), undefined, undefined, 'mcp')) }))
+  return attempt(async () => ({ status: 'queued', ...(await queueRun(userId, input, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }))
 }
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {
@@ -222,7 +225,7 @@ export async function listLabels(userId: string) {
 }
 
 export async function readMemory(userId: string) {
-  const botId = await chatBotId(userId, null)
+  const botId = await chatBotId(userId, null, MCP_WORKSPACE)
   const [session] = await db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, botId))).limit(1)
   return { memory: session?.memory ?? '' }
 }
@@ -231,12 +234,12 @@ export async function remember(userId: string, note: string) {
   return editMemory(userId, memory => {
     const next = rememberNote(memory, note)
     return next === null ? { error: 'memoryFull: forget something first' } : { memory: next, result: { remembered: true } }
-  }, await chatBotId(userId, null))
+  }, await chatBotId(userId, null, MCP_WORKSPACE))
 }
 
 export async function forget(userId: string, text: string) {
   return editMemory(userId, memory => {
     const { memory: next, removed } = forgetNotes(memory, text)
     return { memory: next, result: { removed } }
-  }, await chatBotId(userId, null))
+  }, await chatBotId(userId, null, MCP_WORKSPACE))
 }

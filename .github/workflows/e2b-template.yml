@@ -18,6 +18,11 @@ on:
   pull_request:
     paths: *template_paths
   workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even when the worker hash matches production
+        type: boolean
+        default: false
 permissions:
   contents: read
 # One release at a time. A newer main push waits instead of cancelling a build half way.
@@ -39,10 +44,48 @@ jobs:
       - run: python3 scripts/e2b/build-template.test.py
       - run: node --test scripts/e2b/publish-template-env.test.mjs
 
-  # Holds only E2B_API_KEY. Nothing below runs unless the template is built, public and ready.
-  build:
+  # Holds only the Vercel team token, to read production's current worker hash. A commit that
+  # leaves the template's inputs alone gives the same hash, and nothing below runs.
+  check:
     needs: test
     if: github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Read the Vercel team token through Infisical workload identity
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          include-imports: false
+      - name: Compare the worker hash with production
+        id: compare
+        run: |
+          wanted="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
+          live="$(node scripts/e2b/publish-template-env.mjs --current)"
+          echo "worker hash $wanted; production $live"
+          if [ "$wanted" = "$live" ] && [ "${{ inputs.force }}" != "true" ]; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+
+  # Holds only E2B_API_KEY. Nothing below runs unless the template is built, public and ready.
+  build:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -80,9 +123,10 @@ jobs:
           const out = JSON.parse(readFileSync(process.argv[2], 'utf8'))
           if (out.public !== true || out.buildStatus !== 'ready') throw new Error('Template is not public and ready')
           if (out.sourceCommit !== process.env.GITHUB_SHA) throw new Error('Template was built from another commit')
+          if (!/^[0-9a-f]{40}$/.test(out.workerSha)) throw new Error('Invalid worker hash')
           if (!/^[A-Za-z0-9_-]+$/.test(out.templateId)) throw new Error('Invalid template id')
-          appendFileSync(process.env.GITHUB_OUTPUT, `template-id=${out.templateId}\nsource-sha=${out.sourceCommit}\n`)
-          console.log(`template ${out.templateId} (${out.name}) from ${out.sourceCommit}: public, ready`)
+          appendFileSync(process.env.GITHUB_OUTPUT, `template-id=${out.templateId}\nsource-sha=${out.workerSha}\n`)
+          console.log(`template ${out.templateId} (${out.name}) from ${out.sourceCommit}, worker hash ${out.workerSha}: public, ready`)
           JS
 
   # Holds only the Vercel team token. Both variables change in one request, then production redeploys.

@@ -49,3 +49,24 @@ test('建议：卡片列表与 Coordinator 对话各占一半；发出的卡片�
   await expect(page.getByText('还没有 Artifact', { exact: true })).toBeVisible()
   await expect(rail(page, 'Artifact')).toHaveAttribute('aria-current', 'page')
 })
+
+test('建议：一张卡里很长的不换行文字不会撑宽左栏，右边的 Coordinator 对话仍在屏幕内', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 940 })
+  await register(page)
+  // A made-up unbroken run, as long as the hidden metadata a deploy bot's comment can carry.
+  const unbroken = `${randomUUID().replaceAll('-', '')}${'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo'.repeat(30)}`
+  await seedSuggestion(page, { source: 'github', title: unbroken })
+
+  await rail(page, '建议').click()
+  const card = page.locator('button[data-slot="suggestion-card"]').filter({ hasText: unbroken.slice(0, 32) })
+  await expect(card).toBeVisible()
+  const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
+  await expect(chat).toBeInViewport({ ratio: 1 })
+  const list = page.locator('section[aria-labelledby="suggestions-title"]')
+  const [listBox, chatBox] = await Promise.all([list.boundingBox(), page.locator('[data-slot="suggestions-coordinator"]').boundingBox()])
+  // Half and half, give or take the rule between them.
+  expect(Math.abs(listBox!.width - chatBox!.width)).toBeLessThanOrEqual(2)
+  expect(chatBox!.x + chatBox!.width).toBeLessThanOrEqual(1440)
+  expect(await card.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
