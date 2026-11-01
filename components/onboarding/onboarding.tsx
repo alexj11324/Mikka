@@ -42,6 +42,22 @@ const IDLE_MOVES: BotMood[] = ['wink', 'wide', 'play', 'hexagon']
 const BUBBLE_SPRING = { type: 'spring', stiffness: 520, damping: 27, mass: 0.52 } as const
 
 /**
+ * The Bot this guide created, kept for the tab so the guide can pick up after
+ * an app's sign-in reloads the page. Only that Bot resumes the guide: another
+ * Bot the person already has never stands in for it (R-06).
+ */
+const GUIDE_BOT_KEY = 'mikka:onboarding-bot'
+function rememberGuideBot(id: string | null) {
+  try {
+    if (id) sessionStorage.setItem(GUIDE_BOT_KEY, id)
+    else sessionStorage.removeItem(GUIDE_BOT_KEY)
+  } catch { /* storage blocked: the guide starts over after a reload */ }
+}
+function guideBotId(): string | null {
+  try { return sessionStorage.getItem(GUIDE_BOT_KEY) } catch { return null }
+}
+
+/**
  * The first-run guide: one conversation with the person's first Bot. It names
  * the Bot and picks its look, asks about the cloud computer, connects apps,
  * then shows the Bot on a welcome page. Leaving for an app's sign-in reloads
@@ -130,7 +146,8 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
   useEffect(() => {
     if (opened.current || bots === undefined) return
     opened.current = true
-    const existing = bots[0]
+    const remembered = guideBotId()
+    const existing = remembered ? bots.find(candidate => candidate.id === remembered) : undefined
     if (existing) {
       setBot(existing); setColor(existing.color as BotColor); setShape(existing.shape as BotShape); setStage('chat')
       void run(() => afterName(existing))
@@ -176,6 +193,7 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
     setBusy(true); setError('')
     try {
       const created = await createBot({ name: trimmed, color, shape })
+      rememberGuideBot(created.id)
       void mutate('bots')
       setBot(created)
       setCard(null)
@@ -276,6 +294,7 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
     closing.current = true
     setBusy(true)
     try { await completeOnboarding() } catch { /* the guide still closes; it shows again next time */ }
+    rememberGuideBot(null)
     onDone(bot)
   }
 
@@ -289,8 +308,9 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
     <div className="relative flex justify-end p-4">
       {card !== 'welcome' && <Button variant="ghost" size="sm" disabled={busy && closing.current} onClick={() => { void close() }}>{t('skip')}</Button>}
     </div>
-    {/* The Bot, the conversation and the current card sit together in the middle; a long conversation pushes the Bot up and then scrolls. */}
-    <div className="relative mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col justify-center gap-8 px-4 pb-16">
+    {/* The Bot, the conversation and the current card sit together in the middle; a long conversation pushes the Bot up and then scrolls.
+        One 600px column: the Bot's lines start at its left edge and the person's bubbles end at its right edge (R-39). */}
+    <div className="relative mx-auto flex min-h-0 w-full max-w-[632px] flex-1 flex-col justify-center gap-8 px-4 pb-16">
       <motion.div layout={reduce ? false : 'position'} transition={travel} className="flex shrink-0 flex-col items-center gap-2">
         <motion.div className="flex items-center justify-center" initial={false} animate={{ height: avatarPx }} transition={travel}>
           <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: avatarPx / 144 }} transition={travel}>
@@ -302,7 +322,7 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
         </AnimatePresence>
       </motion.div>
 
-      {stage !== 'welcome' && lines.length > 0 && <div ref={thread} aria-live="polite" className="flex min-h-0 flex-col gap-4 overflow-y-auto">
+      {stage !== 'welcome' && lines.length > 0 && <div ref={thread} aria-live="polite" className="flex min-h-0 w-full flex-col gap-4 overflow-y-auto">
         <AnimatePresence initial={false}>
           {lines.map(line => line.from === 'bot'
             ? <motion.p key={line.id} className="text-base" initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduce ? 0 : PACE.rise / 1000, ease: EASE_OUT }}>{line.text}</motion.p>

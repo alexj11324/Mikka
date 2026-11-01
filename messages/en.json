@@ -3898,7 +3898,7 @@
     "computerAsk": "I can use a cloud computer to browse the web and run code. Turn it on now?",
     "computerYes": "Turn on",
     "computerNo": "Not now",
-    "computerLater": "OK. You can add an E2B API key in Settings later.",
+    "computerLater": "You can turn on the cloud computer later in Settings.",
     "computerMember": "Once a workspace admin adds an E2B API key in Settings, I can use a cloud computer.",
     "keyLabel": "E2B API key",
     "keyLink": "Get a key from E2B",
