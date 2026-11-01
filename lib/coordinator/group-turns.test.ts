@@ -10,6 +10,7 @@ import { createGroupJudgment } from './group-judgment'
 import { DECISION_MODEL, type DecisionAnswer } from './decision'
 import type { DecisionExecution } from './decide'
 import { UnknownMentionError, routingInput } from './group-routing'
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
 const members: GroupAgent[] = [a,b].map((id,i) => ({ id, name: `Agent ${i}`, description: `role ${i}` }))
@@ -89,13 +90,9 @@ test('private routing rejects foreign/self/third peers and an unavailable writer
   assert.equal(writes, 1, 'the first authorized exchange remains, the third-peer response is never stored')
 })
 
-// Enforce the authorized ephemeral DB boundary, even if REQUIRE_DB is accidentally set locally.
-const dbURL = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' ? process.env.E2E_DATABASE_URL : undefined
-if (process.env.REQUIRE_DB === '1' && !dbURL) throw new Error('REQUIRE_DB=1 requires GitHub Actions ephemeral PG17')
-if (dbURL) {
-  const url = new URL(dbURL)
-  if (url.hostname !== '127.0.0.1' || url.pathname !== '/mikka_e2e') throw new Error('Only CI temporary mikka_e2e is allowed')
-}
+// Only a disposable loopback *_e2e database, even if REQUIRE_DB is set.
+const dbURL = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined
+if (process.env.REQUIRE_DB === '1' && !dbURL) throw new Error('REQUIRE_DB=1 requires a loopback *_e2e database')
 test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy', { skip: !dbURL }, async () => {
   const pool = new Pool({ connectionString: dbURL })
   const schema = `turns_${randomUUID().replaceAll('-','')}`

@@ -21,17 +21,16 @@ import {
 } from "./checks";
 import { createFactoryMonitor, monitorGate } from "./monitor";
 import { createLocalMonitorProbe } from "./monitor-probe";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const local = process.env.FACTORY_MONITOR_DISPATCH_TEST_URL;
 const dbURL =
   local ??
-  (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true"
-    ? process.env.E2E_DATABASE_URL
-    : undefined);
+  (disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined);
 if (dbURL) {
   const url = new URL(dbURL);
   assert.equal(url.hostname, "127.0.0.1");
-  assert.equal(url.pathname, "/mikka_e2e");
+  assert.ok(disposableDatabase(process.env, dbURL), "loopback *_e2e only");
   if (local) assert.equal(url.username, "factorydispatch192");
 }
 const binding = (t: FactoryTask) => ({

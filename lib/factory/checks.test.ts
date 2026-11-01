@@ -22,18 +22,17 @@ import {
 } from "./checks";
 import { factoryDispatchDatabase } from "./transaction";
 import { insertRunOnce } from "../run-dispatch";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const local = process.env.FACTORY_TEST_DATABASE_URL;
 const dbURL =
   local ??
-  (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true"
-    ? process.env.E2E_DATABASE_URL
-    : undefined);
-if (dbURL) {
-  const url = new URL(dbURL);
+  (disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined);
+if (local) {
+  const url = new URL(local);
   assert.equal(url.hostname, "127.0.0.1");
-  assert.equal(url.pathname, local ? "/factory193" : "/mikka_e2e");
-  if (local) assert.equal(url.port, "55493");
+  assert.equal(url.pathname, "/factory193");
+  assert.equal(url.port, "55493");
 }
 const binding = (t: FactoryTask): FactoryBinding => ({
   taskId: t.id,

@@ -7,17 +7,18 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 const old = '20261028020000_local_repository_defaults.sql'
 const current = '20261029022353_local_repository_defaults.sql'
 const baseline = '20261023221259_application_baseline.sql'
 const run = promisify(execFile)
 
-test('migration runner handles historical and new names without replay and rejects changed SQL', { skip: !process.env.PR359_MIGRATION_TEST_URL && process.env.REQUIRE_DB !== '1', timeout: 120000 }, async (t) => {
+test('migration runner handles historical and new names without replay and rejects changed SQL', { skip: !process.env.PR359_MIGRATION_TEST_URL && process.env.REQUIRE_DB !== '1' && !disposableDatabase(), timeout: 120000 }, async (t) => {
   const target = new URL(process.env.PR359_MIGRATION_TEST_URL || process.env.E2E_DATABASE_URL)
   assert.ok(['postgres:', 'postgresql:'].includes(target.protocol) && !target.search && !target.hash)
   assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname))
-  assert.ok(target.pathname === '/mikka_alias_test' || (process.env.CI === 'true' && target.pathname === '/mikka_e2e'))
+  assert.ok(target.pathname === '/mikka_alias_test' || disposableDatabase(process.env, target.toString()))
   const root = await mkdtemp(join(tmpdir(), 'pr359-migration-'))
   const admin = new Pool({ connectionString: target.toString() })
   const databases = []
