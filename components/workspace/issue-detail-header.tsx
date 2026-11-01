@@ -42,7 +42,8 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
         </BreadcrumbItem>
         <BreadcrumbItem className="hidden @2xl/header:inline-flex"><span className="min-w-0 max-w-40 truncate" title={workspaceName}>{workspaceName}</span></BreadcrumbItem>
         <BreadcrumbSeparator className="hidden @2xl/header:block" />
-        <BreadcrumbItem className="hidden @2xl/header:inline-flex"><Button variant="ghost" size="xs" disabled={pending} onClick={onClose}>{tDetail('breadcrumbBoard')}</Button></BreadcrumbItem>
+        {/* At the list's own size, colour and weight like the crumbs beside it: no button size of its own shrinks the text. */}
+        <BreadcrumbItem className="hidden @2xl/header:inline-flex"><Button variant="ghost" className="h-6 px-2 font-normal" disabled={pending} onClick={onClose}>{tDetail('breadcrumbBoard')}</Button></BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem className="min-w-0">
           {identifier ? <><BreadcrumbPage className="shrink-0">{identifier}</BreadcrumbPage>

@@ -119,7 +119,8 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
   return <section aria-label={detail?.name ?? t('title')} className="flex h-full min-h-0 flex-col">
     {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
       {back && <>
-        <Button variant="ghost" size="sm" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
+        {/* The way back reads at the title's size: no button size of its own shrinks it. */}
+        <Button variant="ghost" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
         <span aria-hidden="true" className="text-muted-foreground">/</span>
       </>}
       {detail && view && <ThreadStatusIcon status={view.status} waiting={view.waiting} />}
