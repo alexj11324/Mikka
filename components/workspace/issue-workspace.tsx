@@ -54,7 +54,7 @@ import { PluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import { ArtifactLibrary } from '@/components/artifacts/artifact-library'
 import { writeSectionQuery, type WorkspaceSection } from './workspace-navigation'
-import { pushSettingsHistory } from '@/lib/settings-navigation'
+import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest } from '@/lib/settings-navigation'
 import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
 import { fetchSettingsData } from '@/lib/settings-data'
@@ -247,6 +247,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const [typedAhead, setTypedAhead] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const search = usePresence(searchOpen)
+  // The search pill in Settings' window bar, when Settings was opened on its own URL (R-35).
+  useEffect(() => { if (takeShellSearchRequest()) setSearchOpen(true) }, [])
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
       if (event.isComposing || event.keyCode === 229 || boardBusy || settingsOpen || leaving.current) return
@@ -400,7 +402,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const pagerId = pendingSelection !== undefined ? pendingSelection : selected
   const pagerIndex = pagerId ? filtered.findIndex(task => task.id === pagerId) : -1
   // The rail leaves routed Settings for the app page, then opens the chosen destination there.
-  if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={destination => { if (pushSettingsHistory('/')) openRail(destination); else router.push('/') }} />
+  if (pathname.startsWith('/settings')) return <SettingsShell user={user} defaultWorkspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={destination => { if (pushSettingsHistory('/')) openRail(destination); else router.push('/') }}
+    onSearch={() => { if (pushSettingsHistory('/')) setSearchOpen(true); else { requestShellSearch(); router.push('/') } }} onBrowser={() => { showBrowser(true); if (!pushSettingsHistory('/')) router.push('/') }} />
   const isConversation = !selected && section === 'coordinator'
   const savedSessions = new Map((agentHistory?.sessions ?? []).map(session => [session.id, session]))
   for (const session of liveSessions) savedSessions.set(session.id, { ...session, preview: session.preview ?? savedSessions.get(session.id)?.preview })
@@ -415,7 +418,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('projects'); setTeamId(null); setProjectId(id) }) }} />}
   </>
   const leaveSettings = (destination: RailDestination) => { closeSettings(); openRail(destination) }
-  if (settingsOpen) return <SignOutBoundary pending={signingOut}><SettingsFrame user={user} onRail={leaveSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>
+  if (settingsOpen) return <SignOutBoundary pending={signingOut}><SettingsFrame user={user} onRail={leaveSettings} onSearch={() => { closeSettings(); setSearchOpen(true) }} onBrowser={() => { closeSettings(); showBrowser(true) }} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>
     <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
     {dialogs}
   </SettingsFrame></SignOutBoundary>
