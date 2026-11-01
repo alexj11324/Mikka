@@ -2,7 +2,15 @@ diff --git a/lib/util/browser.js b/lib/util/browser.js
 index 8121bc15babc99bb9483bba18e84f674e34f82d0..ccad9fe4d8bfb3fe2a95618c889838cb277758e4 100644
 --- a/lib/util/browser.js
 +++ b/lib/util/browser.js
-@@ -176,7 +176,11 @@ function _checkWebCodecsH264DecodeSupport2() {
+@@ -130,6 +130,7 @@ function _checkWebCodecsH264DecodeSupport2() {
+           decoder = new VideoDecoder({
+             output: function output(frame) {
+               gotframe = true;
++              frame.close();
+             },
+             error: function error(e) {
+               _error = e;
+@@ -176,7 +177,11 @@ function _checkWebCodecsH264DecodeSupport2() {
    }));
    return _checkWebCodecsH264DecodeSupport2.apply(this, arguments);
  }
