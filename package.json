@@ -103,7 +103,7 @@
     "test:cloud-limits": "node --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/snapshot-credentials.test.ts lib/cloud-computer/thread-worker-logs.test.ts",
     "test:cloud-backend-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/backend.db.test.ts lib/cloud-computer/unattended.db.test.ts lib/cloud-computer/thread-machine-task.db.test.ts",
     "test:accounts": "node scripts/test-accounts/cli.mjs",
-    "test:test-accounts": "node --test scripts/test-accounts/environment.test.mjs scripts/test-accounts/session.test.mjs scripts/test-accounts/evidence-content.test.mjs scripts/test-accounts/retained-session-plan.test.mjs scripts/test-accounts/browser-diagnostics.test.mjs scripts/test-accounts/browser-network.test.mjs",
+    "test:test-accounts": "node --test scripts/test-accounts/bootstrap.test.mjs scripts/test-accounts/environment.test.mjs scripts/test-accounts/session.test.mjs scripts/test-accounts/evidence-content.test.mjs scripts/test-accounts/retained-session-plan.test.mjs scripts/test-accounts/browser-diagnostics.test.mjs scripts/test-accounts/browser-network.test.mjs",
     "test:test-accounts-db": "node --test tests/test-account-pool.db.test.mjs",
     "test:test-accounts-http": "node scripts/test-accounts/run-http.mjs",
     "test:personal-message-safety": "node --import tsx --test lib/personal-agent-message.test.ts lib/coordinator/message-safety.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/message-safety-consumers.test.ts lib/coordinator/message-safety-ingress.test.ts lib/coordinator/message-safety-handler.test.ts",
