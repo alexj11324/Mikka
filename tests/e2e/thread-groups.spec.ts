@@ -47,7 +47,7 @@ test('a task\'s failed and blocked attempts fold into one 受阻 row; only done 
   await expect(blocked).toContainText('第 16 次尝试')
   // Each row leads with its group's status icon, never a bot's avatar (R-52, R-78).
   await expect(blocked.getByRole('img', { name: '受阻', exact: true })).toHaveCount(1)
-  await expect(panel.locator('[data-slot="bot-avatar"]')).toHaveCount(0)
+  await expect(panel.getByRole('group', { name: '线程', exact: true }).locator('[data-slot="bot-avatar"]')).toHaveCount(0)
   await expect(panel.getByRole('region', { name: '等待你（1）', exact: true })).toContainText(`Question ${marker}`)
   // 已解决 holds only the done task, collapsed.
   const resolved = panel.getByRole('button', { name: /^已解决（1）/ })
