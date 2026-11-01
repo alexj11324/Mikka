@@ -4015,6 +4015,7 @@
       "platform_paused": "Free allowance paused",
       "unavailable": "Mikka Default is unavailable",
       "verifyCard": "Verify card",
+      "useSubscription": "Use my {name} subscription",
       "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
     }
   },

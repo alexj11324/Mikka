@@ -7,7 +7,7 @@ import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
 import { settingsHref } from '@/lib/settings-sections'
-import { COMPOSER_NOTICE } from './chat-composer'
+import { COMPOSER_NOTICE } from './composer-notice'
 import type { SubscriptionRefusalNotice as Notice } from '@/lib/subscription-refusal'
 
 /**

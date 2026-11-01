@@ -12,7 +12,7 @@ import { settingsHref } from '@/lib/settings-sections'
 import type { BotModelMenu } from '@/lib/bot-model-menu-view'
 import type { QuotaSwitchNotice } from '@/lib/coordinator/message-safety'
 import { botModelMenuKey, openModelPicker } from './bot-model-picker'
-import { COMPOSER_NOTICE } from './chat-composer'
+import { COMPOSER_NOTICE } from './composer-notice'
 
 const PROVIDERS = ['anthropic', 'openai', 'deepseek', 'kimi'] as const
 

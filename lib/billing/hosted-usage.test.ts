@@ -47,3 +47,14 @@ test('the refusal line offers only what the person\'s state allows', () => {
   // Before the state is read, nothing is offered that may turn out wrong.
   assert.deepEqual(refusalOffer('verification_required', null), { transient: false, card: false, connect: false })
 })
+
+test('a refused turn moves to the person\'s own subscription: the first in the menu\'s order', async () => {
+  const { ownSubscriptionOption } = await import('../bot-model-menu-view')
+  const option = (id: string, provider: string) => ({ id, modelId: id, provider })
+  assert.equal(ownSubscriptionOption({ groups: [{ kind: 'hosted', options: [option('h', 'mikka')] }, { kind: 'shared', provider: 'claude', owner: '林二', options: [option('s', 'claude')] }] }), null, 'a teammate\'s shared subscription is not the person\'s own')
+  assert.deepEqual(ownSubscriptionOption({ groups: [
+    { kind: 'hosted', options: [option('h', 'mikka')] },
+    { kind: 'subscription', provider: 'claude', plan: 'Max', options: [option('opus', 'claude'), option('sonnet', 'claude')] },
+    { kind: 'subscription', provider: 'codex', plan: 'Pro', options: [option('gpt', 'codex')] },
+  ] }), { option: 'opus', provider: 'claude', plan: 'Max' })
+})
