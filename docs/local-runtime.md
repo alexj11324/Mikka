@@ -145,6 +145,8 @@ Not substituted:
 | PostHog | No key: every server flag reads off and kill switches read "not killed"; only the proactive profile feature (`mikka-proactive-profile`) stays hidden. The browser client's host is fixed to PostHog cloud, so a local flag service would need an application change. |
 | E2B cloud computers / cloud worker | `NEXT_PUBLIC_COMPUTER_MOCK=1` for the UI. Real runs would need a local container provider in place of `lib/computer/e2b-provider.ts`. |
 | Stripe checkout and webhooks | Billing pages say billing is not configured; the local credit above is what runs need. |
+| BYOS subscription worker and Infisical custody | Off (`MIKKA_BYOS_ENABLED` unset): subscription model routes answer `backend_unavailable`. |
+| Credential KMS (saved logins, `lib/credentials/kms.ts`) | Saving a login fails; decryption serves only E2B computers. |
 | Composio, Linear, Slack, Telegram, Firecrawl, Expo push, Turnstile | Off without their keys, with no effect on the loop. |
 
 `pnpm test:dev-local` covers the guard, the routing, the cron schedule and the
