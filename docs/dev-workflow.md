@@ -28,8 +28,9 @@ Debugging and pipeline runs use source, not builds:
 | Server | `pnpm dev` (`next dev`, via `scripts/dev-preview.mjs`) |
 | Daemon | `pnpm daemon` (`tsx` on `packages/daemon` source) |
 
-Use a production build (`pnpm build` then `next start`) only for production
-screenshots of a UI change, or for a spec that requires one.
+Use a production build (`next build` then `next start`) only for production
+screenshots of a UI change, or for a spec that requires one. Run `next build`
+directly (`pnpm exec next build`): `pnpm build` also runs lint and migrations.
 
 现状（非决定）：`playwright.config.ts` and `scripts/start-mvp-e2e.mjs` still
 start `next start`, so those specs need a build until they move to `next dev`.
@@ -78,6 +79,9 @@ Pull requests waiting to merge go in batches of five:
 5. The coordinator squash-merges the integration PR into `main`, then closes
    the original PRs with a link to it.
 
+Several small fixes go to an integration branch together and are pushed once,
+instead of a full CI round for each fix.
+
 `integration/` replaces the older `integrate/` prefix. 现状（非决定）：CI still
 matches `integrate/` (`browser-tests.yml`, `subagents.yml`,
 `scripts/ci-docs-only.mjs`).
@@ -113,3 +117,19 @@ public machine.
   or move it to the background with a timeout.
 - When the cause is unknown, and before any fix, read the tool's official
   documentation and put the link in the report.
+- Run long commands (builds, full suites, starting the dev server) in the
+  background with a notification and an explicit timeout. No foreground
+  `sleep` loops and no polling of log files.
+
+## 10. Do, then report
+
+Do not sit idle waiting for the coordinator. Anything within these rules,
+do it first and report after. Only real decisions (product direction,
+permissions, production changes) wait for an answer. Every report includes
+the next step you are taking, so the coordinator does not need to reply
+before you continue.
+
+## 11. CI is not a pause
+
+While CI runs, start the next task. When there is none, ask for one in the
+same message as the report.

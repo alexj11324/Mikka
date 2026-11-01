@@ -12,7 +12,8 @@
   - [2026-11-01-1201-e2b-template-public-auto-release](2026-11-01-1201-e2b-template-public-auto-release.md): branches are tested on a `-dev` template built from the branch, without waiting for the release from `main`.
   - `CONTRIBUTING.md` per-PR merging, and Preview deployments as the place to develop and accept (`docs/cloud-preview.md`).
 
-[`docs/dev-workflow.md`](../../dev-workflow.md) holds the rules:
+[`docs/dev-workflow.md`](../../dev-workflow.md) holds the rules (10–13 of the
+coordinator's list are folded in: 12 into § 5, 13 into § 2 and § 9):
 
 1. Build, run services and the daemon, and accept end to end locally. A PR can
    be opened any time and never blocks local verification. CI is only the final
@@ -20,7 +21,8 @@
    locally.
 2. Hot reload: `next dev` for the server and `tsx` on source for the daemon. A
    production build only for production screenshots of UI changes or specs that
-   need one.
+   need one, built with `next build` directly (`pnpm build` adds lint and
+   migrations).
 3. One-command setup (`scripts/dev/bootstrap-local.sh`): Node 24, PostgreSQL 17
    at `127.0.0.1:5433/mikka_e2e`, migrations, bubblewrap, socat and ripgrep;
    Playwright on `/opt/pw-browsers/chromium`, never `playwright install`.
@@ -28,7 +30,8 @@
    other CI variable; GitHub-runner-only suites stay in CI.
 5. Merge in batches of five through `integration/<date>-<n>`, joined with merge
    commits; stacked PRs by their top PR; UI screenshots reviewed first; the
-   coordinator squash-merges and closes the originals.
+   coordinator squash-merges and closes the originals. Several small fixes
+   are pushed to an integration branch together, not one CI round each.
 6. The coordinator assigns rule ids and migration timestamps at dispatch.
 7. Test worker changes on a branch `-dev` E2B template; never overwrite the
    production template or Vercel's production environment.
@@ -37,4 +40,9 @@
    it is, with no workaround and no production credentials on a public machine.
 9. Independent work runs in parallel with subagents; a step stalled for five
    minutes is stopped; unknown causes are checked against official docs, with
-   the link.
+   the link. Long commands run in the background with a notification and a
+   timeout, never a foreground sleep loop or log polling.
+10. Do, then report: anything within these rules is done first and reported
+    after; only product direction, permissions and production changes wait
+    for an answer. Every report names the next step.
+11. While CI runs, start the next task; with none, ask for one in the report.

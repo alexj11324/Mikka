@@ -103,7 +103,7 @@ more than once.
 
 - One Artifact page with all screenshots (light, dark, each state), the
   Figma frame beside each one, and the branch and commit SHA. Screenshots come
-  from a local production build (`pnpm build`, `next start`).
+  from a local production build (`next build`, `next start`).
   No piles of attachments.
 - Say which rules or frames you could not follow and why.
 
