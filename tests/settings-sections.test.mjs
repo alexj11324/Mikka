@@ -33,8 +33,9 @@ const UNBUILT = ['developer']
 test('members do not see admin-only sections; admins see every built one', () => {
   const member = visibleSettingsSections({ admin: false }).map(s => s.id)
   assert.equal(member.includes('permissions'), false)
-  for (const id of ['general', 'members', 'teams', 'computers', 'usage']) assert.equal(member.includes(id), true, id)
-  for (const id of ['secrets', 'audit', 'billing']) assert.equal(member.includes(id), false, id)
+  // 计费: members see 付款 only (their card designation and credit share; C19).
+  for (const id of ['general', 'members', 'teams', 'computers', 'usage', 'billing']) assert.equal(member.includes(id), true, id)
+  for (const id of ['secrets', 'audit']) assert.equal(member.includes(id), false, id)
   assert.deepEqual(visibleSettingsSections({ admin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id)).map(s => s.id))
 })
 
