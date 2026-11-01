@@ -15,12 +15,13 @@ import { MembersSettings } from '@/components/workspace/members-settings'
 import { pushSettingsHistory, requestShellBrowser, requestShellSearch } from '@/lib/settings-navigation'
 import { SearchPill } from '@/components/nav/global-search'
 import { BrowserToggle } from '@/components/browser/browser-toggle'
+import { workspaceLink } from '@/components/workspace/workspace-navigation'
 
 type RailMenu = { user: { name: string; email: string; image?: string | null }; onSettings: (href?: string) => void; onSignOut: () => void; signingOut: boolean }
 
 /** Where a rail item lands when it is chosen from Settings. */
 export function railHref(destination: RailDestination) {
-  return destination === 'chats' ? '/' : `/?section=${destination === 'board' ? 'all-issues' : destination}`
+  return workspaceLink({ section: destination === 'chats' ? 'coordinator' : destination === 'board' ? 'all-issues' : destination })
 }
 
 /**

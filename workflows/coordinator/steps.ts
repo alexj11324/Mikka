@@ -381,7 +381,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
       if (!previous) return dispatchByRules(userId, { ...request, note }, scope, botId, execution, requestEventId, approvedRepositoryKey, target)
       // The thread's next run goes where the thread ran, so its session can be resumed; elsewhere it starts fresh with the note's context.
       if (previous?.cloud && (previous.harness === 'codex' || previous.harness === 'claude_code')) {
-        const cloud = await dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId: request.issueId, harness: previous.harness, note, ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}) }, `thread:${previous.id}:${request.requestKey ?? requestEventId ?? crypto.randomUUID()}`, scope, execution)
+        const cloud = await dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId: request.issueId, harness: previous.harness, note, ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}), ...(request.readOnly || previous.readOnly ? { readOnly: true } : {}) }, `thread:${previous.id}:${request.requestKey ?? requestEventId ?? crypto.randomUUID()}`, scope, execution)
         if (!('error' in cloud)) return cloud
       } else if (previous?.remoteUrl) {
         // Read-only sticks: a read-only request, or a thread that runs read-only, gives a read-only next run.
@@ -479,7 +479,7 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
 }
 
 /** `dispatch_bot_computer`: on a task that has a thread, that thread's next work (lib/thread-dispatch.ts), on this Bot's computer. */
-export async function dispatchComputerThread(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; suggestionId?: string; newThread?: boolean; sourceEventId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, chatBotId?: string) {
+export async function dispatchComputerThread(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; suggestionId?: string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, chatBotId?: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
   const { newThread, sourceEventId, ...request } = input
@@ -487,7 +487,8 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
   return asToolResult(() => dispatchToTask(userId, request.issueId, {
     note: request.note, newThread,
     explicit: () => explicitNewThread(userId, chatBotId ?? request.botId, sourceEventId),
-    start: (previous, note) => dispatchComputerTask(userId, { ...request, note }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution),
+    // Read-only sticks across the thread's runs, as on a computer.
+    start: (previous, note) => dispatchComputerTask(userId, { ...request, note, ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution),
   }))
 }
 

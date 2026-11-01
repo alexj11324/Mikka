@@ -27,15 +27,17 @@ for (const [status, id] of Object.entries(RUNS)) sources[id] = run(id, status, `
 // The succeeded run was judged done (R-52): only then is it 已解决.
 sources[RUNS.succeeded] = { ...sources[RUNS.succeeded], outcome: 'done' } as CitationSource
 
-test('a thread chip shows its status and opens the thread\'s conversation; only a task chip opens the task', async () => {
-  const opened: { issues: string[]; threads: { issueId: string; runId: string }[] } = { issues: [], threads: [] }
+test('a thread chip shows its status and opens the thread beside the chat (?thread=); only a task chip opens the task', async () => {
+  const opened: { issues: string[]; moves: number } = { issues: [], moves: 0 }
+  const counted = () => { opened.moves++ }
+  browser.addEventListener('mikka:navigate', counted)
   const { AgentCitationsContext, CitationChip } = citations
   const container = browser.document.createElement('div') as unknown as HTMLElement
   document.body.append(container)
   const root = createRoot(container)
   await act(async () => {
     root.render(<NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}>
-      <AgentCitationsContext value={{ sources, previews: {}, onOpenIssue: id => { opened.issues.push(id) }, onOpenThread: thread => { opened.threads.push(thread) } }}>
+      <AgentCitationsContext value={{ sources, previews: {}, onOpenIssue: id => { opened.issues.push(id) } }}>
         <CitationChip id={TASK} kind="issue" />
         {Object.values(RUNS).map(id => <CitationChip key={id} id={id} kind="run" />)}
       </AgentCitationsContext>
@@ -52,12 +54,15 @@ test('a thread chip shows its status and opens the thread\'s conversation; only 
     assert.ok(threadChips[2].querySelector('svg')?.getAttribute('class')?.includes('text-success'))
     assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: Thread running')
     await act(async () => { threadChips[1].click() })
-    assert.deepEqual(opened.threads, [{ issueId: TASK, runId: RUNS.failed }])
+    // The thread's address, written through the navigation module; the workspace shows it in the right column (R-80).
+    assert.equal(new URL(browser.location.href).searchParams.get('thread'), RUNS.failed)
+    assert.equal(opened.moves, 1)
     assert.deepEqual(opened.issues, [], 'a thread chip never opens the task')
     await act(async () => { taskChip.click() })
     assert.deepEqual(opened.issues, [TASK])
-    assert.equal(opened.threads.length, 1)
+    assert.equal(opened.moves, 1)
   } finally {
+    browser.removeEventListener('mikka:navigate', counted)
     await act(async () => { root.unmount() })
     container.remove()
   }

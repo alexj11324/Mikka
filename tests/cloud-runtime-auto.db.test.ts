@@ -134,6 +134,37 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [g.id]), 0, 'no approval card')
   })
 
+  await t.test('read-only sticks when a cloud thread continues: a read-only ask on a writable thread, and a read-only thread asked again', async () => {
+    const r = await person('cloud-readonly-thread')
+    const definitionOf = async (runId: string) => (await pool.query(`SELECT r."agentDefinition",d.kind,(SELECT count(*)::int FROM run_publications p WHERE p."runId"=r.id) AS publications
+      FROM agent_runs r JOIN devices d ON d.id=r."deviceId" WHERE r.id=$1`, [runId])).rows[0]
+    type Continued = { runId: string; thread: string; threadId: string }
+    // Its own task numbers: another person's task 7 on octo/repo already holds that publication branch.
+    const work = await anotherTask(r.id, 31)
+    const writable = await dispatch(r.id, work, r.botId) as unknown as Continued
+    assert.equal((await definitionOf(writable.runId)).agentDefinition.repositoryAdmission?.authority, 'github_app', 'the thread starts writable')
+    await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [writable.runId])
+    const look = await steps.dispatchRun(r.id, { issueId: work, repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, r.botId) as unknown as Continued
+    assert.deepEqual([look.thread, look.threadId], ['continued', writable.runId])
+    const looked = await definitionOf(look.runId)
+    assert.deepEqual([looked.kind, looked.agentDefinition.readOnly, looked.agentDefinition.repositoryAdmission, looked.publications], ['cloud', true, undefined, 0])
+    await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [look.runId])
+    const again = await dispatch(r.id, work, r.botId) as unknown as Continued
+    assert.deepEqual([again.thread, again.threadId], ['continued', writable.runId])
+    const kept = await definitionOf(again.runId)
+    assert.deepEqual([kept.kind, kept.agentDefinition.readOnly, kept.agentDefinition.repositoryAdmission, kept.publications], ['cloud', true, undefined, 0], 'a read-only thread stays read-only')
+
+    // dispatch_bot_computer: a read-only first run, and its continuation, stay read-only.
+    const task = await anotherTask(r.id, 32)
+    const first = await steps.dispatchComputerThread(r.id, { botId: r.botId, issueId: task, harness: 'codex', readOnly: true }, `call-${randomUUID()}`, undefined, undefined, r.botId) as unknown as Continued
+    assert.equal(first.thread, 'new', JSON.stringify(first))
+    assert.deepEqual([(await definitionOf(first.runId)).agentDefinition.readOnly, (await definitionOf(first.runId)).agentDefinition.repositoryAdmission], [true, undefined])
+    await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [first.runId])
+    const next = await steps.dispatchComputerThread(r.id, { botId: r.botId, issueId: task, harness: 'codex', note: 'Look further.' }, `call-${randomUUID()}`, undefined, undefined, r.botId) as unknown as Continued
+    assert.deepEqual([next.thread, next.threadId], ['continued', first.runId])
+    assert.deepEqual([(await definitionOf(next.runId)).agentDefinition.readOnly, (await definitionOf(next.runId)).agentDefinition.repositoryAdmission], [true, undefined])
+  })
+
   await t.test('no E2B key of their own: no cloud runtime; the card, or the person\'s own auto-schedule device', async () => {
     const n = await person('no-key', false)
     const before = provisioned

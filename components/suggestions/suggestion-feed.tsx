@@ -96,7 +96,7 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
     </section>
     {/* Half and half until the line between them is dragged (decision 2026-11-01-1310). */}
     <ResizablePane data-slot="suggestions-coordinator" storageKey="mikka:suggestions-chat-width" min={320} max="70%" edge="start" from="md" label={tCommon('resize.suggestionsChat')}
-      className="hidden min-h-0 min-w-0 flex-1 flex-col border-l border-rule md:flex md:basis-1/2 has-data-[slot=thread-view]:[&_[data-slot=conversation-pill]]:hidden">
+      className="hidden min-h-0 min-w-0 flex-1 flex-col border-l border-rule md:flex md:basis-1/2">
       <ConversationPill name={tNav('coordinator')} avatar={<CoordinatorAvatar size="pill" />} />
       <CoordinatorChat onOpenIssue={onOpenIssue} />
     </ResizablePane>

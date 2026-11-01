@@ -458,3 +458,20 @@ describe("mikka daemon login (device authorization)", () => {
       .rejects.toThrow('Device login failed')
   })
 })
+
+describe('HttpServerLink.decide', () => {
+  const request = { purpose: 'command-action' as const, input: 'rm -rf build', questions: [{ type: 'predicate' as const, name: 'safe', instructions: 'Is it safe?' }] }
+  it('posts the request to the run decision route and keys answers by name', async () => {
+    const { fetch, calls } = scripted(() => json({ answers: [{ type: 'predicate', name: 'safe', probability: 0.9 }, { type: 'choice', name: 'level', choice: 'low' }] }))
+    const answers = await new HttpServerLink('http://server.test', fetch).decide('run/1', request)
+    expect(calls[0]).toMatchObject({ method: 'POST', path: '/v1/runs/run%2F1/decision', body: request })
+    expect(answers?.get('safe')).toEqual({ type: 'predicate', name: 'safe', probability: 0.9 })
+    expect(answers?.get('level')).toEqual({ type: 'choice', name: 'level', choice: 'low' })
+  })
+  it('returns null for no decision, a refusal, a server error or a malformed response', async () => {
+    for (const response of [() => json({ answers: null }), () => json({ error: 'decisionUnavailable' }, 409), () => json({}, 503), () => json({ answers: [{ type: 'predicate', name: 'safe' }] }), () => { throw new TypeError('offline') }]) {
+      const { fetch } = scripted(response)
+      expect(await new HttpServerLink('http://server.test', fetch).decide('run-1', request)).toBeNull()
+    }
+  })
+})
