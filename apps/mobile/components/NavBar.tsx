@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react'
-import { Platform } from 'react-native'
+import { Platform, Pressable } from 'react-native'
 import { Stack, useRouter } from 'expo-router'
 import { BackButton, Header, RoundButton } from '@/components/ui'
 
@@ -8,23 +8,36 @@ type SFSymbol = Extract<NonNullable<ComponentProps<typeof Stack.Toolbar.MenuActi
 
 export type BarButton = { icon: SFSymbol; label: string; onPress: () => void; web: ReactNode }
 export type BarMenu = { icon: SFSymbol; label: string; web: ReactNode; onOpen: () => void; items: { label: string; icon: SFSymbol; on?: boolean; onPress: () => void }[] }
-type BarItem = BarButton | BarMenu
+/** A drawn item, such as the person's avatar; it fills its own circle, without the bar's glass behind it. */
+export type BarView = { label: string; view: ReactNode; onPress: () => void }
+type BarItem = BarButton | BarMenu | BarView
 const list = (items?: BarItem | BarItem[]) => items === undefined ? [] : Array.isArray(items) ? items : [items]
 
 const ios = Platform.OS === 'ios'
 
-function NativeItem({ item }: { item: BarItem }) {
+// A plain function, not a component: the toolbar keeps only children whose type is Stack.Toolbar.Button or
+// Stack.Toolbar.Menu itself, and silently drops anything wrapped in another component.
+function nativeItem(item: BarItem) {
+  if ('view' in item) {
+    return (
+      <Stack.Toolbar.View key={item.label} hidesSharedBackground>
+        <Pressable accessibilityRole="button" accessibilityLabel={item.label} onPress={item.onPress} hitSlop={6}>{item.view}</Pressable>
+      </Stack.Toolbar.View>
+    )
+  }
   if ('items' in item) {
     return (
-      <Stack.Toolbar.Menu icon={item.icon} accessibilityLabel={item.label}>
+      <Stack.Toolbar.Menu key={item.label} icon={item.icon} accessibilityLabel={item.label}>
         {item.items.map(entry => <Stack.Toolbar.MenuAction key={entry.label} icon={entry.icon} isOn={entry.on} onPress={entry.onPress}>{entry.label}</Stack.Toolbar.MenuAction>)}
       </Stack.Toolbar.Menu>
     )
   }
-  return <Stack.Toolbar.Button icon={item.icon} accessibilityLabel={item.label} onPress={item.onPress} />
+  return <Stack.Toolbar.Button key={item.label} icon={item.icon} accessibilityLabel={item.label} onPress={item.onPress} />
 }
 
-const webItem = (item: BarItem) => <RoundButton key={item.label} label={item.label} onPress={'items' in item ? item.onOpen : item.onPress}>{item.web}</RoundButton>
+const webItem = (item: BarItem) => 'view' in item
+  ? <Pressable key={item.label} accessibilityRole="button" accessibilityLabel={item.label} onPress={item.onPress}>{item.view}</Pressable>
+  : <RoundButton key={item.label} label={item.label} onPress={'items' in item ? item.onOpen : item.onPress}>{item.web}</RoundButton>
 
 /**
  * The screen's top bar. On iOS it is the system navigation bar: transparent
@@ -66,8 +79,8 @@ export function NavBar({ title, titleView, left, right, back, large, search }: {
         headerLargeTitle: large,
         ...(search ? { headerSearchBarOptions: { placeholder: search.placeholder, hideWhenScrolling: false, onChangeText: event => search.onChange(event.nativeEvent.text), onCancelButtonPress: () => search.onChange('') } } : {}),
       }} />
-      {lefts.length ? <Stack.Toolbar placement="left">{lefts.map(item => <NativeItem key={item.label} item={item} />)}</Stack.Toolbar> : null}
-      {rights.length ? <Stack.Toolbar placement="right">{rights.map(item => <NativeItem key={item.label} item={item} />)}</Stack.Toolbar> : null}
+      {lefts.length ? <Stack.Toolbar placement="left">{lefts.map(nativeItem)}</Stack.Toolbar> : null}
+      {rights.length ? <Stack.Toolbar placement="right">{rights.map(nativeItem)}</Stack.Toolbar> : null}
     </>
   )
 }

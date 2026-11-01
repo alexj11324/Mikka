@@ -30,16 +30,22 @@ briefing in the morning and see what is waiting on me.
 
 ## Where it lives
 
-The system tab bar holds **对话** and **线程**
-([decision](decisions/2026-10-31-2345-mobile-bot-home.md)); the app opens on
-对话. A chat, a thread, 设置, 插件, 建议 and 任务 open over the tabs, with
-the system back button and edge swipe.
+The system tab bar holds **对话**, **线程** and the system search tab
+([decision](decisions/2026-10-31-2345-mobile-bot-home.md),
+[top bar and drawer](decisions/2026-11-01-0045-mobile-home-bar.md)); the app
+opens on 对话. A chat, a thread, 设置, 插件, 建议 and 任务 open over the tabs,
+with the system back button and edge swipe.
 
-**对话**: the Coordinator pinned on top (a star on its avatar), then every
-bot and group chat with its last line and time, newest first (the web bot
-list, R-01). The system search field filters by name. The bar's left menu
-opens 设置, 插件, 建议 and 任务. 「重启以更新」 sits at the top once an
-update has downloaded ([decision](decisions/2026-10-31-2010-ota-updates.md)).
+**对话** is a messaging app's chat list (Alex's Grok screenshot): no title and
+no search field at the top. The person's avatar (top left) opens the
+**drawer**: the person and workspace (→ 设置), 建议, 任务, 插件, 设置, and
+「重启以更新」 once an update has downloaded
+([decision](decisions/2026-10-31-2010-ota-updates.md)); a swipe right on a
+tab's root opens it too. 「+」 (top right) opens 新建 Bot and 新建群聊. The
+Coordinator is pinned on top (a star on its avatar), then every bot and group
+chat with its last line and time, newest first (the web bot list, R-01).
+**搜索** is the tab bar's search: its field sits at the bottom and matches
+bots and group chats by name.
 The Coordinator gets no other special UI (R-06).
 
 Controls are the system's where iOS has one
@@ -135,7 +141,7 @@ What reaches the person and when is R-20. On mobile:
 
 ## Settings
 
-Opened from 设置 in 对话's left menu. A hierarchy (R-70): the
+Opened from 设置 in the drawer. A hierarchy (R-70): the
 top screen holds categories, each opens its own page. Every row cites its
 precedent. Figma frames 07, 07a–07e.
 
