@@ -3411,12 +3411,11 @@
         "dueDate": "截止日期",
         "createdAt": "创建时间"
       },
-      "hiddenColumns": "隐藏的列",
+      "columns": "看板列",
       "hiddenLane": "已隐藏",
       "expandColumn": "展开{status}列",
       "foldColumn": "收起成窄条",
       "hideColumn": "隐藏此列",
-      "hideColumnNamed": "隐藏{status}列",
       "showColumn": "显示{status}列",
       "columnMenu": "{status}列选项",
       "newTask": "新建任务",
