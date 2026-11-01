@@ -4019,7 +4019,6 @@
     "computerYes": "Turn on",
     "computerNo": "Not now",
     "computerLater": "OK. You can add an E2B API key in Settings later.",
-    "computerMember": "Once a workspace admin adds an E2B API key in Settings, I can use a cloud computer.",
     "keyLabel": "E2B API key",
     "keyLink": "Get a key from E2B",
     "keyConnect": "Connect",

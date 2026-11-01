@@ -158,9 +158,12 @@ registers with `kind: "cloud"`, so the devices UI can exclude it.
 
 ### Secrets
 
-The E2B API key is the run owner's own key (today stored per workspace,
-moving to per person: [conflicts](research/2026-10-31-orchestration-conflicts.md) C21); there is no
-platform key in production ([hosted abuse controls](../backend/hosted-abuse-controls.md)).
+The E2B API key is the run owner's own key, stored per person (`user_e2b_keys`;
+[conflicts](research/2026-10-31-orchestration-conflicts.md) C21). Every E2B call
+resolves the sandbox's owner from its machine record, never the person asking. A
+key saved for a workspace before keys were personal is adopted by whoever saved
+it on first use. There is no platform key in production
+([hosted abuse controls](../backend/hosted-abuse-controls.md)).
 The server reads it; it is never handed to the model or to the sandbox. A
 platform `E2B_API_KEY` exists only for isolated acceptance.
 

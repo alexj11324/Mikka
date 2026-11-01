@@ -86,13 +86,17 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
   const t = useTranslations('Settings.integrations')
   const common = useTranslations('Common')
   // Cached across visits: a revisit shows the last state at once and re-checks it behind.
-  // Every mount asks GitHub again (no deduping). Focus never does: what is shown
+  // Every mount asks GitHub again, exactly once. Focus never does: what is shown
   // stays until the person's own action or a finished hand-off reads again.
-  const { data, error, isLoading, mutate } = useSWR(userId ? githubKey(userId) : null, readGitHub, { revalidateOnFocus: false, shouldRetryOnError: false, dedupingInterval: 0 })
+  // SWR's own mount re-check is off: with a cached answer it waits a frame and
+  // is deduplicated against the read before it, whose entry clears on a 0 ms
+  // timer, so a quick revisit could skip the read. A mount effect reads instead.
+  const { data, error, mutate } = useSWR(userId ? githubKey(userId) : null, readGitHub, { revalidateOnMount: false, revalidateOnFocus: false, shouldRetryOnError: false, dedupingInterval: 0 })
+  useEffect(() => { if (userId) void mutate() }, [userId, mutate])
   const permissions = useSWR(userId ? permissionsKey(userId) : null, fetchPermissions, { revalidateOnFocus: false, shouldRetryOnError: false })
   const githubState = error ? null : data?.state ?? null
   const githubReconnect = !error && Boolean(data?.reconnect)
-  const githubLoading = isPending || isLoading
+  const githubLoading = isPending || (Boolean(userId) && !data && !error)
   const githubError = error ? t('githubLoadFailed') : githubReconnect ? t('githubReconnectRequired') : ''
   const [githubLinking, setGithubLinking] = useState(false)
   const [githubLinkError, setGithubLinkError] = useState('')
