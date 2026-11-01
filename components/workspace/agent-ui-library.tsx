@@ -22,6 +22,7 @@ import { Tabs as BeTabs, TabsContent as BeTabsContent, TabsList as BeTabsList, T
 import { AgentAreaChart, AgentBarChart, AgentDonutChart, AgentLineChart, AgentRadialChart } from './agent-chart'
 import { AgentCitations, AgentFileDiff, AgentFileTree, AgentTable } from './agent-report'
 import { AgentEditableTable } from './agent-editable-table'
+import { AgentSteps } from './agent-steps'
 
 const renderers = {
   TextContent: AgentTextContent,
@@ -44,15 +45,13 @@ const renderers = {
   },
   BeStat: ({ props }) => {
     const formatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: props.precision ?? 0, maximumFractionDigits: props.precision ?? 0 })
-    // Figures in a row share the width equally (flex-1 basis-0); label 12/16 muted, value 20/28 SemiBold, unit 13 muted (R-32).
-    return <BeCard size="compact" className="min-w-0 flex-1 basis-0">
-      <BeCardContent className="flex min-w-0 flex-col gap-1">
-        <p className="text-xs text-muted-foreground">{props.label}</p>
-        <p className="text-xl font-semibold tabular-nums">
-          <span aria-hidden="true"><AnimatedNumber value={props.value} format={value => formatter.format(value)} />{props.unit && <span className="ml-0.5 text-[13px] font-normal text-muted-foreground">{props.unit}</span>}</span>
-          <span className="sr-only">{formatter.format(props.value)}{props.unit}</span>
-        </p>
-      </BeCardContent>
+    // Figures in a row share the width equally (flex-1 basis-0); label 12/16 muted, value 20/28 SemiBold, unit muted (R-32).
+    return <BeCard size="compact" className="min-w-0 flex-1 basis-0 gap-1">
+      <BeCardHeader><p className="text-xs text-muted-foreground">{props.label}</p></BeCardHeader>
+      <BeCardContent><p className="text-xl font-semibold tabular-nums">
+        <span aria-hidden="true"><AnimatedNumber value={props.value} format={value => formatter.format(value)} />{props.unit && <span className="ml-0.5 text-sm font-normal text-muted-foreground">{props.unit}</span>}</span>
+        <span className="sr-only">{formatter.format(props.value)}{props.unit}</span>
+      </p></BeCardContent>
     </BeCard>
   },
   // No suggestion cards in a chat (R-12): saved follow-ups draw nothing; agent-follow-ups.tsx stays in the library.
@@ -120,4 +119,6 @@ const block = <Render,>(name: string, render: Render): Render => FLOW.has(name) 
   : ((input: object) => { const Block = render as (props: object) => React.ReactNode; return <InsideBlock value><Block {...input} /></InsideBlock> }) as Render
 const blocks = Object.fromEntries(Object.entries({ ...renderers, ...legacyRenderers }).map(([name, render]) => [name, block(name, render)])) as typeof renderers & typeof legacyRenderers
 
-export const agentUILibrary = createAgentLibrary(blocks, block)
+// OpenUI built-ins the host draws itself, under OpenUI's own name and schema.
+const builtIns: Record<string, unknown> = { Steps: AgentSteps }
+export const agentUILibrary = createAgentLibrary(blocks, (name, render) => block(name, (builtIns[name] as typeof render | undefined) ?? render))
