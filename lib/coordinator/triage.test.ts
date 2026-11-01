@@ -69,9 +69,9 @@ test('the morning briefing is pushed to the person once a day', () => {
   const event = briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'daily', total: 4, counts: { gmail: 3, linear: 1 } }, [
     { suggestionId: 's1', source: 'linear', action: 'handle', title: 'Fix login', actor: 'Dana', url: 'https://linear.app/x/issue/MIK-9', required: true },
     { suggestionId: 's2', source: 'gmail', action: 'reply', title: 'Thursday agenda', actor: null, url: null, required: false },
-  ])
+  ], null, 'c0000000-0000-4000-8000-0000000c0de9')
   assert.equal(event.dedupeKey, 'daily_briefing:u1:2026-10-27:daily')
-  assert.notEqual(briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'first', total: 1, counts: {} }, []).dedupeKey, event.dedupeKey)
+  assert.notEqual(briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'first', total: 1, counts: {} }, [], null, 'c0000000-0000-4000-8000-0000000c0de9').dedupeKey, event.dedupeKey)
   const tier = 'attention' as const // This projection fixture supplies a completed model decision.
   const prompt = eventPrompt({ ...event, tier })
   assert.match(prompt, /^\[Event\] It is 08:00 for the person: their morning briefing for 2026-10-27\. 4 item\(s\)/)
@@ -82,10 +82,10 @@ test('the morning briefing is pushed to the person once a day', () => {
   assert.match(prompt, /早上好，Alex。今天有 4 件事/)
   assert.match(prompt, /one message/)
   assert.doesNotMatch(prompt, /The person's name/)
-  assert.match(eventPrompt({ ...briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'daily', total: 1, counts: {} }, [], 'Alex Jiang'), tier }), /The person's name: Alex Jiang\./)
+  assert.match(eventPrompt({ ...briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind: 'daily', total: 1, counts: {} }, [], 'Alex Jiang', 'c0000000-0000-4000-8000-0000000c0de9'), tier }), /The person's name: Alex Jiang\./)
   assert.deepEqual((event.payload.items as { suggestionId: string }[]).map(item => item.suggestionId), ['s1', 's2'])
   for (const kind of ['daily', 'first'] as const) {
-    const content = eventPrompt({ ...briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind, total: 4, counts: { gmail: 3, linear: 1 } }, event.payload.items as Parameters<typeof briefingEvent>[1]), tier })
+    const content = eventPrompt({ ...briefingEvent({ userId: 'u1', localDate: '2026-10-27', kind, total: 4, counts: { gmail: 3, linear: 1 } }, event.payload.items as Parameters<typeof briefingEvent>[1], null, 'c0000000-0000-4000-8000-0000000c0de9'), tier })
     const rows: (StoredMessage & { createdAt: Date; pending?: true })[] = [
       { position: 1, createdAt: new Date(0), message: { role: 'assistant', content: 'Yesterday’s reply.' } },
       { position: 2, createdAt: new Date(1), pending: true, message: { role: 'user', content } },

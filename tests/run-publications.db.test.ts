@@ -458,20 +458,22 @@ test('run result publication commits one owner-scoped result through retries and
       await pool.query('update devices set "protocolVersion"=3 where id=$1', [f.deviceId])
       const input = { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl }
       const eventId = randomUUID()
-      await pool.query('insert into coordinator_events (id,"userId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,\'user_message\',$5,$3,$4,now())', [eventId, f.userId, f.issueId, JSON.stringify({ text: 'Synthetic owner task; no provider invocation', taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + eventId])
+      // The person's Coordinator is an ordinary bot row in their workspace; the request is in its chat.
+      const {seedWorkspace}=await import('./support/workspace-admin-db')
+      const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])
+      const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null)
+      await pool.query('insert into coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,$6,\'user_message\',$5,$3,$4,now())', [eventId, f.userId, f.issueId, JSON.stringify({ text: 'Synthetic owner task; no provider invocation', taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + eventId, coordinator])
       const before = Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n)
-      await assert.rejects(queueRun(f.userId, input, null, undefined, eventId), /runInvalid/, 'ask cannot execute before its human decision')
-      const proposal = await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }, { eventId, botId: null })
+      await assert.rejects(queueRun(f.userId, input, coordinator, undefined, eventId), /runInvalid/, 'ask cannot execute before its human decision')
+      const proposal = await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }, { eventId, botId: coordinator })
       assert.ok('actionId' in proposal && proposal.actionId)
-      assert.deepEqual(await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }, { eventId, botId: null }), proposal)
+      assert.deepEqual(await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }, { eventId, botId: coordinator }), proposal)
       assert.equal((await decidePendingAction(f.userId, proposal.actionId, true)).status, 'done')
       const { takeInbox } = await import('../lib/coordinator/store')
-      assert.equal((await takeInbox(f.userId,'retained-admission-suite')).added,0,'a decision event remains pending without model classification')
+      assert.equal((await takeInbox(f.userId,'retained-admission-suite',coordinator)).added,0,'a decision event remains pending without model classification')
       // This PG suite disables Coordinator/model network execution. Supply a
       // declared provider substitute through the real triage client and CAS;
       // do not turn an action_decided event into an automatic runtime tier.
-      const {seedWorkspace}=await import('./support/workspace-admin-db')
-      const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])
       const {hostedUsage}=await import('../lib/abuse/runtime')
       await hostedUsage.verify(workspace.id,'cus_synthetic_admission',`card_admission_${randomUUID()}`)
       const { triageInbox } = await import('../lib/coordinator/wake')
@@ -487,13 +489,13 @@ test('run result publication commits one owner-scoped result through retries and
         decisions++
         return Response.json({model:DECISION_MODEL,provider_metadata:{gateway:{generationId:`synthetic-admission-${decisions}`,cost:'0.001'}},answers:[{type:'choice',name:'tier',choice:'result'}]})
       }) as typeof fetch
-      try {await triageInbox(f.userId);assert.equal(decisions,1)}
+      try {await triageInbox(f.userId,coordinator);assert.equal(decisions,1)}
       finally {globalThis.fetch=originalFetch;if(originalDecisionKey===undefined)delete process.env.DECISION_GATEWAY_API_KEY;else process.env.DECISION_GATEWAY_API_KEY=originalDecisionKey}
-      const resumed = await takeInbox(f.userId, 'retained-admission-suite')
+      const resumed = await takeInbox(f.userId, 'retained-admission-suite', coordinator)
       assert.equal(resumed.taskEventId, eventId, 'approval resumes the original host request, without asking the model for its event ID')
       assert.equal(resumed.approvedRepositoryKey, f.remoteKey)
-      await assert.rejects(queueRun(f.userId, { ...input, repo: 'different/repository' }, null, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey), /runInvalid/)
-      const admitted = await Promise.all([queueRun(f.userId, input, null, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey), queueRun(f.userId, input, null, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey)])
+      await assert.rejects(queueRun(f.userId, { ...input, repo: 'different/repository' }, coordinator, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey), /runInvalid/)
+      const admitted = await Promise.all([queueRun(f.userId, input, coordinator, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey), queueRun(f.userId, input, coordinator, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey)])
       assert.equal(admitted[0].runId, admitted[1].runId, 'host replay cannot enqueue a second execution')
       const runId = admitted[0].runId
       const accepted = (await pool.query('select * from agent_runs where id=$1', [runId])).rows[0]
@@ -520,7 +522,7 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal(Number((await pool.query('select count(*) as n from run_messages where "runId"=$1', [legacyRun])).rows[0].n), 0)
       await assert.rejects(sendOwnedRunMessage(db, f.userId, { runId: f.runId, text: 'Finished runs cannot be reopened' }), /runNotFound/)
       assert.equal(Number((await pool.query('select count(*) as n from run_messages where "runId"=$1', [runId])).rows[0].n), 1)
-      assert.deepEqual(await queueRun(f.userId, input, null, undefined, eventId), { runId }, 'old host replay preserves the already accepted execution')
+      assert.deepEqual(await queueRun(f.userId, input, coordinator, undefined, eventId), { runId }, 'old host replay preserves the already accepted execution')
       assert.equal((await prepareRunPublication(accepted, f.remoteUrl)).policy.permissions.git_push, 'allow', 'old admitted scope survives later revocation')
       await assert.rejects(prepareRunPublication({ ...accepted, deviceId: randomUUID() }, f.remoteUrl), /does not match/)
       const nextIssue = randomUUID(), nextEvent = randomUUID()

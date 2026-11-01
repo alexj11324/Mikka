@@ -2,7 +2,7 @@ import 'server-only'
 import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { pendingActions } from '@/lib/db/schema'
+import { agentRuns, pendingActions } from '@/lib/db/schema'
 import { PENDING_ACTION_TTL_MS } from '@/lib/pending-action-view'
 
 /**
@@ -37,7 +37,9 @@ export async function pullRequestApproval(userId: string, raw: PullRequestApprov
       gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS)),
       sql`${pendingActions.input}->>'runId' = ${input.runId}`,
     )).limit(1)
-    if (!waiting) await tx.insert(pendingActions).values({ id: crypto.randomUUID(), userId, action: PULL_REQUEST_APPROVAL, input })
+    // The card goes back to the chat of the bot that dispatched the run.
+    const [run] = waiting ? [] : await tx.select({ botId: agentRuns.botId }).from(agentRuns).where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId))).limit(1)
+    if (!waiting) await tx.insert(pendingActions).values({ id: crypto.randomUUID(), userId, botId: run?.botId ?? null, action: PULL_REQUEST_APPROVAL, input })
     return 'awaiting'
   })
 }

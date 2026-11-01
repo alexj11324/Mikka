@@ -5,6 +5,8 @@ import { asSchema } from "ai";
 import { makeSnapshot } from "../agent-kit/definition";
 import { DEFAULT_AGENT_DEFINITION } from "../agent-kit/builtin";
 import type { AgentExecution } from "../agent-kit/store";
+/** The person's Coordinator: an ordinary bot row, marked as the Coordinator. */
+const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
 
 const calls: unknown[][] = [];
 mock.module("@/workflows/coordinator/steps", {
@@ -115,13 +117,13 @@ test("registration does not widen a frozen grant or enable default-off recovery"
     };
     assert.deepEqual(
       Object.keys(
-        registry.coordinatorTools("owner", null, undefined, { execution }),
+        registry.coordinatorTools("owner", COORDINATOR_BOT, undefined, { coordinator: true,  execution }),
       ),
       ["get_issue"],
     );
     process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = "0";
     assert.equal(
-      registry.createCoordinatorRegistry("owner", null).recover_factory_check,
+      registry.createCoordinatorRegistry("owner", COORDINATOR_BOT, undefined, { coordinator: true }).recover_factory_check,
       undefined,
     );
   } finally {

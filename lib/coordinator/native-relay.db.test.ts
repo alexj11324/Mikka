@@ -44,6 +44,8 @@ before(async () => {
 })
 after(async () => { await pool?.end(); await admin?.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin?.end() })
 
+/** The person's Coordinator: an ordinary bot row (this isolated schema has no bots table). */
+const COORDINATOR_BOT='c1000000-0000-4000-8000-0000000c0de1'
 for (const revoked of ['device','lease','deadline','failed','closed'] as const) {
   test(`relay stops the remaining batch after ${revoked} revocation`, { skip: !url }, async () => {
     const userId=randomUUID(),deviceId=randomUUID(),holder=randomUUID()
@@ -66,7 +68,7 @@ for (const revoked of ['device','lease','deadline','failed','closed'] as const) 
         else await store!.close(userId,holder,turnId)
         return {remembered:true}
       },
-    })})),/ExpiredOrLeaseLost/)
+    })}),COORDINATOR_BOT),/ExpiredOrLeaseLost/)
     assert.deepEqual(effects,['first'])
   })
 }

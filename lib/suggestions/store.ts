@@ -45,8 +45,10 @@ export async function ingestNotifications(incoming: readonly ExternalNotificatio
     const earlier = same ?? (continuesId ? await matterContext(notification.userId, continuesId) : null)
     const level = continuedLevel(score.level, earlier)
     const id = randomUUID()
+    // A suggestion is the person's Coordinator's: its bot row is stored now, so sending it later resolves nothing.
+    const { botId } = await (await import('@/lib/coordinator/coordinator-bot')).coordinatorBot(notification.userId)
     const [stored] = await db.insert(suggestions).values({
-      id, userId: notification.userId, source: notification.source, externalId: notification.externalId, matterKey: notification.matterKey,
+      id, userId: notification.userId, botId, source: notification.source, externalId: notification.externalId, matterKey: notification.matterKey,
       action: notification.action, title: notification.title, url: notification.url, actor: notification.actor,
       shown: level !== 'low', decidedBy: score.decidedBy, level, required: notification.required,
       occurredAt: notification.occurredAt,
@@ -116,7 +118,9 @@ async function pushBriefing(row: Briefing): Promise<boolean> {
   if (!row.total) return false
   const items = (await briefingHighlights(row.userId, row.highlights)).map(item => ({ suggestionId: item.id, source: item.source, action: item.action, title: displayTitle(item), actor: item.actor, url: item.url, required: item.required }))
   const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, row.userId)).limit(1)
-  await recordCoordinatorEvent(db, briefingEvent({ ...row, counts: row.counts as Record<string, number> }, items, person?.name?.trim() || null))
+  // A briefing enters the person's Coordinator chat: its bot row is resolved here.
+  const { botId } = await (await import('@/lib/coordinator/coordinator-bot')).coordinatorBot(row.userId)
+  await recordCoordinatorEvent(db, briefingEvent({ ...row, counts: row.counts as Record<string, number> }, items, person?.name?.trim() || null, botId))
   return true
 }
 

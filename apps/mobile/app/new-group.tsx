@@ -21,7 +21,8 @@ import { colors, font } from '@/lib/theme'
 export default function NewGroup() {
   const router = useRouter()
   const home = useHome()
-  const bots = home.data?.bots ?? []
+  // A group is made of the person's own bots, as before the Coordinator had a bot row.
+  const bots = (home.data?.bots ?? []).filter(bot => !bot.coordinator)
   const [title, setTitle] = useState('')
   const [picked, setPicked] = useState<string[]>([])
   const [busy, setBusy] = useState(false)

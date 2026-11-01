@@ -1,3 +1,4 @@
+import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import { and, eq, isNull } from 'drizzle-orm'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { db } from '@/lib/db'
@@ -36,11 +37,12 @@ async function handleGET(request: Request) {
   const user = await mobileUser(request)
   noteLogUser(user?.id)
   if (!user) return unauthorized()
+  const coordinator = await chatBotId(user.id, null)
   const [context, preferences, [session], apps] = await Promise.all([
     loadWorkspaceContext(undefined, user),
     readPreferences(user.id),
     db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions)
-      .where(and(eq(coordinatorSessions.userId, user.id), isNull(coordinatorSessions.botId))).limit(1),
+      .where(and(eq(coordinatorSessions.userId, user.id), eq(coordinatorSessions.botId, coordinator))).limit(1),
     connectedApps(user.id),
   ])
   return json({

@@ -20,7 +20,7 @@ async function refusalIsFinal<T>(work: Promise<T>): Promise<T> {
   }
 }
 
-export async function beginAgentExecution(userId: string, botId: string | null, holder: string, round: number, runtime: CoordinatorRuntime): Promise<AgentExecution | null> {
+export async function beginAgentExecution(userId: string, botId: string, holder: string, round: number, runtime: CoordinatorRuntime): Promise<AgentExecution | null> {
   'use step'
   if (!agentKitEnabled()) return null
   const scope = await agentScope(userId,botId)
@@ -33,17 +33,17 @@ export async function botRuntime(userId:string,botId:string|null) {
   'use step'
   return refusalIsFinal(freezeBotModel({ownerId:userId,botId,workspaceId:null},{service:()=>subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace}))
 }
-export async function beforeAgentTool(userId: string, botId: string | null, executionId: string, callId: string, name: string, nativeScope?: NativeToolScope) {
+export async function beforeAgentTool(userId: string, botId: string, executionId: string, callId: string, name: string, nativeScope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,nativeScope)
   await agentKitStore.recordTool(await agentScope(userId,botId),executionId,callId,name,'start')
 }
-export async function afterAgentTool(userId: string, botId: string | null, executionId: string, callId: string, name: string, outcome: ToolOutcome, nativeScope?: NativeToolScope) {
+export async function afterAgentTool(userId: string, botId: string, executionId: string, callId: string, name: string, outcome: ToolOutcome, nativeScope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,nativeScope)
   await agentKitStore.recordTool(await agentScope(userId,botId),executionId,callId,name,'finish',outcome)
 }
-export async function loadAgentSkill(userId: string, botId: string | null, executionId: string | undefined, skillId: string, nativeScope?: NativeToolScope) {
+export async function loadAgentSkill(userId: string, botId: string, executionId: string | undefined, skillId: string, nativeScope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,nativeScope)
   if (!executionId) return { error:'noSkillsAssigned' }
@@ -52,7 +52,7 @@ export async function loadAgentSkill(userId: string, botId: string | null, execu
   const skill = execution.snapshot.definition.skills.find(item => item.id === skillId)
   return skill ? { id:skill.id,name:skill.name,body:skill.body,definitionVersion:execution.snapshot.revision,definitionDigest:execution.snapshot.definitionDigest } : { error:'skillNotAssigned' }
 }
-export async function finishAgentExecution(userId: string, botId: string | null, executionId: string | undefined, failure?: FailureCode) {
+export async function finishAgentExecution(userId: string, botId: string, executionId: string | undefined, failure?: FailureCode) {
   'use step'
   if (!executionId) return
   const scope = await agentScope(userId,botId)

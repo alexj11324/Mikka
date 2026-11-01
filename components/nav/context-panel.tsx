@@ -136,19 +136,22 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   const asideRef = useRef<HTMLElement>(null)
   // The content keeps the panel's full width while it opens or closes, so it is clipped, not squeezed.
   useLayoutEffect(() => { asideRef.current?.style.setProperty('--context-panel-width', `${width}px`) }, [width])
+  // Only an ordinary bot's name and look are edited here; the Coordinator keeps its own.
   const botId = conversation.kind === 'bot' ? conversation.id ?? null : null
   const coordinator = conversation.kind === 'coordinator'
-  // A bot's own threads; the Coordinator's are the ones it dispatched: no bot on the run, and not from an MCP client.
-  const ownThreads = botId ? threads.filter(thread => thread.botId === botId) : coordinator ? threads.filter(thread => !thread.botId && thread.source !== 'mcp') : []
+  // The chat's bot row, the Coordinator's included: its threads and its computer are that row's.
+  const chatBotId = botId ?? (coordinator ? conversation.id ?? null : null)
+  // An MCP client's runs are the Coordinator's too, but its panel lists only the threads it dispatched, as before.
+  const ownThreads = chatBotId ? threads.filter(thread => thread.botId === chatBotId && thread.source !== 'mcp') : []
   // An older chat without a bot learns its thread from the 电脑 cards in it.
   const cloudComputer = useCloudComputer()
   const registered = useConversationThread(cloudComputer && conversation.kind === 'agent' ? conversation.id : null)
   // Every bot has the 电脑 tab (Alex, 2026-10-31); without a key it offers 添加 E2B API Key.
   const computerTab = useComputerTab()
-  const computer = (computerTab ? botId : null) ?? (cloudComputer ? registered?.botId : undefined)
+  const computer = (computerTab ? chatBotId : null) ?? (cloudComputer ? registered?.botId : undefined)
   // A conversation whose bot works on its computer opens on its screen (Figma 103:64).
   useEffect(() => { if (registered?.runId) { setView('overview'); setTab('computer') } }, [registered?.runId])
-  // No computer here (the kill switch is on, or the Coordinator): no 电脑 tab.
+  // No computer here (the kill switch is on): no 电脑 tab.
   const tabs = computer ? TABS : TABS.filter(item => item !== 'computer')
   const shown = tabs.includes(tab) ? tab : 'threads'
 
@@ -179,7 +182,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
       <TabsContent value="overview" className="flex min-h-0 flex-col">
         <Tabs value={shown} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
           <div className="flex shrink-0 flex-col items-center gap-3 px-4 pt-9 pb-4">
-            {/* A bot's name and look are edited in place; the Coordinator is not a bot row, so it stays as it is. */}
+            {/* A bot's name and look are edited in place; the Coordinator keeps its own. */}
             {botId ? <BotLookEditor botId={botId} name={conversation.name} color={conversation.color} shape={conversation.shape} />
               : coordinator ? <BotAvatar {...COORDINATOR_AVATAR} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
             {botId ? <BotNameEditor key={botId} botId={botId} name={conversation.name} /> : <h2 className="max-w-full truncate text-xl font-semibold">{conversation.name}</h2>}
@@ -198,7 +201,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
             <PullRequests threads={ownThreads} issues={issues} query={query ?? ''} />
           </TabsContent>
           {computer && <TabsContent value="computer" className="min-h-0 overflow-y-auto px-4 pb-4">
-            {botId ? <AgentComputer botId={botId} name={conversation.name} header={false} workspaceId={workspaceId} /> : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} header={false} workspaceId={workspaceId} />}
+            {chatBotId ? <AgentComputer botId={chatBotId} name={conversation.name} header={false} workspaceId={workspaceId} /> : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} header={false} workspaceId={workspaceId} />}
           </TabsContent>}
         </Tabs>
       </TabsContent>

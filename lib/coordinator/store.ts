@@ -42,16 +42,15 @@ const INBOX_BATCH = 50
 
 type Executor = Pick<typeof db, 'select' | 'insert' | 'execute'>
 
-// Every bot chats on this harness. `botId` picks the chat: null is the
-// person's Coordinator (the built-in bot), otherwise one of their own bots.
-// Each chat has its own conversation, memory, inbox and lease.
-const ofBot = (column: typeof coordinatorSessions.botId | typeof coordinatorMessages.botId | typeof coordinatorEvents.botId, botId: string | null) => botId ? eq(column, botId) : isNull(column)
-const sessionOf = (userId: string, botId: string | null) => and(eq(coordinatorSessions.userId, userId), ofBot(coordinatorSessions.botId, botId))
-const messagesOf = (userId: string, botId: string | null) => and(eq(coordinatorMessages.userId, userId), ofBot(coordinatorMessages.botId, botId))
-const eventsOf = (userId: string, botId: string | null) => and(eq(coordinatorEvents.userId, userId), ofBot(coordinatorEvents.botId, botId))
+// Every bot chats on this harness, the Coordinator included (it is a bot row,
+// lib/coordinator/coordinator-bot.ts). `botId` picks the chat; each chat has
+// its own conversation, memory, inbox and lease.
+const sessionOf = (userId: string, botId: string) => and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, botId))
+const messagesOf = (userId: string, botId: string) => and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId))
+const eventsOf = (userId: string, botId: string) => and(eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.botId, botId))
 
-async function nextPosition(executor: Executor, userId: string, botId: string | null): Promise<number> {
-  await executor.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${userId}:${botId ?? 'coordinator'}`},0))`)
+async function nextPosition(executor: Executor, userId: string, botId: string): Promise<number> {
+  await executor.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${userId}:${botId}`},0))`)
   const [row] = await executor.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
   return Number(row?.last ?? 0) + 1
@@ -60,20 +59,20 @@ async function nextPosition(executor: Executor, userId: string, botId: string | 
 /** Direct user input is deliverable without a classifier. Other events need
  * a classification; a missing runtime judgment remains pending. */
 const wakingEvent = and(isNull(coordinatorEvents.deliveredAt), or(eq(coordinatorEvents.kind, 'user_message'), and(isNotNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background'))))
-function waking(userId: string, botId: string | null) {
+function waking(userId: string, botId: string) {
   return and(eventsOf(userId, botId), wakingEvent)
 }
 
 /** Whether any undelivered event should start a turn in this chat. */
-export async function hasWakingEvents(userId: string, botId: string | null = null): Promise<boolean> {
+export async function hasWakingEvents(userId: string, botId: string): Promise<boolean> {
   const [row] = await db.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(waking(userId, botId)).limit(1)
   return Boolean(row)
 }
 
-/** The person's chats with events that should start a turn: null is the Coordinator. */
-export async function wakingChats(userId: string): Promise<(string | null)[]> {
-  const rows = await db.selectDistinct({ botId: coordinatorEvents.botId }).from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), isNull(coordinatorEvents.deliveredAt), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background'))))
-  return rows.map(row => row.botId)
+/** The person's chats (the Coordinator's among them) with events that should start a turn. */
+export async function wakingChats(userId: string): Promise<string[]> {
+  const rows = await db.selectDistinct({ botId: coordinatorEvents.botId }).from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), isNotNull(coordinatorEvents.botId), isNull(coordinatorEvents.deliveredAt), or(isNull(coordinatorEvents.tier), ne(coordinatorEvents.tier, 'background'))))
+  return rows.flatMap(row => row.botId ? [row.botId] : [])
 }
 
 /**
@@ -102,7 +101,7 @@ export interface InboxTake {
 
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushReasons: [], pushHidesText: false }
 
-export async function takeInbox(userId: string, holder: string, botId: string | null = null): Promise<InboxTake> {
+export async function takeInbox(userId: string, holder: string, botId: string): Promise<InboxTake> {
   return db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId, botId }).onConflictDoNothing()
@@ -116,7 +115,7 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     // A schedule is a separate read-only turn. Hydrate its authority through
     // the stored event link, never from notification/model payload fields.
     const scheduledCandidate = candidates[0]?.payload.source === 'schedule_due' ? candidates[0] : undefined
-    const scheduledRow=scheduledCandidate?(await tx.execute(sql`SELECT o.* FROM schedule_occurrences o JOIN user_schedules s ON s.id=o.schedule_id WHERE o.event_id=${scheduledCandidate.id} AND s.owner_id=${userId} AND s.bot_id IS NOT DISTINCT FROM ${botId}::uuid LIMIT 1`)).rows[0] as Occurrence|undefined:undefined
+    const scheduledRow=scheduledCandidate?(await tx.execute(sql`SELECT o.* FROM schedule_occurrences o JOIN user_schedules s ON s.id=o.schedule_id WHERE o.event_id=${scheduledCandidate.id} AND s.owner_id=${userId} AND s.bot_id=${botId}::uuid LIMIT 1`)).rows[0] as Occurrence|undefined:undefined
     const scheduled=scheduledInbox(scheduledRow,now)
     if(scheduled && !scheduled.scope){
       await tx.update(coordinatorEvents).set({deliveredAt:now,tier:'background'}).where(eq(coordinatorEvents.id,scheduled.eventId))
@@ -192,7 +191,7 @@ function carriesCode(event: { payload: Record<string, unknown> }): boolean {
 }
 
 /** Lets go of the lease. Returns whether events that need a turn arrived meanwhile, so the caller can take them. */
-export async function releaseLease(userId: string, holder: string, botId: string | null = null): Promise<boolean> {
+export async function releaseLease(userId: string, holder: string, botId: string): Promise<boolean> {
   await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, updatedAt: new Date() })
     .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
   return hasWakingEvents(userId, botId)
@@ -201,7 +200,7 @@ export async function releaseLease(userId: string, holder: string, botId: string
 /** Direct user delivery first. Runtime ordering uses the last attempt, falling
  * back to original creation time. Trying a slow event advances the durable
  * cursor instead of repeatedly hiding all events after the oldest batch. */
-export async function untriagedEvents(userId: string, botId: string | null = null) {
+export async function untriagedEvents(userId: string, botId: string) {
   const retryBefore = new Date(Date.now() - TRIAGE_RETRY_COOLDOWN_MS)
   const events = await db.select().from(coordinatorEvents)
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier),
@@ -214,13 +213,13 @@ export async function untriagedEvents(userId: string, botId: string | null = nul
   return events.map(event => ({ ...event, observedRun: event.runId ? observed.get(event.runId) ?? null : null }))
 }
 
-export async function setEventTier(id: string, tier: CoordinatorEventTier, scope: { userId: string; botId: string | null }): Promise<boolean> {
+export async function setEventTier(id: string, tier: CoordinatorEventTier, scope: { userId: string; botId: string }): Promise<boolean> {
   const applied = await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier), eventsOf(scope.userId, scope.botId))).returning({ id: coordinatorEvents.id })
   return applied.length === 1
 }
 
 type TriageEventRecord = typeof coordinatorEvents.$inferSelect
-export async function claimTriageAttempt(event: TriageEventRecord, scope: { userId: string; botId: string | null }): Promise<Date | null> {
+export async function claimTriageAttempt(event: TriageEventRecord, scope: { userId: string; botId: string }): Promise<Date | null> {
   const now = new Date(), retryBefore = new Date(now.getTime() - TRIAGE_RETRY_COOLDOWN_MS)
   const [claimed] = await db.update(coordinatorEvents).set({ lastTriageAttemptAt: now })
     .where(and(eventsOf(scope.userId, scope.botId), eq(coordinatorEvents.id, event.id), ne(coordinatorEvents.kind, 'user_message'),
@@ -233,7 +232,7 @@ export async function claimTriageAttempt(event: TriageEventRecord, scope: { user
 
 /** Winning attempt and the exact event payload must still match. Persisting the
  * actual host receipt with the tier does not turn that choice into permission. */
-export async function completeTriageAttempt(event: TriageEventRecord & { observedRun?: unknown }, scope: { userId: string; botId: string | null }, attemptedAt: Date, judgment: TriageJudgment & { tier: CoordinatorEventTier; execution: DecisionExecution }): Promise<boolean> {
+export async function completeTriageAttempt(event: TriageEventRecord & { observedRun?: unknown }, scope: { userId: string; botId: string }, attemptedAt: Date, judgment: TriageJudgment & { tier: CoordinatorEventTier; execution: DecisionExecution }): Promise<boolean> {
   const receipt = { version: 1, method: 'model', eventId: event.id, eventKind: event.kind,
     attemptedAt: attemptedAt.toISOString(), chosenTier: judgment.tier, observedRun: event.observedRun ?? null, execution: judgment.execution }
   const applied = await db.update(coordinatorEvents).set({ tier: judgment.tier, triageDecision: receipt })
@@ -254,10 +253,10 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
  * Appends the turn's new messages and renews the lease. `warning` says why the
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null, streamId?: string): Promise<number> {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string): Promise<number> {
   await assertCredentialSafeChat(userId, messages)
   return db.transaction(async tx => {
-    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId" IS NOT DISTINCT FROM ${botId}::uuid FOR UPDATE`)
+    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE`)
     const first = await nextPosition(tx, userId, botId)
     if (messages.length) {
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
@@ -279,14 +278,14 @@ export async function appendMessages(userId: string, holder: string, messages: M
  * chat message, and one failure can be retried once; a new failure can be
  * retried again. False when nothing failed or a turn is already running.
  */
-export async function retryFailedTurn(userId: string, botId: string | null = null): Promise<boolean> {
+export async function retryFailedTurn(userId: string, botId: string): Promise<boolean> {
   return db.transaction(async tx => {
-    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId" IS NOT DISTINCT FROM ${botId}::uuid FOR UPDATE`)
+    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE`)
     const [session] = await tx.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
     if (!session?.lastError || !session.lastErrorAt || coordinatorLeaseActive(session)) return false
     const inserted = await tx.insert(coordinatorEvents).values({
       id: crypto.randomUUID(), userId, botId, kind: 'user_message', issueId: null, runId: null,
-      dedupeKey: `turn_retry:${userId}:${botId ?? 'coordinator'}:${session.lastErrorAt.toISOString()}`,
+      dedupeKey: `turn_retry:${userId}:${botId}:${session.lastErrorAt.toISOString()}`,
       payload: { text: '', postedToChat: true, retry: true },
     }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
     return inserted.length === 1
@@ -294,13 +293,13 @@ export async function retryFailedTurn(userId: string, botId: string | null = nul
 }
 
 /** Records why a turn failed and lets go of the lease. */
-export async function failTurn(userId: string, holder: string, error: string, botId: string | null = null): Promise<void> {
+export async function failTurn(userId: string, holder: string, error: string, botId: string): Promise<void> {
   await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: error.slice(0, 1000), lastErrorAt: new Date(), updatedAt: new Date() })
     .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
 }
 
 /** The summary so far, the memory, and every message after the summary, oldest first. */
-export async function loadConversation(userId: string, botId: string | null = null): Promise<{ summary: string | null; memory: string; messages: StoredMessage[] }> {
+export async function loadConversation(userId: string, botId: string): Promise<{ summary: string | null; memory: string; messages: StoredMessage[] }> {
   const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   const through = session?.summaryThrough ?? 0
   const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message })
@@ -316,13 +315,13 @@ export async function loadConversation(userId: string, botId: string | null = nu
 }
 
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */
-export async function saveSummary(userId: string, summary: string, through: number, botId: string | null = null): Promise<void> {
+export async function saveSummary(userId: string, summary: string, through: number, botId: string): Promise<void> {
   await db.update(coordinatorSessions).set({ summary, summaryThrough: through, updatedAt: new Date() })
     .where(sessionOf(userId, botId))
 }
 
 /** Rewrites the memory with `edit`, under a row lock so two edits do not lose each other. */
-export async function editMemory<T>(userId: string, edit: (memory: string) => { memory: string; result: T } | { error: string }, botId: string | null = null): Promise<T | { error: string }> {
+export async function editMemory<T>(userId: string, edit: (memory: string) => { memory: string; result: T } | { error: string }, botId: string): Promise<T | { error: string }> {
   return db.transaction(async tx => {
     await tx.insert(coordinatorSessions).values({ userId, botId }).onConflictDoNothing()
     const [session] = await tx.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions)
@@ -397,7 +396,7 @@ function withImages(text: string, images: unknown): ModelMessage['content'] {
 }
 
 /** The latest of the conversation for the chat, oldest first. */
-export async function chatView(userId: string, limit = 200, botId: string | null = null): Promise<ChatView> {
+export async function chatView(userId: string, limit = 200, botId: string): Promise<ChatView> {
   const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
@@ -461,7 +460,7 @@ export async function botChats(userId: string): Promise<Record<string, BotChatSu
 }
 
 /** The whole conversation for display, newest last. */
-export async function conversationForDisplay(userId: string, limit = 200, botId: string | null = null) {
+export async function conversationForDisplay(userId: string, limit = 200, botId: string) {
   const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)

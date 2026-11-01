@@ -6,7 +6,7 @@ import * as native from './native-steps'
 import type { NativeToolScope } from './tool-scope'
 
 /** A durable transport relay, not an additional LLM/agent loop. Native harness chooses tools. */
-export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, createTools: (scope?: NativeToolScope) => ToolSet, botId: string | null = null, snapshot?: DefinitionSnapshot) {
+export async function nativeCoordinatorTurn(userId: string, holder: string, round: number, runtime: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, createTools: (scope?: NativeToolScope) => ToolSet, botId: string, snapshot?: DefinitionSnapshot) {
   const tools = createTools()
   const definitions: NativeCoordinatorJob['tools'] = []
   for (const [name, definition] of Object.entries(tools)) {

@@ -1,6 +1,6 @@
-import { and, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
-import { agentRuns, agents, coordinatorSessions, devices, bots, conversations, groupTurns } from '@/lib/db/schema'
+import { agentRuns, agents, coordinatorBots, coordinatorSessions, devices, bots, conversations, groupTurns } from '@/lib/db/schema'
 import type * as schema from '@/lib/db/schema'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
@@ -25,7 +25,6 @@ export type ActiveAgent = {
   shape?: string
 }
 
-export const COORDINATOR_ID = 'coordinator'
 export const COORDINATOR_NAME = 'Coordinator'
 
 type Database = NodePgDatabase<typeof schema>
@@ -69,8 +68,10 @@ export async function listActiveAgents(database: Database, userId: string, now =
         inArray(agentRuns.status, [...WORKING_RUN_STATUSES]),
         or(gt(agentRuns.leaseExpiresAt, now), and(isNull(agentRuns.leaseExpiresAt), gt(devices.lastSeenAt, onlineSince))),
       )),
-    database.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, updatedAt: coordinatorSessions.updatedAt })
-      .from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNull(coordinatorSessions.botId))).limit(1),
+    // The Coordinator's chat is its bot row's (coordinator_bots).
+    database.select({ botId: coordinatorBots.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, updatedAt: coordinatorSessions.updatedAt })
+      .from(coordinatorSessions).innerJoin(coordinatorBots, and(eq(coordinatorBots.botId, coordinatorSessions.botId), eq(coordinatorBots.ownerId, userId)))
+      .where(eq(coordinatorSessions.userId, userId)).orderBy(desc(coordinatorSessions.updatedAt)).limit(1),
     database.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, startedAt: groupTurns.updatedAt })
       .from(groupTurns)
       .innerJoin(conversations, and(eq(conversations.id, groupTurns.conversationId), eq(conversations.createdBy, userId)))
@@ -84,7 +85,7 @@ export async function listActiveAgents(database: Database, userId: string, now =
   if (coordinatorLeaseActive(session, now)) {
     // coordinator_sessions has no turn start column yet, so startedAt uses updatedAt for now
     // (bumped when a turn takes or renews the lease). Replace once a real start time is stored.
-    list.push({ id: COORDINATOR_ID, kind: 'coordinator', name: COORDINATOR_NAME, avatarUrl: null, startedAt: session!.updatedAt.toISOString(), state: 'working', runId: null, issueId: null })
+    list.push({ id: session!.botId, kind: 'coordinator', name: COORDINATOR_NAME, avatarUrl: null, startedAt: session!.updatedAt.toISOString(), state: 'working', runId: null, issueId: null })
   }
   return sortActiveAgents(list)
 }

@@ -1,7 +1,8 @@
 import { modelMessage } from '@/lib/coordinator/message-safety'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, sql } from 'drizzle-orm'
+import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import type { ModelMessage } from 'ai'
 import { readRun, visibleRuns } from '@/lib/agent-runs'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
@@ -20,9 +21,12 @@ import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 /** How often a waiting read checks for the Coordinator's reply. */
 const REPLY_POLL_MS = 2000
 
+/** The person's Coordinator chat: its bot row (lib/coordinator/coordinator-bot.ts). */
+const coordinatorChat = (userId: string) => chatBotId(userId, null)
+
 async function lastPosition(userId: string): Promise<number> {
   const [row] = await db.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), isNull(coordinatorMessages.botId)))
+    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId))))
   return Number(row?.last ?? 0)
 }
 
@@ -33,7 +37,7 @@ async function lastPosition(userId: string): Promise<number> {
  */
 export async function sendToCoordinator(userId: string, text: string) {
   const after = await lastPosition(userId)
-  await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, text))
+  await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, await coordinatorChat(userId), text))
   await wakeCoordinator(userId)
   return { queued: true, coordinatorRunning: coordinatorEnabled(), after }
 }
@@ -51,7 +55,7 @@ function displayMessage(message: ModelMessage): { role: 'user' | 'assistant'; te
 
 async function messagesAfter(userId: string, after: number, limit: number) {
   const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), isNull(coordinatorMessages.botId), gt(coordinatorMessages.position, after)))
+    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId)), gt(coordinatorMessages.position, after)))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
   return rows.reverse().flatMap(row => {
     const shown = displayMessage(row.message as unknown as ModelMessage)
@@ -62,7 +66,7 @@ async function messagesAfter(userId: string, after: number, limit: number) {
 /** Whether a turn is running, and why the last one failed (cleared when a turn succeeds). */
 async function turnState(userId: string) {
   const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt })
-    .from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNull(coordinatorSessions.botId))).limit(1)
+    .from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, await coordinatorChat(userId)))).limit(1)
   return {
     working: coordinatorLeaseActive(session),
     error: session?.lastError ?? null, errorAt: session?.lastErrorAt ?? null,

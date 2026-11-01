@@ -49,7 +49,11 @@ test('mobile bot page', { skip: !dbUrl }, async t => {
   })
 
   await t.test("the Coordinator's: what it dispatched, not MCP runs or bots'", async () => {
-    const page = await mobileBot(owner, ws.id, null)
+    // The Coordinator is an ordinary bot row; resolving it moves its older bot-less threads and schedules onto it.
+    const { coordinatorBot } = await import('../lib/coordinator/coordinator-bot')
+    const coordinator = await coordinatorBot(owner)
+    assert.equal(coordinator.workspaceId, ws.id)
+    const page = await mobileBot(owner, coordinator.workspaceId, coordinator.botId)
     assert.deepEqual(page.threads.map(thread => thread.id), [dispatched])
     assert.deepEqual(page.pullRequests, [])
     assert.deepEqual(page.schedules.map(row => [row.id, row.status]), [[coordinatorSchedule, 'paused']])
@@ -91,9 +95,11 @@ test('mobile bot page', { skip: !dbUrl }, async t => {
     const { chatMuted, chatPreferences, setChatPreference } = await import('../lib/chat-preferences')
     assert.equal(await setChatPreference(owner, bot, { pinned: true }), true)
     assert.equal(await setChatPreference(owner, bot, { muted: true }), true, 'a second change keeps the first')
-    assert.equal(await setChatPreference(owner, null, { muted: true }), true, 'the Coordinator')
+    const { coordinatorBot } = await import('../lib/coordinator/coordinator-bot')
+    const coordinator = (await coordinatorBot(owner)).botId
+    assert.equal(await setChatPreference(owner, coordinator, { muted: true }), true, 'the Coordinator, by its bot row')
     assert.equal(await setChatPreference(other, bot, { pinned: true }), false, "someone else's bot")
-    assert.deepEqual(await chatPreferences(owner), { [bot]: { pinned: true, muted: true }, coordinator: { pinned: false, muted: true } })
+    assert.deepEqual(await chatPreferences(owner), { [bot]: { pinned: true, muted: true }, [coordinator]: { pinned: false, muted: true } })
     assert.deepEqual(await chatPreferences(other), {})
     assert.equal(await chatMuted(owner, bot), true)
     assert.equal(await chatMuted(owner, sibling), false)
