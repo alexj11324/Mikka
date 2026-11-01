@@ -24,7 +24,7 @@ coordinator's list are folded in: 12 into § 5, 13 into § 2 and § 9):
    need one, built with `next build` directly (`pnpm build` adds lint and
    migrations).
 3. One-command setup (`scripts/dev/bootstrap-local.sh`): Node 24, PostgreSQL 17
-   at `127.0.0.1:5433/mikka_e2e`, migrations, bubblewrap, socat and ripgrep;
+   at `127.0.0.1:5432/mikka_e2e`, migrations, bubblewrap, socat and ripgrep;
    Playwright on `/opt/pw-browsers/chromium`, never `playwright install`.
 4. Never fake `GITHUB_ACTIONS`, `RUNNER_ENVIRONMENT`, `GITHUB_RUN_ID` or any
    other CI variable; GitHub-runner-only suites stay in CI.
@@ -32,7 +32,8 @@ coordinator's list are folded in: 12 into § 5, 13 into § 2 and § 9):
    commits; stacked PRs by their top PR; UI screenshots reviewed first; the
    coordinator squash-merges and closes the originals. Several small fixes
    are pushed to an integration branch together, not one CI round each.
-6. The coordinator assigns rule ids and migration timestamps at dispatch.
+6. The coordinator assigns rule ids and increasing migration timestamps at
+   dispatch; if they merge out of order, the integration session renames them.
 7. Test worker changes on a branch `-dev` E2B template; never overwrite the
    production template or Vercel's production environment.
 8. Reach local services from outside through a Cloudflare tunnel; in the cloud

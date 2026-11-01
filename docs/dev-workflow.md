@@ -43,7 +43,7 @@ provides:
 
 - **Node 24**, the same as CI. Node 22's `mock.module` ignores `{ exports }`
   and gives false test failures.
-- **PostgreSQL 17** at `127.0.0.1:5433`, database `mikka_e2e`; migrations with
+- **PostgreSQL 17** at `127.0.0.1:5432`, database `mikka_e2e`; migrations with
   `MIGRATE=1 pnpm migrate` (without `MIGRATE=1` the script skips everywhere
   but Vercel Production).
 - **bubblewrap, socat and ripgrep** for the daemon's sandbox and tools.
@@ -82,18 +82,16 @@ Pull requests waiting to merge go in batches of five:
 Several small fixes go to an integration branch together and are pushed once,
 instead of a full CI round for each fix.
 
-`integration/` replaces the older `integrate/` prefix. 现状（非决定）：CI still
-matches `integrate/` (`browser-tests.yml`, `subagents.yml`,
-`scripts/ci-docs-only.mjs`).
+`integration/` replaces the older `integrate/` prefix; CI accepts both
+(`browser-tests.yml`, `subagents.yml`).
 
 ## 6. Numbers
 
 Rule ids (`R-xx`) and migration timestamps are assigned by the coordinator
-when the work is dispatched, so parallel branches never collide and nothing
-is renamed afterwards. A session that needs one and has none asks the
-coordinator. 现状（非决定）：`scripts/check-migrations.mjs` still refuses a
-timestamp at or below the newest one on `main`, so an assigned timestamp can
-fail if a later one merges first; the coordinator then assigns a new one.
+when the work is dispatched, so parallel branches do not collide. A session
+that needs one and has none asks the coordinator. The coordinator assigns
+increasing timestamps. `scripts/check-migrations.mjs` refuses a timestamp at or below the newest one on `main`, so if they merge out
+of order, the integration session renames them.
 
 ## 7. E2B templates
 
