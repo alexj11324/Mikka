@@ -171,9 +171,10 @@ async function writeMain(client, owner, p, workspaceId) {
     // An ended run without an outcome is judged by the decision model in the minute sweep
     // (lib/run-outcome-judge.ts), so every ended demo run carries one.
     const outcome = run.finishedAt ? run.outcome ?? OUTCOME_OF_STATUS[run.status] : null
-    await client.query(`INSERT INTO agent_runs (id, "userId", "issueId", "agentId", "botId", "deviceId", status, kind, prompt, error, "lastReply", "lastReplyPart", "lastReplyAt", "startedAt", "finishedAt", "createdAt", "updatedAt", outcome, "outcomeAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'implement', $8, $9, $10, 'demo', $11, $12, $13, $14, $15, $16, $17)`,
-    [run.id, owner.id, run.issueId, run.agentId, run.botId, run.deviceId, run.status, run.prompt, run.error ?? null, run.lastReply, run.lastReplyAt, run.startedAt, run.finishedAt, run.createdAt, run.lastReplyAt, outcome, run.finishedAt])
+    await client.query(`INSERT INTO agent_runs (id, "userId", "issueId", "agentId", "botId", "deviceId", status, kind, prompt, error, "lastReply", "lastReplyPart", "lastReplyAt", "startedAt", "finishedAt", "createdAt", "updatedAt", outcome, "outcomeDecidedBy", "outcomeAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'implement', $8, $9, $10, 'demo', $11, $12, $13, $14, $15, $16, $17, $18)`,
+    // decidedBy names the seed, so these outcomes never read as the decision model's.
+    [run.id, owner.id, run.issueId, run.agentId, run.botId, run.deviceId, run.status, run.prompt, run.error ?? null, run.lastReply, run.lastReplyAt, run.startedAt, run.finishedAt, run.createdAt, run.lastReplyAt, outcome, outcome ? 'seed' : null, run.finishedAt])
     for (const [index, chunk] of run.chunks.entries()) {
       await client.query('INSERT INTO run_chunks (id, "runId", seq, chunk, "createdAt") VALUES ($1, $2, $3, $4, $5)', [p.id(`chunk:${run.key}:${index}`), run.id, index + 1, json(chunk), new Date(run.startedAt.getTime() + index * 45_000)])
     }
