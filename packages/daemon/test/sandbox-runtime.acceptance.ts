@@ -157,6 +157,15 @@ it("lets the agent commit on its run branch inside real isolation with the run's
   const context = new RunContext({ harness: "claude_code", worktree, privateDir: root, runDir: join(root, "run"),
     gitWritePaths: await worktreeGitWritePaths(path, worktree, "commit-test") })
   writeFileSync(join(worktree, "agent.txt"), "agent change\n")
+  // Git runs auto maintenance after a commit. Git 2.56 packs refs there by
+  // default; older git does the same through `gc --auto` once there are too
+  // many packs. Either rewrites the shared cache's packed-refs, which the run
+  // may not write. Force that path on every git version.
+  execFileSync("git", ["config", "gc.autoPackLimit", "1"], { cwd: path })
+  execFileSync("git", ["config", "gc.autoDetach", "false"], { cwd: path })
+  const loose = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: path, input: "loose\n", encoding: "utf8" })
+  execFileSync("git", ["pack-objects", "-q", join(path, ".git", "objects", "pack", "pack")], { cwd: path, input: loose })
+  expect(execFileSync("git", ["count-objects", "-v"], { cwd: path, encoding: "utf8" })).toMatch(/^packs: [2-9]/m)
   const sandbox = new SandboxRuntime()
   try {
     const wrapped = await sandbox.wrap(["/bin/sh", "-c",
