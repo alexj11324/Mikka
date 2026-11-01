@@ -6,6 +6,7 @@ import useSWR from 'swr'
 
 import { listTaskRuns } from '@/app/actions/task-runs'
 import { getPreferences } from '@/app/actions/preferences'
+import { chooseDesktopNotifications } from '@/app/actions/desktop-notifications'
 import { desktopRunUpdate, type DesktopRun } from '@/lib/platform/desktop-notifications'
 import { pushAllowed } from '@/lib/push-allowed'
 import { usePlatform } from '@/lib/platform/use-platform'
@@ -18,9 +19,10 @@ function appHref(href: string): string | null {
 
 /**
  * The desktop shell's only renderer-side integration. It keeps the Dock badge
- * on the runs waiting for the person and raises a system notification when a
- * run enters 等你 or fails, or finishes while 线程完成 is on (the phone gets
- * its own push too); clicking one opens the issue. Web renders nothing.
+ * on the runs waiting for the person. When a run enters 等你 or fails, or
+ * finishes while 线程完成 is on, the Decisions API decides whether it raises a
+ * system notification (app/actions/desktop-notifications.ts); clicking one
+ * opens the issue. Web renders nothing.
  */
 export function DesktopIntegration() {
   const platform = usePlatform()
@@ -44,9 +46,14 @@ export function DesktopIntegration() {
     const update = desktopRunUpdate(previous.current, data, Date.now(), finished)
     previous.current = update.next
     void bridge.notifications.setBadge(update.badge).catch(() => {})
-    for (const notification of update.notifications) {
-      void bridge.notifications.show(notification).catch(() => {})
-    }
+    if (!update.notifications.length) return
+    // The notification id is run:<issueId>:<kind>:<stamp>.
+    void chooseDesktopNotifications(update.notifications.map(notification => ({ id: notification.id, issueId: notification.id.split(':')[1], kind: notification.kind })))
+      .then(result => {
+        const show = new Set('show' in result && result.show ? result.show : [])
+        for (const notification of update.notifications) if (show.has(notification.id)) void bridge.notifications.show(notification).catch(() => {})
+      })
+      .catch(() => {})
   }, [data, desktop, finished])
 
   useEffect(() => {

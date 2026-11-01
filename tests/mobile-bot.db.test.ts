@@ -101,7 +101,7 @@ test('mobile bot page', { skip: !dbUrl }, async t => {
     const coordinator = (await coordinatorBot(owner, ws.id)).botId
     assert.equal(await setChatPreference(owner, coordinator, { muted: true }), true, 'the Coordinator, by its bot row')
     assert.equal(await setChatPreference(other, bot, { pinned: true }), false, "someone else's bot")
-    assert.deepEqual(await chatPreferences(owner), { [bot]: { pinned: true, muted: true }, [coordinator]: { pinned: false, muted: true } })
+    assert.deepEqual(await chatPreferences(owner), { [bot]: { pinned: true, muted: true }, [coordinator]: { pinned: true, muted: true } }, 'muting the Coordinator keeps its pin')
     assert.deepEqual(await chatPreferences(other), {})
     assert.equal(await chatMuted(owner, bot), true)
     assert.equal(await chatMuted(owner, sibling), false)
@@ -115,5 +115,20 @@ test('mobile bot page', { skip: !dbUrl }, async t => {
     assert.deepEqual(page.library.map(item => [item.id, item.title, item.kind, item.version]), [[artifact, 'Release notes', 'markdown', 1]])
     assert.deepEqual([page.pinned, page.muted], [true, false])
     assert.deepEqual((await mobileBot(other, ws.id, bot)).library, [])
+  })
+
+  await t.test('the Coordinator is pinned until the person unpins it, like any pinned bot', async () => {
+    const { chatPreferences, pinnedByDefault, setChatPreference } = await import('../lib/chat-preferences')
+    const { coordinatorBot } = await import('../lib/coordinator/coordinator-bot')
+    const coordinator = (await coordinatorBot(owner, ws.id)).botId
+    await pool.query(`delete from chat_preferences where "userId"=$1 and "chatKey"=$2`, [owner, coordinator])
+    assert.equal(await pinnedByDefault(owner, coordinator), true)
+    assert.equal(await pinnedByDefault(owner, sibling), false)
+    assert.equal((await mobileBot(owner, ws.id, coordinator)).pinned, true, 'pinned before any change')
+    assert.equal(await setChatPreference(owner, coordinator, { muted: true }), true)
+    assert.deepEqual((await chatPreferences(owner))[coordinator], { pinned: true, muted: true }, 'muting it keeps the pin')
+    assert.equal(await setChatPreference(owner, coordinator, { pinned: false }), true)
+    assert.equal((await mobileBot(owner, ws.id, coordinator)).pinned, false, 'unpinned')
+    assert.equal(await setChatPreference(other, coordinator, { pinned: true }), false, "someone else's Coordinator")
   })
 })

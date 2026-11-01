@@ -73,8 +73,7 @@ export default function BotInfo() {
         {page.loading && !page.data ? <View style={styles.center}><Spinner /></View> : null}
         {page.data ? (
           <Group>
-            {/* The Coordinator is always pinned. */}
-            {coordinator ? null : <ToggleRow label="置顶" value={page.data.pinned} onChange={pinned => void setPreference({ pinned })} />}
+            <ToggleRow label="置顶" value={page.data.pinned} onChange={pinned => void setPreference({ pinned })} />
             <ToggleRow label="通知" value={!page.data.muted} onChange={on => void setPreference({ muted: !on })} />
           </Group>
         ) : null}

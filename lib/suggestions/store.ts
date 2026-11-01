@@ -10,7 +10,7 @@ import { extractFacts } from '@/lib/profile/extract'
 import { briefings, suggestions, userPreferences, users, userTimeZones } from '@/lib/db/schema'
 import { displayTitle, type ActionTitleInput } from './action-title'
 import { writeActionTitles } from './action-title-server'
-import { BRIEFING_HOUR, BRIEFING_WINDOW_MS, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
+import { BRIEFING_HOUR, BRIEFING_WINDOW_MS, briefingCandidates, briefingContent, briefingHighlightInput, briefingHighlightQuestions, dueBriefingZones, readBriefingHighlights, type BriefingItem, localClock, localDate, localInstant, safeTimeZone } from './briefing'
 import type { ExternalNotification } from './notification'
 import { keepEnabledSources } from './source-settings'
 
@@ -98,7 +98,18 @@ export async function dismissSuggestion(userId: string, id: string, executor: Pi
 
 async function briefingRow(userId: string, timeZone: string, kind: 'first' | 'daily', now: Date) {
   const items = await db.select().from(suggestions).where(visible(userId, new Date(now.getTime() - BRIEFING_WINDOW_MS)))
-  return { userId, localDate: localDate(timeZone, now), kind, timeZone, ...briefingContent(items) }
+  return { userId, localDate: localDate(timeZone, now), kind, timeZone, ...briefingContent(items, await pickHighlights(userId, items)) }
+}
+
+/** The items the briefing names, picked by the Decisions API; none when it gives no answer (the counts still go out). */
+async function pickHighlights(userId: string, items: readonly BriefingItem[]): Promise<string[]> {
+  const candidates = briefingCandidates(items)
+  if (!candidates.length) return []
+  const [{ decide }, { hostedBillingScope }, { executionWorkspace }] = await Promise.all([import('@/lib/coordinator/decide'), import('@/lib/abuse/context'), import('@/lib/execution-settings')])
+  try {
+    const answers = await hostedBillingScope.run({ workspaceId: await executionWorkspace(userId, null), ownerId: userId }, () => decide('briefing-highlights', briefingHighlightInput(candidates), briefingHighlightQuestions(candidates)))
+    return readBriefingHighlights(answers, candidates)
+  } catch { return [] }
 }
 
 type Briefing = typeof briefings.$inferSelect

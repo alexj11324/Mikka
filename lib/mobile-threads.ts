@@ -9,6 +9,7 @@ import type { RunSource } from '@/lib/coordinator/citations'
 import { runBotName } from '@/lib/run-bot-name'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { groupThreads, pullRequestsOf, THREAD_GROUPS, threadGroup, type GroupIssue, type PrGroup, type ThreadGroup } from '@/lib/thread-groups'
+import { pinnedByDefault } from '@/lib/chat-preferences'
 
 /** The app's thread states (docs/design/mobile.md, 线程 screen icons). */
 export type MobileThreadStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped'
@@ -166,7 +167,7 @@ export async function mobileBot(userId: string, workspaceId: string, botId: stri
     pullRequests,
     schedules: schedules.rows.map(row => ({ id: row.id, title: row.title, status: row.status, nextAt: row.next_at?.toISOString() ?? null })),
     library: library.rows.map(row => ({ id: row.id, title: row.title, kind: row.kind, version: row.version, updatedAt: row.updated_at.toISOString() })),
-    pinned: preference.rows[0]?.pinned ?? false,
+    pinned: preference.rows[0]?.pinned ?? await pinnedByDefault(userId, botId),
     muted: preference.rows[0]?.muted ?? false,
   }
 }
