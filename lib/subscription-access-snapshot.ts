@@ -1,11 +1,12 @@
 import 'server-only'
+import { runMayUseCredentialSql } from './personal-policy'
 import { infisicalWorkloadToken } from './infisical-workload'
 import type { Pool } from 'pg'
 import type { CredentialScope } from '../packages/daemon/src/subscription-worker-client'
 
 export async function authorizedAccessName(database: Pick<Pool, 'query'>, scope: CredentialScope, use: { bindingId: string; consumerId: string; runId?: string }, revision: unknown): Promise<string> {
   if (!Number.isSafeInteger(revision) || Number(revision) < 1) throw new Error('subscription_access_unavailable')
-  const { rows } = await database.query(`select c."accessSecretName" from byos_connections c join byos_bindings b on b."connectionId"=c.id where c.id=$1 and c."ownerId"=$2 and c."workspaceId"=$3 and c.provider=$4 and c.epoch=$5 and c.state in ('connected','refreshing','publication_pending') and b.id=$6 and b."ownerId"=$2 and b."consumerId"=$7 and b."connectionRevision"=$5 and ($8::uuid is null or exists(select 1 from agent_runs r join byos_native_runs n on n."runId"=r.id where r.id=$8 and r."userId"=$2 and r."agentId"::text=$7 and n."bindingId"=b.id and r.status in ('preparing','running','paused','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null))`, [scope.connectionId, scope.ownerId, scope.workspaceId, scope.provider, revision, use.bindingId, use.consumerId, use.runId ?? null])
+  const { rows } = await database.query(`select c."accessSecretName" from byos_connections c join byos_bindings b on b."connectionId"=c.id where c.id=$1 and c."ownerId"=$2 and c."workspaceId"=$3 and c.provider=$4 and c.epoch=$5 and c.state in ('connected','refreshing','publication_pending') and b.id=$6 and b."ownerId"=$2 and b."consumerId"=$7 and b."connectionRevision"=$5 and ($8::uuid is null or exists(select 1 from agent_runs r join byos_native_runs n on n."runId"=r.id where r.id=$8 and ${runMayUseCredentialSql('$2', 'r."userId"', 'b."workspaceId"')} and r."agentId"::text=$7 and n."bindingId"=b.id and r.status in ('preparing','running','paused','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null))`, [scope.connectionId, scope.ownerId, scope.workspaceId, scope.provider, revision, use.bindingId, use.consumerId, use.runId ?? null])
   const name = rows[0]?.accessSecretName
   if (typeof name !== 'string') throw new Error('subscription_access_unavailable')
   return name

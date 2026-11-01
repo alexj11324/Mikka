@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 
 /**
@@ -77,3 +78,44 @@ export async function stopRunsUsingSubscriptions(query: Query, scope: { ownerId?
 export const subscriptionsUsableSql = (owner: string, workspace: string) =>
   `EXISTS (SELECT 1 FROM workspace_subscription_shares sh WHERE sh."ownerId"=${owner} AND sh."workspaceId"::text=(${workspace})::text)
    AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies pp WHERE pp."workspaceId"::text=(${workspace})::text AND NOT pp.subscriptions)`
+
+/**
+ * SQL for 分享给团队成员 on a run (orchestration.md §2, §6): may the credential
+ * owner's subscription serve the run owner's run in this workspace? Yes for the
+ * owner themselves; for another member only while the owner shares it there for
+ * others too, both are active members and the admin allows member subscriptions.
+ * Checked on every lease and credential read, so withdrawing stops the next one.
+ */
+export const runMayUseCredentialSql = (credentialOwner: string, runOwner: string, workspace: string) =>
+  `(${credentialOwner}=${runOwner} OR (
+    EXISTS (SELECT 1 FROM workspace_subscription_shares sh WHERE sh."ownerId"=${credentialOwner} AND sh."allowOthers" AND sh."workspaceId"::text=(${workspace})::text)
+    AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies pp WHERE pp."workspaceId"::text=(${workspace})::text AND NOT pp.subscriptions)
+    AND EXISTS (SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId"::text=(${workspace})::text AND m."userId"=${runOwner} AND m.status='active')
+    AND EXISTS (SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId"::text=(${workspace})::text AND m."userId"=${credentialOwner} AND m.status='active')))`
+
+/**
+ * A device run whose owner has no subscription of their own here: bind the
+ * first member's subscription shared with 分享给团队成员 to this run's agent
+ * (the owner keeps the binding; it names the connection, never a credential).
+ * Returns the binding id, or null when nobody shares one for this harness.
+ */
+export async function sharedNativeBinding(query: Query, runOwnerId: string, agentId: string, harness: string, workspaceId: string): Promise<string | null> {
+  if (harness !== 'codex' && harness !== 'claude_code') return null
+  const provider = harness === 'codex' ? 'codex' : 'claude'
+  const route = harness === 'codex' ? 'codex_cli' : 'claude_code_cli'
+  for (const ownerId of await pooledOwners(query, runOwnerId, workspaceId)) {
+    const { rows: [template] } = await query.query<{ connectionId: string; epoch: string; modelId: string }>(
+      `SELECT b."connectionId",c.epoch,b."modelId" FROM byos_bindings b
+        JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.state='connected' AND c.epoch=b."connectionRevision" AND c.provider=$3
+        WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND ${runMayUseCredentialSql('$1', '$4', '$2')}
+        ORDER BY (b.route=$5) DESC, b."createdAt" DESC, b.id DESC LIMIT 1`,
+      [ownerId, workspaceId, provider, runOwnerId, route])
+    if (!template) continue
+    const hash = createHash('sha256').update(JSON.stringify([ownerId, workspaceId, agentId, template.connectionId, String(template.epoch)])).digest('hex')
+    const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
+    await query.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (id) DO NOTHING`, [id, ownerId, workspaceId, agentId, template.connectionId, template.epoch, route, template.modelId])
+    return id
+  }
+  return null
+}
