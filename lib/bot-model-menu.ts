@@ -115,7 +115,7 @@ export async function botModelMenu(
       kind: "subscription",
       chosen,
       available: !exhausted,
-      ...(exhausted ? { quota: { plan: (row as { plan?: string | null }).plan ?? null, resetsAt: quotaResetsAt(quota, now), fallback: null } } : {}),
+      ...(exhausted ? { quota: { subscription: row.provider, plan: (row as { plan?: string | null }).plan ?? null, resetsAt: quotaResetsAt(quota, now), fallback: null } } : {}),
     };
   };
 
@@ -166,7 +166,11 @@ export async function botModelMenu(
   if (current.quota) {
     const { quotaFallbackKey } = await import("./quota-fallback");
     const fallback = await quotaFallbackKey(pool, scope.ownerId, scope.workspaceId, current.modelId);
-    if (fallback) current.quota.fallback = { keyProvider: fallback.key.provider, keyName: fallback.key.name, model: fallback.model };
+    if (fallback) {
+      current.quota.fallback = { keyProvider: fallback.key.provider, keyName: fallback.key.name, model: fallback.model };
+      // The chip names what the next turn runs on: the key's model, as freezeBotModel freezes it.
+      current = { ...current, id: apiKeyOptionId(fallback.key.id, fallback.model), modelId: fallback.model, provider: fallback.key.provider, kind: "apiKey", available: true };
+    }
   }
   return { groups, current };
 }

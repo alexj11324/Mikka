@@ -82,7 +82,7 @@ export function QuotaNotice({ botId, stopped, retry }: {
   }, [resetsAt, mutate])
   if (!quota && !stopped) return null
 
-  const name = quota && menu.data ? subscriptionName(menu.data.current.provider, quota.plan) : null
+  const name = quota ? subscriptionName(quota.subscription, quota.plan) : null
   const title = name ? t('used', { name }) : t('usedGeneric')
   const detail = quota?.fallback
     ? t('next', { key: keyName(quota.fallback.keyProvider, quota.fallback.keyName) })

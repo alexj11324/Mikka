@@ -43,12 +43,17 @@ export interface BotModelCurrent extends BotModelMenuOption {
   chosen: boolean
   /** False when the chosen credential was removed, unshared or ran out of quota. */
   available: boolean
-  /** Set when it is unavailable because the subscription ran out of quota. */
+  /**
+   * Set when the subscription ran out of quota. With a fallback key, the rest
+   * of `current` is that key's model, which the next turn uses.
+   */
   quota?: BotModelQuota
 }
 
 /** A subscription out of quota, as the composer warns before sending (decision 2026-11-01-quota-exhausted). */
 export interface BotModelQuota {
+  /** The used-up subscription's provider (`claude` | `codex`). */
+  subscription: string
   /** The subscription's plan, e.g. `Max`. */
   plan: string | null
   /** When the used-up window resets; null when the provider did not say. */

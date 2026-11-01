@@ -179,8 +179,9 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     // the key the next turn moves to; that turn is frozen on Alice's own key, marked, and a frozen one never changes.
     await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [claude, quota(1, FUTURE)]);
     const out = await botModelMenu(pool, settings, alice, botA);
-    assert.equal(out.current.available, false);
-    assert.deepEqual(out.current.quota, { plan: "Max", resetsAt: FUTURE, fallback: { keyProvider: "deepseek", keyName: null, model: "deepseek-chat" } });
+    // The chip names the key's model the next turn runs on.
+    assert.deepEqual([out.current.id, out.current.modelId, out.current.kind, out.current.available], [apiKeyOptionId(key.id, "deepseek-chat"), "deepseek-chat", "apiKey", true]);
+    assert.deepEqual(out.current.quota, { subscription: "claude", plan: "Max", resetsAt: FUTURE, fallback: { keyProvider: "deepseek", keyName: null, model: "deepseek-chat" } });
     const switched = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.deepEqual(switched, {
       harness: "ai_sdk", model: "deepseek-chat",
@@ -189,7 +190,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     });
     // Turned off: the turn stays on the subscription and stops there; the composer offers 添加 API Key 继续 instead.
     await pool.query(`UPDATE "user" SET "apiKeyAfterQuota"=false WHERE id='alice'`);
-    assert.equal((await botModelMenu(pool, settings, alice, botA)).current.quota?.fallback, null);
+    const off = await botModelMenu(pool, settings, alice, botA);
+    assert.deepEqual([off.current.modelId, off.current.available, off.current.quota?.fallback], ["claude-opus-fixture", false, null]);
     const stays = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.equal(stays.modelSelection?.type, "subscription");
     // A teammate's key is never spent this way: Alice shares hers with the team, Bob can pick it, but his bot on his
