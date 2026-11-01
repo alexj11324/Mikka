@@ -77,3 +77,26 @@ test('waking starts the trusted worker after desktop provisioning and fails clos
   assert.equal((await handle(request('POST', { mode: 'view' }), botId, 'viewer')).status, 200)
   assert.equal(attempts, 2)
 })
+
+test('a failed worker start logs its code and sandbox, and the response stays generic', async () => {
+  const f = fixture()
+  const { CloudWorkerError } = await import('./worker-error')
+  const handle = createComputerHandler(f.store, async () => actor, async () => { throw new CloudWorkerError('worker_version_mismatch', 'i1rjvc1rlh2lx188keavy') })
+  const provider = Object.assign(new Error('GET https://api.e2b.app/sandboxes/x?key=secret failed'), { name: 'SandboxError' })
+  const failing = createComputerHandler({ ...f.store, operate: async () => { throw provider } }, async () => actor)
+  const logged: string[] = []
+  const original = console.error
+  console.error = (line: string) => { logged.push(line) }
+  try {
+    const r = await handle(request('POST', {}), botId, 'wake')
+    assert.equal(r.status, 503)
+    assert.deepEqual(await r.json(), { error: 'Cloud computer is unavailable' })
+    const p = await failing(request('POST', {}), botId, 'wake')
+    assert.deepEqual(await p.json(), { error: 'Cloud computer is unavailable' })
+  } finally { console.error = original }
+  assert.deepEqual(logged.map(line => JSON.parse(line)), [
+    { event: 'cloud_computer_failed', action: 'wake', botId, code: 'worker_version_mismatch', sandboxId: 'i1rjvc1rlh2lx188keavy' },
+    { event: 'cloud_computer_failed', action: 'wake', botId, code: 'SandboxError' },
+  ])
+  assert.ok(!logged.join('').includes('secret'))
+})
