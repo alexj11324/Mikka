@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-step local setup for a cloud Linux session (docs/local-bootstrap.md):
-# PostgreSQL 17 on 127.0.0.1:5433 with mikka_e2e migrated, Node 24 as in CI,
+# PostgreSQL 17 on 127.0.0.1:5433 with mikka_e2e migrated (PGDG, no Docker), Node as in .node-version,
 # pnpm install --frozen-lockfile, bubblewrap/socat/ripgrep, and Playwright on
 # the container's own Chromium. Idempotent: a second run only checks.
 # Prints one line of exports for the session; it holds no secret.
@@ -11,7 +11,9 @@ STATE="${MIKKA_DEV_HOME:-/var/lib/mikka-dev}"
 PGDATA_DIR="${MIKKA_PGDATA:-$STATE/pg17}"
 PG_PORT="${MIKKA_PG_PORT:-5433}"
 PG_BIN=/usr/lib/postgresql/17/bin
-NODE_MAJOR=24
+# The Node version CI uses: .node-version (a major like 24, or an exact 24.22.2), else 24.
+NODE_WANT="$(tr -d ' v\n\r' < "$ROOT/.node-version" 2>/dev/null || true)"; NODE_WANT="${NODE_WANT:-24}"
+NODE_MAJOR="${NODE_WANT%%.*}"
 PW_CHROMIUM=/opt/pw-browsers/chromium
 SUDO=""; [ "$(id -u)" -eq 0 ] || SUDO="sudo"
 log() { printf 'bootstrap: %s\n' "$*" >&2; }
@@ -51,16 +53,18 @@ PSQL=("$PG_BIN/psql" -h 127.0.0.1 -p "$PG_PORT" -U postgres -qAt)
 "${PSQL[@]}" -c "SELECT 1 FROM pg_roles WHERE rolname='e2e'" | grep -q 1 || "${PSQL[@]}" -c "CREATE ROLE e2e LOGIN SUPERUSER"
 "${PSQL[@]}" -c "SELECT 1 FROM pg_database WHERE datname='mikka_e2e'" | grep -q 1 || "${PSQL[@]}" -c "CREATE DATABASE mikka_e2e OWNER e2e"
 
-# 2. Node 24, as CI's setup-node (.github/workflows/*.yml node-version: 24), from nodejs.org with its checksum.
-node_major() { "$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0; }
+# 2. Node at NODE_WANT, as CI's setup-node, from nodejs.org with its checksum.
+# A major matches any of its releases; an exact version only itself.
+node_matches() { local v; v="$("$1" -p process.versions.node 2>/dev/null)" || return 1; [ "$v" = "$NODE_WANT" ] || [ "${v%%.*}" = "$NODE_WANT" ]; }
 NODE_DIR=""
-if command -v node >/dev/null && [ "$(node_major node)" = "$NODE_MAJOR" ]; then
+if command -v node >/dev/null && node_matches node; then
   NODE_DIR="$(dirname "$(command -v node)")"
 else
-  NODE_DIR="$(ls -d "$STATE"/node-v$NODE_MAJOR.*/bin 2>/dev/null | sort -V | tail -1 || true)"
+  case "$NODE_WANT" in *.*) GLOB="node-v$NODE_WANT-*" ;; *) GLOB="node-v$NODE_MAJOR.*" ;; esac
+  NODE_DIR="$(ls -d "$STATE"/$GLOB/bin 2>/dev/null | sort -V | tail -1 || true)"
   if [ -z "$NODE_DIR" ]; then
     case "$(uname -m)" in x86_64) ARCH=x64 ;; aarch64|arm64) ARCH=arm64 ;; *) log "unsupported CPU $(uname -m)"; exit 1 ;; esac
-    BASE="https://nodejs.org/dist/latest-v$NODE_MAJOR.x"
+    case "$NODE_WANT" in *.*) BASE="https://nodejs.org/dist/v$NODE_WANT" ;; *) BASE="https://nodejs.org/dist/latest-v$NODE_MAJOR.x" ;; esac
     TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
     curl -fsSL "$BASE/SHASUMS256.txt" -o "$TMP/SHASUMS256.txt"
     FILE="$(grep -o "node-v$NODE_MAJOR\.[0-9.]*-linux-$ARCH\.tar\.xz" "$TMP/SHASUMS256.txt" | head -1)"
