@@ -44,12 +44,15 @@ const renderers = {
   },
   BeStat: ({ props }) => {
     const formatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: props.precision ?? 0, maximumFractionDigits: props.precision ?? 0 })
-    return <BeCard size="compact" className="min-w-0">
-      <BeCardHeader><BeCardTitle>{props.label}</BeCardTitle></BeCardHeader>
-      <BeCardContent><p className="text-2xl font-semibold">
-        <span aria-hidden="true"><AnimatedNumber value={props.value} format={value => formatter.format(value)} />{props.unit}</span>
-        <span className="sr-only">{formatter.format(props.value)}{props.unit}</span>
-      </p></BeCardContent>
+    // Figures in a row share the width equally (flex-1 basis-0); label 12/16 muted, value 20/28 SemiBold, unit 13 muted (R-32).
+    return <BeCard size="compact" className="min-w-0 flex-1 basis-0">
+      <BeCardContent className="flex min-w-0 flex-col gap-1">
+        <p className="text-xs text-muted-foreground">{props.label}</p>
+        <p className="text-xl font-semibold tabular-nums">
+          <span aria-hidden="true"><AnimatedNumber value={props.value} format={value => formatter.format(value)} />{props.unit && <span className="ml-0.5 text-[13px] font-normal text-muted-foreground">{props.unit}</span>}</span>
+          <span className="sr-only">{formatter.format(props.value)}{props.unit}</span>
+        </p>
+      </BeCardContent>
     </BeCard>
   },
   // No suggestion cards in a chat (R-12): saved follow-ups draw nothing; agent-follow-ups.tsx stays in the library.
