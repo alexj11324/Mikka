@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import useSWR from 'swr'
 import { Check, Copy, MoreHorizontal, TriangleAlert } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { Skeleton } from '@/components/ui/skeleton'
 import { withBasePath } from '@/lib/base-path'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { InvalidAuthorization, parseSubscriptionStart, planName, subscriptionListSchema, subscriptionUsageSchema, type SubscriptionUsageView } from '@/lib/subscription-ui'
@@ -49,8 +51,10 @@ async function post(body: unknown, signal?: AbortSignal) {
  */
 export function SubscriptionSettings({ workspaceId, extraRows, action }: { workspaceId: string; extraRows?: ReactNode[]; action?: ReactNode }) {
   const t = useTranslations('Settings.subscriptions')
-  const [state, setState] = useState<State | null>(null)
-  const [loadFailed, setLoadFailed] = useState(false)
+  // Cached per workspace: a return to the page shows the last list at once and re-reads it behind.
+  const list = useSWR(subscriptionsKey(workspaceId), () => readSubscriptions(workspaceId), { revalidateOnFocus: false })
+  const state = list.data ?? null
+  const loadFailed = !list.data && !!list.error
   const [attempt, setAttempt] = useState<Attempt | null>(null)
   const [callback, setCallback] = useState('')
   /** The desktop app is catching the browser's return, so there is nothing to paste. */
@@ -60,18 +64,10 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
   const [starting, setStarting] = useState<{ provider: Provider; id?: string } | null>(null)
   const [error, setError] = useState<Failure | null>(null)
   const [notice, setNotice] = useState('')
-  const [usage, setUsage] = useState<Usage>(null)
-  const [usageLoading, setUsageLoading] = useState(false)
   const [now, setNow] = useState(() => Date.now())
-  const usageAbort = useRef<AbortController | null>(null)
   const connectedKey = state?.connections.filter(item => item.state === 'connected').map(item => `${item.id}:${item.revision}`).join(',') ?? ''
-  const refresh = useCallback(async () => {
-    const response = await fetch(`${path}?workspace=${encodeURIComponent(workspaceId)}`, { cache: 'no-store', credentials: 'same-origin' })
-    if (!response.ok) throw new Error('Subscription list unavailable')
-    setState(subscriptionListSchema.parse(await response.json())); setLoadFailed(false)
-  }, [workspaceId])
-
-  useEffect(() => { void refresh().catch(() => { setState(null); setLoadFailed(true) }) }, [refresh])
+  const { mutate } = list
+  const refresh = useCallback(async () => { await mutate() }, [mutate])
   const failureMessage = useCallback((failure: unknown, key: 'startFailed' | 'finishFailed', provider: Provider) => {
     if (failure instanceof InvalidAuthorization) return t('refusedPage', { provider: t(provider) })
     const code = failure instanceof RequestError ? failure.code : ''
@@ -82,25 +78,20 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
     if (code === 'provider_operation_failed') return t('refusedProvider', { provider: t(provider) })
     return t(key, { provider: t(provider) })
   }, [t])
-  const loadUsage = useCallback(async (force = false) => {
-    usageAbort.current?.abort()
-    const abort = new AbortController()
-    usageAbort.current = abort
-    setUsageLoading(true)
-    try {
-      const response = await fetch(`${path}/usage?workspace=${encodeURIComponent(workspaceId)}${force ? '&refresh=1' : ''}`, { cache: 'no-store', credentials: 'same-origin', signal: abort.signal })
-      if (!response.ok) throw new Error('Subscription usage unavailable')
-      const result = subscriptionUsageSchema.parse(await response.json())
-      if (!abort.signal.aborted) setUsage(new Map(result.connections.map(item => [item.id, item])))
-    } catch { if (!abort.signal.aborted) setUsage('failed') } finally { if (usageAbort.current === abort) setUsageLoading(false); setNow(Date.now()) }
-  }, [workspaceId])
+  // The meters are cached too, and re-read every five minutes while the page is visible.
+  const usageRead = useSWR(connectedKey ? ['settings:subscription-usage', workspaceId, connectedKey] : null, () => readUsage(workspaceId), { revalidateOnFocus: false, refreshInterval: USAGE_EVERY_MS })
+  const usage: Usage = usageRead.error ? 'failed' : usageRead.data ?? null
+  const usageLoading = usageRead.isValidating
+  const { mutate: mutateUsage } = usageRead
+  // A retry that fails again leaves 暂时无法读取 on screen.
+  const reloadUsage = useCallback(() => { void mutateUsage(readUsage(workspaceId, true), { revalidate: false }).catch(() => undefined) }, [mutateUsage, workspaceId])
+  const usageData = usageRead.data
+  useEffect(() => { setNow(Date.now()) }, [usageData, usageRead.error])
   useEffect(() => {
     if (!connectedKey) return
-    void loadUsage()
-    const read = setInterval(() => { if (document.visibilityState === 'visible') void loadUsage() }, USAGE_EVERY_MS)
     const tick = setInterval(() => setNow(Date.now()), 30_000)
-    return () => { clearInterval(read); clearInterval(tick); usageAbort.current?.abort() }
-  }, [connectedKey, loadUsage])
+    return () => clearInterval(tick)
+  }, [connectedKey])
   useEffect(() => {
     if (!attempt || attempt.flow !== 'device' || !attempt.interval) return
     let stopped = false
@@ -191,8 +182,15 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
 
   // Without the subscription service the API keys still form the list.
   const status = loadFailed ? <FieldError className="px-1">{t('loadFailed')}</FieldError>
-    : !state ? <p role="status" className="px-1 text-sm text-muted-foreground">{t('loading')}</p>
+    : !state ? null
       : !state.enabled ? <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p> : null
+  // First visit only: rows the size of the provider rows, so nothing moves when the list arrives.
+  if (!state && !loadFailed) return <div role="status" aria-label={t('loading')} className="flex flex-col gap-1">
+    <SettingsSection action={action}>
+      {(['codex', 'claude'] as const).map(provider => <SubscriptionRowSkeleton key={provider} provider={provider} label={t(provider)} />)}
+      {extraRows}
+    </SettingsSection>
+  </div>
   if (status || !state) return <div className="flex flex-col gap-3">
     {extraRows?.length ? <SettingsSection action={action}>{extraRows}</SettingsSection> : action && <div className="flex justify-end">{action}</div>}
     {status}
@@ -268,7 +266,7 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
                   {(live || reauth) && <div className={cn('flex flex-col gap-2 transition-opacity duration-150 sm:pl-8', paused && 'opacity-50')}>
                     {refused && <p className="text-xs text-foreground">{read?.status === 'unverified' ? t('extraUsageUnverified') : provider === 'claude' ? `${t('extraUsageOn')} · ${t('extraUsageClaudeFix')}` : t('extraUsageOn')}</p>}
                     {failed
-                      ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={() => { void loadUsage(true) }}>{t('retry')}</Button></span>
+                      ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={reloadUsage}>{t('retry')}</Button></span>
                       : read && read.windows.length > 0 && <QuotaMeters windows={read.windows} now={now} />}
                     {bots.length > 0 && <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       {t('usedBy')}
@@ -292,6 +290,27 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
     {updated !== null && <p className="pt-1 pl-1 text-xs text-muted-foreground">{updated < 1 ? t('updatedJustNow') : t('updatedAgo', { minutes: updated })}</p>}
     {notice && <p role="status" className="pt-1 pl-1 text-xs text-muted-foreground">{notice}</p>}
   </div>
+}
+
+export const subscriptionsKey = (workspaceId: string) => ['settings:subscriptions', workspaceId] as const
+export async function readSubscriptions(workspaceId: string): Promise<State> {
+  const response = await fetch(`${path}?workspace=${encodeURIComponent(workspaceId)}`, { cache: 'no-store', credentials: 'same-origin' })
+  if (!response.ok) throw new Error('Subscription list unavailable')
+  return subscriptionListSchema.parse(await response.json())
+}
+async function readUsage(workspaceId: string, force = false) {
+  const response = await fetch(`${path}/usage?workspace=${encodeURIComponent(workspaceId)}${force ? '&refresh=1' : ''}`, { cache: 'no-store', credentials: 'same-origin' })
+  if (!response.ok) throw new Error('Subscription usage unavailable')
+  const result = subscriptionUsageSchema.parse(await response.json())
+  return new Map(result.connections.map(item => [item.id, item]))
+}
+
+/** A provider row before the list has ever loaded: the not-connected row, its button still a placeholder. */
+function SubscriptionRowSkeleton({ provider, label }: { provider: Provider; label: string }) {
+  const Logo = logos[provider]
+  return <SettingRow icon={<Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />} title={label}>
+    <Skeleton className="h-7 w-14 rounded-md" />
+  </SettingRow>
 }
 
 /** The rest of a sign-in the browser can't finish for us, inside its provider's row. */

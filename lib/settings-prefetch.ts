@@ -4,6 +4,7 @@ import type { getPreferences } from '@/app/actions/preferences'
 import type { listSavedLogins } from '@/app/actions/settings-activity'
 import type { getWorkspaceDeletionImpact, getWorkspaceGeneral, getWorkspaceTransferTargets } from '@/app/actions/workspace-settings'
 import { apiKeysKey, readApiKeys } from '@/components/settings/api-key-settings'
+import { readSubscriptions, subscriptionsKey } from '@/components/settings/subscription-settings'
 import type { getAppPolicy } from '@/app/actions/app-policy'
 import type { getPersonalPolicy } from '@/app/actions/personal-policy'
 import type { getE2BKeyCapability, listSecrets } from '@/app/actions/workspace-secrets'
@@ -43,7 +44,8 @@ const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: un
   usage: id => { const month = currentMonth(); return [[['settings:usage', id, month], () => settingsRead<Result<typeof getUsage>>('usage', { month, workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)]] },
   billing: id => [[['settings:billing', id], () => settingsRead<Result<typeof getBilling>>('billing', { workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)], [cardVerificationKey(id), () => readCardVerification(id)]],
   bots: () => botAgentsReads(),
-  models: id => [[apiKeysKey(id), () => readApiKeys(id)]],
+  // API 与订阅: its GET reads. 共享订阅 and 付款 are still server actions, read when the section opens.
+  models: id => [[subscriptionsKey(id), () => readSubscriptions(id)], [apiKeysKey(id), () => readApiKeys(id)], [['settings:e2b-key', id], () => settingsRead<Result<typeof getE2BKeyCapability>>('e2b-key', { workspace: id })]],
   // useSWRInfinite takes a preloaded page by the page's own key: page one of 全部.
   audit: id => [[['settings:audit', id, 'all', null], () => settingsRead<Result<typeof listAuditLog>>('audit', { workspace: id, filter: 'all' })]],
 }
