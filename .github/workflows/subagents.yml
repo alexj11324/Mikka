@@ -1,7 +1,7 @@
 name: Subagents and thread backend
 on:
   push:
-    branches: ['codex/342-runtime', 'codex/180-account-credential-vault', 'integrate/**']
+    branches: ['codex/342-runtime', 'codex/180-account-credential-vault', 'integration/**', 'integrate/**']
   workflow_dispatch:
 permissions:
   contents: read

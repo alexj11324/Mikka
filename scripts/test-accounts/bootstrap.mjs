@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
 import { assertDatabaseIdentity, databaseTarget, environmentFingerprint, EnvironmentError, validateEnvironment } from './environment.mjs'
 import { recordAuthenticationSecrets } from './session.mjs'
+import { localDatabaseTarget } from './database-target.mjs'
 
 /** Capture the runner's existing secrets before a server or account can start. */
 export async function recordRunnerEvidenceSecrets(environment) {
@@ -77,10 +78,43 @@ export async function bootstrapEnvironment({ connectionString, origin, deploymen
   } finally { await pool.end() }
 }
 
+/**
+ * Local mode (MIKKA_LOCAL_TEST_ACCOUNTS=1): the developer's own disposable
+ * PostgreSQL on this machine stands in for the workflow-owned service. It binds
+ * only a loopback database whose name ends in _e2e (the same database rule
+ * validateEnvironment applies to every descriptor) and never reads or fakes a
+ * CI variable. Everything after this check is the CI path's: a fresh database
+ * with no users, the exact checked-out SHA, no external mail or service keys.
+ */
+export { localDatabaseTarget }
+
+async function bootstrapLocal(env, outputFile) {
+  localDatabaseTarget(env.E2E_DATABASE_URL)
+  let sha
+  try { sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() } catch { throw new EnvironmentError('CHECKED_OUT_SHA_UNAVAILABLE') }
+  if (sha !== env.MIKKA_TEST_DEPLOYMENT_SHA) throw new EnvironmentError('CHECKED_OUT_SHA_MISMATCH')
+  return bootstrapEnvironment({
+    connectionString: env.E2E_DATABASE_URL, origin: env.BETTER_AUTH_URL, deploymentSha: sha,
+    id: `local-${randomUUID()}`, outputFile,
+    authorizeDatabase: async pool => {
+      // The connection must reach a server, not a PG* fallback; freshness (no
+      // users, no marker) is checked by bootstrapEnvironment before any DDL.
+      const server = (await pool.query('SELECT inet_server_addr() AS address')).rows[0]
+      if (!server.address) throw new EnvironmentError('LOCAL_DATABASE_UNVERIFIED')
+    },
+  })
+}
+
 async function main() {
   const args = process.argv.slice(2)
   if (args.length !== 2 || args[0] !== '--output') throw new EnvironmentError('USAGE_BOOTSTRAP_OUTPUT_FILE')
   const env = process.env
+  if (env.MIKKA_LOCAL_TEST_ACCOUNTS === '1') {
+    const descriptor = await bootstrapLocal(env, args[1])
+    await recordRunnerEvidenceSecrets(descriptor)
+    console.log(JSON.stringify({ environmentId: descriptor.id, deploymentSha: descriptor.deploymentSha, origin: descriptor.origin, status: 'prepared' }))
+    return
+  }
   if (process.platform !== 'linux' || env.CI !== 'true' || env.GITHUB_ACTIONS !== 'true' || env.RUNNER_ENVIRONMENT !== 'github-hosted' || !/^\d+$/.test(env.GITHUB_RUN_ID ?? '') || !env.GITHUB_WORKSPACE) throw new EnvironmentError('OWNED_GITHUB_SERVICE_REQUIRED')
   let sha
   try { sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', cwd: env.GITHUB_WORKSPACE }).trim() } catch { throw new EnvironmentError('CHECKED_OUT_SHA_UNAVAILABLE') }

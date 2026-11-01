@@ -20,6 +20,8 @@ export interface Home {
 export interface IssueSource { kind: 'issue'; id: string; identifier: string | null; number: number | null; title: string; status: string }
 export interface RunSource {
   kind: 'run'; id: string; name: string; agentName: string; harness: string; status: string
+  /** Its group in the thread list (R-52), decided on the server. Absent from a server older than it. */
+  group?: ThreadGroup
   issue: { id: string; identifier: string | null; number: number | null; title: string } | null
 }
 export type CitationSource = IssueSource | RunSource

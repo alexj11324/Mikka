@@ -147,3 +147,21 @@ test('scripted Decisions accepts only the runtime triage contract and identifies
     assert.equal(evidence.errors.length, 4)
   } finally { await services.close() }
 })
+
+test('scripted Decisions answers an ended run\'s outcome only from the run outcome contract', async () => {
+  const services = await startMvpServices(0)
+  try {
+    const OUTCOME_QUESTIONS = [{ type: 'choice', name: 'outcome', choices: ['done', 'blocked', 'needs_input', 'failed', 'idle'].map(value => ({ value })) }]
+    const facts = (status) => ['status: ' + status, 'stop reason: none', 'attempts on this task: 1', 'task: in_review — "Add README"', 'pull requests: open', 'summary (quoted): "Opened the PR"', 'last reply (quoted): "Done"'].join('\n')
+    const request = (text, questions = OUTCOME_QUESTIONS) => ({ model: 'openai/gpt-6-luna-decisions', input: [{ role: 'user', content: [{ type: 'input_text', text }] }], questions })
+    const post = async body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
+    assert.deepEqual((await (await post(request(facts('succeeded')))).json()).answers, [{ type: 'choice', name: 'outcome', choice: 'done' }])
+    assert.deepEqual((await (await post(request(facts('cancelled')))).json()).answers, [{ type: 'choice', name: 'outcome', choice: 'idle' }])
+    for (const invalid of [request('status: succeeded'), request(facts('running')), request(facts('succeeded'), [{ ...OUTCOME_QUESTIONS[0], choices: OUTCOME_QUESTIONS[0].choices.slice(1) }])]) {
+      assert.equal((await post(invalid)).status, 500)
+    }
+    const evidence = await (await fetch(`${services.origin}/observations`)).json()
+    assert.deepEqual(evidence.observations.filter(item => item.kind === 'outcome-request').map(item => item.status), ['succeeded', 'cancelled'])
+    assert.equal(evidence.errors.length, 3)
+  } finally { await services.close() }
+})

@@ -2,8 +2,10 @@
 
 These are decisions Alex has already made. Designs, specs and code follow
 them without asking again. To change a rule, Alex decides, the change is
-logged in [`decisions.md`](decisions.md), and this file is edited in the same
-PR. Cite rules by id in reviews ("breaks R-11").
+recorded as a file in [`decisions/`](decisions/README.md), and this file is
+edited in the same PR. A new rule's id (`R-xx`) is assigned by the
+coordinator when the work is dispatched ([dev workflow](../dev-workflow.md)
+§ 6). Cite rules by id in reviews ("breaks R-11").
 
 Words (bot, chat, thread) are defined in [`glossary.md`](glossary.md). Which
 source wins in a conflict is in [`README.md`](README.md).

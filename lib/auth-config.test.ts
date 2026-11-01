@@ -204,3 +204,27 @@ test('v0 hosts and local development complete signed proxy login through a hub t
   }
   assert.equal(providerRequests.filter(url => url === tokenEndpoint).length, origins.length)
 })
+
+test('local test-account mode allows HTTP loopback only with its switch and a loopback *_e2e database', () => {
+  const local = 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e'
+  const mode = { NODE_ENV: 'production', MIKKA_LOCAL_TEST_ACCOUNTS: '1', E2E_DATABASE_URL: local, MIKKA_DATABASE_URL: local, DATABASE_URL: local }
+  // Local mode + loopback origin: allowed.
+  for (const origin of ['http://localhost:3100', 'http://127.0.0.1:3100', 'http://[::1]:3100'])
+    assert.deepEqual(authTrustedOrigins({ ...mode, BETTER_AUTH_URL: origin }), [origin])
+  // Local mode + a non-loopback HTTP origin: refused.
+  for (const origin of ['http://mikka.example.com', 'http://10.0.0.5:3100', 'http://localhost.example.com'])
+    assert.throws(() => authTrustedOrigins({ ...mode, BETTER_AUTH_URL: origin }), /Auth origins must be HTTPS/)
+  // Production without the local mode + loopback origin: refused, as before.
+  assert.throws(() => authTrustedOrigins({ NODE_ENV: 'production', BETTER_AUTH_URL: 'http://localhost:3100' }), /Auth origins must be HTTPS/)
+  // The switch alone, or any non-local or non-_e2e database, keeps production behaviour.
+  const remote = 'postgresql://user:secret@ep-example.neon.tech:5432/mikka_e2e'
+  for (const env of [
+    { ...mode, MIKKA_LOCAL_TEST_ACCOUNTS: undefined },
+    { ...mode, MIKKA_LOCAL_TEST_ACCOUNTS: 'true' },
+    { ...mode, E2E_DATABASE_URL: undefined },
+    { ...mode, DATABASE_URL: remote },
+    { ...mode, MIKKA_DATABASE_URL: remote },
+    { ...mode, ORVILO_DATABASE_URL: remote },
+    { ...mode, E2E_DATABASE_URL: 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/orvilo_mvp' },
+  ]) assert.throws(() => authTrustedOrigins({ ...env, BETTER_AUTH_URL: 'http://localhost:3100' }), /Auth origins must be HTTPS/)
+})

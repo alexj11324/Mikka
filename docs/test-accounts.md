@@ -68,6 +68,43 @@ that verifies the created resource's data directory/process/container identity
 against the exact connection. It must not impersonate GitHub Actions by setting
 CI flags. Ordinary shared or production databases have no bootstrap path here.
 
+### Local mode (a developer's own disposable database)
+
+`MIKKA_LOCAL_TEST_ACCOUNTS=1 node scripts/test-accounts/bootstrap.mjs --output <file>`
+is that path for a PostgreSQL 17 you started yourself on this machine (the
+version CI uses). It reads no
+CI variable and sets none. Before connecting it refuses any database that is
+not on `127.0.0.1`, `localhost` or `[::1]` or whose name does not end in `_e2e`;
+after that it applies the CI checks unchanged (a database with no users and no
+marker, the checked-out SHA equal to `MIKKA_TEST_DEPLOYMENT_SHA`, no mail or
+external service keys). Start from an empty database: migrate, run
+`pnpm test:e2e:setup`, then bootstrap. Keep the PostgreSQL data directory
+outside the session scratchpad, whose permissions can change under a running
+server.
+
+Browser specs then run against a server you started (`E2E_BASE_URL`), with the
+preinstalled Chromium as `launchOptions.executablePath` when the pinned
+Playwright browser is not installed.
+
+- Prefer a production build (`next build`, then `next start`), with
+  `MIKKA_LOCAL_TEST_ACCOUNTS=1` and the same loopback `_e2e` database URLs in
+  the server's environment: that is what lets a production build accept the
+  `http://localhost` auth origin (`lib/auth-config.ts`). Do not set `CI`. The fixtures
+  fail a test on any `console.error`, and `next dev` prints React
+  development-only checks (for example `useInsertionEffect must not schedule
+  updates`) that a production build never logs.
+- With `next dev`, warm it first: open every route the spec visits once before
+  the run. A first compile takes 10–35 seconds and lands inside the specs'
+  15-second assertions; the run then fails on timing, not on the code.
+- Every test registers a new account. Start the server with the sign-up and
+  verification throttle values the browser workflow uses
+  (`MIKKA_SIGNUP_IP_HOURLY`, `MIKKA_SIGNUP_GLOBAL_HOURLY`,
+  `MIKKA_VERIFICATION_IP_HOURLY`, `MIKKA_VERIFICATION_GLOBAL_HOURLY` in
+  `.github/workflows/browser-tests.yml`); the defaults allow five sign-ups per
+  address an hour (`lib/abuse/signup.ts`). Better Auth also allows three
+  sign-ups per ten seconds from one origin: run one spec process at a time and
+  do not register by hand during a run.
+
 The environment binding is immutable for its lifetime. A new SHA or origin
 requires a new disposable environment and descriptor; changing an alias while
 an acceptance run is active cannot redirect its sessions.
