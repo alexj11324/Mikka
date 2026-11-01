@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTheme } from 'next-themes'
-import { useSWRConfig } from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -37,6 +37,15 @@ import type { SettingsSectionId } from '@/lib/settings-sections'
 import type { RailDestination } from '@/components/nav/icon-rail'
 import { prefetchAllSettings, prefetchSettingsSection } from '@/lib/settings-prefetch'
 import { FieldError } from '@/components/ui/field'
+import { withBasePath } from '@/lib/base-path'
+
+/** Whether model subscriptions run on this deployment (`GET /api/subscriptions` answers `enabled`); null while unknown or unreadable. */
+async function readSubscriptionsEnabled([, workspaceId]: readonly [string, string]): Promise<boolean | null> {
+  const response = await fetch(withBasePath(`/api/subscriptions?workspace=${encodeURIComponent(workspaceId)}`), { cache: 'no-store', credentials: 'same-origin' })
+  if (!response.ok) return null
+  const body = await response.json().catch(() => null) as { enabled?: unknown } | null
+  return typeof body?.enabled === 'boolean' ? body.enabled : null
+}
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
 
@@ -69,6 +78,9 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   // Settings opened without ?workspace= still has one: the default the API resolved.
   const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
   const roleKnown = workspace !== undefined
+  // ST4: 模型与额度 leaves the list when the deployment has no model subscriptions; a direct link still opens its state line.
+  const subscriptions = useSWR(!preview && resolvedWorkspaceId ? ['settings:subscriptions-enabled', resolvedWorkspaceId] as const : null, readSubscriptionsEnabled, { revalidateOnFocus: false })
+  const hidden: SettingsSectionId[] = subscriptions.data === false ? ['models'] : []
   // Once the role is known, load every section the viewer can open, so none shows a skeleton later.
   useEffect(() => {
     if (preview || !roleKnown || !resolvedWorkspaceId) return
@@ -83,11 +95,11 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const enter = switched.current ? 'animate-in fade-in-0 duration-150 motion-reduce:animate-none' : undefined
 
   return <>
-    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache) }} onRail={onRail} />
+    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} hidden={hidden} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache) }} onRail={onRail} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6', enter)}>
-        {section === 'computers' ? <DevicesSettings /> : <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
+        {section === 'computers' ? <DevicesSettings /> : <h1 className="text-xl font-semibold">{title}</h1>}
         <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
       </SettingsContent>}
     </AppShellContent>

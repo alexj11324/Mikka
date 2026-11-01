@@ -832,15 +832,15 @@
     "commands": {
       "sent": {
         "redetect": "Asked {name} to re-detect agents",
-        "restart": "Asked {name} to restart the daemon",
-        "update": "Asked {name} to update the daemon"
+        "restart": "Asked {name} to restart its connection",
+        "update": "Asked {name} to update its client"
       },
       "queued": "{name} is offline; it runs when it reconnects"
     },
     "actions": {
       "rename": "Rename",
-      "restart": "Restart daemon",
-      "update": "Update daemon",
+      "restart": "Restart connection",
+      "update": "Update client",
       "redetect": "Re-detect agents",
       "remove": "Remove device"
     },
@@ -887,7 +887,8 @@
       "retry": "Retry",
       "done": "Done",
       "cancelled": "Cancelled"
-    }
+    },
+    "autoScheduleNeedsAllow": "Turn on Allow scheduling first"
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -1712,11 +1713,9 @@
       "email": "Email",
       "notSet": "Not set",
       "readOnly": "Account details are read-only; this version does not support editing them here.",
-      "save": "Save",
       "saved": "Saved",
       "changeAvatar": "Change",
       "uploading": "Uploading…",
-      "sessionHeading": "Session",
       "signOut": "Sign out",
       "signingOut": "Signing out…",
       "deleteAccount": "Delete account",
@@ -1725,7 +1724,10 @@
       "deleteConfirmLabel": "Type {email} to confirm",
       "deleting": "Deleting…",
       "confirmDelete": "Delete account",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "currentSession": "This session",
+      "danger": "Danger zone",
+      "account": "This account"
     },
     "memory": {
       "enabled": "Use memory",
@@ -1771,7 +1773,8 @@
       "transferred": "Transferred to {name}",
       "replayOnboarding": "Replay onboarding",
       "replay": "Replay",
-      "replaying": "Replaying…"
+      "replaying": "Replaying…",
+      "transferPick": "Choose a member"
     },
     "computerPolicy": {
       "heading": "Computer use",
@@ -1779,15 +1782,13 @@
       "allow": "Allow",
       "deny": "Deny",
       "error": "Could not update or load the computer setting.",
-      "loading": "Loading computer setting…",
-      "unavailable": "Cloud computers are off"
+      "loading": "Loading computer setting…"
     },
     "issuePrefix": {
       "title": "Personal task ids",
       "label": "Prefix",
       "current": "Personal tasks show as {example}.",
       "needsChoice": "No usable prefix yet: your email has fewer than four letters, or it matches a connected Linear team. Enter four letters.",
-      "save": "Save",
       "saved": "Saved. Personal tasks now show as {example}.",
       "invalid": "Enter four letters A–Z.",
       "taken": "That matches a connected Linear team key. Choose another.",
@@ -1862,7 +1863,7 @@
       "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
       "removeFailed": "The connection could not be removed.",
       "loading": "Loading model subscriptions…",
-      "serviceOff": "Model subscriptions aren't turned on for this deployment. Bots use the workspace's default model quota.",
+      "serviceOff": "Model subscriptions are off.",
       "startFailed": "{provider} sign-in could not start",
       "finishFailed": "{provider} sign-in did not finish",
       "signedOut": "Your session expired. Sign in again, then connect.",
@@ -1974,7 +1975,6 @@
       "userName": "Preview user"
     },
     "notifications": {
-      "heading": "Notifications",
       "proactive": "Proactive messages",
       "pushDecide": "Needs your decision",
       "pushReview": "Ready for review",
@@ -2010,7 +2010,8 @@
       "currentDevice": "This device",
       "signOut": "Sign out",
       "signingOut": "Signing out…",
-      "signOutOthers": "Sign out all"
+      "signOutOthers": "Sign out all",
+      "otherDevices": "Other devices"
     },
     "privacy": {
       "data": "Data",
@@ -2139,7 +2140,6 @@
         "all": "All",
         "security": "Security"
       },
-      "export": "Export",
       "exportCsv": "Export CSV",
       "empty": "Nothing in the last 90 days.",
       "loadMore": "Load more",
@@ -2349,8 +2349,10 @@
       "whenDeviceOffline": "When the device is offline",
       "offlineWait": "Wait for it",
       "offlineCloud": "Run in the cloud",
-      "labels": "By label"
-    }
+      "labels": "By label",
+      "pickModel": "Choose a model"
+    },
+    "searchEmpty": "No matching settings"
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
@@ -2404,7 +2406,6 @@
     "description": "Invite teammates to {workspace} by entering emails or dropping in a CSV.",
     "done": "Done",
     "emailLabel": "Email addresses",
-    "emailHelp": "Separate with commas or new lines; up to {max} people at a time.",
     "csv": {
       "label": "Upload a CSV file",
       "dropNow": "Drop to import the CSV",
@@ -2419,7 +2420,6 @@
       "member": "Member",
       "admin": "Admin"
     },
-    "noEmailService": "Email delivery is not connected, so each invite becomes a link for that address; no email is sent.",
     "pendingCount": "{count, plural, =1 {1 person} other {# people}} to invite",
     "creating": "Creating…",
     "createLinks": "Create invite links",

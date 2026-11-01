@@ -832,15 +832,15 @@
     "commands": {
       "sent": {
         "redetect": "已让 {name} 重新检测 Agent",
-        "restart": "已让 {name} 重启 daemon",
-        "update": "已让 {name} 更新 daemon"
+        "restart": "已让 {name} 重启连接",
+        "update": "已让 {name} 更新客户端"
       },
       "queued": "{name} 离线，上线后执行"
     },
     "actions": {
       "rename": "重命名",
-      "restart": "重启 daemon",
-      "update": "更新 daemon",
+      "restart": "重启连接",
+      "update": "更新客户端",
       "redetect": "重新检测 Agent",
       "remove": "移除设备"
     },
@@ -887,7 +887,8 @@
       "retry": "重试",
       "done": "完成",
       "cancelled": "已取消"
-    }
+    },
+    "autoScheduleNeedsAllow": "需先开启「允许调度」"
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
@@ -1712,11 +1713,9 @@
       "email": "电子邮箱",
       "notSet": "未设置",
       "readOnly": "账户信息为只读，当前版本暂不支持在此修改。",
-      "save": "保存",
       "saved": "已保存",
       "changeAvatar": "更换",
       "uploading": "上传中…",
-      "sessionHeading": "会话",
       "signOut": "退出登录",
       "signingOut": "正在退出…",
       "deleteAccount": "删除账户",
@@ -1725,7 +1724,10 @@
       "deleteConfirmLabel": "输入 {email} 确认",
       "deleting": "正在删除…",
       "confirmDelete": "删除账户",
-      "cancel": "取消"
+      "cancel": "取消",
+      "currentSession": "当前会话",
+      "danger": "危险操作",
+      "account": "此账户"
     },
     "memory": {
       "enabled": "使用记忆",
@@ -1771,7 +1773,8 @@
       "transferred": "已转让给 {name}",
       "replayOnboarding": "重新播放引导",
       "replay": "重新播放",
-      "replaying": "正在重新播放…"
+      "replaying": "正在重新播放…",
+      "transferPick": "选择成员"
     },
     "computerPolicy": {
       "heading": "电脑操作",
@@ -1779,7 +1782,6 @@
       "deny": "禁止",
       "error": "无法读取或更新电脑设置。",
       "loading": "正在读取电脑设置…",
-      "unavailable": "云电脑未开启",
       "allow": "允许"
     },
     "issuePrefix": {
@@ -1787,7 +1789,6 @@
       "label": "前缀",
       "current": "个人任务显示为 {example}。",
       "needsChoice": "还没有可用的前缀：邮箱里的字母不够 4 个，或和已连接的 Linear 团队重名。请填 4 个字母。",
-      "save": "保存",
       "saved": "已保存，个人任务现在显示为 {example}。",
       "invalid": "请填 4 个英文字母。",
       "taken": "和已连接的 Linear 团队 key 重名，请换一个。",
@@ -1862,7 +1863,7 @@
       "extraUsageUnverified": "没确认额外用量已关闭，Bot 暂不会使用这个订阅",
       "removeFailed": "无法移除这个连接。",
       "loading": "正在读取模型订阅…",
-      "serviceOff": "这个部署还没有开启模型订阅，Bot 会使用工作区默认的模型额度。",
+      "serviceOff": "模型订阅未开启。",
       "startFailed": "{provider} 授权启动失败",
       "finishFailed": "{provider} 授权未完成",
       "signedOut": "登录已过期，请重新登录后再连接。",
@@ -1974,7 +1975,6 @@
       "userName": "预览用户"
     },
     "notifications": {
-      "heading": "通知",
       "proactive": "主动消息",
       "pushDecide": "需要你决策",
       "pushReview": "待审阅",
@@ -2010,7 +2010,8 @@
       "currentDevice": "当前设备",
       "signOut": "退出",
       "signingOut": "正在退出…",
-      "signOutOthers": "全部退出"
+      "signOutOthers": "全部退出",
+      "otherDevices": "其他设备"
     },
     "privacy": {
       "data": "数据",
@@ -2139,7 +2140,6 @@
         "all": "全部",
         "security": "安全"
       },
-      "export": "导出",
       "exportCsv": "导出 CSV",
       "empty": "最近 90 天没有记录。",
       "loadMore": "加载更多",
@@ -2349,8 +2349,10 @@
       "whenDeviceOffline": "设备离线时",
       "offlineWait": "等它上线",
       "offlineCloud": "改到云端运行",
-      "labels": "按标签"
-    }
+      "labels": "按标签",
+      "pickModel": "选择模型"
+    },
+    "searchEmpty": "没有匹配的设置"
   },
   "TelegramBot": {
     "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
@@ -2404,7 +2406,6 @@
     "description": "邀请同事加入{workspace}，可输入邮箱或拖入 CSV 批量导入。",
     "done": "完成",
     "emailLabel": "邮箱地址",
-    "emailHelp": "用逗号或换行分隔，一次最多 {max} 人。",
     "csv": {
       "label": "上传 CSV 文件",
       "dropNow": "松开即可导入 CSV",
@@ -2419,7 +2420,6 @@
       "member": "成员",
       "admin": "管理员"
     },
-    "noEmailService": "当前未接入邮件服务，将生成邮箱专属邀请链接，不会自动发送邮件。",
     "pendingCount": "{count} 位待邀请",
     "creating": "正在创建…",
     "createLinks": "创建邀请链接",

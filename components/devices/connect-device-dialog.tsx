@@ -52,8 +52,9 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
         </DialogTitle>
       </DialogHeader>
       {commands ? <div className="flex min-w-0 flex-col gap-4">
-        {(['install', 'login', 'start'] as const).map(key => <CodeBlock key={key} code={commands[key]} language="bash" defaultWrap>
-          <CodeBlockHeader>
+        {/* R-39: the dialog is the only container, so each command is a grey block with no border of its own. */}
+        {(['install', 'login', 'start'] as const).map(key => <CodeBlock key={key} code={commands[key]} language="bash" defaultWrap className="border-0 bg-muted [--code-block-bg:var(--muted)]">
+          <CodeBlockHeader className="border-b-0">
             <CodeBlockTitle>{t(`commands.${key}`)}</CodeBlockTitle>
             <CodeBlockCopyButton className="ml-auto" labels={{ copy: t('copyCommand'), copied: t('copied') }} />
           </CodeBlockHeader>
@@ -61,7 +62,7 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
         <p className="text-xs text-muted-foreground">{t('requirements')}</p>
       </div> : <FieldError>{t('configurationFailed')}</FieldError>}
       <DialogFooter>
-        <Button size="sm" className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => changeOpen(false)}>{t('done')}</Button>
+        <Button size="sm" onClick={() => changeOpen(false)}>{t('done')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

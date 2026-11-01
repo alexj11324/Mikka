@@ -109,7 +109,7 @@ export function SecuritySettings() {
           ? <Badge variant="secondary">{t('currentDevice')}</Badge>
           : <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void signOut(device.id) }}>{pendingSession === device.id ? t('signingOut') : t('signOut')}</Button>}
       </SettingRow>)}
-      {devices.length > 1 && <SettingRow title={t('signOutOthers')}>
+      {devices.length > 1 && <SettingRow title={t('otherDevices')}>
         <Button type="button" variant="secondary" size="sm" disabled={pendingSession !== null} onClick={() => { void signOutEverywhere() }}>{t('signOutOthers')}</Button>
       </SettingRow>}
       {signOutError && <FieldError className="px-5 py-3">{signOutError}</FieldError>}
@@ -120,7 +120,8 @@ export function SecuritySettings() {
         <DialogHeader>
           <DialogTitle>{hasPassword ? t('changePassword') : t('setPassword')}</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
+        {/* R-33: 16px between fields, 6px from a label to its input. */}
+        <div className="flex flex-col gap-4">
           {hasPassword && <Label className="flex flex-col items-start gap-1.5">{t('currentPassword')}
             <Input type="password" autoComplete="current-password" value={current} onChange={event => setCurrent(event.target.value)} />
           </Label>}
