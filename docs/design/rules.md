@@ -197,11 +197,14 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the opening of its last reply (R-53). Someone who cannot open the thread
   sees no reply line. Clicking one opens it on
   the right as a conversation that ends in the composer (R-10); people and
-  the agent talk there. A thread's content is its owner's alone: teammates
-  (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
-  as GitHub Copilot and Cursor keep agent sessions private (Alex:
-  「永远只能自己看」, [decision 2026-11-01-2245](decisions/2026-11-01-2245-thread-privacy-and-local-isolation.md)); what the thread
-  produces (a PR, a comment its owner posts) is how the team sees the work. The bot dispatches the thread; the Agent it hands the work
+  the agent talk there. Visibility follows Warp Factories (Alex:
+  「按照他们的去做」, [decision 2026-11-01-2300](decisions/2026-11-01-2300-thread-visibility-follows-warp.md)): a
+  thread a bot or the Coordinator dispatches in a workspace is visible to
+  every member who can access that bot, live and as a transcript, and
+  teammates only watch, never send messages. A person's private chat with
+  the Coordinator is theirs alone until they share it (team by default,
+  chosen people, or anyone with the link); people it is shared with only
+  view, and fork a copy to continue. The bot dispatches the thread; the Agent it hands the work
   to (Codex, Claude Code) runs it, and where a thread carries an icon
   other than its status, that icon is the Agent's mark (R-78).
 - **R-63** Activity: events (created, handed to, dispatched a thread,
