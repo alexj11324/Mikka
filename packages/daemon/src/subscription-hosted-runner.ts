@@ -48,10 +48,21 @@ const bootstrap = fileURLToPath(
 const placeholder = "mikka-native-broker-placeholder";
 const unavailable = (cause?: unknown) =>
   new Error("subscription_hosted_runtime_unavailable", cause === undefined ? undefined : { cause });
-/** What Docker said, without the CLI's own argv: the reason a run failed. */
-const dockerFailure = (error: unknown) => {
-  const value = error as { stderr?: unknown; message?: unknown };
-  return new Error(String(value.stderr || value.message || error).trim().slice(-500));
+/**
+ * `docker create` on a machine started from a snapshot copies the whole image
+ * (vfs storage driver, cold disk): 65.7s for the 1.1GB hosted image, measured
+ * on a thread machine on 2026-11-01. The old 30s limit killed every such run.
+ */
+const DOCKER_CREATE_TIMEOUT_MS = 180_000;
+/** What Docker said, never the CLI's own argv: the reason a run failed. */
+const dockerFailure = (error: unknown, startedAt?: number) => {
+  const value = error as { stderr?: unknown; killed?: boolean; code?: unknown; signal?: unknown };
+  const took = startedAt === undefined ? "" : ` after ${Math.round((performance.now() - startedAt) / 1000)}s`;
+  const stderr = String(value.stderr ?? "").trim();
+  if (stderr) return new Error(`${stderr.slice(-500)}${took}`);
+  if (value.killed) return new Error(`docker timed out${took}`);
+  if (error instanceof Error && error.message === "subscription_hosted_runtime_unavailable") return new Error(`run fenced${took}`);
+  return new Error(`docker failed (exit ${String(value.code ?? value.signal ?? "unknown")})${took}`);
 };
 const blockedSandbox: AgentSandbox = {
   kind: "none",
@@ -304,7 +315,7 @@ export async function createHostedBotRunner(host: {
           "-c",
           script,
         ],
-        { env: bareEnv, timeout: 30000, signal, maxBuffer: 1024 * 1024 },
+        { env: bareEnv, timeout: DOCKER_CREATE_TIMEOUT_MS, signal, maxBuffer: 1024 * 1024 },
       );
       resource.id = created.stdout.trim();
       if (!/^[a-f0-9]{64}$/.test(resource.id)) throw unavailable();
@@ -668,10 +679,11 @@ export async function createHostedBotRunner(host: {
         ];
         await live();
         writeJsonAtomic(resourceFile, resource);
+        const createStarted = performance.now();
         try {
           creating = exec("docker", containerArgs, {
             env: bareEnv,
-            timeout: 30000,
+            timeout: DOCKER_CREATE_TIMEOUT_MS,
           }).then(created => {
             resource.id = created.stdout.trim();
             if (!/^[a-f0-9]{64}$/.test(resource.id)) throw unavailable();
@@ -679,10 +691,11 @@ export async function createHostedBotRunner(host: {
             writeJsonAtomic(resourceFile, resource);
           });
           await creating;
+          console.info(`run ${assignment.runId}: hosted container created in ${Math.round((performance.now() - createStarted) / 1000)}s`);
           await live();
         } catch (error) {
           // Keep Docker's own reason: a cleanup failure must not replace it.
-          const reason = dockerFailure(error);
+          const reason = dockerFailure(error, createStarted);
           try {
             await close();
           } catch (cleanup) {
