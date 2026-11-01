@@ -5,7 +5,9 @@ import type { AuthContext } from 'better-auth'
 import { decryptOAuthToken, setTokenUtil } from 'better-auth/oauth2'
 import { db } from '@/lib/db'
 import { githubConnections } from '@/lib/db/schema'
-import { auth, githubEnabled, oauthCallbackBaseURL } from '@/lib/auth'
+import { auth } from '@/lib/auth'
+import { authOAuthProxyOptions } from '@/lib/auth-config'
+import { appOrigin } from '@/lib/mcp/resource'
 import { withBasePath } from '@/lib/base-path'
 
 // Plugins → GitHub connects a GitHub account for repository access without
@@ -19,14 +21,17 @@ const STATE_TTL_SECONDS = 600
 export type GitHubConnection = { githubAccountId: string; githubLogin: string }
 type TokenResponse = { access_token: string; expires_in?: number; refresh_token?: string; refresh_token_expires_in?: number }
 
+// The same origin Better Auth registers its GitHub callback on (lib/auth.ts).
+const callbackBase = () => authOAuthProxyOptions(process.env)?.productionURL ?? appOrigin
+
 function callbackURL() {
-  const base = oauthCallbackBaseURL
+  const base = callbackBase()
   if (!base) throw new Error('GitHub connection has no callback origin')
   return new URL(GITHUB_CALLBACK_PATH, base).toString()
 }
 
 export function githubConnectConfigured() {
-  return githubEnabled && Boolean(oauthCallbackBaseURL)
+  return Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET && callbackBase())
 }
 
 export function startGitHubConnect(userId: string) {
