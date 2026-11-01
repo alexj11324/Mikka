@@ -2,21 +2,25 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 
-type Options = {
+export type ResizableWidthOptions = {
   /** localStorage key for the width this device remembers. */
   storageKey: string
   min: number
-  /** A number, or 'half' for half the window. */
-  max: number | 'half'
-  initial: number
+  /** A number, 'half' for half the window, or a share of the window such as '70%'. */
+  max: number | 'half' | `${number}%`
+  /** The default width; null leaves it to the column's own CSS (a 50/50 split) until the edge is moved. */
+  initial: number | null
   /** Which side of the column the handle sits on: 'end' grows toward the end, 'start' toward the start. */
   edge: 'start' | 'end'
 }
+type Options = ResizableWidthOptions
 
 const STEP = 16
 
 function maxFor(max: Options['max']) {
-  return max === 'half' ? Math.floor(window.innerWidth / 2) : max
+  if (typeof max === 'number') return max
+  const share = max === 'half' ? 50 : Number(max.slice(0, -1))
+  return Math.floor(window.innerWidth * share / 100)
 }
 
 /**
@@ -24,9 +28,11 @@ function maxFor(max: Options['max']) {
  * arrow keys on it, or double-click it to go back to the default width. The width
  * is remembered on this device.
  */
-export function useResizableWidth({ storageKey, min, max, initial, edge }: Options) {
-  const [width, setWidth] = useState(initial)
-  const [limit, setLimit] = useState(typeof max === 'number' ? max : initial)
+export function useResizableWidth(options: Options & { initial: number }): ResizableWidth<number>
+export function useResizableWidth(options: Options): ResizableWidth<number | null>
+export function useResizableWidth({ storageKey, min, max, initial, edge }: Options): ResizableWidth<number | null> {
+  const [width, setWidth] = useState<number | null>(initial)
+  const [limit, setLimit] = useState(typeof max === 'number' ? max : initial ?? min)
   const [dragging, setDragging] = useState(false)
   // The remembered width is applied on load without a spring.
   const [restored, setRestored] = useState(false)
@@ -42,7 +48,7 @@ export function useResizableWidth({ storageKey, min, max, initial, edge }: Optio
       if (stored) setWidth(stored)
     } catch { /* storage unavailable */ }
     const frame = requestAnimationFrame(() => setRestored(true))
-    if (max === 'half') window.addEventListener('resize', measure)
+    if (typeof max !== 'number') window.addEventListener('resize', measure)
     return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', measure) }
   }, [storageKey, max])
 
@@ -55,9 +61,17 @@ export function useResizableWidth({ storageKey, min, max, initial, edge }: Optio
     return edge === 'end' ? rtl : -rtl
   }
 
+  /** The width now: the chosen one, or what the column's CSS gives it before one is chosen. */
+  function current(handle: HTMLElement) {
+    return clamp(width ?? handle.parentElement?.getBoundingClientRect().width ?? min)
+  }
+
   function onPointerDown(event: ReactPointerEvent<HTMLElement>) {
     if (event.button !== 0) return
-    const handle = event.currentTarget, startX = event.clientX, startWidth = clamp(width)
+    // No text selection, and no native drag of a selection a double-click left behind: either would cancel the pointer mid-drag.
+    event.preventDefault()
+    window.getSelection()?.removeAllRanges()
+    const handle = event.currentTarget, startX = event.clientX, startWidth = current(handle)
     const direction = sign(handle)
     let latest = startWidth
     moved.current = false
@@ -86,8 +100,9 @@ export function useResizableWidth({ storageKey, min, max, initial, edge }: Optio
   function onKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
     const right = sign(event.currentTarget)
     const step = event.shiftKey ? STEP * 4 : STEP
-    const next = event.key === 'ArrowRight' ? clamp(width) + step * right
-      : event.key === 'ArrowLeft' ? clamp(width) - step * right
+    const now = current(event.currentTarget)
+    const next = event.key === 'ArrowRight' ? now + step * right
+      : event.key === 'ArrowLeft' ? now - step * right
       : event.key === 'Home' ? min
       : event.key === 'End' ? top
       : null
@@ -113,7 +128,7 @@ export function useResizableWidth({ storageKey, min, max, initial, edge }: Optio
   /** Sets the width for now without remembering it, as the 加宽 button does. */
   function resizeTo(next: number) { setWidth(clamp(next)) }
 
-  const value = clamp(width)
+  const value = width === null ? null : clamp(width)
   return {
     width: value,
     max: top,
@@ -126,13 +141,33 @@ export function useResizableWidth({ storageKey, min, max, initial, edge }: Optio
     handleProps: {
       role: 'separator',
       'aria-orientation': 'vertical',
-      'aria-valuenow': value,
+      'aria-valuenow': value ?? undefined,
       'aria-valuemin': min,
       'aria-valuemax': top,
       tabIndex: 0,
       onPointerDown,
       onKeyDown,
-    } as const,
+    },
+  }
+}
+
+export type ResizableWidth<W extends number | null> = {
+  width: W
+  max: number
+  resizeTo: (next: number) => void
+  dragging: boolean
+  instant: boolean
+  endedDrag: () => boolean
+  reset: () => void
+  handleProps: {
+    role: 'separator'
+    'aria-orientation': 'vertical'
+    'aria-valuenow': number | undefined
+    'aria-valuemin': number
+    'aria-valuemax': number
+    tabIndex: 0
+    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
+    onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void
   }
 }
 

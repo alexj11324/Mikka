@@ -1,6 +1,6 @@
 'use client'
 
-import { Component, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Component, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import type { JSONContent } from '@tiptap/react'
@@ -29,6 +29,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
+import { ResizeHandle } from '@/components/ui/resizable-pane'
+import { useResizableWidth } from '@/hooks/use-resizable-width'
 
 type Issue = IssueView
 
@@ -131,6 +133,13 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
     else { setOpenThread(null); setOpenAcceptance(task) }
   }, [])
   const wide = useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false)
+  // The right column resizes from its left line (decision 2026-11-01-1300); an open thread and the properties keep their own widths.
+  const threadWidth = useResizableWidth({ storageKey: 'mikka:task-thread-width', min: 360, max: 720, initial: 432, edge: 'start' })
+  const propertiesWidth = useResizableWidth({ storageKey: 'mikka:task-properties-width', min: 260, max: 480, initial: 320, edge: 'start' })
+  const tCommon = useTranslations('Common')
+  const panelRef = useRef<HTMLDivElement>(null)
+  const panelWidth = (openThread || openAcceptance ? threadWidth : propertiesWidth).width
+  useLayoutEffect(() => { panelRef.current?.style.setProperty('--task-panel-width', `${panelWidth}px`) })
   const [error, setError] = useState('')
   const [history, setHistory] = useState(false)
   const [members, setMembers] = useState(false)
@@ -259,8 +268,9 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
     </div>
     </div>
     {/* One element for both widths: crossing the breakpoint restyles the open thread instead of remounting it (its tab, viewer and draft stay). */}
-    {(wide || threadPanel) && <div className={cn(wide ? 'sticky top-0 flex h-[calc(100svh-3.25rem)] shrink-0 flex-col self-start border-l border-rule' : 'fixed inset-0 z-30 flex flex-col bg-background')}>
-      {threadPanel ? <div className={cn('flex h-full flex-col', wide && 'w-108')}>{threadPanel}</div> : <div className="w-80 overflow-y-auto px-6 py-10"><SectionBoundary onClose={onClose}>{properties}</SectionBoundary></div>}
+    {(wide || threadPanel) && <div ref={panelRef} className={cn(wide ? 'sticky top-0 flex h-[calc(100svh-3.25rem)] shrink-0 flex-col self-start border-l border-rule' : 'fixed inset-0 z-30 flex flex-col bg-background', (threadPanel ? threadWidth : propertiesWidth).dragging && 'select-none')}>
+      {threadPanel ? <div className={cn('flex h-full flex-col', wide && 'w-(--task-panel-width)')}>{threadPanel}</div> : <div className="w-(--task-panel-width) overflow-y-auto px-6 py-10"><SectionBoundary onClose={onClose}>{properties}</SectionBoundary></div>}
+      {wide && <ResizeHandle resize={threadPanel ? threadWidth : propertiesWidth} label={tCommon('resize.taskPanel')} edge="start" />}
     </div>}
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await loadIssue(saved.id)) }} /></DialogContent></Dialog>
     <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={versions} loadingError={!!historyError} onRetry={() => { void refreshVersions() }} onRestore={restore} />

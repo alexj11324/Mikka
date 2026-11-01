@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { CARD_FRAME, SuggestionCardBody } from './mobile-card'
 import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
+import { ResizablePane } from '@/components/ui/resizable-pane'
 
 const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: WorkspaceContentLoading })
 
@@ -48,6 +49,7 @@ const fetchJson = async <T,>(url: string): Promise<T> => {
 export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue: (id: string) => void; onConnect: () => void; onSent?: () => void }) {
   const t = useTranslations('SuggestionsPage')
   const tNav = useTranslations('Nav')
+  const tCommon = useTranslations('Common')
   const actionError = useActionError()
   const locale = useLocale()
   const timeZone = typeof Intl === 'undefined' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -92,9 +94,11 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
         {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader>{noConnection && <Button variant="secondary" className="rounded-full" onClick={onConnect}>{t('connect')}</Button>}</Empty>}
       </div>
     </section>
-    <div data-slot="suggestions-coordinator" className="relative hidden min-h-0 min-w-0 flex-1 flex-col border-l border-rule md:flex md:basis-1/2 has-data-[slot=thread-view]:[&_[data-slot=conversation-pill]]:hidden">
+    {/* Half and half until the line between them is dragged (decision 2026-11-01-1300). */}
+    <ResizablePane data-slot="suggestions-coordinator" storageKey="mikka:suggestions-chat-width" min={320} max="70%" edge="start" from="md" label={tCommon('resize.suggestionsChat')}
+      className="hidden min-h-0 min-w-0 flex-1 flex-col border-l border-rule md:flex md:basis-1/2 has-data-[slot=thread-view]:[&_[data-slot=conversation-pill]]:hidden">
       <ConversationPill name={tNav('coordinator')} avatar={<CoordinatorAvatar size="pill" />} />
       <CoordinatorChat onOpenIssue={onOpenIssue} />
-    </div>
+    </ResizablePane>
   </div>
 }

@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test'
-import { test, expect, register } from './fixtures'
+import { test, expect, register, app } from './fixtures'
 
 async function drag(page: Page, handle: Locator, dx: number) {
   const box = await handle.boundingBox()
@@ -93,4 +93,76 @@ test('Both side columns resize from their inner edge and keep the width after re
   // A single click still folds the list.
   await listEdge.click()
   await expect(list).toHaveAttribute('data-state', 'collapsed')
+})
+
+/** Waits until the handle stops moving: a reset width springs back to its default. */
+async function settled(handle: Locator) {
+  let last = ''
+  await expect.poll(async () => { const box = JSON.stringify(await handle.boundingBox()); const same = box === last; last = box; return same }, { intervals: [100] }).toBe(true)
+}
+
+/** Every vertical line on the page that runs most of its height: an element's own side border, as a column draws it. */
+async function verticalDividers(page: Page) {
+  return page.evaluate(() => {
+    const lines: { x: number; name: string }[] = []
+    for (const element of document.querySelectorAll<HTMLElement>('main *, [data-slot="bot-list"], [data-slot="settings-list"], aside')) {
+      const box = element.getBoundingClientRect()
+      if (!box.width || box.height < window.innerHeight * 0.4 || box.right <= 0 || box.left >= window.innerWidth) continue
+      const style = getComputedStyle(element)
+      if (style.visibility === 'hidden' || element.closest('[aria-hidden="true"], [inert]')) continue
+      const name = `${element.tagName.toLowerCase()}${element.dataset.slot ? `[${element.dataset.slot}]` : ''}${element.getAttribute('aria-label') ? ` "${element.getAttribute('aria-label')}"` : ''}`
+      // A column draws one side; a card or a field with both sides is not a divider.
+      const left = parseFloat(style.borderLeftWidth) >= 1, right = parseFloat(style.borderRightWidth) >= 1
+      if (left && !right && box.left > 1) lines.push({ x: box.left, name })
+      if (right && !left && box.right < window.innerWidth - 1) lines.push({ x: box.right, name })
+    }
+    return lines
+  })
+}
+
+// Decision 2026-11-01-1300 (R-79): every vertical line between columns resizes them, at Alex's 1000px window too.
+test('Every vertical divider on every rail page drags to resize, with a col-resize cursor', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 720 })
+  await register(page)
+  const pages: [string, string][] = [
+    ['chat', app('/')],
+    ['suggestions', app('/?section=suggestions')],
+    ['board', app('/?section=all-issues')],
+    ['plugins', app('/?section=plugins')],
+    ['artifacts', app('/?section=artifacts')],
+    ['settings', app('/settings?section=general')],
+  ]
+  for (const width of [1000, 1440]) {
+    await page.setViewportSize({ width, height: 720 })
+    for (const [name, url] of pages) {
+      await page.goto(url)
+      await page.waitForLoadState('networkidle')
+      const handles = page.locator('[data-slot="resize-handle"]:visible')
+      const boxes = await Promise.all((await handles.all()).map(handle => handle.boundingBox()))
+      for (const line of await verticalDividers(page)) {
+        expect(boxes.some(box => box && Math.abs(box.x + box.width / 2 - line.x) <= 8), `${width}px ${name}: the line of ${line.name} at x=${Math.round(line.x)} has no resize handle`).toBe(true)
+      }
+      for (const handle of await handles.all()) {
+        const label = await handle.getAttribute('aria-label')
+        await settled(handle)
+        await handle.hover()
+        expect(await handle.evaluate(element => getComputedStyle(element).cursor), `${width}px ${name}: ${label}`).toBe('col-resize')
+        const before = await handle.getAttribute('aria-valuenow')
+        let dx = 48
+        await drag(page, handle, dx)
+        let after = await handle.getAttribute('aria-valuenow')
+        // At its limit one way, it moves the other way.
+        if (after === before) { dx = -48; await drag(page, handle, dx * 2); after = await handle.getAttribute('aria-valuenow') }
+        expect(after, `${width}px ${name}: dragging ${label} changes nothing`).not.toBe(before)
+        // A double-click goes back to the default, and the line still drags right after it (the selection it leaves must not cancel the drag).
+        await handle.dblclick()
+        const reset = await handle.getAttribute('aria-valuenow')
+        expect(reset, `${width}px ${name}: double-clicking ${label}`).toBe(before)
+        await settled(handle)
+        await drag(page, handle, dx)
+        expect(await handle.getAttribute('aria-valuenow'), `${width}px ${name}: ${label} after a double-click`).not.toBe(reset)
+        await handle.dblclick()
+      }
+    }
+  }
 })
