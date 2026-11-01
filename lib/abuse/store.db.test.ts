@@ -147,6 +147,37 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     },
   )
   await t.test(
+    'an abandoned reservation is released so one stuck row never bricks the workspace',
+    async () => {
+      const id = await verified()
+      // A finished call whose cost could not be determined and whose generation
+      // id was never recorded: unknown, unreconcilable (the observed 27h brick).
+      const stuck = randomUUID()
+      await store.reserve(id, 'fixture', stuck)
+      await store.settle(stuck, null)
+      // Recent: it still blocks, so a live call is never cut.
+      await assert.rejects(store.reserve(id, 'fixture', randomUUID()), /usage_in_progress/)
+      // Past the margin it can never settle; the next reservation reaps it.
+      await pool.query('UPDATE hosted_usage SET "createdAt"=now()-interval \'11 minutes\' WHERE id=$1', [stuck])
+      const next = randomUUID()
+      await store.reserve(id, 'fixture', next)
+      const states = Object.fromEntries((await pool.query('SELECT id,state FROM hosted_usage WHERE id=ANY($1)', [[stuck, next]])).rows.map(r => [r.id, r.state]))
+      assert.equal(states[stuck], 'failed')
+      assert.equal(states[next], 'pending')
+      await store.settle(next, 100)
+      // The write-off charged nothing; only the settled call drew down the allowance.
+      assert.equal((await store.balance(id)).free, 999_900)
+      // A stale pending row (a crashed call that never settled) is released the same way.
+      const crashed = randomUUID()
+      await store.reserve(id, 'fixture', crashed)
+      await pool.query('UPDATE hosted_usage SET "createdAt"=now()-interval \'11 minutes\' WHERE id=$1', [crashed])
+      const after = randomUUID()
+      await store.reserve(id, 'fixture', after)
+      assert.equal((await pool.query('SELECT state FROM hosted_usage WHERE id=$1', [crashed])).rows[0].state, 'failed')
+      await store.settle(after, null)
+    },
+  )
+  await t.test(
     'actual rolling spend pauses subsequent calls; purchased calls bypass pause; clears after window',
     async capTest => {
       const previous = process.env.MIKKA_FREE_MODEL_DAILY_CENTS
