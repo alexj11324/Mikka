@@ -174,8 +174,9 @@ export const RUNS = [
   { key: 'r-release-notes', issue: null, bot: 'release', agent: 'ag-codex', status: 'succeeded', minutesAgo: 60 * 3, minutes: 6,
     prompt: '起草 v2.4 发版说明', lastReply: '草稿已提交为 Artifact。',
     chunks: [text('汇总 v2.3.2 以来合入的 23 个 PR。'), tool('a'), text('草稿已提交为 Artifact。', 't2')], artifacts: ['a-release-notes'] },
-  { key: 'r-rate-limit-cancel', issue: 'i-rate-limit', bot: 'backend', agent: 'ag-codex', status: 'cancelled', minutesAgo: 60 * 26, minutes: 3,
-    prompt: '复现开放平台 429', lastReply: '已停止：改用压测脚本在 staging 复现。', chunks: [text('已停止。')] },
+  { key: 'r-rate-limit-cancel', issue: 'i-rate-limit', bot: 'backend', agent: 'ag-codex', status: 'succeeded', minutesAgo: 60 * 26, minutes: 18,
+    prompt: '在 staging 复现开放平台 429', lastReply: '用压测脚本复现：每分钟 300 次时 80% 返回 429，和米粒电商的日志一致。',
+    chunks: [text('用 k6 以每分钟 300 次请求 POST /v1/orders。'), tool('a'), text('用压测脚本复现：每分钟 300 次时 80% 返回 429，和米粒电商的日志一致。', 't2')] },
 ]
 
 /** Artifacts the threads handed over; content is stored inline. */
