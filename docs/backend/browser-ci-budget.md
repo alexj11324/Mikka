@@ -1,11 +1,10 @@
 # Browser CI execution budget
 
-The selected browser job has a 45-minute total budget. PRs run critical flows
-and known affected scenarios, escalating shared or unknown paths to full
-functionality. Main, nightly and manual runs add the full performance suite;
-PRs that change a performance spec also run it. Pure CI and classifier changes use dedicated policy checks, critical flows
-and actual subset execution, without full functionality or performance.
-Mixed application changes still escalate according to their risk.
+Since 2026-11-01 browser tests run only when started by hand (Actions →
+Browser tests → Run workflow); CI runs none on pull requests, main pushes or
+nightly ([decision](../design/decisions/2026-11-01-0230-browser-tests-manual-only.md)).
+The budgets below apply to that manual run. The PR, main and nightly tiers
+this page described earlier are history.
 See [CONTRIBUTING.md](../../CONTRIBUTING.md#how-changes-are-tested) for the gate policy.
 
 The original full browser job has a 45-minute total budget. Its official Chromium/system

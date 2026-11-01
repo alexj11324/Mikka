@@ -17,5 +17,4 @@
 - **资料库** lists what the bot's threads handed over, newest first.
   - A Markdown document opens in the app.
   - An HTML one opens on the web, signed in, in its sandboxed frame.
-- Not done: the web shows neither reactions nor pins, and cannot send in
-  group chats. These are web UI, left for the web.
+- 现状（非决定）：the web shows neither reactions nor pins yet.

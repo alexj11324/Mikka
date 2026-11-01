@@ -267,7 +267,7 @@ mobile tabs.
   web. Chat items carry `images` (a count) and the app loads each photo from
   `GET /api/mobile/chat/image?message=<id>&index=<n>`, which serves only the
   person's own messages.
-- **Not on the server yet**, so the app leaves them out: 待审阅 and 已归档
+- **现状（非决定）:** not on the server yet, so the app leaves them out: 待审阅 and 已归档
   threads, pinned bots, 电脑不在用时 (needs the web to report presence),
   dictation (so the composer has no mic yet), dark mode.
 - **App icon:** the Mikka mark, the same file as the desktop app's

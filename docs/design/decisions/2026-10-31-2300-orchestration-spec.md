@@ -4,7 +4,8 @@
 - Source: Alex, relayed by the coordinator session: the rules of 2026-10-31
   on personal workspaces, account-bound subscriptions and shares, model
   resolution, who pays, machines (「Mikka 不托管沙盒」, own E2B → own device →
-  queue with an action card, never fail, no free cloud trial), Warp-like
+  else an action card that the person answers, chat never fails, no free cloud
+  trial), Warp-like
   orchestration, environments that hold software only, and naming; then
   「用户设备和 E2B 一样是 runner」 (daemon-managed Agents, a disposable
   container where Docker exists, otherwise a worktree plus a temporary config

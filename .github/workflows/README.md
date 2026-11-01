@@ -10,15 +10,13 @@ its existing protected status names and real acceptance coverage.
   synthetic merge commit, including the PR together with its target branch at
   the time of the check. A changed PR head gets a new check run.
 - Keep `UI policy (strict)` and `Production build and browser interactions`
-  successful for non-documentation PRs; the latter runs isolated PostgreSQL
-  and DB/migration integration checks. The PR's production build is performed
-  in `browser-tests.yml`, not redundantly in `ui-policy.yml`.
-- Since 2026-11-01 browser tests are manual only; `browser-gate.yml` reports
-  `Browser tests (before merge)` and passes at once, and CI runs no production
-  build (Vercel builds `main`). The text below describes the manual run.
-- `browser-tests.yml` runs `Browser tests (before merge)`: smoke plus
-  changed-area specs, a real isolated PostgreSQL database and the applicable
-  Factory/daemon/browser acceptance. `integrate/*` PRs use the full tier.
+  successful for non-documentation PRs; the latter is the gate over the four
+  isolated PostgreSQL DB/migration integration shards. Despite its name, CI
+  runs no production build (decision 2026-11-01-0230); Vercel builds `main`.
+- Browser tests are manual only: `browser-gate.yml` reports
+  `Browser tests (before merge)` and passes at once. `browser-tests.yml` runs
+  only from Actions → Browser tests → Run workflow, with a real isolated
+  PostgreSQL database and the applicable Factory/daemon/browser acceptance.
 - `GitGuardian Security Checks` is a separate external required check.
 - All four existing required names remain intact. Do not silently replace
   them with a new aggregate check until the GitHub branch-protection settings
@@ -26,14 +24,13 @@ its existing protected status names and real acceptance coverage.
 
 ## Main pushes: postmerge checks
 
-- A push to `main` triggers `ui-policy.yml` again and the functional
-  `browser-tests.yml` tier (four shards). Nightly and manual browser runs
-  retain full coverage; expensive desktop/release workflows stay independent.
+- A push to `main` triggers `ui-policy.yml` again. No browser run follows a
+  main push or runs nightly; expensive desktop/release workflows stay
+  independent.
 - Both workflow concurrency keys include `github.run_id` only on `main`.
   This prevents GitHub from evicting an older *pending* main verification,
   in addition to not cancelling a running main job. Superseded PR checks may
   still be cancelled.
-- The existing red-main browser issue workflow tracks regressions after merge.
 
 ## Cloud worker template release
 

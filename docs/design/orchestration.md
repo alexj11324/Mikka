@@ -143,9 +143,11 @@ still pick any of their own devices by hand.
    (R-23).
 3. Otherwise the owner's online device that has 「允许自动调度」 on and
    passes the capability check, servers first.
-4. Otherwise the run is queued and the chat shows one action card:
-   在这台电脑上启用 / 连接我的服务器 / 填入 E2B Key. The run starts on its own
-   as soon as one of these becomes available.
+4. Otherwise no run is queued and the bot shows one action card,
+   「这个任务需要一台电脑来跑」: 允许这台电脑自动调度 / 在这台电脑上启用 /
+   填入 E2B Key / 让服务器重新上线 or 连接我的服务器. Answering a row (the switch
+   turned on, the key saved) makes the bot dispatch again
+   ([run machine fallback](decisions/2026-10-31-2200-run-machine-fallback.md)).
 
 **When a machine goes away during a thread:**
 
@@ -155,8 +157,7 @@ still pick any of their own devices by hand.
   1. Move the run to E2B, when the owner has a key.
   2. Otherwise move it to the owner's personal computer that has
      「允许自动调度」 on.
-  3. Otherwise show an error with actions to fix it: 在这台电脑上允许自动调度
-     / 填入 E2B Key / 让服务器重新上线.
+  3. Otherwise end the run; the bot shows the same action card.
 - **A personal computer goes offline:** apply the same three steps.
 
 This replaces the old 「设备离线时」 setting.
@@ -269,7 +270,7 @@ The workspace where the work happens pays.
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
 | Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a container where Docker exists, otherwise a worktree plus a temporary config dir, one multi-arch image | — |
 | A device capability check and 「允许自动调度」 instead of Agent detection and 「设备离线时」 | — |
-| Queue with an action card when there is no machine; the offline flow of §4 | — |
+| An action card when there is no machine; the offline flow of §4 | — |
 | One environment per thread; leases and heartbeats; credentials injected each run and absent while paused | — |
 | Card verification per person; credit and card shares per workspace | — |
 | No Mikka-hosted sandboxes and no free cloud trial | (not planned) |

@@ -21,11 +21,20 @@ source wins in a conflict is in [`README.md`](README.md).
   right threads and the computer together.
 - **R-04** Every bot comes with its own computer. There is no 新建云端电脑 entry
   anywhere, and no list of per-bot computers.
-- **R-05** Bots run only on Mikka's own AI SDK harness. The 新建 Bot dialog
-  has a big live preview, a shape grid, colours and a name. It has no machine
-  picker, no harness picker and no 说明 field (instructions are edited in chat).
-  The Coordinator has no runtime switch either: the #312 native Claude Code /
-  Codex runtime is deprecated and stays off (decision 2026-10-27).
+- **R-05** A bot's chat runs on Mikka's own AI SDK harness; threads run on an
+  Agent. Claude Code runs every model except GPT/OpenAI models, which run on
+  Codex; a person can override the Agent per model in 「API 与订阅」. Runners
+  carry Mikka's own Agent copies: preinstalled in the E2B and device image, or
+  installed and updated by the daemon in a private dir, never the person's own
+  install ([orchestration.md §3](orchestration.md),
+  [decision 2026-10-31-2300](decisions/2026-10-31-2300-orchestration-spec.md)).
+  The 新建 Bot dialog has a big live preview, a shape grid, colours and a name.
+  It has no machine picker, no Agent picker and no 说明 field (instructions are
+  edited in chat). Bot chats have no runtime switch: running the Coordinator's
+  or a bot's chat on native Claude Code / Codex (#312) is deprecated and stays
+  off (`decisions.md` 2026-10-27); the native paths that
+  [decision 2026-10-31-1803](decisions/2026-10-31-1803-coordinator-openui-prompt.md)
+  lists are that switched-off code.
 - **R-06** The Coordinator has no special UI; it is a normal bot (Alex
   2026-10-24). Its role is coordinating, not looking different: the same
   bloub avatar with no star or badge, the same row, the same chat, the
