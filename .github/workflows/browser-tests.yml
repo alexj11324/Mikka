@@ -724,10 +724,8 @@ jobs:
     runs-on: ubuntu-latest
     # Eight independent shards for main and full: each matrix job gets its
     # own PostgreSQL service and test-account directory, so no fixture or lease
-    # is shared across shards. Four shards with one worker took 8–10 minutes
-    # each (run 41310831485); eight with one worker 2–6.5 (41317854618); eight
-    # with two workers 1–4.5 (41318002383), with no new failures. Each worker
-    # leases its own test-account pair (tests/e2e/test-account-fixtures.ts).
+    # is shared across shards. Specs run one worker per shard; four shards took
+    # 8–10 minutes each (run 41310831485), eight take about half.
     strategy:
       fail-fast: false
       matrix:
@@ -764,7 +762,6 @@ jobs:
       SLACK_USER_BINDINGS: '{"U456":"ci-only-mikka-user"}'
       NEXT_TELEMETRY_DISABLED: '1'
       BROWSER_SHARDS: '8'
-      PLAYWRIGHT_WORKERS: '2'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
