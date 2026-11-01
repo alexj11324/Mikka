@@ -55,7 +55,7 @@ export function ComputerViewer({ botId, name, open, onOpenChange }: { botId: str
   }
 
   return <Dialog open={open} onOpenChange={changeOpen}>
-    <DialogContent showCloseButton={false} overlay="dim" onClick={event => { if (event.target === event.currentTarget) changeOpen(false) }} className="top-0 left-0 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col items-center justify-center gap-4 rounded-none bg-screen p-6 text-screen-foreground ring-0 sm:max-w-none sm:px-24 sm:py-12">
+    <DialogContent showCloseButton={false} overlay="dim" onClick={event => { if (event.target === event.currentTarget) changeOpen(false) }} className="top-0 left-0 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col items-center justify-center gap-4 rounded-none bg-screen p-6 text-screen-foreground ring-0 sm:max-w-none sm:px-24 sm:py-12 data-open:animate-none data-closed:animate-none">
       <DialogTitle className="sr-only">{t('title', { name })}</DialogTitle>
       <Button variant="ghost" size="icon-sm" aria-label={t('close')} className="absolute top-3 right-3 text-screen-foreground/70 hover:bg-screen-foreground/10 hover:text-screen-foreground" onClick={() => changeOpen(false)}><Minimize2 data-icon="inline-start" /></Button>
       <div className="w-full max-w-[calc((100dvh-10rem)*1.6)] rounded-xl">
