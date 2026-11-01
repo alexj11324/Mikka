@@ -105,7 +105,9 @@ test('The globe opens the browser in place of the right panel; notes on a page g
     const { rows } = await pool.query(`SELECT "userId", "botId", payload FROM coordinator_events WHERE "userId" = $1 AND kind = $2 AND payload->>'text' LIKE $3`, [owner.id, 'user_message', `%${message}`])
     expect(rows).toHaveLength(1)
     expect(rows[0].userId).toBe(owner.id)
-    expect(rows[0].botId).toBeNull()
+    // The Coordinator is an ordinary bot (#757): the message lands in its chat, keyed by its bot row.
+    const { rows: [coordinator] } = await pool.query('SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1', [owner.id])
+    expect(rows[0].botId).toBe(coordinator.botId)
     const stored = splitBrowserNotes(rows[0].payload.text)
     expect(stored.text).toBe(message)
     expect(stored.notes.map(note => note.n)).toEqual([1, 2])
