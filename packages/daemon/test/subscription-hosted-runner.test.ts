@@ -109,6 +109,7 @@ for (const harness of ["codex", "claude_code"] as const) {
     expect(
       existsSync(join(stateDir, "runs", runId, "runtime-git", ".git")),
     ).toBe(true);
+    expect(execFileSync('git', ['--git-dir', join(stateDir, 'runs', runId, 'runtime-git', '.git'), '--work-tree', options.cwd, 'status', '--porcelain'], { encoding: 'utf8' })).toBe('');
     // Closing the session leaves no GitHub token cache or CLI login on the machine.
     expect(existsSync(githubDir)).toBe(false);
     expect(existsSync(join(stateDir, "runs", runId, "runtime-home", ".codex", "auth.json"))).toBe(false);
@@ -120,7 +121,7 @@ for (const harness of ["codex", "claude_code"] as const) {
     await expect(runner.start(assignment, options)).rejects.toThrow("revoked");
     const verify = await runner.command(
       options.cwd,
-      'test -z "$E2B_API_KEY$INFISICAL_CLIENT_SECRET" && ! (printf blocked > .git/guard) 2>/dev/null && printf allowed > project-probe',
+      'test -z "$(git status --porcelain)" && test -z "$E2B_API_KEY$INFISICAL_CLIENT_SECRET" && ! (printf blocked > .git/guard) 2>/dev/null && printf allowed > project-probe',
       false,
       10000,
     );
