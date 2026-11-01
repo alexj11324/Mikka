@@ -15,6 +15,8 @@ export interface ArtifactVersionInfo {
   /** The author bot's bloub colour and shape; null when no bot by that name, so the reader derives a colour from the name. */
   authorColor: string | null
   authorShape: string | null
+  /** Set when a run's Agent wrote the version (Claude Code, Codex): it shows with the Agent's mark, not a bot's bloub (R-78). */
+  authorHarness?: string | null
   createdAt: string
 }
 

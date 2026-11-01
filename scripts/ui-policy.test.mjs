@@ -167,6 +167,9 @@ test('arbitrary lengths are typography, not colors', () => {
 test('CSS cannot bypass typography restrictions', () => {
   for (const css of ['.x { font-size: 13px }', '.x { @apply text-[13px] }', '@theme { --text-sm: 13px }', '.x { font: 500 13px Arial }']) assert.ok(auditCss('app/a.css', css, policy).some(d => d.rule.startsWith('typography/')))
   assert.ok(auditCss('app/a.css', '.custom { background: red }', policy).some(d => d.rule === 'style/no-custom-css'))
+  // R-32's document body token passes only at its pinned value.
+  assert.deepEqual(auditCss('app/a.css', '@theme inline { --text-md: 0.9375rem; --text-md--line-height: 1.5rem }', policy), [])
+  assert.ok(auditCss('app/a.css', '@theme inline { --text-md: 16px }', policy).some(d => d.rule === 'typography/no-css-values'))
 })
 
 test('framework html/body shell is not mistaken for a handmade widget', () => {

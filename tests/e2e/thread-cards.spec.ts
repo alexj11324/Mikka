@@ -95,12 +95,12 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await card.click()
   const thread = page.getByRole('region', { name: 'Speed up the home page', exact: true })
   await expect(thread.getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
-  await expect(thread.getByRole('textbox', { name: '告诉 Mikka Frontend 下一步做什么…' })).toBeVisible()
+  await expect(thread.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })).toBeVisible()
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息' })).toHaveCount(0)
   await testInfo.attach('thread-open', { body: await page.screenshot(), contentType: 'image/png' })
 
   // 「Artifact · 1」 opens the Artifact window with this thread's conversation beside it (F3, F4).
-  await thread.getByRole('button', { name: '产物 · 1', exact: true }).click()
+  await thread.getByRole('button', { name: 'Artifact · 1', exact: true }).click()
   const artifactWindow = page.getByRole('dialog', { name: 'Home page timing', exact: true })
   await expect(artifactWindow.getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
   await artifactWindow.getByRole('button', { name: '关闭', exact: true }).click()

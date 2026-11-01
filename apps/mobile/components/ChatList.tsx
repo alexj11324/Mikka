@@ -30,7 +30,8 @@ export const rowKey = (row: ChatRow) => row.kind === 'bot' ? row.bot.id : row.gr
 export function ChatRowView({ row, onPress }: { row: ChatRow; onPress: () => void }) {
   const bot = row.kind === 'bot' ? row.bot : null
   const group = row.kind === 'group' ? row.group : null
-  const line = bot ? bot.line : group?.lastMessage?.body ?? null
+  // A bot's line is plain text from the server; an empty one is a card with no words.
+  const line = bot ? (bot.line === '' ? '[卡片]' : bot.line) : group?.lastMessage?.body ?? null
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={52} />

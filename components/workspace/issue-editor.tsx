@@ -156,7 +156,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
       <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : layout === 'issue' ? '' : 'rounded-lg border')}>
         {layout !== 'issue' && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
         <div ref={pageRef} className="relative min-w-0">
-          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-28 py-2 text-sm/7', layout === 'description' ? 'px-4 sm:pl-16' : layout === 'issue' ? 'px-0' : 'px-4 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-28 py-2', layout === 'description' ? 'px-4 sm:pl-16' : layout === 'issue' ? 'px-0' : 'px-4 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
@@ -196,7 +196,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
     </div>
     <div className="flex min-h-72 flex-col lg:flex-row">
       <div ref={pageRef} className="relative min-w-0 flex-1">
-        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-72 px-9 py-7 text-sm/7 sm:px-12", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE, RICH_TEXT_MARKUP_VIEW[markup])} />
+        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-72 px-9 py-7 sm:px-12", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE, RICH_TEXT_MARKUP_VIEW[markup])} />
         {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
       </div>
       {panel && <aside aria-label={panel === "outline" ? t('outline') : panel === "changes" ? t('changesReview') : t('commentsPanel')} className="flex w-full shrink-0 flex-col gap-3 bg-muted/15 p-4 lg:w-60 lg:border-l">

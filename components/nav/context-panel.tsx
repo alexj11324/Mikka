@@ -1,13 +1,11 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import useSWR from 'swr'
 import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
 import { Clock, FileText, Maximize2, Minimize2, Search, X, type LucideIcon } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
-import { listBots } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -22,7 +20,6 @@ import { BotLookEditor } from './bot-look-editor'
 import { BotNameEditor } from './bot-name-editor'
 import { GroupHeader } from './group-header'
 import { ThreadList, TWO_LINE_ROW } from './thread-list'
-import { issueIdentifier } from '@/components/workspace/issue-properties'
 import { useCloudComputer, useComputerTab } from '@/hooks/use-feature-availability'
 import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
 
@@ -71,7 +68,7 @@ function PullRequests({ threads, issues }: { threads: Thread[]; issues: Issue[] 
           return <li key={row.url}>
             <Button variant="ghost" className={TWO_LINE_ROW} render={<a href={row.url} target="_blank" rel="noreferrer" />} nativeButton={false}>
               <span className="truncate text-sm">{issue?.title}</span>
-              <span className="truncate text-xs text-muted-foreground"><span className={cn(group === 'review' && 'text-success', group === 'merged' && 'text-label-violet')}>#{row.number}</span>{issue && ` · ${issueIdentifier(issue)}`}</span>
+              <span className="truncate text-xs text-muted-foreground"><span className={cn(group === 'review' && 'text-success', group === 'merged' && 'text-label-violet')}>#{row.number}</span>{issue?.identifier && ` · ${issue.identifier}`}</span>
             </Button>
           </li>
         })}</ul>
@@ -116,7 +113,6 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   const asideRef = useRef<HTMLElement>(null)
   // The content keeps the panel's full width while it opens or closes, so it is clipped, not squeezed.
   useLayoutEffect(() => { asideRef.current?.style.setProperty('--context-panel-width', `${width}px`) }, [width])
-  const { data: bots = [] } = useSWR('bots', listBots)
   const botId = conversation.kind === 'bot' ? conversation.id ?? null : null
   const coordinator = conversation.kind === 'coordinator'
   // A bot's own threads; the Coordinator's are the ones it dispatched: no bot on the run, and not from an MCP client.
@@ -170,7 +166,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
             <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />
           </TabsContent>
           <TabsContent value="threads" className="min-h-0 overflow-y-auto px-4 pb-4">
-            <ThreadList threads={ownThreads} issues={issues} bots={bots} onOpenIssue={onOpenIssue} />
+            <ThreadList threads={ownThreads} issues={issues} onOpenIssue={onOpenIssue} />
           </TabsContent>
           <TabsContent value="prs" className="min-h-0 overflow-y-auto px-4 pb-4">
             <PullRequests threads={ownThreads} issues={issues} />
@@ -181,7 +177,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
         </Tabs>
       </TabsContent>
       <TabsContent value="all" className="min-h-0 overflow-y-auto px-4 py-3">
-        <ThreadList threads={threads} issues={issues} bots={bots} all onOpenIssue={onOpenIssue} />
+        <ThreadList threads={threads} issues={issues} all onOpenIssue={onOpenIssue} />
       </TabsContent>
     </Tabs>
   </motion.aside>

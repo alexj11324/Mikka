@@ -175,9 +175,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the agent talk there. A thread's content is its owner's alone: teammates
   (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
   as GitHub Copilot and Cursor keep agent sessions private; what the thread
-  produces (a PR, a comment its owner posts) is how the team sees the work. The bot runs the thread (R-05); a coding agent it hands work
-  to (Codex, Claude Code) shows as a step 「交给 Codex · …」, never as the
-  runner in the list or the header.
+  produces (a PR, a comment its owner posts) is how the team sees the work. The bot dispatches the thread; the Agent it hands the work
+  to (Codex, Claude Code) runs it, and where a thread carries an icon
+  other than its status, that icon is the Agent's mark (R-78).
 - **R-63** Activity: events (created, handed to, dispatched a thread,
   status changes) are plain one-line rows; one person's events in the same
   minute join into one row (「创建了任务，交给 Mikka Backend，自己负责」). A comment is a card with a 1px
@@ -217,9 +217,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot's avatar and name (R-02), then the tabs 详情, 线程, PR, 电脑. 线程
   lists only the threads this bot dispatched (for the Coordinator, the
   threads it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
-  全部线程 lists every bot's threads; each row carries a 16px bot avatar in
-  that bot's colour, the only thread list that shows one, and a relative
-  time on the right (2 分钟前, 昨天).
+  全部线程 lists every bot's threads; each row carries the 16px mark of the
+  Agent running it (R-78), the only thread list that shows one, and a
+  relative time on the right (2 分钟前, 昨天).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
   header's search, widen and close, and a list group's collapse chevron), the only
@@ -237,7 +237,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-53** A thread row has two lines: the thread's title, then the opening of
   its last reply quoted verbatim, cut to one line. No generated description,
   no status word and no bot-name prefix (generating them costs compute).
-- **R-54** The PR tab lists this bot's PRs in groups 等待审查, 进行中, 已合并,
+- **R-54** The PR tab lists the PRs of the threads this bot dispatched, in groups 等待审查, 进行中, 已合并,
   with R-52's header style. Each row is the PR title and its number.
 - **R-55** 建议 is the second rail item. Its page is split 50/50 with a 1px
   divider: on the left the title 「建议」 (24px SemiBold) with a refresh icon,
@@ -303,6 +303,14 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   asked about. Creating, sending, appending and adding never ask. An
   unavailable or refused judgment shows a card, never a silent write.
   Source: Alex, 2026-10-31.
+- **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…),
+  so wherever a thread or run is drawn with an icon, the icon is that
+  Agent's mark (`HarnessMark`, R-74); a thread whose Agent is unknown takes
+  the neutral thread mark. A bot never does coding work: it appears only
+  where it dispatched or owns the work (「<Bot> 派出线程」, the 概览 header),
+  never as a thread's or run's icon, and neither does the Coordinator's
+  avatar. Status icons stay where a list shows status (R-62, R-66).
+  Source: Alex, 2026-11-01 (decision `2026-11-01-0110-agent-mark-on-threads`).
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
@@ -397,7 +405,13 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
   (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium
   (group title), 11/14 Medium (badge), and 24/32 SemiBold for the 建议 page
-  title only (R-55). Nothing is smaller than 11px. Labels are sentence case:
+  title only (R-55). Documents people read (a task's title and description,
+  the Artifact reader, comments) use four steps, as Linear and Notion do:
+  24/32 SemiBold title (`text-2xl`), 18/28 SemiBold section heading
+  (`text-lg`), 15/24 Regular body (`text-md`, the one theme token, pinned in
+  `ui-policy.json`), 12/16 meta (`text-xs`); a smaller heading is the body
+  size in SemiBold. Chat, the thread pane included, stays 14/22 (Alex,
+  2026-11-01, decision `2026-11-01-0140-document-type-scale`). Nothing is smaller than 11px. Labels are sentence case:
   no uppercase label with wide tracking (unslop; ui-policy
   `typography/uppercase-label`). Weights stop at SemiBold, never Bold.
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
