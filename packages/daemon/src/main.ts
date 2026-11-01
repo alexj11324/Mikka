@@ -513,10 +513,7 @@ export class Daemon {
             pushBranch: assignment.pushBranch,
             baseBranch: assignment.remoteUrl ? await this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch) : assignment.baseBranch,
             push: (() => {
-              const decision = pushDecision(
-                runPolicy(assignment.policy),
-                repo.push?.approved === true
-              )
+              const decision = pushDecision(runPolicy(assignment.policy))
               return {
                 approved: decision.push,
                 remote: repo.push?.remote ?? "origin",

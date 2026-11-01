@@ -1023,7 +1023,7 @@ export class RunSupervisor {
     }
     const branch = assignment.pushBranch
     const base = await this.deps.baseRef(assignment)
-    if (!branch || !pushDecision(runPolicy(assignment.policy), repo.push?.approved === true).push) return base
+    if (!branch || !pushDecision(runPolicy(assignment.policy)).push) return base
     try {
       return await this.deps.worktrees.fetchBranch(
         repo.path,
@@ -1492,7 +1492,7 @@ export class RunSupervisor {
           tree &&
           // The draft-PR exception requires an explicit repository push
           // approval. It must not even create a local commit without it.
-          (report.verify.status === "passed" || pushDecision(policy, repo.push?.approved === true).push) &&
+          (report.verify.status === "passed" || pushDecision(policy).push) &&
           // A read-only check (ADR 0046) never commits or pushes: it reports
           // on the commit the implementation run already pushed.
           policy.readOnly !== true

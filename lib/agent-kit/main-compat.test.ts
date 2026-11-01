@@ -187,7 +187,7 @@ test('repository push approval composes with CLI limits without broadening unrel
  const approved=await request();assert.equal(approved.status,200);const accepted=await approved.json()
  assert.equal(accepted.policy.permissions.git_push,'allow');assert.equal(accepted.policy.permissions.network,'deny');assert.equal(accepted.policy.permissions.install_dependency,'deny');assert.equal(accepted.policyRevision,'a'.repeat(64))
  selectIndex=0;cliPolicy.permissions.git_push='allow';publicationPolicy.permissions.git_push='ask'
- const pending=await request();assert.equal(pending.status,200);assert.equal((await pending.json()).policy.permissions.git_push,'ask')
+ const pending=await request();assert.equal(pending.status,200);assert.equal((await pending.json()).policy.permissions.git_push,'deny','a local run never receives ask: no push card')
 })
 
 test('a claim without a publication never forwards git_push allow as a push grant', async () => {

@@ -260,13 +260,15 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     }
     : {}
   const settings = device.kind === 'local' && repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
-  // A repository grant resolves its push approval, while an explicit CLI deny
-  // or read-only ceiling remains authoritative for every execution tool.
-  // Without a publication no repository approval was resolved, so a CLI
-  // `git_push: allow` cannot reach the daemon as a push grant.
-  const resolvedPolicy = publication && !cliPolicy.policy.readOnly && cliPolicy.policy.permissions.git_push !== 'deny'
-    ? { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: publication.policy.permissions.git_push } }
-    : !publication && cliPolicy.policy.permissions.git_push === 'allow'
+  // Push authority was decided at admission (the GitHub App grant, decision
+  // 2026-11-01-1215). A local run gets `allow` when admitted and `deny`
+  // otherwise: `ask` is never forwarded, so no push card can appear. An
+  // explicit CLI deny or read-only ceiling stays authoritative. A cloud run
+  // keeps its CLI policy, with a configured `allow` sent as `ask` as before.
+  const localPush = publication && !cliPolicy.policy.readOnly && cliPolicy.policy.permissions.git_push !== 'deny' && publication.policy.permissions.git_push === 'allow' ? 'allow' as const : 'deny' as const
+  const resolvedPolicy = device.kind === 'local'
+    ? { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: localPush } }
+    : cliPolicy.policy.permissions.git_push === 'allow'
       ? { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: 'ask' as const } }
       : cliPolicy.policy
   // A read-only run (dispatched without push authority) cannot change, commit or push anything.

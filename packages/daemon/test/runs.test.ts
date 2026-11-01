@@ -127,8 +127,9 @@ describe("mock runs", () => {
     const origin = join(tempDir(), "origin.git")
     git(source, "clone", "--bare", source, origin)
     const cases = [
+      // Only the server's allow (an admitted GitHub App grant) fetches and pushes the issue branch; a local approval no longer stands in.
       { decision: "allow", approved: false, expected: true },
-      { decision: "ask", approved: true, expected: true },
+      { decision: "ask", approved: true, expected: false },
       { decision: "ask", approved: false, expected: false },
       { decision: "deny", approved: true, expected: false },
     ] as const

@@ -1,56 +1,16 @@
 import 'server-only'
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, gt } from 'drizzle-orm'
 import { appToolCallSchema, APP_TOOL_ACTION, type AppToolCall } from '@/lib/app-tools'
 import { COMPOSIO_ACTIONS, isApprovalAction, parseActionInput } from '@/lib/composio-actions'
 import { serverWriteJudge, type WriteJudge } from '@/lib/operations/write-judgment'
 import { resolveActionAccount, runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
-import { coordinatorEvents, pendingActions, repositorySettings } from '@/lib/db/schema'
-import { taskDestinationSchema } from './task-destination'
-import { repositoryPushApproved } from '@/lib/run-publication-policy'
+import { pendingActions } from '@/lib/db/schema'
 import { actionOutcome, calendarEventSummary, PENDING_ACTION_TTL_MS, type PendingActionView } from '@/lib/pending-action-view'
-import { prepareRepositoryApproval, validateRepositoryApproval } from '@/lib/repository-approval-proposal'
 import { PULL_REQUEST_APPROVAL, pullRequestApprovalInput } from '@/lib/github/pull-request-approval'
 
 /** Most proposals one person can have waiting at once. */
 const MAX_PENDING = 20
-
-/** Prepare only: the repository permission is never changed by the model. */
-/** `chat` names the chat that asks (its bot, and the task request when there is one); the decision goes back there. */
-export async function proposeRepositoryPush(userId: string, input: unknown, chat?: { botId: string | null; eventId?: string }) {
-  const parsed = prepareRepositoryApproval(input)
-  if (!parsed) return { error: 'repositoryInvalid' }
-  const task = chat?.eventId ? { eventId: chat.eventId, botId: chat.botId } : undefined
-  return db.transaction(async tx => {
-    if (task) {
-      const [event] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, task.eventId), eq(coordinatorEvents.userId, userId), task.botId ? eq(coordinatorEvents.botId, task.botId) : isNull(coordinatorEvents.botId))).for('update')
-      const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
-      if (!event || event.kind !== 'user_message' || !event.deliveredAt || !destination.success || destination.data.kind !== 'device') return { error: 'runInvalid' }
-    }
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, parsed.remoteKey])}, 0))`)
-    const [settings] = await tx.select({ push: repositorySettings.push }).from(repositorySettings)
-      .where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, parsed.remoteKey))).limit(1)
-    if (settings?.push?.approved === false) return { status: 'denied' as const }
-    if (repositoryPushApproved(settings?.push, userId)) return { status: 'approved' as const }
-    const [existing] = await tx.select({ id: pendingActions.id, context: pendingActions.context }).from(pendingActions).where(and(
-      eq(pendingActions.userId, userId), eq(pendingActions.action, 'approve_repository_push'), eq(pendingActions.status, 'pending'),
-      gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS)),
-      sql`${pendingActions.input}->>'remoteKey' = ${parsed.remoteKey}`,
-    )).limit(1)
-    if (existing) {
-      if (task) {
-        const ids = Array.isArray(existing.context?.taskEventIds) ? existing.context.taskEventIds.filter((id): id is string => typeof id === 'string') : []
-        await tx.update(pendingActions).set({ context: { ...existing.context, taskEventIds: [...new Set([...ids, task.eventId])] } }).where(eq(pendingActions.id, existing.id))
-      }
-      return { status: 'awaiting_approval' as const, actionId: existing.id }
-    }
-    const waiting = await tx.$count(pendingActions, and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
-    if (waiting >= MAX_PENDING) return { error: 'tooManyPendingActions' }
-    const id = crypto.randomUUID()
-    await tx.insert(pendingActions).values({ id, userId, botId: chat?.botId ?? null, action: 'approve_repository_push', input: parsed, context: task ? { taskEventIds: [task.eventId] } : null })
-    return { status: 'awaiting_approval' as const, actionId: id }
-  })
-}
 
 /**
  * Sends mail or writes the calendar in the person's connected account, with
@@ -141,7 +101,8 @@ export async function listPendingActions(userId: string): Promise<PendingActionV
     }
     if (row.action === APP_TOOL_ACTION) return appToolCallSchema.safeParse(row.input).success ? [{ id: row.id, action: APP_TOOL_ACTION, input: row.input, context: null, status: row.status, createdAt: row.createdAt.toISOString() }] : []
     if (row.action === PULL_REQUEST_APPROVAL) return pullRequestApprovalInput.safeParse(row.input).success ? [{ id: row.id, action: PULL_REQUEST_APPROVAL, input: row.input, context: null, status: row.status, createdAt: row.createdAt.toISOString() }] : []
-    if (!isApprovalAction(row.action) && !(row.action === 'approve_repository_push' && validateRepositoryApproval(row.input))) return []
+    // A repository push card from before decision 2026-11-01-1215 is no longer shown: the GitHub App grant decides the push.
+    if (!isApprovalAction(row.action)) return []
     return [{ id: row.id, action: row.action as PendingActionView['action'], input: row.input, context: row.context as PendingActionView['context'], status: row.status, createdAt: row.createdAt.toISOString() }]
   })
 }

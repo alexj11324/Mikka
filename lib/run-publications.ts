@@ -87,9 +87,10 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
     return saved
   })
   const policy = defaultRunPolicy()
-  // Repository approval is sent only in this assignment, never inherited from
-  // a stale /repos snapshot. The remaining permissions keep their defaults.
-  policy.permissions.git_push = row.branch && row.pushApproved ? 'allow' : 'ask'
+  // Push authority is sent only in this assignment, never inherited from a
+  // stale /repos snapshot: allow for an admitted run, deny otherwise (no card).
+  // The remaining permissions keep their defaults.
+  policy.permissions.git_push = row.branch && row.pushApproved ? 'allow' : 'deny'
   return { ...(row.branch ? { pushBranch: row.branch } : {}), policy }
 }
 
@@ -268,7 +269,10 @@ async function withPublicationAuthority<T>(claim: Publication, work: (value: { p
     // It narrows the push authority below, never replaces it; opening the pull
     // request checks the GitHub App installation live again.
     let pullRequest: 'allow' | 'ask' | 'deny'
-    try { pullRequest = explicitSetting(await readWriteSettingLayers(tx, claim.userId, run.botId), [PULL_REQUEST_PERMISSION]) ?? PULL_REQUEST_DEFAULT } catch { pullRequest = 'ask' }
+    // Unset opens it: the App's pull_requests: write is the grant (checked live
+    // when it opens). An unreadable setting retries; it never invents a card.
+    try { pullRequest = explicitSetting(await readWriteSettingLayers(tx, claim.userId, run.botId), [PULL_REQUEST_PERMISSION]) ?? PULL_REQUEST_DEFAULT }
+    catch { throw new PublicationError('pull_request_setting_unavailable', true) }
     if (!publication.pushApproved || !accepted) throw new PublicationError('push_not_approved')
     return work({ publication, run, report, allowCreate: readIssueMetadata(task.content).pullRequests.length < 10, pullRequest })
   })

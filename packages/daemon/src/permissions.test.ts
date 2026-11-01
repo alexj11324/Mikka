@@ -134,17 +134,15 @@ describe("applying the workspace's policy (ADR 0028)", () => {
   })
 
   it("pushes by the workspace's choice and the repo's approval", () => {
-    expect(pushDecision(policy({}), false)).toEqual({
+    // Only the server's allow (an admitted GitHub App grant) pushes; nothing local stands in for it.
+    expect(pushDecision(policy({}))).toEqual({
       push: false,
-      note: "Push needs approval for this repo",
+      note: "Push needs the Mikka GitHub App's access on this repository",
     })
-    expect(pushDecision(policy({}), true)).toEqual({ push: true })
-    expect(pushDecision(policy({ git_push: "allow" }), false)).toEqual({
-      push: true,
-    })
-    expect(pushDecision(policy({ git_push: "deny" }), true)).toEqual({
+    expect(pushDecision(policy({ git_push: "allow" }))).toEqual({ push: true })
+    expect(pushDecision(policy({ git_push: "deny" }))).toEqual({
       push: false,
-      note: "Push is turned off for this workspace",
+      note: "Push is turned off for this run",
     })
   })
 
@@ -161,7 +159,7 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     // Reading is the whole point of the check.
     expect(decide("read_in_worktree", { policy: p })).toBe("allow")
     // A read-only check never pushes, even on an approved repo.
-    expect(pushDecision(p, true)).toEqual({
+    expect(pushDecision(p)).toEqual({
       push: false,
       note: "A read-only check does not push",
     })
