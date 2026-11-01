@@ -1,5 +1,5 @@
 import 'server-only'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { subscriptionsUsableSql } from '@/lib/personal-policy'
 
@@ -14,6 +14,15 @@ export const botRuntimeProvisioner = {
     await new ComputerStore(pool).operate(actor, botId, 'wake')
     await (await import('./wake-worker')).ensureCloudBotWorker(pool, actor, botId)
   },
+}
+
+/** The owner's hidden Coordinator bot in this workspace (glossary: the Coordinator is a
+ * bot too), created on first use. It owns the Coordinator's cloud runtime, so a
+ * Coordinator run never borrows another bot's (#727). It is never listed. */
+export async function ensureCoordinatorBot(pool: Pool, actor: Actor) {
+  await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name,kind) VALUES ($1,$2,$3,'Coordinator','coordinator')
+    ON CONFLICT ("ownerId","workspaceId") WHERE kind='coordinator' DO NOTHING`, [randomUUID(), actor.workspaceId, actor.userId])
+  return (await pool.query<{ id: string }>(`SELECT id FROM bots WHERE "ownerId"=$1 AND "workspaceId"=$2 AND kind='coordinator'`, [actor.userId, actor.workspaceId])).rows[0].id
 }
 
 async function findRuntime(pool: Pool, actor: Actor, botId: string, harness: string) {

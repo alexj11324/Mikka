@@ -112,6 +112,34 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [n.botId]), 0)
   })
 
+  await t.test('the Coordinator (no bot): its own hidden bot gets the runtime, once; never listed, never borrowed', async () => {
+    const c = await person('coordinator')
+    const before = provisioned
+    const dispatchAsCoordinator = () => steps.dispatchRun(c.id, { issueId: c.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, null)
+    const first = await dispatchAsCoordinator() as unknown as { runId: string; status: string }
+    assert.equal(first.status, 'queued', JSON.stringify(first))
+    const hidden = (await pool.query(`SELECT id,name FROM bots WHERE "ownerId"=$1 AND "workspaceId"=$2 AND kind='coordinator'`, [c.id, c.workspaceId])).rows
+    assert.equal(hidden.length, 1, 'one hidden Coordinator bot')
+    const run = (await pool.query(`SELECT r."botId" AS "runBotId",b."botId" FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id WHERE r.id=$1`, [first.runId])).rows[0]
+    assert.deepEqual(run, { runBotId: null, botId: hidden[0].id }, 'the run stays the Coordinator\'s; its runtime is the hidden bot\'s')
+    assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [c.botId]), 0, 'the ordinary bot\'s runtime is never borrowed or created')
+    const second = await dispatchAsCoordinator() as unknown as { status: string }
+    assert.equal(second.status, 'queued')
+    assert.equal(provisioned, before + 1, 'woken once')
+    assert.equal(await count(`SELECT count(*)::int AS n FROM bots WHERE "ownerId"=$1 AND kind='coordinator'`, [c.id]), 1, 'no duplicate Coordinator bot')
+    assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [hidden[0].id]), 1, 'no duplicate runtime')
+    // Never listed, and a person may still name a bot Coordinator.
+    const { workspaceBots } = await import('../lib/workspace-admin/bots')
+    assert.deepEqual((await workspaceBots(c.workspaceId)).map(bot => bot.id), [c.botId])
+    await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,'Coordinator')`, [randomUUID(), c.workspaceId, c.id])
+    const { agentRuns, agents } = await import('../lib/db/schema')
+    const { runBotId } = await import('../lib/run-bot-name')
+    const { db } = await import('../lib/db')
+    const { eq } = await import('drizzle-orm')
+    const [row] = await db.select({ botId: runBotId }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, first.runId))
+    assert.equal(row.botId, null, 'the thread belongs to the Coordinator, not to a bot')
+  })
+
   await t.test('MIKKA_CLOUD_COMPUTER_TASKS=0: no runtime is created and the bot shows the card', async () => {
     const b = await person('kill-switch')
     process.env.MIKKA_CLOUD_COMPUTER_TASKS = '0'

@@ -29,7 +29,7 @@ async function handleGET(request: Request) {
   const context = await loadWorkspaceContext(undefined, user)
   const [botRows, chats, suggestions, [counts], preferences] = await Promise.all([
     db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots)
-      .where(and(eq(bots.ownerId, user.id), eq(bots.workspaceId, context.workspace.id))).orderBy(bots.createdAt),
+      .where(and(eq(bots.ownerId, user.id), eq(bots.workspaceId, context.workspace.id), eq(bots.kind, 'bot'))).orderBy(bots.createdAt),
     botChats(user.id),
     listSuggestions(user.id),
     db.select({

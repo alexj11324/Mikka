@@ -26,7 +26,7 @@ export const groupRuntime: GroupRuntime = {
   async bots(ownerId, workspaceId, ids, client) {
     if (!ids.length) return []
     const { rows } = await client.query(`SELECT id,name,'' AS description,'bot' AS "memberType" FROM bots
-      WHERE "ownerId"=$1 AND "workspaceId"=$2 AND id=ANY($3::uuid[])`, [ownerId, workspaceId, ids])
+      WHERE "ownerId"=$1 AND "workspaceId"=$2 AND kind='bot' AND id=ANY($3::uuid[])`, [ownerId, workspaceId, ids])
     return ids.flatMap(id => { const row = rows.find(b => b.id === id); return row ? [row] : [] })
   },
   prepareBot: (actor, scope, client) => freezeGroupBotModel({ ...scope, botId: actor.id }, client),

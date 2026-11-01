@@ -27,7 +27,7 @@ const directory = groupDirectory({
     return rows.map(row => row.id)
   },
   async ownedBots(workspaceId, userId, ids) {
-    const rows = await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), eq(bots.workspaceId, workspaceId), inArray(bots.id, ids)))
+    const rows = await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), eq(bots.workspaceId, workspaceId), eq(bots.kind, 'bot'), inArray(bots.id, ids)))
     return rows.map(row => row.id)
   },
 })

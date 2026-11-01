@@ -141,7 +141,7 @@ export async function workspaceDeletionImpact(actorId: string, workspaceId: stri
     const [taskRow] = await tx.select({ n: sql<number>`count(distinct ${teamIssues.issueId})::int` }).from(teamIssues).where(eq(teamIssues.workspaceId, workspaceId))
     return { teamCount: teamRow?.n ?? 0, taskCount: taskRow?.n ?? 0 }
   })
-  const [botRow] = await db.select({ n: sql<number>`count(*)::int` }).from(bots).where(eq(bots.workspaceId, workspaceId))
+  const [botRow] = await db.select({ n: sql<number>`count(*)::int` }).from(bots).where(and(eq(bots.workspaceId, workspaceId), eq(bots.kind, 'bot')))
   const [pointRow] = await db.select({ n: sql<number>`coalesce(sum(${workspaceCreditGrants.points}), 0)::int` }).from(workspaceCreditGrants)
     .where(and(eq(workspaceCreditGrants.workspaceId, workspaceId), eq(workspaceCreditGrants.bucket, 'purchased')))
   return { bots: botRow?.n ?? 0, tasks: taskCount, teams: teamCount, purchasedPoints: pointRow?.n ?? 0 }

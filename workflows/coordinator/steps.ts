@@ -346,8 +346,10 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
       }
       if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
-      // The bot's own runtime, created on first use (cloud is on by default); the Coordinator has none.
-      const runtime=botId ? await (await import('@/lib/computer/auto-runtime')).ensureBotCloudRuntime(pool,{userId,workspaceId:target.workspaceId},botId,{harness:target.harness,model:target.model}) : null
+      // The bot's own runtime, created on first use; the Coordinator's lives on its own hidden bot.
+      const autoRuntime=await import('@/lib/computer/auto-runtime')
+      const actor={userId,workspaceId:target.workspaceId}
+      const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId ?? await autoRuntime.ensureCoordinatorBot(pool,actor),{harness:target.harness,model:target.model})
       const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,reportToCoordinator:botId===null},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
       // The person's own E2B refused (capacity, quota, key): same as no cloud.
       if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
@@ -390,7 +392,7 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
   const { authorizeSubscriptionWorkspace } = await import('@/lib/subscription-runtime')
   const { rows } = await pool.query(`SELECT b.id,b.name,b."workspaceId",coalesce(array_agg(r.harness) FILTER (WHERE r.harness IS NOT NULL),'{}') AS harnesses
     FROM bots b LEFT JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
-    WHERE b."ownerId"=$1 GROUP BY b.id ORDER BY b."createdAt",b.id LIMIT 50`, [userId])
+    WHERE b."ownerId"=$1 AND b.kind='bot' GROUP BY b.id ORDER BY b."createdAt",b.id LIMIT 50`, [userId])
   const visible = await Promise.all(rows.map(async row => {
     try { await authorizeSubscriptionWorkspace(userId, row.workspaceId); return { id: row.id, name: row.name, harnesses: row.harnesses } }
     catch { return null }

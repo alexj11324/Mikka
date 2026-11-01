@@ -35,7 +35,7 @@ async function getOwner() {
 export async function listBots(): Promise<BotView[]> {
   const { ownerId, workspaceId } = await getOwner()
   return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots)
-    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId))).orderBy(asc(bots.createdAt))
+    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId), eq(bots.kind, 'bot'))).orderBy(asc(bots.createdAt))
 }
 
 /**

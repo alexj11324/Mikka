@@ -28,7 +28,13 @@ This is idempotent: a second dispatch reuses the runtime and the binding. When
 the cloud refuses (E2B refuses, the worker cannot start), the run takes the
 next step of the fallback order.
 
-A run with no bot (the Coordinator) still never borrows another bot's runtime.
+The Coordinator is a bot too (glossary). Each owner has one hidden
+Coordinator row per workspace (`bots.kind = 'coordinator'`), created on its
+first cloud dispatch. It owns the Coordinator's cloud runtime, so a run the
+Coordinator dispatches goes to the cloud the same way and still never borrows
+another bot's runtime. Its runs stay the Coordinator's (`agent_runs.botId` is
+null), and the row is never listed: not in the bot list, admin lists, usage,
+groups, exports or model tools. A person may still name a bot "Coordinator".
 
 How it is built: `lib/cloud-computer-flag.ts` holds the switch;
 `lib/computer/auto-runtime.ts` creates the runtime from `dispatch_run`;
