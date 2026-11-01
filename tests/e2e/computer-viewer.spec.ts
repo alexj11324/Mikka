@@ -4,7 +4,7 @@ import { test, expect, register } from './fixtures'
 // Real noVNC decodes this bounded RFB server. It deliberately withholds the next
 // frame during signed-grant changes; server authority is checked separately by
 // viewer-gateway tests against the real x11vnc sockets.
-test('computer viewer keeps the desktop through handoff and renewal, with full preview and backdrop targets', async ({ page }, info) => {
+test('computer viewer keeps the desktop through handoff and renewal, with full preview and backdrop targets', async ({ page, allowedConsoleErrors }, info) => {
   // Playwright's routed WebSocket adds an empty subclass; noVNC validates only
   // own properties and the immediate prototype. Expose its public channel API.
   await page.addInitScript(() => {
@@ -23,6 +23,7 @@ test('computer viewer keeps the desktop through handoff and renewal, with full p
   let holdFrames = false
   let inputs = 0
   let denied = false
+  let viewerPath = ''
   const sockets = new Set<WebSocketRoute>()
   const pending = new Set<() => void>()
   const grant = (mode: string) => ({ url: `wss://viewer.test/${mode}/${epoch}/${++serial}`, expiresAt: new Date(Date.now() + 35_000).toISOString() })
@@ -61,7 +62,10 @@ test('computer viewer keeps the desktop through handoff and renewal, with full p
   })
   await page.route('**/api/settings/e2b-key?*', route => route.fulfill({ json: { configured: true } }))
   await page.route('**/api/bots/*/computer', route => route.fulfill({ json: { machine: 'running', control: controlled ? 'user' : 'agent', ...(controlled ? { controlledBy: { userId } } : {}) } }))
-  await page.route('**/api/bots/*/computer/viewer', route => denied ? route.fulfill({ status: 403, json: { error: 'forbidden' } }) : route.fulfill({ json: grant(route.request().postDataJSON().mode) }))
+  await page.route('**/api/bots/*/computer/viewer', route => {
+    viewerPath = new URL(route.request().url()).pathname
+    return denied ? route.fulfill({ status: 403, json: { error: 'forbidden' } }) : route.fulfill({ json: grant(route.request().postDataJSON().mode) })
+  })
   await page.route('**/api/bots/*/computer/takeover', route => { controlled = true; revoke(); return route.fulfill({ json: grant('control') }) })
   await page.route('**/api/bots/*/computer/handback', route => { controlled = false; revoke(); return route.fulfill({ status: 204 }) })
   await register(page)
@@ -147,6 +151,7 @@ test('computer viewer keeps the desktop through handoff and renewal, with full p
   await expect.poll(() => controlled).toBe(false)
   await preview.click({ position: { x: 12, y: 12 } })
   await waitFrame()
+  allowedConsoleErrors.push({ message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)', path: viewerPath })
   denied = true
   await expect(screen).toHaveCount(0, { timeout: 10_000 })
   await expect(viewer.getByRole('button', { name: '重试', exact: true })).toBeVisible()
