@@ -48,8 +48,8 @@ It returns 404 when the environment, origin, marker or build does not match.
 
 ## Bootstrap
 
-The browser and database CI jobs bootstrap their existing disposable PostgreSQL
-service after schema setup and before tests create users:
+The database CI job and local runs bootstrap the disposable PostgreSQL
+database after schema setup and before tests create users:
 
 ```sh
 node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
@@ -233,12 +233,9 @@ timestamp, run/lease IDs, non-sensitive account IDs and expected/actual results.
 Do not place credentials, cookies, tokens, raw authentication responses or
 unfiltered driver errors in logs, PRs, screenshots, traces or public artifacts.
 Secret scans must include the generated logs and exported browser evidence.
-Both CI Playwright commands first capture stdout and stderr in mode 0600 logs.
-Each log is scanned before any of its content is printed to Actions; a blocked
-scan never prints the log. The workflow preserves the test command's failure
-exit code and fails a successful test command if its log scan fails. The final
-artifact scan and upload use the same explicit log paths alongside the reports.
-The scanner also decodes the ZIP payload embedded inside Playwright HTML reports,
+CI runs no browser tests (decision 2026-11-01-1520). The lease session scans
+the evidence it records (`scripts/test-accounts/session.mjs` with
+`evidence-content.mjs`); the scanner also decodes the ZIP payload embedded inside Playwright HTML reports,
 with bounded entry count, depth and decompressed size. It rejects malformed,
 encrypted, unsupported and raw nested archives. The regular registration fixture
 records its generated passwords and cookies in the same protected scanner store.

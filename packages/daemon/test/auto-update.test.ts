@@ -42,7 +42,7 @@ function maintenanceDaemon() {
   const daemon = new Daemon({ dataDir: join(stateFile(), '..'), flavor: 'prod', link: {} as never, log: log as never })
   const internal = daemon as unknown as {
     supervisor: { heartbeatRuns: () => unknown[] }
-    claimsInFlight: number; nativeCoordinator: Promise<void> | null; stopped: boolean; updating: boolean
+    claimsInFlight: number; stopped: boolean; updating: boolean
     maintenance: Promise<void> | null; updateVersion?: string
     options: { autoUpdate?: { latest(): Promise<string>; install(version: string): Promise<void> } }
     startMaintenance(work: () => Promise<void>): void; checkAutoUpdate(): void
@@ -51,16 +51,13 @@ function maintenanceDaemon() {
   internal.supervisor = { heartbeatRuns: () => [] }
   return { daemon, internal, log }
 }
-it('waits for runs, native Coordinator and in-flight claims, then blocks admissions during background installation', async () => {
+it('waits for runs and in-flight claims, then blocks admissions during background installation', async () => {
   const { internal } = maintenanceDaemon()
   let finish!: () => void
   const work = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
   internal.supervisor.heartbeatRuns = () => [{}]
   internal.startMaintenance(work)
   internal.supervisor.heartbeatRuns = () => []
-  internal.nativeCoordinator = Promise.resolve()
-  internal.startMaintenance(work)
-  internal.nativeCoordinator = null
   internal.claimsInFlight = 1
   internal.startMaintenance(work)
   expect(work).not.toHaveBeenCalled()

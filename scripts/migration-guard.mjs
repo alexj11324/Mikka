@@ -20,6 +20,15 @@ export function migrationGuard(env, targets, argv = []) {
   return { warning: `migrate: WARNING --allow-remote: applying migrations to non-loopback ${remote.join(', ')}` }
 }
 
+/** Whether to migrate without being asked: Vercel production, or off Vercel when every configured target is loopback. */
+export function migrationRequested(env, targets) {
+  if (env.MIGRATE === '0') return false
+  if (env.MIGRATE === '1' || env.VERCEL_ENV === 'production') return true
+  if (env.VERCEL || env.VERCEL_ENV) return false
+  const urls = Object.values(targets).filter(Boolean)
+  return urls.length > 0 && urls.every(isLoopbackDatabase)
+}
+
 export function isLoopbackDatabase(connectionString) {
   let url
   try { url = new URL(connectionString) } catch { return false }

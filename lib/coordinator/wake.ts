@@ -61,8 +61,9 @@ export async function wakeCoordinator(userId: string): Promise<void> {
     for (const botId of await wakingChats(userId)) {
       await wakeChat({ userId, botId })
     }
-  } catch {
-    console.error('Failed to wake the Coordinator')
+  } catch (error) {
+    // Name and code only: messages can carry chat or database content.
+    console.error('Failed to wake the Coordinator', { name: error instanceof Error ? error.name : typeof error, code: (error as { code?: unknown } | null)?.code })
   }
 }
 
