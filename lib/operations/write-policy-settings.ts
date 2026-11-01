@@ -6,7 +6,10 @@ import type { MailboxTransactionGuard } from '@/lib/mailbox-transaction-guard'
 import type { PoolClient } from 'pg'
 import { writeTransaction } from './write-transaction'
 
-export const writePolicySettingsSchema = z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), z.enum(['allow', 'ask', 'deny'])).refine(value => Object.keys(value).length <= 100)
+export const writePolicySettingsSchema = z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), z.enum(['allow', 'ask', 'deny']))
+  .refine(value => Object.keys(value).length <= 100)
+  // Browser actions have no "ask": bots operate their browsers without asking (Alex, 2026-10-30 and 2026-11-01).
+  .refine(value => Object.entries(value).every(([key, decision]) => !key.startsWith('browser_') || decision !== 'ask'), { message: 'browserAskUnavailable' })
 const versionSchema = z.string().regex(/^(0|[1-9]\d*)$/)
 
 /** Host supplies workspace membership lease; model input cannot select identity. */
