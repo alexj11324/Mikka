@@ -96,7 +96,7 @@ const pr = 'https://github.com/alexj11324/Mikka/pull/418'
 const refusedTask = randomUUID()
 test.describe('refused merge', () => {
   test.use({ expectedConsoleErrors: [{ path: app(`/api/factory/tasks/${refusedTask}/approval`), message: 'Failed to load resource: the server responded with a status of 409 (Conflict)' }] })
-  test('验收并合并 that GitHub refuses keeps the task waiting with the reason and 在 GitHub 打开', async ({ page }) => {
+  test('验收并合并 that GitHub refuses keeps the task waiting with the reason and 在 GitHub 打开', { tag: '@smoke' }, async ({ page }) => {
     const { dialog, calls, binding } = await setup(page, {
       taskId: refusedTask,
       pullRequest: pr,
