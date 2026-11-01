@@ -12,27 +12,27 @@ let failWake: (error: Error) => void
 const failures: string[] = []
 mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
 mock.module('sonner', { namedExports: { toast: { error: (message: string) => failures.push(message) } } })
-mock.module(new URL('../../hooks/use-computer.ts', import.meta.url).href, { namedExports: {
+mock.module(new URL('../hooks/use-computer.ts', import.meta.url).href, { namedExports: {
   useComputer: () => ({ data: state, mutate: async () => state }),
   useViewerGrant: () => ({}),
 } })
-mock.module(new URL('../../lib/computer/client.ts', import.meta.url).href, { namedExports: { computerApi: {
+mock.module(new URL('../lib/computer/client.ts', import.meta.url).href, { namedExports: { computerApi: {
   wake: () => { requests++; return new Promise<null>((resolve, reject) => { finishWake = resolve; failWake = reject }) },
 } } })
-mock.module(new URL('../ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ size: _size, variant: _variant, ...props }: ComponentProps<'button'> & { size?: string; variant?: string }) => <button {...props} /> } })
-mock.module(new URL('../ui/progress.tsx', import.meta.url).href, { namedExports: { Progress: (props: { 'aria-label': string }) => <div role="progressbar" aria-label={props['aria-label']} /> } })
+mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ size: _size, variant: _variant, ...props }: ComponentProps<'button'> & { size?: string; variant?: string }) => <button {...props} /> } })
+mock.module(new URL('../components/ui/progress.tsx', import.meta.url).href, { namedExports: { Progress: (props: { 'aria-label': string }) => <div role="progressbar" aria-label={props['aria-label']} /> } })
 
 const browser = new Window()
 let root: Root
 let container: HTMLDivElement
 let createRoot: typeof import('react-dom/client')['createRoot']
-let ComputerScreen: typeof import('./computer-screen')['ComputerScreen']
+let ComputerScreen: typeof import('../components/computer/computer-screen')['ComputerScreen']
 before(async () => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
   Object.defineProperty(globalThis, 'document', { configurable: true, value: browser.document })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
-  ;({ ComputerScreen } = await import('./computer-screen'))
+  ;({ ComputerScreen } = await import('../components/computer/computer-screen'))
 })
 beforeEach(() => {
   state = { machine: 'sleeping', control: 'idle' }; requests = 0; failures.length = 0
