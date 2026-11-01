@@ -90,6 +90,18 @@ and offline expiry do not reroute them. `cloud` explicitly routes to cloud using
 the last reported resolved model, retaining runtime and account authorization.
 Device-specific source-event authorization still cannot be redirected to cloud.
 
+When no machine can take the run, `dispatch_run` returns an error the person can
+act on ([decision 2026-10-31-2200](design/decisions/2026-10-31-2200-run-machine-fallback.md)).
+A cloud choice runs on the person's own E2B key only; when there is no key,
+no bot cloud runtime, or that E2B refuses (concurrency cap, quota, key), the run
+goes to the person's online device with 允许调度 and 允许自动调度 on (a server
+first, then the default rule's device, else the most recently seen), then to
+the rule's offline device under `wait`. With none of these it returns
+`error: 'machineUnavailable'` and a card (允许这台电脑自动调度 / 在这台电脑上启用,
+填入 E2B Key, 让服务器重新上线 / 连接我的服务器). 允许自动调度 (`devices."autoSchedule"`)
+defaults to on for servers and off for personal computers, and automatic default
+placement (`suggested`, `auto` rows) uses only devices with it on.
+
 Bot quota `stop` propagates the exhaustion error. Target: no switch inside a
 running run ([orchestration](design/orchestration.md) § 2). Today `switchAccount` only tries
 another connected account of the same owner/workspace, route and model. Each
