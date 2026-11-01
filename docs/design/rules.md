@@ -365,7 +365,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `icons/no-sparkle`).
 - **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
-  value read-only. A stored off is an admin's choice, never a leftover
+  value read-only. A person's own subscriptions and API keys are not such a
+  feature: they always run that person's own bots, with no switch; an admin
+  can switch off only 「分享给团队成员」 (decision
+  [2026-11-01-2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). A stored off is an admin's choice, never a leftover
   default: a migration that turns a default on also rewrites rows that hold
   the old default. A feature stays off only for real per-use cost, an
   incident kill switch or a recorded Alex decision (`decisions.md`). Safety
