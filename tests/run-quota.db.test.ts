@@ -31,6 +31,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   const { persistRunCompletion } = await import('../lib/run-publications')
   const { reclaimLostRuns } = await import('../lib/run-leases')
   const quota = await import('../lib/run-quota')
+  const { threadQuotaView } = await import('../lib/run-quota-view')
   const { hashDeviceToken } = await import('../lib/device-link')
   const claimRoute = await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   const users: string[] = []
@@ -187,13 +188,21 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     await quotaEnd(p, runId, null)
     assert.equal((await row(runId)).quotaResetsAt.toISOString(), resetsAt, 'a replay does not change it')
 
+    // The open thread's card: paused, the reset, no key yet; nothing for anyone else.
+    assert.deepEqual(await threadQuotaView(p.id, [runId], runId), { switched: [], paused: { runId, subscription: 'codex', plan: null, resetsAt, keyReady: false } })
+
     // (d) resume on a key: none yet, then one added.
     await failsWith(quota.resumeQuotaPausedRunOnApiKey(p.id, runId), 'apiKeyNotFound')
     assert.equal((await row(runId)).status, 'paused')
     const other = await person('quota-intruder')
     await failsWith(quota.resumeQuotaPausedRunOnApiKey(other.id, runId), 'runNotFound')
+    assert.deepEqual(await threadQuotaView(other.id, [runId], runId), { switched: [], paused: null })
     const key = await addKey(p.id, 'openai', ['key-model-c'])
+    assert.equal((await threadQuotaView(p.id, [runId], runId)).paused?.keyReady, true, 'the card offers 用 API Key 继续 once a key exists')
     const { runId: retryRunId } = await quota.resumeQuotaPausedRunOnApiKey(p.id, runId)
+    assert.deepEqual(await threadQuotaView(p.id, [runId, retryRunId], retryRunId), {
+      switched: [{ runId, subscription: 'codex', plan: null, key: { provider: 'openai', name: null, model: 'key-model-c' } }], paused: null,
+    })
     assert.deepEqual(await quota.resumeQuotaPausedRunOnApiKey(p.id, runId), { runId: retryRunId }, 'idempotent')
     const original = await row(runId)
     assert.equal(original.status, 'failed')

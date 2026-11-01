@@ -2863,7 +2863,8 @@
       "revert": "Switch back",
       "addKey": "Add API key to continue",
       "useKey": "Continue with API key",
-      "retryAfterReset": "Retry after reset"
+      "retryAfterReset": "Retry after reset",
+      "continueFailed": "Could not continue"
     },
     "wakeErrors": {
       "wake_failed": "Reply pending retry",

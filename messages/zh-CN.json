@@ -2863,7 +2863,8 @@
       "revert": "改回",
       "addKey": "添加 API Key 继续",
       "useKey": "用 API Key 继续",
-      "retryAfterReset": "重置后重试"
+      "retryAfterReset": "重置后重试",
+      "continueFailed": "未能继续"
     },
     "wakeErrors": {
       "wake_failed": "回复等待重试",

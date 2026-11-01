@@ -21,14 +21,14 @@ export function subscriptionName(provider: string, plan: string | null) {
   return plan ? `${name} ${plan}` : name
 }
 
-function useKeyName() {
+export function useKeyName() {
   const t = useTranslations('Settings.apiKeys.provider')
   return (provider: string, name: string | null) =>
     name ?? ((PROVIDERS as readonly string[]).includes(provider) ? t(provider as (typeof PROVIDERS)[number]) : provider)
 }
 
 /** 14:00 today, 11月2日 14:00 on another day. */
-function useResetTime() {
+export function useResetTime() {
   const format = useFormatter()
   return (at: string) => {
     const date = new Date(at)
