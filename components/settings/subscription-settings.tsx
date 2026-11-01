@@ -1,13 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Check, Copy, MoreHorizontal, TriangleAlert } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
-import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
+import { Switch } from '@/components/ui/switch'
 import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { BotAvatar } from '@/components/nav/bot-avatar'
@@ -115,7 +117,7 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
         if (stopped) return
         if (result.pending === true) { timer = setTimeout(poll, (attempt.interval! + 1) * 1000); return }
         if (result.state !== 'connected') throw new Error('Subscription connection failed')
-        setAttempt(null); setNotice(t('connectedNotice')); await refresh()
+        setAttempt(null); await refresh()
       } catch (failure) { if (!stopped) { setAttempt(null); setError({ provider: attempt.provider, message: failureMessage(failure, 'finishFailed', attempt.provider), again }); void refresh().catch(() => undefined) } }
     }
     timer = setTimeout(poll, (attempt.interval + 1) * 1000)
@@ -131,9 +133,9 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
     setCatching(true)
     catcher(attempt.authorizationUrl).then(callbackUrl => {
       if (stopped) return
-      setCatching(false)
+      // Still catching while the return is submitted: ending the attempt ends it, and no paste field flashes.
       if (callbackUrl) void submitLatest.current(attempt, callbackUrl)
-      else { setAttempt(null); setError({ provider: attempt.provider, message: t('expired', { provider: t(attempt.provider) }), again: { connectionId: attempt.connectionId } }) }
+      else { setCatching(false); setAttempt(null); setError({ provider: attempt.provider, message: t('expired', { provider: t(attempt.provider) }), again: { connectionId: attempt.connectionId } }) }
     }, () => { if (!stopped) setCatching(false) }) // The port is taken: the paste below still works.
     return () => { stopped = true; setCatching(false) }
   }, [attempt, t])
@@ -148,6 +150,8 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
       const next = parseSubscriptionStart(value, provider)
       if (Date.parse(next.expiresAt) <= Date.now()) throw new Error('Authorization expired')
       if (tab) { tab.opener = null; tab.location.href = next.authorizationUrl }
+      // Set together with the attempt, so the paste field never flashes while the desktop app catches the return.
+      if (next.flow === 'callback_handoff' && bridgeFromWindow(window as MikkaWindow)?.app.claudeCallback) setCatching(true)
       setAttempt({ ...next, provider })
     } catch (failure) { tab?.close(); setError({ provider, message: failureMessage(failure, 'startFailed', provider), again: existing ? { connectionId: existing.id } : {} }) } finally { setPending(false); setStarting(null) }
     // The started attempt stands even if the list cannot be re-read right now.
@@ -162,7 +166,7 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
     try {
       const result = await post({ action: 'callback', connectionId: attempt.connectionId, state: attempt.state, callbackUrl }) as { state?: unknown }
       if (result.state !== 'connected') throw new Error('Subscription connection failed')
-      setAttempt(null); setNotice(t('connectedNotice')); await refresh()
+      setAttempt(null); await refresh()
     } catch (failure) { setAttempt(null); setError({ provider: attempt.provider, message: failureMessage(failure, 'finishFailed', attempt.provider), again: { connectionId: attempt.connectionId } }); void refresh().catch(() => undefined) } finally { setCallback(''); setPending(false) }
   }
   async function disconnect(connection: { id: string; provider: Provider; revision: number }) {
@@ -170,11 +174,17 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
     try { await post({ action: 'disconnect', connectionId: connection.id, revision: connection.revision }); await refresh(); setNotice(t('disconnectedNotice')) }
     catch { setError({ provider: connection.provider, message: t('disconnectFailed') }) } finally { setPending(false) }
   }
+  async function setPaused(connection: { id: string; provider: Provider }, paused: boolean) {
+    setPending(true); setError(null); setNotice('')
+    try { await post({ action: 'pause', connectionId: connection.id, paused }); await refresh() }
+    catch { setError({ provider: connection.provider, message: t('pauseFailed') }) } finally { setPending(false) }
+  }
   async function remove(connection: { id: string; provider: Provider; revision: number }) {
     setPending(true); setError(null); setNotice('')
     try { await post({ action: 'remove', connectionId: connection.id, revision: connection.revision }); await refresh() }
     catch { setError({ provider: connection.provider, message: t('removeFailed') }) } finally { setPending(false) }
   }
+  function cancel() { setAttempt(null); setCallback(''); void refresh().catch(() => undefined) }
   /** 重新开始: the same connection when there is one (its revision read now), else a new one. */
   function startAgain(failure: Failure) {
     const existing = failure.again?.connectionId ? state?.connections.find(item => item.id === failure.again?.connectionId) : undefined
@@ -189,112 +199,155 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
     {extraRows?.length ? <SettingsSection action={action}>{extraRows}</SettingsSection> : action && <div className="flex justify-end">{action}</div>}
     {status}
   </div>
-  return <div className="flex flex-col gap-3">
+  // The oldest read on screen, so the line never overstates how fresh a meter is.
+  const reads = usage && usage !== 'failed' ? state.connections.flatMap(connection => {
+    const read = connection.state === 'connected' ? usage.get(connection.id) : undefined
+    return read && read.status !== 'unavailable' && read.status !== 'reauth' ? [Date.parse(read.observedAt)] : []
+  }) : []
+  const updated = reads.length > 0 ? Math.max(0, Math.floor((now - Math.min(...reads)) / 60_000)) : null
+  return <div className="flex flex-col gap-1">
     <SettingsSection action={action}>
       {(['codex', 'claude'] as const).map(provider => {
         const available = state.providers.some(item => item.provider === provider && item.available)
         const connections = state.connections.filter(item => item.provider === provider)
         const Logo = logos[provider]
         const failure = error?.provider === provider ? error : null
+        const mine = attempt?.provider === provider ? attempt : null
         return <div key={provider} className="divide-y divide-border">
-          {connections.length === 0 && <SettingRow icon={<Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />} title={t(provider)} description={available ? undefined : t('unavailable')}>
-            <SignInButton busy={(starting?.provider === provider && !starting.id) || attempt?.provider === provider} disabled={!available || pending || !!attempt} label={t('connect')} busyLabel={t('connecting')} onClick={() => { void connect(provider) }} />
-          </SettingRow>}
-          {connections.map(connection => {
-            const live = connection.state === 'connected'
-            const read = live && usage && usage !== 'failed' ? usage.get(connection.id) : undefined
-            const failed = live && (usage === 'failed' || read?.status === 'unavailable')
-            // reauth: the runtime's own reconnect_required, or the provider refused this read.
-            const reauth = connection.state === 'reconnect_required' || read?.status === 'reauth'
-            const refused = read?.status === 'extra_usage' || read?.status === 'unverified'
-            const healthy = live && !reauth && !refused
-            const account = read?.account ?? connection.account ?? null
-            const plan = read?.plan ? t('codexPlan', { plan: read.plan }) : null
-            const product = provider === 'codex' ? plan ?? t('codexProduct') : t('claudeProduct')
-            const updated = read && read.status !== 'unavailable' && read.status !== 'reauth' ? Math.max(0, Math.floor((now - Date.parse(read.observedAt)) / 60_000)) : null
-            const bots = connection.bots ?? []
-            return <div key={connection.id} className="flex flex-col gap-3 px-5 py-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
-                  <Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-medium">{account ?? product}</span>
-                    {account && <span className="text-xs text-muted-foreground">{product}</span>}
+          <div>
+            <div className="divide-y divide-border">
+              {connections.length === 0 && <SettingRow icon={<Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />} title={t(provider)} description={available ? undefined : t('unavailable')}>
+                <span className="flex items-center gap-2">
+                  {mine && catching && <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>{t('cancel')}</Button>}
+                  <SignInButton busy={(starting?.provider === provider && !starting.id) || !!mine} disabled={!available || pending || !!attempt} label={t('connect')} busyLabel={t('connecting')} onClick={() => { void connect(provider) }} />
+                </span>
+              </SettingRow>}
+              {connections.map(connection => {
+                const live = connection.state === 'connected'
+                const read = live && usage && usage !== 'failed' ? usage.get(connection.id) : undefined
+                const failed = live && (usage === 'failed' || read?.status === 'unavailable')
+                // reauth: the runtime's own reconnect_required, or the provider refused this read.
+                const reauth = connection.state === 'reconnect_required' || read?.status === 'reauth'
+                const refused = read?.status === 'extra_usage' || read?.status === 'unverified'
+                const paused = connection.paused === true
+                const healthy = live && !reauth && !refused && !paused
+                const account = read?.account ?? connection.account ?? null
+                const plan = read?.plan ? t('codexPlan', { plan: read.plan }) : null
+                const product = provider === 'codex' ? plan ?? t('codexProduct') : read?.plan ? t('claudePlan', { plan: read.plan }) : t('claudeProduct')
+                const bots = connection.bots ?? []
+                const signingIn = starting?.id === connection.id || attempt?.connectionId === connection.id
+                const canReconnect = available && !pending && !attempt
+                return <div key={connection.id} className="flex flex-col gap-3 px-5 py-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm font-medium">{account ?? product}</span>
+                        {account && <span className="text-xs text-muted-foreground">{product}</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:justify-end">
+                      <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
+                        <span aria-hidden="true" className={cn('size-1.5 rounded-full', healthy ? 'bg-success' : reauth || (refused && !paused) ? 'bg-warning' : 'bg-muted-foreground')} />
+                        {reauth ? t('reauth') : paused ? t('paused') : refused ? t('notInUse') : live ? t('connected') : t('notConnected')}
+                      </span>
+                      {mine?.connectionId === connection.id && catching && <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>{t('cancel')}</Button>}
+                      {(reauth || !live || signingIn) && <SignInButton busy={signingIn} disabled={!canReconnect} label={t('reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection) }} />}
+                      {live && !reauth && !signingIn && <Switch checked={!paused} disabled={pending || !!attempt} aria-label={t('useSubscription', { label: account ?? product })} onCheckedChange={checked => { void setPaused(connection, !checked) }} />}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger disabled={pending || !!attempt} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { label: account ?? product })} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuGroup>
+                            {live
+                              ? <DropdownMenuItem variant="destructive" onClick={() => { void disconnect(connection) }}>{t('disconnect')}</DropdownMenuItem>
+                              : <DropdownMenuItem variant="destructive" onClick={() => { void remove(connection) }}>{t('remove')}</DropdownMenuItem>}
+                          </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
+                  {(live || reauth) && <div className="flex flex-col gap-2 sm:pl-8">
+                    {refused && <p className="text-xs text-foreground">{read?.status === 'unverified' ? t('extraUsageUnverified') : provider === 'claude' ? `${t('extraUsageOn')} · ${t('extraUsageClaudeFix')}` : t('extraUsageOn')}</p>}
+                    {failed
+                      ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={() => { void loadUsage(true) }}>{t('retry')}</Button></span>
+                      : read && read.windows.length > 0 && <QuotaMeters windows={read.windows} now={now} />}
+                    {bots.length > 0 && <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      {t('usedBy')}
+                      {bots.map(bot => <span key={bot.id} className="flex items-center gap-1 text-foreground"><BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} />{bot.name}</span>)}
+                    </span>}
+                  </div>}
                 </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span aria-hidden="true" className={cn('size-2 rounded-full', healthy ? 'bg-success' : reauth || refused ? 'bg-warning' : 'bg-muted-foreground')} />
-                    {reauth ? t('reauth') : refused ? t('notInUse') : live ? t('connected') : t('notConnected')}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    {(reauth || !live) && <SignInButton busy={starting?.id === connection.id || attempt?.connectionId === connection.id} disabled={!available || pending || !!attempt} label={t('reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection) }} />}
-                    {live
-                      ? <Button type="button" variant={reauth ? 'ghost' : 'secondary'} size="sm" disabled={pending || !!attempt} onClick={() => { void disconnect(connection) }}>{t('disconnect')}</Button>
-                      : <Button type="button" variant="ghost" size="sm" disabled={pending || !!attempt} onClick={() => { void remove(connection) }}>{t('remove')}</Button>}
-                  </span>
-                </div>
-              </div>
-              {(live || reauth) && <div className="flex flex-col gap-2 sm:pl-8">
-                {refused && <p className="text-xs text-foreground">{read?.status === 'unverified' ? t('extraUsageUnverified') : provider === 'claude' ? `${t('extraUsageOn')} · ${t('extraUsageClaudeFix')}` : t('extraUsageOn')}</p>}
-                {failed
-                  ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={() => { void loadUsage(true) }}>{t('retry')}</Button></span>
-                  : read && read.windows.length > 0 && <QuotaMeters windows={read.windows} now={now} />}
-                {updated !== null && <p className="text-xs text-muted-foreground">{updated < 1 ? t('updatedJustNow') : t('updatedAgo', { minutes: updated })}</p>}
-                {bots.length > 0 && <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  {t('usedBy')}
-                  {bots.map(bot => <span key={bot.id} className="flex items-center gap-1 text-foreground"><BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} />{bot.name}</span>)}
-                </span>}
-              </div>}
+              })}
             </div>
-          })}
-          {failure && <div className="px-5 py-3">
-            <Alert variant="destructive" role="alert">
-              <AlertDescription>{failure.message}</AlertDescription>
-              {failure.again && available && <AlertAction><Button variant="outline" size="sm" disabled={pending || !!attempt} onClick={() => startAgain(failure)}>{t('restart')}</Button></AlertAction>}
-            </Alert>
+            {mine && !catching && <SignInPanel attempt={mine} callback={callback} pending={pending} onCallback={setCallback} onFinish={() => { void finishCallback() }} onCancel={cancel} />}
+          </div>
+          {failure && <div role="alert" className="flex items-center gap-2 px-5 py-3 text-sm text-warning-foreground">
+            <TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-warning" />
+            <span className="min-w-0 flex-1">{failure.message}</span>
+            {failure.again && available && <Button type="button" variant="secondary" size="sm" disabled={pending || !!attempt} onClick={() => startAgain(failure)}>{t('retry')}</Button>}
           </div>}
         </div>
       })}
       {extraRows}
     </SettingsSection>
-    {attempt && <div className="flex flex-col gap-2 px-1 text-sm">
-      <p role="status">{attempt.flow === 'device' ? t('deviceInstructions') : catching ? t('browserInstructions') : t('callbackInstructions')}</p>
-      {attempt.userCode && <p className="font-mono font-semibold select-all">{attempt.userCode}</p>}
-      <a className="w-fit text-sidebar-primary underline underline-offset-4" href={attempt.authorizationUrl} target="_blank" rel="noopener noreferrer">{t('openProvider')}</a>
-      {attempt.flow === 'callback_handoff' && !catching && <form className="flex flex-col gap-2" onSubmit={event => { event.preventDefault(); void finishCallback() }}>
-        <FieldGroup><Field><FieldLabel htmlFor="subscription-callback">{t('callbackLabel')}</FieldLabel>
-          <Input id="subscription-callback" value={callback} autoComplete="off" spellCheck={false} maxLength={8192} onChange={event => setCallback(event.target.value)} />
-        </Field></FieldGroup>
-        <Button type="submit" className="w-fit" disabled={pending || !callback.trim()}>{t('finish')}</Button>
-      </form>}
-      <Button type="button" variant="ghost" size="sm" className="w-fit" disabled={pending} onClick={() => { setAttempt(null); setCallback(''); void refresh().catch(() => undefined) }}>{t('close')}</Button>
-    </div>}
-    {notice && <p role="status" className="px-1 text-sm">{notice}</p>}
+    {updated !== null && <p className="pt-1 pl-1 text-xs text-muted-foreground">{updated < 1 ? t('updatedJustNow') : t('updatedAgo', { minutes: updated })}</p>}
+    {notice && <p role="status" className="pt-1 pl-1 text-xs text-muted-foreground">{notice}</p>}
   </div>
 }
 
+/** The rest of a sign-in the browser can't finish for us, inside its provider's row. */
+function SignInPanel({ attempt, callback, pending, onCallback, onFinish, onCancel }: { attempt: Attempt; callback: string; pending: boolean; onCallback: (value: string) => void; onFinish: () => void; onCancel: () => void }) {
+  const t = useTranslations('Settings.subscriptions')
+  const [copied, setCopied] = useState(false)
+  const name = t(attempt.provider === 'codex' ? 'codexProduct' : 'claudeProduct')
+  const cancel = <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onCancel}>{t('cancel')}</Button>
+  const open = <Button variant="secondary" size="sm" nativeButton={false} render={<a href={attempt.authorizationUrl} target="_blank" rel="noopener noreferrer" />}>{t('open', { provider: name })}</Button>
+  if (attempt.flow === 'device') return <div className="flex flex-col gap-2 px-5 pb-4 sm:pl-13">
+    <span className="text-xs font-medium">{t('deviceCode')}</span>
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="font-mono text-xl font-semibold select-all">{attempt.userCode}</span>
+      <Button type="button" variant="ghost" size="icon-sm" aria-label={copied ? t('copied') : t('copy')} onClick={() => { void navigator.clipboard.writeText(attempt.userCode ?? '').then(() => setCopied(true), () => undefined) }}>{copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}</Button>
+      <span className="ml-auto flex items-center gap-2">{cancel}{open}</span>
+    </div>
+  </div>
+  return <form className="flex flex-col gap-3 px-5 pb-4 sm:pl-13" onSubmit={event => { event.preventDefault(); onFinish() }}>
+    <FieldGroup><Field><FieldLabel htmlFor="subscription-callback">{t('callbackLabel')}</FieldLabel>
+      <Input id="subscription-callback" value={callback} placeholder={t('callbackPlaceholder')} autoComplete="off" spellCheck={false} maxLength={8192} onChange={event => onCallback(event.target.value)} />
+    </Field></FieldGroup>
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {cancel}{open}
+      <Button type="submit" size="sm" disabled={pending || !callback.trim()}>{t('finish')}</Button>
+    </div>
+  </form>
+}
+
 function SignInButton({ busy, disabled, label, busyLabel, onClick }: { busy: boolean; disabled: boolean; label: string; busyLabel: string; onClick: () => void }) {
-  return <Button type="button" variant="secondary" size="sm" disabled={disabled} aria-busy={busy} onClick={onClick}>{busy ? <><Spinner className="size-3.5" aria-hidden="true" />{busyLabel}</> : label}</Button>
+  // Busy reads as work in progress, not as a dimmed button, and still can't be pressed twice.
+  return <Button type="button" variant="secondary" size="sm" className={cn(busy && 'disabled:opacity-100')} disabled={busy || disabled} aria-busy={busy} onClick={onClick}>{busy ? <><Spinner className="size-3.5" aria-hidden="true" />{busyLabel}</> : label}</Button>
 }
 
 /** What is left of each window the provider returned, with when it resets. */
 function QuotaMeters({ windows, now }: { windows: SubscriptionUsageView['windows']; now: number }) {
   const t = useTranslations('Settings.subscriptions')
   const format = useFormatter()
-  return <span className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:gap-x-6">
+  return <div className="flex flex-col gap-3 text-xs">
     {windows.map(window => {
       const label = window.model ? t('quotaWeeklyModel', { model: window.model }) : window.kind === 'five_hour' ? t('quotaFiveHour') : t('quotaWeekly')
       const at = window.resetsAt ? Date.parse(window.resetsAt) : NaN
       // Within a day the hour is enough; further out, the date.
       const reset = Number.isFinite(at) ? t('quotaReset', { time: at - now < 86_400_000 ? format.dateTime(at, { hour: '2-digit', minute: '2-digit' }) : format.dateTime(at, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }) : null
       const left = t('quotaLeft', { percent: window.remaining })
-      return <span key={`${window.kind}-${window.model ?? ''}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-        <span className="min-w-10 whitespace-nowrap text-muted-foreground">{label}</span>
-        <Progress value={window.remaining} aria-label={[label, left, reset].filter(Boolean).join(' · ')} className={cn('w-12', window.remaining < 10 && '[&_[data-slot=progress-indicator]]:bg-destructive')} />
-        <span className={cn('whitespace-nowrap tabular-nums', window.remaining < 10 ? 'text-destructive' : 'text-foreground')}>{left}</span>
-        {reset && <span className="whitespace-nowrap text-muted-foreground">· {reset}</span>}
-      </span>
+      const low = window.remaining < 10
+      return <div key={`${window.kind}-${window.model ?? ''}`} className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <span className="text-foreground">{label}</span>
+          <span className="flex items-baseline gap-2 whitespace-nowrap tabular-nums">
+            {reset && <span className="text-muted-foreground">{reset}</span>}
+            <span className={cn('font-medium', low ? 'text-destructive' : 'text-foreground')}>{left}</span>
+          </span>
+        </div>
+        <Progress value={window.remaining} aria-label={[label, left, reset].filter(Boolean).join(' · ')} className={cn('[&_[data-slot=progress-track]]:h-1.5', low && '[&_[data-slot=progress-indicator]]:bg-destructive')} />
+      </div>
     })}
-  </span>
+  </div>
 }

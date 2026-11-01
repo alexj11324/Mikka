@@ -459,7 +459,7 @@ export async function listBotSubscriptions(userId: string, input: { botId: strin
   // The owner's subscriptions from any workspace, once shared here and allowed by its admin (decision 2026-10-31-2225).
   const { subscriptionsUsable } = await import('@/lib/personal-policy')
   if (!(await subscriptionsUsable(pool, userId, bot.workspaceId))) return []
-  const rows = (await pool.query(`SELECT id,provider,epoch FROM byos_connections WHERE "ownerId"=$1 AND state='connected' ORDER BY "createdAt",id LIMIT 50`, [userId])).rows
+  const rows = (await pool.query(`SELECT id,provider,epoch FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND paused=false ORDER BY "createdAt",id LIMIT 50`, [userId])).rows
   return rows.map(row => ({ connectionId: row.id, provider: row.provider, revision: Number(row.epoch) }))
 }
 

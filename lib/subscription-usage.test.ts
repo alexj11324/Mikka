@@ -166,3 +166,19 @@ test('a good read stores the email for later failures; a 401 keeps it', async ()
   assert.deepEqual([usage.status, usage.account], ['reauth', 'alex@example.com'])
   assert.deepEqual(refused.saved, [])
 })
+
+test('a Claude plan comes only from the worker\'s known labels', () => {
+  const body = { five_hour: { utilization: 10 }, extra_usage: { is_enabled: false } }
+  assert.equal(parseSubscriptionUsage('id', 'claude', { status: 200, body, plan: 'Max' }).plan, 'Max')
+  assert.equal(parseSubscriptionUsage('id', 'claude', { status: 200, body, plan: '<b>x</b>' }).plan, null)
+  assert.equal(parseSubscriptionUsage('id', 'claude', { status: 200, body }).plan, null)
+})
+
+test('a paused connection refuses use, while its usage stays readable', async () => {
+  const row = { id: 'c', ownerId: 'o', workspaceId: 'w', provider: 'claude', state: 'connected', epoch: '1', quota: null, paused: true }
+  const repository = { binding: async () => ({ workspaceId: 'w', consumerId: 'a', connectionId: 'c', connectionRevision: 1, route: 'claude_cpa', modelId: 'm' }), connection: async () => row, scope: () => ({}), saveAccountLabel: async () => undefined } as never
+  const worker = (() => ({ forUse: () => { throw new Error('a paused connection reached the worker') }, call: async () => ({ status: 200, body: { five_hour: { utilization: 10 } } }) })) as never
+  const service = new SubscriptionService(repository, worker, { ready: () => true, nativeIsolation: 'none' }, undefined, async () => undefined)
+  await assert.rejects(service.access({ ownerId: 'o', workspaceId: 'w', bindingId: 'b', consumerId: 'a', execution: 'model' } as never), (error: { code?: string }) => error.code === 'account_unavailable')
+  assert.equal((await service.usage('o', 'c')).id, 'c')
+})

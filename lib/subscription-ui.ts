@@ -6,6 +6,7 @@ export const subscriptionListSchema = z.object({
   connections: z.array(z.object({
     id: z.uuid(), provider: z.enum(['codex', 'claude']), state: z.string(), revision: z.number().int().positive(),
     account: z.string().max(256).nullable().optional(),
+    paused: z.boolean().optional(),
     bots: z.array(z.object({ id: z.uuid(), name: z.string().max(200), color: z.string().max(40), shape: z.string().max(40) })).max(200).optional(),
   })),
 })
