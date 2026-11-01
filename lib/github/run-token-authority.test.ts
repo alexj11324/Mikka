@@ -16,13 +16,18 @@ const owner = 'test-owner'
 const key = 'v2/github.com/owner/repo'
 const remote = 'https://github.com/owner/repo.git'
 const branch = 'mikka/mik-1'
+/** The receipt admission wrote from the GitHub App grant (lib/github/push-grant.ts). */
+const granted = (): RepositoryAdmission => ({
+  userId: owner, issueId: ids.task, deviceId: ids.device, agentId: ids.agent, remoteKey: key, remoteUrl: remote,
+  targetBranch: branch, permission: 'push_to_origin', authority: 'github_app', approvedAt: '2026-10-30T00:00:00Z', acceptedAt: '2026-10-30T00:00:00Z',
+})
 
 function fixture() {
   return {
     run: { id: ids.run, userId: owner, issueId: ids.task, deviceId: ids.device, agentId: ids.agent, botId: null,
       status: 'running', kind: 'implement', stopRequestedAt: null as Date | null,
       leaseExpiresAt: new Date(Date.now() + 60_000) as Date | null,
-      agentDefinition: null as { repositoryAdmission: RepositoryAdmission } | null },
+      agentDefinition: { repositoryAdmission: granted() } as { repositoryAdmission: RepositoryAdmission } | null },
     repo: { userId: owner, deviceId: ids.device, repoPath: key, remoteUrl: remote },
     device: { id: ids.device, ownerId: owner, enabled: true },
     task: { id: ids.task, userId: owner, scope: 'personal', scopeVersion: 1,
@@ -198,7 +203,7 @@ test('deleted tasks and revoked or stale team scope are rejected', async () => {
   assert.equal(await authorize(request()), null)
 })
 
-test('read-only and git-push deny remain authoritative despite a saved repository approval', async () => {
+test('read-only and git-push deny remain authoritative despite the GitHub App grant', async () => {
   policy.readOnly = true
   assert.equal(await authorize(request()), null)
   policy.readOnly = false; policy.permissions.git_push = 'deny'
@@ -206,19 +211,20 @@ test('read-only and git-push deny remain authoritative despite a saved repositor
   assert.equal(linkedAccount.mock.callCount(), 0)
 })
 
-test('withdrawn, absent and foreign-owner repository approvals cannot issue credentials', async () => {
+test('a Mikka-side repository approval neither grants nor withholds the token: the GitHub App receipt does', async () => {
   for (const value of [null, { approved: false }, { approved: true, approvedByUserId: 'other', approvedAt: '2026-10-30T00:00:00Z' }]) {
     push = value
-    assert.equal(await authorize(request()), null)
+    assert.ok(await authorize(request()), 'the accepted grant receipt issues the token')
   }
+  row!.run.agentDefinition = null
+  push = { approved: true, approvedByUserId: owner, approvedAt: '2026-10-30T00:00:00Z' }
+  assert.equal(await authorize(request()), null, 'without the receipt no Mikka setting lends authority')
+  assert.equal(settings.mock.callCount(), 0, 'the issuer no longer reads Mikka repository settings')
 })
 
 test('a saved admission is checked against the actual device, repository and accepted source event', async () => {
-  const admission: RepositoryAdmission = {
-    userId: owner, issueId: ids.task, deviceId: ids.device, agentId: ids.agent, remoteKey: key, remoteUrl: remote,
-    targetBranch: branch, permission: 'push_to_origin', authority: 'configured_allow', acceptedAt: '2026-10-30T00:00:00Z',
-  }
-  row!.run.agentDefinition = { repositoryAdmission: admission }; push = null
+  const admission = granted()
+  row!.run.agentDefinition = { repositoryAdmission: admission }
   assert.ok(await authorize(request()))
   eventMatches = false
   assert.equal(await authorize(request()), null)
@@ -226,13 +232,21 @@ test('a saved admission is checked against the actual device, repository and acc
   assert.equal(await authorize(request()), null)
 })
 
-test('an explicit repository withdrawal wins over an otherwise valid saved admission', async () => {
-  row!.run.agentDefinition = { repositoryAdmission: {
-    userId: owner, issueId: ids.task, deviceId: ids.device, agentId: ids.agent, remoteKey: key, remoteUrl: remote,
-    targetBranch: branch, permission: 'push_to_origin', authority: 'configured_allow', acceptedAt: '2026-10-30T00:00:00Z',
-  } }
-  push = { approved: false }
+test('a receipt from the earlier per-repository approval still issues; an old configured_allow receipt never does', async () => {
+  row!.run.agentDefinition = { repositoryAdmission: { ...granted(), authority: 'repository_approval' } }
+  assert.ok(await authorize(request()))
+  row!.run.agentDefinition = { repositoryAdmission: { ...granted(), authority: 'configured_allow', approvedAt: undefined } }
   assert.equal(await authorize(request()), null)
+})
+
+test('allow and ask both issue a token with the grant; deny or read-only does not', async () => {
+  for (const decision of ['allow', 'ask'] as const) {
+    policy.permissions.git_push = decision
+    assert.ok(await authorize(request()), decision)
+  }
+  policy.permissions.git_push = 'deny'
+  assert.equal(await authorize(request()), null)
+  assert.equal(linkedAccount.mock.callCount(), 2)
 })
 
 test('a missing linked GitHub identity cannot use App installation credentials', async () => {

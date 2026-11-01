@@ -19,7 +19,7 @@ const stub = (name: string) => () => <div data-stub={name} />
 for (const [file, names] of [
   ['issue-detail-actions', ['IssueDetailActions']], ['issue-description-history', ['IssueDescriptionHistory']], ['issue-relations', ['IssueRelations']],
   ['issue-members', ['IssueMembers']], ['issue-detail-properties', ['IssueDetailProperties']], ['issue-threads', ['IssueThreads', 'ThreadEvents']],
-  ['issue-thread-panel', ['IssueThreadPanel']], ['factory-acceptance', ['FactoryAcceptance']], ['issue-activity-feed', ['IssueActivityFeed']],
+  ['issue-thread-panel', ['IssueThreadPanel']], ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']], ['issue-activity-feed', ['IssueActivityFeed']],
 ] as const) mock.module(u(`../components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, stub(name)])) })
 mock.module(u('../components/workspace/issue-detail-header.tsx'), { namedExports: { IssueDetailHeader: ({ saveLabel }: { saveLabel: string }) => <header data-save-label={saveLabel}>{saveLabel}</header> } })
 
@@ -56,7 +56,7 @@ test('IssueEditor: unreadable content is not editable and shows no typing hint o
 test('TaskDetail: invalid content opens read-only, with an empty save label and a disabled editor', async () => {
   const { TaskDetail } = await import('../components/workspace/task-detail')
   const noop = () => {}
-  const { container, done } = await render(<TaskDetail id="issue-1" workspaceName="W" user={{ id: 'u1', name: 'U', email: 'u@example.invalid' }} navigation={{ index: -1, total: 0, previous: null, next: null } as never}
+  const { container, done } = await render(<TaskDetail id="issue-1" thread={null} user={{ id: 'u1', name: 'U', email: 'u@example.invalid' }} navigation={{ index: -1, total: 0, previous: null, next: null } as never}
     onOpen={noop} onSaved={noop} onDirty={noop} onClose={noop} onDeleted={noop} onRegisterFlush={noop} />, '[data-save-label] ~ * .ProseMirror, .ProseMirror')
   const header = container.querySelector('[data-save-label]')
   assert.ok(header, 'header rendered')

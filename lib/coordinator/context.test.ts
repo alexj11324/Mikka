@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
 import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
-import { sourcedEventMessage } from './message-safety'
+import { modelMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 
 function stored(messages: ModelMessage[]): StoredMessage[] {
   return messages.map((message, index) => ({ position: index + 1, message }))
@@ -152,6 +152,8 @@ test('finished run publication names the verified PR or missing setup in the exi
   assert.match(prompt, /Verified GitHub pull request: https:\/\/github.com\/owner\/repo\/pull\/7 \(draft\)/)
   assert.match(prompt, /existing thread card updates in place/)
   assert.match(prompt, /Verification was not run/)
+  // The fact goes to the Coordinator; whether it needs the person's review is the model's judgment, not a fixed instruction.
+  assert.doesNotMatch(prompt, /needs human review/)
   assert.match(prompt, /Never say the changes passed verification/)
   const blocked = eventPrompt({ ...event, payload: { ...event.payload, publication: { errorCode: 'github_permission_required' } } })
   assert.match(blocked, /pull_requests: write/)
@@ -243,4 +245,20 @@ test('a person\'s message counts the photos sent with it, without carrying them 
   assert.equal(items[0].text, '看看这张')
   assert.ok(!JSON.stringify(items).includes('base64'))
   assert.equal(items[1].images, undefined)
+})
+
+test('a turn moved to the API key after the quota ran out shows as one notice line, and the model reads it as runtime data', () => {
+  const at = new Date('2026-11-01T06:00:00.000Z')
+  const notice = { subscription: 'claude' as const, plan: 'Max', keyProvider: 'deepseek', keyName: null }
+  const message = quotaSwitchMessage(notice, at)
+  const rows = [{ position: 1, createdAt: at, message: { role: 'user', content: 'hi', mikkaUserEvent: { id: null, sentAt: null } } as ModelMessage }, { position: 2, createdAt: at, message }]
+  const items = chatItems(rows)
+  assert.equal(items.length, 2)
+  assert.deepEqual([items[1].from, items[1].notice], ['event', { kind: 'quotaSwitch', ...notice }])
+  const projected = modelMessage(message)
+  assert.equal(projected.role, 'user')
+  assert.ok(!('mikkaEvent' in projected))
+  const packet = JSON.parse(String(projected.content))
+  assert.equal(packet.authority, 'coordination_data_only')
+  assert.match(packet.untrustedData.body, /out of quota.*deepseek API key/)
 })

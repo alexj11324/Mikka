@@ -1,4 +1,5 @@
 import 'server-only'
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { and, eq } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
@@ -8,16 +9,16 @@ import { builtinAgentDefinition } from './builtin'
 import { AgentKitError, AgentKitStore, type AgentScope } from './store'
 import type { PoolClient } from 'pg'
 
-/** Opt-in deployment; migration must be applied first. No runtime/vendor change is implied. */
-export function agentKitEnabled() { return process.env.MIKKA_AGENT_KIT === '1' }
+export { agentKitEnabled } from './config'
 export function agentKitDefaults() {
-  return builtinAgentDefinition({ computerEnabled: process.env.MIKKA_CLOUD_COMPUTER_TASKS === '1' && process.env.MIKKA_BYOS_ENABLED === '1' })
+  return builtinAgentDefinition({ computerEnabled: cloudComputerTasksEnabled() && process.env.MIKKA_BYOS_ENABLED === '1' })
 }
 export const agentKitStore = new AgentKitStore(pool)
 
-/** Identity is derived from the host, never tool input or imported configuration. */
-export async function agentScope(ownerId: string, botId: string | null, appClient?: Pick<PoolClient, 'query'>, workspaceClient?: Pick<PoolClient, 'query'>): Promise<AgentScope> {
-  if (!botId) return { ownerId,botId:null,workspaceId:null }
+/** Identity is derived from the host, never tool input or imported configuration. No bot: the person's Coordinator, an ordinary bot row. */
+export async function agentScope(ownerId: string, chatBot: string | null, appClient?: Pick<PoolClient, 'query'>, workspaceClient?: Pick<PoolClient, 'query'>): Promise<AgentScope> {
+  // Work with no bot stored (an older bot-less run) names no workspace: the personal workspace's Coordinator.
+  const botId = chatBot ?? await (await import('@/lib/coordinator/coordinator-bot')).chatBotId(ownerId, null, null, { backfill: false })
   const bot = appClient
     ? (await appClient.query<{ workspaceId: string }>('select "workspaceId" from bots where id=$1 and "ownerId"=$2 for share', [botId, ownerId])).rows[0]
     : (await db.select({ workspaceId:bots.workspaceId }).from(bots).where(and(eq(bots.id,botId),eq(bots.ownerId,ownerId))).limit(1))[0]

@@ -10,12 +10,13 @@ its existing protected status names and real acceptance coverage.
   synthetic merge commit, including the PR together with its target branch at
   the time of the check. A changed PR head gets a new check run.
 - Keep `UI policy (strict)` and `Production build and browser interactions`
-  successful for non-documentation PRs; the latter runs isolated PostgreSQL
-  and DB/migration integration checks. The PR's production build is performed
-  in `browser-tests.yml`, not redundantly in `ui-policy.yml`.
-- `browser-tests.yml` runs `Browser tests (before merge)`: smoke plus
-  changed-area specs, a real isolated PostgreSQL database and the applicable
-  Factory/daemon/browser acceptance. `integrate/*` PRs use the full tier.
+  successful for non-documentation PRs; the latter is the gate over the four
+  isolated PostgreSQL DB/migration integration shards. Despite its name, CI
+  runs no production build (decision 2026-11-01-0230); Vercel builds `main`.
+- CI runs no browser tests, not even by hand (decision 2026-11-01-1520).
+  `browser-gate.yml` only keeps the protected check name
+  `Browser tests (before merge)` and passes at once; delete it once that name
+  is removed from the required checks in the repository settings.
 - `GitGuardian Security Checks` is a separate external required check.
 - All four existing required names remain intact. Do not silently replace
   them with a new aggregate check until the GitHub branch-protection settings
@@ -23,14 +24,26 @@ its existing protected status names and real acceptance coverage.
 
 ## Main pushes: postmerge checks
 
-- A push to `main` triggers `ui-policy.yml` again and the functional
-  `browser-tests.yml` tier (four shards). Nightly and manual browser runs
-  retain full coverage; expensive desktop/release workflows stay independent.
+- A push to `main` triggers `ui-policy.yml` again. No browser run follows a
+  main push or runs nightly; expensive desktop/release workflows stay
+  independent.
 - Both workflow concurrency keys include `github.run_id` only on `main`.
   This prevents GitHub from evicting an older *pending* main verification,
   in addition to not cancelling a running main job. Superseded PR checks may
   still be cancelled.
-- The existing red-main browser issue workflow tracks regressions after merge.
+
+## Cloud worker template release
+
+- `e2b-template.yml` builds the E2B worker template from `main`, makes it
+  public and points Vercel Production at it (template id and worker hash in one
+  request), then redeploys Production. A `check` job first compares the worker
+  hash with Production's and stops when it is unchanged. Pull requests run only
+  its unit tests. Branch testing uses a `-dev` template built from the branch,
+  never the production template or Vercel's production variables
+  (`docs/dev-workflow.md` § 7).
+  The build job holds only `E2B_API_KEY` (Infisical `prod:/vercel`) and the
+  check and publish jobs only `VERCEL_TEAM_TOKEN` (`prod:/platform`), both read through the
+  existing GitHub OIDC identity.
 
 ## GitHub branch protection (separate repository setting)
 

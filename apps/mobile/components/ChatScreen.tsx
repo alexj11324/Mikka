@@ -4,9 +4,11 @@ import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ellipsis } from 'lucide-react-native'
-import { BotAvatar, Spinner, threadStatus } from '@/components/icons'
+import { BotAvatar, Spinner } from '@/components/icons'
+import { runIcon } from '@/lib/thread-icon'
 import { CardButton } from '@/components/cards'
-import { BotBubble, CopyButton, EventLine, MyBubble, OutgoingBubble, ThreadCard, TimedRow, useChatPhotos, useTimeReveal } from '@/components/chat'
+import { BotBubble, CopyButton, EventLine, MyBubble, OutgoingBubble, Reactions, ThreadCard, TimedRow, useChatPhotos, useTimeReveal } from '@/components/chat'
+import { myReaction, toggled, withMine } from '@/lib/reactions'
 import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { OpenUIReply } from '@/components/OpenUI'
@@ -58,7 +60,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   const [composerHeight, setComposerHeight] = useState(90)
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
   const [fast, setFast] = useState(false)
-  const { data, error, reload } = useApi<Chat>(path, fast ? 2500 : 15000)
+  const { data, error, reload, setData } = useApi<Chat>(path, fast ? 2500 : 15000)
   const pending = useApi<PendingAction[]>('/api/pending-actions', 10000)
   const [outbox, setOutbox] = useState<Outgoing[]>([])
   const [text, setText] = useState(draft ?? '')
@@ -120,11 +122,31 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
 
   const answer = async (message: string) => send(message)
 
-  // A long press: 回复 · 复制 · 选择文本 in a system sheet (app/message.tsx).
-  const actions = (words: string) => {
-    holdMessage({ text: plainText(words), onQuote: () => setQuote(quotable(words)) })
+  // 停止: the turn ends on the server, keeping what it had said; stop stays away until the chat stops working.
+  const [stopping, setStopping] = useState(false)
+  useEffect(() => { if (!working) setStopping(false) }, [working])
+  const stop = async () => {
+    setStopping(true)
+    try { await api('/api/mobile/chat/stop', { method: 'POST', body: { botId } }) } catch { setStopping(false) }
+    await reload()
+  }
+
+  const reactions = data?.reactions ?? {}
+  // Drawn at once, then saved; the next load has the server's word.
+  const react = async (id: string, emoji: string | null) => {
+    setData(current => current && { ...current, reactions: { ...current.reactions, [id]: withMine(current.reactions?.[id], emoji) } })
+    try { await api('/api/mobile/reactions', { method: 'POST', body: { messageId: id, emoji } }) } finally { void reload() }
+  }
+
+  // A long press: reactions, then 回复 · 复制 · 选择文本 in a system sheet (app/message.tsx).
+  const actions = (words: string, id?: string) => {
+    holdMessage({ text: plainText(words), onQuote: () => setQuote(quotable(words)),
+      ...(id ? { react: { current: myReaction(reactions[id]), set: emoji => void react(id, emoji) } } : {}) })
     router.push('/message')
   }
+  const chips = (id: string | undefined, align?: 'right') => id
+    ? <Reactions reactions={reactions[id]} align={align} onToggle={emoji => void react(id, toggled(reactions[id], emoji))} />
+    : null
 
   return (
     <View style={styles.screen}>
@@ -152,19 +174,21 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
             return (
               <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
                 {item.from === 'event' ? <EventLine text={eventText(item.text, sources)} /> : null}
-                {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} /></TimedRow> : null}
+                {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text, item.id) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} />{chips(item.id, 'right')}</TimedRow> : null}
                 {item.from === 'coordinator' && item.text ? (
-                  <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text)}>
+                  <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text, item.id)}>
                     {isOpenUI(item.text)
                       ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} webPath={webChatPath(botId)} sources={sources} onOpen={open} />
                       : <BotBubble><Markdown text={item.text} sources={sources} onOpen={open} /></BotBubble>}
+                    {chips(item.id)}
                     <CopyButton text={plainText(item.text)} />
                   </TimedRow>
                 ) : null}
+                {item.from === 'coordinator' && item.stopped ? <Text style={styles.stopped}>已停止</Text> : null}
                 {item.threads.map(id => {
                   const run = sources[id]
                   return run?.kind === 'run'
-                    ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runTitle(run)} status={threadStatus(run.status)} info={runInfoLine(run.info)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
+                    ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runTitle(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
                     : null
                 })}
               </Fragment>
@@ -172,6 +196,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
           })}
           {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} photos={item.images.map(image => image.uri)} failed={item.state === 'failed'} onRetry={() => void retry(item)} />)}
           {working ? <View style={styles.working}><Spinner size={16} /></View> : null}
+          {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
           {data && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
           {error && !data ? (
             <View style={styles.failed}>
@@ -189,7 +214,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
       </View>
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
-        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} />
+        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} onStop={Boolean(data?.working) && !stopping ? () => void stop() : undefined} />
     </View>
   )
 }
@@ -199,6 +224,8 @@ const styles = StyleSheet.create({
   titleText: { fontSize: 17, fontWeight: '600' },
   // Space above the composer (适度留白).
   list: { paddingHorizontal: 16, gap: 12 },
+  loading: { paddingTop: 120, alignItems: 'center' },
+  stopped: { alignSelf: 'flex-start', fontSize: 12, lineHeight: 17, color: colors.secondary, marginLeft: 4, marginTop: -6 },
   working: { alignSelf: 'flex-start', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
   failed: { alignItems: 'center', gap: 10, marginTop: 24 },
   empty: { alignSelf: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },

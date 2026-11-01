@@ -20,6 +20,7 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
     writeFileSync(join(dir, 'migrate.mjs'), source)
     writeFileSync(join(dir, 'scope.mjs'), scopeStub)
     writeFileSync(join(dir, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url), 'utf8'))
+    writeFileSync(join(dir, 'migration-guard.mjs'), readFileSync(new URL('./migration-guard.mjs', import.meta.url)))
     writeFileSync(join(dir, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
     writeFileSync(join(dir, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
     writeFileSync(join(dir, 'pg.mjs'), 'export class Pool { constructor() { throw new Error("DATABASE_ACCESS") } }')
@@ -34,7 +35,7 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
     // Default production and explicit opt-in must not silently skip migration.
     for (const [environment, mode] of [['production', ''], ['preview', '1']]) {
       const result = spawnSync(process.execPath, [join(dir, 'migrate.mjs')], {
-        env: { ...process.env, DATABASE_URL: 'postgres://user:fixture@preview-fixture:5432/testdb', MIGRATE: mode, VERCEL_ENV: environment }, encoding: 'utf8',
+        env: { ...process.env, DATABASE_URL: 'postgres://user:fixture@preview-fixture:5432/testdb', MIGRATE: mode, VERCEL: '1', VERCEL_ENV: environment, VERCEL_GIT_COMMIT_REF: 'main' }, encoding: 'utf8',
       })
       assert.notEqual(result.status, 0)
       assert.doesNotMatch(result.stdout, /migrate: skipped/)
@@ -60,6 +61,7 @@ test('explicit Preview migration never connects to the global application target
     writeFileSync(join(scripts, 'migrate.mjs'), source)
     writeFileSync(join(scripts, 'scope.mjs'), scopeStub)
     writeFileSync(join(scripts, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url)))
+    writeFileSync(join(scripts, 'migration-guard.mjs'), readFileSync(new URL('./migration-guard.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'order.mjs'), 'export const orderMigrations = x => x; export const alreadyApplied = () => false')
@@ -72,7 +74,7 @@ test('explicit Preview migration never connects to the global application target
     writeFileSync(join(migrations, '0001_application.sql'), '-- target: MIKKA_DATABASE_URL\nSELECT 1;')
     writeFileSync(join(migrations, '0002_workspace.sql'), '-- target: DATABASE_URL\nSELECT 1;')
     const result = spawnSync(process.execPath, [join(scripts, 'migrate.mjs')], {
-      env: { ...process.env, MIGRATE: '1', VERCEL_ENV: 'preview', DATABASE_URL: 'postgres://user:fixture@preview-fixture/testdb', MIKKA_DATABASE_URL: 'postgres://production-fixture' }, encoding: 'utf8',
+      env: { ...process.env, MIGRATE: '1', VERCEL: '1', VERCEL_ENV: 'preview', DATABASE_URL: 'postgres://user:fixture@preview-fixture/testdb', MIKKA_DATABASE_URL: 'postgres://production-fixture' }, encoding: 'utf8',
     })
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /0001_application.sql/)
@@ -81,7 +83,7 @@ test('explicit Preview migration never connects to the global application target
 })
 
 
-test('the build runs migrations last, after next build succeeds', () => {
+test('the build runs migrations only after compilation and type checking succeed', () => {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
   assert.equal(manifest.scripts.migrate, 'node scripts/migrate.mjs')
   assert.equal(manifest.scripts.prebuild, undefined)
@@ -93,9 +95,10 @@ test('the build runs migrations last, after next build succeeds', () => {
       const executable = join(dir, name)
       writeFileSync(executable, `#!/bin/sh
 case "${name} $*" in
-  "node scripts/build-subscription-worker.mjs"|"pnpm generate:agent-ui"|"pnpm lint"|"next build"|"node scripts/migrate.mjs") printf '%s\n' "${name} $*" >> "$BUILD_TEST_TRACE" ;;
+  "node scripts/build-subscription-worker.mjs"|"pnpm generate:agent-ui"|"pnpm lint"|"next build"|"pnpm typecheck"|"node scripts/migrate.mjs") printf '%s\n' "${name} $*" >> "$BUILD_TEST_TRACE" ;;
   *) echo UNEXPECTED_BUILD_SIDE_EFFECT >&2; exit 91 ;;
 esac
+if [ "${name} $*" = "$BUILD_TEST_FAIL" ]; then exit 1; fi
 `)
       chmodSync(executable, 0o700)
     }
@@ -103,7 +106,15 @@ esac
       cwd: dir, env: { PATH: dir, VERCEL_ENV: 'production', MIGRATE: '1', BUILD_TEST_TRACE: trace }, encoding: 'utf8',
     })
     assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm lint', 'next build', 'node scripts/migrate.mjs'])
+    assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm lint', 'next build', 'pnpm typecheck', 'node scripts/migrate.mjs'])
+    for (const failure of ['next build', 'pnpm typecheck']) {
+      writeFileSync(trace, '')
+      const failed = spawnSync('/bin/sh', ['-c', manifest.scripts.build], {
+        cwd: dir, env: { PATH: dir, VERCEL_ENV: 'production', MIGRATE: '1', BUILD_TEST_TRACE: trace, BUILD_TEST_FAIL: failure }, encoding: 'utf8',
+      })
+      assert.equal(failed.status, 1, failed.stderr)
+      assert.doesNotMatch(readFileSync(trace, 'utf8'), /node scripts\/migrate\.mjs/)
+    }
   } finally { console.error(`Retained test fixture: ${dir}`) }
 })
 
@@ -121,6 +132,7 @@ test('all files preflight before a database connection, even if an earlier file 
     writeFileSync(join(scripts, 'scope.mjs'), scopeStub)
     writeFileSync(join(scripts, 'migration-order.mjs'), 'export const orderMigrations = x => x.sort(); export const alreadyApplied = (name, applied) => applied.has(name)')
     writeFileSync(join(scripts, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url), 'utf8'))
+    writeFileSync(join(scripts, 'migration-guard.mjs'), readFileSync(new URL('./migration-guard.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'pg.mjs'), 'export class Pool { constructor() { throw new Error("DATABASE_ACCESS") } }')

@@ -148,8 +148,9 @@ test('a lost response after an external write stays uncertain; preflight failure
 test('an unsuccessful dispatched write is unknown while an unsuccessful read remains a read error', async () => {
   const transport = googleClient('gmail', {})
   transport.tools.execute = async () => ({ successful: false, error: 'provider or gateway error', data: {}, logId: 'fixture-log' })
-  assert.deepEqual(await executeComposioAction('owner', 'send_email', { to: ['recipient@example.invalid'], subject: 'Fixture', body: 'Fixture' }, transport), { error: 'operationUncertain', logId: 'fixture-log' })
-  assert.deepEqual(await executeComposioAction('owner', 'read_gmail_message', { message_id: 'fixture-id' }, transport), { error: 'provider or gateway error', logId: 'fixture-log' })
+  assert.deepEqual(await executeComposioAction('owner', 'send_email', { to: ['recipient@example.invalid'], subject: 'Fixture', body: 'Fixture' }, transport), { error: 'operationUncertain', accountId: 'gmail-account', logId: 'fixture-log' })
+  // The account it ran through, so a refused authorization can be marked on that account (lib/suggestions/reconcile.ts).
+  assert.deepEqual(await executeComposioAction('owner', 'read_gmail_message', { message_id: 'fixture-id' }, transport), { error: 'provider or gateway error', accountId: 'gmail-account', logId: 'fixture-log' })
 })
 
 test('creates an event on the primary calendar without a Meet link, emailing guests unless told not to', async () => {

@@ -5,9 +5,11 @@ import type { Pool } from 'pg'
 import { before, after as afterTests, mock, test } from 'node:test'
 import { eq } from 'drizzle-orm'
 import { suggestions, coordinatorEvents } from '../lib/db/schema'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
-const url = new URL(process.env.E2E_DATABASE_URL ?? '')
-if (process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true' || url.hostname !== '127.0.0.1' || url.port !== '5432' || url.pathname !== '/mikka_e2e' || url.search || url.hash || process.env.MIKKA_DATABASE_URL !== url.href || process.env.DATABASE_URL !== url.href) throw new Error('requires GitHub Actions isolated mikka_e2e service')
+const target = process.env.E2E_DATABASE_URL
+if (!disposableDatabase() || process.env.MIKKA_DATABASE_URL !== target || process.env.DATABASE_URL !== target) throw new Error('requires one loopback *_e2e database in E2E_DATABASE_URL, MIKKA_DATABASE_URL and DATABASE_URL')
+const url = new URL(target!)
 const fixtureSchema = `suggestion_artifact_${randomUUID().replaceAll('-', '')}`
 let scope: ReturnType<typeof import('../lib/db/request-scope').createRequestDatabaseScope>
 const check = (name: string, run: () => Promise<void>) => test(name, () => scope.run(run))
@@ -38,8 +40,10 @@ before(async () => {
   scopedUrl.searchParams.set('options', `-c search_path=${fixtureSchema}`)
   scope = (await import('../lib/db/request-scope')).createRequestDatabaseScope(scopedUrl.href)
   console.info(`Retained CI fixture schema: ${fixtureSchema}`)
-  await scope.run(() => pool.query(`CREATE TABLE suggestions (id uuid primary key, "userId" text not null, source text not null, "externalId" text not null, action text not null, title text not null, url text, actor text, shown boolean not null, "decidedBy" text not null, probability real, level text, "matterKey" text, "actionTitle" text, required boolean not null default false, "occurredAt" timestamptz not null, "dismissedAt" timestamptz, "createdAt" timestamptz not null default now()); CREATE TABLE coordinator_events (id uuid primary key, "userId" text not null, "botId" uuid, kind text not null, "dedupeKey" text not null unique, "issueId" uuid, "runId" uuid, payload jsonb not null CHECK (position('fail-fixture' in payload::text) = 0), tier text, "lastTriageAttemptAt" timestamptz, "triageDecision" jsonb, "deliveredAt" timestamptz, "createdAt" timestamptz not null default now())`))
+  await scope.run(() => pool.query(`CREATE TABLE suggestions (id uuid primary key,"botId" uuid, "userId" text not null, source text not null, "externalId" text not null, action text not null, title text not null, url text, actor text, shown boolean not null, "decidedBy" text not null, probability real, level text, "matterKey" text, "actionTitle" text, required boolean not null default false, "occurredAt" timestamptz not null, "dismissedAt" timestamptz, "createdAt" timestamptz not null default now()); CREATE TABLE coordinator_events (id uuid primary key, "userId" text not null, "botId" uuid, kind text not null, "dedupeKey" text not null unique, "issueId" uuid, "runId" uuid, payload jsonb not null CHECK (position('fail-fixture' in payload::text) = 0), tier text, "lastTriageAttemptAt" timestamptz, "triageDecision" jsonb, "deliveredAt" timestamptz, "createdAt" timestamptz not null default now())`))
   await scope.run(async () => pool.query(await readFile(new URL('../drizzle/20261031002604_coordinator_wake_recovery.sql', import.meta.url), 'utf8')))
+  // The artifact list credits a run's versions to its Agent (R-78), so it reads the run tables too.
+  await scope.run(() => pool.query(`CREATE TABLE agents (id uuid primary key, "userId" text not null, harness text not null, name text not null); CREATE TABLE agent_runs (id uuid primary key, "userId" text not null, "agentId" uuid not null, "botId" uuid); CREATE TABLE bots (id uuid primary key, "ownerId" text not null, name text not null); CREATE TABLE computer_run_bindings ("runId" uuid, "botId" uuid, "ownerId" text); CREATE TABLE bot_cloud_runtimes ("agentId" uuid, "botId" uuid, "ownerId" text); CREATE TABLE coordinator_bots ("ownerId" text, "workspaceId" uuid, "botId" uuid)`))
   await scope.run(() => pool.query(`CREATE TABLE artifacts (id uuid primary key, "userId" text not null, kind text not null, title varchar(200) not null, "runId" uuid, "issueId" uuid, "latestVersion" int not null default 1, "createdAt" timestamptz not null default now(), "updatedAt" timestamptz not null default now()); CREATE TABLE artifact_versions (id uuid primary key, "artifactId" uuid not null, version int not null, "storageKey" text not null, "inlineContent" text, sha256 text not null, size int not null, "authorName" text not null, "createdAt" timestamptz not null default now(), unique("artifactId",version))`))
 })
 afterTests(async () => { await scope?.close(); await pool?.end() })

@@ -16,6 +16,9 @@ import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings
 import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
+import { SubscriptionShareSettings } from '@/components/settings/subscription-share-settings'
+import { ApiKeyFallbackSetting, useApiKeyList } from '@/components/settings/api-key-settings'
+import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
 import { SecuritySettings } from '@/components/settings/security-settings'
@@ -26,14 +29,16 @@ import { MemorySettings } from '@/components/settings/memory-settings'
 import { LocaleSetting } from '@/components/settings/locale-setting'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
-import { SecretsSettings } from '@/components/settings/secrets-settings'
+import { E2BKeySettings, SecretsSettings } from '@/components/settings/secrets-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
 import { BotAgentsSettings } from '@/components/settings/bot-agents-settings'
+import { ArchivedBotsSettings } from '@/components/settings/archived-bots-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
-import type { SettingsSectionId } from '@/lib/settings-sections'
+import { settingsHref, TEAM_ONLY_SECTIONS, type SettingsSectionId } from '@/lib/settings-sections'
+import { useRouter } from '@/i18n/navigation'
 import type { RailDestination } from '@/components/nav/icon-rail'
 import { prefetchAllSettings, prefetchSettingsSection } from '@/lib/settings-prefetch'
 import { FieldError } from '@/components/ui/field'
@@ -65,6 +70,15 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const section = activeSection ?? localSection
   const { data: workspace, error: workspaceError } = useWorkspace(userKey ?? user.email, workspaceId)
   const admin = workspace?.role === 'admin'
+  const personal = workspace?.workspace.kind === 'personal'
+  const router = useRouter()
+  // A personal workspace has no member pages; an old link to one opens 常规 instead.
+  const teamOnly = personal && TEAM_ONLY_SECTIONS.has(activeSection ?? localSection)
+  useEffect(() => {
+    if (!teamOnly) return
+    if (activeSection) router.replace(settingsHref('general', workspaceId ?? workspace?.workspace.id))
+    else setSection('general')
+  }, [teamOnly, activeSection, router, workspaceId, workspace?.workspace.id])
   const { cache } = useSWRConfig()
   // Settings opened without ?workspace= still has one: the default the API resolved.
   const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
@@ -83,18 +97,18 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const enter = switched.current ? 'animate-in fade-in-0 duration-150 motion-reduce:animate-none' : undefined
 
   return <>
-    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache) }} onRail={onRail} />
+    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={personal} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache) }} onRail={onRail} />
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6', enter)}>
-        {section === 'computers' ? <DevicesSettings /> : <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>}
-        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
+        {section === 'computers' ? <DevicesSettings /> : <h1 className="text-xl font-semibold">{title}</h1>}
+        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} personal={personal} admin={admin} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
       </SettingsContent>}
     </AppShellContent>
   </>
 }
 
-function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, workspaceError = false, linearNotice, preview, onSignOut, signingOut }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; workspaceError?: boolean }) {
+function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, personal = false, admin = false, workspaceError = false, linearNotice, preview, onSignOut, signingOut }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; personal?: boolean; admin?: boolean; workspaceError?: boolean }) {
   // Workspace sections wait for the workspace instead of rendering nothing.
   const waiting = preview || !workspaceId
     ? preview || workspaceError ? <FieldError>{t('workspaceUnavailable')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
@@ -108,18 +122,32 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
-    case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} /> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
-    case 'billing': return workspaceId && !preview ? <BillingSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'billing': return workspaceId && !preview ? <><PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />{admin && <BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />}</> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
     case 'computers': return null
-    case 'bots': return workspaceId && !preview ? <BotAgentsSettings key={workspaceId} /> : waiting
+    case 'bots': return workspaceId && !preview ? <><BotAgentsSettings key={workspaceId} /><ArchivedBotsSettings key={`archived-${workspaceId}`} workspaceId={workspaceId} /></> : waiting
     case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return null
   }
+}
+
+/** 「API 与订阅」: subscriptions, API keys and custom providers in one list (orchestration.md § 1). */
+function ApiAndSubscriptions({ workspaceId }: { workspaceId: string }) {
+  const apiKeys = useApiKeyList(workspaceId)
+  return <>
+    <SubscriptionSettings workspaceId={workspaceId} extraRows={apiKeys.rows} action={apiKeys.action} />
+    {apiKeys.dialogs}
+    <ApiKeyFallbackSetting workspaceId={workspaceId} />
+    {/* The person's own E2B key: account-level, so before this workspace's settings. */}
+    <E2BKeySettings key={`e2b-${workspaceId}`} workspaceId={workspaceId} />
+    <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />
+    <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />
+  </>
 }
 
 function AppearanceSection() {

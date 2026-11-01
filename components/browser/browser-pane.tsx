@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { NOTE_MAX, elementLabel, normalizeAddress, pageLabel, type BrowserNote } from '@/lib/browser/note'
 import { cn } from '@/lib/utils'
 import { useBrowserNotes } from './browser-notes'
+import { ResizablePane } from '@/components/ui/resizable-pane'
 
 const STORAGE_KEY = 'mikka:browser-url'
 const PICKER_FLAG = '__mikkaPicker'
@@ -63,6 +64,7 @@ const LOCATION_SCRIPT = `(${locationScript.toString()})()`
  */
 export function BrowserPane({ onClose }: { onClose: () => void }) {
   const t = useTranslations('Browser')
+  const tCommon = useTranslations('Common')
   const tRoles = useTranslations('Artifact.roles')
   const notes = useBrowserNotes()
   const frameRef = useRef<HTMLIFrameElement>(null)
@@ -254,7 +256,7 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
   const tool = (label: string, icon: ReactNode, props: { onClick?: () => void; disabled?: boolean; pressed?: boolean }) =>
     <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', props.pressed && pressed)} aria-label={label} aria-pressed={props.pressed} disabled={props.disabled} onClick={props.onClick} />}>{icon}</TooltipTrigger><TooltipContent side="bottom">{label}</TooltipContent></Tooltip>
 
-  return <aside aria-label={t('label')} data-slot="browser-pane" className="flex min-h-0 w-140 max-w-[50%] shrink-0 flex-col border-l bg-background">
+  return <ResizablePane render="aside" aria-label={t('label')} data-slot="browser-pane" storageKey="mikka:browser-width" defaultWidth={560} min={360} max="half" edge="start" label={tCommon('resize.browser')} className="flex min-h-0 shrink-0 flex-col border-l bg-background">
     <div className="flex h-11 shrink-0 items-center gap-0.5 px-2">
       {tool(t('back'), <ArrowLeft data-icon="inline-start" />, { onClick: () => go(-1), disabled: history.index <= 0 })}
       {tool(t('forward'), <ArrowRight data-icon="inline-start" />, { onClick: () => go(1), disabled: history.index >= history.entries.length - 1 })}
@@ -287,5 +289,5 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
         </InputGroup>
       </form>}
     </div>
-  </aside>
+  </ResizablePane>
 }

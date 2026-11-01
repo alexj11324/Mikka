@@ -1,25 +1,49 @@
 import 'server-only'
-import { createHmac } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { Sandbox } from 'e2b'
+import { Sandbox, SandboxNotFoundError } from 'e2b'
 import { HOSTED_NATIVE_IMAGE } from '@mikka/protocol/subscription'
-import { computerTemplate, e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { computerTemplate, e2bApiKey, sandboxKeyOwner, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { E2BKeyError } from '@/lib/secrets/flag'
 
 const lifetime = 15 * 60_000
 export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number; computerAllowed: boolean; policyVersion: number }
-// The sandbox belongs to the E2B team whose key created it, so every call for a workspace's
-// sandbox resolves that workspace's key (flag on) or the platform key (flag off, unchanged).
-const options = async (workspaceId: string) => ({ apiKey: await e2bApiKey(workspaceId, 'Cloud computer is not configured'), timeoutMs: lifetime, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy })
+// A sandbox belongs to the E2B team whose key created it: its owner's own key (orchestration § 2).
+// Every call resolves the owner from the machine's record, never from whoever is asking.
+const options = async (ownerId: string) => ({ apiKey: await e2bApiKey(ownerId, 'Cloud computer is not configured'), timeoutMs: lifetime, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy })
+const ownerOf = async (workspaceId: string, id: string) => {
+  const owner = await sandboxKeyOwner(workspaceId, id)
+  if (!owner) throw new E2BKeyError('e2b_unavailable', 'sandbox has no owner record')
+  return owner
+}
 
 export async function connectComputer(workspaceId: string, id: string, signal?: AbortSignal) {
-  const base = await options(workspaceId)
-  return withE2BErrors(workspaceId, false, () => Sandbox.connect(id, { ...base, ...(signal ? { signal, retries: 0 } : {}) }))
+  const owner = await ownerOf(workspaceId, id)
+  const base = await options(owner)
+  return withE2BErrors(owner, false, () => Sandbox.connect(id, { ...base, ...(signal ? { signal, retries: 0 } : {}) }))
+}
+
+/** The machine's sandbox no longer exists at E2B (killed, or expired while paused). */
+export function computerGone(error: unknown) {
+  return error instanceof SandboxNotFoundError
+}
+
+/** The worker commit baked into the sandbox's template. */
+export async function computerWorkerSha(sandbox: Sandbox) {
+  return (await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim()
+}
+
+export async function killComputer(workspaceId: string, id: string) {
+  const owner = await ownerOf(workspaceId, id)
+  const base = await options(owner)
+  await withE2BErrors(owner, false, () => Sandbox.kill(id, base))
 }
 
 export async function computerState(workspaceId: string, id: string) {
-  const base = await options(workspaceId)
-  const info = await withE2BErrors(workspaceId, false, () => Sandbox.getInfo(id, base))
+  const owner = await ownerOf(workspaceId, id)
+  const base = await options(owner)
+  const info = await withE2BErrors(owner, false, () => Sandbox.getInfo(id, base))
   return info.state === 'paused' ? 'sleeping' : 'running'
 }
 
@@ -27,23 +51,43 @@ export async function computerState(workspaceId: string, id: string) {
 export async function createComputer(workspaceId: string, operationId: string) {
   // Flag on: only the public template from E2B_BYO_COMPUTER_TEMPLATE; a 404 becomes e2b_template_unavailable.
   const template = computerTemplate()
-  const base = await options(workspaceId)
-  return withE2BErrors(workspaceId, true, () => Sandbox.create(template, { ...base, idempotencyKey: operationId,
+  // The machine row is written before provisioning; its owner's key creates the sandbox.
+  const { pool } = await import('@/lib/db')
+  const owner = (await pool.query<{ ownerId: string }>('SELECT "ownerId" FROM cloud_machines WHERE "workspaceId"=$1 AND "operationId"=$2', [workspaceId, operationId])).rows[0]?.ownerId
+  if (!owner) throw new E2BKeyError('e2b_unavailable', 'cloud machine has no owner record')
+  const base = await options(owner)
+  return withE2BErrors(owner, true, () => Sandbox.create(template, { ...base, idempotencyKey: operationId,
     metadata: { application: 'mikka', workspaceId },
     lifecycle: { onTimeout: 'pause', autoResume: false },
   }))
 }
 
+/** One RPC on a current template. Older snapshots get the current guard files
+ * before a viewer service can start; file hashes also catch partial updates. */
 export async function installComputerRuntime(sandbox: Sandbox) {
-  // Created per instance, never baked into a shared template.
-  await sandbox.commands.run("if getent group mikka-runner >/dev/null; then install -d -m 710 -o root -g mikka-runner /run/mikka-viewer; else install -d -m 700 /run/mikka-viewer; fi; umask 077; head -c 32 /dev/urandom > /run/mikka-viewer/key", { user: 'root' })
-  for (const name of ['start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py']) {
-    const content = await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8')
-    await sandbox.files.write(`/opt/mikka/computer/${name}`, content, { user: 'root' })
-  }
-  await sandbox.commands.run('chmod 0755 /opt/mikka/computer/lease-driver.py', { user: 'root', timeoutMs: 10_000 })
-  await sandbox.commands.run('flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py', { user: 'root', background: true, timeoutMs: 0 })
-  await sandbox.commands.run('for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done; exit 1', { user: 'root', timeoutMs: 10_000 })
+  const files = await Promise.all(['start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py'].map(async name => ({
+    path: `/opt/mikka/computer/${name}`, data: await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8'),
+  })))
+  const manifest = files.map(file => `${createHash('sha256').update(file.data).digest('hex')}  ${file.path}`).join('\n')
+  // Only digests and fixed file names enter the command. The key stays private
+  // to this instance, never baked into the public template or logged.
+  const start = `if ! sha256sum --check --status <<'MIKKA_RUNTIME_HASHES'
+${manifest}
+MIKKA_RUNTIME_HASHES
+then printf 'mikka-runtime-install-required'; exit 0; fi
+set -e
+if getent group mikka-runner >/dev/null; then install -d -m 710 -o root -g mikka-runner /run/mikka-viewer; else install -d -m 700 /run/mikka-viewer; fi
+umask 077
+head -c 32 /dev/urandom > /run/mikka-viewer/key
+chmod 0755 /opt/mikka/computer/lease-driver.py
+nohup flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py </dev/null >>/run/mikka-viewer/gateway.log 2>&1 &
+for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done
+exit 1`
+  const result = await sandbox.commands.run(start, { user: 'root', timeoutMs: 10_000 })
+  if (result.stdout.trim() !== 'mikka-runtime-install-required') return
+  await sandbox.files.write(files, { user: 'root' })
+  const installed = await sandbox.commands.run(start, { user: 'root', timeoutMs: 10_000 })
+  if (installed.stdout.trim() === 'mikka-runtime-install-required') throw new Error('Computer runtime installation failed')
 }
 
 /** Start the container service for a dedicated trusted hosted worker. The

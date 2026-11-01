@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { withBasePath } from '@/lib/base-path'
 import { cn } from '@/lib/utils'
-import { evidenceMediaPath, formatDuration, mediaKind, stepIndex, type EvidenceEntry } from '@/lib/factory/evidence-view'
+import { activeStep, evidenceMediaPath, formatDuration, mediaKind, stepIndex, stepTime, type EvidenceEntry } from '@/lib/factory/evidence-view'
 import type { AcceptanceItem } from '@/lib/factory/acceptance-view'
 import { ShortSha } from './short-sha'
 
@@ -22,6 +22,26 @@ export function itemLabel(t: Translate, { entry, command }: AcceptanceItem) {
   if (mediaKind(entry)) return t('captureLabel', { kind: t(`kind.${entry.kind}`), title: entry.title?.trim() || t(`kind.${entry.kind}`) })
   if (command) return command.text
   return t('textLabel', { stage: t(`stage.${entry.stage}`), kind: t(`kind.${entry.kind}`) })
+}
+
+/**
+ * Figma 13 「操作」: the recording's steps, each its time and what the agent did.
+ * A step seeks the video; the one playing is marked as current.
+ */
+function RecordingSteps({ steps, current, onSeek }: { steps: { atMs: number; label: string }[]; current: number; onSeek: (ms: number) => void }) {
+  const t = useTranslations('FactoryAcceptance')
+  return <section aria-label={t('steps', { count: String(steps.length) })} className="flex max-h-full min-h-0 w-full shrink-0 flex-col gap-1 sm:w-60 sm:self-start">
+    <h3 className="px-2 text-xs text-muted-foreground">{t('steps', { count: String(steps.length) })}</h3>
+    <ol className="flex min-h-0 flex-col gap-0.5 overflow-y-auto">
+      {steps.map((step, position) => <li key={`${step.atMs}:${position}`}>
+        <Button variant="ghost" aria-current={position === current || undefined} onClick={() => onSeek(step.atMs)}
+          className="h-auto w-full min-w-0 items-baseline justify-start gap-3 px-2 py-1.5 text-left font-normal whitespace-normal aria-[current=true]:bg-background">
+          <span className="w-11 shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{stepTime(steps, position)}</span>
+          <span className="min-w-0 flex-1 break-words">{step.label}</span>
+        </Button>
+      </li>)}
+    </ol>
+  </section>
 }
 
 /** `exit 0` in green, anything else in red. */
@@ -106,6 +126,8 @@ export function EvidenceViewer({ taskId, items, index, title, passed, sha, envir
   const [attempt, setAttempt] = useState(0)
   const texts = useRef(new Map<string, string>())
   const strip = useRef<HTMLDivElement>(null)
+  const player = useRef<HTMLVideoElement>(null)
+  const [playingMs, setPlayingMs] = useState(0)
 
   const reader = useRef(readText)
   useEffect(() => { reader.current = readText }, [readText])
@@ -127,6 +149,7 @@ export function EvidenceViewer({ taskId, items, index, title, passed, sha, envir
 
   useEffect(() => {
     strip.current?.querySelector('[aria-current="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    setPlayingMs(0)
   }, [index])
 
   const go = useCallback((delta: number) => onIndex(stepIndex(index, delta, items.length)), [index, items.length, onIndex])
@@ -145,6 +168,8 @@ export function EvidenceViewer({ taskId, items, index, title, passed, sha, envir
   const download = url ?? (load.state === 'ready' && load.content !== undefined ? `data:text/plain;charset=utf-8,${encodeURIComponent(load.content)}` : null)
   const retry = () => { setLoad({ state: 'loading' }); setAttempt(value => value + 1) }
   const name = media ? entry.title?.trim() || label : label
+  const steps = media === 'video' && Array.isArray(entry.steps) ? entry.steps : []
+  const seek = (ms: number) => { const video = player.current; if (video) { video.currentTime = ms / 1000; setPlayingMs(ms) } }
 
   return <Dialog open onOpenChange={value => { if (!value) onClose() }}>
     <DialogContent showCloseButton={false} aria-describedby={undefined} onKeyDown={onKeyDown}
@@ -178,11 +203,16 @@ export function EvidenceViewer({ taskId, items, index, title, passed, sha, envir
               <img key={src} src={src!} alt={name} draggable={false} onLoad={() => setLoad({ state: 'ready' })} onError={() => setLoad({ state: 'error' })}
                 className={cn('max-h-full max-w-full rounded-lg object-contain', load.state !== 'ready' && 'invisible')} />
             </>
-              : media === 'video' ? <>
-                {load.state === 'loading' && <Skeleton data-testid="evidence-loading" className="absolute inset-0 m-auto aspect-video max-h-full w-full max-w-[52rem]" />}
-                <video key={src} src={src!} controls playsInline preload="metadata" aria-label={name} onLoadedMetadata={() => setLoad({ state: 'ready' })} onError={() => setLoad({ state: 'error' })}
-                  className={cn('max-h-full max-w-full rounded-lg bg-muted', load.state !== 'ready' && 'invisible')} />
-              </>
+              : media === 'video' ? <div className={cn('flex size-full min-h-0 min-w-0 flex-col items-center justify-center gap-4 sm:flex-row', steps.length > 0 && 'sm:items-stretch')}>
+                {/* With steps, the video and its timeline share a top edge. */}
+                <div className={cn('relative flex min-h-0 min-w-0 flex-1 items-center justify-center', steps.length > 0 && 'sm:items-start sm:justify-end')}>
+                  {load.state === 'loading' && <Skeleton data-testid="evidence-loading" className="absolute inset-0 m-auto aspect-video max-h-full w-full max-w-[52rem]" />}
+                  <video ref={player} key={src} src={src!} controls playsInline preload="metadata" aria-label={name} onLoadedMetadata={() => setLoad({ state: 'ready' })} onError={() => setLoad({ state: 'error' })}
+                    onTimeUpdate={event => setPlayingMs(event.currentTarget.currentTime * 1000)}
+                    className={cn('max-h-full max-w-full rounded-lg bg-muted', load.state !== 'ready' && 'invisible')} />
+                </div>
+                {steps.length > 0 && <RecordingSteps steps={steps} current={activeStep(steps, playingMs)} onSeek={seek} />}
+              </div>
                 : load.state === 'loading' ? <Skeleton data-testid="evidence-loading" className="size-full max-w-[55rem] rounded-xl" />
                   : <div className="flex size-full max-w-[55rem] flex-col overflow-hidden rounded-xl bg-background">
                     {item.command && <div className="flex shrink-0 items-center gap-3 px-5 pt-4 font-mono text-xs">

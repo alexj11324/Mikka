@@ -5,6 +5,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { groupDirectory } from './group-conversations-directory'
 import { handleGroup, type GroupRequest } from './group-conversations-store'
+import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
 
 const workspaceId = randomUUID(), ownAgent = randomUUID(), privateAgent = randomUUID()
 const directory = groupDirectory({
@@ -34,12 +35,8 @@ for (const [resource, method] of [['conversations','GET'],['conversations','POST
   })
 }
 
-// This test NEVER connects locally. The only authorized DB is the workflow's ephemeral service.
-const dbURL = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' ? process.env.E2E_DATABASE_URL : undefined
-if (dbURL) {
-  const target = new URL(dbURL)
-  if (target.hostname !== '127.0.0.1' || target.pathname !== '/mikka_e2e') throw new Error('Group tests require CI temporary mikka_e2e')
-}
+// Only a disposable loopback *_e2e database is authorized.
+const dbURL = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined
 test('Postgres17 migration, atomic history, pagination, unread counts, membership and privacy', { skip: !dbURL }, async () => {
   const pool = new Pool({ connectionString: dbURL, max: 16 })
   // Isolated schema inside the ephemeral CI database; no dependency on bootstrap #115.

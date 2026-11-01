@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import type { EditorView } from "@tiptap/pm/view"
 import { useTranslations } from "next-intl"
 import { IssueActivity } from './issue-activity'
-import { useEditor, type JSONContent } from "@tiptap/react"
+import { useEditor, useEditorState, type JSONContent } from "@tiptap/react"
 import { createEditorExtensions, readableIssueContent } from "./issue-editor-schema"
 import { TextSelection } from "@tiptap/pm/state"
 import { Collaboration } from "@tiptap/extension-collaboration"
@@ -30,6 +30,7 @@ import { RICH_TEXT_MENTION_PROSE } from "@/components/blocks/rich-text-editor-2/
 import { useRichTextChanges, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_MARKUP_VIEW, type RichTextMarkupView } from "@/components/blocks/rich-text-editor-3/components/rich-text-changes"
 import { addThread, createThreadStore, replyToThread, setThreadResolved, bindThreadRepaint, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
 import { FieldError } from '@/components/ui/field'
+import { ResizablePane } from "@/components/ui/resizable-pane"
 
 const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [{ type: "paragraph" }] }
 const EMPTY_THREADS: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadIndex = {}
@@ -37,6 +38,7 @@ const EMPTY_THREADS: import("@/components/blocks/rich-text-editor-4/components/r
 export { createEditorExtensions, createDocumentSeed } from './issue-editor-schema'
 export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, threadEvents, afterDescription, label: labelProp, disabled = false }: { content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; threadEvents?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
   const t = useTranslations('Editor')
+  const tCommon = useTranslations('Common')
   const author = authorProp ?? t('draftAuthor')
   const syncLabel = syncLabelProp ?? t('unsavedDraft')
   const label = labelProp ?? t('descriptionLabel')
@@ -109,6 +111,8 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
       replacementCallback.current?.(applied)
     }
   }, [editor, replacement, layout])
+  // 选区评论 appears only while text is selected, as in Linear and Notion (R-40).
+  const hasSelection = useEditorState({ editor, selector: ({ editor: current }) => !!current && !current.state.selection.empty }) ?? false
   const { changes } = useRichTextChanges(editor)
   const { anchors, activeId } = useCommentAnchors(editor)
   const outline = useRichTextOutline(editor)
@@ -156,13 +160,13 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
       <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : layout === 'issue' ? '' : 'rounded-lg border')}>
         {layout !== 'issue' && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
         <div ref={pageRef} className="relative min-w-0">
-          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-28 py-2 text-sm/7', layout === 'description' ? 'px-4 sm:pl-16' : layout === 'issue' ? 'px-0' : 'px-4 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-28 py-2', layout === 'description' ? 'px-4 sm:pl-16' : layout === 'issue' ? 'px-0' : 'px-4 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
-      {layout === 'issue' && !compact && <><div className="flex justify-end pb-2">
+      {layout === 'issue' && !compact && <>{(hasSelection || panel === 'comments') && <div className="flex justify-end pb-2">
         <Button variant="ghost" size="xs" onClick={() => setPanel(panel === 'comments' ? '' : 'comments')} aria-expanded={panel === 'comments'}><MessageSquare data-icon="inline-start" />{t('selectionComment')}</Button>
-      </div>
+      </div>}
       {panel === 'comments' && <div className="flex flex-col gap-3 rounded-lg border p-4">
         <FieldGroup><Field><FieldLabel htmlFor="selection-comment" className="sr-only">{t('selectionCommentLabel')}</FieldLabel><Input id="selection-comment" value={comment} onChange={event => setComment(event.target.value)} maxLength={2000} placeholder={t('selectionCommentPlaceholder')} /></Field></FieldGroup>
         <div className="flex justify-end"><Button size="sm" variant="outline" disabled={!comment.trim()} onClick={addComment}>{t('addSelectionComment')}</Button></div>
@@ -196,14 +200,14 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
     </div>
     <div className="flex min-h-72 flex-col lg:flex-row">
       <div ref={pageRef} className="relative min-w-0 flex-1">
-        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-72 px-9 py-7 text-sm/7 sm:px-12", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE, RICH_TEXT_MARKUP_VIEW[markup])} />
+        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-72 px-9 py-7 sm:px-12", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE, RICH_TEXT_MARKUP_VIEW[markup])} />
         {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
       </div>
-      {panel && <aside aria-label={panel === "outline" ? t('outline') : panel === "changes" ? t('changesReview') : t('commentsPanel')} className="flex w-full shrink-0 flex-col gap-3 bg-muted/15 p-4 lg:w-60 lg:border-l">
+      {panel && <ResizablePane render="aside" aria-label={panel === "outline" ? t('outline') : panel === "changes" ? t('changesReview') : t('commentsPanel')} storageKey="mikka:editor-panel-width" defaultWidth={240} min={200} max={420} edge="start" from="lg" label={tCommon('resize.editorPanel')} className="flex w-full shrink-0 flex-col gap-3 bg-muted/15 p-4 lg:border-l">
         {panel === "outline" && <><h3 className="text-xs font-medium">{t('outline')}</h3>{outline.length ? outline.map((heading, index) => <Button key={index} variant="ghost" size="sm" className="justify-start" onClick={() => editor && scrollToRichTextHeading(editor, index)}>{heading.text}</Button>) : null}</>}
         {panel === "changes" && <><h3 className="text-xs font-medium">{t('changesReviewCount', { count: changes.length })}</h3>{changes.map(change => <article key={change.id} className="flex flex-col gap-2 rounded-md bg-background p-3"><Button variant="ghost" size="sm" className="justify-start" onClick={() => editor?.commands.selectChange(change.id)}>{t('changeSummary', { author: t('draftAuthor'), kind: change.kind === "insert" ? t('changeKind.insert') : change.kind === "delete" ? t('changeKind.delete') : t('changeKind.replace') })}</Button>{change.deleted && <del className="break-words text-xs">{change.deleted}</del>}{change.inserted && <ins className="break-words text-xs">{change.inserted}</ins>}<div className="flex gap-1"><Button size="sm" variant="outline" disabled={!editable} onClick={() => editor?.commands.acceptChange(change.id)}><Check data-icon="inline-start" />{t('accept')}</Button><Button size="sm" variant="ghost" disabled={!editable} onClick={() => editor?.commands.rejectChange(change.id)}><X data-icon="inline-start" />{t('reject')}</Button></div></article>)}</>}
         {panel === "comments" && <><h3 className="text-xs font-medium">{t('commentsPanelCount', { count: openCount })}</h3><FieldGroup><Field><FieldLabel htmlFor="draft-comment" className="sr-only">{t('commentLabel')}</FieldLabel><Input id="draft-comment" value={comment} onChange={e => setComment(e.target.value)} placeholder={t('commentPlaceholder')} maxLength={2000} disabled={!editable} /></Field></FieldGroup><Button size="sm" variant="outline" disabled={!editable || !comment.trim()} onClick={addComment}>{t('addSelectionComment')}</Button>{commentError && <FieldError className="text-xs">{commentError}</FieldError>}{threadList.map(thread => { const anchor = anchors.find(item => item.id === thread.id); return <article key={thread.id} className={cn("flex flex-col gap-2 rounded-md bg-background p-3", activeId === thread.id && "ring-1 ring-primary")}><Button variant="ghost" size="sm" className="justify-start" onClick={() => { if (!editor) return; let start: number | undefined; let end = 0; editor.state.doc.descendants((node, pos) => { if (node.isText && node.marks.some(mark => mark.type.name === "comment" && mark.attrs.id === thread.id)) { start ??= pos; end = pos + node.nodeSize } }); if (start !== undefined) editor.chain().focus().setTextSelection({ from: start, to: end }).run() }}><span className="block truncate">{anchor?.excerpt ?? t('anchorRemoved')}</span></Button>{thread.messages.map(message => <div key={message.id}><p className="text-xs text-muted-foreground">{message.author}</p><p className="break-words text-xs leading-6">{message.body}</p></div>)}<div className="flex gap-1"><Button size="sm" variant="ghost" disabled={!editable} onClick={() => { setReplyId(thread.id); setReply("") }}>{t('reply')}</Button><Button size="sm" variant="ghost" disabled={!editable} onClick={() => setThreadResolved(threadDoc, thread.id, !thread.resolved)}>{thread.resolved ? t('reopen') : t('resolve')}</Button></div>{thread.resolved && <Badge variant="secondary">{t('resolved')}</Badge>}{replyId === thread.id && <><Input aria-label={t('replyLabel')} placeholder={t('replyPlaceholder')} value={reply} onChange={e => setReply(e.target.value)} maxLength={2000} /><Button size="sm" disabled={!reply.trim() || !editable} onClick={() => submitReply(thread.id)}>{t('submitReply')}</Button></>}</article> })}</>}
-      </aside>}
+      </ResizablePane>}
     </div>
     <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
   </section></TooltipProvider>

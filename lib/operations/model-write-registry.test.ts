@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { makeSnapshot } from '@/lib/agent-kit/definition'
 import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
+/** The person's Coordinator: an ordinary bot row, marked as the Coordinator. */
+const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
 
 const dispatch=mock.fn(async () => ({ status:'awaiting_approval',actionId:'fixture' }))
 const stub=(path:string,exports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{exports})
@@ -27,5 +29,5 @@ test('registered model tool binds host owner, bot, execution and native call sco
 test('the default text-only route is not given effectful model tools',async()=>{
  const { coordinatorTools }=await import('../../workflows/coordinator/tools')
  const execution={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),1,{...DEFAULT_AGENT_DEFINITION,tools:['append_notion_paragraph']},'host',{harness:'ai_sdk',model:'nvidia/nemotron-3.5-lightning-free'})}
- assert.equal(coordinatorTools('owner',null,undefined,{execution,writeEnabled:true}).append_notion_paragraph,undefined)
+ assert.equal(coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true, execution,writeEnabled:true}).append_notion_paragraph,undefined)
 })

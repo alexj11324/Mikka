@@ -6,7 +6,7 @@ export type ThreadStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped'
 export interface Person { id: string; name: string; email: string; image: string | null }
 export interface Workspace { id: string; name: string }
 
-export interface HomeBot { id: string; name: string; color: string; shape: string; line: string | null; at: string | null; working: boolean }
+export interface HomeBot { id: string; name: string; color: string; shape: string; /** Plain text; an empty string is a card with no words. */ line: string | null; at: string | null; working: boolean; pinned?: boolean; /** The person's Coordinator: the app draws it pinned on top, not as a row. */ coordinator?: boolean }
 
 export interface Home {
   user: Person
@@ -20,6 +20,8 @@ export interface Home {
 export interface IssueSource { kind: 'issue'; id: string; identifier: string | null; number: number | null; title: string; status: string }
 export interface RunSource {
   kind: 'run'; id: string; name: string; agentName: string; harness: string; status: string
+  /** Its group in the thread list (R-52), decided on the server. Absent from a server older than it. */
+  group?: ThreadGroup
   issue: { id: string; identifier: string | null; number: number | null; title: string } | null
   /** 运行信息, on the person's own runs. */
   info?: import('@/lib/run-info').RunInfo
@@ -37,6 +39,8 @@ export interface ChatItem {
   pending?: true
   /** Photos the person sent with it, loaded from /api/mobile/chat/image. */
   images?: number
+  /** The person stopped this reply (停止); it keeps what it had said. */
+  stopped?: true
 }
 
 export interface Chat {
@@ -46,6 +50,36 @@ export interface Chat {
   items: ChatItem[]
   sources: Record<string, CitationSource>
   artifacts: Record<string, { id: string; title: string }>
+  /** By message id. */
+  reactions?: Record<string, Reaction[]>
+}
+
+/** Reactions on a message, by emoji (lib/reactions.ts on the server). */
+export interface Reaction { emoji: string; count: number; mine: boolean }
+
+/** A group chat in 对话 (GET /api/conversations). */
+export interface GroupSummary {
+  id: string
+  title: string
+  createdAt: string
+  lastMessage: GroupMessage | null
+  unreadCount: string
+}
+
+/** One message in a group chat; `position` is a string (a bigint). */
+export interface GroupMessage { id: string; position: string; authorType: 'user' | 'agent' | 'bot'; authorId: string; body: string; createdAt: string }
+
+/** A group's member (GET /api/conversations/<id>/members); a bot has its colour and shape. */
+export interface GroupMember { id: string; name: string; memberType: 'user' | 'agent' | 'bot'; avatarUrl: string | null; color?: string; shape?: string }
+
+/** GET /api/conversations/<id>/messages: newest first. */
+export interface GroupPage {
+  messages: GroupMessage[]
+  nextBefore: string | null
+  agentStatus: { agentId: string | null; botId: string | null; status: string } | null
+  routingError: { code: string } | null
+  /** The latest reply was stopped (停止) by a member. */
+  stopped?: boolean
 }
 
 export interface Thread {
@@ -57,7 +91,28 @@ export interface Thread {
   device: { id: string; name: string; kind: MachineKind } | null
   createdAt: string
   finishedAt: string | null
+  /** Its place in the list, as on the web (R-52). Absent from a server older than it. */
+  group?: ThreadGroup
+  /** How many threads its task has had; the list shows only the newest (第 N 次尝试). */
+  attempts?: number
 }
+
+/** 进行中, 受阻, 等待你, 空闲, 已解决, in that order (R-52). */
+export type ThreadGroup = 'running' | 'blocked' | 'waiting' | 'idle' | 'resolved'
+
+/** A bot's page (GET /api/mobile/bots/<id>): its threads, its tasks' PRs, its scheduled tasks, its 资料库 and the person's 置顶 / 通知. */
+export interface BotPage {
+  threads: Thread[]
+  pullRequests: { url: string; number: number; title: string; group: 'review' | 'running' | 'merged' }[]
+  schedules: { id: string; title: string; status: 'active' | 'paused'; nextAt: string | null }[]
+  /** 资料库: what its threads handed over, newest first. */
+  library: { id: string; title: string; kind: 'markdown' | 'html'; version: number; updatedAt: string }[]
+  pinned: boolean
+  muted: boolean
+}
+
+/** A bot's cloud computer (GET /api/bots/<id>/computer), as far as the app shows it. */
+export interface ComputerStatus { machine: 'sleeping' | 'waking' | 'running' | 'error'; control: 'agent' | 'user' | 'idle' }
 
 export interface Threads { threads: Thread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[] }
 

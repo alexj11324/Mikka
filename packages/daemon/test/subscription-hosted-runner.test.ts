@@ -1,10 +1,9 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
-import { execFile, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { request } from "node:http";
-import { promisify } from "node:util";
 import { afterEach, expect, it, vi } from "vitest";
 import { defaultRunPolicy, type RunAssignment } from "@mikka/protocol";
 import { createHostedBotRunner } from "../src/subscription-hosted-runner";
@@ -19,10 +18,11 @@ import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers";
 
 afterEach(cleanupTempDirs);
 for (const harness of ["codex", "claude_code"] as const) {
-  it(`runs ${harness} through the existing adapter in a private Docker runtime and retains the owner session ledger`, async () => {
+  it(`runs ${harness} through the existing adapter in Anthropic's sandbox-runtime on the machine, with no Docker, and retains the owner session ledger`, async () => {
     const root = tempDir("mnh-");
     const stateDir = join(root, "adapters");
     mkdirSync(stateDir);
+    writeFileSync(join(root, "device.json"), '{"credential":"fixture-device-credential"}', { mode: 0o600 });
     const runId = randomUUID();
     const consumerId = randomUUID();
     const bindingId = randomUUID();
@@ -85,6 +85,7 @@ for (const harness of ["codex", "claude_code"] as const) {
       cwd: await makeRepo(),
       prompt: "PROBE_GIT",
       model: "fixture-model",
+      // The worker's device credential: the sandboxed CLI must not read it.
       env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }),
       log: createLogger({ level: "silent" }),
       github: { endpoint: 'https://mikka.example/api/runs/github-token', repository: 'owner/repo', branch: 'mikka/mik-1', runToken: 'synthetic-run-token', issueId: assignment.issueId },
@@ -108,6 +109,7 @@ for (const harness of ["codex", "claude_code"] as const) {
     expect(
       existsSync(join(stateDir, "runs", runId, "runtime-git", ".git")),
     ).toBe(true);
+    expect(execFileSync('git', ['--git-dir', join(stateDir, 'runs', runId, 'runtime-git', '.git'), '--work-tree', options.cwd, 'status', '--porcelain'], { encoding: 'utf8' })).toBe('');
     // Closing the session leaves no GitHub token cache or CLI login on the machine.
     expect(existsSync(githubDir)).toBe(false);
     expect(existsSync(join(stateDir, "runs", runId, "runtime-home", ".codex", "auth.json"))).toBe(false);
@@ -119,7 +121,7 @@ for (const harness of ["codex", "claude_code"] as const) {
     await expect(runner.start(assignment, options)).rejects.toThrow("revoked");
     const verify = await runner.command(
       options.cwd,
-      'test -z "$E2B_API_KEY$INFISICAL_CLIENT_SECRET" && ! (printf blocked > .git/guard) 2>/dev/null && printf allowed > project-probe',
+      'test -z "$(git status --porcelain)" && test -z "$E2B_API_KEY$INFISICAL_CLIENT_SECRET" && ! (printf blocked > .git/guard) 2>/dev/null && printf allowed > project-probe',
       false,
       10000,
     );
@@ -199,92 +201,62 @@ async function bounded<T>(promise: Promise<T>, label: string): Promise<T> {
     })])
   } finally { clearTimeout(timer) }
 }
-const dockerExec = promisify(execFile)
+/**
+ * The processes of one hosted run still alive: its bootstrap (whose working
+ * directory is the run's worktree) and anything naming the fixture's root
+ * (the CLI's settings carry the run dir).
+ */
+function liveRunProcesses(worktree: string, root: string): string[] {
+  const out = execFileSync('ps', ['-eo', 'pid=,args='], { encoding: 'utf8' })
+  const real = realpathSync(worktree)
+  return out.split('\n').map(line => line.trim()).filter(Boolean).filter(line => {
+    const pid = line.split(' ', 1)[0]
+    if (Number(pid) === process.pid) return false
+    if (line.includes(root)) return true
+    if (!line.includes('native-container.mjs')) return false
+    try { return readlinkSync(`/proc/${pid}/cwd`) === real } catch { return false }
+  })
+}
 
-// These fixtures use real Docker isolation and synthetic CLI/auth/provider
-// protocol only. The trusted command wrapper forwards every Docker operation;
-// it can withhold a *real successful create's stdout* to expose the ownership
-// race deterministically. No production liveness or container result is faked.
-async function revocationFixture(holdCreate = false) {
+// These fixtures run the real bootstrap and process groups on this machine
+// with synthetic CLI/auth/provider protocol only. No production liveness or
+// process result is faked.
+async function revocationFixture(binaryName = 'fakes/fake-claude-subscription.mjs') {
   // Keep audit files outside the shared disposable-directory helper. Its
   // independent owner may recycle fixtures; these records must stay retained.
   const root = mkdtempSync(join(tmpdir(),'mikka-hosted-approval-')), stateDir = join(root, 'adapters')
   console.info(`Retained hosted approval audit: ${root}`)
   mkdirSync(stateDir)
-  const realDocker = execFileSync('/bin/sh', ['-c', 'command -v docker'], { encoding: 'utf8' }).trim()
-  const bin = join(root, 'bin'), calls = join(root, 'docker.jsonl'), created = join(root, 'created-id'), release = join(root, 'release-create')
-  mkdirSync(bin)
-  writeFileSync(join(bin, 'docker'), `#!${process.execPath}
-import { spawn } from 'node:child_process';
-import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
-const args = process.argv.slice(2);
-appendFileSync(${JSON.stringify(calls)}, JSON.stringify({at:new Date().toISOString(),args})+'\\n');
-const creating = args[0] === 'create';
-const child = spawn(${JSON.stringify(realDocker)}, args, { stdio: ['inherit', creating ? 'pipe' : 'inherit', 'inherit'] });
-let output = '';
-if (creating) child.stdout.on('data', part => { output += part });
-else for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => child.kill(signal));
-child.on('error', error => { process.stderr.write(error.message); process.exitCode = 1 });
-child.on('close', async code => {
-  if (creating && code === 0) {
-    writeFileSync(${JSON.stringify(created)}, output.trim());
-    if (${holdCreate}) while (!existsSync(${JSON.stringify(release)})) await new Promise(done => setTimeout(done, 25));
-  }
-  if (creating) process.stdout.write(output);
-  process.exitCode = code ?? 1;
-});
-`, { mode: 0o700 })
-  const dockerEnv = { PATH: process.env.PATH, ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { DOCKER_HOST: 'unix:///run/mikka-container/docker.sock' } : {}) }
   const runId = randomUUID(), deviceId = randomUUID()
   const contextValue = { route: 'claude_code_cli' as const, modelId: 'fixture-model', revision: 2, accountId: 'fixture-account', expiresAt: new Date(Date.now() + 60000).toISOString() }
   const link = Object.assign(new MemoryServer(deviceId).link(), {
     nativeContext: vi.fn(async (_device: string, _run: string, _signal?: AbortSignal) => contextValue),
     nativeRequest: vi.fn(async (_device: string, _run: string, _payload: unknown, _signal?: AbortSignal): Promise<{ contentType: string; body: ReadableStream<Uint8Array> }> => { throw new Error('no real provider in hosted fixture') }),
   })
-  const binary = resolve(import.meta.dirname, 'fakes/fake-claude-subscription.mjs')
+  const binary = binaryName.startsWith('/') ? binaryName : resolve(import.meta.dirname, binaryName)
   chmodSync(binary, 0o700)
-  const previousPath = process.env.PATH
-  let runner: Awaited<ReturnType<typeof createHostedBotRunner>>
-  try {
-    process.env.PATH = `${bin}:${previousPath ?? '/usr/bin:/bin'}`
-    runner = await createHostedBotRunner({ stateDir, link, binaries: { claude_code: binary }, ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: 'unix:///run/mikka-container/docker.sock' as const } : {}) })
-  } finally {
-    if (previousPath === undefined) delete process.env.PATH
-    else process.env.PATH = previousPath
-  }
+  // A runner on this state directory, as a restarted daemon would open it.
+  const open = () => createHostedBotRunner({ stateDir, link, binaries: { claude_code: binary }, ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: 'unix:///run/mikka-container/docker.sock' as const } : {}) })
+  const runner = await open()
   const assignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main', harness: 'claude_code', prompt: 'HANG', model: 'fixture-model',
     subscriptionBinding: { bindingId: randomUUID(), ownerId: 'fixture-owner', workspaceId: randomUUID(), consumerId: randomUUID(), route: 'claude_code_cli' },
   } as RunAssignment
   let policyLive = true
   const gate = denyGate(runId, () => policyLive)
   const options = { runId, toolApproval: gate, cwd: await makeRepo(), prompt: 'HANG', model: 'fixture-model', env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }), log: createLogger({ level: 'silent' }) }
-  const commands = (): string[][] => existsSync(calls) ? readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line).args) : []
   const socket = () => {
     const brokers = join(stateDir, 'native-brokers')
     if (!existsSync(brokers)) return undefined
     return readdirSync(brokers).map(name => join(brokers, name, 'broker.sock')).find(path => existsSync(path))
   }
-  const resource = () => {
-    const files = readdirSync(join(stateDir, 'native-resources'))
-    return files[0] ? JSON.parse(readFileSync(join(stateDir, 'native-resources', files[0]), 'utf8')) as { name: string; id?: string; nonce: string; state: string } : undefined
-  }
-  async function gone(id: string) {
-    await waitFor(async () => {
-      try { await dockerExec(realDocker, ['inspect', id], { env: dockerEnv }); return false }
-      catch (error) {
-        expect(String((error as { stderr: string }).stderr)).toMatch(/No such (?:container|object)/i)
-        return true
-      }
-    })
-  }
-  return { root, stateDir, runId, runner, link, assignment, options, gate, contextValue, binary, created, release, commands, socket, resource, gone,
+  const processes = () => liveRunProcesses(options.cwd, root)
+  return { root, stateDir, runId, runner, open, link, assignment, options, gate, contextValue, binary, socket, processes,
     revokePolicy: () => { policyLive = false },
-    inspect: async (id: string) => JSON.parse((await dockerExec(realDocker, ['inspect', id], { env: dockerEnv })).stdout)[0],
   }
 }
 
-it.each(['context', 'broker', 'create'] as const)('fences hosted startup revoked during %s and removes only its settled Docker resource', async phase => {
-  const fixture = await revocationFixture(phase === 'create')
+it.each(['context', 'broker'] as const)('fences hosted startup revoked during %s and starts no CLI', async phase => {
+  const fixture = await revocationFixture()
   const entered = deferred<void>(), resume = deferred<void>()
   if (phase === 'context') {
     await expect(fixture.runner.start(fixture.assignment, { ...fixture.options, toolApproval: undefined })).rejects.toThrow('Run tool approval unavailable')
@@ -293,7 +265,7 @@ it.each(['context', 'broker', 'create'] as const)('fences hosted startup revoked
     await expect(fixture.runner.start(fixture.assignment, { ...fixture.options, toolApproval: stopped })).rejects.toThrow('Run tool approval unavailable')
     expect(fixture.link.nativeContext).not.toHaveBeenCalled()
   }
-  if (phase !== 'create') fixture.link.nativeContext.mockImplementation(async () => {
+  fixture.link.nativeContext.mockImplementation(async () => {
     if (fixture.link.nativeContext.mock.calls.length === (phase === 'context' ? 1 : 2)) {
       entered.resolve()
       await resume.promise // Trusted server reply can arrive after cancellation.
@@ -305,30 +277,11 @@ it.each(['context', 'broker', 'create'] as const)('fences hosted startup revoked
   const rejected = expect(starting).rejects.toThrow('subscription_hosted_runtime_unavailable')
   void rejected.catch(() => undefined)
   try {
-    if (phase === 'create') await waitFor(() => existsSync(fixture.created))
-    else await bounded(entered.promise, 'trusted context pause')
-    const record = fixture.resource()
-    const brokerSocket = fixture.socket()
+    await bounded(entered.promise, 'trusted context pause')
     fixture.gate.revoke()
-    if (phase === 'create') {
-      expect(record).toMatchObject({ state: 'creating' })
-      expect(brokerSocket).toBeDefined()
-      await waitFor(() => !existsSync(brokerSocket!))
-      // Create has really succeeded, but its stdout is still held. Revocation
-      // must not claim removal before that pending create outcome settles.
-      const actualId = readFileSync(fixture.created, 'utf8')
-      expect((await fixture.inspect(actualId)).State.Running).toBe(false)
-      writeFileSync(fixture.release, 'release owned create result')
-      await rejected
-      await fixture.gone(actualId)
-      expect(fixture.commands().filter(args => args[0] === 'rm')).toEqual([['rm', '-f', actualId]])
-    } else {
-      resume.resolve()
-      await rejected
-      expect(fixture.commands().some(args => args[0] === 'create')).toBe(false)
-    }
-    expect(fixture.commands().some(args => args[0] === 'start')).toBe(false)
-    expect(fixture.resource()).toBeUndefined()
+    resume.resolve()
+    await rejected
+    expect(fixture.processes()).toEqual([])
     expect(fixture.socket()).toBeUndefined()
     expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
     const calls = fixture.link.nativeContext.mock.calls.length
@@ -336,12 +289,53 @@ it.each(['context', 'broker', 'create'] as const)('fences hosted startup revoked
     expect(fixture.link.nativeContext).toHaveBeenCalledTimes(calls)
   } finally {
     fixture.gate.revoke(); resume.resolve()
-    writeFileSync(fixture.release, 'release on fixture teardown')
     await starting.catch(() => undefined)
   }
 }, 60000)
 
-it.each(['pending', 'streaming'] as const)('revokes a real Docker hosted CLI and %s synthetic provider transport when CLI policy expires', async phase => {
+it('a CLI that cannot start keeps its reason, leaves nothing running, and the next runner starts', async () => {
+  const broken = join(mkdtempSync(join(tmpdir(), 'mikka-hosted-broken-')), 'claude')
+  writeFileSync(broken, `#!${process.execPath}\nprocess.exit(3)\n`, { mode: 0o700 })
+  const fixture = await revocationFixture(broken)
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    const error = await (async () => {
+      const session = await fixture.runner.start(fixture.assignment, fixture.options)
+      // An adapter may hand back a session whose CLI already ended; then the
+      // failure is its last event.
+      const events = []
+      for await (const event of session.events()) events.push(event)
+      return events.at(-1)
+    })().then(last => ({ last }), (e: Error) => ({ error: e }))
+    if ('error' in error) {
+      expect(error.error.message).toBe('subscription_hosted_runtime_unavailable')
+      expect(String((error.error.cause as Error | undefined)?.message ?? '')).not.toBe('')
+      expect(warn.mock.calls.some(call => String(call[0]).includes('hosted CLI did not start'))).toBe(true)
+    } else {
+      expect(error.last).toMatchObject({ type: 'exit' })
+      expect((error.last as { outcome?: string }).outcome).not.toBe('succeeded')
+    }
+    await waitFor(() => fixture.processes().length === 0)
+    expect(fixture.socket()).toBeUndefined()
+    // A restarted daemon on the same machine is not blocked by this run.
+    await expect(fixture.open()).resolves.toBeDefined()
+  } finally {
+    warn.mockRestore()
+    fixture.gate.revoke()
+  }
+}, 60000)
+
+it('startup is not blocked by container records an earlier, Docker-based worker left', async () => {
+  const fixture = await revocationFixture()
+  const resources = join(fixture.stateDir, 'native-resources')
+  mkdirSync(resources, { recursive: true })
+  writeFileSync(join(resources, `mikka-native-${randomUUID()}.json`), JSON.stringify({ name: 'mikka-native-x', nonce: randomUUID(), state: 'creating' }))
+  writeFileSync(join(resources, `mikka-native-${randomUUID()}.json`), JSON.stringify({ name: 'mikka-native-y', nonce: randomUUID(), state: 'created', id: 'a'.repeat(64) }))
+  await expect(fixture.open()).resolves.toBeDefined()
+  expect(existsSync(resources)).toBe(false)
+}, 60000)
+
+it.each(['pending', 'streaming'] as const)('revokes a hosted CLI on the machine and %s synthetic provider transport when CLI policy expires', async phase => {
   const fixture = await revocationFixture()
   const entered = deferred<AbortSignal>(), chunk = deferred<void>(), aborted = deferred<void>()
   fixture.link.nativeRequest.mockImplementation(async (_device, _run, _payload, signal) => {
@@ -359,20 +353,23 @@ it.each(['pending', 'streaming'] as const)('revokes a real Docker hosted CLI and
   })
   let session: AgentSession | undefined
   let transport: ReturnType<typeof request> | undefined
+  // Host secrets in the worker's own environment never reach the CLI: the
+  // fixture CLI exits at once when it sees one.
+  const hostSecrets = { E2B_API_KEY: 'fixture-host-secret', INFISICAL_CLIENT_SECRET: 'fixture-host-secret' }
+  const saved = Object.fromEntries(Object.keys(hostSecrets).map(key => [key, process.env[key]]))
+  Object.assign(process.env, hostSecrets)
   try {
     session = await fixture.runner.start(fixture.assignment, fixture.options)
     const finished = (async () => { const events = []; for await (const event of session!.events()) events.push(event); return events })()
     void finished.catch(() => undefined)
-    const record = fixture.resource()!
-    expect(record.state).toBe('created')
-    const actual = await fixture.inspect(record.id!)
-    expect(actual.HostConfig.NetworkMode).toBe('none')
-    expect(actual.HostConfig.ReadonlyRootfs).toBe(true)
-    expect(actual.HostConfig.CapDrop).toContain('ALL')
-    expect(actual.HostConfig.SecurityOpt).toContain('no-new-privileges')
-    expect(actual.Config.User).toBe(`${process.getuid!()}:${process.getgid!()}`)
-    expect(actual.Config.Labels['com.mikka.native.resource']).toBe(record.nonce)
-    expect(actual.Mounts.some((mount: { Destination: string }) => mount.Destination.endsWith('/docker.sock'))).toBe(false)
+    // The CLI runs as this worker's own user, in its own process group, and
+    // nothing of it carries a Docker socket.
+    const running = await waitFor(() => { const list = fixture.processes(); return list.length >= 2 ? list : undefined })
+    for (const line of running) {
+      const pid = Number(line.split(' ', 1)[0])
+      expect(Number(execFileSync('ps', ['-o', 'uid=', '-p', String(pid)], { encoding: 'utf8' }).trim())).toBe(process.getuid!())
+      expect(readFileSync(`/proc/${pid}/environ`, 'utf8')).not.toMatch(/DOCKER_HOST|fixture-host-secret/)
+    }
     const brokerSocket = fixture.socket()!
     const transportClosed = new Promise<void>(resolveClosed => {
       // This is a host test request to the real run-private broker. The CLI is
@@ -394,10 +391,10 @@ it.each(['pending', 'streaming'] as const)('revokes a real Docker hosted CLI and
     await bounded(aborted.promise, 'synthetic provider abort')
     expect(signal.aborted).toBe(true)
     await bounded(transportClosed, 'native broker transport close')
-    await bounded(finished, 'owned Docker CLI exit')
-    await fixture.gone(record.id!)
+    await bounded(finished, 'owned CLI exit')
+    // The whole process group is gone: bootstrap, CLI and its children.
+    await waitFor(() => fixture.processes().length === 0)
     await waitFor(() => !existsSync(brokerSocket))
-    expect(fixture.resource()).toBeUndefined()
     const forwarded = fixture.link.nativeRequest.mock.calls.length
     const lateRefused = await new Promise<boolean>(resolveRefused => {
       const late = request({ socketPath: brokerSocket, method: 'POST', path: '/v1/messages' }, response => { response.resume(); resolveRefused(false) })
@@ -408,10 +405,13 @@ it.each(['pending', 'streaming'] as const)('revokes a real Docker hosted CLI and
     await expect(session.send('late work')).rejects.toThrow('subscription_hosted_runtime_unavailable')
     await expect(fixture.runner.start(fixture.assignment, fixture.options)).rejects.toThrow('Run tool approval unavailable')
     expect(fixture.link.nativeRequest).toHaveBeenCalledTimes(forwarded)
-    expect(fixture.commands().filter(args => args[0] === 'start')).toHaveLength(1)
-    expect(fixture.commands().filter(args => args[0] === 'rm')).toEqual([['rm', '-f', record.id]])
-    writeFileSync(join(fixture.root, 'evidence.json'), JSON.stringify({ classification: 'real Docker; synthetic CLI and provider stream', phase, resource: record, container: actual, commands: fixture.commands(), forwarded, signalAborted: signal.aborted }, null, 2))
+    expect(fixture.processes()).toEqual([])
+    writeFileSync(join(fixture.root, 'evidence.json'), JSON.stringify({ classification: 'process groups on this machine; synthetic CLI and provider stream', phase, processes: running, forwarded, signalAborted: signal.aborted }, null, 2))
   } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
     fixture.gate.revoke()
     transport?.destroy()
     await session?.cancel()
@@ -433,7 +433,7 @@ it.each([true, false])('advertises hosted approval capability only with a prepar
     expect(advertised?.installed).toBe(true)
     expect(advertised?.subscriptionBroker).toBe(true)
     expect(advertised?.toolApproval).toBe(available ? true : undefined)
-    expect(fixture.commands().some(args => args[0] === 'create')).toBe(false)
+    expect(fixture.processes()).toEqual([])
     expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
   } finally { await daemon.stop() }
 }, 60000)

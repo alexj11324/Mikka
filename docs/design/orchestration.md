@@ -20,7 +20,7 @@
 | **Account** | A person. Owns their sign-in, devices, app connections, cards, credits they verified, model credentials and E2B key. |
 | **Personal workspace** | One per account, with exactly one member. Every account has one. |
 | **Team workspace** | Several members, with the team's policies, secrets, credits and payment method. It has no E2B key of its own. |
-| **Bot** | Lives in one workspace and has one owner. Chats on Mikka's own harness (R-05) and dispatches threads. |
+| **Bot** | Lives in one workspace and has one owner. Runs on Mikka's own AI SDK on Vercel; when it has work to do, it sends a thread through the daemon to Claude Code or Codex (R-05). |
 | **Thread** | The work a bot dispatched (`agent_runs`). Each turn of it is a **run**. |
 | **Agent** | The coding worker that runs a thread: Claude Code or Codex. Code may say `harness`; the UI says Agent (R-43). |
 | **Model credential** | A Claude or ChatGPT/Codex subscription login, an API key, or a custom provider. Bound to the account and managed on the page 「API 与订阅」. |
@@ -56,7 +56,7 @@ flowchart TD
    revoked or paused, quota left) and allowed in this workspace. In the
    personal workspace it is always allowed. In a team it is allowed when the
    owner shared it there and the admin has not turned off
-   「允许成员使用个人订阅」. If several qualify, the bot's saved choice wins;
+   「允许成员使用个人订阅和 API Key」. If several qualify, the bot's saved choice wins;
    after that a subscription comes before an API key, and Claude comes before
    ChatGPT/Codex.
 2. **Otherwise another member's credential** shared in this workspace with
@@ -72,23 +72,30 @@ Rules that hold everywhere:
   disconnected, revoked, paused, its share is withdrawn, its owner leaves, or
   the admin switch is turned off.
 - **Quota exhausted.** The run that hit the limit stops; it never switches.
-  - When 「订阅额度用完时改用 API Key」 is on (the default) and the owner has
-    an API key for that provider, the next run uses that API key.
+  - When 「订阅额度用完后，自动改用 API Key」 is on (the default) and the owner has
+    an API key of their own, the next run uses that API key. The chat says so
+    in one line before the reply: 「Claude Max 额度用完，已改用 DeepSeek API Key
+    继续（按 token 计费）· 改回」; 改回 opens the model picker. Before sending,
+    the composer names the used-up subscription and the key the next message
+    moves to, or when the quota resets.
   - When nothing is left, the stopped run opens a popup. The person picks the
     model or credential themselves, and 重试 runs the turn on that choice.
     重试 never re-resolves on its own.
 - Conversation compaction uses the same frozen model and credential as the
   turn.
-- The same order serves bot chats and threads. A bot chat runs on Mikka's
-  harness; a thread runs on the Agent mapped to the model (§3).
+- The same order serves bot chats and threads. The bot itself runs on
+  Mikka's own AI SDK on Vercel; a thread goes through the daemon to the Agent
+  mapped to the model (§3).
 
-## 3. Agents (harnesses) and runners
+## 3. Agents and runners
 
 **Model → Agent.** GPT/OpenAI models run on **Codex**. Every other model runs
 on **Claude Code**, including Mikka 默认 and models reached through an API
 key or a custom provider. In 「API 与订阅」 a person can override which Agent
-runs each model; the override is a per-model setting. Bots never run on
-Claude Code or Codex (R-05); those Agents run threads only.
+runs each model; the override is a per-model setting.
+
+「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过 daemon 把任务派给
+Claude Code 或 Codex。」 (Alex, R-05)
 
 **A user's computer or server is a runner, just like E2B.** Every runner meets
 the same contract: a clean environment for the thread, Agents that Mikka
@@ -139,9 +146,14 @@ still pick any of their own devices by hand.
    (R-23).
 3. Otherwise the owner's online device that has 「允许自动调度」 on and
    passes the capability check, servers first.
-4. Otherwise the run is queued and the chat shows one action card:
-   在这台电脑上启用 / 连接我的服务器 / 填入 E2B Key. The run starts on its own
-   as soon as one of these becomes available.
+4. Otherwise 立即警告: no run is created and the bot at once warns that no
+   computer is available, in one action card 「没有可用的电脑」 that says
+   先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。 It has two rows:
+   连接电脑 (Settings › 电脑) and 填入 E2B Key (the person's own key; no row
+   offers Mikka's cloud). Answering a row (a computer switched on, the key
+   saved) makes the bot dispatch again
+   ([run machine fallback](decisions/2026-10-31-2200-run-machine-fallback.md),
+   [two rows](decisions/2026-11-01-1215-star-is-the-pin.md)).
 
 **When a machine goes away during a thread:**
 
@@ -151,8 +163,7 @@ still pick any of their own devices by hand.
   1. Move the run to E2B, when the owner has a key.
   2. Otherwise move it to the owner's personal computer that has
      「允许自动调度」 on.
-  3. Otherwise show an error with actions to fix it: 在这台电脑上允许自动调度
-     / 填入 E2B Key / 让服务器重新上线.
+  3. Otherwise end the run and 立即警告 with the same action card.
 - **A personal computer goes offline:** apply the same three steps.
 
 This replaces the old 「设备离线时」 setting.
@@ -187,8 +198,8 @@ sequenceDiagram
 - **Leases.** A claimed run holds a lease that the heartbeat renews. When a
   lease runs out because the machine is gone, the run is placed again by §4,
   keeping its frozen model and credential.
-- **Queueing.** A run with no machine stays `queued` and shows the action
-  card (§4).
+- **No machine.** A run is created only once a machine is chosen; with none,
+  the bot warns at once with the action card (§4).
 - **Quota exhausted.** For a credential, see §2. For Mikka 默认, the hosted
   refusal line appears with 验证银行卡 / 充值 and 重试. Admission checks only
   that the balance is positive, then charges actual use afterwards.
@@ -212,6 +223,16 @@ token or key.
    only inside the run's environment: the sandbox, the container, or the
    temporary Agent config dir. It never comes from, or goes to, the person's
    own CLI config.
+   On a device, a subscription run gets only that run's short-lived access
+   token, on a pipe or in memory, never on disk; the refresh grant never
+   leaves the server. A member's share used on the member's own device works
+   the same way. Each lease request is checked again (run, device, binding,
+   revocation). Codex asks again when the token expires; a Claude Code run
+   ends when its token does.
+   A subscription on a device or a sandbox never leaves the server: the
+   Agent holds a placeholder and sends its model requests to Mikka, which
+   checks the run and adds the token to each one. That holds for a member's
+   share used on the member's own device too.
 3. **At run end:** the run token is revoked and the injected credential is
    deleted. The environment pauses or idles without it.
 
@@ -250,12 +271,12 @@ The workspace where the work happens pays.
 | --- | --- |
 | A personal workspace for everyone; team workspaces beside it | — |
 | Account-level subscriptions, API keys and custom providers on 「API 与订阅」; per-workspace shares; 「分享给团队成员」; the admin switch | Per-member spend caps |
-| Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完时改用 API Key」; a popup when nothing is left | — |
+| Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完后，自动改用 API Key」; a popup when nothing is left | — |
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
 | Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a container where Docker exists, otherwise a worktree plus a temporary config dir, one multi-arch image | — |
 | A device capability check and 「允许自动调度」 instead of Agent detection and 「设备离线时」 | — |
-| Queue with an action card when there is no machine; the offline flow of §4 | — |
+| 立即警告 (the action card) when there is no machine; the offline flow of §4 | — |
 | One environment per thread; leases and heartbeats; credentials injected each run and absent while paused | — |
 | Card verification per person; credit and card shares per workspace | — |
 | No Mikka-hosted sandboxes and no free cloud trial | (not planned) |

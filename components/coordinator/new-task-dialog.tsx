@@ -62,14 +62,15 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const [sending, setSending] = useState(false)
   const [coordinatorUnavailable, setCoordinatorUnavailable] = useState(false)
   const tCoordinator = useTranslations('Coordinator')
-  const { data: available = true } = useSWR(open ? 'issue-creation-available' : null, () => issueCreationAvailable(), { revalidateOnFocus: false })
+  const { data: available = true } = useSWR(open ? 'issue-creation-available' : null, () => issueCreationAvailable())
   const fileRef = useRef<HTMLInputElement>(null)
   const composed = useRef<{ key: string; message: string; taskDestination: TaskDestination } | null>(null)
   const fileId = useId()
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
   const { data: bots = [] } = useSWR(open ? 'bots' : null, listBots)
-  const cloudBotId = bots[0]?.id
+  // The Coordinator takes the task on Mikka Cloud, on its own bot's computer.
+  const cloudBotId = (bots.find(bot => bot.coordinator) ?? bots[0])?.id
   // Mikka Cloud first and by default: there the Coordinator picks the bot, so no bot is named.
   // Direct daemon devices are 本机, including Linux. OS is not evidence that
   // a computer is an SSH target reached through another machine (R-23).

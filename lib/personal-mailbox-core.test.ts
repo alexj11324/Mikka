@@ -37,7 +37,11 @@ function harness(origin: 'owner' | 'peer' = 'peer') {
         inserted.push({ id: args[0], text: args[2], mailboxId: args[3], senderMailboxId: args[4], dedupeKey: args[5], replyTo: args[6], origin: args[7] })
         return { rows: [{ createdAt: date }] }
       }
-      if (sql.startsWith('insert into coordinator_events')) { events.push({ kind: sql.includes("'run_report'") ? 'run_report' : sql.includes("'run_finished'") ? 'run_finished' : args[2], payload: JSON.parse(args[5] as string) }); return { rows: [] } }
+      if (sql.startsWith('insert into coordinator_events')) {
+        if (sql.includes('select $1,$2,b.id')) events.push({ id: args[0], userId: args[1], botId: args[5], kind: 'run_report', dedupeKey: args[2], runId: args[3], payload: JSON.parse(args[4] as string), tier: 'attention' })
+        else events.push({ id: args[0], userId: args[1], kind: args[2], dedupeKey: args[3], runId: args[4], payload: JSON.parse(args[5] as string), tier: args[6] })
+        return { rows: [] }
+      }
       if (sql.startsWith('update run_messages set "deliveredAt"')) { control.afterInboxWrite(); return { rows: inbox.filter(row => !acked.has(row.id)) } }
       if (sql.startsWith('update run_messages set "acknowledgedAt"')) { const rows = inbox.filter(row => (args[1] as string[]).includes(row.id)); for (const row of rows) acked.add(row.id); return { rows: rows.map(row => ({ id: row.id })) } }
       if (sql.startsWith('select 1 from run_messages')) return { rows: control.validReply ? [{}] : [], rowCount: control.validReply ? 1 : 0 }

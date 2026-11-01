@@ -1,21 +1,15 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, before, mock, test } from 'node:test'
+import { seedCoordinator } from './support/coordinator-bot'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 // Settings backend actions (docs/settings-backend/prefs.md) against a real,
-// disposable Postgres. Only the session and Composio are stubbed. Runs in CI
-// against the Actions loopback mikka_e2e database, or locally with
-// MIKKA_LOCAL_DB_TESTS=1 against a loopback mikka_*e2e database whose URL is
-// also MIKKA_DATABASE_URL and DATABASE_URL. Skipped otherwise; REQUIRE_DB=1 makes that fail.
-let databaseUrl: string | undefined
-try {
-  const target = new URL(process.env.E2E_DATABASE_URL ?? '')
-  const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.pathname === '/mikka_e2e'
-  const local = process.env.MIKKA_LOCAL_DB_TESTS === '1' && /^\/mikka_[a-z0-9_]*e2e$/.test(target.pathname)
-  if ((ci || local) && ['postgres:', 'postgresql:'].includes(target.protocol)
-    && target.hostname === '127.0.0.1' && target.port === '5432' && !target.search && !target.hash
-    && process.env.MIKKA_DATABASE_URL === target.href && process.env.DATABASE_URL === target.href) databaseUrl = target.href
-} catch { /* no eligible disposable database */ }
+// disposable Postgres. Only the session and Composio are stubbed. Runs against a
+// loopback *_e2e database whose URL is also MIKKA_DATABASE_URL and DATABASE_URL.
+// Skipped otherwise; REQUIRE_DB=1 makes that fail.
+const target = process.env.E2E_DATABASE_URL
+const databaseUrl = disposableDatabase() && process.env.MIKKA_DATABASE_URL === target && process.env.DATABASE_URL === target ? target : undefined
 if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires a matching loopback e2e database')
 const dbTest = databaseUrl ? test : test.skip
 
@@ -114,15 +108,17 @@ dbTest('the Coordinator\'s and a Bot\'s turn prompt (preparePrompt) carry the sa
   const { preferences } = m
   const { preparePrompt } = await import('@/workflows/coordinator/steps')
   const botId = randomUUID()
+  // The Coordinator is an ordinary bot row; its prompt keeps the Coordinator's rules.
+  const coordinator = (await seedCoordinator(people.alex)).botId
   await preferences.updatePreferences({ personalInstructions: 'Sign every reply with 🐧.' })
-  for (const bot of [null, botId]) {
+  for (const bot of [coordinator, botId]) {
     const { instructions } = await preparePrompt(people.alex, bot)
     assert.match(instructions, /You are the Coordinator in Mikka/, 'the rules come first')
     assert.match(instructions, /<personal_instructions>\nSign every reply with 🐧\.\n<\/personal_instructions>/)
     assert.ok(instructions.indexOf('<personal_instructions>') > instructions.indexOf('You are the Coordinator in Mikka'))
   }
   await preferences.updatePreferences({ personalInstructions: '' })
-  for (const bot of [null, botId]) assert.doesNotMatch((await preparePrompt(people.alex, bot)).instructions, /personal_instructions|Sign every reply/)
+  for (const bot of [coordinator, botId]) assert.doesNotMatch((await preparePrompt(people.alex, bot)).instructions, /personal_instructions|Sign every reply/)
 })
 
 dbTest('time zone: a picked zone survives browser and IP reports until 自动', async () => {
@@ -154,7 +150,7 @@ dbTest('time zone: a picked zone survives browser and IP reports until 自动', 
 dbTest('提醒: notified counts the notify budget\'s spends in the last 24 hours', async () => {
   as(people.alex)
   const { preferences, db, schema } = m
-  assert.deepEqual(await preferences.getAttentionToday(), { notified: 0, limit: 5 })
+  assert.deepEqual(await preferences.getAttentionToday(), { notified: 0, limit: 24 }) // the runaway cap; whether to interrupt is the Decisions API's answer
   const matterId = randomUUID()
   await db.insert(schema.attentionMatters).values({ id: matterId, userId: people.alex, matterKey: `test:${matterId}`, source: 'gmail', title: 't', level: 'high', assessment: {}, evidence: {}, state: 'notified' })
   const now = Date.now()
@@ -165,9 +161,9 @@ dbTest('提醒: notified counts the notify budget\'s spends in the last 24 hours
     { id: randomUUID(), userId: people.alex, matterId, action: 'notify', spends: false, createdAt: new Date(now - 60_000) },
     { id: randomUUID(), userId: people.alex, matterId, action: 'handoff', spends: true, createdAt: new Date(now - 60_000) },
   ])
-  assert.deepEqual(await preferences.getAttentionToday(), { notified: 2, limit: 5 })
+  assert.deepEqual(await preferences.getAttentionToday(), { notified: 2, limit: 24 })
   as(people.dana)
-  assert.deepEqual(await preferences.getAttentionToday(), { notified: 0, limit: 5 })
+  assert.deepEqual(await preferences.getAttentionToday(), { notified: 0, limit: 24 }) // the runaway cap; whether to interrupt is the Decisions API's answer
 })
 
 dbTest('删除全部记忆 removes only the person\'s facts and getMemory counts them', async () => {

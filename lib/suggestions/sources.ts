@@ -96,9 +96,9 @@ export async function connectedComposioApps(userId: string): Promise<string[]> {
   return [...new Set((await activeComposioAccounts(composio, userId)).map(account => account.toolkit.slug.toLowerCase()))]
 }
 
-/** Important mail from the last two days, as Gmail sees it now. */
+/** Inbox mail from the last two days; the Decisions API judges which of it matters. */
 async function currentGmail(userId: string): Promise<ExternalNotification[]> {
-  const result = await runComposioAction(userId, 'fetch_recent_gmail', { query: 'in:inbox is:important newer_than:2d -category:promotions -category:social', max_results: 15 })
+  const result = await runComposioAction(userId, 'fetch_recent_gmail', { query: 'in:inbox newer_than:2d', max_results: 15 })
   if ('error' in result) return []
   const messages = (result.data as { messages?: unknown }).messages
   return Array.isArray(messages) ? messages.flatMap(message => ((notification => notification ? { ...notification, connectedAccountId: result.accountId } : [])(gmailNotification(userId, message as Record<string, unknown>)))) : []

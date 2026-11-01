@@ -1,8 +1,8 @@
-import { chmodSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, readFileSync, renameSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { consumeCloudBootstrap, installCloudCredential } from '../src/cloud-bootstrap'
+import { consumeCloudBootstrap, installCloudCredential, watchCloudBootstraps } from '../src/cloud-bootstrap'
 import { Daemon } from '../src/main'
 import { MemoryServer } from '../src/server-link'
 import { cleanupTempDirs, tempDir } from './helpers'
@@ -16,6 +16,34 @@ it('accepts and consumes a private scoped handoff', () => {
   writeFileSync(file, JSON.stringify(input), { mode: 0o600 })
   expect(consumeCloudBootstrap(file)).toEqual(input)
   expect(() => consumeCloudBootstrap(file)).toThrow()
+})
+
+it('a preloaded worker serializes atomic handoffs and duplicate wakes without baking an identity', async () => {
+  const directory = tempDir(), path = join(directory, 'bootstrap.json'), next = join(directory, 'bootstrap.next')
+  const first = config(), second = { ...first, credential: `orv_${'b'.repeat(43)}` }
+  const received: string[] = []
+  let entered!: () => void, release!: () => void, completed!: () => void, reject!: (error: unknown) => void
+  const firstEntered = new Promise<void>(resolve => { entered = resolve })
+  const holding = new Promise<void>(resolve => { release = resolve })
+  const finished = new Promise<void>((resolve, fail) => { completed = resolve; reject = fail })
+  const close = watchCloudBootstraps(directory, async () => {
+    received.push(consumeCloudBootstrap(path).credential)
+    if (received.length === 1) { entered(); await holding }
+    if (received.length === 2) completed()
+  }, reject)
+  try {
+    expect(received).toEqual([])
+    writeFileSync(next, JSON.stringify(first), { mode: 0o600 })
+    renameSync(next, path)
+    await firstEntered
+    writeFileSync(next, JSON.stringify(second), { mode: 0o600 })
+    renameSync(next, path)
+    process.emit('SIGUSR1'); process.emit('SIGUSR1')
+    expect(received).toEqual([first.credential])
+    release()
+    await finished
+    expect(received).toEqual([first.credential, second.credential])
+  } finally { release(); close() }
 })
 
 it('keeps preview access in the private handoff and never persists it with device credentials', async () => {

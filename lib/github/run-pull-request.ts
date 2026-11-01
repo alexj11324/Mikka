@@ -71,13 +71,16 @@ function api(fetcher: typeof fetch) {
       throw new PublicationError('github_unavailable', true)
     }
     if (response.status === 404 && init.missing) throw new PublicationError(init.missing, init.missing === 'branch_not_pushed')
-    if (!response.ok) throw new PublicationError('github_request_failed')
+    // GitHub rejected this server's App JWT or the token it just minted: the App ID, key or clock is wrong here, not a GitHub outage.
+    if (response.status === 401) throw new PublicationError('github_not_configured', false, 401)
+    if (!response.ok) throw new PublicationError('github_request_failed', false, response.status)
     try { return await response.json() as unknown }
     catch { throw new PublicationError('github_request_failed') }
   }
 }
 
-async function repositoryAccess(options: Options) {
+/** `push`: the installation must grant contents:write (the push itself). `pull_request`: pull_requests:write, contents at least read. */
+async function repositoryAccess(options: Options, need: 'push' | 'pull_request' = 'pull_request') {
   const repo = githubRepository(options.remoteKey)
   if (!options.githubAccountId || !/^[1-9][0-9]*$/.test(options.githubAccountId)) throw new PublicationError('github_identity_required')
   const env = options.env ?? process.env
@@ -88,7 +91,8 @@ async function repositoryAccess(options: Options) {
   const request = api(options.fetcher ?? fetch)
   const installation = parse(installationSchema, await request(`${repo.path}/installation`, jwt, { missing: 'github_not_installed' }))
   if (installation.suspended_at) throw new PublicationError('github_suspended')
-  if (installation.permissions.pull_requests !== 'write' || !['read', 'write'].includes(installation.permissions.contents ?? '')) throw new PublicationError('github_permission_required')
+  if (need === 'push' ? installation.permissions.contents !== 'write'
+    : installation.permissions.pull_requests !== 'write' || !['read', 'write'].includes(installation.permissions.contents ?? '')) throw new PublicationError('github_permission_required')
   // Verify the person's durable GitHub identity with a read-only token first.
   // Only after that check may the server issue a token that can open a PR.
   const metadataToken = parse(tokenSchema, await request(`/app/installations/${installation.id}/access_tokens`, jwt, {
@@ -109,15 +113,21 @@ export async function verifyGitHubRepositoryAccess(options: Options): Promise<Gi
   return (await repositoryAccess(options)).binding
 }
 
+/**
+ * Push authority (decision 2026-11-01-1215): the Mikka GitHub App's installation
+ * on this repository grants contents:write, and the person's own linked GitHub
+ * account may write to it. No second approval is asked in Mikka.
+ */
+export async function verifyGitHubPushAccess(options: Options): Promise<GitHubRepositoryBinding> {
+  return (await repositoryAccess(options, 'push')).binding
+}
+
 /** A worker receives one repository's installation token, never the App key. */
 export async function issueRunGitHubInstallationToken(options: Options) {
   const access = await repositoryAccess(options)
   const result = parse(z.object({ token: z.string().min(1), expires_at: z.iso.datetime() }),
     await access.request(`/app/installations/${access.binding.installationId}/access_tokens`, access.jwt, {
-      method: 'POST', body: {
-        repository_ids: [access.binding.repositoryId],
-        permissions: { contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read' },
-      },
+      method: 'POST', body: { repository_ids: [access.binding.repositoryId] },
     }))
   if (Date.parse(result.expires_at) <= Date.now()) throw new PublicationError('github_request_failed')
   return { token: result.token, expiresAt: result.expires_at }
@@ -154,7 +164,7 @@ export async function openRunPullRequest(options: Options & {
   const ref = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, access.metadataToken, { missing: 'branch_not_pushed' }))
   if (ref.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
   const writeToken = parse(tokenSchema, await request(`/app/installations/${binding.installationId}/access_tokens`, access.jwt, {
-    method: 'POST', body: { repository_ids: [binding.repositoryId], permissions: { metadata: 'read', pull_requests: 'write' } },
+    method: 'POST', body: { repository_ids: [binding.repositoryId] },
   })).token
   const marker = `<!-- mikka-issue:${options.issueId} -->`
   const write = <T>(operation: () => Promise<T>) => options.withWrite ? options.withWrite(operation) : operation()

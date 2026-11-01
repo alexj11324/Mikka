@@ -29,6 +29,10 @@ export interface RunSource {
   agentName: string
   harness: string
   status: string
+  /** How it came out once it ended (R-52); null while running or not judged yet. */
+  outcome?: string | null
+  /** Its group in the thread list (R-52), decided on the server: the phone draws it as is. */
+  group?: import('@/lib/thread-groups').ThreadGroup
   issue: { id: string; number: number | null; identifier: string | null; title: string } | null
   /** The thread's name: the first line of what it was asked to do. */
   name: string
@@ -83,6 +87,24 @@ export function citedIds(texts: readonly string[]): { issueIds: string[]; runIds
     }
   }
   return { issueIds: [...issueIds], runIds: [...runIds] }
+}
+
+/**
+ * `text` with each cited issue or run written as the name its chip shows (a
+ * thread's name, a task's title), for one-line previews such as the bot list.
+ * A citation this person cannot see is left out, never shown as its id.
+ * OpenUI Lang (`name = Component(…)`) comes back as it is: its ids are
+ * arguments, and the preview reads its prose from the quoted strings.
+ */
+export function namedCitations(text: string, sources: Readonly<Record<string, CitationSource>>): string {
+  if (/^\w+\s*=/.test(text.trimStart())) return text
+  return splitCitations(text).map(part => {
+    if (part.type === 'text') return part.text
+    if (part.type === 'link') return part.raw
+    const source = sources[part.id]
+    if (!source || (part.kind && part.kind !== source.kind)) return ''
+    return source.kind === 'run' ? source.name : source.title
+  }).join('')
 }
 
 /** Where a citation link points, as `#cite/<kind|any>/<id>`; relative, so Markdown keeps it. */

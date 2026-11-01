@@ -1,3 +1,4 @@
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { z } from 'zod'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
@@ -5,7 +6,7 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 export async function GET(request: Request, { params }: { params: Promise<{ botId: string }> }) {
-  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1') return Response.json({ error: 'Cloud computer task unavailable' }, { status: 503, headers })
+  if (!cloudComputerTasksEnabled()) return Response.json({ error: 'Cloud computer task unavailable' }, { status: 503, headers })
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) return Response.json({ error: 'Sign in required' }, { status: 401, headers })
   const { botId } = await params

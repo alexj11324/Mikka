@@ -5,7 +5,6 @@ import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
 import { AgentApproval, AgentQuestions, useAgentDecision } from './agent-decision'
 import { AgentCodeContent, AgentContent, AgentStatusIcon, AgentTasks, AgentTextContent } from './agent-content'
 import { AgentImage } from './agent-image'
-import { AgentFollowUps } from './agent-follow-ups'
 import { AgentImageCard } from './agent-image-card'
 import { CitationChip, WebCitation } from './agent-citations'
 import { ComputerCard } from '@/components/computer/computer-card'
@@ -19,17 +18,19 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AgentTextBubble, InsideBlock } from './agent-text-bubble'
 import { Alert as BeAlert, AlertContent as BeAlertContent, AlertDescription as BeAlertDescription, AlertIcon as BeAlertIcon, AlertTitle as BeAlertTitle } from '@/components/motion/alert'
 import { Collapsible as BeCollapsible, CollapsibleContent as BeCollapsibleContent, CollapsibleIndicator as BeCollapsibleIndicator, CollapsibleTrigger as BeCollapsibleTrigger } from '@/components/motion/collapsible'
-import { Tabs as BeTabs, TabsContent as BeTabsContent, TabsList as BeTabsList, TabsTrigger as BeTabsTrigger } from '@/components/motion/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AgentAreaChart, AgentBarChart, AgentDonutChart, AgentLineChart, AgentRadialChart } from './agent-chart'
 import { AgentCitations, AgentFileDiff, AgentFileTree, AgentTable } from './agent-report'
 import { AgentEditableTable } from './agent-editable-table'
+import { AgentSteps } from './agent-steps'
+import { AgentOpenUIButton } from './agent-openui-button'
 
 const renderers = {
   TextContent: AgentTextContent,
   BeCodeBlock: AgentCodeContent,
   BeCard: ({ props, renderNode }) => <BeCard size="compact" className="min-w-0">
     <BeCardHeader><BeCardTitle as="h3">{props.title}</BeCardTitle>{props.description && <BeCardDescription>{props.description}</BeCardDescription>}</BeCardHeader>
-    <BeCardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</BeCardContent>
+    <BeCardContent className="flex min-w-0 flex-col gap-2">{renderNode(props.children)}</BeCardContent>
   </BeCard>,
   BeCardGrid: ({ props, renderNode }) => <div className="@container/agent-cards w-full min-w-0"><div role="group" aria-label={agentCopy.illustratedRecommendationCards} className="grid min-w-0 grid-cols-1 items-stretch gap-4 @min-[26rem]/agent-cards:grid-cols-2 @min-[44rem]/agent-cards:grid-cols-3">{renderNode(props.children)}</div></div>,
   BeImageCard: ({ props }) => <AgentImageCard {...props} />,
@@ -45,21 +46,23 @@ const renderers = {
   },
   BeStat: ({ props }) => {
     const formatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: props.precision ?? 0, maximumFractionDigits: props.precision ?? 0 })
-    return <BeCard size="compact" className="min-w-0">
-      <BeCardHeader><BeCardTitle>{props.label}</BeCardTitle></BeCardHeader>
-      <BeCardContent><p className="text-2xl font-semibold">
-        <span aria-hidden="true"><AnimatedNumber value={props.value} format={value => formatter.format(value)} />{props.unit}</span>
+    // Figures in a row share the width equally (flex-1 basis-0); label 12/16 muted, value 20/28 SemiBold, unit muted (R-32).
+    return <BeCard size="compact" className="min-w-0 flex-1 basis-0 gap-1">
+      <BeCardHeader><p className="text-xs text-muted-foreground">{props.label}</p></BeCardHeader>
+      <BeCardContent><p className="text-xl font-semibold tabular-nums">
+        <span aria-hidden="true"><AnimatedNumber value={props.value} format={value => formatter.format(value)} />{props.unit && <span className="ml-0.5 text-sm font-normal text-muted-foreground">{props.unit}</span>}</span>
         <span className="sr-only">{formatter.format(props.value)}{props.unit}</span>
       </p></BeCardContent>
     </BeCard>
   },
-  BeFollowUps: AgentFollowUps,
+  // No suggestion cards in a chat (R-12): saved follow-ups draw nothing; agent-follow-ups.tsx stays in the library.
+  BeFollowUps: () => null,
   BeResponse: AgentContent,
   BeApproval: AgentApproval,
   BeQuestions: AgentQuestions,
   BeTodoList: AgentTasks,
   AgentIcon: AgentStatusIcon,
-  InlineText: ({ props, renderNode }) => <AgentTextBubble><p className="min-w-0 break-words text-sm leading-7">{renderNode(props.parts)}</p></AgentTextBubble>,
+  InlineText: ({ props, renderNode }) => <AgentTextBubble><p className="min-w-0 break-words text-sm leading-5.25">{renderNode(props.parts)}</p></AgentTextBubble>,
   TaskChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="issue" />,
   RunChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="run" />,
   SourceChip: ({ props }) => <WebCitation url={props.url} label={props.label ?? null} />,
@@ -67,10 +70,11 @@ const renderers = {
   BeAlert: ({ props }) => <BeAlert variant={props.variant} role="status"><BeAlertIcon /><BeAlertContent><BeAlertTitle>{props.title}</BeAlertTitle><BeAlertDescription>{props.description}</BeAlertDescription></BeAlertContent></BeAlert>,
   BeTable: ({ props }) => <AgentTable columns={props.columns} rows={props.rows} />,
   EditableTable: ({ props }) => <AgentEditableTable name={props.name} columns={props.columns} data={props.data} />,
-  BeTabs: ({ props, renderNode }) => <BeTabs defaultValue="0" variant="underline" className="min-w-0">
-    <BeTabsList>{(props.items ?? []).map((item, index) => <BeTabsTrigger key={index} value={String(index)}>{item.title}</BeTabsTrigger>)}</BeTabsList>
-    {(props.items ?? []).map((item, index) => <BeTabsContent key={index} value={String(index)} className="flex min-w-0 flex-col gap-3 pt-3">{renderNode(item.children)}</BeTabsContent>)}
-  </BeTabs>,
+  // The app's one tab list (TabsList: the segment track and gliding pill, decision 2026-10-31-1814), not beUI's underline (R-31).
+  BeTabs: ({ props, renderNode }) => <Tabs defaultValue="0" className="min-w-0 gap-3">
+    <TabsList>{(props.items ?? []).map((item, index) => <TabsTrigger key={index} value={String(index)}>{item.title}</TabsTrigger>)}</TabsList>
+    {(props.items ?? []).map((item, index) => <TabsContent key={index} value={String(index)} className="flex min-w-0 flex-col gap-3">{renderNode(item.children)}</TabsContent>)}
+  </Tabs>,
   BeCollapsible: ({ props, renderNode }) => <BeCollapsible defaultOpen={props.defaultOpen} className="min-w-0">
     <BeCollapsibleTrigger>{props.title}<BeCollapsibleIndicator /></BeCollapsibleTrigger>
     <BeCollapsibleContent contentClassName="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</BeCollapsibleContent>
@@ -117,4 +121,6 @@ const block = <Render,>(name: string, render: Render): Render => FLOW.has(name) 
   : ((input: object) => { const Block = render as (props: object) => React.ReactNode; return <InsideBlock value><Block {...input} /></InsideBlock> }) as Render
 const blocks = Object.fromEntries(Object.entries({ ...renderers, ...legacyRenderers }).map(([name, render]) => [name, block(name, render)])) as typeof renderers & typeof legacyRenderers
 
-export const agentUILibrary = createAgentLibrary(blocks, block)
+// OpenUI built-ins the host draws itself, under OpenUI's own name and schema.
+const builtIns: Record<string, unknown> = { Steps: AgentSteps, Button: AgentOpenUIButton }
+export const agentUILibrary = createAgentLibrary(blocks, (name, render) => block(name, (builtIns[name] as typeof render | undefined) ?? render))

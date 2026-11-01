@@ -5,6 +5,7 @@ import type { SessionOptions } from '../adapters/types'
 import { pinnedGit, snapshotTree } from './publish'
 import type { RunPublish } from '@mikka/protocol'
 import { runBranch } from '../worktrees'
+import { localGitConfig } from './local-git-origin'
 
 export type RunGitHub = NonNullable<SessionOptions['github']>
 export const GITHUB_CREDENTIAL_SCRIPT = resolve(import.meta.dirname, 'github-credentials.mjs')
@@ -40,17 +41,56 @@ export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path
   if (!lstatSync(bin).isDirectory() || realpathSync(bin) !== join(realpathSync(dir), 'bin')) throw new Error('Invalid run GitHub executable directory')
   const wrapper = join(bin, 'gh')
   rmSync(wrapper, { force: true })
-  writeFileSync(wrapper, `#!/bin/sh\nexec env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} gh ${quote(config)} "$@"\n`, { mode: 0o700, flag: 'wx' })
+  const fixtureConfig = localGitConfig()
+  // The official sandbox isolates loopback and installs its authenticated
+  // proxy. Its NO_PROXY localhost default would bypass that only route back
+  // to the local acceptance server. The outer daemon's proxy is preserved.
+  const fixtureProxy = fixtureConfig.length ? 'case "${HTTP_PROXY:-${http_proxy:-}}" in http://*@localhost:*|http://*@127.0.0.1:*) unset NO_PROXY no_proxy ;; esac\n' : ''
+  writeFileSync(wrapper, `#!/bin/sh\n${fixtureProxy}exec env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} gh ${quote(config)} "$@"\n`, { mode: 0o700, flag: 'wx' })
   return {
     PATH: `${bin}${delimiter}${path}`, GH_HOST: 'github.com', GH_REPO: github.repository,
-    GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_COUNT: '3',
+    // The agent commits inside the sandbox, where a signing program or agent
+    // configured outside it (gpg, ssh-agent, a signing helper) is unreachable.
+    GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_COUNT: String(5 + fixtureConfig.length),
     GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '',
     GIT_CONFIG_KEY_1: 'credential.https://github.com.helper',
-    GIT_CONFIG_VALUE_1: `!env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} git ${quote(config)}`,
+    GIT_CONFIG_VALUE_1: `!${fixtureProxy}env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} git ${quote(config)}`,
     GIT_CONFIG_KEY_2: 'credential.useHttpPath', GIT_CONFIG_VALUE_2: 'true',
+    GIT_CONFIG_KEY_3: 'commit.gpgSign', GIT_CONFIG_VALUE_3: 'false',
+    GIT_CONFIG_KEY_4: 'tag.gpgSign', GIT_CONFIG_VALUE_4: 'false',
+    ...Object.fromEntries(fixtureConfig.flatMap(([key, value], index) => [[`GIT_CONFIG_KEY_${5 + index}`, key], [`GIT_CONFIG_VALUE_${5 + index}`, value]])),
     GIT_AUTHOR_NAME: 'Mikka Agent', GIT_AUTHOR_EMAIL: 'agent@mikka.invalid',
     GIT_COMMITTER_NAME: 'Mikka Agent', GIT_COMMITTER_EMAIL: 'agent@mikka.invalid',
   }
+}
+
+/**
+ * The daemon's own clone and fetch for a GitHub delivery run: git asks the
+ * run's credential helper, which exchanges the run token for a short-lived
+ * token of this repository only (the person's Mikka GitHub App
+ * authorization). A machine without a GitHub login of its own (a cloud
+ * sandbox, a new computer) can then clone a private repository. Only git's
+ * credential settings are returned; the run-local files are removed after.
+ */
+export async function withRunGitCredentials<T>(
+  assignment: { github?: { endpoint: string; repository: string; branch: string }; mcp?: { token: string }; issueId: string },
+  privateDir: string,
+  work: (env: Record<string, string>) => Promise<T>,
+): Promise<T> {
+  if (!assignment.github || !assignment.mcp) return work({})
+  mkdirSync(privateDir, { recursive: true, mode: 0o700 })
+  const dir = mkdtempSync(join(privateDir, 'github-fetch-'))
+  try {
+    let env: Record<string, string> = {}
+    try {
+      env = prepareGitHubEnvironment(dir, { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId }, process.env.PATH ?? '')
+    } catch {
+      // No gh on this machine: GitHub delivery is unavailable, and the clone
+      // falls back to the machine's own git credentials as before.
+      return await work({})
+    }
+    return await work(Object.fromEntries(Object.entries(env).filter(([key]) => key.startsWith('GIT_CONFIG_') || key === 'GIT_TERMINAL_PROMPT')))
+  } finally { rmSync(dir, { recursive: true, force: true }) }
 }
 
 /** Verify the exact already-pushed commit. Never create a commit or push after CI. */

@@ -9,7 +9,7 @@ import { settingsRead } from '@/lib/settings-read'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
+import { SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import type { AuditFilter } from '@/lib/audit/cursor'
 import type { AuditEventView } from '@/lib/audit/query'
 import { withBasePath } from '@/lib/base-path'
@@ -61,17 +61,14 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
   }
 
   return <>
-    <SettingsSection id="audit-controls">
-      <SettingRow title={t('filter')}>
-        <ToggleGroup aria-label={t('filter')} variant="segment" spacing={0.5} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'security') setFilter(next) }}>
-          <ToggleGroupItem value="all">{t('filters.all')}</ToggleGroupItem>
-          <ToggleGroupItem value="security">{t('filters.security')}</ToggleGroupItem>
-        </ToggleGroup>
-      </SettingRow>
-      <SettingRow title={t('export')}>
-        <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={exportHref} download />}><Download data-icon="inline-start" />{t('exportCsv')}</Button>
-      </SettingRow>
-    </SettingsSection>
+    {/* A toolbar over the list, as Linear's: the filter and export act on the log, they are not settings rows. */}
+    <div role="toolbar" aria-label={t('filter')} className="flex flex-wrap items-center justify-between gap-2">
+      <ToggleGroup aria-label={t('filter')} variant="segment" size="sm" spacing={0.5} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'security') setFilter(next) }}>
+        <ToggleGroupItem value="all">{t('filters.all')}</ToggleGroupItem>
+        <ToggleGroupItem value="security">{t('filters.security')}</ToggleGroupItem>
+      </ToggleGroup>
+      <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={exportHref} download />}><Download data-icon="inline-start" />{t('exportCsv')}</Button>
+    </div>
     {pages.isLoading && <SettingsLoading label={t('loading')} rows={3} />}
     {(pages.error || failure) && <FieldError className="px-1">{actionError(failure?.error)}</FieldError>}
     {!pages.isLoading && !failure && !pages.error && events.length === 0 && <p className="px-1 text-sm text-muted-foreground">{t('empty')}</p>}

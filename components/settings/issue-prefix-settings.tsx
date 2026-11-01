@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { SettingsSection } from '@/components/settings/primitives'
@@ -42,18 +41,23 @@ export function IssuePrefixSettings() {
   }
 
   const unchanged = value.trim().toUpperCase() === state?.prefix
+  // Saves when the field is left or on Enter, as the other settings fields do; an incomplete prefix goes back to the saved one.
+  function commit() {
+    if (!state || busy || unchanged) return
+    if (value.length === 4) { void save(); return }
+    if (state.prefix) setValue(state.prefix)
+  }
   return <SettingsSection id="issue-prefix-heading" title={t('title')}>
-    <form onSubmit={event => { event.preventDefault(); void save() }}>
+    <form onSubmit={event => { event.preventDefault(); commit() }}>
       <FieldGroup className="gap-0">
         <Field orientation="responsive" className="justify-between gap-3 px-5 py-4">
           <FieldContent>
             <FieldLabel htmlFor="issue-prefix">{t('label')}</FieldLabel>
             <FieldDescription>{state && !state.prefix ? t('needsChoice') : t('current', { example: `${state?.prefix ?? 'ALEX'}-12` })}</FieldDescription>
           </FieldContent>
-          <div className="flex items-center gap-2">
-            <Input id="issue-prefix" className="w-24 font-mono uppercase" maxLength={4} value={value} disabled={!state || busy} onChange={event => setValue(event.target.value.replace(/[^a-z]/gi, '').toUpperCase())} />
-            <Button type="submit" size="sm" disabled={!state || busy || value.length !== 4 || unchanged}>{t('save')}</Button>
-          </div>
+          <Input id="issue-prefix" className="w-24 font-mono uppercase" maxLength={4} value={value} disabled={!state || busy} onBlur={commit}
+            onChange={event => setValue(event.target.value.replace(/[^a-z]/gi, '').toUpperCase())}
+            onKeyDown={event => { if (event.key === 'Escape' && state) setValue(state.prefix ?? state.saved ?? state.suggested ?? '') }} />
         </Field>
         {message && <p role={message.kind === 'error' ? 'alert' : 'status'} className={cn('px-5 pb-4 text-sm', message.kind === 'error' ? 'text-destructive' : 'text-success-foreground')}>{message.text}</p>}
       </FieldGroup>

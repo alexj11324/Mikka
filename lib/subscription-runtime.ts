@@ -1,4 +1,6 @@
 import 'server-only'
+import { othersMayUse, subscriptionsUsable } from './personal-policy'
+import { z } from 'zod'
 import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
 import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/subscription'
 import { workspaceDb } from './workspace-db'
@@ -14,7 +16,18 @@ import { join } from 'node:path'
 export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
 }
-export function subscriptionRuntime(nativeBroker = false, custodyOnly = false): SubscriptionService {
+/** A subscription runs in a workspace only for a member who shared it there, and only while that
+ * workspace's admin allows it; otherwise a frozen run stops, never falls back (decision 2026-10-31-2225). */
+export async function authorizeSubscriptionUse(userId: string, workspaceId: string, consumerId?: string) {
+  await authorizeSubscriptionWorkspace(userId, workspaceId)
+  if (!(await subscriptionsUsable(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
+  // Another member's bot needs 分享给团队成员 on, checked on every call: un-sharing or leaving stops it at once.
+  if (consumerId && z.uuid().safeParse(consumerId).success) {
+    const { rows: [bot] } = await pool.query<{ ownerId: string }>('SELECT "ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2', [consumerId, workspaceId])
+    if (bot && bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
+  }
+}
+export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean } = {}): SubscriptionService {
   if (process.env.MIKKA_BYOS_ENABLED !== '1' && !(custodyOnly && process.env.MIKKA_BYOS_ENROLLMENT_ENABLED === '1')) throw new SubscriptionRefusal('backend_unavailable')
   const binary = process.env.MIKKA_BYOS_WORKER_BINARY ?? join(process.cwd(), 'packages/subscription-worker/bin/mikka-subscription-worker')
   // pool is request-scoped; never send a preview worker to the production DB.
@@ -50,10 +63,10 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false): 
     const resolve = sharedCustodyIdentity ? async (executionOnly: boolean, signal?: AbortSignal, use?: { bindingId: string; consumerId: string; runId?: string }, revision?: unknown) => {
       if (!executionOnly) return { workloadToken: await infisicalWorkloadToken(infisicalOrigin, custodyId!, custodySecret!, signal) }
       if (!use) throw new Error('subscription_access_unavailable')
-      const name = await authorizedAccessName(database, scope, use, revision)
+      const name = await authorizedAccessName(database, scope, use, revision, authorizeSubscriptionWorkspace)
       return { accessSnapshot: await subscriptionAccessSnapshot({ origin: infisicalOrigin, clientId: custodyId!, clientSecret: custodySecret!, project: accessProject ?? project, environment, path: accessPath, name, signal }) }
     } : resolveIdentity
-    return new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken: sharedCustodyIdentity ? '' : workloadToken ?? '', accessPath, accessProject, accessToken: custodyOnly || sharedCustodyIdentity ? undefined : accessToken, retainEnrollmentSources: retainEnrollmentSourcesForAcceptance(), enrollmentAttemptPath: process.env.MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH, enrollmentClaimPath: process.env.MIKKA_BYOS_ENROLLMENT_CLAIM_PATH, enrollmentGrantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH, enableRuntime: !custodyOnly, enablePlainModels: !custodyOnly && modelRoutes.has(scope.provider === 'codex' ? 'codex_cpa' : 'claude_cpa'), enableCodexOAuth: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', enableClaudeOAuth: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' }, resolve)
+    return new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken: sharedCustodyIdentity ? '' : workloadToken ?? '', accessPath, accessProject, accessToken: custodyOnly || sharedCustodyIdentity ? undefined : accessToken, retainEnrollmentSources: retainEnrollmentSourcesForAcceptance(), enrollmentAttemptPath: process.env.MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH, enrollmentClaimPath: process.env.MIKKA_BYOS_ENROLLMENT_CLAIM_PATH, enrollmentGrantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH, enableRuntime: !custodyOnly, enablePlainModels: !custodyOnly && modelRoutes.has(scope.provider === 'codex' ? 'codex_cpa' : 'claude_cpa'), enableCodexOAuth: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', enableClaudeOAuth: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1', ...(options.exportAccessLease && !custodyOnly ? { exportAccessLease: true } : {}) }, resolve)
   }, {
     ready: (route: SubscriptionRoute) => !custodyOnly && (ready.has(route) || modelRoutes.has(route)),
     oauth: { codex: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', claude: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' },
@@ -61,5 +74,5 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false): 
     // The private device route also requires a server allow-list and the hosted
     // runner capability. This never enables raw nativeAuth credential export.
     nativeIsolation: nativeBroker ? 'verified_runtime' : 'none'
-  }, undefined, authorizeSubscriptionWorkspace)
+  }, undefined, authorizeSubscriptionUse, undefined, authorizeSubscriptionWorkspace)
 }

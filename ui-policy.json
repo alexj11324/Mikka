@@ -5,14 +5,17 @@
   "iconLibrary": "lucide-react",
   "componentRoots": ["components/ui/", "components/reui/", "components/blocks/", "components/motion/", "components/agents/"],
   "typography": {
-    "sizes": ["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl"],
+    "cssTokens": { "--text-xs": "0.75rem", "--text-xs--line-height": "1.125rem", "--text-sm": "0.8125rem", "--text-sm--line-height": "1.25rem", "--text-md": "0.9375rem", "--text-md--line-height": "1.5rem", "--text-lg": "1.125rem", "--text-lg--line-height": "1.75rem", "--text-lg--letter-spacing": "-0.01em", "--text-xl": "1.25rem", "--text-xl--line-height": "1.875rem", "--text-xl--letter-spacing": "-0.01em", "--text-2xl": "1.5rem", "--text-2xl--line-height": "2rem", "--font-weight-normal": "450", "font-weight": "var(--font-weight-normal)", "font-synthesis": "none" },
+    "sizes": ["xs", "sm", "md", "base", "lg", "xl", "2xl", "3xl", "4xl"],
     "weights": ["normal", "medium", "semibold", "bold"],
     "families": ["sans", "mono", "heading"],
-    "googleFonts": ["Geist"],
+    "googleFonts": ["Inter", "Geist_Mono"],
     "localFonts": [
-      { "family": "Geist", "src": "app/fonts/Geist-Variable.woff2", "variable": "--font-geist" }
+      { "family": "Inter", "src": "app/fonts/InterVariable.woff2", "variable": "--font-inter" },
+      { "family": "Inter", "src": "app/fonts/InterVariable-Italic.woff2", "variable": "--font-inter" },
+      { "family": "Geist Mono", "src": "app/fonts/GeistMono-Variable.woff2", "variable": "--font-geist-mono" }
     ],
-    "leading": ["none", "tight", "snug", "normal", "relaxed", "loose", "3", "4", "5", "5.5", "6", "7", "8", "9", "10"],
+    "leading": ["none", "tight", "snug", "normal", "relaxed", "loose", "3", "4", "5", "5.25", "5.5", "6", "7", "8", "9", "10"],
     "tracking": ["tighter", "tight", "normal", "wide", "wider", "widest"]
   }
 }

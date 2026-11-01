@@ -17,6 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { IssueRelationPicker, type RelationKind } from './issue-relations'
+import { workspaceSearch } from './workspace-navigation'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from './issue-properties'
 import type { MetadataRequest } from './issue-metadata-controls'
 
@@ -40,13 +41,13 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
   const relationTitle = (kind: RelationKind) => tMetadata.has(`title.${kind}` as never) ? tMetadata(`title.${kind}` as never) : kind
   const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
-  const copyItems = [
+  const copyItems = ([
     { kind: 'link', label: tMenu('copyLink') },
     { kind: 'id', label: tMenu('copyId') },
     { kind: 'title', label: tMenu('copyTitle') },
     { kind: 'markdown', label: tMenu('copyMarkdown') },
     { kind: 'branch', label: tMenu('copyBranch') },
-  ] as const
+  ] as const).filter(item => item.kind !== 'id' || task.identifier)
   const { mutate } = useSWRConfig()
   const [relation, setRelation] = useState<RelationKind | null>(null)
   const queuedRelation = useRef<RelationKind | null>(null)
@@ -98,9 +99,11 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
   }
   async function copy(kind: 'link' | 'id' | 'title' | 'markdown' | 'branch') {
     try {
-      const url = new URL(window.location.href); url.search = ''; url.searchParams.set('issue', task.id)
+      const url = new URL(window.location.href); url.search = workspaceSearch({ issue: task.id })
       const identifier = issueIdentifier(task)
-      const text = kind === 'link' ? url.href : kind === 'id' ? identifier : kind === 'title' ? `${identifier} ${task.title}` : kind === 'branch' ? `${identifier.toLowerCase()}/${task.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 60)}` : `[${identifier} ${task.title.replace(/[[\]\\]/g, '\\$&')}](${url.href})`
+      const named = [identifier, task.title].filter(Boolean).join(' ')
+      const slug = task.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 60)
+      const text = kind === 'link' ? url.href : kind === 'id' ? identifier : kind === 'title' ? named : kind === 'branch' ? (identifier ? `${identifier.toLowerCase()}/${slug}` : slug) : `[${named.replace(/[[\]\\]/g, '\\$&')}](${url.href})`
       await navigator.clipboard.writeText(text); toast.success(t('copySuccess'))
     } catch { toast.error(t('copyFailed')) }
   }
@@ -139,7 +142,7 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         <DropdownMenuSub><DropdownMenuSubTrigger><Copy />{tMenu('copy')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{copyItems.map(item => <DropdownMenuItem key={item.kind} onClick={() => { void copy(item.kind) }}>{item.label}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
-        <DropdownMenuItem onClick={() => { const url = new URL(window.location.href); url.search = ''; url.searchParams.set('issue', task.id); window.open(url.href, '_blank', 'noopener,noreferrer') }}><ArrowUpRight />{tMenu('openNewTab')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { const url = new URL(window.location.href); url.search = workspaceSearch({ issue: task.id }); window.open(url.href, '_blank', 'noopener,noreferrer') }}><ArrowUpRight />{tMenu('openNewTab')}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => openDialog('duplicate')}><Copy />{tMenu('createDuplicate')}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => { void toggleFavorite() }}><Star />{favorite ? tMenu('removeFavorite') : tMenu('addFavorite')}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe' })) }}>{subscribed ? <BellOff /> : <Bell />}{subscribed ? tMenu('unsubscribe') : tMenu('subscribe')}</DropdownMenuItem>
@@ -155,6 +158,6 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
     </DropdownMenuContent></DropdownMenu>
     {relation && <IssueRelationPicker task={task} kind={relation} validationError={error} open onOpenChange={open => { if (!open) setRelation(null) }} pending={pending} onSelect={targetId => { void run(issue => updateIssueRelation({ id: task.id, revision: issue.revision, kind: relation, targetId })).then(success => { if (success) setRelation(null) }) }} />}
     <Dialog open={dialog !== null} onOpenChange={open => { if (!open && !pending) setDialog(null) }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{dialog === 'createChild' ? tDialog('createChildTitle') : dialog === 'duplicate' ? tDialog('duplicateTitle') : dialog === 'dueDate' ? tDialog('dueDateTitle') : tDialog('estimateTitle')}</DialogTitle></DialogHeader><form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); const kind = dialog; if (!kind) return; const entered = fieldRef.current?.value ?? ''; void run(issue => kind === 'createChild' || kind === 'duplicate' ? createLinkedIssue({ id: task.id, revision: issue.revision, kind: kind === 'createChild' ? 'child' : 'duplicate', title: entered, includeSubissues: kind === 'duplicate' && includeSubissues }) : updateIssueMetadata({ id: task.id, revision: issue.revision, patch: kind === 'dueDate' ? { dueDate: entered || null } : { estimate: entered === '' ? null : Number(entered) } }), kind === 'createChild' ? 'child' : kind === 'duplicate' ? 'duplicate' : 'current').then(success => { if (success) setDialog(null) }) }}><FieldGroup><Field><FieldLabel htmlFor="issue-action-value">{dialog === 'dueDate' ? tDialog('dueDateLabel') : dialog === 'estimate' ? tDialog('estimateLabel') : tDialog('taskTitleLabel')}</FieldLabel><Input ref={fieldRef} key={fieldKey} id="issue-action-value" autoFocus type={dialog === 'dueDate' ? 'date' : dialog === 'estimate' ? 'number' : 'text'} min={dialog === 'estimate' ? 0 : undefined} max={dialog === 'estimate' ? 100 : undefined} step={dialog === 'estimate' ? 1 : undefined} defaultValue={fieldDefault} disabled={pending} required={dialog === 'createChild' || dialog === 'duplicate'} maxLength={200} onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault() }} /></Field>{dialog === 'duplicate' && <Field orientation="horizontal"><Checkbox id="duplicate-subissues" checked={includeSubissues} onCheckedChange={checked => setIncludeSubissues(!!checked)} /><FieldLabel htmlFor="duplicate-subissues">{tDialog('duplicateSubissues')}</FieldLabel></Field>}</FieldGroup>{error && <FieldError>{error}</FieldError>}<DialogFooter><Button type="button" variant="ghost" disabled={pending} onClick={() => setDialog(null)}>{tCommon('cancel')}</Button><Button type="submit" disabled={pending}>{pending ? tCommon('saving') : dialog === 'createChild' || dialog === 'duplicate' ? tIssue('create.submit') : tCommon('save')}</Button></DialogFooter></form></DialogContent></Dialog>
-    <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{tDialog('deleteTitle', { id: issueIdentifier(task) })}</AlertDialogTitle><AlertDialogDescription>{tDialog('deleteDescription')}</AlertDialogDescription></AlertDialogHeader>{error && <FieldError>{error}</FieldError>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>{tCommon('cancel')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending} onClick={event => { event.preventDefault(); void run(issue => setIssueDeleted({ id: task.id, revision: issue.revision }), 'delete').then(success => { if (success) setDeleteOpen(false) }) }}>{pending ? tDialog('deleting') : tDialog('deleteAction')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{tDialog('deleteTitle', { id: issueIdentifier(task, `「${task.title}」`) })}</AlertDialogTitle><AlertDialogDescription>{tDialog('deleteDescription')}</AlertDialogDescription></AlertDialogHeader>{error && <FieldError>{error}</FieldError>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>{tCommon('cancel')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending} onClick={event => { event.preventDefault(); void run(issue => setIssueDeleted({ id: task.id, revision: issue.revision }), 'delete').then(success => { if (success) setDeleteOpen(false) }) }}>{pending ? tDialog('deleting') : tDialog('deleteAction')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </>
 }

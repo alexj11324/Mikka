@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, rail, browserClientHeaders, watchRuntime, app, BASE_PATH, seedTask, openIssueFromSearch } from './fixtures'
+import { test, expect, register, registerInTeam, rail, browserClientHeaders, watchRuntime, app, BASE_PATH, seedTask, openIssueFromSearch } from './fixtures'
 
 async function createTeam(page: Page, name: string, identifier: string) {
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
@@ -123,7 +123,7 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
 
 test('公开范围限于工作区，未加入团队可访问，停用成员后撤销访问', async ({ page, browser, baseURL }) => {
   test.setTimeout(180000)
-  await register(page, '/settings/teams')
+  await registerInTeam(page, '/settings/teams')
   await createTeam(page, '共享团队', 'SHARED')
   await rail(page, '主页').click()
   const publicTitle = `工作区公开 ${randomUUID()}`
@@ -184,7 +184,7 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
 
 test('非创建者成员在他人公开任务上改父子关系，关系区与选择器立即刷新', async ({ page, browser, baseURL }) => {
   test.setTimeout(180000)
-  await register(page, '/settings/teams')
+  await registerInTeam(page, '/settings/teams')
   await createTeam(page, '协作团队', 'COLLAB')
   await rail(page, '主页').click()
   const parentTitle = `他人父任务 ${randomUUID()}`
@@ -235,8 +235,10 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     // The closing menu keeps an inert backdrop over the page until it is gone.
     await expect(actions).toHaveCount(0)
     const children = member.getByRole('region', { name: '子任务', exact: true })
+    // Empty sub-tasks show only 添加子任务 (R-40); 添加现有子任务 is in the ⋯ menu either way.
     const addExisting = async () => {
-      await children.getByRole('button', { name: '添加现有任务', exact: true }).click()
+      await member.getByRole('button', { name: '更多任务操作', exact: true }).click()
+      await member.getByRole('menuitem', { name: '添加现有子任务…', exact: true }).click()
       return member.getByRole('dialog', { name: '添加现有子任务', exact: true })
     }
     let picker = await addExisting()
@@ -245,7 +247,7 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     await expect(picker).not.toBeVisible()
     await expect(children.getByRole('button', { name: '子任务 0 / 1', exact: true })).toBeVisible()
     await children.getByRole('button', { name: `移除子任务关系：${childTitle}`, exact: true }).click()
-    await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
+    await expect(children.getByRole('button', { name: '添加子任务', exact: true })).toBeVisible()
     // Hold the picker's search: it must show loading or fresh data, never results from before the unlink.
     let release!: () => void
     const held = new Promise<void>(resolve => { release = resolve })

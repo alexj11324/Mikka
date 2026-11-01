@@ -163,7 +163,13 @@ test('a group chat found in ⌘K opens and reads its real messages', async ({ pa
   const messages = chat.getByRole('list', { name: '群聊消息', exact: true })
   await expect(messages.getByText('First note in the group', { exact: true })).toBeVisible()
   await expect(messages.getByText('Second note in the group', { exact: true })).toBeVisible()
-  await expect(chat.getByRole('status')).toHaveText('群聊暂时只能阅读，发送消息还没有开放。')
-  await expect(chat.getByRole('textbox')).toHaveCount(0)
+  // A conversation ends in the standard composer (R-10), open for sending (group-chat-send.spec.ts sends through it).
+  await expect(chat.getByRole('textbox', { name: `给 ${title} 发消息`, exact: true })).toBeEnabled()
+  // R-13: the group's 详情 in the right column lists its members (here only the creator); no computer.
+  await page.setViewportSize({ width: 1440, height: 960 })
+  const panel = page.getByRole('complementary', { name: '右栏', exact: true })
+  await expect(panel.getByRole('heading', { name: title, exact: true })).toBeVisible()
+  await expect(panel.getByRole('region', { name: '成员（1）', exact: true }).getByRole('listitem')).toHaveCount(1)
+  await expect(panel.getByRole('tab', { name: '电脑', exact: true })).toHaveCount(0)
   expect(errors).toEqual([])
 })

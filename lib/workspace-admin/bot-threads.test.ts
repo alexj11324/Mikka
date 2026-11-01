@@ -32,7 +32,7 @@ test('href: task thread when the task is visible, chat only for its owner, else 
   const botId = '00000000-0000-4000-8000-0000000000b0', issueId = '00000000-0000-4000-8000-0000000000a1'
   assert.equal(botThreadHref({ issueId, ownerId: 'u1', botId }, { id: 'u2', issueVisible: true }), `/?issue=${issueId}`)
   assert.equal(botThreadHref({ issueId, ownerId: 'u1', botId }, { id: 'u1', issueVisible: false }), null)
-  assert.equal(botThreadHref({ issueId: null, ownerId: 'u1', botId }, { id: 'u1', issueVisible: false }), `/?section=coordinator&bot=${botId}`)
+  assert.equal(botThreadHref({ issueId: null, ownerId: 'u1', botId }, { id: 'u1', issueVisible: false }), `/?bot=${botId}`)
   assert.equal(botThreadHref({ issueId: null, ownerId: 'u1', botId }, { id: 'u2', issueVisible: true }), null)
 })
 

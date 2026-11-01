@@ -1,7 +1,9 @@
 import type { SuggestionAction, SuggestionSource } from '@/lib/db/schema'
+import { readableText } from './card'
 
 // Every connected app's event becomes one ExternalNotification for one person
-// before the rules and the decision model look at it. The title is the
+// before the decision model looks at it; nothing here decides whether it
+// becomes a suggestion. The title is the
 // source's own text (email subject, Slack message, PR title), never a rewrite.
 
 export interface ExternalNotification {
@@ -23,7 +25,7 @@ export interface ExternalNotification {
   direct: boolean
   /** The person did it themselves. */
   fromSelf: boolean
-  /** A bot, a no-reply sender, or a promotions/updates mail. */
+  /** A bot, a no-reply sender, or a promotions/updates mail. Evidence for the decision model only. */
   automated: boolean
   /** What the decision model reads besides the title. */
   excerpt: string
@@ -207,9 +209,9 @@ export function linearCommentNotification(recipient: LinearRecipient, payload: J
   const data = record(payload.data)
   if (payload.type !== 'Comment' || payload.action !== 'create') return null
   const id = str(data.id)
-  const body = str(data.body)
-  if (!id || !body) return null
+  if (!id) return null
   const issue = record(data.issue)
+  const body = readableText(str(data.body)) || str(issue.title)
   const actor = record(payload.actor)
   return base(recipient.userId, 'linear', {
     externalId: `comment:${id}`,
@@ -249,7 +251,9 @@ export function githubNotification(recipient: GitHubRecipient, event: string, pa
   const common = {
     actor: str(sender.login) || null,
     fromSelf: str(sender.id) === recipient.githubId,
-    automated: str(sender.type) === 'Bot',
+    // A GitHub App posts as a Bot user named `<app>[bot]` (Vercel, GitGuardian, CI).
+    // Evidence for the Decisions API, never a filter: the model decides whether it is worth a card.
+    automated: str(sender.type) === 'Bot' || str(sender.login).endsWith('[bot]'),
   }
   const pr = record(payload.pull_request)
   const issue = record(payload.issue)
@@ -266,11 +270,11 @@ export function githubNotification(recipient: GitHubRecipient, event: string, pa
   }
   if (event === 'issue_comment' && action === 'created' && isMe(issue.user)) {
     const comment = record(payload.comment)
-    return base(recipient.userId, 'github', { ...common, matterKey: matter(issue), externalId: `comment:${str(comment.id)}`, action: 'reply', title: str(comment.body), url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(issue.number)} ${str(issue.title)}\n${str(comment.body)}` })
+    return base(recipient.userId, 'github', { ...common, matterKey: matter(issue), externalId: `comment:${str(comment.id)}`, action: 'reply', title: readableText(str(comment.body)) || str(issue.title), url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(issue.number)} ${str(issue.title)}\n${str(comment.body)}` })
   }
   if (event === 'pull_request_review_comment' && action === 'created' && isMe(pr.user)) {
     const comment = record(payload.comment)
-    return base(recipient.userId, 'github', { ...common, matterKey: matter(pr), externalId: `review_comment:${str(comment.id)}`, action: 'reply', title: str(comment.body), url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(pr.number)} ${str(pr.title)}\n${str(comment.body)}` })
+    return base(recipient.userId, 'github', { ...common, matterKey: matter(pr), externalId: `review_comment:${str(comment.id)}`, action: 'reply', title: readableText(str(comment.body)) || str(pr.title), url: str(comment.html_url) || null, occurredAt: date(comment.created_at), direct: true, excerpt: `on ${repo}#${str(pr.number)} ${str(pr.title)}\n${str(comment.body)}` })
   }
   if (event === 'pull_request_review' && action === 'submitted' && isMe(pr.user)) {
     const review = record(payload.review)

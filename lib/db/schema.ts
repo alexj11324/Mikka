@@ -107,9 +107,19 @@ export const bots = pgTable('bots', {
   repository: text('repository'),
   /** Monthly credit cap for this bot; null uses workspace_settings.botMonthlyCreditLimit. */
   monthlyCreditLimit: integer('monthlyCreditLimit'),
+  /** Set when the owner left or was suspended; the bot stays paused until an admin takes it over (§8.3). */
+  archivedAt: timestamp('archivedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
+
+/** The bot row that is a person's Coordinator in a workspace (drizzle/20261101140000); see lib/coordinator/coordinator-bot.ts. */
+export const coordinatorBots = pgTable('coordinator_bots', {
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull(),
+  botId: uuid('botId').notNull().unique().references(() => bots.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.ownerId, table.workspaceId] })])
 
 /** Personal execution preferences in the same workspace scope as Bots. The
  * default uses a null label and is stored alongside label rules. */
@@ -121,7 +131,9 @@ export const executionRules = pgTable('execution_rules', {
 }, table=>[index('execution_rules_scope_idx').on(table.ownerId,table.workspaceId), uniqueIndex('execution_rules_default_idx').on(table.ownerId,table.workspaceId).where(sql`${table.label} IS NULL`)])
 export const botModelChoices = pgTable('bot_model_choices', {
   ownerId:text('ownerId').notNull().references(()=>users.id,{onDelete:'cascade'}),workspaceId:uuid('workspaceId').notNull(),
-  botKey:text('botKey').notNull(),bindingId:uuid('bindingId').notNull(),
+  botKey:text('botKey').notNull(),bindingId:uuid('bindingId'),
+  /** Or a model an API key / custom provider serves (C22); exactly one of the two. */
+  apiKeyId:uuid('apiKeyId'),apiKeyModel:text('apiKeyModel'),
 }, table=>[primaryKey({columns:[table.ownerId,table.workspaceId,table.botKey]})])
 
 export const agentSessions = pgTable('agent_sessions', {
@@ -318,6 +330,9 @@ export const agents = pgTable('agents', {
 
 export const RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing', 'succeeded', 'stopped', 'failed', 'cancelled'] as const
 export type RunStatus = (typeof RUN_STATUSES)[number]
+/** How an ended run came out (lib/run-outcome.ts). */
+export const RUN_OUTCOMES = ['done', 'blocked', 'needs_input', 'failed', 'idle'] as const
+export type RunOutcome = (typeof RUN_OUTCOMES)[number]
 
 /** One execution of one agent. The daemon claims it, runs it and reports back. */
 export const agentRuns = pgTable('agent_runs', {
@@ -326,14 +341,16 @@ export const agentRuns = pgTable('agent_runs', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   agentId: uuid('agentId').notNull().references(() => agents.id, { onDelete: 'cascade' }),
-  /** The bot that started this thread; null for runs started from a task directly. */
+  /** The bot that started this thread, the Coordinator included; null for an MCP client's run. */
   botId: uuid('botId').references(() => bots.id, { onDelete: 'set null' }),
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
   /** Authenticated daemon token that claimed this run; unknown for old runs. */
   deviceTokenId: uuid('deviceTokenId'),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
-  pauseReason: text('pauseReason').$type<'human_control' | null>(),
+  pauseReason: text('pauseReason').$type<'human_control' | 'quota_exhausted' | null>(),
+  /** A run paused on `quota_exhausted`: when the CLI said the subscription's quota resets; null when it gave no time. */
+  quotaResetsAt: timestamp('quotaResetsAt', { withTimezone: true }),
   resumeStatus: text('resumeStatus').$type<RunStatus | null>(),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),
@@ -350,6 +367,14 @@ export const agentRuns = pgTable('agent_runs', {
   /** The text part (chunk id) lastReply comes from: more text for it appends, another part replaces it. */
   lastReplyPart: text('lastReplyPart'),
   lastReplyAt: timestamp('lastReplyAt', { withTimezone: true }),
+  /** How the run came out once it ended (lib/run-outcome.ts); null until judged. The right column groups by it. */
+  outcome: text('outcome').$type<RunOutcome | null>(),
+  /** Who judged the outcome: the decision model (`decision`). */
+  outcomeDecidedBy: text('outcomeDecidedBy').$type<'decision' | null>(),
+  /** The judge's one-line reason, for review. */
+  outcomeReason: text('outcomeReason'),
+  /** When it was judged, or last asked without an answer (asked again an hour later). */
+  outcomeAt: timestamp('outcomeAt', { withTimezone: true }),
   /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
   source: text('source').$type<'mcp' | null>(),
   questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true} | null>(),
@@ -358,14 +383,27 @@ export const agentRuns = pgTable('agent_runs', {
   attempt: integer('attempt').notNull().default(1),
   /** The run this one retries, when its device went offline. */
   retryOf: uuid('retryOf').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
+  /** The run of the same thread this one goes on from: a dispatch to a task whose thread had ended (lib/thread-dispatch.ts). */
+  continuesRunId: uuid('continuesRunId').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
+  /** On a thread's root run: the root of the thread that replaced it, when the person explicitly asked for a new one. */
+  threadReplacedBy: uuid('threadReplacedBy').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
   stopRequestedAt: timestamp('stopRequestedAt', { withTimezone: true }),
   startedAt: timestamp('startedAt', { withTimezone: true }),
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`)])
+}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`), index('agent_runs_continues_run_idx').on(table.continuesRunId).where(sql`${table.continuesRunId} is not null`)])
 
 /** A verified owner/repository binding. Installation tokens are never stored. */
+/** Plugins → GitHub connection, separate from the login identity; one GitHub account may serve many users. Tokens are sealed like Better Auth's. */
+export const githubConnections = pgTable('github_connections', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  githubAccountId: text('githubAccountId').notNull(), githubLogin: text('githubLogin').notNull(),
+  accessToken: text('accessToken').notNull(), refreshToken: text('refreshToken'),
+  accessTokenExpiresAt: timestamp('accessTokenExpiresAt', { withTimezone: true }), refreshTokenExpiresAt: timestamp('refreshTokenExpiresAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const githubRepositoryInstallations = pgTable('github_repository_installations', {
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
   remoteKey: text('remoteKey').notNull(),
@@ -373,6 +411,8 @@ export const githubRepositoryInstallations = pgTable('github_repository_installa
   installationId: bigint('installationId', { mode: 'number' }).notNull(),
   repositoryId: bigint('repositoryId', { mode: 'number' }).notNull(),
   verifiedAt: timestamp('verifiedAt', { withTimezone: true }).notNull().defaultNow(),
+  /** When a live check last found the push granted (App contents:write, the person may write); null once refused (lib/github/push-grant.ts). */
+  pushGrantedAt: timestamp('pushGrantedAt', { withTimezone: true }),
 }, table => [primaryKey({ columns: [table.userId, table.remoteKey] })])
 
 /** Server-issued publication assignment and durable completion receipt (ADR 0024). */
@@ -384,7 +424,7 @@ export const runPublications = pgTable('run_publications', {
   remoteUrl: text('remoteUrl').notNull(), remoteKey: text('remoteKey').notNull(),
   identifier: text('identifier'), branch: text('branch'), baseBranch: text('baseBranch'),
   pushApproved: boolean('pushApproved').notNull().default(false),
-  status: text('status').$type<'assigned' | 'pending' | 'processing' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
+  status: text('status').$type<'assigned' | 'pending' | 'processing' | 'awaiting_approval' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
   workflowRunId: text('workflowRunId'), leaseToken: uuid('leaseToken'), leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   attempts: integer('attempts').notNull().default(0),
   pullRequest: jsonb('pullRequest').$type<{ url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed' } | null>(),
@@ -446,7 +486,7 @@ export const runTokens = pgTable('run_tokens', {
  * (lib/attention): the person has not seen it, and the Coordinator alone
  * decides whether to tell them.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff', 'run_dispatch_failed', 'run_redispatched'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'issue_status_changed', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff', 'run_dispatch_failed', 'run_redispatched', 'run_credential_switched', 'run_quota_paused'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -457,7 +497,7 @@ export type CoordinatorEventTier = (typeof COORDINATOR_EVENT_TIERS)[number]
 
 export const coordinatorEvents = pgTable('coordinator_events', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
-  /** The bot whose chat this is for; null for the Coordinator's. */
+  /** The bot whose chat this is for, the Coordinator's bot row included; null only on rows from before it had one (lib/coordinator/coordinator-bot.ts moves them). */
   botId: uuid('botId').references(() => bots.id, { onDelete: 'cascade' }),
   kind: text('kind').$type<CoordinatorEventKind>().notNull(),
   dedupeKey: text('dedupeKey').notNull().unique('coordinator_events_dedupe_key'),
@@ -493,7 +533,7 @@ export const coordinatorEvents = pgTable('coordinator_events', {
  */
 export const coordinatorSessions = pgTable('coordinator_sessions', {
   userId: text('userId').notNull(),
-  /** A bot's own conversation on the same harness; null for the Coordinator. */
+  /** The bot whose conversation this is, the Coordinator's bot row included; null only before its first access (lib/coordinator/coordinator-bot.ts). */
   botId: uuid('botId').references(() => bots.id, { onDelete: 'cascade' }),
   leaseHolder: text('leaseHolder'),
   leaseUntil: timestamp('leaseUntil', { withTimezone: true }),
@@ -524,6 +564,8 @@ export type SuggestionDecider = 'rule' | 'model' | 'fallback'
 
 export const suggestions = pgTable('suggestions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** The person's Coordinator bot row, stored when the suggestion is made: sending it writes to that chat (drizzle/20261101160000). Null on older rows. */
+  botId: uuid('botId'),
   source: text('source').$type<SuggestionSource>().notNull(),
   externalId: text('externalId').notNull(),
   action: text('action').$type<SuggestionAction>().notNull(),
@@ -691,6 +733,8 @@ export const composioAccounts = pgTable('composio_accounts', {
   emailCheckedAt: timestamp('emailCheckedAt', { withTimezone: true }),
   /** The last try, final or not; a failed try waits about an hour before the next. */
   lastAttemptAt: timestamp('lastAttemptAt', { withTimezone: true }),
+  /** When the provider refused the person's authorization (a revoked or expired token); cleared once it works again or is reconnected. */
+  needsReconnectAt: timestamp('needsReconnectAt', { withTimezone: true }),
   isDefault: boolean('isDefault').notNull().default(false),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [
@@ -726,10 +770,16 @@ export const coordinatorMessages = pgTable('coordinator_messages', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_messages_position_key').on(table.userId, table.botId, table.position).nullsNotDistinct()])
 
-/** A message a person sent a running agent, delivered on its next poll. */
+/**
+ * A message a person sent a running agent, delivered on its next poll.
+ * runId is null for personal mailbox messages, which address a mailbox
+ * (20261101020100_personal_mailbox_schema.sql); those columns are not listed.
+ */
 export const runMessages = pgTable('run_messages', {
-  id: uuid('id').primaryKey(), runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  id: uuid('id').primaryKey(), runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(), text: text('text').notNull(),
+  origin: text('origin').notNull().default('owner'),
+  mailboxWakeDepth: integer('mailboxWakeDepth').notNull().default(0),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('run_messages_run_idx').on(table.runId, table.createdAt)])
@@ -790,6 +840,17 @@ export const conversationMessages = pgTable('conversation_messages', {
   authorId: text('authorId').notNull(), body: text('body').notNull(), mentions: jsonb('mentions').notNull().default([]),
   replyToId: uuid('replyToId'), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('conversation_messages_position_key').on(t.conversationId, t.position), index('conversation_messages_timeline_idx').on(t.conversationId, t.position.desc())])
+/** A person's 置顶 and 通知 for one chat, keyed by the bot's id (the Coordinator's bot row too; drizzle/20261101020600). */
+export const chatPreferences = pgTable('chat_preferences', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }), chatKey: text('chatKey').notNull(),
+  pinned: boolean('pinned').notNull().default(false), muted: boolean('muted').notNull().default(false),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.chatKey] })])
+/** A person's reaction to a bot-chat or group-chat message: one emoji each (drizzle/20261101020500). No FK: the message is in either table. */
+export const messageReactions = pgTable('message_reactions', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }), messageId: uuid('messageId').notNull(),
+  emoji: text('emoji').notNull(), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.messageId] }), index('message_reactions_message_idx').on(t.messageId)])
 // Same names/types as unmerged MIK-8 (#69); deliberately no FK: 'coordinator' is also a valid id.
 export const conversationReads = pgTable('conversation_reads', {
   userId: text('userId').notNull(), conversationId: text('conversationId').notNull(),
@@ -893,6 +954,8 @@ export const runCaptures = pgTable('run_captures', {
   /** A cloud computer recording: the desktop it records and when it stops by itself. */
   display: integer('display'),
   expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  /** When the recording itself began (ffmpeg up); the timeline's zero. */
+  startedAt: timestamp('startedAt', { withTimezone: true }),
   error: text('error'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -901,6 +964,17 @@ export const runCaptures = pgTable('run_captures', {
   index('run_captures_user_idx').on(table.userId, table.createdAt),
   uniqueIndex('run_captures_recording_key').on(table.runId).where(sql`${table.status} = 'recording'`),
 ])
+
+/** A recording's timeline (Figma 13): what the agent did, in its own words, and when. */
+export const runCaptureSteps = pgTable('run_capture_steps', {
+  id: uuid('id').primaryKey(),
+  captureId: uuid('captureId').notNull().references(() => runCaptures.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  atMs: integer('atMs').notNull(),
+  label: varchar('label', { length: 200 }).notNull(),
+  source: text('source').$type<'action' | 'mark'>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('run_capture_steps_capture_idx').on(table.captureId, table.atMs)])
 
 /** A link anyone can open, as `artifact_shares`: only the token's hash is stored; revoking ends it. */
 export const runCaptureShares = pgTable('run_capture_shares', {
@@ -923,6 +997,8 @@ export const PENDING_ACTION_STATUSES = ['pending', 'running', 'done', 'failed', 
 export type PendingActionStatus = (typeof PENDING_ACTION_STATUSES)[number]
 export const pendingActions = pgTable('pending_actions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** The bot whose chat proposed it (the Coordinator's bot row too): the decision goes back there (drizzle/20261101160000). Null on older rows. */
+  botId: uuid('botId'),
   action: text('action').notNull(),
   connectedAccountId: text('connectedAccountId'),
   input: jsonb('input').$type<Record<string, unknown>>().notNull(),

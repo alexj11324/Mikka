@@ -2,27 +2,23 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 import { getLocale } from 'next-intl/server'
 import 'server-only'
 import { cache } from 'react'
-import { createHash } from 'node:crypto'
 import { cookies } from 'next/headers'
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaces, workspaceMembers, workspaceInvitations } from '@/lib/db/workspace-schema'
-import { defaultWorkspaceName, renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-name'
+import { renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-name'
+import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-workspace'
 
 function workspaceLocale(value: string): WorkspaceLocale {
   return value === 'en' ? 'en' : 'zh-CN'
 }
 
-export class WorkspaceError extends Error {
-  constructor(readonly code: string) {
-    super(code)
-    this.name = 'WorkspaceError'
-  }
-}
+import { WorkspaceError } from '@/lib/workspace-error'
+export { WorkspaceError }
 
 export type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
 type AuthenticatedUser = Awaited<ReturnType<typeof requireUser>>
@@ -51,24 +47,18 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
 const readWorkspaceContext = cache(async (userId: string, email: string, name: string, image: string | null, requestedId: string, locale: WorkspaceLocale) => {
   const user = { id: userId, email, name, image }
   const cookieStore = await cookies()
-  const readChoices = () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, role: workspaceMembers.role }).from(workspaces)
+  const readChoices = () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, role: workspaceMembers.role }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaces.createdAt))
 
   let choices = await readChoices()
-  if (!choices.length) {
-    await workspaceDb.transaction(async tx => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`workspace-owner:${user.id}`}, 0))`)
-      const [own] = await tx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.userId, user.id)).limit(1)
-      if (own) return
-      const defaultName = defaultWorkspaceName(locale, user.name)
-      const hash = createHash('sha256').update(`orvilo-default:${user.id}`).digest('hex')
-      const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
-      await tx.insert(workspaces).values({ id, userId: user.id, name: defaultName.slice(0, 120) }).onConflictDoNothing()
-      await tx.insert(workspaceMembers).values({ workspaceId: id, userId: user.id, email: user.email.toLowerCase(), name: user.name, role: 'admin' }).onConflictDoNothing()
-    })
+  // Every person has one personal workspace, including people whose first workspace came from an invite.
+  if (!choices.some(choice => choice.kind === 'personal')) {
+    await ensurePersonalWorkspace(user, locale)
     choices = await readChoices()
   }
+  const personal = choices.find(choice => choice.kind === 'personal')
+  if (personal) await ensurePersonalShare(user.id, personal.id)
 
   const savedId = cookieStore.get('mikka-workspace')?.value
   const workspaceId = requestedId || (choices.find(item => item.id === savedId)?.id ?? choices[0]?.id)
@@ -87,8 +77,8 @@ const readWorkspaceContext = cache(async (userId: string, email: string, name: s
   }
   if (!selected) throw new WorkspaceError('workspaceAccessDenied')
   return {
-    workspace: { id: selected.id, name: selected.name },
-    choices: choices.map(({ id, name }) => ({ id, name })),
+    workspace: { id: selected.id, name: selected.name, kind: selected.kind },
+    choices: choices.map(({ id, name, kind }) => ({ id, name, kind })),
     currentUserId: user.id,
     role: selected.role,
     currentUser: { name: user.name, email: user.email, image: user.image ?? null },

@@ -26,8 +26,18 @@ export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'c
     } catch (error) {
       if (error instanceof ComputerError) return response({ error: error.message }, error.status)
       if (error instanceof z.ZodError || error instanceof SyntaxError) return response({ error: 'Invalid request' }, 400)
-      // Provider errors may contain request URLs or headers. Never serialize them.
+      // Provider errors may contain request URLs or headers. Never serialize them: the log
+      // gets a fixed code (or the error's class name) and the sandbox id, the response neither.
+      console.error(JSON.stringify({ event: 'cloud_computer_failed', action: action ?? null, botId: botId ?? null, ...failure(error) }))
       return response({ error: 'Cloud computer is unavailable' }, 503)
     }
+  }
+}
+
+function failure(error: unknown) {
+  const { code, sandboxId, name } = (error && typeof error === 'object' ? error : {}) as { code?: unknown; sandboxId?: unknown; name?: unknown }
+  return {
+    code: typeof code === 'string' && /^[a-z0-9_]{1,64}$/.test(code) ? code : typeof name === 'string' && /^\w{1,64}$/.test(name) ? name : 'unknown',
+    ...(typeof sandboxId === 'string' && /^[a-z0-9]{1,64}$/.test(sandboxId) ? { sandboxId } : {}),
   }
 }

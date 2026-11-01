@@ -9,6 +9,7 @@ import {
 import {
   signupClientIP,
   signupLimits,
+  localSignUpRateRules,
   normalizedEmail,
   disposableEmail,
   verifyTurnstile,
@@ -103,4 +104,30 @@ test('signup IP uses the trusted Vercel header and finite overrides never mean u
   assert.equal(signupClientIP(headers, {}), 'local')
   assert.equal(signupLimits({ MIKKA_SIGNUP_IP_HOURLY: '0' }).signupIp, 5)
   assert.equal(signupLimits({ MIKKA_SIGNUP_IP_HOURLY: '1000' }).signupIp, 1000)
+})
+
+test('local test mode defaults to CI\'s limits; production, Vercel and other databases keep 5 an hour', () => {
+  const db = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
+  const local = { NODE_ENV: 'development', MIKKA_LOCAL_TEST_ACCOUNTS: '1', E2E_DATABASE_URL: db, MIKKA_DATABASE_URL: db, DATABASE_URL: db }
+  assert.deepEqual(signupLimits(local), { signupIp: 1000, signupGlobal: 10000, verificationIp: 1000, verificationGlobal: 10000 })
+  // A production build of the app (`next start`, NODE_ENV=production) on the local database is local too.
+  assert.deepEqual(signupLimits({ ...local, NODE_ENV: 'production' }).signupIp, 1000)
+  assert.deepEqual(localSignUpRateRules({ ...local, NODE_ENV: 'production' }), { '/sign-up/email': { window: 10, max: 100 } })
+  // An explicit limit still wins, so rate-limit tests set their own low ones.
+  assert.equal(signupLimits({ ...local, MIKKA_SIGNUP_IP_HOURLY: '2' }).signupIp, 2)
+  for (const env of [
+    { ...local, VERCEL: '1' },
+    { ...local, VERCEL_ENV: 'preview' },
+    { ...local, MIKKA_LOCAL_TEST_ACCOUNTS: undefined },
+    { ...local, MIKKA_DATABASE_URL: 'postgresql://e2e:p@db.example.com:5432/mikka_e2e' },
+    { ...local, DATABASE_URL: 'postgresql://e2e:p@127.0.0.1:5432/mikka' },
+    { ...local, E2E_DATABASE_URL: undefined },
+    { ...local, MIKKA_LOCAL_TEST_ACCOUNTS: 'true' },
+    {},
+  ]) {
+    assert.deepEqual(signupLimits(env), { signupIp: 5, signupGlobal: 100, verificationIp: 15, verificationGlobal: 300 }, JSON.stringify(env))
+    assert.deepEqual(localSignUpRateRules(env), {}, 'Better Auth keeps its default sign-up rule')
+  }
+  // Better Auth's sign-up rule: its default 3 per 10 seconds, raised only locally.
+  assert.deepEqual(localSignUpRateRules(local), { '/sign-up/email': { window: 10, max: 100 } })
 })

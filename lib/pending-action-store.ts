@@ -1,53 +1,15 @@
 import 'server-only'
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, gt } from 'drizzle-orm'
 import { appToolCallSchema, APP_TOOL_ACTION, type AppToolCall } from '@/lib/app-tools'
 import { COMPOSIO_ACTIONS, isApprovalAction, parseActionInput } from '@/lib/composio-actions'
 import { serverWriteJudge, type WriteJudge } from '@/lib/operations/write-judgment'
 import { resolveActionAccount, runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
-import { coordinatorEvents, pendingActions, repositorySettings } from '@/lib/db/schema'
-import { taskDestinationSchema } from './task-destination'
-import { repositoryPushApproved } from '@/lib/run-publication-policy'
+import { pendingActions } from '@/lib/db/schema'
 import { actionOutcome, calendarEventSummary, PENDING_ACTION_TTL_MS, type PendingActionView } from '@/lib/pending-action-view'
-import { prepareRepositoryApproval, validateRepositoryApproval } from '@/lib/repository-approval-proposal'
 
 /** Most proposals one person can have waiting at once. */
 const MAX_PENDING = 20
-
-/** Prepare only: the repository permission is never changed by the model. */
-export async function proposeRepositoryPush(userId: string, input: unknown, task?: { eventId: string; botId: string | null }) {
-  const parsed = prepareRepositoryApproval(input)
-  if (!parsed) return { error: 'repositoryInvalid' }
-  return db.transaction(async tx => {
-    if (task) {
-      const [event] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, task.eventId), eq(coordinatorEvents.userId, userId), task.botId ? eq(coordinatorEvents.botId, task.botId) : isNull(coordinatorEvents.botId))).for('update')
-      const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
-      if (!event || event.kind !== 'user_message' || !event.deliveredAt || !destination.success || destination.data.kind !== 'device') return { error: 'runInvalid' }
-    }
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, parsed.remoteKey])}, 0))`)
-    const [settings] = await tx.select({ push: repositorySettings.push }).from(repositorySettings)
-      .where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, parsed.remoteKey))).limit(1)
-    if (settings?.push?.approved === false) return { status: 'denied' as const }
-    if (repositoryPushApproved(settings?.push, userId)) return { status: 'approved' as const }
-    const [existing] = await tx.select({ id: pendingActions.id, context: pendingActions.context }).from(pendingActions).where(and(
-      eq(pendingActions.userId, userId), eq(pendingActions.action, 'approve_repository_push'), eq(pendingActions.status, 'pending'),
-      gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS)),
-      sql`${pendingActions.input}->>'remoteKey' = ${parsed.remoteKey}`,
-    )).limit(1)
-    if (existing) {
-      if (task) {
-        const ids = Array.isArray(existing.context?.taskEventIds) ? existing.context.taskEventIds.filter((id): id is string => typeof id === 'string') : []
-        await tx.update(pendingActions).set({ context: { ...existing.context, taskEventIds: [...new Set([...ids, task.eventId])] } }).where(eq(pendingActions.id, existing.id))
-      }
-      return { status: 'awaiting_approval' as const, actionId: existing.id }
-    }
-    const waiting = await tx.$count(pendingActions, and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
-    if (waiting >= MAX_PENDING) return { error: 'tooManyPendingActions' }
-    const id = crypto.randomUUID()
-    await tx.insert(pendingActions).values({ id, userId, action: 'approve_repository_push', input: parsed, context: task ? { taskEventIds: [task.eventId] } : null })
-    return { status: 'awaiting_approval' as const, actionId: id }
-  })
-}
 
 /**
  * Sends mail or writes the calendar in the person's connected account, with
@@ -66,11 +28,11 @@ export async function writeAccountAction(userId: string, action: string, input: 
   let recorded = false as boolean
   const result = await runComposioAction(userId, action, parsed, selectedAccountId, async (accountId, tool) => {
     if (await judge({ action, tool: COMPOSIO_ACTIONS[action].slug, annotations: tool.tags, input: parsed }) === 'ask') return { error: 'integrationApprovalRequired' }
-    await db.insert(pendingActions).values({ id, userId, action, input: parsed, connectedAccountId: accountId, status: 'running' })
+    await db.insert(pendingActions).values({ id, userId, botId, action, input: parsed, connectedAccountId: accountId, status: 'running' })
     recorded = true
     return null
   })
-  if ('error' in result && result.error === 'integrationApprovalRequired') return proposeAction(userId, action, parsed, selectedAccountId)
+  if ('error' in result && result.error === 'integrationApprovalRequired') return proposeAction(userId, action, parsed, selectedAccountId, botId)
   // The gate runs before every dispatch, so an unrecorded result never sent anything.
   if (!recorded) return 'error' in result ? result : { error: 'integrationActionFailed' }
   if ('error' in result) {
@@ -88,7 +50,7 @@ export async function writeAccountAction(userId: string, action: string, input: 
  * approve. Nothing runs here. A calendar change also reads the event as it is
  * now, so the card can show what changes.
  */
-export async function proposeAction(userId: string, action: string, input: unknown, selectedAccountId?: string) {
+export async function proposeAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null) {
   if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
   const parsed = parseActionInput(action, input)
   if (!parsed) return { error: 'invalidIntegrationInput' }
@@ -103,7 +65,7 @@ export async function proposeAction(userId: string, action: string, input: unkno
     context = calendarEventSummary(current.data)
   }
   const id = crypto.randomUUID()
-  await db.insert(pendingActions).values({ id, userId, action, input: parsed, context, connectedAccountId: accountId })
+  await db.insert(pendingActions).values({ id, userId, botId, action, input: parsed, context, connectedAccountId: accountId })
   return { status: 'awaiting_approval', actionId: id }
 }
 
@@ -111,13 +73,13 @@ export async function proposeAction(userId: string, action: string, input: unkno
  * A store app's tool call that needs the person's approval (a destructive
  * write, or one an explicit setting asks for). Nothing runs here.
  */
-export async function proposeAppToolCall(userId: string, call: AppToolCall, accountId: string) {
+export async function proposeAppToolCall(userId: string, call: AppToolCall, accountId: string, botId: string | null = null) {
   const parsed = appToolCallSchema.safeParse(call)
   if (!parsed.success) return { error: 'invalidIntegrationInput' }
   const waiting = await db.$count(pendingActions, and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
   if (waiting >= MAX_PENDING) return { error: 'tooManyPendingActions: ask the person to approve or decline the waiting ones first' }
   const id = crypto.randomUUID()
-  await db.insert(pendingActions).values({ id, userId, action: APP_TOOL_ACTION, input: parsed.data, connectedAccountId: accountId })
+  await db.insert(pendingActions).values({ id, userId, botId, action: APP_TOOL_ACTION, input: parsed.data, connectedAccountId: accountId })
   return { status: 'awaiting_approval', actionId: id }
 }
 
@@ -137,7 +99,8 @@ export async function listPendingActions(userId: string): Promise<PendingActionV
       return [{ id: row.id, action: row.action, input: { summary: row.input.summary, origin: row.input.origin, operation: row.input.operation, description: row.action === 'credential_operation' ? 'The page stays hidden until entered login fields are absent. This does not confirm authentication.' : undefined }, context: null, status: row.status, createdAt: row.createdAt.toISOString() }]
     }
     if (row.action === APP_TOOL_ACTION) return appToolCallSchema.safeParse(row.input).success ? [{ id: row.id, action: APP_TOOL_ACTION, input: row.input, context: null, status: row.status, createdAt: row.createdAt.toISOString() }] : []
-    if (!isApprovalAction(row.action) && !(row.action === 'approve_repository_push' && validateRepositoryApproval(row.input))) return []
+    // A repository push card from before decision 2026-11-01-1215 is no longer shown: the GitHub App grant decides the push.
+    if (!isApprovalAction(row.action)) return []
     return [{ id: row.id, action: row.action as PendingActionView['action'], input: row.input, context: row.context as PendingActionView['context'], status: row.status, createdAt: row.createdAt.toISOString() }]
   })
 }

@@ -8,6 +8,8 @@ export const workspaces = pgTable('mikka_workspaces', {
   slug: varchar('slug', { length: 64 }).unique('mikka_workspaces_slug_unique'),
   /** A small image data URL (≤200 KB decoded); see lib/workspace-admin/icon.ts. */
   icon: text('icon'),
+  /** 'personal': the one workspace each person has, with only them as a member (decision 2026-10-31-2130). */
+  kind: text('kind').$type<'personal' | 'team'>().notNull().default('team'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 

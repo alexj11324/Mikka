@@ -1,4 +1,5 @@
 import 'server-only'
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { freezeHostedModelSelection, resolveFrozenHostedModel } from '@/lib/subscription-model-snapshot'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
 import { generateText, streamText, isStepCount } from 'ai'
@@ -19,7 +20,10 @@ import { completedEvaluationReply } from './eval-generation'
 export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, proposalId: string, requestId: string, mode: 'fixture' | 'live') {
   if (mode === 'live' && process.env.MIKKA_AGENT_KIT_LIVE_EVAL !== '1') throw new AgentKitError('agentLiveEvaluationDisabled',409)
   const model = mode === 'live' ? COORDINATOR_MODEL : null
-  const hostInstructions = mode === 'live' ? await botInstructions(scope.ownerId,scope.botId,COORDINATOR_INSTRUCTIONS) : ''
+  const { chatBotId, isCoordinatorBot } = await import('@/lib/coordinator/coordinator-bot')
+  const botId = await chatBotId(scope.ownerId, scope.botId, scope.workspaceId)
+  const coordinator = await isCoordinatorBot((await import('@/lib/db')).pool, scope.ownerId, botId)
+  const hostInstructions = mode === 'live' ? await botInstructions(scope.ownerId,botId,COORDINATOR_INSTRUCTIONS) : ''
   const dependencies = { service:() => subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace }
   const job = await store.beginEvaluation(scope,proposalId,requestId,mode,model,mode === 'live' ? { hostInstructions,resolveRuntime:definition => freezeHostedModelSelection(scope,{ harness:'ai_sdk',model:COORDINATOR_MODEL },definition.modelSelection,dependencies) } : undefined)
   if (job.replayed) return { ...job.evaluation,replayed:true }
@@ -33,7 +37,7 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
         return { text:testCase.expectedOutcome === 'answered' ? `Fixture response: ${testCase.mustMention.join(' ')}` : testCase.expectedOutcome === 'blocked' ? 'Cannot complete this task without the missing prerequisite.' : 'Awaiting approval.',outcome:testCase.expectedOutcome,tools:testCase.requiredTools.map(name => ({ name,outcome:testCase.expectedOutcome === 'blocked' ? 'error' : testCase.expectedOutcome === 'approval_required' ? 'approval_pending' : 'ok',authorized:false,effectPerformed:false })) }
       }
       const observations: ToolObservation[] = []
-      const registry = selectRegisteredTools(createCoordinatorRegistry(scope.ownerId,scope.botId,undefined,{ computerEnabled:process.env.MIKKA_CLOUD_COMPUTER_TASKS === '1' && process.env.MIKKA_BYOS_ENABLED === '1' }),definition.tools)
+      const registry = selectRegisteredTools(createCoordinatorRegistry(scope.ownerId,botId,undefined,{ coordinator,computerEnabled:cloudComputerTasksEnabled() && process.env.MIKKA_BYOS_ENABLED === '1' }),definition.tools)
       const tools = evaluationTools(registry,testCase,observations,definition)
       if (!job.execution) throw new AgentKitError('agentEvaluationSnapshotMissing')
       const frozenRuntime = job.execution.snapshot.runtime

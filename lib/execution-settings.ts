@@ -7,12 +7,15 @@ import { enqueueDeviceCommand } from "./device-management";
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
+import { othersMayUse, pooledOwners, subscriptionsUsable } from "./personal-policy";
 import {
   DEFAULT_EXECUTION_FALLBACKS,
   type ExecutionFallbacks,
   type ExecutionRule,
 } from "./execution-rules";
 import { isDeviceOnline } from "@mikka/protocol/device";
+import { HOSTED_CHOICE } from "./bot-model-menu-view";
+import { ownE2BKeySql } from "./secrets/e2b-owner-sql";
 
 export interface ExecutionSettingsScope {
   ownerId: string;
@@ -31,20 +34,19 @@ const ruleInput = z
 export class ExecutionSettings {
   constructor(readonly pool: Pool) {}
   async fallbacks(ownerId: string): Promise<ExecutionFallbacks> {
-    return (
-      (
-        await this.pool.query(
-          'SELECT "executionFallbacks" FROM "user" WHERE id=$1',
-          [ownerId],
-        )
-      ).rows[0]?.executionFallbacks ?? DEFAULT_EXECUTION_FALLBACKS
-    );
+    const stored = (
+      await this.pool.query(
+        'SELECT "executionFallbacks" FROM "user" WHERE id=$1',
+        [ownerId],
+      )
+    ).rows[0]?.executionFallbacks;
+    // Rows saved before 订阅额度用完后，自动改用 API Key also carry the retired whenQuotaExhausted.
+    return { whenDeviceOffline: stored?.whenDeviceOffline ?? DEFAULT_EXECUTION_FALLBACKS.whenDeviceOffline };
   }
   async setFallbacks(ownerId: string, value: ExecutionFallbacks) {
     const parsed = z
       .object({
         whenDeviceOffline: z.enum(["wait", "cloud"]),
-        whenQuotaExhausted: z.enum(["stop", "switchAccount"]),
       })
       .strict()
       .safeParse(value);
@@ -62,7 +64,9 @@ export class ExecutionSettings {
   ): Promise<ExecutionRule> {
     const places = await this.places(scope, query);
     const models = await this.botModels(scope, query);
-    const providers = (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='connected'`,[scope.ownerId,scope.workspaceId])).rows;
+    const providers = (await subscriptionsUsable(query, scope.ownerId, scope.workspaceId))
+      ? (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND paused=false`,[scope.ownerId])).rows
+      : [];
     const preferred = providers.some((m) => m.provider === "claude")
       ? "claude_code"
       : providers.some((m) => m.provider === "codex")
@@ -81,8 +85,8 @@ export class ExecutionSettings {
       model: model.modelId,
       position: 2147483647,
     };
-    // Cloud first when the workspace has its own E2B key (decision 2026-10-31-2200-run-machine-fallback).
-    if (cloud && (await query.query('SELECT 1 FROM workspace_e2b_keys WHERE "workspaceId"=$1', [scope.workspaceId])).rowCount) return cloud;
+    // Cloud first when the person has their own E2B key (decision 2026-10-31-2200-run-machine-fallback; the key is personal).
+    if (cloud && (await query.query(`SELECT ${ownE2BKeySql("$1")} AS own`, [scope.ownerId])).rows[0]?.own) return cloud;
     const devices = places
       .filter((p) => p.id !== "cloud" && p.enabled && p.online && autoScheduleOn(p))
       .sort(
@@ -317,7 +321,7 @@ export class ExecutionSettings {
         if (value.place === "cloud") {
           const models = await client.query(
             `SELECT b.id FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId"
-            AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected'
+            AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
             WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b."modelId"=$3 AND c.provider=CASE WHEN $4='claude_code' THEN 'claude' WHEN $4='codex' THEN 'codex' END`,
             [scope.ownerId, scope.workspaceId, value.model, value.harness],
           );
@@ -435,22 +439,66 @@ export class ExecutionSettings {
     }
     return [...labels.values()].sort((a,b) => a.name.localeCompare(b.name));
   }
+  /** The owner's connected subscriptions, from any workspace: a subscription belongs to the account.
+   * None unless the owner shared them into this workspace and its admin allows it (decision 2026-10-31-2225). */
   private async connectedBindings(
     scope: ExecutionSettingsScope,
     bindingId?: string,
     query: Pick<PoolClient, "query"> = this.pool,
   ) {
+    if (!(await subscriptionsUsable(query, scope.ownerId, scope.workspaceId))) return [];
+    return this.bindingsOf(scope.ownerId, scope.workspaceId, bindingId, query);
+  }
+  private async bindingsOf(
+    ownerId: string,
+    workspaceId: string,
+    bindingId?: string,
+    query: Pick<PoolClient, "query"> = this.pool,
+  ) {
     return (
       await query.query(
-        `SELECT b.id AS "bindingId",b."consumerId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan
+        `SELECT b.id AS "bindingId",b."ownerId",b."consumerId",b."workspaceId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan,c.quota
        FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
-       AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected'
-       WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
+       AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
+       WHERE b."ownerId"=$1 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
        AND ($3::uuid IS NULL OR b.id=$3)
-       AND ($3::uuid IS NOT NULL OR c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId") ORDER BY b."createdAt" DESC,b.id`,
-        [scope.ownerId, scope.workspaceId, bindingId ?? null],
+       AND ($3::uuid IS NOT NULL OR c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId") ORDER BY (b."workspaceId"=$2) DESC,b."createdAt" DESC,b.id`,
+        [ownerId, workspaceId, bindingId ?? null],
       )
     ).rows;
+  }
+  /**
+   * For a bot whose owner has no subscription here: other members' subscriptions
+   * shared with 分享给团队成员 (Alex, 「B」), Claude first, then by the oldest
+   * share. Only ever offered to the resolver, never listed to the bot's owner.
+   */
+  async pooledBindings(scope: ExecutionSettingsScope) {
+    const rows = [];
+    for (const ownerId of await pooledOwners(this.pool, scope.ownerId, scope.workspaceId))
+      rows.push(...(await this.bindingsOf(ownerId, scope.workspaceId)));
+    return [...rows.filter((row) => row.provider === "claude"), ...rows.filter((row) => row.provider !== "claude")];
+  }
+  /** Clone another member's binding for this bot only, while they allow it here; never a credential. */
+  async bindingForOthersBot(scope: ExecutionSettingsScope, botId: string, subscriptionOwnerId: string, bindingId: string) {
+    if (subscriptionOwnerId === scope.ownerId || !(await othersMayUse(this.pool, subscriptionOwnerId, scope.workspaceId)))
+      throw new ActionFailureError("executionModelUnknown");
+    const hash = createHash("sha256").update(JSON.stringify([subscriptionOwnerId, scope.workspaceId, botId, bindingId])).digest("hex");
+    const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+    const result = await this.pool.query(
+      `INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
+      SELECT $1,b."ownerId",$4::text,$2::text,b."connectionId",b."connectionRevision",b.route,b."modelId" FROM byos_bindings b
+      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
+      JOIN bots bot ON bot.id=$2::uuid AND bot."ownerId"=$3 AND bot."workspaceId"=$4::uuid AND bot."archivedAt" IS NULL
+      WHERE b.id=$5 AND b."ownerId"=$6 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
+      ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id RETURNING id`,
+      [id, botId, scope.ownerId, scope.workspaceId, bindingId, subscriptionOwnerId],
+    );
+    if (!result.rows[0]) throw new ActionFailureError("executionModelUnknown");
+    return result.rows[0].id as string;
+  }
+  /** False once the owner left or was suspended and the bot was archived (§8.3), or when it is not theirs. */
+  async botActive(ownerId: string, botId: string) {
+    return Boolean((await this.pool.query('SELECT 1 FROM bots WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL', [botId, ownerId])).rowCount);
   }
   /** Execution resolves its saved binding independently of the deduplicated catalogue. */
   async botBinding(scope: ExecutionSettingsScope, bindingId: string) {
@@ -474,8 +522,8 @@ export class ExecutionSettings {
   async refreshBotModels(scope: ExecutionSettingsScope, connectionId: string, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
     if (!z.uuid().safeParse(connectionId).success) throw new ActionFailureError("executionAccountUnavailable");
     const connection = (await this.pool.query(
-      `SELECT id,epoch,provider FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND state='connected'`,
-      [connectionId, scope.ownerId, scope.workspaceId])).rows[0];
+      `SELECT id,epoch,provider,"workspaceId" FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND state='connected' AND paused=false`,
+      [connectionId, scope.ownerId])).rows[0];
     if (!connection) throw new ActionFailureError("executionAccountUnavailable");
     let models: {id: string; name?: string}[];
     try {
@@ -486,13 +534,14 @@ export class ExecutionSettings {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      const current = await client.query(`SELECT id FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND state='connected' FOR UPDATE`, [connectionId,scope.ownerId,scope.workspaceId,connection.epoch]);
+      const current = await client.query(`SELECT id FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND epoch=$3 AND state='connected' AND paused=false FOR UPDATE`, [connectionId,scope.ownerId,connection.epoch]);
       if (!current.rowCount) throw new ActionFailureError("executionAccountUnavailable");
       for (const model of unique) {
         if (!z.string().trim().min(1).max(128).safeParse(model.id).success) throw new ActionFailureError("executionModelUnknown");
-        const hash = createHash('sha256').update(JSON.stringify([scope.ownerId,scope.workspaceId,connectionId,connection.epoch,model.id])).digest('hex');
+        // Account-level catalogue: the id leaves out the workspace, and the row keeps the connection's own workspace.
+        const hash = createHash('sha256').update(JSON.stringify([scope.ownerId,connectionId,connection.epoch,model.id])).digest('hex');
         const id = `${hash.slice(0,8)}-${hash.slice(8,12)}-4${hash.slice(13,16)}-8${hash.slice(17,20)}-${hash.slice(20,32)}`;
-        await client.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (id) DO NOTHING`, [id,scope.ownerId,scope.workspaceId,id,connectionId,connection.epoch,route,model.id]);
+        await client.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (id) DO NOTHING`, [id,scope.ownerId,connection.workspaceId,id,connectionId,connection.epoch,route,model.id]);
       }
       await client.query(`UPDATE byos_connections SET "modelCatalog"=$2::jsonb WHERE id=$1`, [connectionId,JSON.stringify({revision:String(connection.epoch),models:unique.map(model=>model.id)})]);
       await client.query('COMMIT');
@@ -519,6 +568,14 @@ export class ExecutionSettings {
         throw new ActionFailureError("botNotFound");
     }
     const key = botId ?? "coordinator";
+    // Mikka 默认 picked on purpose: no binding behind it (decision 2026-10-31-2330).
+    if (bindingId === HOSTED_CHOICE) {
+      await this.pool.query(
+        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId"',
+        [scope.ownerId, scope.workspaceId, key, null],
+      );
+      return;
+    }
     if (bindingId === null || bindingId === "auto")
       throw new ActionFailureError("executionAutoNotAllowed");
     if (!z.uuid().safeParse(bindingId).success)
@@ -529,58 +586,55 @@ export class ExecutionSettings {
     if (!choice) throw new ActionFailureError("executionModelUnknown");
     bindingId = await this.bindingForBot(scope, botId, bindingId);
     await this.pool.query(
-      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId"',
+      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL',
       [scope.ownerId, scope.workspaceId, key, bindingId],
     );
   }
-  /** Clone only the owner's connected account reference, never a credential. */
+  /** Clone only the owner's connected account reference, never a credential. The clone belongs to
+   * the run's workspace, so membership, admission and the admin switch are checked there. */
   async bindingForBot(
     scope: ExecutionSettingsScope,
     botId: string | null,
     bindingId: string,
   ): Promise<string> {
-    if (!botId) return bindingId;
     const source = (await this.connectedBindings(scope, bindingId)).find(
       (row) => row.bindingId === bindingId,
     );
     if (!source) throw new ActionFailureError("executionModelUnknown");
-    if (source.consumerId === botId) return bindingId;
+    if (source.workspaceId === scope.workspaceId && (botId === null || source.consumerId === botId)) return bindingId;
     const hash = createHash("sha256")
       .update(
-        JSON.stringify([scope.ownerId, scope.workspaceId, botId, bindingId]),
+        JSON.stringify([scope.ownerId, scope.workspaceId, botId ?? "coordinator", bindingId]),
       )
       .digest("hex");
     const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
     const result = await this.pool.query(
       `INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
-      SELECT $1,b."ownerId",b."workspaceId",$2::text,b."connectionId",b."connectionRevision",b.route,b."modelId" FROM byos_bindings b
-      JOIN bots bot ON bot.id=$2::uuid AND bot."ownerId"=$3 AND bot."workspaceId"=$4::uuid
-      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected'
-      WHERE b.id=$5 AND b."ownerId"=$3 AND b."workspaceId"=$4::text ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id RETURNING id`,
-      [id, botId, scope.ownerId, scope.workspaceId, bindingId],
+      SELECT $1,b."ownerId",$4::text,$6::text,b."connectionId",b."connectionRevision",b.route,b."modelId" FROM byos_bindings b
+      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
+      WHERE b.id=$5 AND b."ownerId"=$3
+      AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots bot WHERE bot.id=$2::uuid AND bot."ownerId"=$3 AND bot."workspaceId"=$4::uuid))
+      ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id RETURNING id`,
+      [id, botId, scope.ownerId, scope.workspaceId, bindingId, botId ?? id],
     );
     if (!result.rows[0]) throw new ActionFailureError("executionModelUnknown");
     return result.rows[0].id;
-  }
-  /** UI selection follows its deduplicated option; execution keeps the stored binding id. */
-  async botModelOption(scope: ExecutionSettingsScope, botId: string | null) {
-    const bindingId = await this.botModel(scope, botId);
-    if (!bindingId) return undefined;
-    const saved = (await this.connectedBindings(scope,bindingId))[0];
-    if (!saved) return bindingId;
-    return (await this.botModels(scope)).find(option => option.connectionId === saved.connectionId && option.modelId === saved.modelId)?.bindingId ?? bindingId;
   }
   async botModel(
     scope: ExecutionSettingsScope,
     botId: string | null,
   ): Promise<string | undefined> {
-    const saved = (
+    const row = (
       await this.pool.query(
-        'SELECT "bindingId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+        'SELECT "bindingId","apiKeyId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
         [scope.ownerId, scope.workspaceId, botId ?? "coordinator"],
       )
-    ).rows[0]?.bindingId;
-    if (saved) return saved;
+    ).rows[0];
+    if (row?.bindingId) return row.bindingId;
+    // The saved choice is an API key's model (lib/model-api-keys.ts botApiKeyChoice), not a binding.
+    if (row?.apiKeyId) return undefined;
+    // A saved row without either is Mikka 默认, picked on purpose.
+    if (row) return HOSTED_CHOICE;
     // Decision 2026-10-30 (#537): a Claude subscription first, otherwise ChatGPT/Codex, as `suggested` does.
     const models = await this.botModels(scope);
     const first = models.find((m) => m.provider === "claude") ?? models[0];
@@ -594,8 +648,10 @@ export class ExecutionSettings {
   }
 }
 
-/** Bot scope is exact. Coordinator uses the owner's first active workspace,
- * matching the settings fallback in a workflow without browser cookies. */
+/** Bot scope is exact. Work with no bot of its own (the Coordinator's triage,
+ * memory extraction) runs and bills in the owner's first active workspace, as
+ * before: it is charged where it happens, never moved to a new personal
+ * workspace (decision 2026-10-31-2225). */
 export async function executionWorkspace(
   ownerId: string,
   botId: string | null,
@@ -604,7 +660,8 @@ export async function executionWorkspace(
   if (botId) {
     const bot = (
       await pool.query(
-        'SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2',
+        // An archived bot (its owner left or was suspended) runs nothing until an admin takes it over (§8.3).
+        'SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL',
         [botId, ownerId],
       )
     ).rows[0];

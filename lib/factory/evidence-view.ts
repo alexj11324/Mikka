@@ -14,6 +14,8 @@ export interface EvidenceEntry {
   title?: string
   contentType?: string
   durationMs?: number | null
+  /** A recording's timeline: each step's offset and what the agent did, in its own words. */
+  steps?: { atMs: number; label: string }[]
 }
 
 const STAGES: readonly EvidenceStage[] = ['execute', 'review', 'verify']
@@ -46,3 +48,20 @@ export const evidenceEntries = (manifest: unknown): EvidenceEntry[] => {
 /** Stage order (execute, review, verify), stable within a stage: the list and the viewer walk the same order. */
 export const orderEvidence = (entries: readonly EvidenceEntry[]) =>
   STAGES.flatMap(stage => entries.filter(entry => entry.stage === stage))
+
+/** The step playing at `ms`: the last one already reached, or -1 before the first. */
+export function activeStep(steps: readonly { atMs: number }[], ms: number) {
+  let active = -1
+  steps.forEach((step, position) => { if (step.atMs <= ms) active = position })
+  return active
+}
+
+/** A step's time; steps that share a second show tenths, so no two rows read the same. */
+export function stepTime(steps: { atMs: number }[], position: number) {
+  const second = (ms: number) => Math.floor(ms / 1000)
+  const atMs = steps[position].atMs
+  const shared = steps.some((other, index) => index !== position && second(other.atMs) === second(atMs))
+  if (!shared) return formatDuration(Math.floor(atMs / 1000) * 1000)
+  return `${Math.floor(atMs / 60000)}:${(Math.floor(atMs / 100) / 10 % 60).toFixed(1).padStart(4, '0')}`
+}
+

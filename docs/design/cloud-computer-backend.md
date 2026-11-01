@@ -158,9 +158,12 @@ registers with `kind: "cloud"`, so the devices UI can exclude it.
 
 ### Secrets
 
-The E2B API key is the run owner's own key (today stored per workspace,
-moving to per person: [conflicts](research/2026-10-31-orchestration-conflicts.md) C21); there is no
-platform key in production ([hosted abuse controls](../backend/hosted-abuse-controls.md)).
+The E2B API key is the run owner's own key, stored per person (`user_e2b_keys`;
+[conflicts](research/2026-10-31-orchestration-conflicts.md) C21). Every E2B call
+resolves the sandbox's owner from its machine record, never the person asking. A
+key saved for a workspace before keys were personal is adopted by whoever saved
+it on first use. There is no platform key in production
+([hosted abuse controls](../backend/hosted-abuse-controls.md)).
 The server reads it; it is never handed to the model or to the sandbox. A
 platform `E2B_API_KEY` exists only for isolated acceptance.
 
@@ -389,39 +392,36 @@ billing stops immediately." Storage is included, and a paused sandbox is kept
 indefinitely, so a paused machine costs nothing and counts only against state,
 never against the compute budget.
 
-`ensureThreadMachine` enforces hard spend guards before any provider call. The
-workspace and owner advisory locks make the count race-free, so two provisioning
-runs cannot both take the last slot:
+There are no Mikka caps on thread machines ([orchestration](orchestration.md)
+§ 5; the 3-per-owner, 20-per-workspace and 60-hour limits were removed with
+C15). The person's own E2B account sets the limit. When it refuses (its
+concurrency cap, quota or key), a bot's `dispatch_run` ends the queued cloud
+run and the thread goes to the person's own device, or returns an error the
+person can act on
+([decision 2026-10-31-2200](decisions/2026-10-31-2200-run-machine-fallback.md)).
 
-| Setting | Default | Blocks |
-| --- | --- | --- |
-| `MIKKA_THREAD_MACHINES_PER_OWNER` | `3` | A 4th running machine for one owner |
-| `MIKKA_THREAD_MACHINES_PER_WORKSPACE` | `20` | A 21st running machine in one workspace |
-| `MIKKA_THREAD_MACHINE_MONTHLY_COMPUTE_HOURS` | `60` | The owner's rolling 30-day E2B-billed compute hours |
+A cloud run uses the cloud runtime of the bot that dispatched it, never another
+bot's: a Coordinator run, which has no bot, does not borrow one and goes to the
+person's device or the card instead. Every cloud run freezes its definition
+(Agent, model, credential source) when it is queued, with or without a model in
+the request. Moving cloud runs from the bot's computer to a thread machine of
+the run owner is the next change ([orchestration](orchestration.md) § 1, § 5).
 
-Today a blocked request returns `429` (`Thread machine limit reached`, `Workspace
-machine limit reached`, or `Thread machine budget exhausted`); it never
-provisions or bills. Under [orchestration](orchestration.md) § 5 there are no
-Mikka caps when the person's own E2B key pays; removing them is pending in code
-(conflict C15). A bot's `dispatch_run` checks the same limits before it
-queues a cloud thread and treats a refusal, or any E2B refusal while the
-machine starts, as no cloud: the queued cloud run is ended and the thread goes
-to the person's own device, or returns an error the person can act on
-([decision 2026-10-31-2200](decisions/2026-10-31-2200-run-machine-fallback.md)). Invalid, zero or negative settings fall back to the
-defaults, so there is no "unlimited" configuration.
+The run-recovery cron also reconciles Bot computers (`cloud_machines`): a row
+that has said running or waking for over an hour is checked with E2B. A sandbox
+E2B no longer has becomes `sleeping` with no sandbox (the next wake creates a
+new one); a paused one becomes `sleeping`. An unusable key changes nothing.
 
-Compute hours are tracked, not assumed: the migration adds `runningSince` and
-`computeSeconds` to `thread_machines`. Provisioning sets `runningSince`; a
-provider auto-pause detected on resume, a manual pause and an end accumulate the
-elapsed running interval and clear `runningSince`, so paused time is never
-counted. The budget sums `computeSeconds` plus any interval still running.
+Compute time is still tracked: `runningSince` and `computeSeconds` on
+`thread_machines` record each running interval, and paused time is never
+counted. Each machine still ends after the 12-hour lifecycle.
 
-The defaults follow comparable products, adjusted for the 2 vCPU shape: Cursor
-Pro runs up to 8 concurrent Cloud Agents per account, so one owner gets 3;
-GitHub Codespaces grants free accounts 120 core-hours a month (60 real hours on
-a 2-core machine) and a 12-hour maximum lifetime, which matches the 60-hour
-budget and the 12-hour end; E2B enforces concurrent running sandboxes per team,
-and 20 stays inside the Hobby ceiling.
+A sandbox that is gone at the provider (deleted, expired or killed outside
+Mikka) is replaced, not reported: `ensureThreadMachine` resets the row to a new
+operation ID and creates a new sandbox from the thread's workspace snapshot.
+When a cloud run loses its worker mid-run, its lease runs out and the retry gets
+a thread machine of its own on the same bot, continuing from the uploaded
+checkpoint.
 
 Disable by draining first. The flag is read at enqueue and at claim, so turning
 it off while a thread run is still queued sends that run down the Bot-machine

@@ -48,13 +48,13 @@ export function useConversationThread(conversation: string | null | undefined): 
 
 /** A bot's display name: the one the card was given, else the bot list. */
 export function useComputerBotName(botId: string, given?: string) {
-  const { data } = useSWR(given || isMockedComputer(botId) ? null : 'bots', listBots, { revalidateOnFocus: false })
+  const { data } = useSWR(given || isMockedComputer(botId) ? null : 'bots', listBots)
   return given ?? data?.find(bot => bot.id === botId)?.name ?? 'Bot'
 }
 
 /** A thread's name from its task; the card's own name, then its task sentence, until that is known. */
 export function useThreadName(botId: string, runId: string, given: string | undefined, fallback: string) {
-  const { data } = useSWR(given || isMockedComputer(botId) ? null : ['thread-name', runId], ([, id]: [string, string]) => getThreadName(id), { revalidateOnFocus: false })
+  const { data } = useSWR(given || isMockedComputer(botId) ? null : ['thread-name', runId], ([, id]: [string, string]) => getThreadName(id))
   return given ?? data ?? fallback
 }
 

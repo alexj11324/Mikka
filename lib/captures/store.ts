@@ -7,7 +7,7 @@ import {
 } from '@mikka/protocol/capture'
 import { withAccountWrite } from '@/lib/account/write-guard'
 import { db } from '@/lib/db'
-import { agentRuns, artifacts, runCaptureShares, runCaptures } from '@/lib/db/schema'
+import { agentRuns, artifacts, runCaptureShares, runCaptureSteps, runCaptures } from '@/lib/db/schema'
 import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignArtifactPut, putArtifactObject } from '@/lib/artifacts/storage'
 
 // Screenshots and screen recordings in Neon (whose, which run, share links)
@@ -219,6 +219,38 @@ export async function openRecording(owner: CaptureOwner, input: { title: string;
     title: cleanCaptureTitle(input.title) || 'Recording', display: input.display, expiresAt: input.stopsAt,
   }).onConflictDoNothing().returning({ id: runCaptures.id })
   return inserted[0] ?? null
+}
+
+/** ffmpeg is up: the timeline starts here, not when the slot was reserved. */
+export async function markRecordingStarted(id: string) {
+  await db.update(runCaptures).set({ startedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(runCaptures.id, id), eq(runCaptures.status, 'recording'), isNull(runCaptures.startedAt)))
+}
+
+export const RECORDING_STEPS_MAX = 200
+
+/**
+ * A step on the run's recording in progress: its offset from the recording's
+ * start and the agent's own description. Nothing is kept when no recording runs.
+ */
+export async function recordStep(owner: { userId: string; runId: string }, input: { label: string; source: 'action' | 'mark' }, now = Date.now()) {
+  const row = await currentRecording(owner.runId)
+  if (!row || row.userId !== owner.userId || !row.startedAt) return false
+  const atMs = now - row.startedAt.getTime()
+  if (atMs < 0 || (row.expiresAt && now > row.expiresAt.getTime())) return false
+  const label = input.label.replace(/\s+/g, ' ').trim().slice(0, 200)
+  if (!label) return false
+  // One statement keeps the cap under concurrent steps.
+  const inserted = await db.execute(sql`INSERT INTO run_capture_steps (id,"captureId","userId","atMs",label,source)
+    SELECT ${crypto.randomUUID()},${row.id},${owner.userId},${atMs},${label},${input.source}
+    WHERE (SELECT count(*) FROM run_capture_steps WHERE "captureId"=${row.id}) < ${RECORDING_STEPS_MAX}`)
+  return (inserted.rowCount ?? 0) > 0
+}
+
+/** A recording's timeline, in order. */
+export async function recordingSteps(captureId: string) {
+  return db.select({ atMs: runCaptureSteps.atMs, label: runCaptureSteps.label, source: runCaptureSteps.source })
+    .from(runCaptureSteps).where(eq(runCaptureSteps.captureId, captureId)).orderBy(asc(runCaptureSteps.atMs), asc(runCaptureSteps.createdAt))
 }
 
 /** The run's recording in progress, if any. */

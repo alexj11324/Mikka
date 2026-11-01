@@ -60,8 +60,11 @@ export type TurnStatus = "completed" | "interrupted" | "failed" | "inProgress"
 export interface Turn {
   id: string
   status: TurnStatus
-  error: { message: string } | null
+  error: TurnError | null
 }
+
+/** `codexErrorInfo` tells a usage limit or HTTP failure apart (e.g. "usageLimitExceeded"). */
+export interface TurnError { message: string; codexErrorInfo?: unknown }
 
 export type PatchChangeKind =
   | { type: "add" }
@@ -114,7 +117,7 @@ export interface TurnNotification {
 }
 
 export interface ErrorNotification {
-  error: { message: string }
+  error: TurnError
   willRetry: boolean
   threadId: string
   turnId: string
@@ -125,4 +128,9 @@ export interface TokenUsageNotification {
   tokenUsage: {
     total: { inputTokens: number; outputTokens: number }
   }
+}
+
+/** `account/rateLimits/updated`: the ChatGPT plan's windows, with their resets in Unix seconds. */
+export interface RateLimitsNotification {
+  rateLimits: { primary?: { usedPercent?: number; resetsAt?: number | null } | null; secondary?: { usedPercent?: number; resetsAt?: number | null } | null }
 }

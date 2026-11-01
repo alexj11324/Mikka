@@ -37,29 +37,24 @@ async function seedCardTasks(email: string, botTask: string, prTask: string) {
 }
 
 for (const width of [1280, 1440]) {
-  test(`${width}px，Coordinator 侧栏打开：列宽固定 300，只有已完成折成窄条，放不下就横向滚动`, async ({ page }) => {
+  test(`${width}px，Coordinator 侧栏打开：每一列（含已完成）都固定 300，放不下就横向滚动`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await register(page)
-    await seedTask(page, '窄条里的已完成任务', { status: 'done' })
+    await seedTask(page, '已完成里的任务', { status: 'done' })
     await seedTask(page, '待整理里的任务', { status: 'backlog' })
     await page.goto(app('/'))
     await rail(page, '看板').click()
 
     const board = page.getByRole('region', { name: '横向滚动任务看板', exact: true })
-    const strip = page.getByRole('button', { name: '展开已完成列', exact: true })
-    await expect(strip).toBeVisible()
-    expect((await strip.boundingBox())!.width).toBe(40)
-    await expect(page.getByRole('button', { name: '展开待整理列', exact: true })).toHaveCount(0)
-    await expect(page.getByText('窄条里的已完成任务', { exact: true })).toHaveCount(0)
+    const sidebar = page.getByRole('complementary', { name: 'Coordinator', exact: true })
+    await expect(sidebar).toBeVisible()
+    // 已完成 is a full column beside the sidebar, never a strip (decisions/2026-11-01-1144-board-done-keeps-its-width.md).
+    await expect(board.getByRole('region', { name: '已完成任务列', exact: true })).toBeVisible()
+    const done = board.locator('[data-slot="kanban-column"]').last()
 
-    // The strip's name reads top to bottom: no two glyphs share a line.
-    const glyphs = await strip.locator('span[aria-hidden="true"] > span').evaluateAll(spans => spans.map(span => span.getBoundingClientRect()).map(box => ({ top: box.top, height: box.height })))
-    expect(glyphs.map((_, index) => index)).toEqual([0, 1, 2])
-    for (let index = 1; index < glyphs.length; index += 1) expect(glyphs[index].top).toBeGreaterThanOrEqual(glyphs[index - 1].top + glyphs[index - 1].height - 1)
-
-    // Every expanded column is 300px (R-25); the board scrolls instead of squeezing them.
+    // Every column is 300px (R-25); the board scrolls instead of squeezing or folding them.
     const columns = await board.locator('[data-slot="kanban-column"]').evaluateAll(items => items.map(item => Math.round(item.getBoundingClientRect().width)))
-    expect(columns.filter(value => value !== 40)).toEqual([300, 300, 300, 300])
+    expect(columns).toEqual([300, 300, 300, 300, 300])
     const metrics = await board.evaluate(el => ({ client: el.clientWidth, scroll: el.scrollWidth }))
     expect(metrics.scroll).toBeGreaterThan(metrics.client)
 
@@ -69,13 +64,44 @@ for (const width of [1280, 1440]) {
     await expect.poll(() => board.evaluate(el => el.scrollLeft)).toBeGreaterThan(0)
     await page.keyboard.press('End')
     await expect.poll(() => board.evaluate(el => el.scrollLeft + el.clientWidth)).toBeGreaterThanOrEqual(metrics.scroll - 1)
+
+    // Scrolled to the end, 已完成 is whole, its task shows, and it stops before the sidebar.
+    await expect(page.getByText('已完成里的任务', { exact: true })).toBeVisible()
+    const [doneBox, sidebarBox] = await Promise.all([done.boundingBox(), sidebar.boundingBox()])
+    expect(Math.round(doneBox!.width)).toBe(300)
+    expect(doneBox!.x + doneBox!.width).toBeLessThanOrEqual(sidebarBox!.x)
     await page.keyboard.press('Home')
     await expect.poll(() => board.evaluate(el => el.scrollLeft)).toBe(0)
-
-    await strip.click()
-    await expect(page.getByText('窄条里的已完成任务', { exact: true })).toBeVisible()
   })
 }
+
+test('1024px：Coordinator 侧栏默认收起，展开时浮在看板上；无编号不占位，列表没有版本号', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await register(page)
+  await seedTask(page, '窄窗口里的任务', { status: 'todo' })
+  await page.goto(app('/'))
+  await rail(page, '看板').click()
+
+  // Below 1280 the 360px panel would squeeze the board (R-65): it starts folded.
+  const card = page.getByRole('group', { name: '窄窗口里的任务', exact: true })
+  await expect(card).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true })).toBeHidden()
+  await page.getByRole('button', { name: '展开对话', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Coordinator', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  // Linear sync is off, so the task has no number: no placeholder on the card (R-25, R-40).
+  await expect(card.getByText('正在分配编号', { exact: true })).toHaveCount(0)
+
+  // The list: no number placeholder, no internal version, priority as the card's icon.
+  await page.getByRole('button', { name: '列表视图', exact: true }).click()
+  const list = page.getByLabel('任务列表', { exact: true })
+  const row = list.getByRole('button', { name: /窄窗口里的任务/ })
+  await expect(row).toBeVisible()
+  await expect(row.getByText('正在分配编号', { exact: true })).toHaveCount(0)
+  await expect(row.getByText(/^v\d+$/)).toHaveCount(0)
+  await expect(row.getByRole('img', { name: '中', exact: true })).toBeVisible()
+})
 
 test('看板工具栏：范围切换、筛选和筛选条同高', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -149,5 +175,14 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
     // The personal-task lock explains itself on hover.
     await botCard.getByLabel('个人任务', { exact: true }).hover()
     await expect(page.getByText('个人任务 · 只有你能看到', { exact: true })).toBeVisible()
+
+    // The list shows the card's own group: the Bot's blob on top, the same person, nothing when unassigned.
+    await page.getByRole('button', { name: '列表视图', exact: true }).click()
+    const list = page.getByLabel('任务列表', { exact: true })
+    const listGroup = list.getByRole('button', { name: /Bot 负责的看板任务/ }).locator('[data-slot="avatar-group"]')
+    await expect(listGroup.locator('[data-avatar]')).toHaveCount(4)
+    await expect(listGroup.locator('[data-avatar]').first()).toHaveAttribute('data-avatar', 'bot')
+    await expect(listGroup.locator('[data-avatar="member"]')).toHaveText('回')
+    await expect(list.getByRole('button', { name: /只有 PR 的看板任务/ }).locator('[data-slot="avatar-group"]')).toHaveCount(0)
   })
 })

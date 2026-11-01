@@ -17,7 +17,7 @@ import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-manag
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
 import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
-import { executionBotName, runBotName } from '@/lib/run-bot-name'
+import { executionBotName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
@@ -185,7 +185,8 @@ async function issueThreadAccess(issueId: string) {
 const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt,
   sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, report: agentRuns.report, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
-  agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt,
+  agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt, outcome: agentRuns.outcome,
+  botColor: sql<string | null>`(select b.color from bots b where b.id = ${runBotId})`, botShape: sql<string | null>`(select b.shape from bots b where b.id = ${runBotId})`,
 }
 
 /** The issue's threads, as much of each as this viewer may see (R-62). */
@@ -212,9 +213,23 @@ async function readableThread(issueId: string, runId: string) {
   return { row, user: access.user }
 }
 
+/**
+ * The task a thread works on, for a thread opened from its address alone (R-82).
+ * Null unless the viewer may read that thread, exactly as getIssueThread decides.
+ */
+export async function findThreadIssue(runId: string): Promise<string | null> {
+  if (!z.uuid().safeParse(runId).success) return null
+  const [run] = await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(eq(agentRuns.id, runId)).limit(1)
+  if (!run?.issueId) return null
+  try {
+    await readableThread(run.issueId, runId)
+    return run.issueId
+  } catch { return null }
+}
+
 export interface IssueThreadDetail {
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
-  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean }
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** This run's failure reason, stored masked (agent_runs.error). */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
 }
@@ -252,8 +267,11 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
   // A stop request belongs to the live run that send and stop address, not to an earlier attempt.
   const live = chain?.attempts.find(attempt => attempt.runId === thread.latestRunId)
   const stopRequestedAt = live && live.runId !== row.id ? live.stopRequestedAt : row.stopRequestedAt
+  const quota = row.userId === user.id
+    ? await (await import('@/lib/run-quota-view')).threadQuotaView(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
+    : null
   return {
-    thread: { ...thread, prompt: row.prompt, stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, prompt: row.prompt, stopRequestedAt, quota, error: row.status === 'failed' ? row.error ?? null : null, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }
@@ -289,6 +307,16 @@ export async function getThreadName(runId: string): Promise<string | null> {
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
 export async function stopRun(runId: string): Promise<{ stoppedRunIds: string[] }> {
   return requestRunStop(await getUserId(), runId)
+}
+
+/** A run paused because its subscription's quota ran out goes on with the person's API key. Owner only; a repeat returns the same run. */
+export async function resumeQuotaPausedRunOnApiKey(runId: string): Promise<{ runId: string }> {
+  return (await import('@/lib/run-quota')).resumeQuotaPausedRunOnApiKey(await getUserId(), runId)
+}
+
+/** A run paused because its subscription's quota ran out is tried again with its original credential. Owner only; a repeat returns the same run. */
+export async function retryQuotaPausedRun(runId: string): Promise<{ runId: string }> {
+  return (await import('@/lib/run-quota')).retryQuotaPausedRun(await getUserId(), runId)
 }
 
 /** Settings #504 queues maintenance through the same owner-scoped backend as HTTP. */

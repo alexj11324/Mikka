@@ -43,12 +43,13 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES (\'alice\'),(\'bob\')')
     const migration = await readFile(new URL('../../drizzle/20261027164501_cloud_computers.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
-    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz)')
+    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz, "agentDefinition" jsonb)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027164502_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
     await pool.query(await readFile(new URL('../../drizzle/20261030234636_run_human_control_pause.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261101150000_run_quota_resets_at.sql', import.meta.url), 'utf8'))
     await pool.query('ALTER TABLE agent_runs ADD COLUMN "sessionId" text')
-    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz, "createdAt" timestamptz NOT NULL DEFAULT now())')
+    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', "nameLocked" boolean NOT NULL DEFAULT false, enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz, "createdAt" timestamptz NOT NULL DEFAULT now())')
     const scopeMigration = await readFile(new URL('../../drizzle/20261027164511_cloud_device_scope.sql', import.meta.url), 'utf8')
     await pool.query(scopeMigration); await pool.query(scopeMigration)
     const workerLeaseMigration = await readFile(new URL('../../drizzle/20261027164512_cloud_worker_leases.sql', import.meta.url), 'utf8')
@@ -57,7 +58,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(reviewMigration); await pool.query(reviewMigration)
     const runApprovalMigration = await readFile(new URL('../../drizzle/20261027164513_computer_run_approvals.sql', import.meta.url), 'utf8')
     await pool.query(runApprovalMigration); await pool.query(runApprovalMigration)
-    await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
+    await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text, "removedAt" timestamptz, paused boolean NOT NULL DEFAULT false); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
     await pool.query('ALTER TABLE byos_connections ADD COLUMN "accessSecretName" text')
     const botRuntimeMigration = await readFile(new URL('../../drizzle/20261027164514_bot_cloud_runtimes.sql', import.meta.url), 'utf8')
     await pool.query(botRuntimeMigration); await pool.query(botRuntimeMigration)
@@ -65,12 +66,14 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(policyMigration); await pool.query(policyMigration)
     const policyAllowMigration = await readFile(new URL('../../drizzle/20261029010447_workspace_computer_policy_allow.sql', import.meta.url), 'utf8')
     await pool.query(policyAllowMigration); await pool.query(policyAllowMigration)
+    const personalPolicyMigration = await readFile(new URL('../../drizzle/20261101020201_workspace_personal_policies.sql', import.meta.url), 'utf8')
+    await pool.query(personalPolicyMigration); await pool.query(personalPolicyMigration)
     const policyDefaultAllowMigration = await readFile(new URL('../../drizzle/20261030204751_workspace_computer_policy_default_allow.sql', import.meta.url), 'utf8')
     await pool.query(policyDefaultAllowMigration); await pool.query(policyDefaultAllowMigration)
-    await pool.query('CREATE TABLE suggestions (id uuid PRIMARY KEY)')
+    await pool.query('CREATE TABLE suggestions (id uuid PRIMARY KEY,"botId" uuid)')
     const threadMigration = await readFile(new URL('../../drizzle/20261029011635_subagents_thread_machines.sql', import.meta.url), 'utf8')
     await pool.query(threadMigration); await pool.query(threadMigration)
-    for (const name of ['20261029080000_unattended_browser_runtime.sql','20261029080001_owner_cloud_machines.sql']) {
+    for (const name of ['20261029080000_unattended_browser_runtime.sql','20261029080001_owner_cloud_machines.sql','20261101021000_model_api_keys.sql']) {
       const sql=await readFile(new URL('../../drizzle/'+name,import.meta.url),'utf8')
       await pool.query(sql);await pool.query(sql)
     }
@@ -113,9 +116,9 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
         await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1', [createHash('sha256').update(handoff.credential).digest('hex')])
       }
     } } } as unknown as import('e2b').Sandbox
-    const workerRuntime = { ...runtime, ensureHostedRunnerImage: async () => {} } as typeof provider
+    const workerRuntime = { ...runtime, ensureHostedRunnerImage: async () => { assert.fail('hosted workers must not pull the obsolete Docker image') } } as typeof provider
     await assert.rejects(startCloudWorker(pool, bob, sandbox, 'https://mikka.example/mikka', sha, workerRuntime), /busy or unavailable/)
-    await assert.rejects(startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', 'b'.repeat(40), workerRuntime), /version mismatch/)
+    await assert.rejects(startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', 'b'.repeat(40), workerRuntime), /worker_version_mismatch/)
     const worker = await startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', sha, workerRuntime)
     assert.equal(worker.deviceId, handoff!.deviceId)
     assert.equal((await pool.query('SELECT "workerLeaseId" FROM cloud_machines WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0].workerLeaseId, null)
@@ -159,6 +162,8 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId") VALUES ($1,$2,$3,$4),($5,$6,$3,$4)', [cloudSubscription, actor.userId, actor.workspaceId, consumer, wrongSubscription, bob.userId])
     const connectionId = randomUUID()
     await pool.query('INSERT INTO byos_connections (id,"ownerId","workspaceId",state,epoch,provider) VALUES ($1,$2,$3,$4,$5,$6)', [connectionId, actor.userId, actor.workspaceId, 'connected', 1, 'codex'])
+    // Shared where it was connected, as the migration does for existing subscriptions (decision 2026-10-31-2225).
+    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)', [actor.userId, actor.workspaceId])
     await pool.query('UPDATE byos_bindings SET route=$2,"connectionId"=$3,"connectionRevision"=1 WHERE id=$1', [cloudSubscription, 'codex_cli', connectionId])
     const projectionName = `mikka-byos-${randomUUID()}`
     await pool.query('UPDATE byos_connections SET "accessSecretName"=$2 WHERE id=$1', [connectionId, projectionName])

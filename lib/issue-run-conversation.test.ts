@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runIsActive, runListRefreshInterval, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
+import { runFailureText, runIsActive, runListRefreshInterval, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
 
 test('only active run states offer messages; completed history stays readable', () => {
   for (const state of ['queued', 'preparing', 'running', 'waiting_input', 'finishing']) assert.equal(runIsActive(state), true)
@@ -42,8 +42,30 @@ test('a thread reads as one conversation: agent text, folded steps and people in
     { chunk: { type: 'text-delta', id: 'c', delta: '  ' }, at: t(21) },
     { chunk: { type: 'error', errorText: 'Interrupted' }, at: t(30) },
   ], [{ id: 'm', text: 'Check the fallback', author: 'Lin', mine: false, at: t(10) }])
-  assert.deepEqual(items.map(item => item.kind === 'steps' ? `steps:${item.count}` : item.kind === 'person' ? `person:${item.author}` : item.kind === 'computer' ? `computer:${item.botId}` : `${item.kind}:${item.text}`),
+  assert.deepEqual(items.map(item => item.kind === 'steps' ? `steps:${item.count}` : item.kind === 'person' ? `person:${item.author}` : item.kind === 'computer' ? `computer:${item.botId}` : item.kind === 'stages' ? `stages:${item.stages.length}` : `${item.kind}:${item.text}`),
     ['agent:Reproduced it.', 'steps:2', 'person:Lin', 'agent:Fixed.', 'error:Interrupted'])
+})
+
+test('a folded steps line keeps each tool call so it can open: name, what it ran, whether it failed', () => {
+  const at = new Date()
+  const items = threadItems([
+    { chunk: { type: 'tool-input-available', toolCallId: '1', toolName: 'Bash', input: { command: 'pnpm   test\n --watch=false', description: 'Run tests' } }, at },
+    { chunk: { type: 'tool-output-error', toolCallId: '1', errorText: 'exit 1' }, at },
+    { chunk: { type: 'tool-input-available', toolCallId: '2', toolName: 'apply_patch', input: { files: ['a.ts', 'b.ts'] } }, at },
+    { chunk: { type: 'tool-input-available', toolCallId: '3', toolName: 'Read', input: { file_path: `/${'x'.repeat(300)}` } }, at },
+    { chunk: { type: 'tool-input-available', toolCallId: '4', input: 'raw' }, at },
+  ], [])
+  assert.equal(items.length, 1)
+  const [steps] = items
+  assert.ok(steps.kind === 'steps')
+  assert.equal(steps.count, 4)
+  assert.deepEqual(steps.steps.slice(0, 2), [
+    { id: '1', name: 'Bash', detail: 'pnpm test --watch=false', failed: true },
+    { id: '2', name: 'apply_patch', detail: 'a.ts, b.ts', failed: false },
+  ])
+  assert.equal(steps.steps[2].detail?.length, 200)
+  assert.ok(steps.steps[2].detail?.endsWith('…'))
+  assert.deepEqual(steps.steps[3], { id: '4', name: 'tool', detail: null, failed: false })
 })
 
 test('a thread shows one computer card only for its own run', () => {
@@ -52,4 +74,28 @@ test('a thread shows one computer card only for its own run', () => {
   const chunks = [{ chunk: card, at }, { chunk: card, at }, { chunk: { ...card, data: { ...card.data, runId: 'run-b' } }, at }]
   assert.deepEqual(threadItems(chunks, [], 'run-a').map(item => item.kind), ['computer'])
   assert.deepEqual(threadItems(chunks, [], 'run-c'), [])
+})
+
+test('start-up stages fold into one line in order, keep failures, and ignore malformed stage data', () => {
+  const at = '2026-11-01T12:00:00Z'
+  const items = threadItems([
+    { chunk: { type: 'data-run-stage', data: { stage: 'repository', ms: 3200, ok: true } }, at },
+    { chunk: { type: 'data-run-stage', data: { stage: 'worktree', ms: 400, ok: true } }, at },
+    { chunk: { type: 'data-run-stage', data: { stage: 'agent_start', ms: 65_700, ok: false } }, at },
+    { chunk: { type: 'data-run-stage', data: { stage: 'docker', ms: 1, ok: true } }, at },
+    { chunk: { type: 'data-run-stage', data: { stage: 'worktree', ms: '1', ok: true } }, at },
+  ], [])
+  assert.deepEqual(items, [{ kind: 'stages', id: 'stages:0', at: Date.parse(at), stages: [
+    { stage: 'repository', ms: 3200, ok: true },
+    { stage: 'worktree', ms: 400, ok: true },
+    { stage: 'agent_start', ms: 65_700, ok: false },
+  ] }])
+})
+
+test('a failed run says why; any other run says nothing', () => {
+  assert.equal(runFailureText('failed', '  docker timed out after 65s\n'), 'docker timed out after 65s')
+  assert.equal(runFailureText('failed', null), null)
+  assert.equal(runFailureText('failed', '   '), null)
+  assert.equal(runFailureText('succeeded', 'leftover error'), null)
+  assert.equal(runFailureText('running', 'transient error'), null)
 })

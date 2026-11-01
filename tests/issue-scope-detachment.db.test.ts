@@ -13,17 +13,15 @@ import { readIssueMetadata } from '../lib/issue-metadata'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { REPO_ORIGIN_HEADER, RUN_LEASE_MS } from '@mikka/protocol/device'
 import { remoteKey } from '@mikka/protocol/repository'
-import { assertE2eTarget } from './helpers/e2e-target.mjs'
+import { assertE2eTarget, disposableDatabase } from './helpers/e2e-target.mjs'
 
-// Only the dedicated cloud-Linux test DB or Actions' ephemeral service. Never
-// fall back to business credentials. Fixtures are intentionally retained.
+// Only a disposable loopback *_e2e database (ISSUE184_LOCAL_TEST=1: the retained
+// scope service). Never fall back to business credentials. Fixtures are intentionally retained.
 const url = process.env.E2E_DATABASE_URL
 if (url) {
   const target = assertE2eTarget(url)
-  const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.port === '5432' && target.pathname === '/mikka_e2e'
-  const cloud = process.env.ISSUE184_LOCAL_TEST === '1' && target.port === '55484' && target.pathname === '/issue184_e2e'
-  const local = process.env.GITHUB_ACTIONS !== 'true' && process.env.ISSUE184_LOCAL_TEST !== '1' && process.env.REQUIRE_DB === '1'
-  if ((!ci && !cloud && !local) || process.env.GITHUB_ACTIONS === 'true' && !ci || process.env.ISSUE184_LOCAL_TEST === '1' && !cloud) throw new Error('Scope tests require an isolated E2E target or the retained scope service')
+  const cloud = target.port === '55484' && target.pathname === '/issue184_e2e'
+  if (!disposableDatabase() || process.env.ISSUE184_LOCAL_TEST === '1' && !cloud) throw new Error('Scope tests require an isolated E2E target or the retained scope service')
   if (process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) throw new Error('Scope tests must use the same isolated application/workspace target')
 }
 if (!url && process.env.REQUIRE_DB === '1') throw new Error('Scope DB tests cannot skip in required CI')
@@ -600,8 +598,16 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     await pool.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$5,\'MIK-184\')', [randomUUID(), fixture.id, owner, sync, randomUUID()])
     const remote = `https://github.com/mikka-ci/publication-${randomUUID()}.git`
     const { remoteKey } = await import('@mikka/protocol/repository')
-    await pool.query('insert into repository_settings ("userId","remoteKey",push) values ($1,$2,$3)', [actor, remoteKey(remote), JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: actor, approvedAt: new Date().toISOString() })])
-    const assignment = await prepareRunPublication({ id: fixture.run, userId: actor, issueId: fixture.id, baseBranch: null }, remote)
+    // Push is what the GitHub App grants (lib/github/push-grant.ts): admission
+    // writes the receipt and an approved publication; this fixture does the same.
+    const reserved = await prepareRunPublication({ id: fixture.run, userId: actor, issueId: fixture.id, baseBranch: null }, remote)
+    assert.ok(reserved.pushBranch)
+    const { rows: [run] } = await pool.query('select "deviceId","agentId" from agent_runs where id=$1', [fixture.run])
+    const now = new Date().toISOString()
+    await pool.query('update agent_runs set "agentDefinition"=$2 where id=$1', [fixture.run, JSON.stringify({ repositoryAdmission: { userId: actor, issueId: fixture.id, deviceId: run.deviceId, agentId: run.agentId, remoteKey: remoteKey(remote), remoteUrl: remote, permission: 'push_to_origin', targetBranch: reserved.pushBranch, approvedAt: now, authority: 'github_app', acceptedAt: now } })])
+    await pool.query('update run_publications set "pushApproved"=true where "runId"=$1', [fixture.run])
+    const assignment = await prepareRunPublication({ id: fixture.run, userId: actor, issueId: fixture.id, baseBranch: null, deviceId: run.deviceId, agentId: run.agentId, botId: null, agentDefinition: (await pool.query('select "agentDefinition" from agent_runs where id=$1', [fixture.run])).rows[0].agentDefinition }, remote)
+    assert.equal(assignment.policy.permissions.git_push, 'allow')
     assert.ok(assignment.pushBranch)
     return { ...fixture, report: { ...passedReport, publish: { branch: assignment.pushBranch, remote: 'origin' as const, pushed: true, commit: 'b'.repeat(40) } } }
   }
@@ -681,8 +687,8 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     let retiring: Promise<void> | undefined
     try {
       await Promise.race([entered.promise, publishing.then(() => { throw new Error('Publication ended before its fenced write') })])
-      const holder = (await pool.query("select pid from pg_stat_activity where datname=current_database() and state='idle in transaction' and query like '%repository_settings%for share%'")).rows
-      assert.equal(holder.length, 1, 'one publication transaction holds the repository approval through provider IO')
+      const holder = (await pool.query("select pid from pg_stat_activity where datname=current_database() and state='idle in transaction' and query like '%external_write_permissions%'")).rows
+      assert.equal(holder.length, 1, 'one publication transaction stays open through provider IO')
       retiring = retirePublicationFixture(fixture, true).then(() => { retired = true })
       let waiting = false
       for (let n = 0; n < 100 && !waiting; n++) {

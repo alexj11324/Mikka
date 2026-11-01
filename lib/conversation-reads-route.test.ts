@@ -9,6 +9,7 @@ import { Pool } from 'pg'
 // Run with --experimental-test-module-mocks.
 
 let sessionUser: string | null = null
+const coordinatorLookups: [string, string | null][] = []
 let pool: Pool | null = null
 let skipReason = 'MIKKA_DATABASE_URL not set (run via ~/.mikka/local-run.sh)'
 let route: typeof import('../app/api/conversations/[id]/read/route')
@@ -32,6 +33,10 @@ before(async () => {
     namedExports: { auth: { api: { getSession: async () => (sessionUser ? { user: { id: sessionUser } } : null) } } },
   })
   mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { pool: pool ?? stubPool, db: null } })
+  // The route names the signed-in person's Coordinator bot; these people have none, so their chat is bot-less.
+  mock.module(new URL('./coordinator/coordinator-bot.ts', import.meta.url).href, {
+    namedExports: { openChatBotId: async (user: { id: string }, botId: string | null) => { coordinatorLookups.push([user.id, botId]); return null } },
+  })
   route = await import('../app/api/conversations/[id]/read/route')
 })
 
@@ -65,4 +70,5 @@ test('route: same-origin via x-forwarded-host → 200; missing Origin → 200', 
   assert.equal((await call('GET', { host: 'internal:3000' })).status, 200)
   // text/plain beacon body reaches the JSON parser: unknown position → 422, not 400/415.
   assert.equal((await call('POST', { host: 'internal:3000', 'content-type': 'text/plain' }, '{"messageId":"1"}')).status, 422)
+  assert.deepEqual(coordinatorLookups.at(-1), [sessionUser, null], "the route resolves the signed-in person's Coordinator")
 })

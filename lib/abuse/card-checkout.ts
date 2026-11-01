@@ -9,12 +9,25 @@ import { stripeConfig, stripePost, StripeRequestError } from '@/lib/billing/stri
 
 type Env = Readonly<Record<string, string | undefined>>
 
-/** Admin-only. Stripe hosts verification; setup mode cannot charge the customer. */
-export async function createCardSetup(actorId: string, workspaceId: string, fetchImpl: typeof fetch = fetch, locale = 'zh-CN', env: Env = process.env): Promise<{ url: string }> {
-  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
+/**
+ * Card verification belongs to the person (orchestration.md § 7, C19): any
+ * member verifies, from any workspace, and it is recorded on their own personal
+ * workspace, which gets the one-off USD 1 credit once per card. Returns to that
+ * workspace's 计费. Stripe hosts the page; setup mode cannot charge the customer.
+ */
+export async function personalBillingWorkspace(actorId: string, locale = 'zh-CN'): Promise<string> {
+  const { rows: [user] } = await pool.query<{ id: string; email: string; name: string }>('SELECT id,email,name FROM "user" WHERE id=$1', [actorId])
+  if (!user) throw new WorkspaceError('workspaceAccessDenied')
+  const { ensurePersonalWorkspace } = await import('@/lib/personal-workspace')
+  return ensurePersonalWorkspace(user, locale === 'en' ? 'en' : 'zh-CN')
+}
+
+export async function createCardSetup(actorId: string, currentWorkspaceId: string, fetchImpl: typeof fetch = fetch, locale = 'zh-CN', env: Env = process.env): Promise<{ url: string }> {
+  await workspaceDb.transaction(tx => requireWorkspace(tx, currentWorkspaceId, actorId))
   const config = stripeConfig(env)
   const origin = resolveAppOrigin(env)
   if (!config?.webhookSecret || !origin) throw new WorkspaceError('billingNotConfigured')
+  const workspaceId = await personalBillingWorkspace(actorId, locale)
   const [trustedOrigin] = authTrustedOrigins({ BETTER_AUTH_URL: origin, NODE_ENV: env.NODE_ENV, CI: env.CI })
   const back = new URL(withBasePath(`${locale === 'en' ? '/en' : ''}/settings`), trustedOrigin)
   back.searchParams.set('section', 'billing')
@@ -25,7 +38,7 @@ export async function createCardSetup(actorId: string, workspaceId: string, fetc
       UNION ALL SELECT "customerId" AS id FROM hosted_verifications WHERE "workspaceId"=$1 AND "customerId" IS NOT NULL
       UNION ALL SELECT "customerId" AS id FROM hosted_setup_intents WHERE "workspaceId"=$1
       LIMIT 1`, [workspaceId])).rows[0]
-    const customer = prior ?? await stripePost<{ id: string }>(config, 'customers', { metadata: { workspaceId } }, fetchImpl, `points-customer:${workspaceId}`)
+    const customer = prior ?? await stripePost<{ id: string }>(config, 'customers', { metadata: { workspaceId, userId: actorId } }, fetchImpl, `points-customer:${workspaceId}`)
     const binding = (await pool.query<{ id: string }>(`
       INSERT INTO workspace_billing ("workspaceId", "stripeCustomerId") VALUES ($1,$2)
       ON CONFLICT ("workspaceId") DO UPDATE SET "stripeCustomerId"=coalesce(workspace_billing."stripeCustomerId",excluded."stripeCustomerId")

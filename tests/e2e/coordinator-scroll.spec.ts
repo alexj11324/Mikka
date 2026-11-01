@@ -52,7 +52,9 @@ test('a failed hidden welcome does not enqueue another welcome on mount or poll'
   await expect(page.getByRole('alert').filter({ hasText: '回复重试已停止' })).toBeVisible()
   await expect(page.getByRole('status').filter({ hasText: '正在写欢迎语…' })).toHaveCount(0)
   const served = chat.served
+  // Focus never re-reads; the next poll (10 s while idle) does.
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  expect(chat.served).toBe(served)
   await expect.poll(() => chat.served, { timeout: 15000 }).toBeGreaterThan(served)
   expect(chat.welcomes).toBe(0)
 })
@@ -95,7 +97,7 @@ async function serve(page: Page, state: Awaited<ReturnType<typeof mockChat>>, it
   state.working = working
   const before = state.served
   await page.evaluate(step => Object.assign(window, { __chatStep: step }), shown)
-  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+  // The next poll puts it on screen; focus would not.
   await expect.poll(() => state.served, { timeout: 15000 }).toBeGreaterThan(before)
   await expect(conversation(page).getByText(shown, { exact: false }).last()).toBeAttached()
 }

@@ -5,14 +5,15 @@ import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
 import { AGENT_TOOL_IDS, SCHEDULE_TOOL_IDS } from '@/lib/agent-kit/registry'
 import { issueMutationsEnabled } from './issue-tools-enabled'
 import { COORDINATOR_INSTRUCTIONS } from './instructions'
+/** The person's Coordinator: an ordinary bot row, marked as the Coordinator. */
+const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
 
 const created = mock.fn(async () => ({ id: 'created' }))
 const updated = mock.fn(async () => ({ id: 'updated' }))
 const dispatched = mock.fn(async () => ({ runId: 'queued' }))
-const proposed = mock.fn(async () => ({ status: 'awaiting_approval' }))
 const readIssue = mock.fn(async (..._args: unknown[]) => ({ id: 'read-issue' }))
 const scheduled = mock.fn(async (..._args: unknown[]) => ({ id: 'schedule' }))
-mock.module('@/workflows/coordinator/steps', { namedExports: { createIssue: created, updateIssue: updated, dispatchRun: dispatched, proposeRepositoryPushApproval: proposed, getIssue: readIssue, scheduleCommand: scheduled } })
+mock.module('@/workflows/coordinator/steps', { namedExports: { createIssue: created, updateIssue: updated, dispatchRun: dispatched, getIssue: readIssue, scheduleCommand: scheduled } })
 mock.module('@/workflows/coordinator/agent-kit-steps', { namedExports: {} })
 mock.module('@/lib/composio-actions', { namedExports: { createComposioAITools: () => ({}), createGoogleAITools: () => ({}) } })
 let registry: typeof import('@/workflows/coordinator/tools')
@@ -27,23 +28,23 @@ test('issue tools default on; only an explicit kill switch turns them off', () =
   assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: '0' }), false)
   assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: 'true' }), false)
   delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
-  const unset = registry.createCoordinatorRegistry('owner', null)
+  const unset = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
   assert.ok(unset.create_issue)
   assert.ok(unset.update_issue)
 })
 
 test('the kill switch removes the tools and never widens a frozen execution grant', () => {
   process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
-  const disabled = registry.createCoordinatorRegistry('owner', null)
+  const disabled = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
   assert.equal(disabled.create_issue, undefined)
   assert.equal(disabled.update_issue, undefined)
   assert.doesNotMatch(COORDINATOR_INSTRUCTIONS, /When task mutation tools are available|Respect the machine selected in a new-task request/)
   type Execution = NonNullable<NonNullable<Parameters<typeof registry.coordinatorTools>[3]>['execution']>
   const executionFor = (effectiveTools: string[]) => ({ id: 'execution', snapshot: { effectiveTools } }) as unknown as Execution
-  assert.deepEqual(Object.keys(registry.coordinatorTools('owner', null, undefined, { execution: executionFor(['create_issue', 'get_issue']) })), ['get_issue'])
+  assert.deepEqual(Object.keys(registry.coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution: executionFor(['create_issue', 'get_issue']) })), ['get_issue'])
   process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
-  assert.deepEqual(Object.keys(registry.coordinatorTools('owner', null, undefined, { execution: executionFor(['get_issue']) })), ['get_issue'])
-  assert.throws(() => registry.coordinatorTools('owner', null, undefined, { execution: executionFor(['unregistered_tool']) }))
+  assert.deepEqual(Object.keys(registry.coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution: executionFor(['get_issue']) })), ['get_issue'])
+  assert.throws(() => registry.coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution: executionFor(['unregistered_tool']) }))
 })
 
 test('issue tools are available in the default definition and global capability registry', () => {
@@ -65,7 +66,7 @@ test('scheduled reads cannot request write tools and retain their trusted read s
 test('scheduled read restrictions narrow a frozen grant before instrumentation', () => {
   type Execution = NonNullable<NonNullable<Parameters<typeof registry.coordinatorTools>[3]>['execution']>
   const execution = { id: 'execution', snapshot: { effectiveTools: ['create_issue', 'dispatch_run', 'get_issue', 'web_search', 'schedule_create'] } } as unknown as Execution
-  const tools = registry.coordinatorTools('owner', null, undefined, { execution, readOnly: true, readToolIds: ['get_issue', 'create_issue'] })
+  const tools = registry.coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution, readOnly: true, readToolIds: ['get_issue', 'create_issue'] })
   assert.deepEqual(Object.keys(tools), ['get_issue'])
 })
 
@@ -108,25 +109,54 @@ test('mutations preserve the host user, Bot and scope and forward the SDK tool c
 
 test('create tool forwards only the host-provided request event, never a model argument', async () => {
   const eventId = 'b4000000-0000-4000-8000-000000000004'
-  const tools = registry.createCoordinatorRegistry('owner', null, undefined, { taskEventId: eventId })
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true,  taskEventId: eventId })
   const options = { toolCallId: 'event-call', messages: [], context: {} }
   assert.equal(createIssueInput.safeParse({ title: 'Task', taskEventId: 'forged' }).success, false)
   await tools.create_issue!.execute!({ title: 'Task' }, options)
-  assert.deepEqual(created.mock.calls.at(-1)!.arguments, ['owner', { title: 'Task' }, 'event-call', undefined, null, eventId])
+  assert.deepEqual(created.mock.calls.at(-1)!.arguments, ['owner', { title: 'Task' }, 'event-call', undefined, COORDINATOR_BOT, eventId])
 })
 
 test('dispatch uses the same host event as task creation and exposes no event argument to the model', async () => {
   const eventId = 'b4000000-0000-4000-8000-000000000004'
-  const tools = registry.createCoordinatorRegistry('owner', null, undefined, { taskEventId: eventId })
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true,  taskEventId: eventId })
   const input = { issueId: 'b4000000-0000-4000-8000-000000000005', agentId: 'b4000000-0000-4000-8000-000000000006', repo: 'example/repository' }
   await tools.dispatch_run!.execute!(input, { toolCallId: 'dispatch', messages: [], context: {} })
-  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:dispatch'}, undefined, null, undefined, eventId])
-  const request = tools.request_repository_push_approval!
-  const schema = request.inputSchema as { safeParse(input: unknown): { success: boolean } }
-  assert.equal(schema.safeParse({ repo: input.repo, taskEventId: 'forged' }).success, false)
-  await request.execute!({ repo: input.repo }, { toolCallId: 'approval', messages: [], context: {} })
-  assert.deepEqual(proposed.mock.calls.at(-1)!.arguments, ['owner', { repo: input.repo }, undefined, { eventId, botId: null }])
-  const resumed = registry.createCoordinatorRegistry('owner', null, undefined, { taskEventId: eventId, approvedRepositoryKey: 'v2:github.com/example/repository' })
+  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId])
+  assert.equal(tools.request_repository_push_approval, undefined, 'push is what the GitHub App grants; Mikka asks for no approval of its own')
+  const resumed = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true,  taskEventId: eventId, approvedRepositoryKey: 'v2:github.com/example/repository' })
   await resumed.dispatch_run!.execute!(input, { toolCallId: 'resumed-dispatch', messages: [], context: {} })
-  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:resumed-dispatch'}, undefined, null, undefined, eventId, 'v2:github.com/example/repository'])
+  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:resumed-dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId, 'v2:github.com/example/repository'])
+})
+
+test('one task, one thread: dispatch takes newThread from the model but the person\'s message only from the host', async () => {
+  const sourceEventId = 'b4000000-0000-4000-8000-000000000007'
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true, sourceEventId })
+  const dispatch = tools.dispatch_run!
+  // Retrying or adding information goes to the existing thread; only an explicit request may start another.
+  assert.match(String(dispatch.description), /one thread at a time/)
+  assert.match(String(dispatch.description), /never to start over/)
+  assert.match(COORDINATOR_INSTRUCTIONS, /Never dispatch a second thread/)
+  const schema = dispatch.inputSchema as { safeParse(input: unknown): { success: boolean; data?: Record<string, unknown> } }
+  const input = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository', newThread: true }
+  assert.equal(schema.safeParse(input).success, true)
+  // A model-supplied message id is not part of the tool's input.
+  assert.equal('sourceEventId' in (schema.safeParse({ ...input, sourceEventId: 'forged' }).data ?? {}), false)
+  await dispatch.execute!({ ...input, sourceEventId: 'forged' } as typeof input, { toolCallId: 'again', messages: [], context: {} })
+  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', { ...input, requestKey: 'dispatch:again', sourceEventId }, undefined, COORDINATOR_BOT, undefined])
+})
+
+test('dispatch takes a named place: one of the person\'s computers by id, or the cloud, and reports where it runs', async () => {
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
+  const dispatch = tools.dispatch_run!
+  const schema = dispatch.inputSchema as { safeParse(input: unknown): { success: boolean } }
+  const base = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository' }
+  assert.equal(schema.safeParse({ ...base, target: { deviceId: 'b4000000-0000-4000-8000-000000000008' } }).success, true)
+  assert.equal(schema.safeParse({ ...base, target: 'cloud' }).success, true)
+  assert.equal(schema.safeParse({ ...base, target: { deviceId: 'e2b.local' } }).success, false, 'a computer is named by its id from list_agents')
+  assert.equal(schema.safeParse({ ...base, target: 'my-mac' }).success, false)
+  assert.match(String(dispatch.description), /result\.placement/)
+  assert.match(String(tools.list_agents!.description), /deviceId as dispatch_run target/)
+  const target = { deviceId: 'b4000000-0000-4000-8000-000000000008' }
+  await dispatch.execute!({ ...base, target }, { toolCallId: 'named', messages: [], context: {} })
+  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', { ...base, target, requestKey: 'dispatch:named' }, undefined, COORDINATOR_BOT, undefined])
 })

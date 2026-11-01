@@ -5,8 +5,14 @@ import type { PublicationErrorCode, PublishedPullRequest } from '@/lib/run-publi
 /** One row for `coordinator_events`, before it gets an id. */
 export interface CoordinatorEventInput {
   userId: string
-  /** The bot whose chat it goes to; null or absent for the Coordinator's. */
-  botId?: string | null
+  /**
+   * The bot whose chat it goes to, the Coordinator's bot row included. The
+   * producer passes the bot its row already stores (a run's, a task's, a
+   * schedule's) or resolves the Coordinator where the work enters (a message,
+   * a briefing, a matter). Null only for a legacy run from before the
+   * Coordinator had a bot row; lib/coordinator/coordinator-bot.ts moves it.
+   */
+  botId: string | null
   kind: CoordinatorEventKind
   dedupeKey: string
   issueId: string | null
@@ -27,13 +33,13 @@ export interface TelegramMessageSource extends TelegramReplyTarget {
 export function userMessageEvent(
   userId: string,
   text: string,
-  options: { issueId?: string | null; telegram?: TelegramMessageSource; botId?: string | null } = {},
+  options: { issueId?: string | null; telegram?: TelegramMessageSource; botId: string },
 ): CoordinatorEventInput {
   const id = crypto.randomUUID()
   const telegram = options.telegram
   return {
     userId,
-    ...(options.botId ? { botId: options.botId } : {}),
+    botId: options.botId,
     kind: 'user_message',
     dedupeKey: telegram ? 'telegram:' + telegram.threadId + ':' + telegram.messageId : 'user_message:' + id,
     issueId: options.issueId ?? null,
@@ -43,11 +49,12 @@ export function userMessageEvent(
 }
 
 /** OAuth delegates access to an Agent; it does not turn Agent prose into a
- * human decision. Result tier preserves the existing wake-on-send behaviour.
+ * human decision. No preset tier: triage (the Decisions API) decides whether
+ * it needs the person, is a result, or is background, like any runtime event.
  */
-export function peerCoordinatorMessageEvent(userId: string, text: string): CoordinatorEventInput & { tier: 'result' } {
-  return { userId, kind: 'run_report', dedupeKey: 'peer_message:' + crypto.randomUUID(), issueId: null, runId: null,
-    payload: { text, source: 'oauth_agent_mcp' }, tier: 'result' }
+export function peerCoordinatorMessageEvent(userId: string, botId: string, text: string): CoordinatorEventInput {
+  return { userId, botId, kind: 'run_report', dedupeKey: 'peer_message:' + crypto.randomUUID(), issueId: null, runId: null,
+    payload: { text, source: 'oauth_agent_mcp' } }
 }
 
 /** Unique Telegram destinations for the user messages in one claimed batch. */
@@ -69,7 +76,7 @@ export function telegramReplyTargets(events: ReadonlyArray<Pick<CoordinatorEvent
 export function runFinishedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null; kind: string; status: RunStatus; stopReason: string; report?: RunReport | null; publication?: { pullRequest?: PublishedPullRequest | null; errorCode?: PublicationErrorCode | null; branch?: string | null } }): CoordinatorEventInput {
   return {
     userId: run.userId,
-    ...(run.botId ? { botId: run.botId } : {}),
+    botId: run.botId ?? null,
     kind: 'run_finished',
     dedupeKey: `run_finished:${run.id}`,
     issueId: run.issueId,
@@ -79,32 +86,79 @@ export function runFinishedEvent(run: { id: string; userId: string; botId?: stri
 }
 
 /** A run lost its device and was queued again as `retryRunId`. Background: nobody needs to act. */
-export function runRetriedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null }, retry: { runId: string; attempt: number; maxAttempts: number; movedToDeviceId?: string | null }): CoordinatorEventInput {
+/** Where a lost run went on (decision 2026-10-31-2200-run-machine-fallback): the person's own E2B cloud, or another of their devices. */
+export type RunMovedTo = { kind: 'cloud' } | { kind: 'device'; deviceId: string }
+
+export function runRetriedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null }, retry: { runId: string; attempt: number; maxAttempts: number; movedToDeviceId?: string | null; movedTo?: RunMovedTo | null }): CoordinatorEventInput {
   return {
     userId: run.userId,
-    ...(run.botId ? { botId: run.botId } : {}),
+    botId: run.botId ?? null,
     kind: 'run_retried',
     dedupeKey: `run_retried:${run.id}`,
     issueId: run.issueId,
     runId: run.id,
-    payload: { retryRunId: retry.runId, attempt: retry.attempt, maxAttempts: retry.maxAttempts, ...(retry.movedToDeviceId ? { movedToDeviceId: retry.movedToDeviceId } : {}) },
+    payload: { retryRunId: retry.runId, attempt: retry.attempt, maxAttempts: retry.maxAttempts, ...(retry.movedToDeviceId ? { movedToDeviceId: retry.movedToDeviceId } : {}), ...(retry.movedTo ? { movedTo: retry.movedTo } : {}) },
+  }
+}
+
+/** Which subscription a run was on: its byos_connections id, or null for a device's own CLI login. */
+export interface QuotaSubscription { provider: 'claude' | 'codex'; connectionId: string | null }
+
+/** The API key a quota continuation runs on, without the key itself. */
+export interface QuotaApiKey { keyId: string; provider: string; name: string | null; last4: string; model: string }
+
+/** A subscription's quota ran out mid-run and the run went on as `retryRunId` on the person's API key. */
+export function runCredentialSwitchedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null }, from: QuotaSubscription, to: QuotaApiKey, retryRunId: string, resetsAt: string | null): CoordinatorEventInput {
+  return {
+    userId: run.userId,
+    botId: run.botId ?? null,
+    kind: 'run_credential_switched',
+    dedupeKey: `run_credential_switched:${run.id}`,
+    issueId: run.issueId,
+    runId: run.id,
+    payload: {
+      reason: 'quota_exhausted',
+      from: { kind: 'subscription', provider: from.provider, connectionId: from.connectionId },
+      to: { kind: 'api_key', keyId: to.keyId, provider: to.provider, name: to.name, last4: to.last4, model: to.model },
+      retryRunId, resetsAt,
+    },
+  }
+}
+
+/** A subscription's quota ran out mid-run and nothing could go on with it: the run is paused for the person. */
+export function runQuotaPausedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null }, from: QuotaSubscription, resetsAt: string | null, why: 'apiKeyAfterQuotaOff' | 'noApiKey'): CoordinatorEventInput {
+  return {
+    userId: run.userId,
+    botId: run.botId ?? null,
+    kind: 'run_quota_paused',
+    dedupeKey: `run_quota_paused:${run.id}`,
+    issueId: run.issueId,
+    runId: run.id,
+    payload: {
+      reason: 'quota_exhausted', provider: from.provider, connectionId: from.connectionId, resetsAt, why,
+      actions: [{ action: 'addApiKey' }, { action: 'retryAfterReset', at: resetsAt }],
+    },
   }
 }
 
 /**
- * An issue moved to done, or null when this save is not that move. Keyed by
- * the revision that made the move, so reopening and finishing again is a new
- * event.
+ * An issue changed status, or null when this save did not change it. A move
+ * to done is `issue_done`; any other move (canceled, blocked, review, reopened…)
+ * is `issue_status_changed`. Neither carries a tier: whether the person's
+ * Coordinator should act on it is triage's call on the Decisions API, not a
+ * done-only filter. Keyed by the revision that made the move.
  */
-export function issueDoneEvent(before: { status: string }, after: { id: string; userId: string; title: string; status: string; revision: number }): CoordinatorEventInput | null {
-  if (before.status === 'done' || after.status !== 'done') return null
+export function issueStatusEvent(before: { status: string }, after: { id: string; userId: string; title: string; status: string; revision: number }, botId: string): CoordinatorEventInput | null {
+  if (before.status === after.status) return null
+  const done = after.status === 'done'
   return {
     userId: after.userId,
-    kind: 'issue_done',
-    dedupeKey: `issue_done:${after.id}:${after.revision}`,
+    botId,
+    kind: done ? 'issue_done' : 'issue_status_changed',
+    dedupeKey: `${done ? 'issue_done' : 'issue_status'}:${after.id}:${after.revision}`,
     issueId: after.id,
     runId: null,
-    payload: { title: after.title, previousStatus: before.status },
+    payload: { title: after.title, previousStatus: before.status, ...(done ? {} : { status: after.status }) },
   }
 }
 
@@ -112,7 +166,7 @@ export function issueDoneEvent(before: { status: string }, after: { id: string; 
 interface WorkerRun { id: string; userId: string; botId?: string | null; issueId: string | null }
 
 function workerEvent(kind: 'run_report' | 'run_question' | 'run_blocked', run: WorkerRun, payload: Record<string, unknown>): CoordinatorEventInput {
-  return { userId: run.userId, ...(run.botId ? { botId: run.botId } : {}), kind, dedupeKey: `${kind}:${run.id}:${crypto.randomUUID()}`, issueId: run.issueId, runId: run.id, payload }
+  return { userId: run.userId, botId: run.botId ?? null, kind, dedupeKey: `${kind}:${run.id}:${crypto.randomUUID()}`, issueId: run.issueId, runId: run.id, payload }
 }
 
 /** The agent inside a run reached a milestone and says so (MCP `report`). */
@@ -147,9 +201,9 @@ export interface BriefingEventItem { suggestionId: string; source: string; actio
  * first one after they connect an app. One event per briefing kind and local
  * date, so a rerun of the cron does not push it twice.
  */
-export function briefingEvent(briefing: { userId: string; localDate: string; kind: 'first' | 'daily'; total: number; counts: Record<string, number> }, items: readonly BriefingEventItem[], personName: string | null = null): CoordinatorEventInput {
+export function briefingEvent(briefing: { userId: string; localDate: string; kind: 'first' | 'daily'; total: number; counts: Record<string, number> }, items: readonly BriefingEventItem[], personName: string | null, botId: string): CoordinatorEventInput {
   return {
-    userId: briefing.userId, kind: 'daily_briefing', dedupeKey: `daily_briefing:${briefing.userId}:${briefing.localDate}:${briefing.kind}`, issueId: null, runId: null,
+    userId: briefing.userId, botId, kind: 'daily_briefing', dedupeKey: `daily_briefing:${briefing.userId}:${briefing.localDate}:${briefing.kind}`, issueId: null, runId: null,
     payload: { localDate: briefing.localDate, briefingKind: briefing.kind, total: briefing.total, counts: briefing.counts, items, ...(personName ? { personName } : {}) },
   }
 }
@@ -161,7 +215,7 @@ export function artifactSubmittedEvent(
 ): CoordinatorEventInput {
   return {
     userId: submitter.userId,
-    ...(submitter.botId ? { botId: submitter.botId } : {}),
+    botId: submitter.botId ?? null,
     kind: 'artifact_submitted',
     dedupeKey: `artifact_submitted:${artifact.artifactId}:${artifact.version}`,
     issueId: submitter.issueId,
@@ -174,10 +228,11 @@ export function artifactSubmittedEvent(
 export function actionDecidedEvent(
   action: { id: string; userId: string; action: string; input: Record<string, unknown> },
   decision: { status: 'done' | 'failed' | 'declined' | 'running'; error: string | null; outcome: Record<string, string> },
-  task?: { eventId: string; botId: string | null; issueId: string | null },
+  chat: { botId: string | null } & ({ eventId: string; issueId: string | null } | { eventId?: undefined; issueId?: undefined }),
 ): CoordinatorEventInput {
+  const task = chat.eventId !== undefined ? chat as { eventId: string; botId: string | null; issueId: string | null } : undefined
   return {
-    userId: action.userId, ...(task ? { botId: task.botId } : {}), kind: 'action_decided', dedupeKey: `action_decided:${action.id}${task ? ':' + task.eventId : ''}`, issueId: task?.issueId ?? null, runId: null,
+    userId: action.userId, botId: chat.botId, kind: 'action_decided', dedupeKey: `action_decided:${action.id}${task ? ':' + task.eventId : ''}`, issueId: task?.issueId ?? null, runId: null,
     payload: { actionId: action.id, action: action.action, input: action.input, status: decision.status, ...(task ? { requestEventId: task.eventId } : {}), ...(decision.error ? { error: decision.error } : {}), outcome: decision.outcome },
   }
 }

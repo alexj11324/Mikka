@@ -62,7 +62,7 @@ Notes:
 | What | Where | Kept by |
 | --- | --- | --- |
 | Words | `docs/design/glossary.md` | Whoever changes the model, in the same PR |
-| Product and visual rules | `docs/design/rules.md` | Any thread, after Alex decides |
+| Product and visual rules | `docs/design/rules.md` | Any thread, after Alex decides; the coordinator assigns new ids |
 | Components | `docs/design/components.md` | The thread that adds or retires a component |
 | Decisions | `docs/design/decisions/`, one file each (`decisions.md` is frozen) | Whoever hears the decision, the same day |
 | Brand mark | `docs/design/brand.md` | Any thread, after Alex decides |

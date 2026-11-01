@@ -111,10 +111,10 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
       WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$3 FOR SHARE OF repo`,[runId,userId,issueId])
     if (!source) throw new ImprovementError('sourceMismatch')
-    // Admission and continuations use the same repository -> issue order.
+    // Admission and continuations use the same repository -> issue order: the
+    // recorded GitHub App grant (lib/github/push-grant.ts), then the issue.
     // The host acquires CLI policy before any source run/worker lock.
-    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
-      [JSON.stringify(['repository-approval', userId, source.repoPath])])
+    await tx.query('SELECT 1 FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2 FOR SHARE', [userId, source.repoPath])
     await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
       [JSON.stringify(['dispatch-issue', userId, issueId])])
     const run = await owned(tx, userId, runId)

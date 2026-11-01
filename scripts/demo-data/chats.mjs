@@ -21,10 +21,9 @@ export const CHATS = {
     user([{ type: 'text', text: '这是我这边的截图，「已完成」那列' }, { type: 'file', mediaType: 'image/png', data: PIXEL }]),
     bot('收到截图，和我复现的一致。改动是这一处：\n\n```tsx\n// components/blocks/kanban-board-1/components/kanban-board.tsx\n<KanbanColumnContent\n  value={column.value}\n  className="min-h-0 flex-1 gap-1.5 overflow-y-auto overscroll-y-contain p-0.5 pb-[var(--scrollbar-size)]"\n/>\n```\n\n`--scrollbar-size` 在 `globals.css` 里按平台给值，macOS 叠加滚动条时是 0，不会多出空白。'),
     user('顺便把这周前端相关的 PR 状态列一下'),
-    bot(`root = Stack([title, table, follow])
+    bot(`root = Stack([title, table])
 title = TextContent("前端相关 PR（本周）", "large-heavy")
-table = BeTable(["PR", "标题", "状态", "评审"], [["#845", "看板最后一张卡避开滚动条", "Open", "等 CI"], ["#851", "引用保留 Artifact 版本", "Open", "1 条意见"], ["#790", "半透明窗口去掉对话框模糊", "Merged", "通过"], ["#781", "旧组件名继续解析", "Merged", "通过"]])
-follow = BeFollowUps([{label: "#851 的意见是什么？", prompt: "把 #851 的评审意见贴出来，并说说你打算怎么改。"}, {label: "哪些可以今天合？", prompt: "这些 PR 里哪些今天就能合？给出理由。"}])`),
+table = BeTable(["PR", "标题", "状态", "评审"], [["#845", "看板最后一张卡避开滚动条", "进行中", "等 CI"], ["#851", "引用保留 Artifact 版本", "进行中", "1 条意见"], ["#790", "半透明窗口去掉对话框模糊", "已合并", "通过"], ["#781", "旧组件名继续解析", "已合并", "通过"]])`),
     user('#851 的意见是什么？'),
     bot(`root = Stack([intro, diff, alert])
 intro = InlineText(["评审在 ", SourceChip("https://github.com/mikka-demo/web/pull/851", "PR #851"), " 里指出：引用对象里的 version 用的是字符串，", TaskChip("{{issue:i-quote-artifact}}"), " 的根因其实在序列化那一层。"])
@@ -66,7 +65,7 @@ approve = BeApproval("合并 #61 到 main？", "改动只有一行 await，外�
     user('今天的回归巡检结果？'),
     bot(`root = Stack([alert, donut, radial, list])
 alert = BeAlert("2 个失败", "登录死循环仍可复现；iOS 冷启动白屏 2 秒。", "destructive")
-donut = DonutChart([{name: "通过", value: 46}, {name: "失败", value: 2}, {name: "跳过", value: 3}], "个", "用例")
+donut = DonutChart([{name: "通过", value: 46, status: "success"}, {name: "失败", value: 2, status: "destructive"}, {name: "跳过", value: 3, status: "neutral"}], "个", "用例")
 radial = RadialChart("本月 E2E 时长额度", 312, 500, "分钟")
 list = BeTodoList("待跟进", [{id: "1", title: "登录死循环：等 handoff 修复", status: "pending", detail: "APP 任务，紧急"}, {id: "2", title: "冷启动白屏：已有线程在跑", status: "in-progress", progress: 40}, {id: "3", title: "离线横幅：无法稳定复现", status: "cancelled"}])`),
     user('登录死循环那个能给我复现步骤吗'),
@@ -74,7 +73,7 @@ list = BeTodoList("待跟进", [{id: "1", title: "登录死循环：等 handoff 
     user('哪些页面最近改动最大，巡检要加重'),
     bot(`root = Stack([area, cards])
 area = AreaChart(["第 41 周", "第 42 周", "第 43 周", "第 44 周"], [{name: "看板", values: [3, 8, 12, 9]}, {name: "聊天", values: [6, 7, 15, 18]}, {name: "设置", values: [2, 4, 3, 6]}], "个 PR")
-cards = BeCard("建议加重", [TextContent("聊天（OpenUI 卡片、引用、图片）和看板（R-25 卡片）。设置页改动小，保持冒烟即可。"), Separator(), Tag("聊天", null, "sm", "info"), Tag("看板", null, "sm", "success")], "按最近四周合入的 PR 数")`),
+cards = BeCard("建议加重", [TextContent("聊天（OpenUI 卡片、引用、图片）和看板（R-25 卡片）。设置页改动小，保持冒烟即可。"), Separator(), Stack([Tag("聊天", null, "sm", "neutral"), Tag("看板", null, "sm", "neutral")], "row", "xs")], "按最近四周合入的 PR 数")`),
   ],
 
   release: [

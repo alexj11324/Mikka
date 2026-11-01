@@ -41,6 +41,21 @@ test('workspace usage', { skip: !dbUrl }, async t => {
     assert.deepEqual(september.bots.find(bot => bot.name === 'Frontend')?.seconds, 1800)
   })
 
+  await t.test('a thread counts in the month it started; its run time counts in the months it ran', async () => {
+    // A bot whose only thread started in September and ran into October: 0 新线程 and an hour of run time in October.
+    const solo = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const carried = await seedBot(pool, solo.id, admin, 'Carried over')
+    await run(admin, agent, carried, '2026-09-30T23:00:00Z', '2026-09-30T23:00:00Z', '2026-10-01T01:00:00Z')
+    const october = await workspaceUsage(admin, solo.id, '2026-10')
+    assert.deepEqual(october.bots.map(bot => [bot.name, bot.threads, bot.seconds]), [['Carried over', 0, 3600]])
+    const september = await workspaceUsage(admin, solo.id, '2026-09')
+    assert.deepEqual(september.bots.map(bot => [bot.name, bot.threads, bot.seconds]), [['Carried over', 1, 3600]])
+    // The 新线程 total is the sum of the daily bars, in every month.
+    for (const usage of [october, september, await workspaceUsage(admin, ws.id, '2026-10')]) {
+      assert.equal(usage.totals.threads, usage.daily.reduce((sum, day) => sum + day.threads, 0))
+    }
+  })
+
   await t.test('members see their own bots only; outsiders are refused', async () => {
     const usage = await workspaceUsage(member, ws.id, '2026-10')
     assert.equal(usage.scope, 'own')

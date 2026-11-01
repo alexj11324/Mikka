@@ -5,16 +5,14 @@ the worker transport candidate. It does not replace either branch or include
 enterprise audit, organization management, invitations, exports or retention.
 The current rollout flag remains off; no configuration or database was changed.
 
-The review SQL is not registered in Drizzle and must not be executed without
-an approved environment, exact source, immutable input hashes and write budget.
-It prepares one personal `session_mailboxes` table and its sequence; adds the
-run's optional mailbox reference and message recipient/sender/idempotency/reply/
-origin/ACK/failure/sequence fields; relaxes the old run-only message reference;
-and adds lookup/deduplication indexes and foreign keys. It neither backfills
-historical messages as human-approved nor creates a role or grants privileges.
-The new NOT NULL sequence default assigns sequence values to existing rows;
-installation may rewrite/lock the message table and requires explicit migration
-impact review before execution.
+The schema is `drizzle/20261101020100_personal_mailbox_schema.sql`: one
+personal `session_mailboxes` table and its sequence, the run's optional mailbox
+reference, and the message recipient/sender/idempotency/reply/origin/ACK/
+failure/sequence fields, in the shape production has had since 2026-10-25
+(`workspaceId` text, `latestRunId` set null on run delete, `wakeBudget` 0–10,
+`origin` default `owner`, `kind` includes `group`). `run_messages."runId"` is
+nullable. It is a no-op on production and builds the same objects on an empty
+database.
 
 Dependencies already represented on main are `agent_runs`, `run_messages`,
 `agents`, `devices`, `run_tokens`, `bots` and the three AgentKit version/head/
@@ -27,7 +25,6 @@ checkout is needed for scope checks inside an effect transaction.
 New mailbox columns are deliberately absent from Drizzle's default selections.
 Only rollout-gated personal mailbox SQL references them. Ordinary run, issue,
 MCP report/ask/blocked and default AgentKit paths retain their old schema needs.
-An enabled deployment still requires the reviewed schema to be installed first.
 No production or retained test SQL, ACL change or new token is authorized here.
 
 Frozen definitions select mailbox IDs explicitly. The current owner-selected

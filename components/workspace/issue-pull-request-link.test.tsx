@@ -8,7 +8,7 @@ let pending = false
 let data: { state: string; checkedAt: number } | { error: string } | undefined
 let validating = false
 let swrKey: unknown
-let swrOptions: { refreshInterval: number; revalidateOnFocus: boolean; revalidateOnMount: boolean; dedupingInterval: number }
+let swrOptions: { refreshInterval: number; revalidateOnFocus?: boolean; revalidateOnMount: boolean; dedupingInterval: number }
 let fetchStatus: (key: readonly string[]) => Promise<unknown>
 mock.module(new URL('../../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: { useSession: () => ({ data: userId ? { user: { id: userId } } : null, isPending: pending }) } } })
 mock.module('swr', { defaultExport: (key: unknown, fetcher: typeof fetchStatus, options: typeof swrOptions) => {
@@ -26,16 +26,16 @@ before(async () => { ({ IssuePullRequestLink } = await import('./issue-pull-requ
 beforeEach(() => { userId = 'viewer'; pending = false; data = undefined; validating = false })
 const render = (compact = false) => renderToStaticMarkup(<IssuePullRequestLink issueId="issue-1" pr={{ url, state: 'open' }} compact={compact} />)
 
-test('requests are viewer scoped and refresh on mount, focus and every minute', () => {
+test('requests are viewer scoped and refresh on mount and every minute, never on focus', () => {
   render()
   assert.deepEqual(swrKey, ['github-pr-status', 'viewer', 'issue-1', url])
   assert.equal(swrOptions.refreshInterval, 60_000)
-  assert.equal(swrOptions.revalidateOnFocus, true)
+  assert.notEqual(swrOptions.revalidateOnFocus, true)
   assert.equal(swrOptions.revalidateOnMount, true)
   assert.equal(swrOptions.dedupingInterval, 0)
   render(true)
   assert.equal(swrOptions.refreshInterval, 0)
-  assert.equal(swrOptions.revalidateOnFocus, true)
+  assert.notEqual(swrOptions.revalidateOnFocus, true)
 })
 
 test('detail and board show GitHub state separately from the shared manual value', () => {

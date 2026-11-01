@@ -28,6 +28,13 @@ export async function detectComputerDriver(binary = "cua-driver") {
     return null;
   }
 }
+// What an action does, in the person's words. While a screen recording runs it
+// becomes a step on the recording's timeline (Figma 13), so it is never
+// coordinates, keys or a tool name.
+const step = {
+  type: "string", minLength: 1, maxLength: 200,
+  description: "What this action does, in plain words for the person watching (e.g. \"Click Sign in\", \"点击登录按钮\"). Shown on the screen recording's timeline; never coordinates or tool names.",
+};
 export const TOOLS = [
   {
     name: "get_desktop_state",
@@ -47,8 +54,9 @@ export const TOOLS = [
       properties: {
         x: { type: "integer", minimum: 0, maximum: 100000 },
         y: { type: "integer", minimum: 0, maximum: 100000 },
+        step,
       },
-      required: ["x", "y"],
+      required: ["x", "y", "step"],
       additionalProperties: false,
     },
   },
@@ -58,8 +66,8 @@ export const TOOLS = [
       "Type exactly the requested text into the focused desktop control, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
-      properties: { text: { type: "string", minLength: 1, maxLength: 8000 } },
-      required: ["text"],
+      properties: { text: { type: "string", minLength: 1, maxLength: 8000 }, step },
+      required: ["text", "step"],
       additionalProperties: false,
     },
   },
@@ -68,8 +76,8 @@ export const TOOLS = [
     description: "Press the requested key and modifiers on the focused desktop, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
-      properties: { key: { type: "string" }, modifiers: { type: "array", items: { type: "string", enum: ["ctrl", "shift", "alt", "super"] }, maxItems: 4, uniqueItems: true } },
-      required: ["key"], additionalProperties: false,
+      properties: { key: { type: "string" }, modifiers: { type: "array", items: { type: "string", enum: ["ctrl", "shift", "alt", "super"] }, maxItems: 4, uniqueItems: true }, step },
+      required: ["key", "step"], additionalProperties: false,
     },
   },
   {
@@ -77,8 +85,8 @@ export const TOOLS = [
     description: "Scroll the requested amount at a desktop coordinate, subject to the computer permission policy.",
     inputSchema: {
       type: "object",
-      properties: { direction: { type: "string", enum: ["up", "down", "left", "right"] }, amount: { type: "integer", minimum: 1, maximum: 50 }, x: { type: "integer", minimum: 0, maximum: 100000 }, y: { type: "integer", minimum: 0, maximum: 100000 } },
-      required: ["direction", "amount", "x", "y"], additionalProperties: false,
+      properties: { direction: { type: "string", enum: ["up", "down", "left", "right"] }, amount: { type: "integer", minimum: 1, maximum: 50 }, x: { type: "integer", minimum: 0, maximum: 100000 }, y: { type: "integer", minimum: 0, maximum: 100000 }, step },
+      required: ["direction", "amount", "x", "y", "step"], additionalProperties: false,
     },
   },
 ];
@@ -108,8 +116,20 @@ export const CAPTURE_TOOLS = [
     description: "Stop the screen recording and keep it with the thread.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
+  {
+    name: "mark_recording_step",
+    description:
+      "While recording, mark a moment that is not one of your actions (e.g. \"The first screen appears\", \"首屏出现\") on the recording's timeline. Each action's `step` is marked by itself.",
+    inputSchema: { type: "object", properties: { label: step }, required: ["label"], additionalProperties: false },
+  },
 ];
-const CAPTURE_ACTIONS = { capture_screenshot: "screenshot", start_screen_recording: "start_recording", stop_screen_recording: "stop_recording" };
+const CAPTURE_ACTIONS = { capture_screenshot: "screenshot", start_screen_recording: "start_recording", stop_screen_recording: "stop_recording", mark_recording_step: "step" };
+const cleanStep = (value) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "");
+/** The action's own description for the recording timeline, or null. */
+export function actionStep(value) {
+  const label = cleanStep(value?.arguments?.step);
+  return label && label.length <= 200 ? label : null;
+}
 export function normalizeCaptureCall(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid tool call");
   if (Object.keys(value).some((k) => !["name", "arguments"].includes(k))) throw new Error("Unknown call fields");
@@ -119,6 +139,10 @@ export function normalizeCaptureCall(value) {
   const keys = Object.keys(args).sort().join(",");
   const title = typeof args.title === "string" ? args.title.replace(/\s+/g, " ").trim() : "";
   if (action === "stop_recording" && !keys) return { action };
+  if (action === "step" && keys === "label") {
+    const label = cleanStep(args.label);
+    if (label && label.length <= 200) return { action, label, source: "mark" };
+  }
   if (action === "screenshot" && keys === "title" && title && title.length <= 200) return { action, title };
   if (action === "start_recording" && ["title", "maxSeconds,title"].includes(keys) && title && title.length <= 200 && (args.maxSeconds === undefined || (Number.isInteger(args.maxSeconds) && args.maxSeconds >= 5 && args.maxSeconds <= 300)))
     return { action, title, ...(args.maxSeconds === undefined ? {} : { maxSeconds: args.maxSeconds }) };
@@ -130,9 +154,14 @@ export function normalizeCall(value) {
     throw new Error("Invalid tool call");
   if (Object.keys(value).some((k) => !["name", "arguments"].includes(k)))
     throw new Error("Unknown call fields");
-  const { name, arguments: args = {} } = value;
-  if (!args || typeof args !== "object" || Array.isArray(args))
+  const { name, arguments: given = {} } = value;
+  if (!given || typeof given !== "object" || Array.isArray(given))
     throw new Error("Invalid arguments");
+  // `step` is the person's description, kept by the broker for the recording
+  // timeline; it never reaches the driver or a review.
+  const { step: described, ...args } = given;
+  if (Object.hasOwn(given, "step") && (name === "get_desktop_state" || !cleanStep(described) || cleanStep(described).length > 200))
+    throw new Error("Unsupported tool or arguments");
   const keys = Object.keys(args).sort().join(",");
   if (name === "get_desktop_state" && !keys) return { name, arguments: {} };
   if (

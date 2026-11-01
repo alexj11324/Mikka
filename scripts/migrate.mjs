@@ -1,8 +1,9 @@
 // Applies pending drizzle/*.sql files in order and records each one, so a
 // file runs once per database. `pnpm build` runs it last, after `next build`
 // succeeds, so a Vercel production deploy applies pending migrations itself
-// (Alex, 2026-10-30). It runs in Vercel production or with MIGRATE=1; MIGRATE=0
-// skips before reading files or opening a database.
+// (Alex, 2026-10-30). It runs in Vercel production, with MIGRATE=1, or off
+// Vercel when every configured target is a loopback database; MIGRATE=0 skips
+// before reading files or opening a database.
 //
 // A file targets MIKKA_DATABASE_URL unless its first lines contain
 // `-- target: DATABASE_URL` (the workspace database). In Preview both targets
@@ -13,15 +14,21 @@ import { Pool } from 'pg'
 import { alreadyApplied, orderMigrations } from './migration-order.mjs'
 import { applyMigration, planMigration } from './migration-steps.mjs'
 import { migrationTargets } from './migration-targets.mjs'
+import { migrationGuard, migrationRequested } from './migration-guard.mjs'
 import { scopeMigrationBeforeCommit, validateScopeMigrationHistory, validateScopeMigrationSources } from './scope-migration-history.mjs'
 
-const shouldRun = process.env.MIGRATE !== '0' && (process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production')
-if (!shouldRun) {
-  console.log('migrate: skipped (explicit MIGRATE=0 or non-production; set MIGRATE=1 to apply)')
+// Targets are resolved only when they can decide: MIGRATE=0 and an unrequested
+// Vercel build skip first (Preview's resolution throws without its database).
+const env = process.env
+const mayRun = env.MIGRATE !== '0' && (env.MIGRATE === '1' || env.VERCEL_ENV === 'production' || (!env.VERCEL && !env.VERCEL_ENV))
+const targets = mayRun ? migrationTargets(env) : {}
+if (!migrationRequested(env, targets)) {
+  console.log('migrate: skipped (explicit MIGRATE=0, or a non-production remote database; set MIGRATE=1 to apply)')
   process.exit(0)
 }
 
-const targets = migrationTargets(process.env)
+const { warning } = migrationGuard(process.env, targets, process.argv.slice(2))
+if (warning) console.warn(warning)
 
 const dir = new URL('../drizzle/', import.meta.url)
 // 旧迁移是 NNNN_*.sql，新迁移是 YYYYMMDDHHMMSS_*.sql（UTC）。按文件名排序时时间戳文件排在所有旧文件之后。

@@ -4,6 +4,11 @@ import { resolve } from 'node:path'
 import { Pool } from 'pg'
 import { readBoundedBody } from './http-body.mjs'
 import { MVP_DECISION_KEY, hasBoundMvpTransport, verifyMvpTransport } from '../../tests/mvp/transport.mjs'
+import { hasBoundDevLocalTransport, verifyDevLocalTransport } from '../dev-local/transport.mjs'
+import { LOCAL_RESEND_KEY } from '../dev-local/services.mjs'
+import { databaseTarget, EnvironmentError } from './database-target.mjs'
+
+export { databaseTarget, EnvironmentError }
 
 const IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/
 const LABEL = /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/
@@ -11,20 +16,7 @@ const SHA = /^[a-f0-9]{40}$/
 const INSTANCE = /^[a-f0-9-]{36}$/
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]'])
 
-export class EnvironmentError extends Error {
-  constructor(code) { super(code); this.name = 'EnvironmentError'; this.code = code }
-}
 const fail = code => { throw new EnvironmentError(code) }
-
-/** Deliberately never include a URL, driver error, password or response body in errors. */
-export function databaseTarget(connectionString) {
-  let target
-  try { target = new URL(connectionString) } catch { fail('DATABASE_URL_REQUIRED') }
-  if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.search || target.hash || !target.username || !target.password) fail('DATABASE_URL_INVALID')
-  const name = target.pathname.slice(1)
-  if (!IDENTIFIER.test(name) || !IDENTIFIER.test(decodeURIComponent(target.username))) fail('DATABASE_TARGET_INVALID')
-  return { host: target.hostname, port: Number(target.port || 5432), name, schema: 'public', user: decodeURIComponent(target.username) }
-}
 
 export function bindingValue(value) {
   return {
@@ -49,9 +41,9 @@ export function validateEnvironment(value, env = process.env) {
   if (env.VERCEL_ENV || env.VERCEL === '1') fail('DEPLOYED_ENVIRONMENT_REQUIRES_APPROVAL')
   if (!value.database || !LOOPBACK.has(value.database.host) || !Number.isInteger(value.database.port) || value.database.port < 1 || value.database.port > 65535 || !IDENTIFIER.test(value.database.name ?? '') || !value.database.name.endsWith('_e2e') || value.database.schema !== 'public' || !IDENTIFIER.test(value.database.user ?? '')) fail('ENVIRONMENT_DATABASE_FORBIDDEN')
   if (typeof value.capabilities?.provision !== 'boolean' || value.capabilities.mail !== 'disabled' || typeof value.capabilities.reset !== 'boolean') fail('ENVIRONMENT_CAPABILITIES_INVALID')
-  if (env.RESEND_API_KEY) fail('EXTERNAL_MAIL_FORBIDDEN')
-  if (['AI_GATEWAY_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY'].some(name => Boolean(env[name])) || env.MIKKA_NATIVE_COORDINATOR === '1' ||
-      (env.DECISION_GATEWAY_API_KEY && !(env.DECISION_GATEWAY_API_KEY === MVP_DECISION_KEY && hasBoundMvpTransport(env)))) fail('EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN')
+  const localTransport = hasBoundDevLocalTransport(env)
+  if (env.RESEND_API_KEY && !(env.RESEND_API_KEY === LOCAL_RESEND_KEY && localTransport)) fail('EXTERNAL_MAIL_FORBIDDEN')
+  if ((env.AI_GATEWAY_API_KEY && !(env.AI_GATEWAY_API_KEY === MVP_DECISION_KEY && (hasBoundMvpTransport(env) || localTransport))) || ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY'].some(name => Boolean(env[name])) || env.MIKKA_NATIVE_COORDINATOR === '1') fail('EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN')
   if (!env.E2E_DATABASE_URL || !env.MIKKA_DATABASE_URL || !env.DATABASE_URL) fail('DATABASE_TARGET_CONFIGURATION_REQUIRED')
   if (env.MIKKA_DATABASE_URL !== env.E2E_DATABASE_URL || env.DATABASE_URL !== env.E2E_DATABASE_URL || (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL)) fail('DATABASE_FALLBACK_MISMATCH')
   const target = databaseTarget(env.E2E_DATABASE_URL)
@@ -68,12 +60,15 @@ export async function loadEnvironment(env = process.env) {
     const stat = await lstat(resolve(path))
     if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0 || stat.size > 16384) fail('ENVIRONMENT_FILE_UNSAFE')
     const descriptor = JSON.parse(await readFile(resolve(path), 'utf8'))
-    if (env.DECISION_GATEWAY_API_KEY === MVP_DECISION_KEY) {
+    const syntheticGateway = env.AI_GATEWAY_API_KEY === MVP_DECISION_KEY
+    const syntheticMail = env.RESEND_API_KEY === LOCAL_RESEND_KEY
+    if (syntheticGateway || syntheticMail) {
       // Check every ordinary isolation/credential guard before even the local
       // challenge. Final validation still requires the actual current fetch
       // path to reach the isolated MVP preload; a key or flag is not proof.
-      validateEnvironment(descriptor, { ...env, DECISION_GATEWAY_API_KEY: undefined })
+      validateEnvironment(descriptor, { ...env, ...(syntheticGateway ? { AI_GATEWAY_API_KEY: undefined } : {}), ...(syntheticMail ? { RESEND_API_KEY: undefined } : {}) })
       await verifyMvpTransport(env)
+      await verifyDevLocalTransport(env)
     }
     return validateEnvironment(descriptor, env)
   } catch (error) {

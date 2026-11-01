@@ -55,7 +55,7 @@ export function ThreadCard({ run, onOpen }: { run: RunSource; onOpen: (thread: {
   const issue = run.issue
   return <div data-slot="thread-card" className="relative flex w-full max-w-md items-center gap-3 rounded-xl bg-muted/60 px-3.5 py-3">
     <Button variant="ghost" className="absolute inset-0 size-full rounded-xl" aria-label={t('open', { name: run.name })} disabled={!issue} onClick={issue ? () => onOpen({ issueId: issue.id, runId: run.id }) : undefined} />
-    <ThreadStatusIcon status={run.status} />
+    <ThreadStatusIcon status={run.status} outcome={run.outcome} />
     <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-2">
       <span className="truncate text-sm leading-5 font-medium">{run.name}</span>
       {Boolean(run.pullRequests?.length) && <ThreadOutputs pullRequests={run.pullRequests!} />}

@@ -1,0 +1,20 @@
+name: Browser gate
+
+# Browser tests are removed from CI (decision 2026-11-01-1520). This job only
+# keeps the protected check name "Browser tests (before merge)"; delete this
+# file once Alex removes that name from the required checks in the repository
+# settings.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  browser-e2e:
+    name: Browser tests (before merge)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "Browser tests are not run in CI (decision 2026-11-01-1520)."

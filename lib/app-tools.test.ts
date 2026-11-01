@@ -29,10 +29,17 @@ function deps(overrides: Partial<AppToolDeps> = {}) {
 }
 const call = (tool: string, toolkit = 'hubspot') => ({ toolkit, tool, arguments: { email: 'a@acme.dev' } })
 
-test('a read-only tool runs at once, with the pinned version and no record', async () => {
-  const { deps: d, calls } = deps({ judge: async () => { throw new Error('reads are not judged') } })
+test('a read-only tool goes to the Decisions judge too; allowed, it runs with the pinned version and no record', async () => {
+  const judged: unknown[] = []
+  const { deps: d, calls } = deps({ judge: async call => { judged.push(call); return 'allow' } })
   assert.deepEqual(await callAppTool(d, call('HUBSPOT_LIST_CONTACTS')), { data: { id: 'c1' } })
   assert.deepEqual(calls, ['execute:HUBSPOT_LIST_CONTACTS:20261030_00'])
+  // readOnlyHint is evidence the judge reads, not a rule that skips it.
+  assert.deepEqual(judged, [{ action: 'hubspot_list_contacts', tool: 'HUBSPOT_LIST_CONTACTS', annotations: ['readOnlyHint'], input: { email: 'a@acme.dev' } }])
+  // A read the judge asks about becomes a card, like any other call.
+  const asked = deps({ judge: async () => 'ask' })
+  await callAppTool(asked.deps, call('HUBSPOT_LIST_CONTACTS'))
+  assert.equal(asked.calls.some(entry => entry.startsWith('execute:')), false)
 })
 
 test('a write the shared judge allows runs directly and leaves a record', async () => {

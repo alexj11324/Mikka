@@ -1,7 +1,9 @@
 'use client'
 
 import { useFormatter, useTranslations } from 'next-intl'
-import { Timeline, TimelineDate, TimelineHeader, TimelineIndicator, TimelineItem, TimelineSeparator, TimelineTitle } from '@/components/reui/timeline'
+import { PersonAvatar } from '@/components/person-avatar'
+import { AgentSphere } from './issue-assignee-menu'
+import type { ActivityActorView } from '@/lib/activity-actor-view'
 import { deriveIssueActivity, groupActivityByMinute, type ActivityChild, type ActivityVersion, type IssueActivityEvent } from '@/lib/issue-activity'
 
 export function IssueActivityFeed({ versions, children }: { versions: ActivityVersion[]; children: ActivityChild[] }) {
@@ -22,16 +24,20 @@ export function IssueActivityFeed({ versions, children }: { versions: ActivityVe
     : event.kind === 'labelAdded' ? t('addedLabel', { name: event.title ?? '' })
     : event.kind === 'labelRemoved' ? t('removedLabel', { name: event.title ?? '' })
     : t('addedSubtask', { title: event.title ?? '' })
-  // R-63: one person's events in the same minute are one row.
+  // R-63: one person's events in the same minute are one plain row, led by who did them.
   const rows = groupActivityByMinute(events)
-  return <Timeline value={rows.length}>
-    {rows.map((row, index) => <TimelineItem key={row[0].id} step={index + 1}>
-      <TimelineIndicator />
-      <TimelineSeparator />
-      <TimelineHeader className="flex flex-wrap items-baseline gap-x-2">
-        <TimelineTitle>{row.map(labelOf).join(t('separator'))}</TimelineTitle>
-        <TimelineDate dateTime={row[0].at}>{format.dateTime(new Date(row[0].at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</TimelineDate>
-      </TimelineHeader>
-    </TimelineItem>)}
-  </Timeline>
+  return <>{rows.map(row => <div key={row[0].id} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+    <ActorName actor={row[0].actor ?? null} />
+    <span className="text-muted-foreground">{row.map(labelOf).join(t('separator'))}</span>
+    <time className="text-xs text-muted-foreground" dateTime={row[0].at}>{format.dateTime(new Date(row[0].at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
+  </div>)}</>
+}
+
+/** A person's avatar and name; an agent's mark and name. Rows from before MIK-17 have no actor and show the action alone. */
+function ActorName({ actor }: { actor: ActivityActorView | null }) {
+  if (!actor?.name) return null
+  return <>
+    {actor.type === 'agent' ? <AgentSphere name={actor.name} /> : <PersonAvatar name={actor.name} image={actor.avatarUrl} />}
+    <span className="font-medium">{actor.name}</span>
+  </>
 }

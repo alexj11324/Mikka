@@ -2,8 +2,10 @@
 
 These are decisions Alex has already made. Designs, specs and code follow
 them without asking again. To change a rule, Alex decides, the change is
-logged in [`decisions.md`](decisions.md), and this file is edited in the same
-PR. Cite rules by id in reviews ("breaks R-11").
+recorded as a file in [`decisions/`](decisions/README.md), and this file is
+edited in the same PR. A new rule's id (`R-xx`) is assigned by the
+coordinator when the work is dispatched ([dev workflow](../dev-workflow.md)
+§ 6). Cite rules by id in reviews ("breaks R-11").
 
 Words (bot, chat, thread) are defined in [`glossary.md`](glossary.md). Which
 source wins in a conflict is in [`README.md`](README.md).
@@ -21,15 +23,20 @@ source wins in a conflict is in [`README.md`](README.md).
   right threads and the computer together.
 - **R-04** Every bot comes with its own computer. There is no 新建云端电脑 entry
   anywhere, and no list of per-bot computers.
-- **R-05** Bots run only on Mikka's own AI SDK harness. The 新建 Bot dialog
-  has a big live preview, a shape grid, colours and a name. It has no machine
-  picker, no harness picker and no 说明 field (instructions are edited in chat).
-  The Coordinator has no runtime switch either: the #312 native Claude Code /
-  Codex runtime is deprecated and stays off (decision 2026-10-27).
+- **R-05** 「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过
+  daemon 把任务派给 Claude Code 或 Codex。」 (Alex, 2026-11-01;
+  [orchestration.md §3](orchestration.md)). GPT/OpenAI models go to Codex,
+  every other model to Claude Code; a person can change this per model in
+  「API 与订阅」. The 新建 Bot dialog has a big live preview, a shape grid,
+  colours and a name. It has no machine picker, no Claude Code / Codex picker
+  and no 说明 field (instructions are edited in chat). A bot's own chat never
+  runs inside Claude Code or Codex: that was an old plan (#312), abandoned.
 - **R-06** The Coordinator has no special UI; it is a normal bot (Alex
   2026-10-24). Its role is coordinating, not looking different: the same
-  bloub avatar with no star or badge, the same row, the same chat, the
-  same empty state as any other bot. Never the letter C.
+  bloub avatar with no badge of its own, the same row, the same chat, the
+  same empty state as any other bot. Never the letter C. 星标 = 置顶标记，所有
+  bot 一致: every pinned bot shows the star, the Coordinator only when pinned,
+  like any other bot (Alex 2026-11-01).
 - **R-07** Action entry points (buttons, menu items, the collapsed sidebar
   toggle, the 新建任务 dialog header) never say "Coordinator". Conversation
   headers keep the centred Coordinator pill.
@@ -42,8 +49,11 @@ source wins in a conflict is in [`README.md`](README.md).
   and a bot's computer screen send instructions through the centre composer.
   An open thread is a conversation with the agent running it, so its detail
   ends in that composer and what is typed there goes to that agent.
-- **R-11** The composer has no model picker. The model is our default;
-  BYOK users will choose it in Settings later.
+- **R-11** A bot's composer, the Coordinator's included, has one model chip
+  (`BotModelPicker`) beside 「+」, saved per bot; it picks a model only, never
+  an Agent. Settings has no per-bot model rows
+  ([decision](decisions/2026-10-31-2330-bot-model-picker.md)). A thread's
+  composer has none.
 - **R-12** No starter or suggestion cards in any chat ("试试从这些事情开始").
   Suggestions live only on the 建议 page (R-55). A new bot greets with one
   bubble and an A–D choice card.
@@ -63,7 +73,14 @@ source wins in a conflict is in [`README.md`](README.md).
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
 - **R-15** A task or thread mentioned in chat is an inline chip, not a large
-  card (a task chip carries the board's status icon). A thread the reply
+  card (a task chip carries the board's status icon). Internal object chips
+  are boxed: a faint accent fill (`--object-chip`), small radius, the status or
+  type icon, then the title in the accent with no underline; the chip never
+  breaks across lines and a long title truncates. The task number is in the
+  hover card, not the chip. A thread chip leads with the thread's status icon
+  (the same marks and colours as the thread card and Threads list) and opens
+  the thread's own conversation, as a thread card does (R-66); only a task chip
+  opens the task. Web sources and links keep the unboxed source chip (R-14). A thread the reply
   dispatches is different: it is a thread card under that reply (R-66). An
   Artifact waiting for acceptance is a bordered card under the reply (icon,
   name, state such as 待你确认); clicking it opens the Artifact window (R-56).
@@ -80,23 +97,28 @@ source wins in a conflict is in [`README.md`](README.md).
   Slack, GitHub, Linear…) are rated by the decision model (OpenAI Decisions
   API) after Comma's attention model: first the cost if the person does
   nothing, when it lands and whether it can be undone; then one level,
-  critical, high, ask, normal or low (unclear rereads the source). Code floors
-  the level: any cost is at least high; a cost due within 48 hours, or an
-  irreversible one due within a week, is critical. Only the Coordinator speaks to the person about events: no
-  push, chat message or Telegram/Slack message is sent around it. Critical,
-  high and ask go to the Coordinator at once. The daily briefing is posted
+  critical, high, ask, normal or low (unclear rereads the source), and
+  whether the Coordinator takes it up now. The level's guidance (any cost is
+  at least high; a cost due within 48 hours, or an irreversible one due within
+  a week, is critical) is in the question; no code floor, cutoff or rule before
+  the call changes the answer (decision 2026-11-01-1300). Only the Coordinator speaks to the person about events: no
+  push, chat message or Telegram/Slack message is sent around it. What the
+  model says to take up goes to the Coordinator at once. The daily briefing is posted
   by the Coordinator in its chat every day at 08:00 local time (and pushed),
   whatever the bar below says. It tells the person only when they must act before the next
   08:00 briefing, or when a cost that cannot be undone lands within a week;
   everything else waits in 建议 for the briefing. When unsure, it stays
   quiet. It also stays quiet when fresh evidence shows the matter resolved,
-  owned by someone else, or already covered in the chat. When the daily cap
-  is spent, a matter the person must still act on is snoozed until the cap
-  reopens, never dropped. Telling the person is a card in its
+  owned by someone else, or already covered in the chat. When the Decisions
+  API says not now, a matter the person must still act on is snoozed until
+  the time it names, never dropped. Telling the person is a card in its
   own chat that says what happens if nothing is done and offers one next
-  step, pushed on mobile. Normal stays in 建议; low is not shown. Telling the
-  person is capped at 5 a day, 30 minutes apart (critical skips the spacing,
-  not the cap); held items wait, they are not dropped. The Coordinator never
+  step, pushed on mobile. Normal stays in 建议; low is not shown. Whether to
+  interrupt the person now, which waiting matter the Coordinator takes up
+  next, and what happens to a matter it left undecided are Decisions API
+  answers that read how often the person was told today; only runaway caps
+  (24 tellings, 48 handoffs a day) stay in code. Held items wait, they are not
+  dropped. The Coordinator never
   acts on an event before the person says yes. Its own ideas also go in its
   chat.
 - **R-21** 建议 is its own rail page (R-55), not part of the right panel; the
@@ -143,9 +165,9 @@ source wins in a conflict is in [`README.md`](README.md).
   Kanban with no column `+` (R-22) and no page-title pill (the rail says
   where you are). Columns are a fixed 300px, as in Linear: when they do not
   fit, the board scrolls horizontally, and spare width stays empty. With the
-  Coordinator sidebar open, only 已完成 collapses, to a 40px strip (icon, the
-  name one glyph per line, count) that expands when clicked; every other
-  column keeps its 300px. Figma: page 「看板卡片 v1 · 定稿 2026-10-31」
+  Coordinator sidebar open every column, 已完成 included, keeps its 300px;
+  no column folds to a strip
+  ([decision](decisions/2026-11-01-1144-board-done-keeps-its-width.md)). Figma: page 「看板卡片 v1 · 定稿 2026-10-31」
   (`714:5283`).
 - **R-26** Workspace tasks sync with Linear (`MIK-xx`); personal tasks stay in
   Mikka. A task can move both ways: a workspace task can be turned back into
@@ -164,6 +186,12 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   line before the properties column or an open thread. Nothing else gets a
   line; sections are separated by space. The content column is centred in
   the main area, up to 680px wide.
+- **R-79** No breadcrumb, title bar or page header shows the workspace's
+  name. There is one workspace on screen, the name cannot be clicked there,
+  and it is shown and switched only from the avatar menu at the bottom left.
+  The task page's breadcrumb starts at 看板. A group heading that names the
+  workspace its settings apply to (设置's workspace group) is not a crumb and
+  stays.
 - **R-62** 线程 lists the threads working on the issue, grouped as R-52:
   status icon (never the bot's avatar, `glossary.md`), thread name, time, and
   the opening of its last reply (R-53). Someone who cannot open the thread
@@ -172,9 +200,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the agent talk there. A thread's content is its owner's alone: teammates
   (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
   as GitHub Copilot and Cursor keep agent sessions private; what the thread
-  produces (a PR, a comment its owner posts) is how the team sees the work. The bot runs the thread (R-05); a coding agent it hands work
-  to (Codex, Claude Code) shows as a step 「交给 Codex · …」, never as the
-  runner in the list or the header.
+  produces (a PR, a comment its owner posts) is how the team sees the work. The bot dispatches the thread; the Agent it hands the work
+  to (Codex, Claude Code) runs it, and where a thread carries an icon
+  other than its status, that icon is the Agent's mark (R-78).
 - **R-63** Activity: events (created, handed to, dispatched a thread,
   status changes) are plain one-line rows; one person's events in the same
   minute join into one row (「创建了任务，交给 Mikka Backend，自己负责」). A comment is a card with a 1px
@@ -199,9 +227,21 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
   card in a chat; a later change of state is a sentence from the Coordinator,
   not a second card. The card has no log, input box or buttons. Clicking it
-  opens the thread conversation: on desktop the centre column switches to it
-  with 「‹ Coordinator」 to go back, on a phone it pushes in full screen.
+  opens the thread conversation as R-82 says for every thread: on desktop in
+  the right column beside the chat, which stays; on a phone it pushes in full
+  screen ([decision](decisions/2026-11-01-1320-navigation-model.md)).
   Figma: page 「线程卡片 · 聊天里派出线程」.
+- **R-81** A task has one thread at a time (Alex, 2026-11-01). Dispatching a
+  task that already has a thread gives that thread the work: while it works
+  the note goes in as a message; once it ended (done, failed, stopped) it runs
+  again in the same thread, resuming the agent's session where it can. The
+  thread's id does not change. Only the person's explicit request for a new
+  session or thread, or another agent, starts a new one; the old thread is
+  stopped and marked replaced. The server enforces this at every dispatch
+  entry, not the prompt ([decision](decisions/2026-11-01-1330-one-thread-per-task.md)).
+  The person may name where it runs (one of their computers, or the cloud);
+  a named computer that is offline gets the 没有可用的电脑 card, never another
+  computer, and the reply names only where the run actually is.
 
 ## Right panel, 建议, Artifact and browser
 
@@ -214,9 +254,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot's avatar and name (R-02), then the tabs 详情, 线程, PR, 电脑. 线程
   lists only the threads this bot dispatched (for the Coordinator, the
   threads it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
-  全部线程 lists every bot's threads; each row carries a 16px bot avatar in
-  that bot's colour, the only thread list that shows one, and a relative
-  time on the right (2 分钟前, 昨天).
+  全部线程 lists every bot's threads; each row carries the small mark of the
+  Agent running it (R-78), the only thread list that shows one, beside a
+  relative time on the right (2 分钟前, 昨天).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
   header's search, widen and close, and a list group's collapse chevron), the only
@@ -226,15 +266,38 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   (2026-10-31). The Coordinator's header stays read-only. 详情 holds two lists, 例行 (routines)
   and 资料库 (library). The bot creates routines when asked in chat; files are
   uploaded with the composer's 「+」.
-- **R-52** Every thread list groups its rows in this order: 等待回复（N）,
-  进行中（N）, 空闲（N）, 已解决（N）. A group header is muted text
-  (「等待回复（2）」) followed by a thin rule filling the rest of the row.
-  已解决 is collapsed by default behind a chevron. A failed thread sits under
-  等待回复. Never a 「今天」 or 「今天完成」 group.
+- **R-52** Every thread list, web and phone, groups its rows in this order:
+  进行中（N）, 受阻（N）, 等待你（N）, 空闲（N）, 已解决（N）
+  (Running, Blocked, Waiting for you, Idle, Resolved). A group header is
+  muted text (「等待你（2）」) followed by a thin rule filling the rest of
+  the row. 已解决 is collapsed by default behind a chevron. Never a 「今天」
+  or 「今天完成」 group
+  ([decision](decisions/2026-11-01-1250-five-thread-groups.md)).
+  - 进行中 follows the run's state: queued, preparing, running or finishing.
+  - Every other group follows how the run came out (`agent_runs.outcome`:
+    done, blocked, needs_input, failed, idle), judged by the decision model
+    when the run ends from its last reply, status, task and PRs
+    (`lib/run-outcome-judge.ts`); with no answer it stays empty and is asked
+    again an hour later. Code never guesses it from the status: a run that
+    "finished" saying it could not log in is 受阻.
+  - 受阻: blocked or failed, or paused on its quota: it needs something
+    outside the work fixed (login, credentials, proxy, permission) or nobody
+    took over after it failed. 等待你: needs_input, a run asking a question,
+    or a task with a PR to review. 空闲: idle, its task still open.
+  - 已解决 only when the outcome is done, or its task is done, cancelled or a
+    duplicate, or its PR is merged. A run nobody could judge sits under 受阻
+    (failed) or 等待你, never 已解决.
+  - Every row leads with its group's status icon and colour, the phone's set
+    (`ThreadStatusIcon`): 进行中 spins, 受阻 a red alert, 等待你 a hollow
+    circle, 空闲 a slashed circle, 已解决 a green check.
+  - A task's existing threads fold into its newest one, which carries
+    「第 N 次尝试」 past the first and stays out of 已解决 until the task is
+    resolved; the task's own 线程 tab lists every attempt. (New work keeps one
+    thread per task, so this is for threads that already exist.)
 - **R-53** A thread row has two lines: the thread's title, then the opening of
   its last reply quoted verbatim, cut to one line. No generated description,
   no status word and no bot-name prefix (generating them costs compute).
-- **R-54** The PR tab lists this bot's PRs in groups 等待审查, 进行中, 已合并,
+- **R-54** The PR tab lists the PRs of the threads this bot dispatched, in groups 等待审查, 进行中, 已合并,
   with R-52's header style. Each row is the PR title and its number.
 - **R-55** 建议 is the second rail item. Its page is split 50/50 with a 1px
   divider: on the left the title 「建议」 (24px SemiBold) with a refresh icon,
@@ -263,6 +326,24 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   a chip 「1 · <element> · <action> · <note>」 into the current chat's
   composer. The 浏览器 is the person's own and app-wide; it is not a bot's
   电脑 (R-50).
+
+## Navigation
+
+- **R-82** One address says what is on screen, and every click goes through
+  `components/workspace/workspace-navigation.ts`; nothing else writes the
+  browser history or builds a workspace link (`scripts/navigation-policy.mjs`).
+  A move the person makes (another bot or group chat, a rail page, a task, a
+  thread, an Artifact) is a new history entry, so back and forward step
+  through it one move at a time and never leave Mikka while there is a step
+  inside it; a filter or a tab replaces the entry. Each object opens in one
+  place whatever the entry point: a bot or group chat in the centre; a thread
+  in the right column beside what is in the centre (the chat, or a task with
+  its properties), a thread of another bot included, its header naming the
+  bot that dispatched it; a task as its own page in the centre, as Linear; an
+  Artifact in its window over the page (R-56); PRs and web pages in a new
+  tab. Projects and teams live under 看板, with no rail item of their own. On
+  a phone the right column is a page pushed over the chat. Source: Alex,
+  2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)).
 
 ## Settings
 
@@ -300,6 +381,14 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   asked about. Creating, sending, appending and adding never ask. An
   unavailable or refused judgment shows a card, never a silent write.
   Source: Alex, 2026-10-31.
+- **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…),
+  so wherever a thread or run is drawn with an icon, the icon is that
+  Agent's mark (`HarnessMark`, R-74); a thread whose Agent is unknown takes
+  the neutral thread mark. A bot never does coding work: it appears only
+  where it dispatched or owns the work (「<Bot> 派出线程」, the 概览 header),
+  never as a thread's or run's icon, and neither does the Coordinator's
+  avatar. Status icons stay where a list shows status (R-62, R-66).
+  Source: Alex, 2026-11-01 (decision `2026-11-01-0110-agent-mark-on-threads`).
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
@@ -387,14 +476,27 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `--control` fill, no stroke, the magnifier on the left and a light focus ring.
   ui-policy fails an outlined `Input`, `InputGroup` or `SidebarInput` used for
   search as `style/search-input`.
-- **R-32** Font Geist, self-hosted from `app/fonts/Geist-Variable.woff2` through
-  `next/font/local` (no runtime font CDN). A local font is only allowed after
+- **R-32** Type follows Comma (decision `2026-11-01-1204-type-follows-comma`):
+  Inter Variable for text and Geist Mono for code, self-hosted from
+  `app/fonts/` through `next/font/local` (no runtime font CDN, no metric
+  fallback, `font-display: block`), then the system stack `"SF Pro Display",
+  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, …, sans-serif`. No
+  Chinese font is named: Chinese takes the system font (PingFang on a Mac), and
+  no self-hosted text font may draw a CJK code point (`ui-policy.test.mjs`).
+  Regular is 450 (`font-normal`); `font-synthesis: none`,
+  `text-rendering: optimizeLegibility`, `-webkit-font-smoothing: antialiased`.
+  A local font is only allowed after
   its file and CSS variable are registered in `ui-policy.json` →
-  `typography.localFonts`. Chinese falls back to the system font. Only these text
-  styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
-  (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium
-  (group title), 11/14 Medium (badge), and 24/32 SemiBold for the 建议 page
-  title only (R-55). Nothing is smaller than 11px. Labels are sentence case:
+  `typography.localFonts`. The size tokens are Comma's, set in
+  `app/globals.css` and pinned in `ui-policy.json`: `text-xs` 12/18,
+  `text-sm` 13/20, `text-md` 15/24, `text-lg` 18/28 and `text-xl` 20/30 at
+  -0.01em, `text-2xl` 24/32. UI body is 13/20 (list titles in Medium), meta
+  and group titles 12/18, badges 11/14 Medium, and 24/32 SemiBold for the
+  建议 page title only (R-55). Documents people read (a task's title and
+  description, the Artifact reader, comments) use 24/32 SemiBold title,
+  18/28 SemiBold section heading, 15/24 Regular body and 12/18 meta; a
+  smaller heading is the body size in SemiBold. Chat, the thread pane
+  included, is 13/21 (`text-sm leading-5.25`, Comma's message text). Nothing is smaller than 11px. Labels are sentence case:
   no uppercase label with wide tracking (unslop; ui-policy
   `typography/uppercase-label`). Weights stop at SemiBold, never Bold.
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
@@ -407,17 +509,35 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,
   forward, centred search pill that opens ⌘K, the 浏览器 globe toggle at the
-  right, R-57), 72px icon rail with a text label under each icon, in this
-  order: 主页, 建议, 看板, 插件, Artifact; and one rounded content card. Build on
+  right, R-57), 68px icon rail, in this order: 主页, 建议, 看板, 插件,
+  Artifact; and one rounded content card. Rail items are icons only: no text
+  under the icon; the name shows as a tooltip on hover and stays the item's
+  accessible name (Alex, #580; restored 2026-11-01 after #747 brought the
+  labels back). Build on
   `components/app-shell.tsx`; no reUI App Shell blocks. Standing rule: a
   skill audit (unslop, interface-design) never changes the shell layout;
   Alex keeps it as it is (2026-10-31).
+- **R-80** Every vertical line between two columns can be dragged to resize
+  them (Alex: 「只要是这种竖线都可以 resizable」, decision 2026-11-01-1310):
+  the bot list, the right panel, 建议's two halves, Artifact's list, the
+  board's Coordinator sidebar, a task's right panel, the editor's side
+  panel, a project's details, the settings list, the browser. The line is a
+  `ResizablePane` or a `ResizeHandle` (`components/ui/resizable-pane.tsx`,
+  on `hooks/use-resizable-width.ts`): drag it, use the arrow keys on it
+  (Shift for bigger steps, Home and End for the limits), double-click it for
+  the default width; it shows `col-resize` on hover, stays between a minimum
+  and a maximum, and the width is remembered per place on this device. No
+  second way to resize a column. `scripts/split-pane-policy.mjs` fails a
+  fixed-width column with its own side border and no handle; a line that is
+  not between columns says why with `split-pane-exempt: <reason>`.
 - **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`, all 16
   shapes kept); people use letter avatars. A person without an uploaded
   picture gets a generated gradient avatar (`public/avatars/*.webp`): after
   adopting the unslop skill Alex still requires it (2026-10-31), so it is
   intentional and not a violation. A bot's avatars move through the idle
-  montage on one shared clock, so every copy of one bot shows the same pose.
+  montage on one shared clock, so every animated copy of one bot shows the
+  same pose. Small (`row`) and `still` avatars (group messages, members, the
+  group avatar) hold the bot's own shape and do not play the montage.
 - **R-37** Animate only when the user's action changes a size or position.
   Position and size move with springs; opacity and colour use a duration.
   Springs settle without visible overshoot (no bouncy springs). No hover

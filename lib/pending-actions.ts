@@ -55,7 +55,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
       const action = { id: request.id, userId, action: request.action, input: request.input }
       if (tasks.length) {
         for (const task of tasks) await recordCoordinatorEvent(tx, actionDecidedEvent(action, { status, error: null, outcome: {} }, task))
-      } else await recordCoordinatorEvent(tx, actionDecidedEvent(action, { status, error: null, outcome: {} }))
+      } else await recordCoordinatorEvent(tx, actionDecidedEvent(action, { status, error: null, outcome: {} }, { botId: request.botId }))
     })
     const status = approve ? 'done' as const : 'declined' as const
     await wakeCoordinator(userId)
@@ -94,7 +94,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     }
     await db.update(pendingActions).set({ status, error, result: outcome }).where(eq(pendingActions.id, row.id))
   }
-  await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }))
+  await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }, { botId: row.botId }))
   await wakeCoordinator(userId)
   return { status, error }
 }
@@ -117,3 +117,4 @@ async function runApprovedAppToolCall(userId: string, input: unknown, accountId:
     return { error: 'operationUncertain' }
   }
 }
+

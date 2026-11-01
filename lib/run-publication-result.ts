@@ -12,18 +12,21 @@ export const PUBLICATION_ERRORS = {
   branch_not_pushed: 'GitHub has not received the reported branch commit.',
   branch_changed: 'The issue branch changed after this thread pushed. Check the newer thread.',
   pull_request_conflict: 'This branch already belongs to a different pull request.',
-  push_not_approved: 'Push needs approval for this repository.',
+  push_not_approved: 'This thread was not admitted to push: the Mikka GitHub App needs contents: write on this repository.',
   push_failed: 'The local git push did not succeed. Check the thread report and local git credentials.',
   task_identifier_required: 'The task needs its team identifier and number before publication.',
   publication_missing: 'This thread has no server-issued publication assignment.',
   publication_mismatch: 'The reported push does not match the server-issued issue branch.',
   issue_unavailable: 'The task is no longer available to this thread.',
   pull_request_limit: 'The task already has the maximum number of pull request links.',
+  pull_request_denied: 'Opening pull requests is set to deny in Plugins › GitHub. The pushed branch is preserved.',
+  pull_request_setting_unavailable: 'The pull request setting could not be read. The pushed branch is preserved and opening is retried.',
 } as const
 export type PublicationErrorCode = keyof typeof PUBLICATION_ERRORS
 
 export class PublicationError extends Error {
-  constructor(readonly code: PublicationErrorCode, readonly retryable = false) {
+  /** `status` is GitHub's HTTP status when GitHub answered, for server logs only. */
+  constructor(readonly code: PublicationErrorCode, readonly retryable = false, readonly status?: number) {
     super(PUBLICATION_ERRORS[code])
     this.name = 'PublicationError'
   }

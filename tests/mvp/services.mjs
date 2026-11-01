@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { answerModel } from './model.mjs'
 import { subscriptionPrompt, subscriptionChunks, MVP_SUBSCRIPTION_MODEL } from './subscription.mjs'
-import { REPOSITORY } from './isolated-env.mjs'
+import { MVP_SERVICES, REPOSITORY } from './isolated-env.mjs'
 import { finishMvpResources, indexMvpResource } from './retention.mjs'
 
 const execute = promisify(execFile)
@@ -17,6 +17,7 @@ const REPO_PATH = '/repos/mikka-e2e/core-loop'
 const REPOSITORY_ID = 789
 const READ_TOKEN = 'mvp-synthetic-installation-read'
 const WRITE_TOKEN = 'mvp-synthetic-installation-write'
+const RUN_TOKEN = 'mvp-synthetic-installation-run'
 
 async function readBody(request) {
   const chunks = []
@@ -29,8 +30,12 @@ async function readBody(request) {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {}
 }
 
-/** Loopback only. Real git changes are required before the fake GitHub accepts a PR. */
-export async function startMvpServices(port = 3191) {
+/**
+ * Loopback only. Real git changes are required before the fake GitHub accepts a PR.
+ * `routes` (pnpm dev:local's other substitutes, scripts/dev-local/services.mjs)
+ * sees each request first and returns true when it answered it.
+ */
+export async function startMvpServices(port = 3191, { routes } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-mvp-origin-'))
   await indexMvpResource('origin-directory', directory)
   let scenario = null
@@ -44,6 +49,7 @@ export async function startMvpServices(port = 3191) {
     const url = new URL(request.url, 'http://127.0.0.1')
     const reply = (value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json', 'x-mvp-request-id': requestId }); response.end(JSON.stringify(value)) }
     try {
+      if (routes && await routes(request, response, url)) return
       if (url.pathname === '/health') return reply({ ready: true })
       if (url.pathname === '/observations') return reply({ observations, errors, pullRequests: pullRequests.map(pr => ({ number: pr.number, url: pr.html_url, branch: pr.head.ref, draft: pr.draft })) })
       if (url.pathname === '/streaming/scenario' && request.method === 'POST') {
@@ -79,7 +85,10 @@ export async function startMvpServices(port = 3191) {
         await git(source, ['add', 'README.md'])
         await git(source, ['-c', 'user.name=Mikka CI', '-c', 'user.email=mikka-ci@example.com', 'commit', '-m', 'test: seed isolated origin'])
         await git(source, ['clone', '--bare', '--no-hardlinks', '.', barePath])
-        scenario = { marker: input.marker, title: input.title, repo: REPOSITORY, deviceId: null, barePath, githubAccountId }
+        // dev:local (scripts/dev-local.mjs) runs a real agent, not the mock harness.
+        const harness = input.harness ?? 'mock'
+        assert.ok(harness === 'mock' || harness === 'any')
+        scenario = { marker: input.marker, title: input.title, repo: REPOSITORY, deviceId: null, barePath, githubAccountId, harness }
         return reply({ barePath, repo: REPOSITORY, baseBranch: 'trunk' })
       }
       if (url.pathname === '/scenario/device' && request.method === 'POST') {
@@ -120,12 +129,40 @@ export async function startMvpServices(port = 3191) {
         assert.equal(input.questions?.length, 1)
         const question = input.questions[0]
         assert.equal(question.type, 'choice')
-        assert.equal(question.name, 'tier')
-        assert.deepEqual(question.choices?.map(choice => choice.value), ['attention', 'result', 'background'])
+        if (question.name === 'push') {
+          // Whether a Coordinator reply also goes to the phone (lib/push-reasons.ts):
+          // the answered events and the reply, one per line, as plain text.
+          assert.deepEqual(question.choices?.map(choice => choice.value), ['decide', 'review', 'finished', 'briefing', 'none'])
+          assert.equal(typeof input.input, 'string')
+          const answersPerson = /^answeredEvents: .+\nanswersAMessageFromThePerson: (yes|no)\nreply: .+$/s.exec(input.input)?.[1]
+          assert.ok(answersPerson, 'Unexpected push evidence')
+          observe({ kind: 'push-request', requestId, answersPerson })
+          // The person is in the chat they just wrote in: no phone notification.
+          return reply({
+            model: input.model,
+            provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}`, cost: '0.001' } },
+            answers: [{ type: 'choice', name: 'push', choice: 'none' }],
+          })
+        }
         assert.equal(input.input?.length, 1)
         assert.equal(input.input[0].role, 'user')
         assert.equal(input.input[0].content?.length, 1)
         assert.equal(input.input[0].content[0].type, 'input_text')
+        if (question.name === 'outcome') {
+          // An ended run's outcome (lib/run-outcome.ts): the run's facts, one per line.
+          assert.deepEqual(question.choices?.map(choice => choice.value), ['done', 'blocked', 'needs_input', 'failed', 'idle'])
+          const facts = input.input[0].content[0].text
+          const status = /^status: (succeeded|stopped|failed|cancelled)\nstop reason: .+\nattempts on this task: [1-9][0-9]*\ntask: .+\npull requests: .+\nsummary \(quoted\): .+\nlast reply \(quoted\): .+$/.exec(facts)?.[1]
+          assert.ok(status, 'Unexpected run outcome evidence')
+          observe({ kind: 'outcome-request', requestId, status })
+          return reply({
+            model: input.model,
+            provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}`, cost: '0.001' } },
+            answers: [{ type: 'choice', name: 'outcome', choice: status === 'succeeded' ? 'done' : 'idle' }],
+          })
+        }
+        assert.equal(question.name, 'tier')
+        assert.deepEqual(question.choices?.map(choice => choice.value), ['attention', 'result', 'background'])
         const state = JSON.parse(input.input[0].content[0].text)
         const host = JSON.parse(state.hostObservation)
         assert.ok(['run_finished', 'action_decided'].includes(host.eventKind), 'Unexpected MVP runtime event')
@@ -149,16 +186,20 @@ export async function startMvpServices(port = 3191) {
       const method = request.method ?? 'GET'
       observe({ kind: 'github-request', requestId, method, path })
       const bearer = request.headers.authorization
-      const readAccess = () => assert.equal(bearer, `Bearer ${READ_TOKEN}`, 'Expected repository read token')
-      const writeAccess = () => assert.equal(bearer, `Bearer ${WRITE_TOKEN}`, 'Expected repository PR token')
+      const readAccess = () => assert.ok([READ_TOKEN, RUN_TOKEN].some(token => bearer === `Bearer ${token}`), 'Expected repository read token')
+      const writeAccess = () => assert.ok([WRITE_TOKEN, RUN_TOKEN].some(token => bearer === `Bearer ${token}`), 'Expected repository PR token')
       const appAccess = () => assert.match(bearer ?? '', /^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/, 'Expected an App JWT')
       if (path === `${REPO_PATH}/installation` && method === 'GET') {
         appAccess()
-        return reply({ id: 99, suspended_at: null, permissions: { pull_requests: 'write', contents: 'read' } })
+        return reply({ id: 99, suspended_at: null, permissions: { pull_requests: 'write', contents: 'write' } })
       }
       if (path === '/app/installations/99/access_tokens' && method === 'POST') {
         appAccess()
         const input = await readBody(request)
+        if (input.permissions?.contents === 'write') {
+          assert.deepEqual(input, { repository_ids: [REPOSITORY_ID], permissions: { contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read' } })
+          return reply({ token: RUN_TOKEN, expires_at: new Date(Date.now() + 3600_000).toISOString() })
+        }
         if (input.permissions?.pull_requests === 'write') {
           assert.deepEqual(input, { repository_ids: [REPOSITORY_ID], permissions: { metadata: 'read', pull_requests: 'write' } })
           return reply({ token: WRITE_TOKEN })
@@ -169,6 +210,51 @@ export async function startMvpServices(port = 3191) {
       if (path === `/user/${githubUser.id}` && method === 'GET') { readAccess(); return reply(githubUser) }
       if (path === `${REPO_PATH}/collaborators/${githubUser.login}/permission` && method === 'GET') { readAccess(); return reply({ permission: 'write', user: githubUser }) }
       if (path === REPO_PATH && method === 'GET') { readAccess(); return reply({ id: REPOSITORY_ID, full_name: 'mikka-e2e/core-loop', default_branch: 'trunk' }) }
+      const currentCommit = branch => git(scenario.barePath, ['rev-parse', '--verify', `refs/heads/${branch}`])
+      const checkCommit = async commit => {
+        assert.match(commit, /^[a-f0-9]{40}$/)
+        assert.equal(await git(scenario.barePath, ['rev-parse', '--verify', `${commit}^{commit}`]), commit)
+        // This is a real fixture whitespace check, explicitly synthetic CI.
+        // It establishes no claim about GitHub Actions or production checks.
+        await git(scenario.barePath, ['diff', '--check', 'trunk', commit])
+        observe({ kind: 'synthetic-ci-checked', commit, name: 'Local fixture diff (synthetic CI)' })
+        return { state: 'SUCCESS', contexts: { totalCount: 1, nodes: [{ __typename: 'CheckRun', name: 'Local fixture diff (synthetic CI)', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: `${MVP_SERVICES}/observations` }] } }
+      }
+      if (path === '/graphql' && method === 'POST') {
+        const input = await readBody(request)
+        if (input.query === 'mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { pullRequest { id isDraft } } }') {
+          writeAccess()
+          const pr = pullRequests.find(value => value.node_id === input.variables?.id)
+          assert.ok(pr, 'Draft conversion requires an existing fixture PR')
+          pr.draft = true
+          observe({ kind: 'pull-request-converted-to-draft', requestId, number: pr.number })
+          return reply({ data: { convertPullRequestToDraft: { pullRequest: { id: pr.node_id, isDraft: true } } } })
+        }
+        readAccess()
+        assert.ok(typeof input.query === 'string' && !/\bmutation\b/.test(input.query), 'Fixture GraphQL is read-only')
+        const variables = input.variables ?? input
+        assert.equal(variables.owner, 'mikka-e2e'); assert.equal(variables.repository, 'core-loop')
+        const commit = variables.commit
+        return reply({ data: { repository: { object: { oid: commit, statusCheckRollup: await checkCommit(commit) } } } })
+      }
+      if (path.startsWith(`${REPO_PATH}/git/commits/`) && method === 'GET') {
+        readAccess()
+        const commit = path.slice(`${REPO_PATH}/git/commits/`.length)
+        assert.match(commit, /^[a-f0-9]{40}$/)
+        return reply({ sha: await git(scenario.barePath, ['rev-parse', '--verify', `${commit}^{commit}`]), tree: { sha: await git(scenario.barePath, ['rev-parse', `${commit}^{tree}`]) } })
+      }
+      if (new RegExp(`^${REPO_PATH}/pulls/[0-9]+$`).test(path) && method === 'GET') {
+        writeAccess()
+        const pr = pullRequests.find(value => value.number === Number(path.split('/').at(-1)))
+        if (!pr) return reply({ message: 'Fixture pull request not found' }, 404)
+        return reply({ ...pr, head: { ...pr.head, sha: await currentCommit(pr.head.ref) } })
+      }
+      if (new RegExp(`^${REPO_PATH}/commits/[a-f0-9]{40}/check-runs$`).test(path) && method === 'GET') {
+        readAccess()
+        const commit = path.split('/').at(-2)
+        const result = await checkCommit(commit)
+        return reply({ total_count: 1, check_runs: [{ name: 'Local fixture diff (synthetic CI)', head_sha: commit, status: 'completed', conclusion: 'success', html_url: `${MVP_SERVICES}/observations`, ...result }] })
+      }
       if (path.startsWith(`${REPO_PATH}/git/ref/heads/`) && method === 'GET') {
         readAccess()
         const branch = path.slice(`${REPO_PATH}/git/ref/heads/`.length)
@@ -182,7 +268,7 @@ export async function startMvpServices(port = 3191) {
         writeAccess()
         const head = url.searchParams.get('head')
         assert.equal(url.searchParams.get('state'), 'all')
-        return reply(pullRequests.filter(pr => `mikka-e2e:${pr.head.ref}` === head))
+        return reply(await Promise.all(pullRequests.filter(pr => !head || `mikka-e2e:${pr.head.ref}` === head).map(async pr => ({ ...pr, head: { ...pr.head, sha: await currentCommit(pr.head.ref) } }))))
       }
       if (path === `${REPO_PATH}/pulls` && method === 'POST') {
         writeAccess()
@@ -191,17 +277,18 @@ export async function startMvpServices(port = 3191) {
         assert.equal(input.base, 'trunk', 'PR must use the actual origin default branch')
         assert.match(input.body, /<!-- mikka-issue:[a-f0-9-]{36} -->$/)
         const commit = await git(scenario.barePath, ['rev-parse', '--verify', `refs/heads/${input.head}`])
-        assert.match(await git(scenario.barePath, ['show', `${commit}:MIKKA_MOCK.md`]), /Written by the real Mikka mock harness/)
+        if (scenario.harness === 'mock') assert.match(await git(scenario.barePath, ['show', `${commit}:MIKKA_MOCK.md`]), /Written by the real Mikka mock harness/)
         const message = await git(scenario.barePath, ['show', '-s', '--format=%B', commit])
         const runId = message.match(/Mikka-Run: ([a-f0-9-]{36})/)?.[1]
         const issueId = message.match(/Mikka-Issue: ([a-f0-9-]{36})/)?.[1]
-        assert.ok(runId && issueId, 'The pushed commit must carry its real run/task provenance')
-        assert.ok(input.body.endsWith(`<!-- mikka-issue:${issueId} -->`))
+        const bodyIssueId = input.body.match(/<!-- mikka-issue:([a-f0-9-]{36}) -->$/)?.[1]
+        if (scenario.harness === 'mock') assert.ok(runId && issueId, 'The mock commit must carry its real run/task provenance')
+        if (issueId) assert.equal(bodyIssueId, issueId)
         assert.equal(pullRequests.some(pr => pr.head.ref === input.head), false, 'A replay must find the existing PR')
         const number = 41 + pullRequests.length
-        const pr = { number, html_url: `https://github.com/mikka-e2e/core-loop/pull/${number}`, state: 'open', draft: input.draft === true, merged_at: null, body: input.body, head: { ref: input.head, repo: { id: REPOSITORY_ID } }, base: { repo: { id: REPOSITORY_ID } } }
+        const pr = { number, node_id: `MVP_PR_${number}`, title: input.title, html_url: `https://github.com/mikka-e2e/core-loop/pull/${number}`, state: 'open', draft: input.draft === true, merged_at: null, body: input.body, head: { ref: input.head, repo: { id: REPOSITORY_ID } }, base: { ref: 'trunk', repo: { id: REPOSITORY_ID } } }
         pullRequests.push(pr)
-        observe({ kind: 'pull-request-created', requestId, runId, issueId, commit, branch: input.head, url: pr.html_url })
+        observe({ kind: 'pull-request-created', requestId, ...(runId ? { runId } : {}), issueId: bodyIssueId, commit, branch: input.head, url: pr.html_url })
         return reply(pr, 201)
       }
       throw new Error(`Unexpected GitHub operation: ${method} ${path}`)

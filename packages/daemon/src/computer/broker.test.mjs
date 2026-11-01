@@ -405,7 +405,7 @@ test("capture calls skip review but still need the run's grant", async (t) => {
 });
 test("capture calls cannot choose the desktop, a path or a longer recording", async (t) => {
   const { normalizeCaptureCall, CAPTURE_TOOLS } = await import("./driver.mjs");
-  assert.deepEqual(CAPTURE_TOOLS.map(tool => tool.name), ["capture_screenshot", "start_screen_recording", "stop_screen_recording"]);
+  assert.deepEqual(CAPTURE_TOOLS.map(tool => tool.name), ["capture_screenshot", "start_screen_recording", "stop_screen_recording", "mark_recording_step"]);
   for (const value of [
     { name: "capture_screenshot", arguments: { title: "x", display: ":3" } },
     { name: "capture_screenshot", arguments: { title: "x", path: "/etc/passwd" } },
@@ -449,4 +449,101 @@ test("the proxy lists capture tools only with --captures and relays them over th
   assert.ok(cloud.get(1).tools.some(tool => tool.name === "capture_screenshot"));
   assert.deepEqual(JSON.parse(cloud.get(2).content[0].text), { action: "screenshot", capture: { id: "c1", title: "Home" } });
   assert.equal(b.list().length, 0);
+});
+
+test("a done action's step goes on the recording timeline only while recording; the driver never sees it", async (t) => {
+  const { normalizeCall, normalizeCaptureCall, TOOLS } = await import("./driver.mjs");
+  for (const name of ["click", "type_text", "press_key", "scroll"]) assert.ok(TOOLS.find(tool => tool.name === name).inputSchema.required.includes("step"), `${name} asks for its step`);
+  assert.deepEqual(normalizeCall({ name: "click", arguments: { x: 1, y: 2, step: "  Click  Sign in " } }), { name: "click", arguments: { x: 1, y: 2 } });
+  assert.throws(() => normalizeCall({ name: "get_desktop_state", arguments: { step: "look" } }));
+  assert.throws(() => normalizeCall({ name: "click", arguments: { x: 1, y: 2, step: " " } }));
+  assert.deepEqual(normalizeCaptureCall({ name: "mark_recording_step", arguments: { label: "首屏出现" } }), { action: "step", label: "首屏出现", source: "mark" });
+  assert.throws(() => normalizeCaptureCall({ name: "mark_recording_step", arguments: { label: "x", atMs: 5 } }));
+  const relayed = [];
+  const executed = [];
+  let clock = 1_000;
+  const b = await fixture(t, {
+    now: () => clock,
+    execute: async (_, call) => { executed.push(call); return { content: [] }; },
+    capture: async (_runId, call) => {
+      relayed.push(call);
+      if (call.action === "start_recording") return { action: call.action, recordingId: "r1", stopsAt: new Date(clock + 60_000).toISOString() };
+      return { action: call.action };
+    },
+  });
+  const { token } = b.spec("run-1", "allow");
+  const tick = () => new Promise(resolve => setImmediate(resolve));
+  await b.request(token, { name: "click", arguments: { x: 1, y: 2, step: "Before recording" } });
+  await tick();
+  assert.deepEqual(relayed, [], "no recording, no step");
+  // Fake clock: Date.parse(stopsAt) is relative to the broker's own now().
+  clock = Date.now();
+  await b.captureRequest(token, { name: "start_screen_recording", arguments: { title: "Flow" } });
+  await b.request(token, { name: "click", arguments: { x: 1, y: 2, step: "点击登录按钮" } });
+  await tick();
+  assert.deepEqual(relayed.at(-1), { action: "step", label: "点击登录按钮", source: "action" });
+  assert.deepEqual(executed.at(-1), { name: "click", arguments: { x: 1, y: 2 } }, "the driver gets the action, never the description");
+  await b.captureRequest(token, { name: "stop_screen_recording", arguments: {} });
+  const count = relayed.length;
+  await b.request(token, { name: "scroll", arguments: { direction: "down", amount: 3, x: 1, y: 2, step: "After" } });
+  await tick();
+  assert.equal(relayed.length, count, "a stopped recording takes no more steps");
+});
+test("under ask the Decisions API says which actions need the person; no answer executes, logged", async (t) => {
+  const asked = [];
+  let answer = false;
+  let calls = 0;
+  const b = await fixture(t, {
+    execute: async () => { calls++; return "ok"; },
+    needsPerson: async (runId, evidence) => { asked.push({ runId, ...evidence }); return answer; },
+  });
+  const { token } = b.spec("run", "ask");
+  // No: executes without a review.
+  assert.equal(await b.request(token, { name: "click", arguments: { x: 1, y: 2 } }), "ok");
+  assert.equal(b.list().length, 0);
+  assert.deepEqual(asked[0], { runId: "run", call: { name: "click", arguments: { x: 1, y: 2 } }, recent: [] });
+  // Yes: the existing review queue.
+  answer = true;
+  const pending = b.request(token, { name: "type_text", arguments: { text: "hello" } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(b.list().length, 1);
+  assert.deepEqual(asked[1].recent, ["click"]);
+  const row = b.list()[0];
+  await b.decide(row.id, row.digest, true);
+  assert.equal(await pending, "ok");
+  // Null: reviewed by the person, as before the Decisions API; never executed by default.
+  answer = null;
+  const warnings = [];
+  const warn = console.warn;
+  console.warn = (line) => warnings.push(line);
+  let unanswered;
+  try {
+    unanswered = b.request(token, { name: "get_desktop_state" });
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally { console.warn = warn; }
+  assert.match(warnings[0], /^Decision fallback: computer action get_desktop_state/);
+  assert.equal(calls, 2);
+  assert.equal(b.list().length, 1);
+  const held = b.list()[0];
+  await b.decide(held.id, held.digest, true);
+  assert.equal(await unanswered, "ok");
+  assert.equal(calls, 3);
+});
+test("allow never asks the Decisions API and deny grants nothing", async (t) => {
+  let asked = 0;
+  const b = await fixture(t, { execute: async () => "ok", needsPerson: async () => { asked++; return true; } });
+  const { token } = b.spec("run", "allow");
+  assert.equal(await b.request(token, { name: "get_desktop_state" }), "ok");
+  assert.equal(b.spec("run", "deny"), undefined);
+  assert.equal(asked, 0);
+});
+test("judged reviews keep the pending cap", async (t) => {
+  const b = await fixture(t, { needsPerson: async () => true, ttl: 60000 });
+  const { token } = b.spec("run", "ask");
+  const pending = Array.from({ length: 20 }, () => b.request(token, { name: "get_desktop_state" }).catch(() => {}));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(b.list().length, 20);
+  await assert.rejects(b.request(token, { name: "get_desktop_state" }), /Not permitted/);
+  b.revoke(token);
+  await Promise.all(pending);
 });

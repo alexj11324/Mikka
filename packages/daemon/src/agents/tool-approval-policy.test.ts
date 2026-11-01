@@ -3,12 +3,38 @@ import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { toolApprovalDecision } from './tool-approval-policy'
 import type { ToolApprovalRequest } from './tool-approval'
 
+it('permits only the host-enabled fixed mailbox transport without widening other tools', () => {
+  const policy = { ...defaultRunPolicy(), readOnly: true }
+  for (const name of ['mailbox_recipients', 'mailbox_send', 'mailbox_inbox', 'mailbox_ack', 'mailbox_sent']) {
+    const request: ToolApprovalRequest = { runId: 'r', requestId: name, harness: 'claude_code', method: `cli/mcp__mikka_mailbox__${name}`, input: {} }
+    expect(toolApprovalDecision(request, policy, '/worktree')).toBe('unavailable')
+    expect(toolApprovalDecision(request, policy, '/worktree', [], [], true)).toBe('allow')
+  }
+  for (const method of ['cli/mcp__mikka_mailbox__arbitrary_tool', 'cli/mcp__other_mailbox__mailbox_send', 'cli/Bash'])
+    expect(toolApprovalDecision({ runId: 'r', requestId: method, harness: 'claude_code', method, input: {} }, policy, '/worktree', [], [], true)).toBe('unavailable')
+})
+
 it('uses the trusted network setting for host proxy requests without inspecting commands', () => {
   const base = defaultRunPolicy()
   const request: ToolApprovalRequest = {runId:'r',requestId:'i',harness:'codex',method:'sandbox/network',input:{host:'example.invalid',port:443}}
   for (const decision of ['allow','ask','deny'] as const) expect(toolApprovalDecision(request,{...base,permissions:{...base.permissions,network:decision}})).toBe(decision)
   expect(toolApprovalDecision({...request,input:{host:'example.invalid',port:0}},base)).toBe('deny')
   expect(toolApprovalDecision({...request,method:'cli/sandbox/network'},base)).toBe('unavailable')
+})
+
+it('pre-authorizes the repo allow list and the run endpoints under ask, and asks for anything else', () => {
+  const base = defaultRunPolicy()
+  const policy = {...base,networkAllow:['github.com','*.githubusercontent.com'],permissions:{...base.permissions,network:'ask' as const}}
+  const to = (host: string, port = 443) => ({runId:'r',requestId:'i',harness:'claude_code' as const,method:'sandbox/network',input:{host,port}})
+  expect(toolApprovalDecision(to('github.com'),policy)).toBe('allow')
+  expect(toolApprovalDecision(to('raw.githubusercontent.com'),policy)).toBe('allow')
+  expect(toolApprovalDecision(to('example.com'),policy)).toBe('ask')
+  expect(toolApprovalDecision(to('api.github.com'),policy)).toBe('ask')
+  // The run's own Mikka endpoint (e.g. the GitHub token exchange), host and port exact.
+  expect(toolApprovalDecision(to('mikka.example'),policy,undefined,[],['mikka.example'])).toBe('allow')
+  expect(toolApprovalDecision(to('mikka.example',8443),policy,undefined,[],['mikka.example:443'])).toBe('ask')
+  // `deny` stays deny, even for the allow list.
+  expect(toolApprovalDecision(to('github.com'),{...policy,permissions:{...policy.permissions,network:'deny'}})).toBe('deny')
 })
 
 it('does not infer action authority from callback text or automatically ask', () => {

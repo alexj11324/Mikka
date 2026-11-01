@@ -1,3 +1,4 @@
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { z } from 'zod'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
@@ -11,7 +12,7 @@ const inputSchema = z.object({ issueId: z.uuid(), harness: z.enum(['codex', 'cla
 const headers = { 'Cache-Control': 'private, no-store' }
 
 export async function POST(request: Request, { params }: { params: Promise<{ botId: string }> }) {
-  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return Response.json({ error: 'Cloud computer task unavailable' }, { status: 503, headers })
+  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return Response.json({ error: 'Cloud computer task unavailable' }, { status: 503, headers })
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) return Response.json({ error: 'Sign in required' }, { status: 401, headers })
   if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'Invalid origin' }, { status: 403, headers })
@@ -25,7 +26,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
     if (!issue) return Response.json({ error: 'Task unavailable' }, { status: 404, headers })
     const runtime = (await pool.query('SELECT "agentId","repoId" FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND harness=$4', [botId, session.user.id, context.workspace.id, parsed.data.harness])).rows[0]
     if (!runtime) return Response.json({ error: 'Bot computer task is unavailable' }, { status: 409, headers })
-    const result = await queueCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note: parsed.data.note, botId, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: issue.title, body: tiptapToText(issue.content) })
+    // One task, one thread (lib/thread-dispatch.ts): a task with a thread gets this as that thread's work.
+    const { dispatchToTask } = await import('@/lib/thread-dispatch')
+    const result = await dispatchToTask(session.user.id, parsed.data.issueId, {
+      note: parsed.data.note,
+      start: (previous, note) => queueCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note, botId, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: issue.title, body: tiptapToText(issue.content), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous ? { idempotencyKey: `thread:${previous.id}:${crypto.randomUUID()}` } : {}) }),
+    })
     return Response.json(result, { status: 202, headers })
   } catch (error) {
     if (error instanceof ComputerError) return Response.json({ error: error.message }, { status: error.status, headers })

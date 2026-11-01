@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
+import { workspaceLink } from '@/components/workspace/workspace-navigation'
 export const BOT_THREAD_PAGE_DEFAULT = 20
 export const BOT_THREAD_PAGE_MAX = 50
 export const BOT_THREAD_TITLE_MAX = 80
@@ -53,6 +54,6 @@ export function botThreadTitle(input: { issueTitle: string | null; issueVisible:
 
 /** Where a row opens: the task, or the viewer's own chat with the bot. Null when the viewer may not open it. */
 export function botThreadHref(thread: { issueId: string | null; ownerId: string; botId: string }, viewer: { id: string; issueVisible: boolean }): string | null {
-  if (thread.issueId) return viewer.issueVisible ? `/?issue=${thread.issueId}` : null
-  return thread.ownerId === viewer.id ? `/?section=coordinator&bot=${thread.botId}` : null
+  if (thread.issueId) return viewer.issueVisible ? workspaceLink({ issue: thread.issueId }) : null
+  return thread.ownerId === viewer.id ? workspaceLink({ bot: thread.botId }) : null
 }

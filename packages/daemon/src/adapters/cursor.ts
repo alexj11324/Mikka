@@ -34,8 +34,18 @@ import {
   classifyCommand,
   decide,
   runPolicy,
+  type PermissionDecision,
   type RunPolicy,
 } from "../permissions"
+import {
+  COMMAND_ACTIONS,
+  commandDigest,
+  decisionFallback,
+  judgeCommandAction,
+  noServerDecision,
+  type CommandAction,
+} from "../decision-judgments"
+import type { ServerDecide } from "../server-decision"
 import { DAEMON_VERSION } from "../paths"
 import type {
   AgentAdapter,
@@ -51,6 +61,8 @@ export interface CursorAdapterOptions {
   /** `agent` (or `cursor-agent`) on PATH by default. */
   binary?: string
   computerProvider?: ComputerSpecProvider
+  /** The server's Decisions API for shell-command judgments; none means no answer. */
+  decide?: ServerDecide
 }
 
 /**
@@ -60,18 +72,56 @@ export interface CursorAdapterOptions {
 type PermissionRequest = Parameters<acp.Client["requestPermission"]>[0]
 type PermissionResponse = Awaited<ReturnType<acp.Client["requestPermission"]>>
 
+/** The Decisions API for one run's command judgments, cached by command digest. */
+export interface CommandJudgment {
+  decide: ServerDecide
+  runId: string
+  cwd?: string
+  cache: Map<string, Promise<CommandAction | null>>
+}
+
+/**
+ * The workspace decision for a shell command that is not `git push`. When
+ * the person's settings give every action a command could be the same
+ * decision, that decision stands and nothing is asked. Otherwise the
+ * Decisions API names the action and its policy applies; no answer keeps the
+ * decision this command had before the Decisions API (logged).
+ */
+async function commandDecision(command: string, policy: RunPolicy, judgment: CommandJudgment | undefined): Promise<PermissionDecision> {
+  const decisionFor = (action: CommandAction): PermissionDecision => action === "other" ? "allow" : decide(action, { policy })
+  const decisions = new Set(COMMAND_ACTIONS.map(decisionFor))
+  if (decisions.size === 1) return [...decisions][0]
+  const digest = commandDigest(command)
+  const cache = judgment?.cache
+  let pending = cache?.get(digest)
+  if (!pending) {
+    pending = judgeCommandAction(judgment?.decide ?? noServerDecision, judgment?.runId ?? "", { command, cwd: judgment?.cwd, harness: "cursor" })
+    cache?.set(digest, pending)
+  }
+  const action = await pending
+  if (action) return decisionFor(action)
+  if (cache?.get(digest) === pending) cache.delete(digest)
+  // No answer: the classification in force before the Decisions API, so nothing is looser than it was.
+  const legacy = classifyCommand(command, true)
+  const previous = legacy ? decide(legacy, { policy }) : "allow"
+  decisionFallback(`cursor command ${digest.slice(0, 12)} kept its previous decision (${previous}) without a judgment`)
+  return previous
+}
+
 /**
  * Answers Cursor's permission request for a tool call (ADR 0028). Mikka's
  * sandbox is the boundary, so tool calls are allowed, except a shell command
- * the workspace's policy does not allow: installing dependencies under
- * `ask` or `deny` (nobody can be asked mid-run, so `ask` is refused and the
- * agent is told to call `ask_human`) and `git push`, which only the daemon
- * does (ADR 0017).
+ * the workspace's policy does not allow once the Decisions API has named its
+ * action (nobody can be asked mid-run, so `ask` is refused and the agent is
+ * told to call `ask_human`) and `git push`, which only the daemon does
+ * (ADR 0017) unless the agent delivers the run itself.
  */
-export function acpPermissionResponse(
+export async function acpPermissionResponse(
   params: PermissionRequest,
-  policy: RunPolicy | undefined
-): { response: PermissionResponse; refused: boolean } {
+  policy: RunPolicy | undefined,
+  agentDelivers = false,
+  judgment?: CommandJudgment
+): Promise<{ response: PermissionResponse; refused: boolean }> {
   const pick = (kinds: readonly string[]): PermissionResponse => {
     for (const kind of kinds) {
       const option = params.options.find((o) => o.kind === kind)
@@ -87,10 +137,11 @@ export function acpPermissionResponse(
       ? raw.command
       : (params.toolCall.title ?? "")
   const action = classifyCommand(command)
-  const refused =
-    action === "git_push" ||
-    (action !== null &&
-      decide(action, { policy: runPolicy(policy) }) !== "allow")
+  // Only a shell command is judged; other tool calls stay inside the sandbox.
+  const shell = Array.isArray(raw?.command) || typeof raw?.command === "string"
+  const refused = action === "git_push"
+    ? !agentDelivers || decide(action, { policy: runPolicy(policy) }) !== "allow"
+    : shell && command.trim() !== "" && await commandDecision(command, runPolicy(policy), judgment) !== "allow"
   if (refused)
     return { response: pick(["reject_once", "reject_always"]), refused }
   const allowed = pick(["allow_always", "allow_once"])
@@ -295,6 +346,7 @@ export class CursorAdapter implements AgentAdapter {
       marker: ctx.runDir,
     })
     const queue = new EventQueue()
+    const judgment: CommandJudgment = { decide: this.options.decide ?? noServerDecision, runId: options.runId, cwd: ctx.worktree, cache: new Map() }
     const chunker = new AcpChunker("cursor")
     const pending: string[] = []
     let replaying = false
@@ -305,9 +357,11 @@ export class CursorAdapter implements AgentAdapter {
       () => ({
         // Mikka's sandbox decides, plus the workspace's command rules.
         async requestPermission(params) {
-          const { response, refused } = acpPermissionResponse(
+          const { response, refused } = await acpPermissionResponse(
             params,
-            options.policy
+            options.policy,
+            ctx.agentDelivers,
+            judgment
           )
           if (refused)
             log.info(

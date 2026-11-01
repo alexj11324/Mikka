@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowUpRight, ChevronRight, Ellipsis, Plus, Puzzle, Search } from 'lucide-react'
 
+import { goToHref, workspaceLink } from '@/components/workspace/workspace-navigation'
 import { withBasePath } from '@/lib/base-path'
 import { isToolkitSlug } from '@/lib/composio-accounts'
 import type { SkillsSearchResult } from '@/lib/skills-search'
@@ -104,7 +105,7 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
       if (value) url.searchParams.set(key, value)
       else url.searchParams.delete(key)
     }
-    window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    goToHref(`${url.pathname}${url.search}${url.hash}`)
     setApp(next.app ?? null)
     setCategory(next.category ?? null)
   }
@@ -121,11 +122,13 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
         ? <><ConnectedAppsStatus apps={apps} /><ConnectedAppDetail apps={apps} app={app} rootLabel={rootLabel} rootHref={root} onBack={back} /></>
         : <div className="flex flex-col gap-8">
           <PluginBreadcrumb rootLabel={rootLabel} rootHref={root} onBack={back} name={info(app).name} />
-          <header className="flex flex-wrap items-center gap-4">
-            <AppTile app={app} size="xl" />
-            <h2 className="min-w-0 flex-1 text-xl font-semibold">{info(app).name}</h2>
-          </header>
-          {app === 'github' ? <GitHubSettings /> : app === 'linear' ? <LinearSettings notice={linearNotice} /> : <TelegramSettings />}
+          {app === 'github' ? <GitHubSettings /> : <>
+            <header className="flex flex-wrap items-center gap-4">
+              <AppTile app={app} size="xl" />
+              <h2 className="min-w-0 flex-1 text-xl font-semibold">{info(app).name}</h2>
+            </header>
+            {app === 'linear' ? <LinearSettings notice={linearNotice} /> : <TelegramSettings />}
+          </>}
         </div>}
     </div>
   }
@@ -146,7 +149,7 @@ function ConnectedList({ apps, ownStates, href, onOpen }: { apps: ConnectedApps;
         <EmptyMedia variant="icon"><Puzzle aria-hidden="true" /></EmptyMedia>
         <EmptyTitle>{t('noConnections')}</EmptyTitle>
       </EmptyHeader>
-      <Button variant="secondary" size="sm" nativeButton={false} render={<Link href="/?section=plugins" />}>{t('openStore')}</Button>
+      <Button variant="secondary" size="sm" nativeButton={false} render={<Link href={workspaceLink({ section: 'plugins' })} />}>{t('openStore')}</Button>
     </Empty>
   </div>
   return <div className="flex flex-col gap-4">

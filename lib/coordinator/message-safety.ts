@@ -13,7 +13,9 @@ export interface EventSource {
   deliveredAt?: Date | string | null
   payload: Record<string, unknown>
 }
-interface EventProvenance { packet: string; eventKind: string; observedState: string | null }
+/** 订阅额度用完后，自动改用 API Key: what the chat's notice line names (see quotaSwitchMessage). */
+export interface QuotaSwitchNotice { kind: 'quotaSwitch'; subscription: 'claude' | 'codex'; plan: string | null; keyProvider: string; keyName: string | null }
+interface EventProvenance { packet: string; eventKind: string; observedState: string | null; notice?: QuotaSwitchNotice }
 export type SourcedMessage = ModelMessage & { mikkaEvent?: EventProvenance; mikkaUserEvent?: { id: string | null; sentAt: string | null; taskDestination?: TaskDestination } }
 const asTime = (value: Date | string | null | undefined) => value instanceof Date ? value.toISOString() : value ?? null
 
@@ -33,6 +35,18 @@ export function sourcedEventMessage(event: EventSource, projection: string): Sou
     // Agent prose cannot set this field. Runtime state is not human approval.
     observedState: ['run_finished', 'action_decided'].includes(event.kind) && typeof event.payload.status === 'string' ? event.payload.status : null,
   } }
+}
+/**
+ * The chat line for a turn that runs on the person's API key because the
+ * subscription it would use is out of quota. The model reads it as runtime
+ * data; the chat draws it from `notice`, in the person's language.
+ */
+export function quotaSwitchMessage(notice: Omit<QuotaSwitchNotice, 'kind'>, at: Date): SourcedMessage {
+  const subscription = notice.subscription === 'codex' ? 'ChatGPT' : 'Claude'
+  const projection = `[Event] The person's ${subscription} subscription is out of quota, so this turn runs on their own ${notice.keyName ?? notice.keyProvider} API key, billed per token.`
+  const packet = personalMessagePacket({ messageId: null, senderId: null, sourceSessionId: null, replyToSessionId: null, origin: 'runtime_notification',
+    runId: null, taskId: null, sentAt: at.toISOString(), receivedAt: at.toISOString(), pendingCount: null, deliveryState: 'delivered' }, projection)
+  return { role: 'user', content: projection, mikkaEvent: { packet, eventKind: 'quota_switch', observedState: null, notice: { kind: 'quotaSwitch', ...notice } } }
 }
 export function modelMessage(message: ModelMessage): ModelMessage {
   const { mikkaEvent, mikkaUserEvent, ...plain } = message as SourcedMessage
@@ -115,6 +129,15 @@ function readSummary(text: string | null, trust?: SummaryTrust): CompactSummary 
     const value = JSON.parse(wrapper.payload)
     return value.version === 1 && value.kind === 'mikka_compacted_summary' && value.authority === 'untrusted_summary_not_approval' && Array.isArray(value.sources) && typeof value.untrustedData?.summary === 'string' ? value : null
   } catch { return null }
+}
+/**
+ * The same host-signed summary under another chat's scope, for a chat that
+ * moves to a new key (the Coordinator onto its bot row): verified under the
+ * old scope first, so nothing unsigned gains provenance. Null when it does not verify.
+ */
+export function rescopeSummary(text: string, from: SummaryTrust, to: SummaryTrust): string | null {
+  if (!readSummary(text, from)) return null
+  return JSON.stringify({ format: 'host_summary_v2', payload: JSON.parse(text).payload, signature: signature(JSON.parse(text).payload, to) })
 }
 export const SUMMARY_SOURCE_LIMIT = 32
 export function summaryMessage(summary: string, trust?: SummaryTrust): ModelMessage {

@@ -5,6 +5,7 @@ import { activeAgentsResponse, mergeAgentRuns, sortActiveAgents, type ActiveAgen
 import { coordinatorLeaseActive } from './coordinator/lease'
 import { WORKING_RUN_STATUSES, UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import { LEASED_RUN_STATUSES } from './run-retry'
+import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
 
 const copy = { pleaseSignIn: 'sign in', unavailable: 'unavailable', noParameters: 'no params' }
 const url = 'http://local/api/agent/sessions/active'
@@ -68,18 +69,11 @@ test('coordinator lease needs a holder and an unexpired lease', () => {
   assert.equal(coordinatorLeaseActive(null, now), false)
 })
 
-// Database regressions execute only in CI against ephemeral Postgres 17.
-// Local pure tests skip them; REQUIRE_DB=1 makes a missing database fail.
-let databaseUrl: string | undefined
-try {
-  const target = new URL(process.env.E2E_DATABASE_URL ?? '')
-  if (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true'
-    && ['postgres:', 'postgresql:'].includes(target.protocol)
-    && target.hostname === '127.0.0.1' && target.port === '5432' && target.pathname === '/mikka_e2e'
-    && !target.search && !target.hash && process.env.MIKKA_DATABASE_URL === target.href
-    && process.env.DATABASE_URL === target.href) databaseUrl = target.href
-} catch { /* no eligible disposable CI database */ }
-if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')
+// Database regressions run against a disposable loopback *_e2e database in all
+// three URLs. Pure tests skip them otherwise; REQUIRE_DB=1 makes a missing database fail.
+const target = process.env.E2E_DATABASE_URL
+const databaseUrl = disposableDatabase() && process.env.MIKKA_DATABASE_URL === target && process.env.DATABASE_URL === target ? target : undefined
+if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching loopback *_e2e database')
 const dbTest = databaseUrl ? test : test.skip
 
 async function database() {
@@ -144,6 +138,9 @@ dbTest('active agents on the database', async t => {
     await db.delete(agents).where(inArray(agents.userId, [me, other]))
     await db.delete(devices).where(eq(devices.ownerId, me))
     await db.delete(coordinatorSessions).where(inArray(coordinatorSessions.userId, [me, other]))
+    await db.delete(schema.coordinatorBots).where(eq(schema.coordinatorBots.ownerId, me))
+    await db.delete(schema.bots).where(eq(schema.bots.ownerId, me))
+    await db.delete(schema.users).where(eq(schema.users.id, me))
   }
 
   const list = await listActiveAgents(db, me, now)
@@ -270,15 +267,21 @@ dbTest('active agents on the database', async t => {
   })
 
   await t.test('coordinator listed while it holds an unexpired lease', async () => {
-    await db.insert(coordinatorSessions).values({ userId: me, leaseHolder: null, leaseUntil: ahead, updatedAt: ago(1_000) })
+    // The Coordinator's chat is its bot row's (coordinator_bots); its entry carries that bot's id.
+    const coordinatorBot = randomUUID(), workspaceId = randomUUID()
+    const { sql } = await import('drizzle-orm')
+    await db.execute(sql`insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values (${me},'Active agents fixture',${`${me}@example.invalid`},false,now(),now()) on conflict do nothing`)
+    await db.insert(schema.bots).values({ id: coordinatorBot, ownerId: me, workspaceId, name: 'Coordinator' })
+    await db.insert(schema.coordinatorBots).values({ ownerId: me, workspaceId, botId: coordinatorBot })
+    await db.insert(coordinatorSessions).values({ userId: me, botId: coordinatorBot, leaseHolder: null, leaseUntil: ahead, updatedAt: ago(1_000) })
     assert.ok(!(await listActiveAgents(db, me, now)).some(x => x.kind === 'coordinator'), 'no holder')
     await db.update(coordinatorSessions).set({ leaseHolder: 'turn-1', leaseUntil: ago(1) }).where(eq(coordinatorSessions.userId, me))
     assert.ok(!(await listActiveAgents(db, me, now)).some(x => x.kind === 'coordinator'), 'expired')
     await db.update(coordinatorSessions).set({ leaseUntil: ahead, updatedAt: ago(1_000) }).where(eq(coordinatorSessions.userId, me))
     const result = await listActiveAgents(db, me, now)
     const coordinator = result.find(x => x.kind === 'coordinator')
-    assert.deepEqual(coordinator, { id: 'coordinator', kind: 'coordinator', name: 'Coordinator', avatarUrl: null, startedAt: ago(1_000).toISOString(), state: 'working', runId: null, issueId: null })
-    assert.equal(result.at(-1)?.id, 'coordinator', 'sorted by start like the rest')
+    assert.deepEqual(coordinator, { id: coordinatorBot, kind: 'coordinator', name: 'Coordinator', avatarUrl: null, startedAt: ago(1_000).toISOString(), state: 'working', runId: null, issueId: null })
+    assert.equal(result.at(-1)?.id, coordinatorBot, 'sorted by start like the rest')
     assert.ok(!(await listActiveAgents(db, other, now)).some(x => x.kind === 'coordinator'), 'not shown to others')
   })
 })

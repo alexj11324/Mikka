@@ -331,6 +331,14 @@ daemon. Builds, type checks and end-to-end tests run there or in CI.
 Credentials live in Infisical Cloud; never commit them or store them in a local
 `.env` file.
 
+In a fresh cloud Linux session, one command sets up PostgreSQL 17 with
+`mikka_e2e` migrated, Node 24, dependencies, the sandbox tools and Playwright
+(see [docs/local-bootstrap.md](docs/local-bootstrap.md)):
+
+```sh
+eval "$(scripts/dev/bootstrap-local.sh)"
+```
+
 Install dependencies and run the source checks:
 
 ```sh
@@ -353,9 +361,9 @@ pnpm desktop:dev
 ```
 
 While working, run `pnpm typecheck`, `pnpm lint`, the unit tests for what you
-changed and the one browser test for a flow you changed. A pull request runs
-the `@smoke` browser set plus the specs of the areas it touches; a push to
-main runs the main functional list; nightly runs cover every spec. See
+changed and the one browser test for a flow you changed. CI runs source,
+daemon and database checks and no browser tests; browser specs run locally,
+and Vercel, not CI, builds `main`. See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) ("How changes are tested").
 
 Start with these documents:

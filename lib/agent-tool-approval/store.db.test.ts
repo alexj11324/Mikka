@@ -126,8 +126,9 @@ test('legacy local runs materialize stable sandbox defaults without changing exp
   const first=await readCliRunPolicy(pool,legacyRun,user)
   const second=await readCliRunPolicy(pool,legacyRun,user)
   assert.equal(first.policy.permissions.install_dependency,'allow')
-  assert.equal(first.policy.permissions.network,'ask')
-  assert.equal(first.policy.permissions.git_push,'ask')
+  // Network is open by default (decision 2026-11-01-1230).
+  assert.equal(first.policy.permissions.network,'allow')
+  assert.equal(first.policy.permissions.git_push,'allow','push is the GitHub App grant, never ask')
   assert.equal(first.revision,second.revision)
   assert.deepEqual(first.layers.agent,{})
   const results = await Promise.allSettled([
@@ -138,12 +139,13 @@ test('legacy local runs materialize stable sandbox defaults without changing exp
   assert.equal(results.filter(result => result.status === 'rejected').length,1)
 })
 
-test('unbound workers configure safely and only owned cloud devices receive open defaults',async()=>{
+test('unbound workers get open network defaults and only owned cloud devices are read',async()=>{
  const user=`device-defaults-${randomUUID()}`,worker=randomUUID(),device=randomUUID()
  const guard=async()=>({async check(){},async close(){}})
  await pool.query(`INSERT INTO agents(id,"userId",harness) VALUES($1,$2,'codex')`,[worker,user])
  const unbound=await readCliAgentPolicy(pool,user,worker,null,guard)
- assert.equal(unbound.policy.permissions.network,'ask')
+ // Network is open by default everywhere (decision 2026-11-01-1230).
+ assert.equal(unbound.policy.permissions.network,'allow')
  await pool.query(`INSERT INTO devices(id,"ownerId",enabled,kind) VALUES($1,$2,true,'cloud')`,[device,user])
  await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1',[worker,device])
  const cloud=await readCliAgentPolicy(pool,user,worker,null,guard)

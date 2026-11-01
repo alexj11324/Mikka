@@ -6,13 +6,15 @@ import { attentionLog, attentionMatters, attentionSettings, coordinatorEvents, t
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { BUDGET_WINDOW_MS, BUDGETS, budgetState, type BudgetKind } from './budget'
 import { mergeEvidence, notice, stateAfterNotice, type BudgetView, type HandoffPayload, type ItemEvidence } from './handoff'
-import { higherLevel, isRouted, levelRank, type MatterContext } from './judgment'
+import { interruptInput, interruptQuestions, nextHandoffInput, nextHandoffQuestions, readInterrupt, readNextHandoff, readSettle, settleInput, settleQuestions, UNDECIDED_RETRY_MS, type MatterBrief, type NotifyHistory } from './interrupt'
+import type { DecisionAnswer, DecisionQuestion } from '@/lib/coordinator/decision'
+import type { MatterContext } from './judgment'
 import { onPersonTold } from './push'
 import type { Score } from './score'
 
 // The person's matters from connected apps, their two budgets and the
 // Coordinator's decisions (R-20). Ingest records a notice on its matter; a
-// matter at a routed level waits until the handoff budget allows it and no
+// matter the Decisions API said to hand over waits until the handoff budget allows it and no
 // other matter is in the Coordinator's hands, then goes over as a hidden
 // `matter_handoff` event. The Coordinator records notify, quiet, snooze or
 // handled with record_attention. Nothing is dropped: a matter that cannot go
@@ -21,7 +23,7 @@ import type { Score } from './score'
 /** Recent matters the judgment may link a notice to. */
 const MATTERS_FOR_JUDGMENT = 10
 const MATTERS_DAYS = 60
-/** A matter in the Coordinator's hands this long without a decision counts as quiet, so the next one can go over. */
+/** A matter in the Coordinator's hands this long without a decision is settled by the Decisions API, so the next one can go over. */
 const HANDED_STALE_MS = 30 * 60_000
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -70,15 +72,10 @@ export async function judgmentContext(userId: string, key: string, now = new Dat
   return { same: same ? context(same) : null, matters: recent.map((matter, index) => context(matter, `m${index + 1}`)), ids }
 }
 
-/** The matter a judged notice continues, by real id, when the person has not answered it. */
-export async function matterContext(userId: string, id: string): Promise<MatterContext | null> {
-  const [matter] = await db.select().from(attentionMatters).where(and(eq(attentionMatters.id, id), eq(attentionMatters.userId, userId))).limit(1)
-  return matter ? context(matter) : null
-}
-
 /**
  * Records a notice on its matter: the thread's own matter, else the earlier
- * matter the judgment linked, else a new one when the level is routed.
+ * matter the judgment linked, else a new one when the Decisions API said
+ * `handOver`. The matter takes the level the API gave this notice.
  * Returns whether a matter now waits to go over.
  */
 export async function recordNotice(notification: ExternalNotification, suggestionId: string, score: Score, continuesId: string | null): Promise<boolean> {
@@ -89,21 +86,19 @@ export async function recordNotice(notification: ExternalNotification, suggestio
     const [same] = await tx.select().from(attentionMatters).where(byKey(userId, matterKey)).limit(1)
     const [linked] = same || !continuesId ? [] : await tx.select().from(attentionMatters).where(and(eq(attentionMatters.id, continuesId), eq(attentionMatters.userId, userId))).limit(1)
     const target = same ?? linked
-    const routed = isRouted(score.level)
     const now = new Date()
     if (!target) {
-      if (!routed) return false
+      if (!score.handOver) return false
       await tx.insert(attentionMatters).values({
         id: randomUUID(), userId, matterKey, source: notification.source, suggestionId, title: notification.title, url: notification.url,
         level: score.level, assessment: { ...score.assessment }, evidence: { ...mergeEvidence(null, notice(notification), matterKey) }, state: 'waiting',
       }).onConflictDoNothing()
       return true
     }
-    const next = stateAfterNotice(target, score.level, routed)
-    const level = target.state === 'handled' && next ? score.level : higherLevel(score.level, target.level)
+    const next = stateAfterNotice(target, score.handOver)
     await tx.update(attentionMatters).set({
-      suggestionId, url: notification.url ?? target.url, level,
-      // A notice the model judged supersedes the earlier assessment; a rule or fallback keeps it.
+      suggestionId, url: notification.url ?? target.url, level: score.level,
+      // A judgment without an assessment keeps the earlier one.
       ...(score.assessment ? { assessment: { ...score.assessment } } : {}),
       evidence: { ...mergeEvidence(target.evidence as unknown as ItemEvidence, notice(notification), matterKey) },
       ...(next ? { state: next, recheck: false, runAt: null } : {}),
@@ -153,33 +148,86 @@ async function lastDecision(tx: Tx, matterId: string): Promise<HandoffPayload['p
   return { state, reason: row.reason }
 }
 
+type Answers = ReadonlyMap<string, Exclude<DecisionAnswer, { type: 'refusal' }>>
+/** One Decisions API call for the person, billed to their execution workspace. Null when it gives no answer. */
+export type AttentionDecide = (userId: string, purpose: string, input: string, questions: DecisionQuestion[]) => Promise<Answers | null>
+const decisionsCall: AttentionDecide = async (userId, purpose, input, questions) => {
+  const [{ decide }, { hostedBillingScope }, { executionWorkspace }] = await Promise.all([import('@/lib/coordinator/decide'), import('@/lib/abuse/context'), import('@/lib/execution-settings')])
+  try { return await hostedBillingScope.run({ workspaceId: await executionWorkspace(userId, null), ownerId: userId }, () => decide(purpose, input, questions)) } catch { return null }
+}
+
+function brief(matter: Matter, now: Date): MatterBrief {
+  return { id: matter.id, title: matter.title, level: matter.level, reason: matter.reason, personAsked: matter.personAsked, recheck: matter.recheck, minutesWaiting: Math.max(0, Math.round((now.getTime() - matter.updatedAt.getTime()) / 60_000)) }
+}
+
+async function notifyHistory(executor: Pick<typeof db, 'select'>, userId: string, now: Date): Promise<NotifyHistory> {
+  const told = (await spends(executor, userId, 'notify', now)).sort((a, b) => b.getTime() - a.getTime())
+  return { today: told.length, minutesSinceLast: told.length ? Math.round((now.getTime() - told[0].getTime()) / 60_000) : null }
+}
+
+/** The Decisions API's settlement for matters the Coordinator left undecided; no answer snoozes it to be asked again. */
+async function settlements(userId: string, matters: readonly Matter[], now: Date, call: AttentionDecide) {
+  const notified = await notifyHistory(db, userId, now)
+  return Promise.all(matters.map(async matter => {
+    const answers = await call(userId, 'attention-settle', settleInput(brief(matter, now), notified, now), settleQuestions())
+    const settled = answers && readSettle(answers, now)
+    return { matter, settled: settled ?? { state: 'snoozed' as const, runAt: new Date(now.getTime() + UNDECIDED_RETRY_MS) }, reason: settled ? 'no decision recorded' : 'decision unavailable' }
+  }))
+}
+
+async function applySettlement(tx: Tx, item: Awaited<ReturnType<typeof settlements>>[number], now: Date) {
+  const { matter, settled, reason } = item
+  if (settled.state === 'quiet') {
+    await tx.update(attentionMatters).set({ state: 'quiet', reason, updatedAt: now }).where(and(eq(attentionMatters.id, matter.id), eq(attentionMatters.state, 'handed')))
+    await log(tx, matter, 'quiet', false, { reason })
+  } else {
+    await tx.update(attentionMatters).set({ state: 'snoozed', reason, runAt: settled.runAt, updatedAt: now }).where(and(eq(attentionMatters.id, matter.id), eq(attentionMatters.state, 'handed')))
+    await log(tx, matter, 'snooze', false, { reason, runAt: settled.runAt })
+  }
+}
+
 /**
- * Hands the next waiting matter to the Coordinator, one at a time: snoozes
- * that are due come back first as rechecks, a matter long in hand without a
- * decision is settled quiet, and a new handoff waits while the handoff budget
- * is closed. Returns whether a matter went over; the caller wakes the
- * Coordinator.
+ * Hands the next waiting matter to the Coordinator, one at a time. Snoozes
+ * that are due come back as rechecks; a matter long in the Coordinator's hands
+ * without a decision is settled by the Decisions API; then the Decisions API
+ * picks which waiting matter, if any, goes over now (it reads how many were
+ * handed and told today). No answer hands nothing; the next wake asks again.
+ * Only the runaway handoff cap stays in code. Model calls run outside the
+ * transactions. Returns whether a matter went over; the caller wakes the Coordinator.
  */
-export async function releaseAttention(userId: string, now = new Date()): Promise<boolean> {
-  return db.transaction(async tx => {
+export async function releaseAttention(userId: string, now = new Date(), call: AttentionDecide = decisionsCall): Promise<boolean> {
+  if (!await attentionEnabled(userId)) return false
+  // Only once the Coordinator read it: a handoff still in the inbox waits for the next turn.
+  const delivered = sql`exists (select 1 from ${coordinatorEvents} where ${coordinatorEvents.userId} = ${userId} and ${coordinatorEvents.dedupeKey} = 'matter_handoff:' || ${attentionMatters.id} || ':' || ${attentionMatters.handoffs} and ${coordinatorEvents.deliveredAt} is not null)`
+  const stale = await db.select().from(attentionMatters)
+    .where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'handed'), lte(attentionMatters.handedAt, new Date(now.getTime() - HANDED_STALE_MS)), delivered))
+  const settled = stale.length ? await settlements(userId, stale, now, call) : []
+  const waiting = await db.transaction(async tx => {
     await lock(tx, userId)
-    if (!await attentionEnabled(userId, tx)) return false
-    // Only once the Coordinator read it: a handoff still in the inbox waits for the next turn.
-    const delivered = sql`exists (select 1 from ${coordinatorEvents} where ${coordinatorEvents.userId} = ${userId} and ${coordinatorEvents.dedupeKey} = 'matter_handoff:' || ${attentionMatters.id} || ':' || ${attentionMatters.handoffs} and ${coordinatorEvents.deliveredAt} is not null)`
-    const stale = await tx.update(attentionMatters).set({ state: 'quiet', reason: 'no decision recorded', updatedAt: now })
-      .where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'handed'), lte(attentionMatters.handedAt, new Date(now.getTime() - HANDED_STALE_MS)), delivered)).returning()
-    for (const matter of stale) await log(tx, matter, 'quiet', false, { reason: 'no decision recorded' })
+    for (const item of settled) await applySettlement(tx, item, now)
     await tx.update(attentionMatters).set({ state: 'waiting', recheck: true, runAt: null, updatedAt: now })
       .where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'snoozed'), lte(attentionMatters.runAt, now)))
     const [inHand] = await tx.select({ id: attentionMatters.id }).from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'handed'))).limit(1)
+    if (inHand) return []
+    return tx.select().from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'waiting'))).orderBy(attentionMatters.updatedAt).limit(20)
+  })
+  if (!waiting.length) return false
+  const handed = await spends(db, userId, 'handoff', now)
+  if (!budgetState('handoff', handed, now).open) return false
+  const briefs = waiting.map(matter => brief(matter, now))
+  const answers = await call(userId, 'attention-next', nextHandoffInput(briefs, handed.length, await notifyHistory(db, userId, now), now), nextHandoffQuestions(briefs))
+  const pick = answers && readNextHandoff(answers, briefs)
+  if (!pick || pick === 'none') return false
+  // Matters from connected apps enter the person's Coordinator chat: its bot row is resolved here, before the transaction.
+  // App connections belong to the account and a matter names no workspace, so it is the personal workspace's Coordinator.
+  const { botId } = await (await import('@/lib/coordinator/coordinator-bot')).coordinatorBot(userId, null)
+  return db.transaction(async tx => {
+    await lock(tx, userId)
+    if (!await attentionEnabled(userId, tx)) return false
+    const [inHand] = await tx.select({ id: attentionMatters.id }).from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'handed'))).limit(1)
     if (inHand) return false
-    const waiting = await tx.select().from(attentionMatters).where(and(eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'waiting'))).limit(100)
-    if (!waiting.length) return false
-    const handoffOpen = budgetState('handoff', await spends(tx, userId, 'handoff', now), now).open
-    const matter = waiting
-      .sort((a, b) => Number(b.recheck) - Number(a.recheck) || levelRank(b.level) - levelRank(a.level) || a.updatedAt.getTime() - b.updatedAt.getTime())
-      .find(candidate => candidate.recheck || handoffOpen)
-    if (!matter) return false
+    const [matter] = await tx.select().from(attentionMatters).where(and(eq(attentionMatters.id, pick), eq(attentionMatters.userId, userId), eq(attentionMatters.state, 'waiting'))).limit(1)
+    if (!matter || !budgetState('handoff', await spends(tx, userId, 'handoff', now), now).open) return false
     const evidence = matter.evidence as unknown as ItemEvidence
     const payload: HandoffPayload = {
       matterId: matter.id, level: matter.level, title: matter.title, url: matter.url,
@@ -188,10 +236,10 @@ export async function releaseAttention(userId: string, now = new Date()): Promis
       minutesAgo: Math.max(0, Math.round((now.getTime() - new Date(evidence.latest.occurredAt).getTime()) / 60_000)),
       recheck: matter.recheck, personAsked: matter.personAsked,
       previous: matter.handoffs ? await lastDecision(tx, matter.id) : null,
-      notifyBudget: view(budgetState('notify', await spends(tx, userId, 'notify', now), now, matter.level)),
+      notified: await notifyHistory(tx, userId, now),
     }
     await tx.insert(coordinatorEvents).values({
-      id: randomUUID(), userId, kind: 'matter_handoff',
+      id: randomUUID(), userId, botId, kind: 'matter_handoff',
       dedupeKey: `matter_handoff:${matter.id}:${matter.handoffs + 1}`, issueId: null, runId: null,
       payload: { ...payload }, tier: 'attention',
     }).onConflictDoNothing()
@@ -210,11 +258,24 @@ export type AttentionDecision =
 export type DecisionResult = { ok: true; state: AttentionMatterState } | { error: string; nextAt?: string }
 
 /**
- * Records the Coordinator's decision on one matter. `notify` spends the
- * notification budget (unless the person asked for the reminder) and fails
- * while it is closed, with the time it reopens; then snooze until then.
+ * Records the Coordinator's decision on one matter. Before `notify`, the
+ * Decisions API decides whether the person is interrupted now, reading how
+ * often they were told today; a no fails with the time to look again (then
+ * snooze until then). No answer leaves the Coordinator's own call standing,
+ * logged as a fallback. A reminder the person asked for is not asked about.
+ * Only the runaway notify cap stays in code.
  */
-export async function recordDecision(userId: string, input: AttentionDecision, now = new Date()): Promise<DecisionResult> {
+export async function recordDecision(userId: string, input: AttentionDecision, now = new Date(), call: AttentionDecide = decisionsCall): Promise<DecisionResult> {
+  let declined: Date | null = null
+  if (input.decision === 'notify') {
+    const [matter] = await db.select().from(attentionMatters).where(and(eq(attentionMatters.id, input.matterId), eq(attentionMatters.userId, userId))).limit(1)
+    if (matter?.state === 'handed' && !matter.personAsked) {
+      const answers = await call(userId, 'attention-interrupt', interruptInput(brief(matter, now), await notifyHistory(db, userId, now), now), interruptQuestions())
+      const verdict = answers && readInterrupt(answers, now)
+      if (!verdict) console.warn('Attention interrupt fallback: the Coordinator\'s notify stands without a Decisions answer', { matterId: matter.id })
+      else if (!verdict.interrupt) declined = verdict.retryAt
+    }
+  }
   const result = await db.transaction(async (tx): Promise<{ result: DecisionResult; told?: Matter }> => {
     await lock(tx, userId)
     const [matter] = await tx.select().from(attentionMatters).where(and(eq(attentionMatters.id, input.matterId), eq(attentionMatters.userId, userId))).limit(1)
@@ -223,6 +284,7 @@ export async function recordDecision(userId: string, input: AttentionDecision, n
     switch (input.decision) {
       case 'notify': {
         if (matter.state !== 'handed') return { result: { error: 'matterNotInHand' } }
+        if (declined && !matter.personAsked) return { result: { error: 'notifyDeclined', nextAt: declined.toISOString() } }
         if (!matter.personAsked) {
           const budget = budgetState('notify', await spends(tx, userId, 'notify', now), now, matter.level)
           if (!budget.open) return { result: { error: 'notificationBudgetClosed', nextAt: budget.nextAt.toISOString() } }
@@ -249,38 +311,33 @@ export async function recordDecision(userId: string, input: AttentionDecision, n
   })
   if (result.told) await onPersonTold(result.told)
   // The next waiting matter can go over now; the running turn takes it in its next round.
-  if ('ok' in result.result) await releaseAttention(userId, now)
+  if ('ok' in result.result) await releaseAttention(userId, now, call)
   return result.result
 }
 
 /**
  * After a turn: a matter it was handed but did not decide on is settled. A
  * visible reply to a turn that held only handoffs told the person, so it
- * counts as notify. Otherwise a matter the person must act on is snoozed
- * until the notification budget reopens when it is closed, and quiet
- * when it is open (when unsure, quiet).
+ * counts as notify. Otherwise the Decisions API decides quiet or snooze (and
+ * until when); no answer snoozes it to be asked again.
  */
-export async function settleTurn(userId: string, matterIds: readonly string[], toldPerson: boolean, now = new Date()): Promise<void> {
+export async function settleTurn(userId: string, matterIds: readonly string[], toldPerson: boolean, now = new Date(), call: AttentionDecide = decisionsCall): Promise<void> {
   if (!matterIds.length) return
+  const open = await db.select().from(attentionMatters).where(and(eq(attentionMatters.userId, userId), inArray(attentionMatters.id, [...matterIds]), eq(attentionMatters.state, 'handed')))
+  if (!open.length) return
+  const settled = toldPerson ? [] : await settlements(userId, open, now, call)
   const told: Matter[] = []
   await db.transaction(async tx => {
     await lock(tx, userId)
-    const open = await tx.select().from(attentionMatters).where(and(eq(attentionMatters.userId, userId), inArray(attentionMatters.id, [...matterIds]), eq(attentionMatters.state, 'handed')))
-    for (const matter of open) {
-      const budget = budgetState('notify', await spends(tx, userId, 'notify', now), now, matter.level)
-      if (toldPerson) {
-        await tx.update(attentionMatters).set({ state: 'notified', reason: 'told without recording', personAsked: false, updatedAt: now }).where(eq(attentionMatters.id, matter.id))
+    if (toldPerson) {
+      for (const matter of open) {
+        const rows = await tx.update(attentionMatters).set({ state: 'notified', reason: 'told without recording', personAsked: false, updatedAt: now }).where(and(eq(attentionMatters.id, matter.id), eq(attentionMatters.state, 'handed'))).returning({ id: attentionMatters.id })
+        if (!rows.length) continue
         await log(tx, matter, 'notify', !matter.personAsked, { reason: 'told without recording' })
         told.push(matter)
-      } else if (!budget.open && (matter.level === 'critical' || matter.level === 'high')) {
-        await tx.update(attentionMatters).set({ state: 'snoozed', reason: 'notification budget closed', runAt: budget.nextAt, updatedAt: now }).where(eq(attentionMatters.id, matter.id))
-        await log(tx, matter, 'snooze', false, { reason: 'notification budget closed', runAt: budget.nextAt })
-      } else {
-        await tx.update(attentionMatters).set({ state: 'quiet', reason: 'no decision recorded', updatedAt: now }).where(eq(attentionMatters.id, matter.id))
-        await log(tx, matter, 'quiet', false, { reason: 'no decision recorded' })
       }
-    }
+    } else for (const item of settled) await applySettlement(tx, item, now)
   })
   for (const matter of told) await onPersonTold(matter)
-  await releaseAttention(userId, now)
+  await releaseAttention(userId, now, call)
 }

@@ -22,7 +22,7 @@ test('a saved current Bot reply loads its image via the canonical GET without le
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
     expect(user).toBeTruthy()
-    await pool.query('INSERT INTO coordinator_messages (id, "userId", position, message) VALUES ($1, $2, 1, $3)', [randomUUID(), user.id, JSON.stringify({ role: 'assistant', content: 'root = Stack([TextContent("已保存的 Bot 配图正文"), BeImage("Public fixture", "公开文档配图", "公开文档示例")])' })])
+    await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), 1, $3)', [randomUUID(), user.id, JSON.stringify({ role: 'assistant', content: 'root = Stack([TextContent("已保存的 Bot 配图正文"), BeImage("Public fixture", "公开文档配图", "公开文档示例")])' })])
   } finally { await pool.end() }
   const image = { src: 'https://upload.wikimedia.org/controlled-fixture.png', width: 500, height: 300, title: 'Controlled fixture', source: 'https://commons.wikimedia.org/wiki/File:Fixture.png', author: 'Fixture', license: 'CC0' }
   const lookups: string[] = []
