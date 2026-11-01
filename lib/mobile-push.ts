@@ -1,5 +1,5 @@
 import 'server-only'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { bots, mobilePushTokens } from '@/lib/db/schema'
 import { readPreferences } from '@/lib/preferences'
@@ -52,7 +52,7 @@ export function pushBody(text: string): string {
  * is a reply about a verification code: the push only says one came, the code
  * stays in the app chat. Tokens Expo reports as gone are removed. Never throws.
  */
-export async function pushReply(userId: string, botId: string | null, text: string | null, reasons: readonly PushReason[]): Promise<void> {
+export async function pushReply(userId: string, botId: string, text: string | null, reasons: readonly PushReason[]): Promise<void> {
   try {
     if (!reasons.length || text?.trim() === '') return
     if (!pushAllowed(await readPreferences(userId), reasons)) return
@@ -60,7 +60,9 @@ export async function pushReply(userId: string, botId: string | null, text: stri
     if (await chatMuted(userId, botId)) return
     const tokens = await db.select({ token: mobilePushTokens.token }).from(mobilePushTokens).where(eq(mobilePushTokens.userId, userId))
     if (!tokens.length) return
-    const [bot] = botId ? await db.select({ name: bots.name }).from(bots).where(eq(bots.id, botId)).limit(1) : []
+    const [bot] = await db.select({ name: bots.name, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` }).from(bots).where(eq(bots.id, botId)).limit(1)
+    // The app opens the Coordinator's chat by its own route (botId null), under its usual name.
+    const coordinator = !bot || bot.coordinator
     const body = text === null ? await codePushBody(await personLocale(userId)) : pushBody(text)
     const response = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
@@ -68,7 +70,7 @@ export async function pushReply(userId: string, botId: string | null, text: stri
         'content-type': 'application/json', accept: 'application/json',
         ...(process.env.EXPO_ACCESS_TOKEN ? { authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}),
       },
-      body: JSON.stringify(tokens.map(({ token }) => ({ to: token, title: bot?.name ?? 'Coordinator', body, sound: 'default', data: { botId } }))),
+      body: JSON.stringify(tokens.map(({ token }) => ({ to: token, title: coordinator ? 'Coordinator' : bot.name, body, sound: 'default', data: { botId: coordinator ? null : botId } }))),
       signal: AbortSignal.timeout(10_000),
     })
     if (!response.ok) throw new Error(`Expo push returned ${response.status}`)

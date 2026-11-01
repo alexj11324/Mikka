@@ -34,6 +34,10 @@ Thank you for helping improve Mikka.
   this loose-check policy; the workflow alone cannot change that setting.
   See "How changes are tested" below for which checks run when.
 - Never commit credentials. Project secrets live in Infisical Cloud.
+- Focus is stale-while-revalidate: only data past its freshness threshold
+  revalidates, silently, never hiding what is shown; third-party status never
+  on focus. See
+  [`docs/design/decisions/2026-11-01-0400-no-refetch-on-focus.md`](docs/design/decisions/2026-11-01-0400-no-refetch-on-focus.md).
 
 ## How changes are tested
 
@@ -124,6 +128,22 @@ is printed in the Changed files job and its summary. The browser environment
 remains an isolated PostgreSQL service and the built application on the GitHub
 Linux runner's localhost; this workflow does not test a Vercel Preview.
 
+### Before asking Alex: look at how leading products do it
+
+A choice goes to Alex only when leading products (Linear, Slack, GitHub, Figma,
+Claude, ChatGPT, Cursor, Devin and the like) disagree or the choice is about
+Mikka's own strategy, money or brand. When they agree, follow them and record
+which products in the PR. Details:
+`docs/design/decisions/2026-11-01-0400-research-before-asking-alex.md`.
+
+### UI changes: Figma, then skill review, then code
+
+A change a person can see is drawn in Figma first, reviewed with the
+`interface-design:design-review` and `unslop` skills until nothing blocking
+remains, confirmed by Alex, and only then implemented. The PR shows the built
+screen next to the confirmed frames; green CI alone does not make it
+mergeable. Details: `docs/design/decisions/2026-11-01-0330-ui-figma-and-skill-review-before-code.md`.
+
 ### Test logins: never ask for a password
 
 Sessions never ask Alex for an account, password or login step. To test
@@ -134,6 +154,13 @@ check it through `POST <base>/api/auth/sign-in/email`. Only a click on a
 third-party site under Alex's identity (a GitHub App install, an OAuth consent)
 or a session permission prompt may be asked of him. Details and the current
 test accounts: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
+
+The cloud worker's E2B template is released by CI, not by hand: a push to `main` that
+changes a path the template packages (`WORKER_PATHS` in `scripts/e2b/build-template.py`)
+or `scripts/e2b/` runs `.github/workflows/e2b-template.yml`, which builds the template,
+makes it public, sets `E2B_BYO_COMPUTER_TEMPLATE` and `MIKKA_CLOUD_WORKER_SHA` together
+in Vercel Production and redeploys. A manual build uses the same script with
+`--public --json`.
 
 ## License
 

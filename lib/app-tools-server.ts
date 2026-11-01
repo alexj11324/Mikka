@@ -5,7 +5,8 @@ import { serverWriteJudge } from '@/lib/operations/write-judgment'
 import { resolveComposioAccount } from '@/lib/composio-actions'
 import { chosenComposioDefault } from '@/lib/composio-account-store'
 import { getComposio } from '@/lib/composio'
-import { db, pool } from '@/lib/db'
+import { db } from '@/lib/db'
+import { readWriteSettingLayers } from '@/lib/operations/write-setting-layers'
 import { pendingActions } from '@/lib/db/schema'
 import { proposeAppToolCall } from '@/lib/pending-action-store'
 import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
@@ -19,14 +20,6 @@ export async function executeAppToolCall(client: Client, userId: string, call: A
   return { successful: result.successful, data: result.data, error: result.error, ...(result.logId ? { logId: result.logId } : {}) }
 }
 
-/** The person's (agent) and workspace write settings for this Coordinator or Bot. */
-async function readSettingLayers(userId: string, botId: string | null) {
-  const { rows } = await pool.query<{ agent: unknown; workspace: unknown }>(
-    'select h.external_write_permissions as agent, w.external_write_permissions as workspace from agent_kit_heads h left join workspace_computer_policies w on w."workspaceId" = h.workspace_id where h.owner_id=$1 and h.bot_key=$2',
-    [userId, botId ?? 'coordinator'])
-  return rows[0] ?? null
-}
-
 export function appToolDeps(userId: string, botId: string | null, client: Client): AppToolDeps {
   return {
     appAllowed: async toolkit => (await import('@/lib/app-policy/store')).botMayUseApp(botId, toolkit),
@@ -35,18 +28,18 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
     getTool: slug => client.tools.getRawComposioToolBySlug(slug) as Promise<AppTool>,
     execute: (call, accountId) => executeAppToolCall(client, userId, call, accountId),
     setting: async (tool, toolkit) => {
-      try { return explicitSetting(await readSettingLayers(userId, botId), [tool, toolkit]) } catch { return 'ask' }
+      try { return explicitSetting(await readWriteSettingLayers(db, userId, botId), [tool, toolkit]) } catch { return 'ask' }
     },
     judge: serverWriteJudge(userId, botId),
     recordStart: async (call, accountId) => {
       const id = crypto.randomUUID()
-      await db.insert(pendingActions).values({ id, userId, action: 'app_tool_call', input: call, connectedAccountId: accountId, status: 'running' })
+      await db.insert(pendingActions).values({ id, userId, botId, action: 'app_tool_call', input: call, connectedAccountId: accountId, status: 'running' })
       return id
     },
     recordEnd: async (id, outcome) => {
       await db.update(pendingActions).set({ status: outcome.status, error: outcome.error ?? null, result: outcome.result ?? null }).where(eq(pendingActions.id, id))
     },
-    propose: (call, accountId) => proposeAppToolCall(userId, call, accountId),
+    propose: (call, accountId) => proposeAppToolCall(userId, call, accountId, botId),
   }
 }
 

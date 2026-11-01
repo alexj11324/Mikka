@@ -29,8 +29,8 @@ session. The existing action names remain:
   show only its resolved `name`, without an alias prefix. Legacy `models` stays
   available. Cloud models come from connected subscription bindings.
 - `getExecutionFallbacks()` and `updateExecutionFallbacks(value)`: per-person
-  `{whenDeviceOffline: 'wait' | 'cloud', whenQuotaExhausted: 'stop' | 'switchAccount'}`.
-  Both fields are required when updating. Defaults are `wait` and `stop`.
+  `{whenDeviceOffline: 'wait' | 'cloud'}`, default `wait`. The retired
+  `whenQuotaExhausted` is ignored where older rows still carry it.
   `whenDeviceOffline` is still stored but no longer read or shown: an offline
   device follows the fixed order below (decision 2026-10-31-2200).
 - `listBotModels()`, `getBotModel(botId)`, `setBotModel(botId, bindingId)`:
@@ -110,13 +110,14 @@ and the bot gets the card (`run_finished` payload `noMachine`). A cloud run's
 retry gets a new sandbox on the same bot. The `run_retried` event's `movedTo`
 says where it went.
 
-Bot quota `stop` propagates the exhaustion error. Target: no switch inside a
-running run ([orchestration](design/orchestration.md) § 2). Today `switchAccount` only tries
-another connected account of the same owner/workspace, route and model. Each
-candidate is independently bound to the consumer and reauthorized for epoch,
-workspace, connection and quota. No paid provider fallback, model substitution,
-or retry of a partially emitted generation is introduced. Unavailable accounts,
-unknown quota and authorization errors do not trigger switching.
+Bot quota: a turn frozen on a subscription that runs out stops with
+`quota_exhausted`; it never switches inside the turn. When the subscription is
+already known to be out of quota (`byos_connections.quota`, a used-up window
+that has not reset) and 「订阅额度用完后，自动改用 API Key」 (`"user"."apiKeyAfterQuota"`)
+is on, `freezeBotModel` freezes the next turn on the person's own API key
+instead (`lib/quota-fallback.ts`: the same model when the key serves it, else
+its first chat model; never a teammate's shared key). The snapshot carries
+`afterQuota`, and the chat shows one line for it before the reply.
 
 ## Other existing handoff actions (#539)
 

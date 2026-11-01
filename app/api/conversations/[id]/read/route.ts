@@ -12,9 +12,12 @@ async function respond(request: Request, id: string, method: ReadRequest['method
     return respondGroup(request, 'read', id)
   }
   const session = await auth.api.getSession({ headers: request.headers })
+  const userId = session?.user?.id ?? null
   const result = await handleRead(pool, {
+    // The Coordinator is an ordinary bot (#757): the `coordinator` conversation is the chat of the open workspace's one.
+    coordinatorBot: session?.user ? async () => (await import('@/lib/coordinator/coordinator-bot')).openChatBotId(session.user, null) : undefined,
     method,
-    userId: session?.user?.id ?? null,
+    userId,
     conversationId: id,
     origin: request.headers.get('origin'),
     host: requestHost(request.headers.get('x-forwarded-host'), request.headers.get('host') ?? new URL(request.url).host),

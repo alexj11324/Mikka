@@ -55,15 +55,27 @@ test('retry is disabled with a spinner while refetching', () => {
   assert.match(busy, /role="status"|data-slot="spinner"|animate-spin/)
 })
 
-test('list rows use the same ledger state as the window', () => {
+test('a code candidate row reads the merge: 待你确认, 合并中, 已合并 (#528)', () => {
+  const merge = (status: string) => ({ candidateId: 'c1', status, code: null, pullRequestUrl: 'https://github.com/o/r/pull/1', createdAt: new Date().toISOString() })
+  swr.data = { tasks: [task()] }
+  ledger = { approvals: [], publications: [], merges: [] }
+  assert.match(list(), />待你确认</)
+  ledger = { approvals: [], publications: [], merges: [merge('merging')] }
+  assert.match(list(), />合并中</)
+  swr.data = { tasks: [task({ stage: 'publish', status: 'passed' })] }
+  ledger = { approvals: [], publications: [], merges: [merge('merged')] }
+  assert.match(list(), />已合并</)
+})
+
+test('skill rows use the same ledger state as the window', () => {
   const approval = { id: 'a1', candidateId: 'c1', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null }
-  swr.data = { tasks: [task({ stage: 'publish', status: 'running' })] }
+  swr.data = { tasks: [task({ stage: 'publish', status: 'running', isSkillCandidate: true })] }
   ledger = { approvals: [approval], publications: [{ approvalId: 'a1', status: 'failed' }] }
   assert.match(list(), />发布失败</)
-  swr.data = { tasks: [task({ stage: 'publish', status: 'running', candidateId: 'c2' })] }
+  swr.data = { tasks: [task({ stage: 'publish', status: 'running', candidateId: 'c2', isSkillCandidate: true })] }
   ledger = { approvals: [approval], publications: [] }
   // A new commit voids the old approval: the row is back to pending (GitHub-style).
-  assert.match(list(), />待你确认</)
+  assert.match(list(), />待启用</)
   assert.doesNotMatch(list(), />已失效</)
   ledger = { approvals: [{ ...approval, expiresAt: new Date(Date.now() - 1000).toISOString(), candidateId: 'c2' }], publications: [] }
   assert.match(list(), />已过期</)
@@ -124,6 +136,14 @@ test('pending shows 退回修改 only when a reject handler is passed', () => {
   assert.doesNotMatch(without, /退回修改/)
   const withReject = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} canApprove onReject={() => {}} />)
   assert.match(withReject, /variant="secondary"[^<]*<?[^<]*退回修改|退回修改/)
+})
+
+test('a refused merge leads with 在 GitHub 打开 and offers merging again as secondary, two actions at most', () => {
+  const html = renderToStaticMarkup(<ApprovalBar state="pending" isSkill={false} canApprove onReject={() => {}} onAccept={() => {}} refusal="githubMergeBlocked" pullRequestUrl="https://github.com/o/r/pull/1" />)
+  assert.equal((html.match(/data-slot="button"/g) ?? []).length, 2)
+  assert.match(html, /data-button-variant="default"[^>]*>(<svg[^>]*>.*?<\/svg>)?在 GitHub 打开/)
+  assert.match(html, /data-button-variant="secondary"[^>]*>.*?验收并合并/)
+  assert.doesNotMatch(html, /退回修改/)
 })
 
 test('publish failed keeps revoke and offers publish again', () => {

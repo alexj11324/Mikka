@@ -24,7 +24,9 @@ export interface SubscriptionUsage {
 
 /** What the worker's `usage` call returns: the fixed quota projection and email.
  * Status 0: the provider could not be reached. */
-export interface WorkerUsage { status: number; body: unknown; account?: unknown }
+export interface WorkerUsage { status: number; body: unknown; account?: unknown; plan?: unknown }
+
+const CLAUDE_PLANS = new Set(['Pro', 'Max', 'Team', 'Enterprise'])
 
 const EMAIL = /^[^\s@<>"]{1,64}@[^\s@<>"]{1,190}$/
 export const accountLabel = (value: unknown) => typeof value === 'string' && value.length <= 256 && EMAIL.test(value) ? value : null
@@ -69,9 +71,9 @@ export function parseSubscriptionUsage(id: string, provider: 'codex' | 'claude',
       .sort((a, b) => a.remaining - b.remaining)[0]
     if (tightest && (!weekly || tightest.remaining < weekly.remaining)) windows.push(tightest)
   }
-  // Claude's usage answer has no plan; the decoder's fallback label is not one.
+  // Claude's usage answer has no plan (the decoder's fallback label is not one); the worker reads it from the profile.
   const body = result.body as Record<string, unknown>
-  const plan = provider === 'codex' ? decoded?.plan ?? codexPlanLabel(body.plan_type) : null
+  const plan = provider === 'codex' ? decoded?.plan ?? codexPlanLabel(body.plan_type) : typeof result.plan === 'string' && CLAUDE_PLANS.has(result.plan) ? result.plan : null
   const guard = extraUsage(provider, body)
   return { id, status: guard === 'off' ? 'ok' : guard === 'on' ? 'extra_usage' : 'unverified', account, plan, windows, observedAt: now.toISOString() }
 }

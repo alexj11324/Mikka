@@ -28,7 +28,7 @@ test('real text event reaches the prompt without requiring an image',async()=>{
  const { userMessageEvent }=await import('@/lib/coordinator-events')
  const { eventPrompt,promptMessages }=await import('@/lib/coordinator/context')
  const { sourcedEventMessage }=await import('@/lib/coordinator/message-safety')
- const event=userMessageEvent('owner','Cancel the calendar event I identified')
+ const event=userMessageEvent('owner','Cancel the calendar event I identified',{botId:'c0000000-0000-4000-8000-0000000c0de9'})
  const message=sourcedEventMessage({...event,id:'fixture'},eventPrompt(event))
  const prompt=promptMessages(null,[{position:1,message}])
  assert.equal(prompt[0].role,'user')

@@ -9,7 +9,7 @@ mock.module('../../lib/coordinator/native.ts',{namedExports:{nativeCoordinatorSt
 mock.module('../../lib/schedules/runtime.ts',{namedExports:{assertScheduledRead:async()=>{calls.push('schedule');if(!scheduledAllowed)throw new ScheduleError('scheduleReadAuthorityLost',403)}}})
 let assertNativeToolScope:typeof import('../../workflows/coordinator/tool-scope').assertNativeToolScope
 before(async()=>{({assertNativeToolScope}=await import('../../workflows/coordinator/tool-scope'))})
-const scheduledRead={botId:null,occurrence:{occurrenceId:'d4303c80-b410-43b8-a6ab-5db89d3c05ce',leaseToken:randomUUID(),allowedActions:['get_issue'],prompt:'Read only'}}
+const scheduledRead={botId:'d4303c80-b410-43b8-a6ab-5db89d3c0de1',occurrence:{occurrenceId:'d4303c80-b410-43b8-a6ab-5db89d3c05ce',leaseToken:randomUUID(),allowedActions:['get_issue'],prompt:'Read only'}}
 beforeEach(()=>{calls.length=0;nativeAllowed=true;scheduledAllowed=true})
 test('scheduled SDK calls use the occurrence authority without manufacturing native identities',async()=>{await assertNativeToolScope('owner',{scheduledRead});assert.deepEqual(calls,['schedule'])})
 test('scheduled native calls retain the current holder/turn/call fence as well',async()=>{await assertNativeToolScope('owner',{holder:'host',turnId:'turn',callId:'call',scheduledRead});assert.deepEqual(calls,['native','schedule'])})

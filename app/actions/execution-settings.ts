@@ -6,6 +6,11 @@ import { loadWorkspaceContext } from "@/lib/workspace-access";
 import { pool } from "@/lib/db";
 import { ExecutionSettings } from "@/lib/execution-settings";
 import { botModelMenu, botModelScope, refreshBotModelMenu } from "@/lib/bot-model-menu";
+import { z } from "zod";
+import { chatBotId } from "@/lib/coordinator/coordinator-bot";
+import { parseApiKeyOption } from "@/lib/bot-model-menu-view";
+import { setBotApiKeyChoice } from "@/lib/model-api-keys";
+import { WorkspaceError } from "@/lib/workspace-error";
 async function context(workspaceId?: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ActionFailureError("authRequired");
@@ -68,26 +73,41 @@ export async function redetectDevice(deviceId: string) {
 export async function listBotModels() {
   return new ExecutionSettings(pool).botModels(await context());
 }
-async function chatScope(botId: string | null) {
+/** The chat's bot (no bot named: the person's Coordinator, an ordinary bot row) and the scope its picker reads and saves in. */
+async function chatScope(chatBot: string | null) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ActionFailureError("authRequired");
-  return botModelScope(session.user.id, botId);
+  if (chatBot !== null && !z.uuid().safeParse(chatBot).success) throw new ActionFailureError("botNotFound");
+  // No bot named: the Coordinator of the workspace the person has open.
+  const botId = chatBot ?? await chatBotId(session.user.id, null, (await loadWorkspaceContext(undefined, session.user)).workspace.id);
+  return { botId, scope: await botModelScope(session.user.id, botId) };
 }
 /** The composer's model menu for a bot, or the Coordinator (`null`). */
-export async function getBotModelMenu(botId: string | null) {
-  const scope = await chatScope(botId);
+export async function getBotModelMenu(chatBot: string | null) {
+  const { botId, scope } = await chatScope(chatBot);
   return botModelMenu(pool, new ExecutionSettings(pool), scope, botId);
 }
 /** 刷新模型列表: re-reads what this person can use here, after asking each subscription for its models. */
-export async function refreshBotModelMenuAction(botId: string | null) {
-  const scope = await chatScope(botId);
+export async function refreshBotModelMenuAction(chatBot: string | null) {
+  const { botId, scope } = await chatScope(chatBot);
   return refreshBotModelMenu(pool, new ExecutionSettings(pool), scope, botId);
 }
-/** Saves the composer's pick for the bot's next runs; a run already going keeps its model. */
-export async function chooseBotModel(botId: string | null, id: string) {
-  const scope = await chatScope(botId);
+/**
+ * Saves the composer's pick for the bot's next runs; a run already going keeps its model.
+ * An API key model (`apikey:<keyId>:<model>`, C22) is saved as that key's choice.
+ */
+export async function chooseBotModel(chatBot: string | null, id: string) {
+  const { botId, scope } = await chatScope(chatBot);
   const settings = new ExecutionSettings(pool);
-  await settings.setBotModel(scope, botId, id);
+  const apiKey = parseApiKeyOption(id);
+  if (apiKey) {
+    try {
+      await setBotApiKeyChoice(pool, scope, botId, apiKey.keyId, apiKey.model);
+    } catch (error) {
+      if (error instanceof WorkspaceError) throw new ActionFailureError(error.code === "botNotFound" ? "botNotFound" : "executionModelUnknown");
+      throw error;
+    }
+  } else await settings.setBotModel(scope, botId, id);
   return botModelMenu(pool, settings, scope, botId);
 }
 

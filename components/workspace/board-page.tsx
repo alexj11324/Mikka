@@ -4,7 +4,7 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useId, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { Box, CircleUserRound, Columns3, Flag, List, ListFilter, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Settings2, SquareKanban, Tag, X } from 'lucide-react'
+import { Box, Check, CircleUserRound, Columns3, Flag, List, ListFilter, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Settings2, SquareKanban, Tag, X } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
 import { listTaskRuns } from '@/app/actions/task-runs'
@@ -43,10 +43,13 @@ type Display = { sort: Sort; completed: Completed; showEmpty: boolean; propertie
 
 const SETTINGS_KEY = 'mikka:board-v2'
 const SIDEBAR_KEY = 'mikka:board-coordinator-open'
+const WIDE = '(min-width: 80rem)'
 const ME = 'me'
 const NONE = 'none'
 const DEFAULT_DISPLAY: Display = { sort: 'priority', completed: 'week', showEmpty: true, properties: DEFAULT_CARD_PROPERTIES, hidden: DEFAULT_HIDDEN_COLUMNS }
 const DEFAULT_SETTINGS = { scope: 'all' as Scope, view: 'board' as 'board' | 'list', filters: { assignee: [ME] } as Filters, display: DEFAULT_DISPLAY }
+/** A 显示 chip: checked and tinted when on, plain grey when off. */
+const DISPLAY_CHIP = 'h-7 rounded-md px-2 text-xs font-normal text-muted-foreground aria-pressed:bg-sidebar-primary/10 aria-pressed:text-sidebar-primary'
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
 const COMPLETED_DAYS: Record<Completed, number> = { all: Infinity, week: 7, month: 30 }
 const FILTER_FIELDS: { field: FilterField; icon: typeof Flag }[] = [
@@ -107,22 +110,25 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const [settings, update] = useBoardSettings()
   const { scope, view, filters, display } = settings
   const [sidebar, setSidebar] = useStoredFlag(SIDEBAR_KEY, true)
-  // Below lg the panel has no room beside the board; it opens as a sheet instead.
+  // Below xl (1280) a 360px panel leaves the board too little room: it starts folded and opens as a sheet over the board, as Linear's side panel does on narrow windows (R-65).
   const [sheet, setSheet] = useState(false)
+  const [wide, setWide] = useState(true)
   useEffect(() => {
-    const wide = window.matchMedia('(min-width: 64rem)')
-    const close = () => { if (wide.matches) setSheet(false) }
-    wide.addEventListener('change', close)
-    return () => wide.removeEventListener('change', close)
+    const query = window.matchMedia(WIDE)
+    const sync = () => { setWide(query.matches); if (query.matches) setSheet(false) }
+    sync()
+    query.addEventListener('change', sync)
+    return () => query.removeEventListener('change', sync)
   }, [])
-  const openPanel = () => { setSidebar(true); if (!window.matchMedia('(min-width: 64rem)').matches) setSheet(true) }
+  const openPanel = () => { setSidebar(true); if (!window.matchMedia(WIDE).matches) setSheet(true) }
+  const sidebarShown = sidebar && wide
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const [newTask, setNewTask] = useState(false)
-  const { data: agents } = useSWR('agents', () => listAgents(), { revalidateOnFocus: false })
+  const { data: agents } = useSWR('agents', () => listAgents())
   const { data: linear } = useSWR('linear-board-sync', () => getLinearBoardSync(), { revalidateOnFocus: false })
   // Without a connected Linear team, the button only reloads the board.
   const linearSynced = !!linear && !linear.error && linear.synced
-  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
+  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000 })
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run.status); return state ? [[run.issueId, state] as const] : [] })), [runs])
@@ -228,23 +234,24 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
               <div className="flex items-center justify-between gap-3"><Label htmlFor={`${titleId}-empty`}>{t('showEmpty')}</Label><Switch id={`${titleId}-empty`} checked={display.showEmpty} onCheckedChange={showEmpty => setDisplay({ showEmpty })} /></div>
               <p className="pt-2 text-xs text-muted-foreground">{t('cardProperties')}</p>
               <div className="flex flex-wrap gap-1.5">
-                {CARD_PROPERTIES.map(property => <Toggle key={property} size="sm" variant="outline" pressed={display.properties.includes(property)} className="h-7 rounded-md px-2 text-xs font-normal aria-pressed:bg-sidebar-primary/10 aria-pressed:text-sidebar-primary" onPressedChange={pressed => setDisplay({ properties: pressed ? [...display.properties, property] : display.properties.filter(item => item !== property) })}>{t(`property.${property}`)}</Toggle>)}
+                {CARD_PROPERTIES.map(property => <Toggle key={property} size="sm" variant="outline" pressed={display.properties.includes(property)} className={DISPLAY_CHIP} onPressedChange={pressed => setDisplay({ properties: pressed ? [...display.properties, property] : display.properties.filter(item => item !== property) })}>{display.properties.includes(property) && <Check data-icon="inline-start" />}{t(`property.${property}`)}</Toggle>)}
               </div>
-              <p className="pt-2 text-xs text-muted-foreground">{t('hiddenColumns')}</p>
+              {/* Both groups read the same way: checked and tinted means shown (R-30). */}
+              <p className="pt-2 text-xs text-muted-foreground">{t('columns')}</p>
               <div className="flex flex-wrap gap-1.5">
-                {ISSUE_STATUSES.map(status => { const isHidden = display.hidden.includes(status.value); return <Toggle key={status.value} size="sm" variant="outline" pressed={isHidden} aria-label={t(isHidden ? 'showColumn' : 'hideColumnNamed', { status: statusLabel(status.value) })} className={cn('h-7 rounded-md px-2 text-xs font-normal aria-pressed:bg-sidebar-primary/10 aria-pressed:text-sidebar-primary', !isHidden && 'text-muted-foreground')} onPressedChange={pressed => setDisplay({ hidden: pressed ? [...display.hidden, status.value] : display.hidden.filter(item => item !== status.value) })}><status.icon className={cn(statusIconTints[status.tone])} />{statusLabel(status.value)}</Toggle> })}
+                {ISSUE_STATUSES.map(status => { const isShown = !display.hidden.includes(status.value); return <Toggle key={status.value} size="sm" variant="outline" pressed={isShown} className={DISPLAY_CHIP} onPressedChange={pressed => setDisplay({ hidden: pressed ? display.hidden.filter(item => item !== status.value) : [...display.hidden, status.value] })}>{isShown && <Check data-icon="inline-start" />}{statusLabel(status.value)}</Toggle> })}
               </div>
             </PopoverContent>
           </Popover>
           <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask(true)}><Plus data-icon="inline-start" />{t('newTask')}</Button>
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'lg:hidden')} aria-expanded={sheet} aria-label={t('expand')} onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}</TooltipContent></Tooltip>
         </div>
       </div>
       {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} narrow={sidebar ? ['done'] : undefined} context={{ properties: new Set(display.properties), agentStates, subtasks, owners }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
-        : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} context={{ properties: new Set(display.properties), agentStates, subtasks, owners }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
-    {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l lg:flex">
+    {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
       <ConversationPill name={tNav('coordinator')} avatar={<CoordinatorAvatar size="pill" />} />
       <div className="absolute top-3.5 right-3 z-20"><Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('collapse')} aria-expanded onClick={() => setSidebar(false)} />}><PanelRightClose data-icon="inline-start" /></TooltipTrigger><TooltipContent side="left">{t('collapse')}</TooltipContent></Tooltip></div>

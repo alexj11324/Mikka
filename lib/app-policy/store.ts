@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaceAppPolicies } from '@/lib/db/app-policy-schema'
 import { bots } from '@/lib/db/schema'
@@ -39,15 +39,16 @@ export async function setAppPolicy(actor: { id: string; name: string }, workspac
 }
 
 /**
- * The enforcement point: may this bot use this app? The personal Coordinator
- * (botId null) belongs to no workspace and is not governed here. A bot whose
- * row is gone is refused.
+ * The enforcement point: may this bot use this app? The person's Coordinator
+ * is their own, one per person (lib/coordinator/coordinator-bot.ts), and is
+ * not governed here, as before it had a bot row. Work with no bot (botId
+ * null) is not either. A bot whose row is gone is refused.
  */
 export async function botMayUseApp(botId: string | null | undefined, app: string): Promise<boolean> {
   if (!botId) return true
-  const [row] = await db.select({ access: workspaceAppPolicies.access, workspaceId: bots.workspaceId }).from(bots)
+  const [row] = await db.select({ access: workspaceAppPolicies.access, workspaceId: bots.workspaceId, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` }).from(bots)
     .leftJoin(workspaceAppPolicies, and(eq(workspaceAppPolicies.workspaceId, bots.workspaceId), eq(workspaceAppPolicies.app, app)))
     .where(eq(bots.id, botId)).limit(1)
   if (!row) return false
-  return row.access !== 'deny'
+  return row.coordinator || row.access !== 'deny'
 }

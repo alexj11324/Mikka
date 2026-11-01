@@ -1,13 +1,11 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { and, asc, eq } from 'drizzle-orm'
+import { listOwnerBots } from '@/lib/coordinator/coordinator-bot'
 import { ActionFailureError } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
-import { db } from '@/lib/db'
-import { bots } from '@/lib/db/schema'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { updateOwnedBot } from '@/lib/bot-update'
 import { createOwnedBot } from '@/lib/bot-create'
@@ -21,6 +19,8 @@ export interface BotView {
   name: string
   color: string
   shape: string
+  /** The person's Coordinator (coordinator_bots): the left column draws it as the Coordinator, pinned on top. */
+  coordinator?: boolean
 }
 
 
@@ -32,10 +32,10 @@ async function getOwner() {
   return { ownerId: session.user.id, workspaceId: context.workspace.id }
 }
 
+/** The bot list: the person's bots here, their Coordinator first (lib/coordinator/coordinator-bot.ts listOwnerBots). */
 export async function listBots(): Promise<BotView[]> {
   const { ownerId, workspaceId } = await getOwner()
-  return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots)
-    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId))).orderBy(asc(bots.createdAt))
+  return listOwnerBots(ownerId, workspaceId)
 }
 
 /**
@@ -48,7 +48,7 @@ export async function createBot(input: { name: string; color: string; shape: str
 
 /**
  * Rename a bot or change its shape and colour, from the right panel. Same rules
- * as createBot; the Coordinator is not a bot row, so it cannot be changed here.
+ * as createBot. The Coordinator keeps its name and look (the left column draws it).
  */
 export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string }): Promise<ActionResult<BotView>> {
   return workspaceAction(async () => updateOwnedBot(await getOwner(), input))

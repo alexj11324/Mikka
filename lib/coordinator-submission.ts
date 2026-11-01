@@ -27,19 +27,24 @@ function submissionKey(userId: string, botId: string | null, submissionId: strin
 }
 
 /** Read an existing receipt without inserting an event for an already-dismissed suggestion. */
-export async function personalSubmissionRecorded(executor: Pick<typeof db, 'select'>, userId: string, text: string, submissionId: string): Promise<boolean> {
+export async function personalSubmissionRecorded(executor: Pick<typeof db, 'select'>, userId: string, text: string, submissionId: string, botId: string | null): Promise<boolean> {
   const id = personalSubmissionInput.shape.submissionId.parse(submissionId)!
   const [prior] = await executor.select({ userId: coordinatorEvents.userId, botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, issueId: coordinatorEvents.issueId, runId: coordinatorEvents.runId, payload: coordinatorEvents.payload })
-    .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, submissionKey(userId, null, id))).limit(1)
+    .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, submissionKey(userId, botId, id))).limit(1)
   if (!prior) return false
-  if (prior.userId !== userId || prior.botId !== null || prior.kind !== 'user_message' || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(prior.payload, { text })) throw new SubmissionConflictError()
+  if (prior.userId !== userId || prior.botId !== botId || prior.kind !== 'user_message' || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(prior.payload, { text })) throw new SubmissionConflictError()
   return true
 }
 
-/** Caller authenticates the person and validates any Bot ownership before calling. */
-export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId?: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; humanSessionId?: string } = {}) {
+/**
+ * Caller authenticates the person, validates the bot's ownership and names
+ * the chat's bot: the one the person wrote to, their Coordinator's bot row
+ * included (resolved where the message enters), or a suggestion's stored one
+ * (null only on a suggestion from before it stored one).
+ */
+export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; humanSessionId?: string }) {
   const submissionId = personalSubmissionInput.shape.submissionId.parse(options.submissionId)
-  const botId = options.botId ?? null
+  const botId = options.botId
   const images = normalizeUserImages(options.images)
   const taskDestination = options.taskDestination ? taskDestinationSchema.parse(options.taskDestination) : undefined
   const dedupeKey = submissionId

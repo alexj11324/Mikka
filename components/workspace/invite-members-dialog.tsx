@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, type DragEvent, type FormEvent } from "react";
-import { Copy, FileSpreadsheet, Loader2, Mail, Upload, X } from "lucide-react";
+import { Copy, FileSpreadsheet, Loader2, Mail, X } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { createWorkspaceInvitation } from "@/app/actions/workspace";
 import {
@@ -26,7 +26,6 @@ import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
@@ -292,10 +291,7 @@ export function InviteMembersDialog({
               </p>
             )}
             <DialogFooter className="m-0 mt-2 border-0 bg-transparent p-0">
-              <Button
-                className="rounded-full bg-workspace-accent text-workspace-accent-foreground hover:bg-workspace-accent/90"
-                onClick={close}
-              >
+              <Button onClick={close}>
                 {t("done")}
               </Button>
             </DialogFooter>
@@ -319,12 +315,8 @@ export function InviteMembersDialog({
                   required
                   maxLength={5200}
                   disabled={busy}
-                      aria-describedby="invite-email-help"
-                  className="min-h-24 resize-y"
+                  className="max-h-48 min-h-24 resize-none"
                 />
-                <FieldDescription id="invite-email-help">
-                  {t("emailHelp", { max: MAX_INVITATION_EMAILS })}
-                </FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="invite-csv" className="sr-only">
@@ -435,10 +427,6 @@ export function InviteMembersDialog({
                 </Select>
               </Field>
             </FieldGroup>
-            <div className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
-              <Mail className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              <p>{t("noEmailService")}</p>
-            </div>
             <DialogFooter className="m-0 mt-1 flex-row items-center justify-between border-0 bg-transparent p-0 sm:justify-between">
               <span className="text-xs text-muted-foreground">
                 {recipients.length
@@ -448,8 +436,7 @@ export function InviteMembersDialog({
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
-                  variant="ghost"
-                  className="rounded-full"
+                  variant="outline"
                   disabled={busy}
                   onClick={close}
                 >
@@ -457,16 +444,13 @@ export function InviteMembersDialog({
                 </Button>
                 <Button
                   type="submit"
-                  className="rounded-full bg-workspace-accent text-workspace-accent-foreground hover:bg-workspace-accent/90"
                   disabled={busy || !emails.trim()}
                 >
-                  {pending ? (
+                  {pending && (
                     <Loader2
                       className="animate-spin"
                       data-icon="inline-start"
                     />
-                  ) : (
-                    <Upload data-icon="inline-start" />
                   )}
                   {pending ? t("creating") : t("createLinks")}
                 </Button>

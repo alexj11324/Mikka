@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, before, mock, test } from 'node:test'
+import { seedCoordinator } from './support/coordinator-bot'
 
 // Settings backend actions (docs/settings-backend/prefs.md) against a real,
 // disposable Postgres. Only the session and Composio are stubbed. Runs in CI
@@ -114,15 +115,17 @@ dbTest('the Coordinator\'s and a Bot\'s turn prompt (preparePrompt) carry the sa
   const { preferences } = m
   const { preparePrompt } = await import('@/workflows/coordinator/steps')
   const botId = randomUUID()
+  // The Coordinator is an ordinary bot row; its prompt keeps the Coordinator's rules.
+  const coordinator = (await seedCoordinator(people.alex)).botId
   await preferences.updatePreferences({ personalInstructions: 'Sign every reply with 🐧.' })
-  for (const bot of [null, botId]) {
+  for (const bot of [coordinator, botId]) {
     const { instructions } = await preparePrompt(people.alex, bot)
     assert.match(instructions, /You are the Coordinator in Mikka/, 'the rules come first')
     assert.match(instructions, /<personal_instructions>\nSign every reply with 🐧\.\n<\/personal_instructions>/)
     assert.ok(instructions.indexOf('<personal_instructions>') > instructions.indexOf('You are the Coordinator in Mikka'))
   }
   await preferences.updatePreferences({ personalInstructions: '' })
-  for (const bot of [null, botId]) assert.doesNotMatch((await preparePrompt(people.alex, bot)).instructions, /personal_instructions|Sign every reply/)
+  for (const bot of [coordinator, botId]) assert.doesNotMatch((await preparePrompt(people.alex, bot)).instructions, /personal_instructions|Sign every reply/)
 })
 
 dbTest('time zone: a picked zone survives browser and IP reports until 自动', async () => {

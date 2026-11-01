@@ -17,12 +17,8 @@ function workspaceLocale(value: string): WorkspaceLocale {
   return value === 'en' ? 'en' : 'zh-CN'
 }
 
-export class WorkspaceError extends Error {
-  constructor(readonly code: string) {
-    super(code)
-    this.name = 'WorkspaceError'
-  }
-}
+import { WorkspaceError } from '@/lib/workspace-error'
+export { WorkspaceError }
 
 export type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
 type AuthenticatedUser = Awaited<ReturnType<typeof requireUser>>

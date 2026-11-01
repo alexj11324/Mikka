@@ -1,4 +1,5 @@
 import 'server-only'
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
@@ -17,6 +18,7 @@ import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATT
 import { autoScheduleOn } from '@/lib/device-auto-schedule'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { afterRunEnded } from '@/lib/run-completion-effects'
+import { ownE2BKeySql } from './secrets/e2b-owner-sql'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -206,17 +208,17 @@ async function reclaimLostRun(run: Run, now: Date) {
 
 type CloudTarget = { botId: string; workspaceId: string; harness: 'codex' | 'claude_code'; agentId: string; repoId: string; deviceId: string; remoteUrl: string }
 
-/** The person's own E2B cloud for a lost run: an E2B key and a bot cloud runtime, the run's bot first. */
+/** The person's own E2B cloud for a lost run: their own E2B key and the run's own bot's cloud runtime (never another bot's). */
 async function cloudTarget(run: Run): Promise<CloudTarget | null> {
-  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return null
-  if (run.agentDefinition?.repositoryAdmission || !run.deviceRepoId) return null
+  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return null
+  if (run.agentDefinition?.repositoryAdmission || !run.deviceRepoId || !run.botId) return null
   const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
   if (!repo?.remoteUrl) return null
   const harness = run.agentDefinition?.harness ?? null
   const { rows: [row] } = await pool.query(`SELECT r."botId",r."workspaceId",r.harness,r."agentId",r."repoId",a."deviceId" FROM bot_cloud_runtimes r
-      JOIN workspace_e2b_keys k ON k."workspaceId"=r."workspaceId" JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId"
-      WHERE r."ownerId"=$1 AND a."deviceId" IS NOT NULL
-      ORDER BY (r."botId"=$2::uuid) DESC NULLS LAST,(r.harness=$3) DESC NULLS LAST,r."botId" LIMIT 1`, [run.userId, run.botId, harness])
+      JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId"
+      WHERE r."ownerId"=$1 AND r."botId"=$2 AND a."deviceId" IS NOT NULL AND ${ownE2BKeySql('r."ownerId"')}
+      ORDER BY (r.harness=$3) DESC NULLS LAST LIMIT 1`, [run.userId, run.botId, harness])
   return row ? { ...row, remoteUrl: repo.remoteUrl } : null
 }
 
@@ -233,7 +235,7 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
     const { queueCloudRun } = await import('@/lib/computer/queue-run')
     const repo = await ensureDeviceRepository(run.userId, cloud.deviceId, cloud.remoteUrl)
     const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: cloud.agentId, deviceRepoId: repo.id, title: issue.title, body: tiptapToText(issue.content),
-      note: retryNote(attempt), reportToCoordinator: run.botId === null, idempotencyKey: `retry:${run.id}`,
+      note: retryNote(attempt), withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`,
       ...(run.agentDefinition?.harness === cloud.harness && run.agentDefinition?.model ? { model: run.agentDefinition.model } : {}) })
     await db.update(agentRuns).set({ retryOf: run.id, attempt, updatedAt: now }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
     await recordCoordinatorEvent(db, runRetriedEvent(run, { runId, attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedTo: { kind: 'cloud' } }))
@@ -246,7 +248,7 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
 }
 
 /** Provisions a queued cloud run's thread machine; a refusal ends that run with the card. */
-async function startThreadMachine(actor: { userId: string; workspaceId: string }, runId: string) {
+export async function startThreadMachine(actor: { userId: string; workspaceId: string }, runId: string) {
   if (process.env.MIKKA_CLOUD_THREAD_MACHINES !== '1') return
   try {
     await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, actor, runId)

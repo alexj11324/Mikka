@@ -33,7 +33,7 @@ async function seed(email: string, messages: object[]) {
   const pool = isolatedPool()
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
-    for (const [index, message] of messages.entries()) await pool.query('INSERT INTO coordinator_messages (id, "userId", position, message) VALUES ($1, $2, $3, $4)', [randomUUID(), user.id, index + 1, JSON.stringify(message)])
+    for (const [index, message] of messages.entries()) await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), $3, $4)', [randomUUID(), user.id, index + 1, JSON.stringify(message)])
   } finally { await pool.end() }
 }
 
@@ -91,7 +91,8 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await page.goto(app('/?section=coordinator'))
     const card = page.getByRole('region', { name: 'Coordinator', exact: true }).getByRole('group', { name: /派不出去/ })
     const setup = card.getByRole('link', { name: /去设置 E2B 密钥/ })
-    await expect(setup).toHaveAttribute('href', /\/settings\?section=secrets$/)
+    // The E2B key is the person's own and lives under API 与订阅 (#745, CLOUD_KEY_SETTINGS).
+    await expect(setup).toHaveAttribute('href', /\/settings\?section=models$/)
     // Without a key there is no run-on-cloud option: no button or link offers it (the question itself names Mikka Cloud).
     const runOnCloud = /Run on Mikka Cloud|在 Mikka Cloud 上运行/
     await expect(card.getByRole('button', { name: runOnCloud })).toHaveCount(0)
@@ -99,8 +100,8 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await expect(card.getByRole('button', { name: /等它上线/ })).toBeEnabled()
     await shoot(page, testInfo, `choice-${viewport.name}-nokey`)
     await setup.click()
-    await expect(page).toHaveURL(/\/settings\?section=secrets/)
-    await expect(page.getByRole('heading', { level: 1, name: '密钥与环境', exact: true })).toBeVisible()
+    await expect(page).toHaveURL(/\/settings\?section=models/)
+    await expect(page.getByRole('heading', { level: 1, name: 'API 与订阅', exact: true })).toBeVisible()
   })
 
   test(`after answering, the no-key option is a record, not a settings link (${viewport.name})`, async ({ page }) => {

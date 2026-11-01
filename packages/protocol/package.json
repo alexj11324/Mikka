@@ -6,6 +6,9 @@
   "license": "AGPL-3.0-only",
   "exports": {
     "./mailbox": "./src/mailbox.ts",
+    "./personal-agent-message": "./src/personal-agent-message.ts",
+    "./web-url-schema": "./src/web-url-schema.ts",
+    "./web-url-policy": "./src/web-url-policy.ts",
     ".": "./src/index.ts",
     "./bridge": "./src/bridge.ts",
     "./ipc": "./src/ipc.ts",

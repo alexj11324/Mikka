@@ -17,7 +17,7 @@ export type RailDestination = 'chats' | 'suggestions' | 'board' | 'plugins' | 'a
 /** A lucide icon or one of ours drawn the same way (components/icons). */
 type RailIcon = ComponentType<{ className?: string; 'data-icon'?: string }>
 
-// 主页 (the bot chats), 建议, the board, plugins, 产物. `selectedIcon` is the solid twin shown on the current item.
+// 主页 (the bot chats), 建议, the board, plugins, Artifact. `selectedIcon` is the solid twin shown on the current item.
 export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'Nav.home' | 'Nav.suggestions' | 'Nav.board' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
   { id: 'chats', icon: House, selectedIcon: HouseFilled, label: 'Nav.home' },
   { id: 'suggestions', icon: Lightbulb, selectedIcon: LightbulbFilled, label: 'Nav.suggestions' },
@@ -28,6 +28,8 @@ export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: Ra
 
 const ITEM = 'group/rail-item size-9 rounded-sm text-muted-foreground/80 shadow-none hover:bg-transparent hover:text-muted-foreground/80 aria-[current=page]:text-foreground dark:hover:bg-transparent'
 const ITEM_ICON = 'flex rounded-sm p-2 group-hover/rail-item:bg-sidebar-item in-data-desktop-translucent:group-hover/rail-item:bg-control'
+/** A destination: the icon, its name under it (R-35, as in Slack's desktop rail). */
+const LABELLED_ITEM = 'group/rail-item h-auto w-18 flex-col gap-0.5 rounded-sm px-0 py-1 text-xs font-medium text-muted-foreground/80 shadow-none hover:bg-transparent hover:text-muted-foreground/80 aria-[current=page]:text-foreground dark:hover:bg-transparent'
 
 type RailProps = {
   active: RailDestination | null
@@ -40,27 +42,25 @@ type RailProps = {
 }
 
 /**
- * The 68px icon column on the window's frame, left of the card (Figma 56:500,
- * Icon rail v4). Each item is an icon whose name shows as a tooltip on hover; hover and the current item fill
- * the icon, in Comma's light gray, and the current item swaps to the
- * solid icon. It never collapses; the conversation list inside the card does.
+ * The 72px icon column on the window's frame, left of the card (R-35). Each
+ * item is an icon with its name under it, as in Slack's desktop rail; hover and
+ * the current item fill the icon, in Comma's light gray, and the current item
+ * swaps to the solid icon. It never collapses; the bot list inside the card does.
  */
 export function IconRail({ active, onNavigate, ...menu }: RailProps) {
   const i18nText = useTranslations()
   // A non-collapsing Sidebar, as in shadcn's nested icon-rail pattern; phones get these items in the list footer.
-  return <Sidebar collapsible="none" role="navigation" aria-label={i18nText('Nav.rail')} className="hidden h-full w-17 shrink-0 items-center gap-1 bg-transparent pt-1 pb-1 md:flex">
+  return <Sidebar collapsible="none" role="navigation" aria-label={i18nText('Nav.rail')} className="hidden h-full w-18 shrink-0 items-center gap-2 bg-transparent pt-1 pb-1 md:flex">
     {RAIL_ITEMS.map(item => {
       const selected = active === item.id
       const Icon = selected ? item.selectedIcon : item.icon
       const label = i18nText(item.label)
-      return <Tooltip key={item.id}>
-        <TooltipTrigger render={<Button variant="ghost" size="icon" className={ITEM} aria-label={label} aria-current={selected ? 'page' : undefined} onClick={() => onNavigate(item.id)} />}>
-          <span className={cn(ITEM_ICON, selected && 'bg-sidebar-item in-data-desktop-translucent:bg-control-hover')}><Icon className="size-5" /></span>
-        </TooltipTrigger>
-        <TooltipContent side="right">{label}</TooltipContent>
-      </Tooltip>
+      return <Button key={item.id} variant="ghost" className={LABELLED_ITEM} aria-current={selected ? 'page' : undefined} onClick={() => onNavigate(item.id)}>
+        <span className={cn(ITEM_ICON, selected && 'bg-sidebar-item in-data-desktop-translucent:bg-control-hover')}><Icon className="size-5" /></span>
+        <span className="max-w-full truncate">{label}</span>
+      </Button>
     })}
-    <div className="mt-auto flex w-15 flex-col items-center gap-1">
+    <div className="mt-auto flex w-16 flex-col items-center gap-1">
       <UpdateButton />
       <WorkspaceMenu compact {...menu} />
     </div>

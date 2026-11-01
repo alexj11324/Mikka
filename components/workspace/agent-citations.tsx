@@ -3,12 +3,13 @@
 import { createContext, useContext, useState, type ComponentProps } from 'react'
 import useSWR from 'swr'
 import { Globe } from 'lucide-react'
+import { GitHubIcon } from '@/components/icons/brand-icons'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { cn } from 'cn'
-import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
+import { HarnessMark } from '@/components/labels/entity-labels'
 import { Badge } from '@/components/reui/badge'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type StreamingSource } from '@/components/ui/streaming-text'
@@ -84,7 +85,7 @@ export function CitationSources({ text }: { text: string }) {
       if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
       else {
         const issue = source.issue
-        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <BotAvatar color={colorFor(source.agentName)} size="row" still />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
+        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <HarnessMark harness={source.harness} />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
       }
     }
   }
@@ -143,7 +144,7 @@ export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: stri
   const format = useFormatter()
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
-  // The bot runs the thread; the coding agent is a step inside it, never its face (R-62).
+  // The coding agent runs the thread, so its mark is the thread's face; the bot only dispatched it (R-78).
   const issue = run.issue
   const status = t.has(`runStatus.${run.status}` as never) ? t(`runStatus.${run.status}` as never) : run.status
   return <InlineCitation>
@@ -151,7 +152,7 @@ export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: stri
       aria-label={issue ? t('openRunIssue', { agent: run.agentName, title: issue.title }) : t('runOf', { agent: run.agentName })}
       onClick={issue ? () => onOpen(issue.id) : undefined}
     >
-      <SourceAvatar source={{ name: run.agentName, domain: run.agentName, icon: <BotAvatar color={colorFor(run.agentName)} size="row" still /> }} className="size-4 rounded-full" />
+      <SourceAvatar source={{ name: run.agentName, domain: run.agentName, icon: <HarnessMark harness={run.harness} /> }} className="size-4 rounded-full" />
       <InlineCitationLabel>{run.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
@@ -185,17 +186,26 @@ function describeLink(url: string, label: string | null, preview: LinkPreview | 
   }
 }
 
+/**
+ * GitHub's favicon is its black mark, which vanished on the dark page; its mark in the text colour holds in both
+ * themes, as GitHub's own light mark does on dark (R-74). Other sites keep their favicon.
+ */
+function linkIcon(host: string | undefined, preview: LinkPreview | null | undefined) {
+  return host === 'github.com' ? { image: undefined, icon: <GitHubIcon /> } : { image: preview?.icon, icon: <Globe /> }
+}
+
 function linkSource(url: string, label: string | null, preview: LinkPreview | null | undefined): StreamingSource {
   const link = describeLink(url, label, preview)
-  return { name: preview?.title ?? link?.name ?? url, domain: link?.host ?? url, href: url, image: preview?.icon }
+  return { name: preview?.title ?? link?.name ?? url, domain: link?.host ?? url, href: url, ...linkIcon(link?.host, preview) }
 }
 
 export function LinkCitation({ url, label, preview }: { url: string; label: string | null; preview: LinkPreview | null | undefined }) {
   const link = describeLink(url, label, preview)
   if (!link) return <>{url}</>
+  const mark = linkIcon(link.host, preview)
   return <InlineCitation>
     <InlineCitationTrigger render={<a href={url} target="_blank" rel="noopener noreferrer" />}>
-      <SourceAvatar source={{ name: link.name, domain: link.host, image: preview?.icon, icon: <Globe /> }} className={sourceTileClassName} />
+      <SourceAvatar source={{ name: link.name, domain: link.host, ...mark }} className={sourceTileClassName} />
       <InlineCitationLabel>{link.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
@@ -204,7 +214,7 @@ export function LinkCitation({ url, label, preview }: { url: string; label: stri
         <InlineCitationTitle>{preview?.title ?? label ?? link.address}</InlineCitationTitle>
         {preview?.description && <InlineCitationDescription>{preview.description}</InlineCitationDescription>}
       </InlineCitationBody>
-      <InlineCitationFooter><InlineCitationFavicon src={preview?.icon} /><span className="min-w-0 truncate">{link.address}</span></InlineCitationFooter>
+      <InlineCitationFooter>{mark.image ? <InlineCitationFavicon src={mark.image} /> : mark.icon}<span className="min-w-0 truncate">{link.address}</span></InlineCitationFooter>
     </InlineCitationContent>
   </InlineCitation>
 }

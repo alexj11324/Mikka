@@ -8,7 +8,15 @@ export const runtime = 'nodejs'
 const MAX_BODY_BYTES = 1_000_000
 const noStore = { 'Cache-Control': 'no-store' }
 
-/** GitHub webhook for the suggestions list: review requests, assignments, and replies on the person's PRs and issues. */
+/** Merged PR, from a verified delivery: completes the Factory tasks waiting on it (#528), including merges made on GitHub. */
+function mergedPullRequest(event: string, payload: Record<string, unknown>) {
+  if (event !== 'pull_request' || payload.action !== 'closed') return null
+  const pr = payload.pull_request as { html_url?: unknown; merged?: unknown; merge_commit_sha?: unknown; head?: { sha?: unknown } } | undefined
+  if (pr?.merged !== true || typeof pr.html_url !== 'string') return null
+  return { url: pr.html_url, headSha: typeof pr.head?.sha === 'string' ? pr.head.sha : null, mergeCommitSha: typeof pr.merge_commit_sha === 'string' ? pr.merge_commit_sha : null }
+}
+
+/** GitHub webhook for the suggestions list (review requests, assignments, and replies on the person's PRs and issues) and Factory merges. */
 async function handlePOST(request: Request) {
   const secret = process.env.GITHUB_WEBHOOK_SECRET
   if (!secret) return new Response('Webhook is not configured.', { status: 503, headers: noStore })
@@ -27,7 +35,12 @@ async function handlePOST(request: Request) {
     noteLogOutcome('ignored')
     return new Response(null, { status: 204, headers: noStore })
   }
+  const merged = mergedPullRequest(event, payload)
   after(async () => {
+    if (merged) {
+      try { await (await import('@/lib/factory/server')).factoryMerges.pullRequestMerged(merged) }
+      catch (error) { console.error('Factory merge completion failed', error instanceof Error ? error.message : error) }
+    }
     if (event === 'pull_request') {
       try { await (await import('@/lib/github/publication-webhook')).refreshPublishedPullRequest(event, payload) }
       catch { console.error('GitHub delivery refresh failed') }

@@ -138,3 +138,59 @@ it("probes real Linux isolation, advertises only usable harnesses, and cleans up
     cleanupTempDirs()
   }
 }, 60_000)
+
+it("lets the agent commit on its run branch inside real isolation with the run's own policy", async () => {
+  const { RepositoryCache } = await import("../src/repositories")
+  const { WorktreeManager } = await import("../src/worktrees")
+  const { worktreeGitWritePaths } = await import("../src/agents/publish")
+  const { RunContext } = await import("../src/agents/run-context")
+  const { makeRepo } = await import("./helpers")
+  const { join } = await import("node:path")
+  const { pathToFileURL } = await import("node:url")
+  const { writeFileSync, readFileSync } = await import("node:fs")
+  const { execa } = await import("execa")
+  const source = await makeRepo()
+  const root = tempDir()
+  const cache = new RepositoryCache(join(root, "repos"))
+  const path = await cache.prepare(pathToFileURL(source).href)
+  const worktree = await new WorktreeManager(join(root, "worktrees")).create("commit-test", path, await cache.baseRef(pathToFileURL(source).href))
+  const context = new RunContext({ harness: "claude_code", worktree, privateDir: root, runDir: join(root, "run"),
+    gitWritePaths: await worktreeGitWritePaths(path, worktree, "commit-test") })
+  writeFileSync(join(worktree, "agent.txt"), "agent change\n")
+  // Git runs auto maintenance after a commit. Git 2.56 packs refs there by
+  // default; older git does the same through `gc --auto` once there are too
+  // many packs. Either rewrites the shared cache's packed-refs, which the run
+  // may not write. Force that path on every git version.
+  execFileSync("git", ["config", "gc.autoPackLimit", "1"], { cwd: path })
+  execFileSync("git", ["config", "gc.autoDetach", "false"], { cwd: path })
+  const loose = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: path, input: "loose\n", encoding: "utf8" })
+  execFileSync("git", ["pack-objects", "-q", join(path, ".git", "objects", "pack", "pack")], { cwd: path, input: loose })
+  expect(execFileSync("git", ["count-objects", "-v"], { cwd: path, encoding: "utf8" })).toMatch(/^packs: [2-9]/m)
+  const sandbox = new SandboxRuntime()
+  try {
+    const run = async (script: string) => {
+      const wrapped = await sandbox.wrap(["/bin/sh", "-c", script], { ...context.policy(), allowDomains: [] })
+      const result = await execa("/bin/sh", ["-c", wrapped.command], { cwd: worktree, reject: false, env: { ...process.env, ...context.tempEnv() } })
+      wrapped.release()
+      return { ...result, stderr: wrapped.annotate(result.stderr) }
+    }
+    const result = await run("git add agent.txt && git -c commit.gpgSign=false -c user.name=Agent -c user.email=agent@mikka.invalid commit -qm agent && git rev-parse HEAD")
+    expect(result.stderr).toBe("")
+    expect(result.exitCode).toBe(0)
+    const head = result.stdout.trim()
+    expect(execFileSync("git", ["rev-parse", "refs/heads/mikka/run-commit-test"], { cwd: path, encoding: "utf8" }).trim()).toBe(head)
+    // The agent's git ran no auto maintenance on the shared cache: still two packs.
+    expect(execFileSync("git", ["count-objects", "-v"], { cwd: path, encoding: "utf8" })).toMatch(/^packs: 2$/m)
+    // The repository is writable, but sandbox-runtime keeps its config and hooks read-only.
+    const config = join(path, ".git", "config")
+    const before = readFileSync(config, "utf8")
+    expect((await run(`printf '[core]\\n\\tsshCommand = /bin/true\\n' >> ${config}`)).exitCode).not.toBe(0)
+    expect((await run(`git config --file ${config} core.fsmonitor /bin/true`)).exitCode).not.toBe(0)
+    expect((await run(`printf '#!/bin/sh\\n' > ${join(path, ".git", "hooks", "pre-commit")}`)).exitCode).not.toBe(0)
+    expect(readFileSync(config, "utf8")).toBe(before)
+    expect(existsSync(join(path, ".git", "hooks", "pre-commit"))).toBe(false)
+  } finally {
+    await sandbox.reset()
+    cleanupTempDirs()
+  }
+})

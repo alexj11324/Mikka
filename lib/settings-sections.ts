@@ -32,7 +32,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
-  { id: 'models', group: 'personal', title: 'Models' },
+  { id: 'models', group: 'personal', title: 'API and subscriptions' },
   { id: 'logins', group: 'personal', title: 'Logins and keys' },
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
   { id: 'computers', group: 'personal', title: 'Devices' },
@@ -46,7 +46,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true },
   { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
   { id: 'usage', group: 'workspace', title: 'Usage' },
-  { id: 'billing', group: 'workspace', title: 'Billing', adminOnly: true },
+  // Members see 付款 here (their card designation and credit share); plan, balance and top-ups are admins' (C19).
+  { id: 'billing', group: 'workspace', title: 'Billing' },
 ]
 
 /** Section ids from before v4. Old links open the page that now holds the content. */

@@ -15,6 +15,8 @@ export interface ArtifactVersionInfo {
   /** The author bot's bloub colour and shape; null when no bot by that name, so the reader derives a colour from the name. */
   authorColor: string | null
   authorShape: string | null
+  /** Set when a run's Agent wrote the version (Claude Code, Codex): it shows with the Agent's mark, not a bot's bloub (R-78). */
+  authorHarness?: string | null
   createdAt: string
 }
 
@@ -30,6 +32,8 @@ export interface ArtifactDetail extends ArtifactSummary {
 export interface ArtifactListItem extends ArtifactSummary {
   runId: string | null
   issueId: string | null
+  /** The bot whose run made it, so the reader sits beside that bot's chat; null outside a run or for the Coordinator. */
+  botId: string | null
   /** Who made the latest version: the agent's name. */
   authorName: string | null
   /** The task it was made for, as 「MIK-41」; null without one. */

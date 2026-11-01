@@ -216,9 +216,9 @@ test('withdrawn, absent and foreign-owner repository approvals cannot issue cred
 test('a saved admission is checked against the actual device, repository and accepted source event', async () => {
   const admission: RepositoryAdmission = {
     userId: owner, issueId: ids.task, deviceId: ids.device, agentId: ids.agent, remoteKey: key, remoteUrl: remote,
-    targetBranch: branch, permission: 'push_to_origin', authority: 'configured_allow', acceptedAt: '2026-10-30T00:00:00Z',
+    targetBranch: branch, permission: 'push_to_origin', authority: 'repository_approval', approvedAt: '2026-10-30T00:00:00Z', acceptedAt: '2026-10-30T00:00:00Z',
   }
-  row!.run.agentDefinition = { repositoryAdmission: admission }; push = null
+  row!.run.agentDefinition = { repositoryAdmission: admission }
   assert.ok(await authorize(request()))
   eventMatches = false
   assert.equal(await authorize(request()), null)
@@ -229,9 +229,48 @@ test('a saved admission is checked against the actual device, repository and acc
 test('an explicit repository withdrawal wins over an otherwise valid saved admission', async () => {
   row!.run.agentDefinition = { repositoryAdmission: {
     userId: owner, issueId: ids.task, deviceId: ids.device, agentId: ids.agent, remoteKey: key, remoteUrl: remote,
+    targetBranch: branch, permission: 'push_to_origin', authority: 'repository_approval', approvedAt: '2026-10-30T00:00:00Z', acceptedAt: '2026-10-30T00:00:00Z',
+  } }
+  assert.ok(await authorize(request()))
+  push = { approved: false }
+  assert.equal(await authorize(request()), null)
+})
+
+test('git_push allow never issues a token without the repository approval', async () => {
+  const admission: RepositoryAdmission = {
+    userId: owner, issueId: ids.task, deviceId: ids.device, agentId: ids.agent, remoteKey: key, remoteUrl: remote,
+    targetBranch: branch, permission: 'push_to_origin', authority: 'repository_approval', approvedAt: '2026-10-30T00:00:00Z', acceptedAt: '2026-10-30T00:00:00Z',
+  }
+  assert.equal(policy.permissions.git_push, 'allow')
+  for (const value of [null, { approved: true }, { approved: true, approvedByUserId: 'other', approvedAt: '2026-10-30T00:00:00Z' }]) {
+    push = value
+    row = fixture()
+    assert.equal(await authorize(request()), null, 'no admission')
+    row.run.agentDefinition = { repositoryAdmission: admission }
+    assert.equal(await authorize(request()), null, 'an accepted admission does not replace the live approval')
+  }
+  assert.equal(linkedAccount.mock.callCount(), 0)
+})
+
+test('an old configured_allow receipt grants no token, even with a repository approval', async () => {
+  row!.run.agentDefinition = { repositoryAdmission: {
+    userId: owner, issueId: ids.task, deviceId: ids.device, agentId: ids.agent, remoteKey: key, remoteUrl: remote,
     targetBranch: branch, permission: 'push_to_origin', authority: 'configured_allow', acceptedAt: '2026-10-30T00:00:00Z',
   } }
-  push = { approved: false }
+  assert.equal(await authorize(request()), null)
+  push = null
+  assert.equal(await authorize(request()), null)
+  assert.equal(linkedAccount.mock.callCount(), 0)
+})
+
+test('allow and ask with the repository approval both issue a token; deny on either gate does not', async () => {
+  for (const decision of ['allow', 'ask'] as const) {
+    policy.permissions.git_push = decision
+    assert.ok(await authorize(request()), decision)
+  }
+  policy.permissions.git_push = 'deny'
+  assert.equal(await authorize(request()), null)
+  policy.permissions.git_push = 'allow'; push = { approved: false }
   assert.equal(await authorize(request()), null)
 })
 

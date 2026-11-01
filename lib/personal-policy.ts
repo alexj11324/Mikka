@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import { stopRunsUsingApiKeys } from './model-api-key-runs'
 
 /**
  * Decision 2026-10-31-2225: a subscription belongs to its owner. Their personal
@@ -46,6 +47,7 @@ export async function setSubscriptionShare(query: Query, ownerId: string, worksp
   if (!shared) {
     await query.query('DELETE FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, workspaceId])
     await stopRunsUsingSubscriptions(query, { ownerId, workspaceId })
+    await stopRunsUsingApiKeys(query, { ownerId, workspaceId })
     return
   }
   await query.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,COALESCE($3::boolean,false))
@@ -106,7 +108,7 @@ export async function sharedNativeBinding(query: Query, runOwnerId: string, agen
   for (const ownerId of await pooledOwners(query, runOwnerId, workspaceId)) {
     const { rows: [template] } = await query.query<{ connectionId: string; epoch: string; modelId: string }>(
       `SELECT b."connectionId",c.epoch,b."modelId" FROM byos_bindings b
-        JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.state='connected' AND c.epoch=b."connectionRevision" AND c.provider=$3
+        JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.state='connected' AND c.paused=false AND c.epoch=b."connectionRevision" AND c.provider=$3
         WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND ${runMayUseCredentialSql('$1', '$4', '$2')}
         ORDER BY (b.route=$5) DESC, b."createdAt" DESC, b.id DESC LIMIT 1`,
       [ownerId, workspaceId, provider, runOwnerId, route])

@@ -62,6 +62,8 @@ stub('../lib/self-improvement/server.ts',{improvementStore:{},skillAssignments:{
 let steps: typeof import('../workflows/coordinator/steps')
 before(async()=>{steps=await import('../workflows/coordinator/steps')})
 const scope={holder:'holder',turnId:'turn',callId:'call'}
+/** The person's Coordinator: an ordinary bot row. */
+const COORDINATOR_BOT='40000000-0000-4000-8000-0000000c0de1'
 const user='host-owned-user'
 
 beforeEach(()=>{
@@ -99,17 +101,17 @@ const calls = {
   answerFactoryQuestionFromUser:()=>steps.answerFactoryQuestionFromUser(user,{reference,answerId:'answer',sourceEventId:'event'},scope),
   resolveFactoryTask:()=>steps.resolveFactoryTask(user,{binding,sourceEventId:'event',rationale:'resolution',missingInformation:[],missingPermissions:[],needsSpec:false},scope),
   stopFactoryTask:()=>steps.stopFactoryTask(user,{binding,reason:'cancel',action:'cancel'},scope),
-  remember:()=>steps.remember(user,{note:'preference'},scope),
-  forget:()=>steps.forget(user,{text:'preference'},scope),
+  remember:()=>steps.remember(user,{note:'preference'},scope,COORDINATOR_BOT),
+  forget:()=>steps.forget(user,{text:'preference'},scope,COORDINATOR_BOT),
   composioAction:()=>steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope),
   accountWrite:()=>steps.accountWrite(user,'send_email',{},scope),
-  proposeRepositoryPushApproval:()=>steps.proposeRepositoryPushApproval(user,{repo:'owner/repo'},scope),
+  proposeRepositoryPushApproval:()=>steps.proposeRepositoryPushApproval(user,{repo:'owner/repo'},scope,{botId:COORDINATOR_BOT}),
   listIssues:()=>steps.listIssues(user,{},scope),
-  getIssue:()=>steps.getIssue(user,{issueId:'issue'},scope),
-  createIssue:()=>steps.createIssue(user,{title:'Task'},'tool-call',scope),
-  updateIssue:()=>steps.updateIssue(user,{issueId:'issue',title:'Updated'},'tool-call',scope),
+  getIssue:()=>steps.getIssue(user,{issueId:'issue'},scope,COORDINATOR_BOT),
+  createIssue:()=>steps.createIssue(user,{title:'Task'},'tool-call',scope,COORDINATOR_BOT),
+  updateIssue:()=>steps.updateIssue(user,{issueId:'issue',title:'Updated'},'tool-call',scope,COORDINATOR_BOT),
   listAgents:()=>steps.listAgents(user,scope),
-  dispatchRun:()=>steps.dispatchRun(user,{issueId:'issue',agentId:'agent',repo:'owner/repo'},scope),
+  dispatchRun:()=>steps.dispatchRun(user,{issueId:'issue',agentId:'agent',repo:'owner/repo'},scope,COORDINATOR_BOT),
   listComputerWorkspaces:()=>steps.listComputerWorkspaces(user,scope),
   createComputerBot:()=>steps.createComputerBot(user,{workspaceId:'workspace',name:'Bot'},'tool-call',scope),
   listComputerBots:()=>steps.listComputerBots(user,scope),
@@ -204,9 +206,9 @@ test('question reads and escalation expose the same compact action reference wit
 
 test('a retried business step rechecks authorization rather than reusing a prior successful guard',async()=>{
   uncertain=true
-  await assert.rejects(steps.remember(user,{note:'preference'},scope),/retryable/)
+  await assert.rejects(steps.remember(user,{note:'preference'},scope,COORDINATOR_BOT),/retryable/)
   revoked=true
-  await assert.rejects(steps.remember(user,{note:'preference'},scope),/coordinatorExpiredOrLeaseLost/)
+  await assert.rejects(steps.remember(user,{note:'preference'},scope,COORDINATOR_BOT),/coordinatorExpiredOrLeaseLost/)
   assert.equal(checks.mock.callCount(),2)
   assert.equal(effect.mock.callCount(),1)
 })
@@ -217,7 +219,7 @@ test('issue creation passes only the host-owned user and request input to persis
 })
 test('unscoped AI SDK calls keep the existing business callbacks and account writes',async()=>{
   revoked=true
-  await steps.remember(user,{note:'preference'})
+  await steps.remember(user,{note:'preference'},undefined,COORDINATOR_BOT)
   await steps.accountWrite(user,'send_email',{subject:'proposal'})
   assert.equal(checks.mock.callCount(),0)
   assert.equal(effect.mock.callCount(),2)
@@ -299,9 +301,10 @@ test('workspace app denies block reads, account writes and personal writes befor
   assert.equal(effect.mock.callCount(),3)
 })
 
-test('a personal Coordinator remains outside workspace app policy and revoked native calls never check policy', async () => {
+// The Coordinator's own exemption is botMayUseApp's (tests/coordinator-bot.db.test.ts); here, work with no bot.
+test('work with no bot of its own stays outside workspace app policy and revoked native calls never check policy', async () => {
   appAllowed=false
-  await steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope,undefined,null)
+  await steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope,undefined,undefined)
   assert.equal(effect.mock.callCount(),1)
   assert.equal(policyChecks.mock.callCount(),0)
   revoked=true

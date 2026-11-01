@@ -12,7 +12,8 @@ import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { botChats, chatView, retryFailedTurn, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
+import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
 import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
@@ -23,34 +24,47 @@ import { claimSuggestion, readClaimedSuggestion } from '@/lib/suggestions/store'
 import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 
-async function getUserId(): Promise<string> {
+async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
+  return session.user
 }
 
-export type CoordinatorChat = ChatView & { enabled: boolean }
+async function getUserId(): Promise<string> {
+  return (await getUser()).id
+}
+
+/** `botId` is the chat's bot row, the Coordinator's included. */
+export type CoordinatorChat = ChatView & { botId: string; enabled: boolean }
 
 const botIdSchema = z.uuid().nullable()
 
-/** The bot `botId` if it is one of the person's; null stays the Coordinator. */
-async function ownBot(userId: string, botId: string | null | undefined): Promise<{ id: string; name: string } | null> {
+/**
+ * The bot whose chat this is: `botId` if it is one of the person's, or their
+ * Coordinator's bot row when the caller names none (the Coordinator's entry
+ * in the bot list).
+ */
+async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string | null | undefined): Promise<{ id: string; name: string; coordinator: boolean }> {
+  const userId = user.id
   const parsed = botIdSchema.safeParse(botId ?? null)
   if (!parsed.success) throw new ActionFailureError('validationGeneric')
-  if (!parsed.data) return null
-  const [bot] = await db.select({ id: bots.id, name: bots.name }).from(bots).where(and(eq(bots.id, parsed.data), eq(bots.ownerId, userId))).limit(1)
+  // No bot named: the Coordinator of the workspace the person has open.
+  const id = await openChatBotId(user, parsed.data)
+  const [bot] = await db.select({ id: bots.id, name: bots.name, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
+    .from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, userId))).limit(1)
   if (!bot) throw new ActionFailureError('validationGeneric')
   return bot
 }
 
 /** The person's chat with their Coordinator, or with one of their bots: every bot runs on the same harness. */
 export async function getCoordinatorChat(botId: string | null = null): Promise<CoordinatorChat> {
-  const userId = await getUserId()
-  const bot = await ownBot(userId, botId)
+  const user = await getUser()
+  const userId = user.id
+  const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()
-  const chat = await chatView(userId, 200, bot?.id ?? null)
+  const chat = await chatView(userId, 200, bot.id)
   // Without a Coordinator here nothing is coming, so do not show one working.
-  return { ...chat, enabled, working: enabled && chat.working }
+  return { ...chat, botId: bot.id, enabled, working: enabled && chat.working }
 }
 
 const quoteSchema = z.object({
@@ -83,7 +97,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
         if(['http:','https:'].includes(origin.protocol)&&origin.host===host)humanSessionId=session.session.id
       }catch{/* Missing/malformed origin is no approval provenance. */}
     }
-    const bot = await ownBot(userId, botId)
+    const bot = await ownBot(session.user, botId)
     const parsed = personalSubmissionInput.safeParse({ text, submissionId, ...(images?.length ? { images } : {}) })
     if (!parsed.success) throw new ActionFailureError('messageRequired')
     const quoted = quote ? quoteSchema.safeParse(quote) : null
@@ -103,7 +117,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
         .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).limit(1)
       if (!device) throw new ActionFailureError('deviceNotFound')
     }
-    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot?.id ?? null, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, ...(humanSessionId ? { humanSessionId } : {}) }) }
+    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, ...(humanSessionId ? { humanSessionId } : {}) }) }
     catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error
@@ -122,12 +136,12 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
   return runAction(async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
-    const bot = await ownBot(session.user.id, botId)
+    const bot = await ownBot(session.user, botId)
     if (!coordinatorEnabled()) return { queued: false }
-    const chat = await chatView(session.user.id, 1, bot?.id ?? null)
+    const chat = await chatView(session.user.id, 1, bot.id)
     if (chat.items.length || chat.working || chat.error) return { queued: false }
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
-    await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot?.name), { botId: bot?.id ?? null }))
+    await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot.coordinator ? undefined : bot.name), { botId: bot.id }))
     after(() => wakeCoordinator(session.user.id))
     return { queued: true }
   })
@@ -138,9 +152,9 @@ export async function retryCoordinatorTurn(botId: string | null = null): Promise
   return runAction(async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
-    const bot = await ownBot(session.user.id, botId)
+    const bot = await ownBot(session.user, botId)
     if (!coordinatorEnabled()) return { queued: false }
-    const queued = await retryFailedTurn(session.user.id, bot?.id ?? null)
+    const queued = await retryFailedTurn(session.user.id, bot.id)
     if (queued) after(() => wakeCoordinator(session.user.id))
     return { queued }
   })
@@ -166,8 +180,9 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
         const item = claimed ?? await readClaimedSuggestion(userId, id.data, tx)
         if (!item) throw new ActionFailureError('suggestionNotFound')
         const text = suggestionMessage({ source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, actor: item.actor, url: item.url })
-        if (claimed) await recordPersonalSubmission(tx, userId, text, { submissionId: item.id })
-        else if (!await personalSubmissionRecorded(tx, userId, text, item.id)) throw new ActionFailureError('suggestionNotFound')
+        // The suggestion stored its Coordinator bot row when it was made (null only on an older one).
+        if (claimed) await recordPersonalSubmission(tx, userId, text, { submissionId: item.id, botId: item.botId })
+        else if (!await personalSubmissionRecorded(tx, userId, text, item.id, item.botId)) throw new ActionFailureError('suggestionNotFound')
       })
     } catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')

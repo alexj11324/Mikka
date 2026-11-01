@@ -51,19 +51,19 @@ export function MemorySettings() {
     </SettingsSection>
     {(error || failed) && <FieldError className="px-1">{t('error')}</FieldError>}
     {data && !groups.length && <p className="px-1 text-sm text-muted-foreground">{t('empty')}</p>}
-    {groups.map(group => <section key={group.kind} aria-labelledby={`memory-${group.kind}`} className="flex flex-col gap-2 px-1">
-      <h2 id={`memory-${group.kind}`} className="text-base font-semibold">{t(`kinds.${group.kind as UserFactKind}`)}</h2>
-      <ul className="flex list-disc flex-col gap-1 pl-5">
-        {group.facts.map((fact: Fact) => <li key={fact.id} className="group/fact">
-          {editing?.id === fact.id
-            ? <Input autoFocus aria-label={t('correct')} value={editing.subject} maxLength={200} className="h-7" onChange={event => setEditing({ id: fact.id, subject: event.target.value })} onBlur={save} onKeyDown={event => { if (event.key === 'Enter') void save(); if (event.key === 'Escape') setEditing(null) }} />
-            : <span className="inline-flex items-center gap-1">
-                <span>{fact.subject}</span>
-                <Button variant="ghost" size="icon-xs" aria-label={t('correct')} onClick={() => setEditing({ id: fact.id, subject: fact.subject })}><Pencil data-icon="inline-start" /></Button>
-                <Button variant="ghost" size="icon-xs" aria-label={t('delete')} onClick={() => run(() => removeFact(fact.id), current => ({ ...current, facts: current.facts.filter(item => item.id !== fact.id) }))}><Trash2 data-icon="inline-start" /></Button>
-              </span>}
-        </li>)}
-      </ul>
-    </section>)}
+    {/* Each kind is a section card like every other settings group; a fact is a row whose 28px actions show on hover or focus (always on touch). */}
+    {groups.map(group => <SettingsSection key={group.kind} id={`memory-${group.kind}`} title={t(`kinds.${group.kind as UserFactKind}`)}>
+      {group.facts.map((fact: Fact) => <div key={fact.id} className="group/fact flex min-h-12 items-center gap-2 px-5 py-2 text-sm">
+        {editing?.id === fact.id
+          ? <Input autoFocus aria-label={t('correct')} value={editing.subject} maxLength={200} onChange={event => setEditing({ id: fact.id, subject: event.target.value })} onBlur={save} onKeyDown={event => { if (event.key === 'Enter') void save(); if (event.key === 'Escape') setEditing(null) }} />
+          : <>
+              <span className="min-w-0 flex-1">{fact.subject}</span>
+              <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within/fact:opacity-100 group-hover/fact:opacity-100 pointer-coarse:opacity-100">
+                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t('correct')} onClick={() => setEditing({ id: fact.id, subject: fact.subject })}><Pencil data-icon="inline-start" /></Button>
+                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t('delete')} onClick={() => run(() => removeFact(fact.id), current => ({ ...current, facts: current.facts.filter(item => item.id !== fact.id) }))}><Trash2 data-icon="inline-start" /></Button>
+              </span>
+            </>}
+      </div>)}
+    </SettingsSection>)}
   </div>
 }

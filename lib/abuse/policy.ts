@@ -2,12 +2,23 @@
 export const FREE_ALLOWANCE_MICRO_USD = 1_000_000
 export const MICRO_USD_PER_POINT = 10_000 // Billing conversion: 100 points = USD 1.
 export const HOSTED_CALL_TIMEOUT_MS = 60_000
+/**
+ * Estimated maximum cost one hosted call holds while in flight. Output is capped
+ * at 4,096 tokens (model.ts); USD 0.10 covers that at USD 15 per million output
+ * tokens plus about 100k input tokens at USD 0.30 per million, far above the
+ * default hosted model. A call that still costs more settles at its actual cost
+ * (any shortfall is debt, as before). Eight holds fit the USD 1 allowance.
+ */
+export const HOSTED_CALL_HOLD_MICRO_USD = 100_000
+/** Anti-abuse cap on concurrent hosted calls per workspace. */
+export const HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE = 8
 export type PaidResourceCode =
   | 'verification_required'
   | 'free_allowance_used'
   | 'points_exhausted'
   | 'platform_paused'
   | 'usage_in_progress'
+  | 'usage_concurrency_limit'
   | 'usage_cost_unavailable'
 export class PaidResourceError extends Error {
   constructor(readonly code: PaidResourceCode) {

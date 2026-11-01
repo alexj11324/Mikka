@@ -29,10 +29,11 @@ import { runBotName } from '@/lib/run-bot-name'
 
 export interface RunView {
   id: string
-  pauseReason?: 'human_control' | null
+  pauseReason?: 'human_control' | 'quota_exhausted' | null
   waitFor?: string
   issueId: string | null
   agentId: string
+  /** The Bot that dispatched the run; `harness` is the Agent that executes it (R-78). */
   agentName: string
   harness: SupportedHarness
   status: string
@@ -129,7 +130,9 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = true
-  const subscription = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
+  const found = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
+  // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
+  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.model, found)
   const mailboxEnabled = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1'
   let mailboxScope: { botId: string | null; workspaceId: string } | undefined
   if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
@@ -139,10 +142,18 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
     mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope })
     : null
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
     deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+}
+
+/** A device run's credential source; the bot's workspace decides whose API keys it may use. */
+async function localRunCredential<S extends { id: string; ownerId: string; connectionId: string; connectionRevision: number }>(query: import('pg').Pool | import('pg').PoolClient,
+  userId: string, botId: string | null, harness: string, model: string | undefined, subscription: S | null) {
+  const botWorkspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId ?? null : null
+  const choiceWorkspaceId = botWorkspaceId ?? (async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, null).catch(() => null))
+  return (await import('@/lib/run-credential-source')).runCredentialSource(query, { ownerId: userId, botId, harness, model, botWorkspaceId, choiceWorkspaceId, subscription, localLogin: true })
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,

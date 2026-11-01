@@ -28,6 +28,7 @@ import {
   CLIENT_VERSION_HEADER,
   REPO_ORIGIN_HEADER,
   RECOVERY_WORKTREE_HEADER,
+  MODEL_CREDENTIAL_HEADER,
   DAEMON_RPC_ERRORS,
   devicePaths,
   fsPaths,
@@ -146,7 +147,8 @@ export class HttpServerLink implements ServerLink {
     const response = z.object({ decision: z.enum(['pending', 'allow', 'deny']) })
     const liveness = new AbortController()
     const gate = new ToolApprovalGate(assignment.runId, {
-      permission: request => toolApprovalDecision(request, assignment.policy, worktree, runApps(assignment.mcp)?.apps.map(app => app.name)),
+      permission: request => toolApprovalDecision(request, assignment.policy, worktree, runApps(assignment.mcp)?.apps.map(app => app.name),
+        assignment.github ? [new URL(assignment.github.endpoint).host] : []),
       // Keep the callback pending at the tool boundary. The adapter's current
       // session and checkpoint remain intact; handback resolves this same call.
       isLive: async () => {
@@ -269,6 +271,7 @@ export class HttpServerLink implements ServerLink {
           [TEAM_SKILL_HEADER]: '1',
           [REPO_ORIGIN_HEADER]: '1',
           [RECOVERY_WORKTREE_HEADER]: '1',
+          [MODEL_CREDENTIAL_HEADER]: '1',
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
         },

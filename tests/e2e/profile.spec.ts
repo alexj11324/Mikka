@@ -21,7 +21,9 @@ test('个人资料名称可以编辑，保存后刷新仍然生效', { tag: '@sm
   const name = page.getByRole('textbox', { name: '名称', exact: true })
   await expect(name).toHaveValue('回归测试成员')
   await name.fill('新的显示名')
-  await page.getByRole('button', { name: '保存', exact: true }).click()
+  // Saves on Enter or when the field is left, like the workspace name; there is no 保存 button.
+  await expect(page.getByRole('button', { name: '保存', exact: true })).toHaveCount(0)
+  await name.press('Enter')
   await expect(page.getByText('已保存', { exact: true })).toBeVisible()
 
   await page.reload()
@@ -57,24 +59,62 @@ test('通知设置可以关闭主动消息，刷新后保持', async ({ page }) 
   await expect(page.getByRole('switch', { name: '主动消息', exact: true })).not.toBeChecked()
 })
 
+// A save never waits behind Settings' idle prefetch: the reads are GETs, not server actions, which Next runs one at a time.
+// The API key read is held open; the switch must still save, and stay off after a reload.
+test('设置预取未返回时，开关仍立即保存', async ({ page }) => {
+  const held: import('@playwright/test').Route[] = []
+  await page.context().route('**/api/settings/api-keys**', route => { held.push(route) })
+  await register(page, '/settings?section=notifications')
+  const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
+  await expect(proactive).toBeChecked()
+  // Pointing at 「API 与订阅」 prefetches that section now, if the idle prefetch has not already.
+  await page.locator('[data-slot="settings-list"]').getByRole('link', { name: 'API 与订阅', exact: true }).hover()
+  await expect.poll(() => held.length).toBeGreaterThan(0)
+  const saved = page.waitForResponse(response => {
+    const request = response.request()
+    try { return Boolean(request.headers()['next-action']) && request.postData() === JSON.stringify([{ proactive: false }]) } catch { return false }
+  })
+  await proactive.click()
+  expect((await saved).ok()).toBe(true)
+  await page.context().unroute('**/api/settings/api-keys**')
+  for (const route of held) await route.fallback()
+  await page.reload()
+  await expect(page.getByRole('switch', { name: '主动消息', exact: true })).not.toBeChecked()
+})
+
 // S-O: a refused save puts the switch back and offers a retry that sends the same change.
 test.describe('通知保存失败', () => {
   // The test aborts the save itself; Chromium logs that aborted server-action POST once.
+  // Only that save is aborted: Settings also prefetches other sections' data through server actions while idle.
   test.use({ expectedConsoleErrors: [{ path: '/mikka/settings?section=notifications', message: 'Failed to load resource: net::ERR_FAILED' }] })
 
 test('通知保存失败时开关恢复原值，重试后保存成功', async ({ page }) => {
   await register(page, '/settings?section=notifications')
   const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
   await expect(proactive).toBeChecked()
-  // Server actions POST with a Next-Action header; drop exactly those.
-  await page.route('**/*', route => route.request().headers()['next-action'] ? route.abort() : route.continue())
+  // A server action POSTs its arguments as JSON with a Next-Action header; drop exactly the save of this switch.
+  const isSave = (request: import('@playwright/test').Request) => {
+    try { return Boolean(request.headers()['next-action']) && JSON.stringify(JSON.parse(request.postData() ?? '')) === JSON.stringify([{ proactive: false }]) } catch { return false }
+  }
+  let aborted = 0
+  const dropSave = async (route: import('@playwright/test').Route) => {
+    if (!isSave(route.request())) return route.fallback()
+    aborted += 1
+    return route.abort()
+  }
+  await page.route('**/*', dropSave)
   await proactive.click()
   await expect(page.locator('[data-slot="alert"]')).toContainText('这项设置没有保存，已恢复为原来的值。')
   await expect(proactive).toBeChecked()
-  await page.unroute('**/*')
+  expect(aborted).toBe(1)
+  await page.unroute('**/*', dropSave)
+  // The switch turns off before the server answers, and server actions run one at a time: the save can still wait behind
+  // a settings prefetch. Reload only once the save has answered.
+  const saved = page.waitForResponse(response => isSave(response.request()))
   await page.getByRole('button', { name: '重试', exact: true }).click()
   await expect(page.locator('[data-slot="alert"]')).toHaveCount(0)
   await expect(proactive).not.toBeChecked()
+  expect((await saved).ok()).toBe(true)
   await page.reload()
   await expect(page.getByRole('switch', { name: '主动消息', exact: true })).not.toBeChecked()
 })

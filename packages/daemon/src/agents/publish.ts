@@ -17,7 +17,7 @@ import {
   rmSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import { assertSafeId } from "../ids"
 
 import type { RunPublish } from "@mikka/protocol"
@@ -44,7 +44,8 @@ export interface PublishOptions {
   baseBranch?: string
   /**
    * Push only when allowed: the repo approved it ("always for this repo")
-   * or the workspace allows pushes (`pushDecision` in ../permissions).
+   * or the run's assignment, after the server checked that approval,
+   * allows pushes (`pushDecision` in ../permissions).
    * `note` says why not otherwise.
    */
   push: { approved: boolean; remote: string; note?: string }
@@ -113,13 +114,19 @@ export async function worktreeGitDir(
   throw new Error(`${worktree} is not a worktree of ${repoPath}`)
 }
 
-/** Only this run's git administration and shared immutable object storage. */
+/**
+ * The repository the worktree belongs to, as sandbox-runtime expects a
+ * repository to be granted: its root directory, with `.git` beneath it. The
+ * runtime itself keeps that `.git/config` and `.git/hooks` read-only
+ * (mandatory deny paths), so git can take any lock it needs in `.git`
+ * (refs, packed-refs, logs, objects). Listing files inside `.git` instead
+ * makes each one a mount point, and git's rename of a lock over it fails.
+ */
 export async function worktreeGitWritePaths(repoPath: string, worktree: string, runId: string): Promise<string[]> {
-  const gitDir = await worktreeGitDir(repoPath, worktree)
-  const common = resolve(gitDir, '..', '..')
-  const branch = `mikka/run-${assertSafeId('run id', runId)}`
-  const ref = join(common, 'refs', 'heads', branch)
-  return [gitDir, join(common, 'objects'), ref, `${ref}.lock`, join(common, 'logs', 'refs', 'heads', branch)]
+  assertSafeId('run id', runId)
+  const common = resolve(await worktreeGitDir(repoPath, worktree), '..', '..')
+  if (basename(common) !== '.git') throw new Error(`${repoPath} is not a standard clone`)
+  return [dirname(common)]
 }
 
 function safeRealpath(path: string) {

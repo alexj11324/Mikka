@@ -55,7 +55,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
 }) {
   const t = useTranslations('Artifact')
   const format = useFormatter()
-  const { data: detail, error, mutate } = useSWR<ArtifactDetail | null>(['artifact', artifactId], () => getArtifact(artifactId), { revalidateOnFocus: false, refreshInterval: 15000 })
+  const { data: detail, error, mutate } = useSWR<ArtifactDetail | null>(['artifact', artifactId], () => getArtifact(artifactId), { refreshInterval: 15000 })
   const [picked, setPicked] = useState<{ id: string; version: number } | null>(null)
   const [showDiff, setShowDiff] = useState(true)
   const [selecting, setSelecting] = useState(false)

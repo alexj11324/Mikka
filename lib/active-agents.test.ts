@@ -144,6 +144,9 @@ dbTest('active agents on the database', async t => {
     await db.delete(agents).where(inArray(agents.userId, [me, other]))
     await db.delete(devices).where(eq(devices.ownerId, me))
     await db.delete(coordinatorSessions).where(inArray(coordinatorSessions.userId, [me, other]))
+    await db.delete(schema.coordinatorBots).where(eq(schema.coordinatorBots.ownerId, me))
+    await db.delete(schema.bots).where(eq(schema.bots.ownerId, me))
+    await db.delete(schema.users).where(eq(schema.users.id, me))
   }
 
   const list = await listActiveAgents(db, me, now)
@@ -270,15 +273,21 @@ dbTest('active agents on the database', async t => {
   })
 
   await t.test('coordinator listed while it holds an unexpired lease', async () => {
-    await db.insert(coordinatorSessions).values({ userId: me, leaseHolder: null, leaseUntil: ahead, updatedAt: ago(1_000) })
+    // The Coordinator's chat is its bot row's (coordinator_bots); its entry carries that bot's id.
+    const coordinatorBot = randomUUID(), workspaceId = randomUUID()
+    const { sql } = await import('drizzle-orm')
+    await db.execute(sql`insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values (${me},'Active agents fixture',${`${me}@example.invalid`},false,now(),now()) on conflict do nothing`)
+    await db.insert(schema.bots).values({ id: coordinatorBot, ownerId: me, workspaceId, name: 'Coordinator' })
+    await db.insert(schema.coordinatorBots).values({ ownerId: me, workspaceId, botId: coordinatorBot })
+    await db.insert(coordinatorSessions).values({ userId: me, botId: coordinatorBot, leaseHolder: null, leaseUntil: ahead, updatedAt: ago(1_000) })
     assert.ok(!(await listActiveAgents(db, me, now)).some(x => x.kind === 'coordinator'), 'no holder')
     await db.update(coordinatorSessions).set({ leaseHolder: 'turn-1', leaseUntil: ago(1) }).where(eq(coordinatorSessions.userId, me))
     assert.ok(!(await listActiveAgents(db, me, now)).some(x => x.kind === 'coordinator'), 'expired')
     await db.update(coordinatorSessions).set({ leaseUntil: ahead, updatedAt: ago(1_000) }).where(eq(coordinatorSessions.userId, me))
     const result = await listActiveAgents(db, me, now)
     const coordinator = result.find(x => x.kind === 'coordinator')
-    assert.deepEqual(coordinator, { id: 'coordinator', kind: 'coordinator', name: 'Coordinator', avatarUrl: null, startedAt: ago(1_000).toISOString(), state: 'working', runId: null, issueId: null })
-    assert.equal(result.at(-1)?.id, 'coordinator', 'sorted by start like the rest')
+    assert.deepEqual(coordinator, { id: coordinatorBot, kind: 'coordinator', name: 'Coordinator', avatarUrl: null, startedAt: ago(1_000).toISOString(), state: 'working', runId: null, issueId: null })
+    assert.equal(result.at(-1)?.id, coordinatorBot, 'sorted by start like the rest')
     assert.ok(!(await listActiveAgents(db, other, now)).some(x => x.kind === 'coordinator'), 'not shown to others')
   })
 })

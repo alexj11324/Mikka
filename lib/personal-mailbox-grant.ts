@@ -19,12 +19,16 @@ export async function mailboxGrantTools(q: Pick<Pool, 'query'>, identity: {
     // run. Resolve its parent scope from the stored execution, not the model
     // or the target Bot. A named Bot can only delegate to its own namespace.
     const { rows: [origin] } = await q.query('select bot_key from agent_kit_executions where owner_id=$1 and id=$2', [identity.userId, identity.executionId])
-    if (!origin || (origin.bot_key !== 'coordinator' && origin.bot_key !== identity.botId)) throw new MailboxError('Mailbox parent scope mismatch', 403)
+    // The Coordinator is now its bot row (coordinator_bots), so its executions carry that row's id as their key.
+    const delegated = Boolean(origin) && origin.bot_key !== 'coordinator' && origin.bot_key !== identity.botId
+      && Boolean((await q.query('select 1 from coordinator_bots where "ownerId"=$1 and "botId"::text=$2', [identity.userId, origin.bot_key])).rowCount)
+    if (!origin || (origin.bot_key !== 'coordinator' && origin.bot_key !== identity.botId && !delegated)) throw new MailboxError('Mailbox parent scope mismatch', 403)
     key = origin.bot_key
   }
   const args = [identity.userId, key]
   const { rows: [head] } = await q.query(`select active_version,workspace_id from agent_kit_heads where owner_id=$1 and bot_key=$2${lock ? ' for share' : ''}`, args)
-  if (!head || head.workspace_id !== (key === 'coordinator' ? null : identity.workspaceId)) throw new MailboxError('Mailbox definition scope unavailable', 403)
+  // A run the Coordinator delegated to another bot keeps the Coordinator's own head, in the Coordinator's workspace.
+  if (!head || head.workspace_id !== (key === 'coordinator' ? null : key === identity.botId ? identity.workspaceId : head.workspace_id)) throw new MailboxError('Mailbox definition scope unavailable', 403)
   const { rows: [execution] } = await q.query(`select snapshot,status,version_id from agent_kit_executions where owner_id=$1 and bot_key=$2 and id=$3${lock ? ' for share' : ''}`, [...args, identity.executionId])
   const snapshot = execution?.snapshot as DefinitionSnapshot | undefined
   if (!snapshot || execution.version_id !== snapshot.revisionId || digest(snapshot.definition) !== snapshot.definitionDigest

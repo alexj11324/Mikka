@@ -43,7 +43,8 @@ export function ComputerPolicySettings({ workspaceId }: { workspaceId: string })
   }
   const labels = { allow: t('allow'), deny: t('deny') }
   if (!state) return error ? <FieldError>{t('error')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>
-  if (!state.enabled) return <p role="status" className="text-sm text-muted-foreground">{t('unavailable')}</p>
+  // No cloud computer on this deployment: there is no row to set, and a line saying so would sit apart from everything below it (R-40).
+  if (!state.enabled) return null
   return <div className="flex flex-col gap-2">
     <SettingsSection id="computer-policy-heading" title={t('heading')}>
       <SettingRow title={t('label')}>

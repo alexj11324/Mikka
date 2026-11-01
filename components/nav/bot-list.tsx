@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactM
 import useSWR from 'swr'
 import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
-import { PanelLeft, Plus } from 'lucide-react'
+import { PanelLeft, Plus, Users } from 'lucide-react'
 import { botChatSummaries, getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
 import type { Thread } from '@/app/actions/task-runs'
@@ -16,7 +16,9 @@ import { WorkspaceMenu } from '@/components/workspace-menu'
 import { cn } from '@/lib/utils'
 import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
 import { SPRING_SIDEBAR } from '@/lib/ease'
-import { markdownLine, sessionPreview } from '@/lib/agent-history'
+import { chatPreview } from '@/lib/agent-history'
+import { fetchGroups } from '@/lib/group-messages'
+import { namedCitations } from '@/lib/coordinator/citations'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
 
@@ -28,6 +30,8 @@ export type ChatTarget = { kind: 'coordinator' } | { kind: 'bot'; botId: string 
 
 type ListProps = {
   bots: BotView[]
+  /** The workspace whose group chats are listed with the bots (R-01). */
+  workspaceId: string | null
   threads: Thread[]
   active: ChatTarget | null
   onOpen: (target: ChatTarget) => void
@@ -85,16 +89,15 @@ function botMood(threads: Thread[], botId: string, chatting: boolean): BotMood {
   return own[0]?.status === 'failed' ? 'exclaim' : 'idle'
 }
 
-/** A Coordinator reply as one plain line: citations become their labels. */
-function coordinatorLine(text: string) {
-  return sessionPreview(markdownLine(text), null)
-}
 
 /** Green while the bot is working, orange while it waits on you; otherwise no dot. */
 type RowStatus = 'working' | 'waiting'
 
+/** Hover is one overlay step, the current bot the next one up, so a hovered row never looks selected (R-38). */
+const ROW_FILL = 'hover:bg-control active:bg-control data-active:bg-control-hover data-active:hover:bg-control-hover'
+
 function Row({ name, preview, avatar, status, current, unread, onClick, label }: { name: string; preview: ReactNode; avatar: ReactNode; status?: RowStatus; current: boolean; unread: boolean; onClick: () => void; label: string }) {
-  return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={label} onClick={onClick} className="h-13 gap-2.5 rounded-xl px-2.5">
+  return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={label} onClick={onClick} className={cn('h-13 gap-2.5 rounded-xl px-2.5', ROW_FILL)}>
     <span className="relative shrink-0">
       {avatar}
       {status && <span aria-hidden="true" className={cn('absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-sidebar', status === 'working' ? 'bg-success' : 'bg-attention')} />}
@@ -109,22 +112,35 @@ function Row({ name, preview, avatar, status, current, unread, onClick, label }:
 
 /**
  * The bot list beside the icon rail (Figma 188:3115): the Coordinator pinned
- * on top, then one row per bot with its blob, its name and the latest line
- * of its chat, most recent first. Threads (the work a bot does) live in the
+ * on top, then one row per bot or group chat (R-01) with its avatar, its name
+ * and the latest line of its chat, most recent first. Threads (the work a bot does) live in the
  * right column, never here. It collapses off canvas; the rail stays.
  */
-export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
+export function BotList({ bots, workspaceId, threads, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
-  const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat(), { revalidateOnFocus: false })
+  const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat())
   // Each bot's latest line gives its row the preview and its place in the list.
-  const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: 15000, revalidateOnFocus: false })
-  const ordered = [...bots].sort((a, b) => (chats[b.id]?.at ?? '').localeCompare(chats[a.id]?.at ?? '') || a.name.localeCompare(b.name))
+  const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: 15000 })
+  // Group chats sit among the bots (R-01), ordered by their latest message.
+  const { data: groups = [] } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: 15000 })
+  // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots.
+  const rows = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
+    .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
   const lastReply = coordinator?.items.findLast(item => item.from !== 'event')
   const latest: Record<string, string> = {}
-  for (const [botId, chat] of Object.entries(chats)) if (chat.at) latest[botId] = chat.at
+  // The Coordinator's row is read as 'coordinator', from its chat's latest reply below.
+  const coordinatorId = bots.find(bot => bot.coordinator)?.id
+  for (const [botId, chat] of Object.entries(chats)) if (chat.at && botId !== coordinatorId) latest[botId] = chat.at
+  for (const group of groups) if (group.lastMessage) latest[group.id] = group.lastMessage.createdAt
   if (lastReply?.from === 'coordinator') latest.coordinator = lastReply.createdAt
-  const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : null
+  const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : active?.kind === 'group' ? active.id : null
+  /** One plain line of a message; a card that shows no words reads as the card placeholder. */
+  const previewOf = (text: string | null | undefined) => {
+    if (!text) return null
+    const line = chatPreview(text) ?? i18nText('Nav.cardPreview')
+    return line ? <span className="truncate">{line}</span> : null
+  }
   const unread = useUnread(activeId, latest)
   const { width, dragging, instant, endedDrag, reset, handleProps } = useResizableWidth(LIST_WIDTH)
   const foldTimer = useRef<number | undefined>(undefined)
@@ -156,14 +172,22 @@ export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail,
         <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}
           status={coordinator?.working ? 'working' : undefined}
-          preview={lastReply ? <span className="truncate">{coordinatorLine(lastReply.text)}</span> : null} />
-        {ordered.map(bot => {
+          preview={previewOf(lastReply?.from === 'coordinator' ? namedCitations(lastReply.text, coordinator?.sources ?? {}) : lastReply?.text)} />
+        {rows.map(row => {
+          if (row.kind === 'group') {
+            const { group } = row
+            const title = group.title || i18nText('Nav.untitledConversation')
+            return <Row key={group.id} name={title} label={title} current={active?.kind === 'group' && active.id === group.id} unread={unread(group.id)} onClick={() => choose({ kind: 'group', id: group.id, title: group.title, workspaceId: group.workspaceId })}
+              avatar={<span aria-hidden="true" className="flex size-8.5 items-center justify-center rounded-full bg-muted text-muted-foreground"><Users className="size-4" /></span>}
+              preview={previewOf(group.lastMessage?.body)} />
+          }
+          const { bot } = row
           const chat = chats[bot.id]
           const mood = botMood(threads, bot.id, chat?.working ?? false)
           const status: RowStatus | undefined = mood === 'notify' ? 'waiting' : mood === 'thinking' ? 'working' : undefined
           return <Row key={bot.id} name={bot.name} label={bot.name} current={active?.kind === 'bot' && active.botId === bot.id} unread={unread(bot.id)} onClick={() => choose({ kind: 'bot', botId: bot.id })}
             avatar={<BotAvatar color={bot.color} shape={bot.shape} mood={mood} />} status={status}
-            preview={chat?.line ? <span className="truncate">{coordinatorLine(chat.line)}</span> : null} />
+            preview={previewOf(chat?.line)} />
         })}
       </SidebarMenu></SidebarGroup>
     </SidebarContent>

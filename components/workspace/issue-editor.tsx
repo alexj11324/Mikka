@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import type { EditorView } from "@tiptap/pm/view"
 import { useTranslations } from "next-intl"
 import { IssueActivity } from './issue-activity'
-import { useEditor, type JSONContent } from "@tiptap/react"
+import { useEditor, useEditorState, type JSONContent } from "@tiptap/react"
 import { createEditorExtensions, readableIssueContent } from "./issue-editor-schema"
 import { TextSelection } from "@tiptap/pm/state"
 import { Collaboration } from "@tiptap/extension-collaboration"
@@ -109,6 +109,8 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
       replacementCallback.current?.(applied)
     }
   }, [editor, replacement, layout])
+  // 选区评论 appears only while text is selected, as in Linear and Notion (R-40).
+  const hasSelection = useEditorState({ editor, selector: ({ editor: current }) => !!current && !current.state.selection.empty }) ?? false
   const { changes } = useRichTextChanges(editor)
   const { anchors, activeId } = useCommentAnchors(editor)
   const outline = useRichTextOutline(editor)
@@ -156,13 +158,13 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
       <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : layout === 'issue' ? '' : 'rounded-lg border')}>
         {layout !== 'issue' && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
         <div ref={pageRef} className="relative min-w-0">
-          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-28 py-2 text-sm/7', layout === 'description' ? 'px-4 sm:pl-16' : layout === 'issue' ? 'px-0' : 'px-4 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-28 py-2', layout === 'description' ? 'px-4 sm:pl-16' : layout === 'issue' ? 'px-0' : 'px-4 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
-      {layout === 'issue' && !compact && <><div className="flex justify-end pb-2">
+      {layout === 'issue' && !compact && <>{(hasSelection || panel === 'comments') && <div className="flex justify-end pb-2">
         <Button variant="ghost" size="xs" onClick={() => setPanel(panel === 'comments' ? '' : 'comments')} aria-expanded={panel === 'comments'}><MessageSquare data-icon="inline-start" />{t('selectionComment')}</Button>
-      </div>
+      </div>}
       {panel === 'comments' && <div className="flex flex-col gap-3 rounded-lg border p-4">
         <FieldGroup><Field><FieldLabel htmlFor="selection-comment" className="sr-only">{t('selectionCommentLabel')}</FieldLabel><Input id="selection-comment" value={comment} onChange={event => setComment(event.target.value)} maxLength={2000} placeholder={t('selectionCommentPlaceholder')} /></Field></FieldGroup>
         <div className="flex justify-end"><Button size="sm" variant="outline" disabled={!comment.trim()} onClick={addComment}>{t('addSelectionComment')}</Button></div>
@@ -196,7 +198,7 @@ export function IssueEditor({ content, onChange, sharedDoc, author: authorProp, 
     </div>
     <div className="flex min-h-72 flex-col lg:flex-row">
       <div ref={pageRef} className="relative min-w-0 flex-1">
-        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-72 px-9 py-7 text-sm/7 sm:px-12", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE, RICH_TEXT_MARKUP_VIEW[markup])} />
+        <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn("min-h-72 px-9 py-7 sm:px-12", RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE, RICH_TEXT_MARKUP_VIEW[markup])} />
         {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
       </div>
       {panel && <aside aria-label={panel === "outline" ? t('outline') : panel === "changes" ? t('changesReview') : t('commentsPanel')} className="flex w-full shrink-0 flex-col gap-3 bg-muted/15 p-4 lg:w-60 lg:border-l">

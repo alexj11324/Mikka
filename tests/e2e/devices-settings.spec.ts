@@ -56,10 +56,13 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   // A CLI the sandbox cannot run is named, never reported as absent.
   await expect(row(page, 'no-sandbox')).toContainText('已检测到 Claude Code，但沙箱不可用')
   await row(page, 'no-sandbox').getByRole('button', { name: '修复方法' }).click()
-  await expect(page.getByText('daemon 没能自动装好 socat, ripgrep', { exact: false })).toBeVisible()
+  await expect(page.getByText('这台设备无法自动安装 socat, ripgrep', { exact: false })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
   await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许调度到 gpu-box' })).not.toBeChecked()
+  // 自动调度 needs 允许调度: a server defaults to auto, but with scheduling off it reads off and is locked.
+  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许 gpu-box 自动调度' })).not.toBeChecked()
+  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许 gpu-box 自动调度' })).toBeDisabled()
   // 允许自动调度: servers on and personal computers off by default; turning it on is saved.
   await expect(row(page, 'build-01').getByRole('switch', { name: '允许 build-01 自动调度' })).toBeChecked()
   const auto = row(page, 'E2E MacBook').getByRole('switch', { name: '允许 E2E MacBook 自动调度' })
@@ -74,7 +77,7 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await expect.poll(async () => (await db().query('SELECT kind FROM device_management_commands WHERE "deviceId" = $1', [ids.server])).rows.map(item => item.kind)).toEqual(['redetect'])
 
   await row(page, 'gpu-box').getByRole('button', { name: 'gpu-box 的更多操作' }).click()
-  await page.getByRole('menuitem', { name: '重启 daemon' }).click()
+  await page.getByRole('menuitem', { name: '重启 Mikka 客户端' }).click()
   await expect(page.getByText('gpu-box 离线，上线后执行')).toBeVisible()
 
   await row(page, 'build-01').getByRole('button', { name: 'build-01 的更多操作' }).click()
@@ -87,7 +90,7 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
 
   await row(page, 'dev-vps').getByRole('button', { name: 'dev-vps 的更多操作' }).click()
   await page.getByRole('menuitem', { name: '移除设备' }).click()
-  await expect(page.getByRole('alertdialog', { name: '移除「dev-vps」？' })).toContainText('也会卸载 dev-vps 上的 daemon')
+  await expect(page.getByRole('alertdialog', { name: '移除「dev-vps」？' })).toContainText('也会卸载 dev-vps 上的 Mikka 客户端')
   await page.getByRole('button', { name: '移除', exact: true }).click()
   await expect(page.getByText('dev-vps', { exact: true })).toHaveCount(0)
   await expect.poll(async () => (await db().query('SELECT "removedAt" IS NOT NULL AS removed FROM devices WHERE id = $1', [ids.bare])).rows[0]?.removed).toBe(true)

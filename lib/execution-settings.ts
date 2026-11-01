@@ -15,6 +15,7 @@ import {
 } from "./execution-rules";
 import { isDeviceOnline } from "@mikka/protocol/device";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
+import { ownE2BKeySql } from "./secrets/e2b-owner-sql";
 
 export interface ExecutionSettingsScope {
   ownerId: string;
@@ -33,20 +34,19 @@ const ruleInput = z
 export class ExecutionSettings {
   constructor(readonly pool: Pool) {}
   async fallbacks(ownerId: string): Promise<ExecutionFallbacks> {
-    return (
-      (
-        await this.pool.query(
-          'SELECT "executionFallbacks" FROM "user" WHERE id=$1',
-          [ownerId],
-        )
-      ).rows[0]?.executionFallbacks ?? DEFAULT_EXECUTION_FALLBACKS
-    );
+    const stored = (
+      await this.pool.query(
+        'SELECT "executionFallbacks" FROM "user" WHERE id=$1',
+        [ownerId],
+      )
+    ).rows[0]?.executionFallbacks;
+    // Rows saved before 订阅额度用完后，自动改用 API Key also carry the retired whenQuotaExhausted.
+    return { whenDeviceOffline: stored?.whenDeviceOffline ?? DEFAULT_EXECUTION_FALLBACKS.whenDeviceOffline };
   }
   async setFallbacks(ownerId: string, value: ExecutionFallbacks) {
     const parsed = z
       .object({
         whenDeviceOffline: z.enum(["wait", "cloud"]),
-        whenQuotaExhausted: z.enum(["stop", "switchAccount"]),
       })
       .strict()
       .safeParse(value);
@@ -65,7 +65,7 @@ export class ExecutionSettings {
     const places = await this.places(scope, query);
     const models = await this.botModels(scope, query);
     const providers = (await subscriptionsUsable(query, scope.ownerId, scope.workspaceId))
-      ? (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND state='connected'`,[scope.ownerId])).rows
+      ? (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND paused=false`,[scope.ownerId])).rows
       : [];
     const preferred = providers.some((m) => m.provider === "claude")
       ? "claude_code"
@@ -85,8 +85,8 @@ export class ExecutionSettings {
       model: model.modelId,
       position: 2147483647,
     };
-    // Cloud first when the workspace has its own E2B key (decision 2026-10-31-2200-run-machine-fallback).
-    if (cloud && (await query.query('SELECT 1 FROM workspace_e2b_keys WHERE "workspaceId"=$1', [scope.workspaceId])).rowCount) return cloud;
+    // Cloud first when the person has their own E2B key (decision 2026-10-31-2200-run-machine-fallback; the key is personal).
+    if (cloud && (await query.query(`SELECT ${ownE2BKeySql("$1")} AS own`, [scope.ownerId])).rows[0]?.own) return cloud;
     const devices = places
       .filter((p) => p.id !== "cloud" && p.enabled && p.online && autoScheduleOn(p))
       .sort(
@@ -321,7 +321,7 @@ export class ExecutionSettings {
         if (value.place === "cloud") {
           const models = await client.query(
             `SELECT b.id FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId"
-            AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected'
+            AND c."ownerId"=b."ownerId" AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
             WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b."modelId"=$3 AND c.provider=CASE WHEN $4='claude_code' THEN 'claude' WHEN $4='codex' THEN 'codex' END`,
             [scope.ownerId, scope.workspaceId, value.model, value.harness],
           );
@@ -457,9 +457,9 @@ export class ExecutionSettings {
   ) {
     return (
       await query.query(
-        `SELECT b.id AS "bindingId",b."ownerId",b."consumerId",b."workspaceId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan
+        `SELECT b.id AS "bindingId",b."ownerId",b."consumerId",b."workspaceId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan,c.quota
        FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
-       AND c.epoch=b."connectionRevision" AND c.state='connected'
+       AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
        WHERE b."ownerId"=$1 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
        AND ($3::uuid IS NULL OR b.id=$3)
        AND ($3::uuid IS NOT NULL OR c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId") ORDER BY (b."workspaceId"=$2) DESC,b."createdAt" DESC,b.id`,
@@ -487,7 +487,7 @@ export class ExecutionSettings {
     const result = await this.pool.query(
       `INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
       SELECT $1,b."ownerId",$4::text,$2::text,b."connectionId",b."connectionRevision",b.route,b."modelId" FROM byos_bindings b
-      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected'
+      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
       JOIN bots bot ON bot.id=$2::uuid AND bot."ownerId"=$3 AND bot."workspaceId"=$4::uuid AND bot."archivedAt" IS NULL
       WHERE b.id=$5 AND b."ownerId"=$6 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
       ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id RETURNING id`,
@@ -522,7 +522,7 @@ export class ExecutionSettings {
   async refreshBotModels(scope: ExecutionSettingsScope, connectionId: string, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
     if (!z.uuid().safeParse(connectionId).success) throw new ActionFailureError("executionAccountUnavailable");
     const connection = (await this.pool.query(
-      `SELECT id,epoch,provider,"workspaceId" FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND state='connected'`,
+      `SELECT id,epoch,provider,"workspaceId" FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND state='connected' AND paused=false`,
       [connectionId, scope.ownerId])).rows[0];
     if (!connection) throw new ActionFailureError("executionAccountUnavailable");
     let models: {id: string; name?: string}[];
@@ -534,7 +534,7 @@ export class ExecutionSettings {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      const current = await client.query(`SELECT id FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND epoch=$3 AND state='connected' FOR UPDATE`, [connectionId,scope.ownerId,connection.epoch]);
+      const current = await client.query(`SELECT id FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND epoch=$3 AND state='connected' AND paused=false FOR UPDATE`, [connectionId,scope.ownerId,connection.epoch]);
       if (!current.rowCount) throw new ActionFailureError("executionAccountUnavailable");
       for (const model of unique) {
         if (!z.string().trim().min(1).max(128).safeParse(model.id).success) throw new ActionFailureError("executionModelUnknown");
@@ -586,7 +586,7 @@ export class ExecutionSettings {
     if (!choice) throw new ActionFailureError("executionModelUnknown");
     bindingId = await this.bindingForBot(scope, botId, bindingId);
     await this.pool.query(
-      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId"',
+      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL',
       [scope.ownerId, scope.workspaceId, key, bindingId],
     );
   }
@@ -611,7 +611,7 @@ export class ExecutionSettings {
     const result = await this.pool.query(
       `INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
       SELECT $1,b."ownerId",$4::text,$6::text,b."connectionId",b."connectionRevision",b.route,b."modelId" FROM byos_bindings b
-      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected'
+      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
       WHERE b.id=$5 AND b."ownerId"=$3
       AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots bot WHERE bot.id=$2::uuid AND bot."ownerId"=$3 AND bot."workspaceId"=$4::uuid))
       ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id RETURNING id`,
@@ -626,12 +626,15 @@ export class ExecutionSettings {
   ): Promise<string | undefined> {
     const row = (
       await this.pool.query(
-        'SELECT "bindingId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+        'SELECT "bindingId","apiKeyId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
         [scope.ownerId, scope.workspaceId, botId ?? "coordinator"],
       )
     ).rows[0];
-    // A saved row without a binding is Mikka 默认, picked on purpose.
-    if (row) return row.bindingId ?? HOSTED_CHOICE;
+    if (row?.bindingId) return row.bindingId;
+    // The saved choice is an API key's model (lib/model-api-keys.ts botApiKeyChoice), not a binding.
+    if (row?.apiKeyId) return undefined;
+    // A saved row without either is Mikka 默认, picked on purpose.
+    if (row) return HOSTED_CHOICE;
     // Decision 2026-10-30 (#537): a Claude subscription first, otherwise ChatGPT/Codex, as `suggested` does.
     const models = await this.botModels(scope);
     const first = models.find((m) => m.provider === "claude") ?? models[0];

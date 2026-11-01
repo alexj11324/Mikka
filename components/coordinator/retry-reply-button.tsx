@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
  * the same turn again for the message already sent. One run per click; the
  * chat then shows its normal working state.
  */
-export function RetryReplyButton({ botId, onQueued }: { botId: string | null; onQueued: () => unknown }) {
+export function RetryReplyButton({ botId, onQueued, label, disabled }: { botId: string | null; onQueued: () => unknown; label?: string; disabled?: boolean }) {
   const t = useTranslations('Common')
   const [pending, setPending] = useState(false)
   async function retry() {
@@ -21,5 +21,5 @@ export function RetryReplyButton({ botId, onQueued }: { botId: string | null; on
       if (!result.error) await onQueued()
     } finally { setPending(false) }
   }
-  return <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => void retry()}>{t('retry')}</Button>
+  return <Button type="button" size="sm" variant="outline" disabled={pending || disabled} onClick={() => void retry()}>{label ?? t('retry')}</Button>
 }

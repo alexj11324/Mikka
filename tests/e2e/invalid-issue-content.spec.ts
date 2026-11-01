@@ -56,7 +56,7 @@ test('invalid stored content opens read-only with one notice and is byte-for-byt
       await page.screenshot({ path: `${evidence}/invalid-content-dark.png` })
       await page.emulateMedia({ colorScheme: 'light' })
     }
-    // Longer than several sync intervals (1.5s) plus a focus revalidation.
+    // Longer than several sync intervals (1.5s); focus must change nothing either.
     await page.waitForTimeout(5000)
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     await page.waitForTimeout(1500)

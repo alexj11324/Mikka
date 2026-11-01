@@ -4,7 +4,6 @@ import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { shortWhen } from '@/lib/clock'
 import { useHome } from '@/lib/home'
-import { plainText } from '@/lib/quote'
 import type { GroupSummary, HomeBot } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
@@ -17,7 +16,8 @@ export function useChatRows(needle = '') {
   const groups = useApi<{ conversations: GroupSummary[] }>(home.data ? `/api/conversations?workspaceId=${home.data.workspace.id}` : null, 30_000)
   const match = (name: string) => !needle || name.toLowerCase().includes(needle)
   const rows: ChatRow[] = [
-    ...(home.data?.bots ?? []).filter(bot => match(bot.name)).map(bot => ({ kind: 'bot' as const, bot, at: bot.at ?? '' })),
+    // The Coordinator's bot row is the pinned Coordinator entry, not another row.
+    ...(home.data?.bots ?? []).filter(bot => !bot.coordinator && match(bot.name)).map(bot => ({ kind: 'bot' as const, bot, at: bot.at ?? '' })),
     ...(groups.data?.conversations ?? []).filter(group => match(group.title))
       .map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt })),
   ].sort((a, b) => b.at.localeCompare(a.at))
@@ -31,9 +31,8 @@ export const rowKey = (row: ChatRow) => row.kind === 'bot' ? row.bot.id : row.gr
 export function ChatRowView({ row, onPress }: { row: ChatRow; onPress: () => void }) {
   const bot = row.kind === 'bot' ? row.bot : null
   const group = row.kind === 'group' ? row.group : null
-  // A card reply is OpenUI source; the list shows its words, as a push does.
-  const raw = bot ? bot.line : group?.lastMessage?.body ?? null
-  const line = raw ? plainText(raw).split('\n').find(Boolean) ?? null : null
+  // A bot's line is plain text from the server; an empty one is a card with no words.
+  const line = bot ? (bot.line === '' ? '[卡片]' : bot.line) : group?.lastMessage?.body ?? null
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={52} />

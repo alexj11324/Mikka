@@ -101,13 +101,32 @@ it('supplies a private run-local helper to each real harness without modifying t
     expect(env.PATH.split(delimiter)[0]).toBe(join(runDir, 'github', 'bin'))
     expect(env.GIT_CONFIG_VALUE_0).toBe('')
     expect(env.GIT_CONFIG_VALUE_2).toBe('true')
+    // The run's own settings follow the credential entries instead of replacing them.
+    expect(env.GIT_CONFIG_COUNT).toBe('7')
+    expect([env.GIT_CONFIG_KEY_5, env.GIT_CONFIG_VALUE_5, env.GIT_CONFIG_KEY_6, env.GIT_CONFIG_VALUE_6]).toEqual(['maintenance.auto', 'false', 'gc.auto', '0'])
     const config = join(runDir, 'github', 'config.json')
     expect(statSync(config).mode & 0o077).toBe(0)
     expect(JSON.parse(readFileSync(config, 'utf8')).runToken).toBe(github.runToken)
     expect(git(f.worktree, 'status', '--porcelain')).toBe('')
     expect(ctx.instructions()).toContain('gh pr checks <PR URL> --watch')
     expect(ctx.instructions()).not.toContain('Do not commit, push')
+    expect(ctx.agentDelivers).toBe(true)
   }
+})
+
+it('lets the agent commit when the person signs commits with a program the sandbox cannot reach', async () => {
+  const f = await fixture()
+  const home = tempDir()
+  // The person's own global config: every commit is signed by a program outside the sandbox.
+  writeFileSync(join(home, '.gitconfig'), '[commit]\n\tgpgsign = true\n[tag]\n\tgpgsign = true\n[gpg]\n\tprogram = /nonexistent/signer\n')
+  writeFileSync(join(f.worktree, 'signed.txt'), 'change\n')
+  const base = { PATH: f.path, HOME: home, GIT_CONFIG_NOSYSTEM: '1' }
+  const commit = (env: Record<string, string>) => execa('git', ['commit', '-qam', 'x', '--allow-empty'], { env, extendEnv: false, cwd: f.worktree, reject: false })
+  git(f.worktree, 'add', 'signed.txt')
+  expect((await commit({ ...base, GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@x', GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@x' })).exitCode).not.toBe(0)
+  const result = await commit({ ...base, ...prepareGitHubEnvironment(f.runDir, github, f.path) })
+  expect(result.stderr).toBe('')
+  expect(result.exitCode).toBe(0)
 })
 
 it('does not supply credentials to plan or read-only sessions and respects network deny/ceiling', async () => {
@@ -115,8 +134,13 @@ it('does not supply credentials to plan or read-only sessions and respects netwo
   const policy = runPolicy(undefined)
   for (const options of [{ kind: 'plan' as const }, { policy: { ...policy, readOnly: true } }]) {
     const ctx = new RunContext({ harness: 'codex', worktree: f.worktree, runDir: tempDir(), privateDir: tempDir(), github, childPath: f.path, ...options })
-    expect(ctx.tempEnv()).not.toHaveProperty('GIT_CONFIG_COUNT')
+    // Only the run's own git settings; no credential helper, gh wrapper or GitHub env.
+    const env = ctx.tempEnv()
+    expect(Object.fromEntries(Object.entries(env).filter(([key]) => key.startsWith('GIT_') || key.startsWith('GH_') || key === 'PATH'))).toEqual({
+      GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'maintenance.auto', GIT_CONFIG_VALUE_0: 'false', GIT_CONFIG_KEY_1: 'gc.auto', GIT_CONFIG_VALUE_1: '0',
+    })
     expect(ctx.instructions()).toContain('Do not commit, push')
+    expect(ctx.agentDelivers).toBe(false)
   }
   const denied = new RunContext({ harness: 'codex', worktree: f.worktree, runDir: tempDir(), privateDir: tempDir(), github, childPath: f.path,
     policy: { ...policy, permissions: { ...policy.permissions, network: 'deny' } } })

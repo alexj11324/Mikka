@@ -91,9 +91,12 @@ export function runDomains(
 }
 
 /**
- * Whether the daemon pushes a verified run branch. `ask` pushes only when
- * the repo was approved ("always for this repo"); `allow` is that approval
- * for every repo; `deny` never pushes.
+ * Whether the daemon pushes a verified run branch. A push needs the owner's
+ * repository approval and `git_push` together. The server resolves both at
+ * claim and sends `allow` in this run's assignment only when both hold
+ * (a configured `allow` without an approved repository arrives as `ask`).
+ * `ask` pushes only when the repo was approved ("always for this repo");
+ * `deny` never pushes.
  */
 export function pushDecision(
   policy: RunPolicy,
@@ -189,9 +192,10 @@ function classifySegment(segment: string, depth: number): PermissionAction | nul
  * Claude Code permission rules for the run (`--settings` `permissions`).
  * The SDK handles asks through the run-bound host gate. A raw shell whose
  * configurable effects cannot be authorized is unavailable as a capability.
- * `git push` is always denied to the agent: the daemon pushes (ADR 0017).
+ * `git push` is denied to the agent (the daemon pushes, ADR 0017) unless the
+ * agent delivers the run itself with run-scoped GitHub credentials.
  */
-export function claudePermissionRules(policy: RunPolicy): {
+export function claudePermissionRules(policy: RunPolicy, agentDelivers = false): {
   allow: string[]
   ask: string[]
   deny: string[]
@@ -209,7 +213,7 @@ export function claudePermissionRules(policy: RunPolicy): {
     ask: decision === "ask" ? install : [],
     deny: [
       ...(!rawCliShellAvailable(policy) ? ['Bash','PowerShell','Monitor'] : []),
-      "Bash(git push:*)",
+      ...(agentDelivers && !policy.readOnly ? [] : ["Bash(git push:*)"]),
       ...(policy.readOnly ? READ_ONLY_TOOLS : []),
       ...(decision === "deny" ? install : []),
     ],

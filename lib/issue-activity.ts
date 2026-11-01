@@ -32,6 +32,8 @@ export type IssueActivityEvent = {
   assigneeName?: string
   /** `type:id` of whoever made the change; null for rows from before MIK-17 and for subtasks. */
   actorKey?: string | null
+  /** Who made the change, as the server resolved it (R-63 names them in front of the row). */
+  actor?: ActivityActorView | null
 }
 
 function actorKeyOf(version: ActivityVersion) {
@@ -55,28 +57,29 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
   const ordered = [...versions].sort((a, b) => a.revision - b.revision)
   const events: IssueActivityEvent[] = []
   const created = ordered.find(version => version.revision === 1) ?? ordered[0]
-  if (created) events.push({ id: `created-${created.id}`, at: timestamp(created.createdAt), kind: 'created', actorKey: actorKeyOf(created) })
+  if (created) events.push({ id: `created-${created.id}`, at: timestamp(created.createdAt), kind: 'created', actorKey: actorKeyOf(created), actor: created.actor ?? null })
   for (let index = 1; index < ordered.length; index += 1) {
     const previous = ordered[index - 1]
     const current = ordered[index]
     const at = timestamp(current.createdAt)
     const actorKey = actorKeyOf(current)
-    if (current.status !== previous.status) events.push({ id: `status-${current.id}`, at, actorKey, kind: 'status', status: current.status })
-    if (current.priority !== previous.priority) events.push({ id: `priority-${current.id}`, at, actorKey, kind: 'priority', priority: current.priority })
-    if (current.title !== previous.title) events.push({ id: `title-${current.id}`, at, actorKey, kind: 'title', title: current.title })
+    const actor = current.actor ?? null
+    if (current.status !== previous.status) events.push({ id: `status-${current.id}`, at, actorKey, actor, kind: 'status', status: current.status })
+    if (current.priority !== previous.priority) events.push({ id: `priority-${current.id}`, at, actorKey, actor, kind: 'priority', priority: current.priority })
+    if (current.title !== previous.title) events.push({ id: `title-${current.id}`, at, actorKey, actor, kind: 'title', title: current.title })
     const before = assigneeOf(previous.content)
     const after = assigneeOf(current.content)
     if ((before?.id ?? null) !== (after?.id ?? null)) {
-      if (after) events.push({ id: `assign-${current.id}`, at, actorKey, kind: 'assigned', assigneeName: after.name })
-      else events.push({ id: `unassign-${current.id}`, at, actorKey, kind: 'unassigned' })
+      if (after) events.push({ id: `assign-${current.id}`, at, actorKey, actor, kind: 'assigned', assigneeName: after.name })
+      else events.push({ id: `unassign-${current.id}`, at, actorKey, actor, kind: 'unassigned' })
     }
     const beforeLabels = new Set(labelNames(previous.content))
     const afterLabels = new Set(labelNames(current.content))
     for (const name of afterLabels) {
-      if (!beforeLabels.has(name)) events.push({ id: `label-add-${current.id}-${name}`, at, actorKey, kind: 'labelAdded', title: name })
+      if (!beforeLabels.has(name)) events.push({ id: `label-add-${current.id}-${name}`, at, actorKey, actor, kind: 'labelAdded', title: name })
     }
     for (const name of beforeLabels) {
-      if (!afterLabels.has(name)) events.push({ id: `label-remove-${current.id}-${name}`, at, actorKey, kind: 'labelRemoved', title: name })
+      if (!afterLabels.has(name)) events.push({ id: `label-remove-${current.id}-${name}`, at, actorKey, actor, kind: 'labelRemoved', title: name })
     }
   }
   const createdAt = created ? Date.parse(timestamp(created.createdAt)) : Number.NEGATIVE_INFINITY

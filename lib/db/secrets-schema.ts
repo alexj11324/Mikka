@@ -37,3 +37,18 @@ export const workspaceE2bKeys = pgTable('workspace_e2b_keys', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** A person's own E2B key (one per user, never shared); see drizzle/20261101140100_user_e2b_keys.sql. */
+export const userE2bKeys = pgTable('user_e2b_keys', {
+  userId: text('userId').primaryKey(),
+  ciphertext: text('ciphertext').notNull(),
+  iv: text('iv').notNull(),
+  keyVersion: integer('keyVersion').notNull(),
+  last4: text('last4').notNull(),
+  e2bTeamHint: text('e2bTeamHint'),
+  verifiedAt: timestamp('verifiedAt', { withTimezone: true }),
+  lastErrorCode: text('lastErrorCode').$type<(typeof E2B_KEY_ERROR_CODES)[number]>(),
+  lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})

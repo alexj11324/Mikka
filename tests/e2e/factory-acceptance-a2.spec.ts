@@ -2,17 +2,23 @@ import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import { test, expect, register, seedTask, openIssueFromSearch, app } from './fixtures'
 
-// Server responses are fixtures; these tests verify client states and requests.
+// Server responses are fixtures; the merge itself is covered by lib/factory/merge.db.test.ts.
 type Call = { operation: string; input: Record<string, unknown> }
 const shot = async (page: Page, name: string) => {
-  for (const scheme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme: scheme })
-    await page.screenshot({ path: test.info().outputPath(`shots/fe2-${name}-${scheme}.png`) })
+  const size = page.viewportSize()
+  for (const [suffix, viewport] of [['', size], ['-mobile', { width: 390, height: 844 }]] as const) {
+    if (viewport) await page.setViewportSize(viewport)
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme })
+      await page.waitForTimeout(150)
+      await page.screenshot({ path: test.info().outputPath(`shots/fe2-${name}${suffix}-${scheme}.png`) })
+    }
   }
+  if (size) await page.setViewportSize(size)
   await page.emulateMedia({ colorScheme: 'light' })
 }
 
-async function setup(page: Page, opts: { taskId?: string; stage?: string; ledger: (ids: { candidateId: string; binding: Record<string, unknown> }) => Record<string, unknown>; onPost?: (call: Call) => { status: number; json: unknown } }) {
+async function setup(page: Page, opts: { taskId?: string; stage?: string; status?: string; pullRequest?: string; ledger: (ids: { candidateId: string; binding: Record<string, unknown> }) => Record<string, unknown>; onPost?: (call: Call) => { status: number; json: unknown } }) {
   await register(page)
   const title = `Factory A2 ${randomUUID()}`
   const issueId = await seedTask(page, title)
@@ -21,13 +27,13 @@ async function setup(page: Page, opts: { taskId?: string; stage?: string; ledger
   const candidate = { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'run report' }
   const calls: Call[] = []
   const ledger = { binding, ...opts.ledger({ candidateId, binding }) }
-  await page.route('**/api/factory/tasks?issueId=*', route => route.fulfill({ json: { tasks: [{ id: taskId, issueId, stage: opts.stage ?? 'approval', status: 'pending', reason: '独立检查通过', candidateId, candidateRunId: null, isSkillCandidate: false }] } }))
-  await page.route(`**/api/factory/tasks/${taskId}`, route => route.fulfill({ json: { checks: [], delivery: { candidateSha: candidate.sha, pullRequest: null, repository: candidate.repository, environment: null, previewUrl: null, databaseBranch: null, deploymentEnvironment: null } } }))
+  await page.route('**/api/factory/tasks?issueId=*', route => route.fulfill({ json: { tasks: [{ id: taskId, issueId, stage: opts.stage ?? 'approval', status: opts.status ?? 'pending', reason: '独立检查通过', candidateId, candidateRunId: null, isSkillCandidate: false }] } }))
+  await page.route(`**/api/factory/tasks/${taskId}`, route => route.fulfill({ json: { checks: [], delivery: { candidateSha: candidate.sha, pullRequest: opts.pullRequest ? { url: opts.pullRequest, state: 'open' } : null, repository: candidate.repository, environment: null, previewUrl: null, databaseBranch: null, deploymentEnvironment: null } } }))
   await page.route(`**/api/factory/tasks/${taskId}/approval*`, async route => {
     const url = new URL(route.request().url())
     if (route.request().method() === 'GET') {
       if (url.searchParams.get('view') === 'ledger') return route.fulfill({ json: ledger })
-      return route.fulfill({ json: { binding, evidenceReadId: randomUUID(), evidenceDigest: 'b'.repeat(64), manifest: { candidate, artifacts: [{ artifact: 'run-report:fixture', kind: 'report', stage: 'review' }] } } })
+      return route.fulfill({ json: { binding, evidenceDigest: 'b'.repeat(64), manifest: { candidate, artifacts: [{ artifact: 'run-report:fixture', kind: 'report', stage: 'review' }] } } })
     }
     const call = route.request().postDataJSON() as Call
     calls.push(call)
@@ -41,8 +47,6 @@ async function setup(page: Page, opts: { taskId?: string; stage?: string; ledger
   await expect(dialog.getByRole('heading', { name: 'Factory 验收' })).toBeVisible()
   return { dialog, calls, binding }
 }
-
-const approval = (candidateId: string, id = randomUUID()) => ({ id, candidateId, candidate: { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'run report' }, action: 'deploy', target: 'web', targetEnvironment: 'preview', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null, createdAt: new Date().toISOString() })
 
 test('退回修改 hides without server support', async ({ page }) => {
   const { dialog } = await setup(page, { ledger: () => ({ approvals: [], publications: [] }) })
@@ -86,29 +90,40 @@ test.describe('send-back', () => {
   })
 })
 
-test('publish failed keeps the approval and offers publish again', { tag: '@smoke' }, async ({ page }) => {
-  const id = randomUUID()
-  const { dialog } = await setup(page, { stage: 'publish', ledger: ({ candidateId }) => ({ approvals: [approval(candidateId, id)], publications: [{ id: randomUUID(), approvalId: id, status: 'failed', request: {}, receipt: null }] }) })
-  await expect(dialog.getByText('发布失败，批准仍保留')).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '撤销批准' })).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '发布', exact: true })).toBeVisible()
-  await shot(page, `publish-failed-${test.info().project.name}`)
+const pr = 'https://github.com/alexj11324/Mikka/pull/418'
+
+// GitHub refuses the merge on purpose (409); the browser logs it once.
+const refusedTask = randomUUID()
+test.describe('refused merge', () => {
+  test.use({ expectedConsoleErrors: [{ path: app(`/api/factory/tasks/${refusedTask}/approval`), message: 'Failed to load resource: the server responded with a status of 409 (Conflict)' }] })
+  test('验收并合并 that GitHub refuses keeps the task waiting with the reason and 在 GitHub 打开', { tag: '@smoke' }, async ({ page }) => {
+    const { dialog, calls, binding } = await setup(page, {
+      taskId: refusedTask,
+      pullRequest: pr,
+      ledger: () => ({ approvals: [], publications: [], merges: [] }),
+      onPost: () => ({ status: 409, json: { error: 'githubMergeBlocked', pullRequestUrl: pr } }),
+    })
+    await expect(dialog.getByText(/有效|批准/)).toHaveCount(0)
+    await dialog.getByRole('button', { name: '验收并合并' }).click()
+    await expect(dialog.getByText('无法合并')).toBeVisible()
+    await expect(dialog.getByText('检查或审批未通过')).toBeVisible()
+    await expect(dialog.getByRole('link', { name: '在 GitHub 打开' })).toHaveAttribute('href', pr)
+    await expect(dialog.getByRole('button', { name: '验收并合并' })).toBeVisible()
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toEqual({ operation: 'accept', input: { binding, eventId: expect.any(String) } })
+    await shot(page, `merge-refused-${test.info().project.name}`)
+  })
 })
 
-test('failed publication returned to approval requires a new approval request', async ({ page }) => {
-  const id = randomUUID()
-  const { dialog, calls } = await setup(page, { stage: 'approval', ledger: ({ candidateId }) => ({ approvals: [approval(candidateId, id)], publications: [{ id: randomUUID(), approvalId: id, status: 'failed', request: {}, receipt: null }] }) })
-  await expect(dialog.getByText('待你确认', { exact: true }).first()).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '发布', exact: true })).toHaveCount(0)
-  await dialog.getByRole('button', { name: '批准并发布', exact: true }).click()
-  await expect.poll(() => calls.map(call => call.operation)).toEqual(['approve'])
-  expect(calls[0].input).not.toHaveProperty('approvalId')
-})
-
-// a1: an approval on an older candidate is shown as 「<sha> · 已失效」 and the new candidate waits for approval again.
-test('approvals on an older candidate read <sha> · 已失效 and cannot publish', async ({ page }) => {
-  const { dialog } = await setup(page, { stage: 'publish', ledger: () => ({ approvals: [approval(randomUUID())], publications: [] }) })
-  await expect(dialog.getByText('aaaaaaa · 已失效', { exact: true })).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '发布', exact: true })).toHaveCount(0)
-  await shot(page, `invalidated-${test.info().project.name}`)
+test('a merged candidate reads 已合并 and opens the PR', async ({ page }) => {
+  const { dialog } = await setup(page, {
+    stage: 'publish',
+    status: 'passed',
+    pullRequest: pr,
+    ledger: ({ candidateId }) => ({ approvals: [], publications: [], merges: [{ id: randomUUID(), candidateId, status: 'merged', source: 'mikka', code: null, pullRequestUrl: pr, createdAt: new Date().toISOString() }] }),
+  })
+  await expect(dialog.getByText('已合并', { exact: true }).first()).toBeVisible()
+  await expect(dialog.getByRole('link', { name: '在 GitHub 打开' })).toHaveAttribute('href', pr)
+  await expect(dialog.getByRole('button', { name: '验收并合并' })).toHaveCount(0)
+  await shot(page, `merged-${test.info().project.name}`)
 })

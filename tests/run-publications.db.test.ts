@@ -458,20 +458,22 @@ test('run result publication commits one owner-scoped result through retries and
       await pool.query('update devices set "protocolVersion"=3 where id=$1', [f.deviceId])
       const input = { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl }
       const eventId = randomUUID()
-      await pool.query('insert into coordinator_events (id,"userId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,\'user_message\',$5,$3,$4,now())', [eventId, f.userId, f.issueId, JSON.stringify({ text: 'Synthetic owner task; no provider invocation', taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + eventId])
+      // The person's Coordinator is an ordinary bot row in their workspace; the request is in its chat.
+      const {seedWorkspace}=await import('./support/workspace-admin-db')
+      const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])
+      const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null, workspace.id)
+      await pool.query('insert into coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,$6,\'user_message\',$5,$3,$4,now())', [eventId, f.userId, f.issueId, JSON.stringify({ text: 'Synthetic owner task; no provider invocation', taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + eventId, coordinator])
       const before = Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n)
-      await assert.rejects(queueRun(f.userId, input, null, undefined, eventId), /runInvalid/, 'ask cannot execute before its human decision')
-      const proposal = await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }, { eventId, botId: null })
+      await assert.rejects(queueRun(f.userId, input, coordinator, undefined, eventId), /runInvalid/, 'ask cannot execute before its human decision')
+      const proposal = await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }, { eventId, botId: coordinator })
       assert.ok('actionId' in proposal && proposal.actionId)
-      assert.deepEqual(await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }, { eventId, botId: null }), proposal)
+      assert.deepEqual(await proposeRepositoryPush(f.userId, { repo: f.remoteUrl }, { eventId, botId: coordinator }), proposal)
       assert.equal((await decidePendingAction(f.userId, proposal.actionId, true)).status, 'done')
       const { takeInbox } = await import('../lib/coordinator/store')
-      assert.equal((await takeInbox(f.userId,'retained-admission-suite')).added,0,'a decision event remains pending without model classification')
+      assert.equal((await takeInbox(f.userId,'retained-admission-suite',coordinator)).added,0,'a decision event remains pending without model classification')
       // This PG suite disables Coordinator/model network execution. Supply a
       // declared provider substitute through the real triage client and CAS;
       // do not turn an action_decided event into an automatic runtime tier.
-      const {seedWorkspace}=await import('./support/workspace-admin-db')
-      const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])
       const {hostedUsage}=await import('../lib/abuse/runtime')
       await hostedUsage.verify(workspace.id,'cus_synthetic_admission',`card_admission_${randomUUID()}`)
       const { triageInbox } = await import('../lib/coordinator/wake')
@@ -487,13 +489,13 @@ test('run result publication commits one owner-scoped result through retries and
         decisions++
         return Response.json({model:DECISION_MODEL,provider_metadata:{gateway:{generationId:`synthetic-admission-${decisions}`,cost:'0.001'}},answers:[{type:'choice',name:'tier',choice:'result'}]})
       }) as typeof fetch
-      try {await triageInbox(f.userId);assert.equal(decisions,1)}
+      try {await triageInbox(f.userId,coordinator);assert.equal(decisions,1)}
       finally {globalThis.fetch=originalFetch;if(originalDecisionKey===undefined)delete process.env.DECISION_GATEWAY_API_KEY;else process.env.DECISION_GATEWAY_API_KEY=originalDecisionKey}
-      const resumed = await takeInbox(f.userId, 'retained-admission-suite')
+      const resumed = await takeInbox(f.userId, 'retained-admission-suite', coordinator)
       assert.equal(resumed.taskEventId, eventId, 'approval resumes the original host request, without asking the model for its event ID')
       assert.equal(resumed.approvedRepositoryKey, f.remoteKey)
-      await assert.rejects(queueRun(f.userId, { ...input, repo: 'different/repository' }, null, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey), /runInvalid/)
-      const admitted = await Promise.all([queueRun(f.userId, input, null, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey), queueRun(f.userId, input, null, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey)])
+      await assert.rejects(queueRun(f.userId, { ...input, repo: 'different/repository' }, coordinator, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey), /runInvalid/)
+      const admitted = await Promise.all([queueRun(f.userId, input, coordinator, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey), queueRun(f.userId, input, coordinator, undefined, resumed.taskEventId, null, resumed.approvedRepositoryKey)])
       assert.equal(admitted[0].runId, admitted[1].runId, 'host replay cannot enqueue a second execution')
       const runId = admitted[0].runId
       const accepted = (await pool.query('select * from agent_runs where id=$1', [runId])).rows[0]
@@ -520,7 +522,7 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal(Number((await pool.query('select count(*) as n from run_messages where "runId"=$1', [legacyRun])).rows[0].n), 0)
       await assert.rejects(sendOwnedRunMessage(db, f.userId, { runId: f.runId, text: 'Finished runs cannot be reopened' }), /runNotFound/)
       assert.equal(Number((await pool.query('select count(*) as n from run_messages where "runId"=$1', [runId])).rows[0].n), 1)
-      assert.deepEqual(await queueRun(f.userId, input, null, undefined, eventId), { runId }, 'old host replay preserves the already accepted execution')
+      assert.deepEqual(await queueRun(f.userId, input, coordinator, undefined, eventId), { runId }, 'old host replay preserves the already accepted execution')
       assert.equal((await prepareRunPublication(accepted, f.remoteUrl)).policy.permissions.git_push, 'allow', 'old admitted scope survives later revocation')
       await assert.rejects(prepareRunPublication({ ...accepted, deviceId: randomUUID() }, f.remoteUrl), /does not match/)
       const nextIssue = randomUUID(), nextEvent = randomUUID()
@@ -557,6 +559,83 @@ test('run result publication commits one owner-scoped result through retries and
         await attempt?.catch(() => {})
       }
       assert.equal(Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n), before + 2, 'only the admitted execution and the explicit legacy fixture were added')
+    })
+
+    await t.test('Plugins › GitHub: 推送分支 is the run policy the token issuer reads; 创建 Pull Request deny blocks, ask waits on one card, allow opens', async () => {
+      const { readGitHubPermissions, setGitHubPermissions } = await import('../lib/github/plugin-permissions')
+      // The runs here name no bot; they are the personal workspace's Coordinator's, whose settings these are.
+      const home = async (userId: string) => (await (await import('../lib/coordinator/coordinator-bot')).coordinatorBot(userId, null)).workspaceId
+      const { readCliRunPolicy } = await import('../lib/agent-tool-approval/policy-store')
+      const { decidePendingAction } = await import('../lib/pending-actions')
+      const ready = async () => {
+        const f = await fixture({ approved: true })
+        await prepareRunPublication(assignment(f), f.remoteUrl)
+        assert.equal((await persistRunCompletion(f.userId, f.runId, completion(f)))?.publicationPending, true)
+        return f
+      }
+      const never: OpenPullRequest = async () => { throw new Error('A denied or unanswered pull request must never reach GitHub') }
+      const cards = async (f: Fixture) => (await pool.query(`select id,status,input from pending_actions where "userId"=$1 and action='approve_pull_request'`, [f.userId])).rows
+
+      // 推送分支: the Coordinator's own git_push, the value authorizeRunGitHubToken refuses on deny.
+      const pushed = await ready()
+      assert.equal((await readCliRunPolicy(pool, pushed.runId, pushed.userId)).policy.permissions.git_push, 'ask')
+      let settings = await setGitHubPermissions(pool, pushed.userId, await home(pushed.userId), { version: (await readGitHubPermissions(pool, pushed.userId, await home(pushed.userId))).version, push: 'deny' })
+      assert.equal((await readCliRunPolicy(pool, pushed.runId, pushed.userId)).policy.permissions.git_push, 'deny')
+      settings = await setGitHubPermissions(pool, pushed.userId, await home(pushed.userId), { version: settings.version, push: 'allow' })
+      assert.equal((await readCliRunPolicy(pool, pushed.runId, pushed.userId)).policy.permissions.git_push, 'allow')
+      await assert.rejects(setGitHubPermissions(pool, pushed.userId, await home(pushed.userId), { version: '0:0', push: 'deny' }), { code: 'githubPermissionsChanged' })
+      // Unset 创建 Pull Request keeps today's behaviour: the approved push opens it.
+      assert.deepEqual(await publishRunResult(pushed.runId, async () => prFor(pushed)), { done: true })
+      assert.equal((await receipt(pushed)).status, 'published')
+
+      const denied = await ready()
+      await setGitHubPermissions(pool, denied.userId, await home(denied.userId), { version: '0:0', pullRequest: 'deny' })
+      assert.deepEqual(await publishRunResult(denied.runId, never), { done: true })
+      assert.equal((await receipt(denied)).status, 'blocked')
+      assert.equal((await receipt(denied)).errorCode, 'pull_request_denied')
+      assert.equal((await event(denied)).payload.publication.errorCode, 'pull_request_denied')
+      assert.deepEqual(await cards(denied), [])
+
+      const asked = await ready()
+      await setGitHubPermissions(pool, asked.userId, await home(asked.userId), { version: '0:0', pullRequest: 'ask' })
+      assert.deepEqual(await publishRunResult(asked.runId, never), { done: true })
+      assert.equal((await receipt(asked)).status, 'awaiting_approval')
+      assert.deepEqual(await publishRunResult(asked.runId, never), { done: true }, 'a duplicate workflow stops while the card waits')
+      const [card, ...extra] = await cards(asked)
+      assert.equal(extra.length, 0)
+      assert.equal(card.status, 'pending')
+      assert.deepEqual(card.input, { runId: asked.runId, repo: asked.remoteKey.split('/').slice(2).join('/'), branch: asked.branch, title: 'Fix redirect' })
+      assert.deepEqual(await counts(asked), { versions: 0, events: 0 }, 'nothing is reported done while the card waits')
+      const other = await fixture()
+      await assert.rejects(decidePendingAction(other.userId, card.id, true, async () => {}))
+      const restarted: string[] = []
+      assert.deepEqual(await decidePendingAction(asked.userId, card.id, true, async runId => { restarted.push(runId) }), { status: 'done', error: null })
+      assert.deepEqual(restarted, [asked.runId])
+      assert.equal((await receipt(asked)).status, 'pending')
+      let opened = 0
+      assert.deepEqual(await publishRunResult(asked.runId, async () => { opened++; return prFor(asked) }), { done: true })
+      assert.equal(opened, 1)
+      assert.equal((await receipt(asked)).status, 'published')
+      assert.deepEqual((await event(asked)).payload.publication.pullRequest, prFor(asked))
+      await assert.rejects(decidePendingAction(asked.userId, card.id, false, async () => {}), 'a decided card cannot be decided again')
+
+      const declined = await ready()
+      await setGitHubPermissions(pool, declined.userId, await home(declined.userId), { version: '0:0', pullRequest: 'ask' })
+      await publishRunResult(declined.runId, never)
+      const [declinedCard] = await cards(declined)
+      await decidePendingAction(declined.userId, declinedCard.id, false, async () => {})
+      assert.deepEqual(await publishRunResult(declined.runId, never), { done: true })
+      assert.equal((await receipt(declined)).errorCode, 'pull_request_declined')
+
+      // Approved, then turned to deny before the restart: deny wins.
+      const revoked = await ready()
+      let revokedSettings = await setGitHubPermissions(pool, revoked.userId, await home(revoked.userId), { version: '0:0', pullRequest: 'ask' })
+      await publishRunResult(revoked.runId, never)
+      const [revokedCard] = await cards(revoked)
+      await decidePendingAction(revoked.userId, revokedCard.id, true, async () => {})
+      revokedSettings = await setGitHubPermissions(pool, revoked.userId, await home(revoked.userId), { version: revokedSettings.version, pullRequest: 'deny' })
+      assert.deepEqual(await publishRunResult(revoked.runId, never), { done: true })
+      assert.equal((await receipt(revoked)).errorCode, 'pull_request_denied')
     })
   } finally {
     // Fixture rows and audit history remain; credential invalidation is non-deleting.

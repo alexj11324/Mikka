@@ -9,6 +9,7 @@ import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/l
 import { workspaceDb } from '@/lib/workspace-db'
 import { releasePaymentDesignation } from '@/lib/payment-designation'
 import { stopRunsUsingSubscriptions } from '@/lib/personal-policy'
+import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/delivery'
 import type { MainTransaction } from './general'
@@ -36,11 +37,14 @@ async function requireTransferTarget(tx: WorkspaceTransaction, workspaceId: stri
  * bindings) are removed and recreated for the new owner on first use. The
  * agent-kit history is immutable and keyed by its owner, so it is removed too:
  * the bot continues on the built-in definition for its new owner.
- * Refused while any of those bots is still working.
+ * Refused while any of those bots is still working. The person's Coordinator
+ * (coordinator_bots) is never handed over: every member has their own, so it
+ * is paused with their other bots when they leave (releaseDepartingMember)
+ * and stays theirs.
  */
 export async function transferBots(tx: MainTransaction, workspaceId: string, fromUserId: string, toUserId: string, only?: string[]): Promise<AssetTransfer> {
   const owned = await tx.select({ id: bots.id, name: bots.name }).from(bots)
-    .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, fromUserId), ...(only ? [inArray(bots.id, only)] : []))).for('update')
+    .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, fromUserId), sql`not exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})`, ...(only ? [inArray(bots.id, only)] : []))).for('update')
   if (!owned.length) return { bots: 0 }
   const ids = owned.map(bot => bot.id)
   const [busyRun] = await tx.select({ id: agentRuns.id }).from(agentRuns)
@@ -61,7 +65,7 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
 
 /**
  * §8.3 (decision 2026-10-31-2225): when someone leaves a team or is suspended,
- * their subscription share leaves with them and their bots there pause until an
+ * their subscription share, API key shares and credit share leave with them and their bots there pause until an
  * admin takes one over. Runs on that subscription are stopped at once, and
  * model calls check the share and the membership on every call.
  */
@@ -70,11 +74,15 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
   await releasePaymentDesignation(workspaceId, userId)
   await db.transaction(async main => {
     await main.execute(sql`delete from workspace_subscription_shares where "ownerId" = ${userId} and "workspaceId" = ${workspaceId}`)
+    // Their credits stop paying for the team at once (lib/credit-shares.ts).
+    await main.execute(sql`delete from workspace_credit_shares where "userId" = ${userId} and "workspaceId" = ${workspaceId}`)
+    await main.execute(sql`delete from model_api_key_shares s using model_api_keys k where k.id = s."keyId" and k."ownerId" = ${userId} and s."workspaceId" = ${workspaceId}`)
     await main.update(bots).set({ archivedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, userId), isNull(bots.archivedAt)))
   })
   // Runs there on their subscription stop now, including other members' bots they had shared it with.
   await stopRunsUsingSubscriptions(pool, { ownerId: userId, workspaceId })
+  await stopRunsUsingApiKeys(pool, { ownerId: userId, workspaceId })
 }
 
 /** Reactivation brings a suspended member's own bots back; their subscription stays unshared until they share it again. */

@@ -3,7 +3,7 @@ import type { Pool } from 'pg'
 export const MAX_WAKE_ATTEMPTS = 8
 export const WAKE_LEASE_MS = 120_000
 export const WAKE_BACKOFF_MS = [60_000, 120_000, 240_000, 480_000, 900_000] as const
-export type WakeScope = { userId: string; botId: string | null }
+export type WakeScope = { userId: string; botId: string }
 export type WakeClaim = WakeScope & { ids: string[]; leaseUntil: Date; attempt: number }
 
 /** A committed inbox row is enough to recover even if the producer dies
@@ -11,8 +11,9 @@ export type WakeClaim = WakeScope & { ids: string[]; leaseUntil: Date; attempt: 
 export function createWakeRecovery(pool: Pick<Pool, 'connect' | 'query'>, clock: () => Date = () => new Date()) {
   const pending = `"deliveredAt" IS NULL AND (tier IS NULL OR tier <> 'background') AND "wakeAttempts" < ${MAX_WAKE_ATTEMPTS}`
   return {
-    async due(limit = 50): Promise<WakeScope[]> {
-      return (await pool.query<WakeScope>(`SELECT "userId", "botId" FROM coordinator_events
+    /** A null botId is an event written before the Coordinator had its bot row; the sweep moves it there first. */
+    async due(limit = 50): Promise<{ userId: string; botId: string | null }[]> {
+      return (await pool.query<{ userId: string; botId: string | null }>(`SELECT "userId", "botId" FROM coordinator_events
         WHERE ${pending} AND "nextWakeAt" <= $1 AND ("wakeLeaseUntil" IS NULL OR "wakeLeaseUntil" <= $1)
         GROUP BY "userId", "botId" ORDER BY min("nextWakeAt") LIMIT $2`, [clock(), limit])).rows
     },
@@ -27,15 +28,15 @@ export function createWakeRecovery(pool: Pick<Pool, 'connect' | 'query'>, clock:
       try {
         await tx.query('BEGIN')
         await tx.query(`SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, [JSON.stringify(['coordinator-wake', scope.userId, scope.botId])])
-        const held = await tx.query(`SELECT 1 FROM coordinator_events WHERE "userId"=$1 AND "botId" IS NOT DISTINCT FROM $2::uuid
+        const held = await tx.query(`SELECT 1 FROM coordinator_events WHERE "userId"=$1 AND "botId"=$2::uuid
           AND "deliveredAt" IS NULL AND "wakeLeaseUntil">$3
-          UNION ALL SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND "botId" IS NOT DISTINCT FROM $2::uuid
+          UNION ALL SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2::uuid
           AND "leaseHolder" IS NOT NULL AND "leaseUntil">$3 LIMIT 1`, [scope.userId, scope.botId, now])
         if (held.rowCount) { await tx.query('COMMIT'); return null }
         const rows = await tx.query<{ id: string; wakeAttempts: number }>(`UPDATE coordinator_events SET
           "wakeAttempts"="wakeAttempts"+1,"wakeLeaseUntil"=$4,"nextWakeAt"=$4,
           "wakeLastError"=CASE WHEN "wakeAttempts"+1 >= ${MAX_WAKE_ATTEMPTS} THEN 'wake_exhausted' ELSE NULL END
-          WHERE id IN (SELECT id FROM coordinator_events WHERE "userId"=$1 AND "botId" IS NOT DISTINCT FROM $2::uuid
+          WHERE id IN (SELECT id FROM coordinator_events WHERE "userId"=$1 AND "botId"=$2::uuid
             AND ${pending} AND "nextWakeAt" <= $3 ORDER BY "createdAt",id LIMIT 50 FOR UPDATE)
           RETURNING id,"wakeAttempts"`, [scope.userId, scope.botId, now, leaseUntil])
         await tx.query('COMMIT')

@@ -24,8 +24,10 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
 }
 
 /** The scoped cloud device may claim only a run bound to its owner's Bot
- * and its workspace's machine. Binding and claim use the same run row lock. */
-export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: 'allow' } | null> {
+ * and its workspace's machine. Binding and claim use the same run row lock.
+ * A run frozen on an API key has no subscription binding (null): its key
+ * was checked and recorded for it by `apiKeyForRun` before the claim. */
+export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: 'allow' } | null> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -50,9 +52,11 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!binding) { await client.query('COMMIT'); return null }
     const held = await client.query(`SELECT 1 FROM bot_desktops WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND control='user' AND "controlUntil">now()`, [binding.botId, actor.userId, actor.workspaceId])
     if (held.rowCount) { await client.query('COMMIT'); return null }
-    const subscription = await client.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "consumerId"=$4', [subscriptionBindingId, actor.userId, actor.workspaceId, run.agentId])
-    if (!subscription.rowCount) { await client.query('COMMIT'); return null }
-    await client.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [runId, subscriptionBindingId])
+    if (subscriptionBindingId) {
+      const subscription = await client.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "consumerId"=$4', [subscriptionBindingId, actor.userId, actor.workspaceId, run.agentId])
+      if (!subscription.rowCount) { await client.query('COMMIT'); return null }
+      await client.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [runId, subscriptionBindingId])
+    } else if (!(await client.query('SELECT 1 FROM model_api_key_runs WHERE "runId"=$1', [runId])).rowCount) { await client.query('COMMIT'); return null }
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')

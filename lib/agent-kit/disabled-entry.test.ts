@@ -11,6 +11,6 @@ stub('../coordinator/native-prompt.ts',{personalCoordinatorInstructions:forbidde
 stub('../../workflows/coordinator/tool-scope.ts',{assertNativeToolScope:forbidden})
 test('disabled execution entry returns before scope, binding or model access',async()=>{
   const {beginAgentExecution}=await import('../../workflows/coordinator/agent-kit-steps')
-  assert.equal(await beginAgentExecution('synthetic-owner',null,'synthetic-workflow',0,{harness:'ai_sdk'}),null)
+  assert.equal(await beginAgentExecution('synthetic-owner','20000000-0000-4000-8000-0000000c0de1','synthetic-workflow',0,{harness:'ai_sdk'}),null)
   assert.equal(effects,0)
 })

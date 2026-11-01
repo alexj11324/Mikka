@@ -22,13 +22,13 @@ export async function bindBotSubscription(pool: Pool, actor: { userId: string; w
     if (!runtime) throw new Error('Bot subscription unavailable')
     await client.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
       SELECT $1,$2,$3,$4,id,epoch,$7,$8 FROM byos_connections WHERE id=$5 AND "ownerId"=$2
-        AND epoch=$6 AND state='connected' AND provider=$9
+        AND epoch=$6 AND state='connected' AND paused=false AND provider=$9
         AND ${subscriptionsUsableSql('$2', '$3')} ON CONFLICT (id) DO NOTHING`,
     [id, actor.userId, actor.workspaceId, runtime.agentId, input.connectionId, input.revision, route, input.modelId, provider])
     const result = await client.query(`SELECT b.id FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId"
       WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3 AND b."consumerId"=$4 AND b."connectionId"=$5
         AND b."connectionRevision"=$6 AND b.route=$7 AND b."modelId"=$8 AND c."ownerId"=$2
-        AND c.epoch=$6 AND c.state='connected' AND c.provider=$9`,
+        AND c.epoch=$6 AND c.state='connected' AND c.paused=false AND c.provider=$9`,
     [id, actor.userId, actor.workspaceId, runtime.agentId, input.connectionId, input.revision, route, input.modelId, provider])
     if (!result.rowCount) throw new Error('Bot subscription unavailable')
     await client.query('COMMIT')

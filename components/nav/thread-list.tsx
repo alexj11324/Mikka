@@ -4,14 +4,12 @@ import { ChevronRight, Hash, Laptop, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
-import type { BotView } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
 import { activityLabel, groupThreads, lastActivity, THREAD_GROUPS } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
 import { HarnessMark } from '@/components/labels/entity-labels'
-import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 import { GroupHeader } from './group-header'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
@@ -26,7 +24,7 @@ export const TWO_LINE_ROW = 'flex h-auto w-full flex-col items-stretch justify-s
 
 export function threadName(thread: Thread, issues: Issue[], fallback: string) {
   const issue = thread.issueId ? issues.find(item => item.id === thread.issueId) : undefined
-  if (issue) return `${issueIdentifier(issue)} ${issue.title}`
+  if (issue) return [issueIdentifier(issue), issue.title].filter(Boolean).join(' ')
   return thread.prompt.split('\n').find(line => line.trim())?.trim().slice(0, 80) || fallback
 }
 
@@ -54,20 +52,20 @@ function WaitingChip({ waiting }: { waiting: NonNullable<ThreadView['waitingFor'
 
 /**
  * One row: the thread's name, then the opening of its last reply on one line,
- * verbatim. No status word, no bot name. In 全部线程 a 16px avatar in its
- * bot's colour leads the name and the last activity sits on the right.
+ * verbatim. No status word, no bot name. In 全部线程 the mark of the Agent
+ * running it leads the name (R-78; a neutral thread mark when unknown, never
+ * the bot's avatar) and the last activity sits on the right.
  */
-function ThreadRow({ thread, issues, bots, all, now, onOpenIssue }: { thread: Thread; issues: Issue[]; bots: BotView[]; all: boolean; now: Date; onOpenIssue: (id: string) => void }) {
+function ThreadRow({ thread, issues, all, now, onOpenThread }: { thread: Thread; issues: Issue[]; all: boolean; now: Date; onOpenThread: (thread: { issueId: string; runId: string }) => void }) {
   const t = useTranslations('Shell.threads')
   const format = useFormatter()
-  const bot = thread.botId ? bots.find(item => item.id === thread.botId) : undefined
   const name = threadName(thread, issues, t('untitled'))
   const at = new Date(lastActivity(thread))
   const when = activityLabel(at, now)
   const waiting = thread.status === 'queued' ? (thread as ThreadView).waitingFor : undefined
   const body = <>
     <span className="flex w-full min-w-0 items-center gap-2">
-      {all && (thread.botId ? <BotAvatar color={bot?.color} shape={bot?.shape} size="row" /> : <CoordinatorAvatar size="row" />)}
+      {all && <span data-slot="thread-agent" className="flex size-4 shrink-0 items-center justify-center">{thread.harness ? <HarnessMark harness={thread.harness} /> : <ThreadMark size="row" />}</span>}
       <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
       {all && <span className="shrink-0 text-xs text-muted-foreground">{when === 'relative' ? format.relativeTime(at, now) : t(when)}</span>}
     </span>
@@ -77,7 +75,7 @@ function ThreadRow({ thread, issues, bots, all, now, onOpenIssue }: { thread: Th
   </>
   return <li>
     {thread.issueId
-      ? <Button variant="ghost" className={TWO_LINE_ROW} aria-label={name} onClick={() => onOpenIssue(thread.issueId!)}>{body}</Button>
+      ? <Button variant="ghost" className={TWO_LINE_ROW} aria-label={name} onClick={() => onOpenThread({ issueId: thread.issueId!, runId: thread.id })}>{body}</Button>
       : <div className={TWO_LINE_ROW}>{body}</div>}
   </li>
 }
@@ -85,15 +83,16 @@ function ThreadRow({ thread, issues, bots, all, now, onOpenIssue }: { thread: Th
 /**
  * The right column's thread list: 等待回复 → 进行中 → 空闲 → 已解决, each
  * with its count; 已解决 starts collapsed. A failed thread waits for the
- * person, so it sits under 等待回复. Picking a thread opens its task.
+ * person, so it sits under 等待回复. Picking a thread opens it in the centre, as a
+ * thread card does; the chat stays one click away (R-50, R-66).
  */
-export function ThreadList({ threads, issues, bots, all = false, onOpenIssue }: { threads: Thread[]; issues: Issue[]; bots: BotView[]; all?: boolean; onOpenIssue: (id: string) => void }) {
+export function ThreadList({ threads, issues, all = false, onOpenThread }: { threads: Thread[]; issues: Issue[]; all?: boolean; onOpenThread: (thread: { issueId: string; runId: string }) => void }) {
   const t = useTranslations('Shell.threads')
   // One clock for every row's time.
   const now = useNow({ updateInterval: 60_000 })
   if (!threads.length) return <p className="px-2 py-6 text-center text-xs text-muted-foreground">{t('empty')}</p>
   const groups = groupThreads(threads, id => issues.find(issue => issue.id === id))
-  const rows = (list: Thread[]) => <ul className="flex flex-col">{list.map(thread => <ThreadRow key={thread.id} thread={thread} issues={issues} bots={bots} all={all} now={now} onOpenIssue={onOpenIssue} />)}</ul>
+  const rows = (list: Thread[]) => <ul className="flex flex-col">{list.map(thread => <ThreadRow key={thread.id} thread={thread} issues={issues} all={all} now={now} onOpenThread={onOpenThread} />)}</ul>
   return <div role="group" aria-label={t('title')} className="flex flex-col gap-3">
     {THREAD_GROUPS.map(group => {
       const list = groups[group]

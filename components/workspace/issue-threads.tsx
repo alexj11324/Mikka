@@ -6,7 +6,7 @@ import { ChevronRight } from 'lucide-react'
 import { listIssueThreads } from '@/app/actions/agents'
 import { threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
 import { runListRefreshInterval, runStatusKey } from '@/lib/issue-run-conversation'
-import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
+import { BotAvatar, COORDINATOR_AVATAR, colorFor } from '@/components/nav/bot-avatar'
 import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
 import { RUN_BADGES } from './agent-citations'
@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { InlineLoadError } from '@/components/load-error'
 
 export function useIssueThreads(issueId: string) {
-  return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: threads => runListRefreshInterval(threads?.map(threadQuestionView)), revalidateOnFocus: true, revalidateOnReconnect: true })
+  return useSWR(['issue-threads', issueId], () => listIssueThreads(issueId), { refreshInterval: threads => runListRefreshInterval(threads?.map(threadQuestionView)), revalidateOnReconnect: true })
 }
 
 export function harnessLabel(harness: string) {
@@ -75,7 +75,7 @@ export function ThreadEvents({ issueId, onOpen }: { issueId: string; onOpen: (id
   return <>{[...data].reverse().map((thread: IssueThread) => {
     const name = thread.detail?.name ?? (thread.ownerName ? t('ownerThread', { name: thread.ownerName }) : t('hidden'))
     return <div key={thread.id} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-      <BotAvatar color={colorFor(thread.detail?.agentName ?? t('agent'))} size="pill" still />
+      <ThreadBotAvatar thread={thread} />
       <span className="font-medium">{thread.detail?.agentName ?? t('agent')}</span>
       <span className="text-muted-foreground">{t('dispatched')}</span>
       {thread.detail
@@ -84,4 +84,11 @@ export function ThreadEvents({ issueId, onOpen }: { issueId: string; onOpen: (id
       <time className="text-xs text-muted-foreground" dateTime={new Date(thread.createdAt).toISOString()}>{format.dateTime(new Date(thread.createdAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
     </div>
   })}</>
+}
+
+/** The dispatching Bot in its own look (R-36): the same bloub as its bot-list row; the Coordinator's own runs use its mark. */
+export function ThreadBotAvatar({ thread, size = 'pill' }: { thread: Pick<IssueThread, 'detail'>; size?: 'pill' | 'row' }) {
+  const t = useTranslations('IssueThreads')
+  if (!thread.detail) return <BotAvatar color={colorFor(t('agent'))} size={size} still />
+  return <BotAvatar {...(thread.detail.bot ?? COORDINATOR_AVATAR)} size={size} still />
 }

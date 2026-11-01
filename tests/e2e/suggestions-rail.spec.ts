@@ -12,7 +12,7 @@ async function seedSentCard(email: string, message: string) {
   const pool = new Pool({ connectionString, max: 1 })
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
-    await pool.query('INSERT INTO coordinator_messages (id, "userId", position, message) VALUES ($1, $2, 1, $3)', [randomUUID(), user.id, JSON.stringify({ role: 'user', content: message })])
+    await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), 1, $3)', [randomUUID(), user.id, JSON.stringify({ role: 'user', content: message })])
   } finally { await pool.end() }
 }
 
@@ -28,6 +28,8 @@ test('建议：卡片列表与 Coordinator 对话各占一半；发出的卡片�
   const card = page.locator('button[data-slot="suggestion-card"]').filter({ hasText: subject })
   await expect(card).toContainText('回复')
   await expect(card.locator('[data-slot="source-mention"]')).toHaveText('Gmail')
+  // The mark keeps 4px off the words after it.
+  expect(await card.locator('[data-slot="source-mention"]').evaluate(mention => parseFloat(getComputedStyle(mention).marginRight))).toBeGreaterThanOrEqual(4)
 
   const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
   const sent = chat.locator('[data-slot="suggestion-card"]').filter({ hasText: 'PR #212 的类型检查' })
@@ -42,8 +44,29 @@ test('建议：卡片列表与 Coordinator 对话各占一半；发出的卡片�
   await expect(page.getByRole('alert').filter({ hasText: 'Coordinator 现在不可用' })).toBeVisible()
   await expect(card).toBeVisible()
 
-  await rail(page, '产物').click()
-  await expect(page.getByRole('heading', { name: '产物', exact: true })).toBeVisible()
-  await expect(page.getByText('还没有 产物', { exact: true })).toBeVisible()
-  await expect(rail(page, '产物')).toHaveAttribute('aria-current', 'page')
+  await rail(page, 'Artifact').click()
+  await expect(page.getByRole('heading', { name: 'Artifact', exact: true })).toBeVisible()
+  await expect(page.getByText('还没有 Artifact', { exact: true })).toBeVisible()
+  await expect(rail(page, 'Artifact')).toHaveAttribute('aria-current', 'page')
+})
+
+test('建议：一张卡里很长的不换行文字不会撑宽左栏，右边的 Coordinator 对话仍在屏幕内', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 940 })
+  await register(page)
+  // A made-up unbroken run, as long as the hidden metadata a deploy bot's comment can carry.
+  const unbroken = `${randomUUID().replaceAll('-', '')}${'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo'.repeat(30)}`
+  await seedSuggestion(page, { source: 'github', title: unbroken })
+
+  await rail(page, '建议').click()
+  const card = page.locator('button[data-slot="suggestion-card"]').filter({ hasText: unbroken.slice(0, 32) })
+  await expect(card).toBeVisible()
+  const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
+  await expect(chat).toBeInViewport({ ratio: 1 })
+  const list = page.locator('section[aria-labelledby="suggestions-title"]')
+  const [listBox, chatBox] = await Promise.all([list.boundingBox(), page.locator('[data-slot="suggestions-coordinator"]').boundingBox()])
+  // Half and half, give or take the rule between them.
+  expect(Math.abs(listBox!.width - chatBox!.width)).toBeLessThanOrEqual(2)
+  expect(chatBox!.x + chatBox!.width).toBeLessThanOrEqual(1440)
+  expect(await card.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })

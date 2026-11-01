@@ -16,11 +16,34 @@ export const hostedSubscriptionSnapshotSchema = z.strictObject({
   route: z.enum(['codex_cpa', 'claude_cpa', 'openai_siwc']),
 })
 export type HostedSubscriptionSnapshot = z.infer<typeof hostedSubscriptionSnapshotSchema>
+/**
+ * A bot chat frozen on a model an API key or custom provider serves (C22).
+ * `ownerId` is the bot's owner; the key may be a teammate's shared one. No key material.
+ */
+export const hostedApiKeySnapshotSchema = z.strictObject({
+  coordinator: z.literal(true).optional(),
+  type: z.literal('api_key'), keyId: z.uuid(), ownerId: z.string().min(1),
+  consumerId: z.uuid().optional(), workspaceId: z.uuid(), modelId: z.string().min(1).max(128),
+  /** 订阅额度用完后，自动改用 API Key: the subscription this turn would have used, out of quota, and the person's own key it runs on instead. */
+  afterQuota: z.strictObject({
+    subscription: z.enum(['claude', 'codex']), plan: z.string().max(60).nullable(),
+    keyProvider: z.string().min(1).max(20), keyName: z.string().max(60).nullable(),
+  }).optional(),
+})
+export type HostedApiKeySnapshot = z.infer<typeof hostedApiKeySnapshotSchema>
+export const hostedModelSelectionSchema = z.discriminatedUnion('type', [hostedSubscriptionSnapshotSchema, hostedApiKeySnapshotSchema])
+export type HostedModelSelection = z.infer<typeof hostedModelSelectionSchema>
 export interface HostedRuntimeSnapshot {
   harness: string
   model: string | null
-  modelSelection?: HostedSubscriptionSnapshot
+  modelSelection?: HostedModelSelection
 }
+/** The bot scope a frozen selection belongs to. */
+export const selectionScope = (selection: HostedModelSelection): HostedModelScope => ({
+  ownerId: selection.type === 'subscription' ? selection.runOwnerId ?? selection.ownerId : selection.ownerId,
+  botId: selection.coordinator ? null : selection.consumerId ?? null,
+  workspaceId: selection.workspaceId,
+})
 export interface HostedModelScope { ownerId: string; botId: string | null; workspaceId: string | null }
 export interface HostedModelDependencies {
   service(): SubscriptionService
@@ -34,7 +57,7 @@ function checkScope(scope: HostedModelScope, value: HostedSubscriptionSnapshot) 
   if (scope.ownerId !== (value.runOwnerId ?? value.ownerId) || value.runOwnerId === value.ownerId || (value.runOwnerId !== undefined && scope.botId === null) || (scope.botId === null ? value.coordinator !== true : scope.botId !== value.consumerId || value.coordinator === true) || scope.workspaceId !== value.workspaceId) throw refuse()
 }
 /** Called only inside first execution reservation, never before replay lookup. */
-export async function freezeHostedModelSelection(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, selection: unknown, dependencies: HostedModelDependencies, subscriptionOwnerId = scope.ownerId): Promise<HostedRuntimeSnapshot> {
+export async function freezeHostedModelSelection(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, selection: unknown, dependencies: HostedModelDependencies, subscriptionOwnerId = scope.ownerId): Promise<HostedRuntimeSnapshot & { modelSelection?: HostedSubscriptionSnapshot }> {
   if (selection === undefined) return { harness: runtime.harness, model: runtime.model }
   if (runtime.harness !== 'ai_sdk' || !scope.workspaceId) throw refuse()
   const requested = agentModelSourceSchema.safeParse(selection)
@@ -63,6 +86,14 @@ export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime:
   if (runtime.modelSelection === undefined) {
     return resolveDefaultHostedModel(scope,runtime.model)
   }
+  if (runtime.modelSelection.type === 'api_key') {
+    const frozen = hostedApiKeySnapshotSchema.parse(runtime.modelSelection)
+    const expected = selectionScope(frozen)
+    if (expected.ownerId !== scope.ownerId || expected.botId !== scope.botId || expected.workspaceId !== scope.workspaceId || runtime.model !== frozen.modelId) throw refuse()
+    cancelled(signal)
+    const { resolveApiKeyChatModel } = await import('./model-api-key-chat')
+    return resolveApiKeyChatModel(frozen)
+  }
   const frozen = hostedSubscriptionSnapshotSchema.parse(runtime.modelSelection)
   checkScope(scope, frozen)
   if (runtime.model !== frozen.modelId) throw refuse()
@@ -82,71 +113,7 @@ export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime:
   await verify()
   const model = await resolveAgentExecutionModel({ ownerId: frozen.ownerId, consumerId: frozen.consumerId, source: { type: 'subscription', bindingId: frozen.bindingId }, signal }, {
     defaultModel: () => { throw refuse() }, subscriptionService: () => service, workspace: dependencies.workspace,
-  }).catch(async (error) => {
-    if (
-      !(error instanceof SubscriptionRefusal) ||
-      error.code !== "quota_exhausted"
-    )
-      throw error;
-    // Switching accounts is the run owner's choice over their own subscriptions, never another member's.
-    if (frozen.runOwnerId) throw error;
-    const { ExecutionSettings } = await import("./execution-settings");
-    const { pool } = await import("./db");
-    const settings = new ExecutionSettings(pool);
-    if (
-      (await settings.fallbacks(scope.ownerId)).whenQuotaExhausted !==
-      "switchAccount"
-    )
-      throw error;
-    const settingsScope = {
-      ownerId: scope.ownerId,
-      workspaceId: frozen.workspaceId,
-    };
-    const candidates = (await settings.botModels(settingsScope)).filter(
-      (b) =>
-        b.connectionId !== frozen.connectionId &&
-        b.modelId === frozen.modelId &&
-        b.route === frozen.route,
-    );
-    for (const candidate of candidates) {
-      const bindingId = await settings.bindingForBot(
-        settingsScope,
-        scope.botId,
-        candidate.bindingId,
-      );
-      const next = await freezeHostedModelSelection(
-        scope,
-        runtime,
-        { type: "subscription", bindingId },
-        dependencies,
-      );
-      try {
-        // Re-authorize the alternate account, consumer, workspace and quota.
-        return await resolveAgentExecutionModel(
-          {
-            ownerId: scope.ownerId,
-            consumerId: next.modelSelection!.consumerId,
-            source: { type: "subscription", bindingId },
-            signal,
-          },
-          {
-            defaultModel: () => {
-              throw refuse();
-            },
-            subscriptionService: () => service,
-            workspace: dependencies.workspace,
-          },
-        );
-      } catch (nextError) {
-        if (
-          !(nextError instanceof SubscriptionRefusal) ||
-          nextError.code !== "quota_exhausted"
-        )
-          throw nextError;
-      }
-    }
-    throw error;
-  });
+  })
   await verify()
   if (typeof model === 'string') throw refuse()
   return new Proxy(model, { get(target, property) {

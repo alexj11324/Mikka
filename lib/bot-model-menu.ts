@@ -1,10 +1,14 @@
 import "server-only";
 import type { Pool } from "pg";
-import { quotaWindowSchema } from "@mikka/protocol";
 import { z } from "zod";
 import { ActionFailureError } from "./action-error";
 import type { ExecutionSettings, ExecutionSettingsScope } from "./execution-settings";
+import { apiKeyChatBaseUrl } from "./model-api-key-providers";
+import { quotaExhausted, quotaResetsAt } from "./subscription-quota";
+
+export { quotaExhausted } from "./subscription-quota";
 import {
+  apiKeyOptionId,
   HOSTED_CHOICE,
   type BotModelCurrent,
   type BotModelMenu,
@@ -25,18 +29,6 @@ export async function botModelScope(ownerId: string, botId: string | null, onlyW
 }
 
 const HOSTED = { id: HOSTED_CHOICE, modelId: "", provider: "mikka" } as const;
-
-/** A subscription is out of quota while an account-wide window is fully used and has not reset. */
-export function quotaExhausted(quota: unknown, now = Date.now()) {
-  const parsed = z.object({ windows: z.array(quotaWindowSchema) }).safeParse(quota);
-  if (!parsed.success) return false;
-  return parsed.data.windows.some(
-    (window) =>
-      !window.model &&
-      window.used >= 1 &&
-      (!window.resetsAt || !(Date.parse(window.resetsAt) <= now)),
-  );
-}
 
 /**
  * The composer's model menu for one bot, or the Coordinator (`botId` null),
@@ -79,10 +71,23 @@ export async function botModelMenu(
     subscriptions.set(key, group);
     group.options.push({ id: row.bindingId, modelId: row.modelId, provider: row.provider });
   }
+  // API keys and custom providers that reach bot chats (C22): the person's own, then teammates' shared ones.
+  const { usableApiKeys, botApiKeyChoice } = await import("./model-api-keys");
+  const keys = (await usableApiKeys(pool, scope.ownerId, scope.workspaceId)).filter((key) => apiKeyChatBaseUrl(key) && key.models.length);
+  const keyOptions = (key: (typeof keys)[number]) =>
+    key.models.map((model) => ({ id: apiKeyOptionId(key.id, model), modelId: model, provider: key.provider }));
+  const ownKeys = keys.filter((key) => key.mine);
+  const sharedOwners = [...new Set(keys.filter((key) => !key.mine).map((key) => key.ownerId))];
+  const ownerNames = sharedOwners.length ? await memberNames(scope.workspaceId, sharedOwners) : new Map<string, string>();
   const groups: BotModelMenuGroup[] = [
     { kind: "hosted", options: [{ ...HOSTED }] },
     ...subscriptions.values(),
+    ...(ownKeys.length ? [{ kind: "apiKey" as const, options: ownKeys.flatMap(keyOptions) }] : []),
+    ...sharedOwners.filter((owner) => ownerNames.has(owner)).map((owner) => ({
+      kind: "shared" as const, owner: ownerNames.get(owner)!, options: keys.filter((key) => key.ownerId === owner).flatMap(keyOptions),
+    })),
   ];
+  const keyChoice = await botApiKeyChoice(pool, scope, botId);
 
   const row = (
     await pool.query<{ bindingId: string | null }>(
@@ -102,18 +107,31 @@ export async function botModelMenu(
     const option = rows.find(
       (item) => item.connectionId === row.connectionId && item.modelId === row.modelId,
     );
+    const exhausted = quotaExhausted(quota, now);
     return {
       id: option?.bindingId ?? row.bindingId,
       modelId: row.modelId,
       provider: row.provider,
       kind: "subscription",
       chosen,
-      available: !quotaExhausted(quota, now),
+      available: !exhausted,
+      ...(exhausted ? { quota: { subscription: row.provider, plan: (row as { plan?: string | null }).plan ?? null, resetsAt: quotaResetsAt(quota, now), fallback: null } } : {}),
     };
   };
 
   let current: BotModelCurrent;
-  if (saved === HOSTED_CHOICE) {
+  if (keyChoice) {
+    // A saved API key model; unavailable once the key is deleted, unshared or not allowed here.
+    const key = keys.find((item) => item.id === keyChoice.keyId);
+    current = {
+      id: apiKeyOptionId(keyChoice.keyId, keyChoice.model),
+      modelId: keyChoice.model,
+      provider: key?.provider ?? "unknown",
+      kind: key && !key.mine ? "shared" : "apiKey",
+      chosen: true,
+      available: Boolean(key),
+    };
+  } else if (saved === HOSTED_CHOICE) {
     current = { ...HOSTED, kind: "hosted", chosen: true, available: true };
   } else if (saved) {
     const live = await settings.botBinding(scope, saved);
@@ -144,7 +162,27 @@ export async function botModelMenu(
       ? fromRow(first, false, quotas.get(String(first.connectionId)))
       : { ...HOSTED, kind: "hosted", chosen: false, available: true };
   }
+  // Out of quota: the key the next turn moves to, when 订阅额度用完后，自动改用 API Key allows it (freezeBotModel decides the same way).
+  if (current.quota) {
+    const { quotaFallbackKey } = await import("./quota-fallback");
+    const fallback = await quotaFallbackKey(pool, scope.ownerId, scope.workspaceId, current.modelId);
+    if (fallback) {
+      current.quota.fallback = { keyProvider: fallback.key.provider, keyName: fallback.key.name, model: fallback.model };
+      // The chip names what the next turn runs on: the key's model, as freezeBotModel freezes it.
+      current = { ...current, id: apiKeyOptionId(fallback.key.id, fallback.model), modelId: fallback.model, provider: fallback.key.provider, kind: "apiKey", available: true };
+    }
+  }
   return { groups, current };
+}
+
+/** Active members' names, for 「{name} 的 Key」 headings. Never the credential. */
+async function memberNames(workspaceId: string, userIds: string[]) {
+  const [{ workspaceDb }, { workspaceMembers }, { and, eq, inArray }] = await Promise.all([
+    import("./workspace-db"), import("./db/workspace-schema"), import("drizzle-orm"),
+  ]);
+  const rows = await workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name }).from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), inArray(workspaceMembers.userId, userIds), eq(workspaceMembers.status, "active")));
+  return new Map(rows.map((row) => [row.userId, row.name]));
 }
 
 async function connectionQuota(pool: Pick<Pool, "query">, connectionId: string) {
