@@ -2349,7 +2349,8 @@
       "whenDeviceOffline": "When the device is offline",
       "offlineWait": "Wait for it",
       "offlineCloud": "Run in the cloud",
-      "labels": "By label"
+      "labels": "By label",
+      "pickModel": "Choose a model"
     }
   },
   "TelegramBot": {
