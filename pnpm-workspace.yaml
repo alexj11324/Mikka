@@ -26,3 +26,4 @@ allowBuilds:
 
 patchedDependencies:
   '@novnc/novnc@1.6.0': patches/@novnc__novnc@1.6.0.patch
+  better-auth@1.7.12: patches/better-auth@1.7.12.patch
