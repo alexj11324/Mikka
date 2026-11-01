@@ -94,10 +94,10 @@ export function AgentGenerativeUI({ response, isStreaming, onAction, showErrors 
   // A detected card that cannot be read must never show its source as text: say
   // so quietly where errors are hidden (the Coordinator chat), never blank.
   const hiddenError = !isStreaming && !showErrors && issue
-    ? <AgentTextBubble><p className="text-sm leading-7">{issue.message}</p></AgentTextBubble>
+    ? <AgentTextBubble><p className="text-sm leading-5.25">{issue.message}</p></AgentTextBubble>
     : null
   const boundaryFallback = !isStreaming && !showErrors && !issue
-    ? <AgentTextBubble><p className="text-sm leading-7">{agentCopy.theModelReturnedAnInvalidFormatThis}</p></AgentTextBubble>
+    ? <AgentTextBubble><p className="text-sm leading-5.25">{agentCopy.theModelReturnedAnInvalidFormatThis}</p></AgentTextBubble>
     : undefined
 
   return <>

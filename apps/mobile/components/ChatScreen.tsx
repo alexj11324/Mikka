@@ -120,6 +120,15 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
 
   const answer = async (message: string) => send(message)
 
+  // 停止: the turn ends on the server, keeping what it had said; stop stays away until the chat stops working.
+  const [stopping, setStopping] = useState(false)
+  useEffect(() => { if (!working) setStopping(false) }, [working])
+  const stop = async () => {
+    setStopping(true)
+    try { await api('/api/mobile/chat/stop', { method: 'POST', body: { botId } }) } catch { setStopping(false) }
+    await reload()
+  }
+
   const reactions = data?.reactions ?? {}
   // Drawn at once, then saved; the next load has the server's word.
   const react = async (id: string, emoji: string | null) => {
@@ -173,6 +182,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
                     <CopyButton text={plainText(item.text)} />
                   </TimedRow>
                 ) : null}
+                {item.from === 'coordinator' && item.stopped ? <Text style={styles.stopped}>已停止</Text> : null}
                 {item.threads.map(id => {
                   const run = sources[id]
                   return run?.kind === 'run'
@@ -202,7 +212,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
       </View>
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
-        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} />
+        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} onStop={Boolean(data?.working) && !stopping ? () => void stop() : undefined} />
     </View>
   )
 }
@@ -213,6 +223,7 @@ const styles = StyleSheet.create({
   // Space above the composer (适度留白).
   list: { paddingHorizontal: 16, gap: 12 },
   loading: { paddingTop: 120, alignItems: 'center' },
+  stopped: { alignSelf: 'flex-start', fontSize: 12, lineHeight: 17, color: colors.secondary, marginLeft: 4, marginTop: -6 },
   working: { alignSelf: 'flex-start', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
   failed: { alignItems: 'center', gap: 10, marginTop: 24 },
   empty: { alignSelf: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },

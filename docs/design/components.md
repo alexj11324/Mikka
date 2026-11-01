@@ -24,7 +24,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | New task | `components/coordinator/new-task-dialog.tsx` | R-22, R-23 |
 | Search field on a page (filter a list) | `SearchInput` in `components/ui/search-input.tsx` | Borderless grey fill, icon left (R-31). Never an outlined `Input` with a magnifier |
 | Search | reUI `CommandDialog` (⌘K), centred | Local rows first, then `GET /api/search` hits per source (`hooks/use-site-search.ts`) |
-| Group chat (opened from search) | `components/workspace/group-chat-view.tsx` | A conversation, so it ends in the standard `ChatComposer`; people send in a group from the web and the phone (R-10). Runs per R-13. 现状（非决定）：no bot colour yet |
+| Group chat (bot list or search) | `components/workspace/group-chat-view.tsx` | A conversation, so it ends in the standard `ChatComposer` (R-10). A sent message shows at once and stays with 重试 if it fails; @name picks the bots that answer. Runs per R-13; bots show their own name and avatar |
 | Group chat's right column (详情) and avatar | `GroupPanel` (`components/nav/group-panel.tsx`), `GroupAvatar` (`components/nav/group-avatar.tsx`) | R-13: the group's avatar and name, then 成员 (people and bots), read-only (R-51), no computer. The avatar is up to three member bloubs, never a letter from the title (R-36) |
 | Board | reUI `Kanban` (`components/reui/kanban.tsx`) | R-25 |
 | Status | StatusBadge set; `components/nav/status-dot.tsx` for devices | R-24, R-34 |

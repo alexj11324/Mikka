@@ -18,11 +18,11 @@
   - A message goes to the bots it names as `@name`. Otherwise it goes to the
     ones Mikka judges should answer.
   - When none takes it, the chat says to @ one.
-  - People send in group chats from both the web and the phone.
+  - The web and the phone both send in groups, through the same API.
 - **Reactions:** the long-press sheet opens with a row of six: ❤️ 👍 👎 😂 🎉 🙏.
   - Each person keeps one reaction per message. Choosing another replaces it;
     choosing the same one removes it.
   - Reactions show under the message as chips, with a count past one. Tapping
     the person's own chip removes it.
   - They work in bot chats and group chats. The server keeps them
-    (`message_reactions`). 现状（非决定）：the web does not show them yet.
+    (`message_reactions`). The web does not show them yet.

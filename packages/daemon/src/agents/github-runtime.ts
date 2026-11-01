@@ -57,6 +57,35 @@ export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path
   }
 }
 
+/**
+ * The daemon's own clone and fetch for a GitHub delivery run: git asks the
+ * run's credential helper, which exchanges the run token for a short-lived
+ * token of this repository only (the person's Mikka GitHub App
+ * authorization). A machine without a GitHub login of its own (a cloud
+ * sandbox, a new computer) can then clone a private repository. Only git's
+ * credential settings are returned; the run-local files are removed after.
+ */
+export async function withRunGitCredentials<T>(
+  assignment: { github?: { endpoint: string; repository: string; branch: string }; mcp?: { token: string }; issueId: string },
+  privateDir: string,
+  work: (env: Record<string, string>) => Promise<T>,
+): Promise<T> {
+  if (!assignment.github || !assignment.mcp) return work({})
+  mkdirSync(privateDir, { recursive: true, mode: 0o700 })
+  const dir = mkdtempSync(join(privateDir, 'github-fetch-'))
+  try {
+    let env: Record<string, string> = {}
+    try {
+      env = prepareGitHubEnvironment(dir, { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId }, process.env.PATH ?? '')
+    } catch {
+      // No gh on this machine: GitHub delivery is unavailable, and the clone
+      // falls back to the machine's own git credentials as before.
+      return await work({})
+    }
+    return await work(Object.fromEntries(Object.entries(env).filter(([key]) => key.startsWith('GIT_CONFIG_') || key === 'GIT_TERMINAL_PROMPT')))
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+}
+
 /** Verify the exact already-pushed commit. Never create a commit or push after CI. */
 export async function agentPublishedReceipt(input: {
   runId: string; repoPath: string; worktree: string; tree: string; github: RunGitHub; privateDir: string; hosted?: boolean; env?: NodeJS.ProcessEnv

@@ -31,6 +31,32 @@ export const SOURCE_NAMES: Record<SuggestionSource, string> = { gmail: 'Gmail', 
 /** How many characters each quoted value keeps. */
 export const CARD_LIMITS = { title: 200, actionTitle: 200, actor: 100, url: 500 } as const
 
+/**
+ * A text's words as a person reads them: Markdown and HTML markup, link
+ * reference definitions (a bot's hidden metadata such as `[vc]: #…`) and
+ * comments taken out, one line. Empty when nothing readable is left.
+ */
+export function readableText(markdown: string): string {
+  return markdown
+    .replace(/<!--[\s\S]*?(-->|$)/g, ' ')
+    .replace(/^ {0,3}\[[^\]\n]+\]:[^\n]*$/gm, ' ')
+    .replace(/^ {0,3}(```|~~~)[^\n]*$/gm, ' ')
+    .replace(/<\/?[a-z][^>]*>/gi, ' ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\[[^\]]*\]/g, '$1')
+    .replace(/^ {0,3}(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/gm, '')
+    .replace(/(\*\*|__|~~|`)/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** The title as the card shows it: GitHub and Linear write Markdown, so theirs is read as text (an older stored row can still hold raw markup); other apps' titles are left as written. */
+function readableTitle(card: Pick<SuggestionCard, 'source' | 'title'>): string {
+  return card.source === 'github' || card.source === 'linear' ? readableText(card.title) : card.title
+}
+
 /** One line, no 「」 of its own, at most `max` characters. */
 function clean(value: string | null | undefined, max: number): string {
   return [...(value ?? '').replace(/[「」]/g, ' ').replace(/\s+/g, ' ').trim()].slice(0, max).join('').trim()
@@ -46,7 +72,9 @@ const unquote = (value: string) => /^「[^「」]*」$/.test(value) ? value.slic
 
 /** The message for a tapped card: the card and nothing else. */
 export function suggestionMessage(card: SuggestionCard): string {
-  const attributes = [`source="${card.source}"`, `action="${card.action}"`, `title="${quoted(clean(card.title, CARD_LIMITS.title))}"`]
+  // The source's words as a person reads them, never raw markup or a bot's metadata; a title with nothing readable is named by its link or app.
+  const title = clean(readableTitle(card), CARD_LIMITS.title) || webUrl(card.url) || SOURCE_NAMES[card.source]
+  const attributes = [`source="${card.source}"`, `action="${card.action}"`, `title="${quoted(title)}"`]
   const actor = clean(card.actor, CARD_LIMITS.actor)
   if (actor) attributes.push(`actor="${quoted(actor)}"`)
   const url = webUrl(card.url)
@@ -75,7 +103,8 @@ export function splitSuggestion(message: string): { suggestion: SuggestionCard |
 
 /** What the bubble under a sent card adds: the source's own words when the card shows its action line instead, and the link. */
 export function cardExtras(card: SuggestionCard): { original: string | null; url: string | null } {
-  const original = card.actionTitle && card.title.trim() !== card.actionTitle.trim() ? card.title : null
+  const title = readableTitle(card).trim()
+  const original = card.actionTitle && title && title !== card.actionTitle.trim() ? title : null
   return { original, url: card.url ?? null }
 }
 
@@ -96,10 +125,10 @@ export function cardParts(card: Pick<SuggestionCard, 'source' | 'title' | 'actio
   // the item's kind, with that verb taken off the front when the line starts with it (R-21, R-45).
   const unspaced = !split && !!line && /^[㐀-鿿]/.test(line)
   const verb = split ? split[1] : unspaced || !line ? fallbackVerb : null
-  const words = split ? split[2] : unspaced ? (line.startsWith(fallbackVerb) ? line.slice(fallbackVerb.length).trimStart() || line : line) : line || card.title
+  const words = split ? split[2] : unspaced ? (line.startsWith(fallbackVerb) ? line.slice(fallbackVerb.length).trimStart() || line : line) : line || readableTitle(card)
   const name = SOURCE_NAMES[card.source]
   const at = words.toLowerCase().indexOf(name.toLowerCase())
-  if (at < 0) return { verb, parts: [{ kind: 'source', source: card.source }, { kind: 'text', text: words }] }
+  if (at < 0) return { verb, parts: words ? [{ kind: 'source', source: card.source }, { kind: 'text', text: words }] : [{ kind: 'source', source: card.source }] }
   const parts: CardPart[] = []
   if (at > 0) parts.push({ kind: 'text', text: words.slice(0, at) })
   parts.push({ kind: 'source', source: card.source })

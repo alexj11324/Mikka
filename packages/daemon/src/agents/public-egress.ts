@@ -4,7 +4,7 @@ import { createServer, request as httpRequest, type IncomingHttpHeaders } from '
 import { connect, isIP, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { isPublicWebAddress } from '../../../../lib/search/url-policy'
+import { isPublicWebAddress } from '@mikka/protocol/web-url-policy'
 
 export type EgressDestination = { host: string; port: number }
 export type EgressAddress = { address: string; family: number }

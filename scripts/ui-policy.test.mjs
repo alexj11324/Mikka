@@ -75,11 +75,15 @@ for (const [label, source, rule] of [
 
 test('local fonts must be registered with their CSS variable', () => {
   const approved = `import localFont from 'next/font/local';
-    const fontSans = localFont({ src: '../fonts/Geist-Variable.woff2', variable: '--font-geist', weight: '100 900' });`
+    const fontSans = localFont({ src: '../fonts/InterVariable.woff2', variable: '--font-inter', weight: '100 900' });`
   assert.deepEqual(auditSource('app/[locale]/layout.tsx', approved, policy), [])
-  for (const source of [approved.replace('Geist-Variable.woff2', 'Other-Variable.woff2'), approved.replace('--font-geist', '--font-other')]) {
+  for (const source of [approved.replace('InterVariable.woff2', 'Other-Variable.woff2'), approved.replace('--font-inter', '--font-other')]) {
     assert.ok(auditSource('app/[locale]/layout.tsx', source, policy).some(d => d.rule === 'typography/font-family'))
   }
+  const pair = `import localFont from 'next/font/local';
+    const fontSans = localFont({ src: [{ path: '../fonts/InterVariable.woff2', style: 'normal' }, { path: '../fonts/InterVariable-Italic.woff2', style: 'italic' }], variable: '--font-inter' });`
+  assert.deepEqual(auditSource('app/[locale]/layout.tsx', pair, policy), [])
+  assert.ok(auditSource('app/[locale]/layout.tsx', pair.replace('InterVariable-Italic.woff2', 'Other-Italic.woff2'), policy).some(d => d.rule === 'typography/font-family'))
 })
 
 test('component composition + business data/event wiring + layout are allowed', () => {
@@ -343,4 +347,30 @@ test('one container per surface: a frame inside a frame is a double border', () 
   clean(`<div className="rounded-lg border"><div className="rounded-full border bg-popover shadow-lg" /></div>`)
   clean(`<Card><CardHeader /><CardContent><Dialog><DialogContent><DialogTitle>x</DialogTitle><div className="rounded-lg border" /></DialogContent></Dialog></CardContent></Card>`)
   clean(`<FramePanel><Item /></FramePanel>`)
+})
+
+test('Chinese takes the system font, as in Comma: no self-hosted text font draws CJK and --font-sans names none before the system stack', async () => {
+  const { createRequire } = await import('node:module')
+  const fontkit = createRequire(import.meta.url)('next/dist/compiled/@next/font/dist/fontkit').default
+  const root = new URL('../', import.meta.url)
+  const cjk = cp => (cp >= 0x2E80 && cp <= 0x9FFF) || (cp >= 0xF900 && cp <= 0xFAFF) || (cp >= 0xFE30 && cp <= 0xFE4F) || (cp >= 0xFF00 && cp <= 0xFFEF)
+  // A Latin font that drew CJK would win over the system font for those characters (mixed punctuation, wrong glyphs).
+  for (const file of ['InterVariable.woff2', 'InterVariable-Italic.woff2']) {
+    const font = (fontkit.default ?? fontkit)(readFileSync(new URL(`app/fonts/${file}`, root)))
+    assert.deepEqual(font.characterSet.filter(cjk).map(cp => `U+${cp.toString(16).toUpperCase()}`), [], file)
+  }
+  const stack = readFileSync(new URL('app/globals.css', root), 'utf8').match(/--font-sans:\s*([^;]+);/)[1].split(',').map(family => family.trim().replaceAll('"', ''))
+  assert.deepEqual(stack, ['var(--font-inter)', 'SF Pro Display', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Open Sans', 'Helvetica Neue', 'sans-serif'])
+})
+
+test('the type scale is Comma\'s: size tokens in globals.css match the pinned values', () => {
+  const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8')
+  const comma = { xs: ['0.75rem', '1.125rem'], sm: ['0.8125rem', '1.25rem'], md: ['0.9375rem', '1.5rem'], lg: ['1.125rem', '1.75rem', '-0.01em'], xl: ['1.25rem', '1.875rem', '-0.01em'], '2xl': ['1.5rem', '2rem'] }
+  const token = name => css.match(new RegExp(`\\n${name}:\\s*([^;]+);`))?.[1].trim()
+  for (const [step, [size, leading, tracking]] of Object.entries(comma)) {
+    assert.equal(token(`--text-${step}`), size, `text-${step} size`)
+    assert.equal(token(`--text-${step}--line-height`), leading, `text-${step} line height`)
+    assert.equal(token(`--text-${step}--letter-spacing`), tracking, `text-${step} letter spacing`)
+  }
+  assert.equal(token('--font-weight-normal'), '450')
 })

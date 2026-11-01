@@ -32,9 +32,26 @@ export function runSummaryText(run: { report: unknown; error: string | null }): 
   return run.error?.split('\n').find(line => line.trim())?.trim() ?? null
 }
 
+/** One tool call in a folded "N steps" line: its name, the one input that says what it did, and whether it failed. */
+export type ThreadStep = { id: string; name: string; detail: string | null; failed: boolean }
+
+const STEP_DETAIL_KEYS = ['command', 'file_path', 'path', 'pattern', 'url', 'query', 'title', 'description'] as const
+const STEP_DETAIL_MAX = 200
+
+function stepDetail(input: unknown): string | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null
+  const record = input as Record<string, unknown>
+  let detail: string | null = null
+  for (const key of STEP_DETAIL_KEYS) if (typeof record[key] === 'string' && (record[key] as string).trim()) { detail = (record[key] as string).trim(); break }
+  if (!detail && Array.isArray(record.files)) detail = record.files.filter(file => typeof file === 'string').join(', ') || null
+  if (!detail) return null
+  const line = detail.replace(/\s+/g, ' ')
+  return line.length > STEP_DETAIL_MAX ? `${line.slice(0, STEP_DETAIL_MAX - 1)}…` : line
+}
+
 export type ThreadItem =
   | { kind: 'agent'; id: string; text: string; at: number }
-  | { kind: 'steps'; id: string; count: number; at: number }
+  | { kind: 'steps'; id: string; count: number; steps: ThreadStep[]; at: number }
   | { kind: 'error'; id: string; text: string; at: number }
   | { kind: 'computer'; id: string; botId: string; runId: string; task: string; at: number }
   | { kind: 'person'; id: string; text: string; author: string; image?: string | null; mine: boolean; at: number }
@@ -50,6 +67,7 @@ export function threadItems(
 ): ThreadItem[] {
   const items: ThreadItem[] = []
   const texts = new Map<string, Extract<ThreadItem, { kind: 'agent' }>>()
+  const calls = new Map<string, ThreadStep>()
   for (const [index, { chunk, at }] of chunks.entries()) {
     const time = new Date(at).getTime()
     const last = items[items.length - 1]
@@ -59,8 +77,13 @@ export function threadItems(
       if (!item) { item = { kind: 'agent', id, text: '', at: time }; texts.set(id, item); items.push(item) }
       if (typeof chunk.delta === 'string') item.text += chunk.delta
     } else if (chunk.type === 'tool-input-available') {
-      if (last?.kind === 'steps') last.count += 1
-      else items.push({ kind: 'steps', id: `steps:${index}`, count: 1, at: time })
+      const step: ThreadStep = { id: String(chunk.toolCallId ?? index), name: typeof chunk.toolName === 'string' && chunk.toolName ? chunk.toolName : 'tool', detail: stepDetail(chunk.input), failed: false }
+      calls.set(step.id, step)
+      if (last?.kind === 'steps') { last.count += 1; last.steps.push(step) }
+      else items.push({ kind: 'steps', id: `steps:${index}`, count: 1, steps: [step], at: time })
+    } else if (chunk.type === 'tool-output-error' && typeof chunk.toolCallId === 'string') {
+      const step = calls.get(chunk.toolCallId)
+      if (step) step.failed = true
     } else if (chunk.type === 'data-computer' && expectedRunId && chunk.data && typeof chunk.data === 'object') {
       const data = chunk.data as Record<string, unknown>
       if (data.runId === expectedRunId && typeof data.botId === 'string' && typeof data.task === 'string' && data.task.length <= 200 && !items.some(item => item.kind === 'computer' && item.runId === expectedRunId))

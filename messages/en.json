@@ -2314,9 +2314,13 @@
     "paymentDesignation": {
       "heading": "Payment",
       "mine": "Pay for this team with my card",
+      "payerTitle": "Paying card",
       "payer": "{name}'s card",
-      "active": "Paying",
-      "until": "Stops paying on {date}"
+      "until": "{name}'s card · stops on {date}"
+    },
+    "creditShare": {
+      "mine": "My credits also pay for this team",
+      "sharers": "Members sharing credits"
     },
     "personalPolicy": {
       "loading": "Loading personal subscription settings",
@@ -2780,6 +2784,7 @@
   },
   "Coordinator": {
     "stop": "Stop",
+    "stopped": "Stopped",
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
     "conversationWith": "Conversation with {name}",
@@ -3462,8 +3467,6 @@
       },
       "columns": "Board columns",
       "hiddenLane": "Hidden",
-      "expandColumn": "Expand the {status} column",
-      "foldColumn": "Fold to a strip",
       "hideColumn": "Hide column",
       "showColumn": "Show {status} column",
       "columnMenu": "{status} column options",
@@ -3681,7 +3684,7 @@
   },
   "GroupChat": {
     "untitled": "Untitled group chat",
-    "composer": "Sending to groups isn't open yet",
+    "composer": "Message {name}",
     "messages": "Group chat messages",
     "you": "You",
     "member": "Member",
@@ -3692,7 +3695,10 @@
     "loadError": "Couldn't load group chat messages.",
     "retry": "Retry",
     "older": "Load earlier messages",
-    "loadingOlder": "Loading…"
+    "loadingOlder": "Loading…",
+    "notSent": "Not sent",
+    "answering": "Replying",
+    "noTaker": "No bot took this. @ one by name"
   },
   "DeviceSetup": {
     "title": "Set up {device}",

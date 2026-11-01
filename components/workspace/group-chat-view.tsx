@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -15,17 +16,24 @@ import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { UserMessageText } from '@/components/workspace/user-message-text'
 import { cn } from '@/lib/utils'
-import { authorRuns, chronological, fetchGroupMessages, GroupMessagesRequestError, type GroupMessagePage } from '@/lib/group-messages'
+import { mentionsIn } from '@/lib/group-mentions'
+import { authorRuns, chronological, fetchGroupMessages, GroupMessagesRequestError, postGroupMessage, type GroupMessagePage } from '@/lib/group-messages'
+
+/** A message the person sent that the server has not stored yet; a failed one waits for 重试. */
+type Pending = { key: string; body: string; failed: boolean; sentId?: string }
+
+/** How often the chat reads again while a bot is answering; it does not poll otherwise. */
+const ANSWER_POLL_MS = 2500
 
 export type GroupChatRequest = { id: string; title: string; workspaceId: string }
 
 /**
- * A group chat, read-only. It opens from a search hit and reads the real
- * message history through the group API, which checks workspace and group
- * membership on every page. Sending is not wired yet, so it ends in the
- * standard composer, disabled (R-10), with no line explaining it (R-40). Names
- * and bot avatars come from the group's member list, then the workspace's
- * members and the person's agents.
+ * A group chat. It reads and sends through the group API (the phone's path),
+ * which checks workspace and group membership on every request. A message goes
+ * to the bots it @mentions, else to the ones the server judges should answer;
+ * it shows at once and, if it fails, stays with 重试. While a bot is answering
+ * the chat reads again every few seconds. Names and bot avatars come from the
+ * group's member list, then the workspace's members and the person's agents.
  */
 export function GroupChatView({ group, userId, people }: {
   group: GroupChatRequest
@@ -38,15 +46,45 @@ export function GroupChatView({ group, userId, people }: {
   // The pill's avatar is the members' bloubs (R-36); the right column's 详情 reads the same request.
   const { data: members = [] } = useGroupMembers(group.id)
   const member = (type: 'user' | 'agent' | 'bot', id: string) => members.find(item => item.memberType === type && item.id === id)
+  const [draft, setDraft] = useState('')
+  const [pending, setPending] = useState<Pending[]>([])
+  const [answering, setAnswering] = useState(false)
   const { data: pages, error, size, setSize, isValidating, mutate } = useSWRInfinite<GroupMessagePage>(
     (index, previous: GroupMessagePage | null) => index === 0 ? ['group-messages', group.id, null] : previous?.nextBefore ? ['group-messages', group.id, previous.nextBefore] : null,
     ([, id, before]: [string, string, string | null]) => fetchGroupMessages(id, before),
-    { revalidateOnFocus: false, revalidateFirstPage: false },
+    // The first page carries new messages and who is answering; only it is read again while a bot answers.
+    { revalidateOnFocus: false, refreshInterval: answering ? ANSWER_POLL_MS : 0, onSuccess: data => setAnswering(!!data[0]?.agentStatus) },
   )
   const messages = pages ? chronological(pages) : []
   const older = pages?.at(-1)?.nextBefore ?? null
   const loadingOlder = isValidating && !!pages && size > pages.length
   const code = error instanceof GroupMessagesRequestError ? error.code : error ? 'unavailable' : null
+  const deliver = async (item: Pending) => {
+    setPending(list => list.map(entry => entry.key === item.key ? { ...entry, failed: false } : entry))
+    let sentId: string
+    try { sentId = (await postGroupMessage(group.id, item.body, mentionsIn(item.body, members))).id }
+    catch {
+      setPending(list => list.map(entry => entry.key === item.key ? { ...entry, failed: true } : entry))
+      return
+    }
+    // Stored: never offered for 重试 again. It stays, hidden behind the stored copy once that is read, so it never flickers.
+    setPending(list => list.map(entry => entry.key === item.key ? { ...entry, sentId } : entry))
+    await mutate()
+  }
+  const send = () => {
+    const body = draft.trim()
+    if (!body) return
+    const item = { key: crypto.randomUUID(), body, failed: false }
+    setDraft('')
+    setPending(list => [...list, item])
+    void deliver(item)
+  }
+  const first = pages?.[0]
+  const unsent = pending.filter(item => !item.sentId || !messages.some(message => message.id === item.sentId))
+  // The newest message, a sent one or a bot answering keeps the chat at its end; loading older ones does not move it.
+  const scroller = useRef<HTMLDivElement>(null)
+  const end = `${messages.at(-1)?.id}:${unsent.length}:${!!first?.agentStatus}`
+  useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight }) }, [end])
   const authorName = (type: 'user' | 'agent' | 'bot', id: string) => type === 'user'
     ? id === userId ? t('you') : member(type, id)?.name || people.get(id) || t('member')
     : member(type, id)?.name ?? (type === 'agent' ? agents.find(agent => agent.id === id)?.name : undefined) ?? t('bot')
@@ -54,12 +92,12 @@ export function GroupChatView({ group, userId, people }: {
   return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className="relative flex size-full min-h-0 flex-col">
     <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
-    <div className="min-h-0 flex-1 overflow-y-auto">
+    <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6">
         {code === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>
           : code ? <div role="alert" className="flex items-center gap-3 py-6 text-sm"><span>{code === 'unauthorized' ? t('authRequired') : t('loadError')}</span>{code !== 'unauthorized' && <Button variant="outline" size="sm" onClick={() => { void mutate() }}>{t('retry')}</Button>}</div>
             : !pages ? <div aria-busy="true" className="flex flex-col gap-3 py-4"><Skeleton className="h-9 w-2/3" /><Skeleton className="ml-auto h-9 w-1/2" /><Skeleton className="h-9 w-3/5" /></div>
-              : messages.length === 0 ? <p className="py-6 text-sm text-muted-foreground">{t('empty')}</p>
+              : messages.length === 0 && !unsent.length ? <p className="py-6 text-sm text-muted-foreground">{t('empty')}</p>
                 : <>
                   {older && <Button variant="ghost" size="sm" className="self-center text-muted-foreground" disabled={loadingOlder} onClick={() => { void setSize(size + 1) }}>{loadingOlder && <Spinner data-icon="inline-start" role="presentation" aria-hidden="true" />}{loadingOlder ? t('loadingOlder') : t('older')}</Button>}
                   <ol aria-label={t('messages')} className="flex flex-col gap-4">
@@ -77,12 +115,20 @@ export function GroupChatView({ group, userId, people }: {
                         </div>
                       </li>
                     })}
+                    {unsent.map(item => <li key={item.key} data-pending={item.failed ? 'failed' : 'sending'} className="flex flex-col items-end gap-1">
+                      <Bubble variant="secondary" align="end" className={cn('max-w-[min(26rem,80%)] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', !item.failed && 'opacity-60')}>
+                        <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap"><UserMessageText text={item.body} /></BubbleContent>
+                      </Bubble>
+                      {item.failed && <span role="alert" className="flex items-center gap-2 text-xs text-destructive">{t('notSent')}<Button variant="ghost" size="xs" onClick={() => { void deliver(item) }}>{t('retry')}</Button></span>}
+                    </li>)}
+                    {first?.agentStatus && <li aria-label={t('answering')} className="flex"><span className="rounded-2xl bg-muted px-4 py-3"><Spinner aria-hidden="true" /></span></li>}
                   </ol>
+                  {first?.routingError && !first.agentStatus && <p className="text-center text-xs text-muted-foreground">{t('noTaker')}</p>}
                 </>}
       </div>
     </div>
     <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
-      <ChatComposer ref={null} value="" onChange={() => {}} onSubmit={() => {}} label={t('composer')} disabled />
+      <ChatComposer ref={null} value={draft} onChange={setDraft} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!code} />
     </div>
   </section>
 }
