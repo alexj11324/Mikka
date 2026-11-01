@@ -225,8 +225,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
   card in a chat; a later change of state is a sentence from the Coordinator,
   not a second card. The card has no log, input box or buttons. Clicking it
-  opens the thread conversation: on desktop the centre column switches to it
-  with 「‹ Coordinator」 to go back, on a phone it pushes in full screen.
+  opens the thread conversation as R-80 says for every thread: on desktop in
+  the right column beside the chat, which stays; on a phone it pushes in full
+  screen ([decision](decisions/2026-11-01-1320-navigation-model.md)).
   Figma: page 「线程卡片 · 聊天里派出线程」.
 
 ## Right panel, 建议, Artifact and browser
@@ -289,6 +290,24 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   a chip 「1 · <element> · <action> · <note>」 into the current chat's
   composer. The 浏览器 is the person's own and app-wide; it is not a bot's
   电脑 (R-50).
+
+## Navigation
+
+- **R-80** One address says what is on screen, and every click goes through
+  `components/workspace/workspace-navigation.ts`; nothing else writes the
+  browser history or builds a workspace link (`scripts/navigation-policy.mjs`).
+  A move the person makes (another bot or group chat, a rail page, a task, a
+  thread, an Artifact) is a new history entry, so back and forward step
+  through it one move at a time and never leave Mikka while there is a step
+  inside it; a filter or a tab replaces the entry. Each object opens in one
+  place whatever the entry point: a bot or group chat in the centre; a thread
+  in the right column beside what is in the centre (the chat, or a task with
+  its properties), a thread of another bot included, its header naming the
+  bot that dispatched it; a task as its own page in the centre, as Linear; an
+  Artifact in its window over the page (R-56); PRs and web pages in a new
+  tab. Projects and teams live under 看板, with no rail item of their own. On
+  a phone the right column is a page pushed over the chat. Source: Alex,
+  2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)).
 
 ## Settings
 

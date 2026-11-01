@@ -73,7 +73,8 @@
     "bot-model-picker.spec.ts",
     "devices-settings.spec.ts",
     "factory-evidence-viewer.spec.ts",
-    "onboarding.spec.ts"
+    "onboarding.spec.ts",
+    "navigation-model.spec.ts"
   ],
   "nightly": [
     "agent-performance.spec.ts",
@@ -388,6 +389,20 @@
         "group-chat-send.spec.ts",
         "bot-list-groups.spec.ts",
         "group-chat-stop.spec.ts"
+      ]
+    },
+    {
+      "area": "navigation",
+      "paths": [
+        "^components\\/workspace\\/(?:workspace-navigation\\.ts|issue-workspace\\.tsx)$",
+        "^lib\\/settings-navigation\\.ts$",
+        "^scripts\\/navigation-policy\\.mjs$",
+        "^components\\/desktop\\/desktop-integration\\.tsx$"
+      ],
+      "specs": [
+        "navigation-model.spec.ts",
+        "detail-return.spec.ts",
+        "workspace.spec.ts"
       ]
     }
   ]

@@ -10,6 +10,7 @@ import { chooseDesktopNotifications } from '@/app/actions/desktop-notifications'
 import { desktopRunUpdate, type DesktopRun } from '@/lib/platform/desktop-notifications'
 import { pushAllowed } from '@/lib/push-allowed'
 import { usePlatform } from '@/lib/platform/use-platform'
+import { openAppLink } from '@/components/workspace/workspace-navigation'
 
 const POLL_MS = 15_000
 
@@ -62,7 +63,7 @@ export function DesktopIntegration() {
     if (!bridge) return
     const open = (href: string) => {
       const target = appHref(href)
-      if (target) router.push(target)
+      if (target && !openAppLink(target)) router.push(target)
     }
     const unsubscribe = bridge.notifications.onClick(open)
     void bridge.notifications.consumePendingClick()
