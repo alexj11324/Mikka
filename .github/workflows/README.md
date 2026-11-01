@@ -35,6 +35,15 @@ its existing protected status names and real acceptance coverage.
   still be cancelled.
 - The existing red-main browser issue workflow tracks regressions after merge.
 
+## Cloud worker template release
+
+- `e2b-template.yml` builds the E2B worker template from `main`, makes it
+  public and points Vercel Production at it (template id and worker SHA in one
+  request), then redeploys Production. Pull requests run only its unit tests.
+  The build job holds only `E2B_API_KEY` (Infisical `prod:/vercel`) and the
+  publish job only `VERCEL_TEAM_TOKEN` (`prod:/platform`), both read through the
+  existing GitHub OIDC identity.
+
 ## GitHub branch protection (separate repository setting)
 
 Keep required status checks enabled. Disable **Require branches to be up to
