@@ -147,7 +147,8 @@ export class HttpServerLink implements ServerLink {
     const response = z.object({ decision: z.enum(['pending', 'allow', 'deny']) })
     const liveness = new AbortController()
     const gate = new ToolApprovalGate(assignment.runId, {
-      permission: request => toolApprovalDecision(request, assignment.policy, worktree, runApps(assignment.mcp)?.apps.map(app => app.name)),
+      permission: request => toolApprovalDecision(request, assignment.policy, worktree, runApps(assignment.mcp)?.apps.map(app => app.name),
+        assignment.github ? [new URL(assignment.github.endpoint).host] : []),
       // Keep the callback pending at the tool boundary. The adapter's current
       // session and checkpoint remain intact; handback resolves this same call.
       isLive: async () => {

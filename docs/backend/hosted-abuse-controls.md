@@ -6,15 +6,22 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
 
 ## Backend contract for the frontend
 
-- `startCardVerification(workspaceId?)` is admin-only and returns a Stripe
-  Checkout `{ url }` in `mode: 'setup'`, with USD currency and the workspace's
-  shared Stripe customer. Redirect the browser to that URL. The server builds
-  the localized billing return URL with the application base path and workspace:
+- Card verification belongs to the person (orchestration.md § 7, C19). Any
+  member may start it, from any workspace; it is always recorded on their own
+  personal workspace, which gets the USD 1 once per card. 计费 offers it only in
+  the personal workspace, and the chat's 验证银行卡 link only there too.
+- `startCardVerification(workspaceId?)` needs membership of `workspaceId` and
+  returns a Stripe Checkout `{ url }` in `mode: 'setup'`, with USD currency and
+  the personal workspace's Stripe customer. Redirect the browser to that URL. The
+  server builds the localized billing return URL with the application base path
+  and the personal workspace:
   `?section=billing&workspace=…&verify=success&session_id={CHECKOUT_SESSION_ID}`
   or `verify=cancelled`. Setup creates no charge, subscription, or automatic
   top-up; bank authorization holds can still appear. The frontend never grants
   credit from the return parameters.
-- `cardVerificationStatus(workspaceId?)` is admin-only. It returns `status`
+- `cardVerificationStatus(workspaceId?)` needs membership and reads the
+  person's own verification (their personal workspace; a card they verified
+  earlier on another workspace they own counts). It returns `status`
   (`unverified`, `pending`, `verified`, or `unavailable`), nullable `last4`,
   nullable `allowance` (`granted` or `claimed_elsewhere`), and
   `remainingAllowanceMicroUsd` / `remainingAllowancePoints`. USD 1 is 1,000,000

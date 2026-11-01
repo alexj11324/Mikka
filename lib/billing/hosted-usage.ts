@@ -18,6 +18,8 @@ export interface HostedBalance {
 export interface HostedUsage {
   state: HostedState
   balance: HostedBalance
+  /** A personal workspace: card verification (the person's, C19) lands here. */
+  personal?: boolean
 }
 
 /** #558 `cardVerificationStatus`. */

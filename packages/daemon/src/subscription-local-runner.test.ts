@@ -31,7 +31,7 @@ function recordingCli(record: string) {
 import { readFileSync, writeFileSync } from "node:fs"
 import { spawn } from "node:child_process"
 const token = readFileSync(3, "utf8")
-writeFileSync(${JSON.stringify(record)}, JSON.stringify({ token, env: Object.keys(process.env).filter(key => /TOKEN|KEY|SECRET/.test(key)) }))
+writeFileSync(${JSON.stringify(record)}, JSON.stringify({ token, env: Object.keys(process.env).filter(key => /TOKEN|KEY|SECRET/.test(key) && !/^GIT_CONFIG_KEY_[0-9]+$/.test(key)), gitConfig: Object.fromEntries(Object.entries(process.env).filter(([key]) => /^GIT_CONFIG_(?:KEY|VALUE)_[0-9]+$/.test(key))) }))
 const child = spawn(process.execPath, [${JSON.stringify(resolve(import.meta.dirname, "../test/fakes/fake-claude-subscription.mjs"))}, ...process.argv.slice(2)], { stdio: ["inherit", "inherit", "inherit", "pipe"] })
 child.stdio[3].end(token)
 child.on("exit", code => process.exit(code ?? 1))
@@ -66,6 +66,8 @@ describe("local subscription runs", () => {
     const seen = JSON.parse(readFileSync(record, "utf8"))
     expect(seen.token).toBe(TOKEN)
     expect(seen.env).toEqual(["CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"])
+    // The git config entries are the run's own maintenance settings, nothing else.
+    expect(seen.gitConfig).toEqual({ GIT_CONFIG_KEY_0: "maintenance.auto", GIT_CONFIG_VALUE_0: "false", GIT_CONFIG_KEY_1: "gc.auto", GIT_CONFIG_VALUE_1: "0" })
     expect(asked).toEqual([`device-1/${RUN}`])
     expect(JSON.stringify(events)).not.toContain(TOKEN)
     for (const file of filesUnder(stateDir)) expect(readFileSync(file, "utf8")).not.toContain(TOKEN)

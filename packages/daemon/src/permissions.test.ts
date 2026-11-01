@@ -176,6 +176,16 @@ describe("applying the workspace's policy (ADR 0028)", () => {
       ]),
     })
     expect(policyInstructions(p)[0]).toContain("read-only check")
+    // A read-only check never pushes, even when handed GitHub delivery.
+    expect(claudePermissionRules(p, true).deny).toContain("Bash(git push:*)")
+  })
+
+  it("lets the agent push only when it delivers the run itself", () => {
+    // The daemon pushes (ADR 0017): every other run denies the agent's push.
+    expect(claudePermissionRules(policy({ git_push: "allow" })).deny).toContain("Bash(git push:*)")
+    // A GitHub delivery run: the server sent run-scoped credentials because
+    // the push is allowed, and the agent is told to push and open the PR.
+    expect(claudePermissionRules(policy({ git_push: "allow" }), true).deny).not.toContain("Bash(git push:*)")
   })
 
   it("classifies shell commands", () => {
@@ -272,6 +282,13 @@ describe("applying the workspace's policy (ADR 0028)", () => {
       chosen("npm install zod", policy({ install_dependency: "allow" }))
     ).toBe("yes")
     expect(chosen("git push", policy({ git_push: "allow" }))).toBe("no")
+    // Agent-delivered GitHub runs push themselves, still within the policy.
+    const delivered = (command: string, p?: RunPolicy) => {
+      const { response } = acpPermissionResponse(request(command), p, true)
+      return response.outcome.outcome === "selected" ? response.outcome.optionId : null
+    }
+    expect(delivered("git push https://github.com/o/r.git HEAD:refs/heads/mikka/x", policy({ git_push: "allow" }))).toBe("yes")
+    expect(delivered("git push", policy({ git_push: "deny" }))).toBe("no")
   })
 
   it("tells the agent what it may do", () => {

@@ -145,18 +145,20 @@ describe('daemon-owned clone cache', () => {
     const worktree = await new WorktreeManager(join(root, 'worktrees')).create('git-test', path, await cache.baseRef(pathToFileURL(source).href))
     const gitWritePaths = await worktreeGitWritePaths(path, worktree, 'git-test')
     const context = new RunContext({ harness: 'codex', worktree, gitWritePaths, privateDir: root, runDir: join(root, 'run') })
-    expect(context.policy().allowWrite).toContain(join(path, '.git', 'objects'))
-    expect(context.policy().allowWrite).toContain(context.gitDir)
-    // The branch ref's directory (not just the ref file) must be writable so git
-    // can create <branch>.lock when committing; binding only the leaf leaves the
-    // dir read-only and `git commit` fails with EROFS.
-    expect(context.policy().allowWrite).toContain(join(path, '.git', 'refs', 'heads', 'mikka'))
-    expect(context.policy().allowWrite).toContain(join(path, '.git', 'logs', 'refs', 'heads', 'mikka'))
+    // The repository root, as sandbox-runtime grants a repository: it protects
+    // `.git/config` and `.git/hooks` itself. No file inside `.git` is listed
+    // (each would be its own mount point, and git renames locks over refs).
+    expect(gitWritePaths).toEqual([path])
+    expect(context.policy().allowWrite).toContain(path)
+    expect(context.policy().allowWrite.filter(p => p.startsWith(join(path, '.git')))).toEqual([])
+    expect(context.policy().denyWrite).toEqual(expect.arrayContaining([join(path, '.git', 'config'), join(path, '.git', 'hooks')]))
     expect(context.policy().denyWrite).toContain(join(context.gitDir, 'commondir'))
     expect(context.policy().allowWrite).not.toContain(source)
     const readonly = new RunContext({ harness: 'codex', worktree, gitWritePaths, privateDir: root, runDir: join(root, 'readonly'), policy: { ...runPolicy(undefined), readOnly: true } })
-    expect(readonly.policy().allowWrite).not.toContain(context.gitDir)
-    expect(readonly.policy().denyWrite).toContain(context.gitDir)
+    // A read-only check writes nothing of the repository, its git dir included.
+    expect(readonly.policy().allowWrite.filter(p => context.gitDir.startsWith(p))).toEqual([])
+    expect(readonly.policy().denyWrite).toContain(path)
+    expect(context.gitDir.startsWith(`${path}/`)).toBe(true)
   })
   it('a real daemon claims a URL-only assignment without registering any repository', async () => {
     const source = await makeRepo()

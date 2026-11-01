@@ -75,6 +75,22 @@ export const MCP_SERVER_SCRIPT = resolve(import.meta.dirname, "mikka-mcp.mjs")
 export const MCP_SERVER_NAME = "mikka"
 export const COMPUTER_MCP_SERVER_NAME = "mikka_computer"
 
+/**
+ * Git runs auto maintenance after commit, fetch and merge (gc; since 2.56 also
+ * pack-refs and repack by default). It would rewrite the shared clone cache
+ * outside this run's git dir, which the run may not write; the daemon
+ * maintains the cache. Set as GIT_CONFIG_COUNT entries: sandbox-runtime
+ * continues those, but replaces GIT_CONFIG_PARAMETERS with its proxy setting.
+ */
+const RUN_GIT_CONFIG: ReadonlyArray<readonly [string, string]> = [["maintenance.auto", "false"], ["gc.auto", "0"]]
+
+function withGitConfig(env: Record<string, string>, entries: ReadonlyArray<readonly [string, string]>): Record<string, string> {
+  const start = Number(env.GIT_CONFIG_COUNT ?? 0)
+  const out: Record<string, string> = { ...env, GIT_CONFIG_COUNT: String(start + entries.length) }
+  entries.forEach(([key, value], i) => { out[`GIT_CONFIG_KEY_${start + i}`] = key; out[`GIT_CONFIG_VALUE_${start + i}`] = value })
+  return out
+}
+
 export interface McpServerSpec {
   command: string
   args: string[]
@@ -310,6 +326,10 @@ export class RunContext {
         join(this.gitDir, "commondir"),
         join(this.gitDir, "gitdir"),
         join(this.gitDir, "config.worktree"),
+        // sandbox-runtime's own protection of a repository's config and hooks
+        // covers repositories under the process's working directory only;
+        // the shared clone lies outside it, so it is declared here the same way.
+        ...(this.options.gitWritePaths?.length ? [join(this.gitDir, "..", "..", "config"), join(this.gitDir, "..", "..", "hooks")] : []),
         ...(readOnly ? [this.worktree, ...(this.options.gitWritePaths ?? [])] : []),
       ],
       denyRead: [
@@ -369,7 +389,16 @@ export class RunContext {
    * and zsh writes here-docs to `$TMPPREFIX` (default `/tmp/zsh`).
    */
   tempEnv(): Record<string, string> {
-    return { TMPDIR: this.tmpDir, TMPPREFIX: join(this.tmpDir, "zsh"), ...this.githubEnv, ...(this.options.policyHash ? { MIKKA_POLICY_HASH: this.options.policyHash } : {}) }
+    return { TMPDIR: this.tmpDir, TMPPREFIX: join(this.tmpDir, "zsh"), ...withGitConfig(this.githubEnv, RUN_GIT_CONFIG), ...(this.options.policyHash ? { MIKKA_POLICY_HASH: this.options.policyHash } : {}) }
+  }
+
+  /**
+   * The agent delivers this run itself: it commits, pushes to the issue
+   * branch and opens the pull request with run-scoped GitHub credentials. The
+   * server sends GitHub delivery only for a run whose push is allowed.
+   */
+  get agentDelivers(): boolean {
+    return Object.keys(this.githubEnv).length > 0
   }
 
   /** A hand-in from an earlier session would end this one at once. */
