@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
-// This suite must run after tracked migrations in GitHub's disposable service,
-// never against a developer database or a Preview/production application DB.
+// This suite must run after tracked migrations in a disposable loopback *_e2e
+// database, never against a shared or Preview/production application DB.
 const url = process.env.E2E_DATABASE_URL
-if (!url || process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true'
-  || new URL(url).hostname !== '127.0.0.1' || new URL(url).pathname !== '/mikka_e2e'
-  || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) {
-  throw new Error('Local runtime integration requires GitHub CI ephemeral mikka_e2e')
+if (!disposableDatabase() || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) {
+  throw new Error('Local runtime integration requires a migrated loopback *_e2e database')
 }
 
 test('device identity convergence, repository URL deduplication and history preservation', async () => {

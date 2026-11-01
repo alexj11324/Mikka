@@ -7,6 +7,7 @@ import { CredentialStore, hashNonce } from './store'
 import { CredentialError } from './contracts'
 import { fillCredential } from './broker'
 import type { Kms } from './kms'
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const databaseURL = process.env.CREDENTIAL_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (databaseURL && process.env.CREDENTIAL_TEST_RETAIN_RESOURCES !== '1') throw new Error('Credential database tests require explicit resource retention')
@@ -14,7 +15,7 @@ if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Credential 
 test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation and opaque responses', { skip: !databaseURL }, async () => {
   process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   const target = new URL(databaseURL!)
-  const isolated = target.pathname === '/credential_test' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.hostname === '127.0.0.1' && target.pathname === '/mikka_e2e')
+  const isolated = target.pathname === '/credential_test' || disposableDatabase(process.env, databaseURL)
   if (!isolated) throw new Error('Use the isolated credential test database')
   const schema = `credential_${randomBytes(8).toString('hex')}`, admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
@@ -92,7 +93,7 @@ test('real PostgreSQL: owner/workspace binding, one-use forms/leases, revocation
 test('real PostgreSQL: observed credential lease inserts once and stays guarded', { skip: !databaseURL }, async () => {
   process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   const targetUrl = new URL(databaseURL!)
-  const isolated = targetUrl.pathname === '/credential_test' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && targetUrl.hostname === '127.0.0.1' && targetUrl.pathname === '/mikka_e2e')
+  const isolated = targetUrl.pathname === '/credential_test' || disposableDatabase(process.env, databaseURL)
   if (!isolated) throw new Error('Use the isolated credential test database')
   const schema = `credential_${randomBytes(8).toString('hex')}`, admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)

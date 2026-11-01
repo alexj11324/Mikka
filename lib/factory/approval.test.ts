@@ -32,6 +32,7 @@ import {
   vercelTarget,
 } from "./vercel-publication";
 import { PublicationDeferred } from "./publication-operation";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const binding = (task: FactoryTask): FactoryBinding => ({
   taskId: task.id,
@@ -67,16 +68,7 @@ test("approval schema cannot accept a client-supplied human identity", () => {
   );
 });
 
-const dbURL =
-  process.env.FACTORY_LOCAL_DB_TESTS === "1" ||
-  (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true")
-    ? process.env.E2E_DATABASE_URL
-    : undefined;
-if (dbURL) {
-  const url = new URL(dbURL);
-  assert.equal(url.hostname, "127.0.0.1");
-  assert.equal(url.pathname, "/mikka_e2e");
-}
+const dbURL = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined;
 
 test(
   "PG17 approval/publish contract: real SQL, HTTP handler, isolated filesystem effect; upstream identities/results/policy receipts are fixtures",

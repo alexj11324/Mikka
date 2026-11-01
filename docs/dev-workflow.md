@@ -70,10 +70,12 @@ Never set `GITHUB_ACTIONS`, `RUNNER_ENVIRONMENT`, `GITHUB_RUN_ID` or any other
 CI variable to get past a test guard. A suite that runs only on a
 GitHub-hosted runner is left to CI.
 
-现状（非决定）：many database and browser suites, and the shared test-account
-pool (`scripts/test-accounts/bootstrap.mjs`), refuse to run unless
-`GITHUB_ACTIONS` and related variables are set, and several hard-code port
-5432. Until those guards learn the local environment, those suites run in CI.
+Database suites decide by the database, not the runner: they run wherever every
+application database URL is a loopback `*_e2e` database
+(`disposableDatabase` in `tests/helpers/e2e-target.mjs`) and skip or refuse
+otherwise. 现状（非决定）：browser suites, the shared test-account pool
+(`scripts/test-accounts/bootstrap.mjs`) and a few hosted-service suites still
+require `GITHUB_ACTIONS`; those run in CI.
 
 Local test accounts: the local mode (`MIKKA_LOCAL_TEST_ACCOUNTS=1` with a
 loopback `*_e2e` database) is described in

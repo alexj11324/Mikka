@@ -9,6 +9,7 @@ import {
   FACTORY_CHECK_ANCESTRY_CONTRACT_VERSION,
 } from "./check-independence";
 import { fixture } from "./test-support/check-ancestry-fixture";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 // Only the already-authorized Actions ephemeral service. No application/cloud
 // fallback and no local CI impersonation. Rows are a synthetic reader projection,
@@ -18,22 +19,14 @@ if (!connectionString)
   throw new Error(
     "Factory ancestry DB contract needs the isolated CI database",
   );
-const target = new URL(connectionString);
 if (
-  process.env.CI !== "true" ||
-  process.env.GITHUB_ACTIONS !== "true" ||
   process.env.REQUIRE_DB !== "1" ||
-  !["postgres:", "postgresql:"].includes(target.protocol) ||
-  target.hostname !== "127.0.0.1" ||
-  target.port !== "5432" ||
-  target.pathname !== "/mikka_e2e" ||
-  target.search ||
-  target.hash ||
+  !disposableDatabase() ||
   process.env.MIKKA_DATABASE_URL !== connectionString ||
   process.env.DATABASE_URL !== connectionString
 )
   throw new Error(
-    "Refusing non-Actions/non-isolated Factory ancestry database",
+    "Refusing non-isolated Factory ancestry database (loopback *_e2e, REQUIRE_DB=1)",
   );
 
 type Graph = ReturnType<typeof fixture>;

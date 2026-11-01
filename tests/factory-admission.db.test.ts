@@ -4,13 +4,12 @@ import test from 'node:test'
 import type { PoolClient } from 'pg'
 import { remoteKey } from '@mikka/protocol/repository'
 import type { FactoryTask } from '../lib/factory/store'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 const connection = process.env.E2E_DATABASE_URL
-const enabled = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && Boolean(connection)
+const enabled = disposableDatabase()
 if (connection) {
-  if (!enabled) throw new Error('Factory admission DB tests require GitHub Actions ephemeral PG17')
-  const target = new URL(connection)
-  if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.port !== '5432' || target.pathname !== '/mikka_e2e' || target.search || target.hash) throw new Error('Factory admission DB tests require the isolated loopback mikka_e2e service')
+  if (!enabled) throw new Error('Factory admission DB tests require a loopback *_e2e database')
   if (process.env.MIKKA_DATABASE_URL !== connection || process.env.DATABASE_URL !== connection || (process.env.ORVILO_DATABASE_URL && process.env.ORVILO_DATABASE_URL !== connection)) throw new Error('All admission database paths must use the ephemeral E2E_DATABASE_URL')
 }
 if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Factory admission DB tests cannot skip in required CI')

@@ -13,17 +13,15 @@ import { readIssueMetadata } from '../lib/issue-metadata'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { REPO_ORIGIN_HEADER, RUN_LEASE_MS } from '@mikka/protocol/device'
 import { remoteKey } from '@mikka/protocol/repository'
-import { assertE2eTarget } from './helpers/e2e-target.mjs'
+import { assertE2eTarget, disposableDatabase } from './helpers/e2e-target.mjs'
 
-// Only the dedicated cloud-Linux test DB or Actions' ephemeral service. Never
-// fall back to business credentials. Fixtures are intentionally retained.
+// Only a disposable loopback *_e2e database (ISSUE184_LOCAL_TEST=1: the retained
+// scope service). Never fall back to business credentials. Fixtures are intentionally retained.
 const url = process.env.E2E_DATABASE_URL
 if (url) {
   const target = assertE2eTarget(url)
-  const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.port === '5432' && target.pathname === '/mikka_e2e'
-  const cloud = process.env.ISSUE184_LOCAL_TEST === '1' && target.port === '55484' && target.pathname === '/issue184_e2e'
-  const local = process.env.GITHUB_ACTIONS !== 'true' && process.env.ISSUE184_LOCAL_TEST !== '1' && process.env.REQUIRE_DB === '1'
-  if ((!ci && !cloud && !local) || process.env.GITHUB_ACTIONS === 'true' && !ci || process.env.ISSUE184_LOCAL_TEST === '1' && !cloud) throw new Error('Scope tests require an isolated E2E target or the retained scope service')
+  const cloud = target.port === '55484' && target.pathname === '/issue184_e2e'
+  if (!disposableDatabase() || process.env.ISSUE184_LOCAL_TEST === '1' && !cloud) throw new Error('Scope tests require an isolated E2E target or the retained scope service')
   if (process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) throw new Error('Scope tests must use the same isolated application/workspace target')
 }
 if (!url && process.env.REQUIRE_DB === '1') throw new Error('Scope DB tests cannot skip in required CI')

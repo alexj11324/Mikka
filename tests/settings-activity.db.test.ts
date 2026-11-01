@@ -2,20 +2,15 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { after, before, mock, test } from 'node:test'
 import type { Pool } from 'pg'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 // Settings backend: saved logins, activity and device removal, run through the
 // real server actions and daemon routes against Postgres. Session/request
 // (auth + next/headers) and request locale are fixture ports; workspace context
-// resolves actual active membership through the production loader. CI runs it on the Actions loopback
-// mikka_e2e; locally it needs MIKKA_LOCAL_DB_TESTS=1 and a loopback mikka_*e2e database.
-let databaseUrl: string | undefined
-try {
-  const target = new URL(process.env.E2E_DATABASE_URL ?? '')
-  const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.pathname === '/mikka_e2e'
-  const local = process.env.MIKKA_LOCAL_DB_TESTS === '1' && /^\/mikka_[a-z0-9_]*e2e$/.test(target.pathname)
-  if ((ci || local) && ['postgres:', 'postgresql:'].includes(target.protocol) && target.hostname === '127.0.0.1'
-    && !target.search && !target.hash && process.env.MIKKA_DATABASE_URL === target.href && process.env.DATABASE_URL === target.href) databaseUrl = target.href
-} catch { /* no eligible disposable database */ }
+// resolves actual active membership through the production loader. Runs when
+// E2E_DATABASE_URL, MIKKA_DATABASE_URL and DATABASE_URL are one loopback *_e2e database.
+const target = process.env.E2E_DATABASE_URL
+const databaseUrl = disposableDatabase() && process.env.MIKKA_DATABASE_URL === target && process.env.DATABASE_URL === target ? target : undefined
 if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching loopback test database')
 const dbTest = databaseUrl ? test : test.skip
 
