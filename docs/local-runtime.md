@@ -71,7 +71,8 @@ deployment, with `MIKKA_DATABASE_URL` and every other database URL on a
 loopback PostgreSQL whose name ends in `_e2e`; do not set `CI=true` for a
 local `next dev` or `next start`. The same switch lets the MVP browser specs
 (`pnpm test:e2e:mvp`) run outside GitHub Actions, still only against the
-loopback `mikka_e2e` database at `http://localhost:3100`. Production
+loopback `mikka_e2e` database at `http://localhost:3100`, and lets a
+production build trust an HTTP loopback auth origin (`lib/auth-config.ts`). Production
 deployments must not set this test switch. Vitest sets it for its disposable
 Git fixtures; the Preview E2E job must set it explicitly on both server and
 daemon. A production Next build alone does not enable test behavior.
