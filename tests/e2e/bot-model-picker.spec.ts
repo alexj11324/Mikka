@@ -99,10 +99,38 @@ test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 
   await expect(page.getByRole('menu')).toHaveCount(0)
   await expect.poll(async () => (await choice(userId)).map(row => row.bindingId)).toEqual([null])
 
+  // A pick whose account goes away while it is being saved is answered, not a 500: the chip goes back to
+  // what it was and says 未保存. The save is held until the account is gone (the race the browser's one-at-a-time
+  // server actions make possible); the runtime guard fails the test on any 5xx.
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  let saving = false
+  await page.route('**/*', async route => {
+    const request = route.request()
+    if (request.method() === 'POST' && request.headers()['next-action'] && /^\[null,"[0-9a-f-]{36}"\]$/.test(request.postData() ?? '')) {
+      saving = true
+      await held
+    }
+    await route.fallback()
+  })
+  await page.getByTestId('bot-model-chip').click()
+  await page.getByRole('menu').getByRole('menuitemradio', { name: /claude-e2e-model/ }).click()
+  await expect.poll(() => saving).toBe(true)
+  await db().query(`UPDATE byos_connections SET state = 'disconnected' WHERE id = $1`, [connections.claude])
+  release()
+  await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：Mikka 默认')
+  await expect(page.getByText('未保存', { exact: true })).toBeVisible()
+  expect((await choice(userId)).map(row => row.bindingId)).toEqual([null])
+  await page.unroute('**/*')
+  await db().query(`UPDATE byos_connections SET state = 'connected' WHERE id = $1`, [connections.claude])
+
   // The picked account goes away: the chip names it, marked unavailable, and the menu no longer offers it.
   await page.getByTestId('bot-model-chip').click()
   await page.getByRole('menu').getByRole('menuitemradio', { name: /codex-e2e-model/ }).click()
   await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：codex-e2e-model')
+  // The chip changes before the pick is saved, and the browser sends one server action at a time
+  // behind the page's own reads: wait for the saved choice before the account goes away under it.
+  await expect.poll(async () => (await choice(userId)).map(row => row.modelId)).toEqual(['codex-e2e-model'])
   await db().query(`UPDATE byos_connections SET state = 'disconnected' WHERE id = $1`, [connections.codex])
   await page.reload()
   await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：codex-e2e-model，不可用')

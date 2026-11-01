@@ -59,8 +59,8 @@ export function assigneeGroupOf({ assignee, owner }: { assignee: IssueMetadata['
   </AvatarGroup>
 }
 
-const AGENT_STATE_BADGES = { running: 'success-light', waiting: 'warning-light', failed: 'destructive-light' } as const satisfies Record<AgentState, string>
-const AGENT_STATE_DOTS = { running: 'bg-success', waiting: 'bg-warning', failed: 'bg-destructive' } as const satisfies Record<AgentState, string>
+const AGENT_STATE_BADGES = { running: 'success-light', waiting: 'warning-light', blocked: 'destructive-light' } as const satisfies Record<AgentState, string>
+const AGENT_STATE_DOTS = { running: 'bg-success', waiting: 'bg-warning', blocked: 'bg-destructive' } as const satisfies Record<AgentState, string>
 
 export type CardHandlers = {
   onOpen: (id: string) => void
