@@ -15,9 +15,11 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // retrying cannot fix.
 import { z } from "zod"
 import { ToolApprovalGate } from "./agents/tool-approval"
+import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { toolApprovalDecision } from "./agents/tool-approval-policy"
+import { judgeNetworkDestination } from "./decision-judgments"
 import { runApps } from "./agents/run-apps"
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
@@ -109,6 +111,10 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
+  /** The run-scoped Decisions API (POST /v1/runs/:runId/decision). */
+  private serverDecide(): ServerDecide {
+    return this.decide
+  }
   /** Run entry and resume both call this before repository/setup execution. */
   async verifyRunPolicy(assignment: RunAssignment, signal: AbortSignal) {
     if (signal.aborted) throw Error('Run policy cancelled')
@@ -138,6 +144,18 @@ export class HttpServerLink implements ServerLink {
     Object.freeze(assignment.policy)
     return context
   }
+  /** Asks the server's Decisions API for one run. Never throws; null on any failure. */
+  decide: ServerDecide = async (runId, request, signal) => {
+    const answer = z.discriminatedUnion('type', [
+      z.object({ type: z.literal('predicate'), name: z.string(), probability: z.number() }),
+      z.object({ type: z.literal('choice'), name: z.string(), choice: z.string() }),
+    ])
+    try {
+      const { answers } = await this.call('POST', `/v1/runs/${seg(runId)}/decision`, { body: request, schema: z.object({ answers: z.array(answer).nullable() }), signal, timeoutMs: 6000 })
+      return answers ? new Map<string, ServerDecisionAnswer>(answers.map(item => [item.name, item])) : null
+    } catch { return null }
+  }
+
   async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string) {
     if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
     let context = signal.aborted ? null : await this.verifyRunPolicy(assignment,signal)
@@ -149,6 +167,13 @@ export class HttpServerLink implements ServerLink {
     const gate = new ToolApprovalGate(assignment.runId, {
       permission: request => toolApprovalDecision(request, assignment.policy, worktree, runApps(assignment.mcp)?.apps.map(app => app.name),
         assignment.github ? [new URL(assignment.github.endpoint).host] : []),
+      preauthorizeNetwork: (request, signal) => {
+        const { host, port } = request.input as { host: string; port: number }
+        return judgeNetworkDestination(this.serverDecide(), assignment.runId, {
+          host, port, repo: assignment.expectedRepoRemote ?? assignment.repoId,
+          task: assignment.prompt, allow: assignment.policy?.networkAllow ?? [],
+        }, signal)
+      },
       // Keep the callback pending at the tool boundary. The adapter's current
       // session and checkpoint remain intact; handback resolves this same call.
       isLive: async () => {
