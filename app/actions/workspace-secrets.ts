@@ -43,7 +43,7 @@ export async function deleteE2BKey(workspaceId?: string): Promise<SettingsAction
 export async function listApiKeyModels(workspaceId?: string): Promise<SettingsActionResult<{ models: ApiKeyModelView[] }>> {
   return withActor(async (u, w) => ({ models: await listWorkspaceApiKeyModels(u, w) }), workspaceId)
 }
-export async function addApiKeyModel(input: { baseURL: string; apiKey: string; models: string[] }, workspaceId?: string): Promise<SettingsActionResult<ApiKeyModelView>> {
+export async function addApiKeyModel(input: { apiKey: string; models: string[] }, workspaceId?: string): Promise<SettingsActionResult<ApiKeyModelView>> {
   return withActor((u, w) => setWorkspaceApiKeyModel(u, w, input), workspaceId)
 }
 export async function removeApiKeyModel(input: { connectionId: string }, workspaceId?: string): Promise<SettingsActionResult<{ removed: boolean }>> {

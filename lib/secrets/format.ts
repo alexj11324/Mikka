@@ -41,9 +41,15 @@ export const scopeColumns = (scope: SecretScope) => scope.type === 'workspace'
 
 export const e2bKeyInput = z.object({ apiKey: z.string().trim().min(8).max(200).regex(/^\S+$/) }).strict()
 
-/** A workspace-added API-key model: an OpenAI-compatible endpoint, its key, and one or more model ids. */
+/** A workspace-added API-key model: a provider key and one or more Vercel AI
+ * Gateway model ids (`provider/model`, e.g. `deepseek/deepseek-v4.1-flash`). The
+ * key is handed to the gateway as a BYOK credential for that provider, so every
+ * model must name the same provider (the id's prefix). */
+export const GATEWAY_MODEL_ID = /^[a-z0-9-]{1,40}\/[A-Za-z0-9._-]{1,120}$/
 export const apiKeyModelInput = z.object({
-  baseURL: z.string().trim().url().max(512).refine(url => url.startsWith('https://'), 'https required'),
   apiKey: z.string().trim().min(8).max(400).regex(/^\S+$/),
-  models: z.array(z.string().trim().min(1).max(128)).min(1).max(20),
-}).strict()
+  models: z.array(z.string().trim().regex(GATEWAY_MODEL_ID)).min(1).max(20),
+}).strict().refine(
+  input => new Set(input.models.map(model => model.split('/')[0])).size === 1,
+  { message: 'one provider per key', path: ['models'] },
+)

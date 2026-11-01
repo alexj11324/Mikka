@@ -2135,7 +2135,6 @@
       },
       "apiKeyModels": {
         "heading": "API key models",
-        "baseURL": "Base URL",
         "key": "API key",
         "models": "Model IDs",
         "add": "Add model",

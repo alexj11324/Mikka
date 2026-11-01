@@ -22,13 +22,10 @@ export const workspaceSecrets = pgTable('workspace_secrets', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('workspace_secrets_name_key').on(table.workspaceId, table.scopeType, table.scopeRef, table.name)])
 
-export const WORKSPACE_API_KEY_MODEL_KINDS = ['openai'] as const
-
 export const workspaceApiKeyCredentials = pgTable('workspace_api_key_credentials', {
   connectionId: uuid('connectionId').primaryKey(),
   workspaceId: text('workspaceId').notNull(),
-  kind: text('kind').$type<(typeof WORKSPACE_API_KEY_MODEL_KINDS)[number]>().notNull(),
-  baseURL: text('baseURL').notNull(),
+  providerSlug: text('providerSlug').notNull(),
   ciphertext: text('ciphertext').notNull(),
   iv: text('iv').notNull(),
   keyVersion: integer('keyVersion').notNull(),

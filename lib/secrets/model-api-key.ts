@@ -1,10 +1,12 @@
 import 'server-only'
-// Workspace-added API-key models (an OpenAI-compatible endpoint + key, e.g.
-// DeepSeek). A model added here can run any bot, the Coordinator included,
-// through the normal model menu/choice/freeze plumbing. The key is sealed
-// (AES-256-GCM) in workspace_api_key_credentials and read back in exactly one
-// authorized place at run time; byos_connections / byos_bindings carry only
-// non-secret metadata, so nothing here changes the subscription credential path.
+// Workspace-added API-key models (a provider key, e.g. DeepSeek). A model added
+// here can run any bot, the Coordinator included. The Coordinator runs on the AI
+// SDK through the Vercel AI Gateway, so the key is handed to the gateway as a
+// request-scoped BYOK credential for the model's provider (the gateway model
+// id's prefix). The key is sealed (AES-256-GCM) in workspace_api_key_credentials
+// and read back in exactly one authorized place at run time; byos_connections /
+// byos_bindings carry only non-secret metadata, so nothing here changes the
+// subscription credential path.
 import { createHash, randomUUID } from 'node:crypto'
 import { pool } from '@/lib/db'
 import { WorkspaceError } from '@/lib/workspace-access'
@@ -14,47 +16,27 @@ import { workspaceRole } from './store'
 
 const ROUTE = 'api_key'
 const PROVIDER = 'apiKey'
-const KIND = 'openai'
 
-export interface ApiKeyModelView { connectionId: string; baseURL: string; last4: string | null; models: string[]; createdAt: string }
-export type ApiKeyVerifyResult = { ok: true } | { ok: false; code: 'invalid' | 'unreachable' }
-
-/** Read-only check that the endpoint answers for this key: GET {baseURL}/models. Creates nothing. */
-export async function verifyApiKeyModel(baseURL: string, apiKey: string, fetchImpl: typeof fetch = fetch): Promise<ApiKeyVerifyResult> {
-  try {
-    const response = await fetchImpl(`${baseURL.replace(/\/$/, '')}/models`, {
-      headers: { authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(10_000), cache: 'no-store', redirect: 'error',
-    })
-    if (response.ok) { await response.body?.cancel(); return { ok: true } }
-    await response.body?.cancel()
-    return { ok: false, code: response.status === 401 || response.status === 403 ? 'invalid' : 'unreachable' }
-  } catch { return { ok: false, code: 'unreachable' } }
-}
+export interface ApiKeyModelView { connectionId: string; providerSlug: string; last4: string | null; models: string[]; createdAt: string }
 
 async function requireAdmin(userId: string, workspaceId: string) {
   if (await workspaceRole(userId, workspaceId) !== 'admin') throw new WorkspaceError('workspaceAccessDenied')
 }
 
 /**
- * Adds (or appends models to) an API-key model for the workspace, after a live
- * endpoint check. Admin only. The key is sealed before the endpoint is called
- * and the sealed value is all that reaches the database.
+ * Adds (or appends models to) an API-key model for the workspace. Admin only.
+ * The key is sealed before anything is written and the sealed value is all that
+ * reaches the database. The provider is the models' shared id prefix.
  */
-export async function setWorkspaceApiKeyModel(
-  userId: string,
-  workspaceId: string,
-  input: unknown,
-  options: { verify?: (baseURL: string, apiKey: string) => Promise<ApiKeyVerifyResult> } = {},
-): Promise<ApiKeyModelView> {
+export async function setWorkspaceApiKeyModel(userId: string, workspaceId: string, input: unknown): Promise<ApiKeyModelView> {
   await requireAdmin(userId, workspaceId)
-  const { baseURL, apiKey, models } = apiKeyModelInput.parse(input)
+  const { apiKey, models } = apiKeyModelInput.parse(input)
+  const uniqueModels = [...new Set(models)]
+  const providerSlug = uniqueModels[0]!.split('/')[0]!
   const connectionId = randomUUID()
   let sealed: ReturnType<typeof sealSecret>
-  try { sealed = sealSecret(apiKey, apiKeyModelAad(connectionId, workspaceId)) } // fail closed before any network call
+  try { sealed = sealSecret(apiKey, apiKeyModelAad(connectionId, workspaceId)) }
   catch (error) { if (error instanceof SecretsKeyMissingError) throw new WorkspaceError('secretsUnavailable'); throw error }
-  const result = await (options.verify ?? verifyApiKeyModel)(baseURL, apiKey)
-  if (!result.ok) throw new WorkspaceError(result.code === 'invalid' ? 'apiKeyModelInvalid' : 'apiKeyModelUnreachable')
-  const uniqueModels = [...new Set(models)]
   const secretName = `apikey:${connectionId}`
   const secretDigest = createHash('sha256').update(secretName).digest('hex')
   const client = await pool.connect()
@@ -66,9 +48,9 @@ export async function setWorkspaceApiKeyModel(
       [connectionId, userId, workspaceId, PROVIDER, secretName, secretDigest],
     )
     await client.query(
-      `INSERT INTO workspace_api_key_credentials ("connectionId","workspaceId",kind,"baseURL",ciphertext,iv,"keyVersion",last4,"createdBy")
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [connectionId, workspaceId, KIND, baseURL, sealed.ciphertext, sealed.iv, sealed.keyVersion, apiKey.slice(-4), userId],
+      `INSERT INTO workspace_api_key_credentials ("connectionId","workspaceId","providerSlug",ciphertext,iv,"keyVersion",last4,"createdBy")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [connectionId, workspaceId, providerSlug, sealed.ciphertext, sealed.iv, sealed.keyVersion, apiKey.slice(-4), userId],
     )
     for (const modelId of uniqueModels) {
       const bindingId = randomUUID()
@@ -80,14 +62,14 @@ export async function setWorkspaceApiKeyModel(
     }
     await client.query('COMMIT')
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
-  return { connectionId, baseURL, last4: apiKey.slice(-4), models: uniqueModels, createdAt: new Date().toISOString() }
+  return { connectionId, providerSlug, last4: apiKey.slice(-4), models: uniqueModels, createdAt: new Date().toISOString() }
 }
 
 /** Metadata only; the key is never returned. */
 export async function listWorkspaceApiKeyModels(userId: string, workspaceId: string): Promise<ApiKeyModelView[]> {
   await requireAdmin(userId, workspaceId)
   const { rows } = await pool.query(
-    `SELECT c."connectionId",c."baseURL",c.last4,c."createdAt",
+    `SELECT c."connectionId",c."providerSlug",c.last4,c."createdAt",
             coalesce((SELECT json_agg(b."modelId" ORDER BY b."createdAt") FROM byos_bindings b
                       WHERE b."connectionId"=c."connectionId" AND b."consumerId"=c."connectionId"::text),'[]') AS models
      FROM workspace_api_key_credentials c
@@ -95,7 +77,7 @@ export async function listWorkspaceApiKeyModels(userId: string, workspaceId: str
      WHERE c."workspaceId"=$1 ORDER BY c."createdAt" DESC`,
     [workspaceId],
   )
-  return rows.map(row => ({ connectionId: row.connectionId, baseURL: row.baseURL, last4: row.last4, models: row.models ?? [], createdAt: new Date(row.createdAt).toISOString() }))
+  return rows.map(row => ({ connectionId: row.connectionId, providerSlug: row.providerSlug, last4: row.last4, models: row.models ?? [], createdAt: new Date(row.createdAt).toISOString() }))
 }
 
 /** Admin-only delete; cascades to this connection's bindings and credential. */
@@ -110,15 +92,16 @@ export async function removeWorkspaceApiKeyModel(userId: string, workspaceId: st
 
 /**
  * The one authorized read of a workspace API-key model's credential, for the
- * model builder at run time. Returns the endpoint and the key; never logs it.
+ * gateway BYOK call at run time. Returns the provider slug and the key; never
+ * logs it.
  */
 export async function getWorkspaceApiKeyCredential(
   connectionId: string,
   workspaceId: string,
   env: Record<string, string | undefined> = process.env,
-): Promise<{ baseURL: string; kind: string; apiKey: string }> {
+): Promise<{ providerSlug: string; apiKey: string }> {
   const { rows } = await pool.query(
-    `SELECT c."baseURL",c.kind,c.ciphertext,c.iv,c."keyVersion"
+    `SELECT c."providerSlug",c.ciphertext,c.iv,c."keyVersion"
      FROM workspace_api_key_credentials c JOIN byos_connections n ON n.id=c."connectionId" AND n.state='connected'
      WHERE c."connectionId"=$1 AND c."workspaceId"=$2`,
     [connectionId, workspaceId],
@@ -127,7 +110,7 @@ export async function getWorkspaceApiKeyCredential(
   if (!row) throw new WorkspaceError('apiKeyModelMissing')
   try {
     const apiKey = openSecret({ ciphertext: row.ciphertext, iv: row.iv, keyVersion: row.keyVersion }, apiKeyModelAad(connectionId, workspaceId), env)
-    return { baseURL: row.baseURL, kind: row.kind, apiKey }
+    return { providerSlug: row.providerSlug, apiKey }
   } catch (error) {
     if (error instanceof SecretsKeyMissingError) throw new WorkspaceError('secretsUnavailable')
     throw new WorkspaceError('apiKeyModelUnreadable')

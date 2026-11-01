@@ -2135,7 +2135,6 @@
       },
       "apiKeyModels": {
         "heading": "API key 模型",
-        "baseURL": "Base URL",
         "key": "API key",
         "models": "模型 ID",
         "add": "添加模型",
