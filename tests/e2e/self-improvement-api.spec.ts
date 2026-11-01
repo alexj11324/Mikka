@@ -53,7 +53,7 @@ test('Skill baseline selection, actual claim receipt and feedback provenance use
     const assignment=await claimed.json();verifySkillAssignment(assignment)
     expect({runId:assignment.runId,issueId:assignment.issueId,deviceId:assignment.deviceId,repoId:assignment.repoId,
       expectedRepoRemote:assignment.expectedRepoRemote,gitPush:assignment.policy?.permissions?.git_push})
-      .toEqual({runId,issueId,deviceId,repoId,expectedRepoRemote:remoteUrl,gitPush:'ask'})
+      .toEqual({runId,issueId,deviceId,repoId,expectedRepoRemote:remoteUrl,gitPush:'deny'})
     expect(assignment.skillReceipt.runId).toBe(runId)
     expect((await pool.query('SELECT receipt FROM improvement_skill_receipts WHERE "runId"=$1',[runId])).rows[0].receipt.id).toBe(assignment.skillReceipt.id)
     const receiptPath=app(`/v1/runs/${runId}/skill-receipt?receiptId=${assignment.skillReceipt.id}`)
