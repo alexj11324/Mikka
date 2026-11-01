@@ -10,6 +10,7 @@ import { runBotName } from '@/lib/run-bot-name'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { groupThreads, pullRequestsOf, THREAD_GROUPS, threadGroup, type GroupIssue, type PrGroup, type ThreadGroup } from '@/lib/thread-groups'
 import { pinnedByDefault } from '@/lib/chat-preferences'
+import { notThreadMachineDevice } from '@/lib/cloud-computer/thread-devices'
 
 /** The app's thread states (docs/design/mobile.md, 线程 screen icons). */
 export type MobileThreadStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped'
@@ -25,8 +26,8 @@ export function mobileThreadStatus(status: string): MobileThreadStatus {
 }
 
 /** A machine as the app draws it: an icon, never its name as a status (mobile.md). */
-export function machineKind(device: { name: string | null; platform: string | null } | null): 'cloud' | 'laptop' | 'server' {
-  if (!device) return 'cloud'
+export function machineKind(device: { name: string | null; platform: string | null; kind?: string | null } | null): 'cloud' | 'laptop' | 'server' {
+  if (!device || device.kind === 'cloud') return 'cloud'
   if (device.platform === 'darwin' || device.platform === 'win32') return 'laptop'
   if (/cloud/i.test(device.name ?? '')) return 'cloud'
   return 'server'
@@ -78,7 +79,7 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
   const rows = await db.select({
     id: agentRuns.id, prompt: sql<string>`left(${agentRuns.prompt}, 300)`, status: agentRuns.status,
     agentName: runBotName, harness: agents.harness,
-    deviceId: devices.id, deviceName: devices.name, platform: devices.platform,
+    deviceId: devices.id, deviceName: devices.name, platform: devices.platform, deviceKind: devices.kind,
     createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, outcome: agentRuns.outcome,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .leftJoin(devices, eq(devices.id, agentRuns.deviceId))
@@ -98,7 +99,7 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
       status: mobileThreadStatus(row.status),
       by: row.agentName,
       harness: row.harness,
-      device: row.deviceId ? { id: row.deviceId, name: row.deviceName ?? '', kind: machineKind({ name: row.deviceName, platform: row.platform }) } : null,
+      device: row.deviceId ? { id: row.deviceId, name: row.deviceName ?? '', kind: machineKind({ name: row.deviceName, platform: row.platform, kind: row.deviceKind }) } : null,
       createdAt: row.createdAt.toISOString(),
       finishedAt: row.finishedAt?.toISOString() ?? null,
       group: threadGroup({ id: row.id, status: row.status, issueId: source?.issue?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: row.outcome }, source?.issue ? tasks.get(source.issue.id) : undefined),
@@ -112,7 +113,9 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
 export async function mobileThreads(userId: string, limit = 60): Promise<{ threads: MobileThread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[] }> {
   const [threads, machines] = await Promise.all([
     runRows(userId, sql`${agentRuns.createdAt} > now() - interval '30 days'`, limit).then(listed),
-    db.select({ id: devices.id, name: devices.name, platform: devices.platform, lastSeenAt: devices.lastSeenAt }).from(devices).where(and(eq(devices.ownerId, userId), isNull(devices.removedAt))),
+    // A task's own cloud sandbox is not one of the person's machines (Alex, 2026-11-01).
+    db.select({ id: devices.id, name: devices.name, platform: devices.platform, kind: devices.kind, lastSeenAt: devices.lastSeenAt }).from(devices)
+      .where(and(eq(devices.ownerId, userId), isNull(devices.removedAt), notThreadMachineDevice)),
   ])
   return {
     threads,

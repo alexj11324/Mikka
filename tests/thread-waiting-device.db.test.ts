@@ -48,6 +48,20 @@ test('thread waiting device uses the same private queue projection as visibleRun
     assert.equal(Object.hasOwn((await thread())!, 'waitingFor'), false)
     assert.equal(await waitFor(), undefined)
   })
+  await t.test('a cloud run never waits on its sandbox device, and that device is not one of the machines', async () => {
+    const { mobileThreads } = await import('../lib/mobile-threads')
+    const sandboxDevice = randomUUID(), cloudRun = await seedRun(fixtures, { userId: owner, agentId, status: 'queued' })
+    await fixtures.query(`INSERT INTO devices (id,"ownerId",name,kind,"nameLocked",enabled,"lastSeenAt") VALUES ($1,$2,'Thread computer','cloud',true,true,now()-interval '1 hour')`, [sandboxDevice, owner])
+    await fixtures.query(`UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1`, [cloudRun, sandboxDevice])
+    await fixtures.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,$3,'snapshot',$5,'running',$4)`, [cloudRun, randomUUID(), owner, sandboxDevice, randomUUID()])
+    const row = (await listThreads()).find(thread => thread.id === cloudRun)
+    assert.ok(row, 'the cloud run is listed')
+    assert.equal(Object.hasOwn(row!, 'waitingFor'), false, 'no 「等待 … 上线」 for a cloud sandbox')
+    const mobile = await mobileThreads(owner)
+    assert.equal(mobile.devices.some(device => device.id === sandboxDevice), false, 'the sandbox is not listed as a machine')
+    assert.ok(mobile.devices.some(device => device.id === deviceId), 'the person\'s own machine still is')
+    assert.equal(mobile.threads.find(thread => thread.id === cloudRun)?.device?.kind, 'cloud')
+  })
   await t.test('another caller receives no thread or waiting metadata', async () => {
     await fixtures.query(`UPDATE agent_runs SET status='queued' WHERE id=$1`, [runId])
     actor = other

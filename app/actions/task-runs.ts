@@ -81,14 +81,15 @@ export async function listThreads(): Promise<Thread[]> {
     status: agentRuns.status, error: agentRuns.error, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
     lastReply: agentRuns.lastReply, lastReplyAt: agentRuns.lastReplyAt, source: agentRuns.source,
     ownerId: agentRuns.userId, deviceId: devices.id, deviceName: devices.name, deviceType: devices.deviceType,
-    deviceEnabled: devices.enabled, lastSeenAt: devices.lastSeenAt,
+    deviceEnabled: devices.enabled, lastSeenAt: devices.lastSeenAt, deviceKind: devices.kind,
     harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`,
     outcome: agentRuns.outcome,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
     .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
-  return rows.map(({ ownerId, deviceId, deviceName, deviceType, deviceEnabled, lastSeenAt, harness, ...row }) => ({
-    ...(runWaitingDeviceId(session.user.id, { ownerId, status: row.status, deviceId, deviceEnabled, lastSeenAt }) && deviceId && deviceName !== null && deviceType
+  return rows.map(({ ownerId, deviceId, deviceName, deviceType, deviceEnabled, lastSeenAt, deviceKind, harness, ...row }) => ({
+    // A cloud run waits on its own sandbox, never on a machine the person can turn on.
+    ...(deviceKind === 'local' && runWaitingDeviceId(session.user.id, { ownerId, status: row.status, deviceId, deviceEnabled, lastSeenAt }) && deviceId && deviceName !== null && deviceType
       ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
     ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
     lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
