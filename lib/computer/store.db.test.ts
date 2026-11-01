@@ -72,7 +72,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('CREATE TABLE suggestions (id uuid PRIMARY KEY)')
     const threadMigration = await readFile(new URL('../../drizzle/20261029011635_subagents_thread_machines.sql', import.meta.url), 'utf8')
     await pool.query(threadMigration); await pool.query(threadMigration)
-    for (const name of ['20261029080000_unattended_browser_runtime.sql','20261029080001_owner_cloud_machines.sql']) {
+    for (const name of ['20261029080000_unattended_browser_runtime.sql','20261029080001_owner_cloud_machines.sql','20261101021000_model_api_keys.sql']) {
       const sql=await readFile(new URL('../../drizzle/'+name,import.meta.url),'utf8')
       await pool.query(sql);await pool.query(sql)
     }

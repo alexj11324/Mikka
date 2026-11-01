@@ -29,7 +29,7 @@ import { MemorySettings } from '@/components/settings/memory-settings'
 import { LocaleSetting } from '@/components/settings/locale-setting'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
-import { SecretsSettings } from '@/components/settings/secrets-settings'
+import { E2BKeySettings, SecretsSettings } from '@/components/settings/secrets-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
@@ -143,6 +143,8 @@ function ApiAndSubscriptions({ workspaceId }: { workspaceId: string }) {
     <SubscriptionSettings workspaceId={workspaceId} extraRows={apiKeys.rows} action={apiKeys.action} />
     {apiKeys.dialogs}
     <ApiKeyFallbackSetting workspaceId={workspaceId} />
+    {/* The person's own E2B key: account-level, so before this workspace's settings. */}
+    <E2BKeySettings key={`e2b-${workspaceId}`} workspaceId={workspaceId} />
     <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />
     <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />
   </>

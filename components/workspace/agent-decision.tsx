@@ -180,7 +180,7 @@ export const ReplyAnswer = createContext<string | null>(null)
  * a check and the others dim. Anything else goes through the composer.
  */
 /** Where the user stores their own E2B key (the cloud computer runs on it). */
-export const CLOUD_KEY_SETTINGS = '/settings?section=secrets'
+export const CLOUD_KEY_SETTINGS = '/settings?section=models'
 
 /** Where the person connects a server: Settings › 电脑 (one-click SSH in the desktop app). */
 export const CONNECT_SERVER_SETTINGS = '/settings?section=computers'

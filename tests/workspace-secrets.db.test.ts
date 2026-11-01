@@ -28,13 +28,12 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const stored = async (id: string) => { const { rows: [row] } = await pool.query('select * from workspace_secrets where id=$1', [id]); return secretCrypto.openSecret(row, secretCrypto.secretAad(row)) }
   const META_KEYS = ['id', 'kind', 'name', 'scopeRef', 'scopeType']
 
-  await t.test('E2B status and capability report mandatory BYO regardless of the legacy flag and honor membership', async () => {
+  await t.test('E2B status and capability: everyone edits only their own key, regardless of the legacy flag, and membership still applies', async () => {
     const previous = process.env.MIKKA_BYO_E2B_KEY
     try {
       for (const enabled of ['0', '1']) {
         process.env.MIKKA_BYO_E2B_KEY = enabled
-        assert.deepEqual(await e2b.getE2BKeyCapabilityForUser(admin, ws.id), { canEdit: true, configured: false, byoEnabled: true, lastErrorCode: null, lastErrorAt: null })
-        assert.deepEqual(await e2b.getE2BKeyCapabilityForUser(member, ws.id), { canEdit: false, configured: false, byoEnabled: true, lastErrorCode: null, lastErrorAt: null })
+        for (const user of [admin, member]) assert.deepEqual(await e2b.getE2BKeyCapabilityForUser(user, ws.id), { canEdit: true, configured: false, byoEnabled: true, lastErrorCode: null, lastErrorAt: null })
         await rejects(e2b.getE2BKeyCapabilityForUser(member, other.id), 'workspaceAccessDenied')
       }
     } finally { if (previous === undefined) delete process.env.MIKKA_BYO_E2B_KEY; else process.env.MIKKA_BYO_E2B_KEY = previous }
@@ -131,9 +130,9 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const status = await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }), audit: async (_tx, e) => { events.push(`${e.action}:${e.target.type}:${e.target.label}`) } })
     assert.deepEqual(Object.keys(status).sort(), ['byoEnabled', 'configured', 'lastErrorAt', 'lastErrorCode'], 'no last4 / verifiedAt / updatedAt')
     assert.equal(status.configured, true)
-    assert.ok((await pool.query('select last4, "verifiedAt" from workspace_e2b_keys where "workspaceId"=$1', [ws.id])).rows[0].verifiedAt, 'still stored')
+    assert.ok((await pool.query('select last4, "verifiedAt" from user_e2b_keys where "userId"=$1', [admin])).rows[0].verifiedAt, 'still stored')
     assert.ok(!JSON.stringify(status).includes(KEY))
-    const { rows } = await pool.query('select * from workspace_e2b_keys where "workspaceId"=$1', [ws.id])
+    const { rows } = await pool.query('select * from user_e2b_keys where "userId"=$1', [admin])
     assert.ok(!JSON.stringify(rows).includes(KEY), 'ciphertext only')
     await e2b.setE2BKey(admin, ws.id, { apiKey: KEY + 'z' }, { verify: async () => ({ ok: true }), audit: async (_tx, e) => { events.push(`${e.action}:${e.target.type}:${e.target.label}`) } })
     await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) }) // no hook
@@ -151,33 +150,48 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     await store.deleteWorkspaceSecret(admin, other.id, { id: short.id })
   })
 
-  await t.test('E2B key delete: admin only; afterwards dispatch sees no key', async () => {
-    const KEY = 'e2b_' + randomBytes(16).toString('hex')
+  await t.test('an E2B key is its owner\'s alone: a teammate neither reads nor removes it, and removing one leaves the other', async () => {
+    const A = 'e2b_' + randomBytes(16).toString('hex'), M = 'e2b_' + randomBytes(16).toString('hex')
     const on = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, E2B_API_KEY: 'platform', MIKKA_BYO_E2B_KEY: '1' }
-    await e2b.setE2BKey(admin, ws.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) })
-    assert.equal(await e2b.getWorkspaceE2BApiKey(ws.id, on), KEY)
-    await rejects(e2b.removeE2BKey(member, ws.id), 'secretPermissionDenied')
-    assert.equal(await e2b.getWorkspaceE2BApiKey(ws.id, on), KEY, 'non-admin delete changed nothing')
+    await e2b.setE2BKey(admin, ws.id, { apiKey: A }, { verify: async () => ({ ok: true }) })
+    await assert.rejects(e2b.getUserE2BApiKey(member, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing', 'an admin\'s key is not the workspace\'s')
+    await e2b.setE2BKey(member, ws.id, { apiKey: M }, { verify: async () => ({ ok: true }) })
+    assert.deepEqual([await e2b.getUserE2BApiKey(admin, on), await e2b.getUserE2BApiKey(member, on)], [A, M])
+    assert.deepEqual(await e2b.removeE2BKey(member, ws.id), { removed: true })
+    assert.equal(await e2b.getUserE2BApiKey(admin, on), A, 'removing one person\'s key leaves the other\'s')
     assert.deepEqual(await e2b.removeE2BKey(admin, ws.id), { removed: true })
-    await assert.rejects(e2b.getWorkspaceE2BApiKey(ws.id, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing')
-    await assert.rejects(e2b.getWorkspaceE2BApiKey(ws.id, { ...on, MIKKA_BYO_E2B_KEY: '0' }), /e2b_key_missing/)
+    await assert.rejects(e2b.getUserE2BApiKey(admin, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing')
+    await assert.rejects(e2b.getUserE2BApiKey(admin, { ...on, MIKKA_BYO_E2B_KEY: '0' }), /e2b_key_missing/)
+  })
+
+  await t.test('a key saved for a workspace before keys were personal: its creator adopts it on first use, nobody else gets it', async () => {
+    const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
+    const K = 'e2b_' + randomBytes(16).toString('hex'), on = { MIKKA_BYO_E2B_KEY: '1', WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
+    const sealed = secretCrypto.sealSecret(K, secretCrypto.e2bKeyAad(team.id))
+    await pool.query(`insert into workspace_e2b_keys ("workspaceId",ciphertext,iv,"keyVersion",last4,"createdBy","updatedBy") values ($1,$2,$3,$4,$5,$6,$6)`, [team.id, sealed.ciphertext, sealed.iv, sealed.keyVersion, K.slice(-4), member])
+    await assert.rejects(e2b.getUserE2BApiKey(admin, on), /e2b_key_missing/, 'not another member\'s, even the admin\'s')
+    assert.equal((await e2b.getE2BKeyStatus(member, team.id)).configured, true)
+    assert.equal(await e2b.getUserE2BApiKey(member, on), K)
+    assert.equal((await pool.query('select count(*)::int as n from workspace_e2b_keys where "workspaceId"=$1', [team.id])).rows[0].n, 0, 'the workspace row is gone')
+    assert.ok(!JSON.stringify((await pool.query('select * from user_e2b_keys where "userId"=$1', [member])).rows).includes(K), 're-sealed, ciphertext only')
+    await e2b.removeE2BKey(member, team.id)
   })
 
   await t.test('BYO E2B getter never falls back to a platform key', async () => {
+    const solo = await seedUser(pool, 'solo'), mine = await seedWorkspace(pool, solo, [{ userId: solo, role: 'admin' }])
     const PLATFORM = 'platform_' + randomBytes(8).toString('hex'), KEY = 'e2b_' + randomBytes(16).toString('hex')
     const base = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, E2B_API_KEY: PLATFORM }
-    await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, base), /e2b_key_missing/)
-    await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, { ...base, MIKKA_BYO_E2B_KEY: '0' }), /e2b_key_missing/)
-    await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, { MIKKA_BYO_E2B_KEY: '' }), /e2b_key_missing/)
+    await assert.rejects(e2b.getUserE2BApiKey(solo, base), /e2b_key_missing/)
+    await assert.rejects(e2b.getUserE2BApiKey(solo, { ...base, MIKKA_BYO_E2B_KEY: '0' }), /e2b_key_missing/)
+    await assert.rejects(e2b.getUserE2BApiKey(solo, { MIKKA_BYO_E2B_KEY: '' }), /e2b_key_missing/)
     const on = { ...base, MIKKA_BYO_E2B_KEY: '1' }
-    await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing')
-    await e2b.setE2BKey(admin, other.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) })
-    assert.equal(await e2b.getWorkspaceE2BApiKey(other.id, on), KEY)
-    assert.equal(await e2b.getWorkspaceE2BApiKey(other.id, base), KEY, 'stored BYO key is used regardless of legacy flag')
-    await assert.rejects(e2b.getWorkspaceE2BApiKey(ws.id, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing')
-    await assert.rejects(e2b.getWorkspaceE2BApiKey(other.id, { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
-    await e2b.recordE2BKeyError(other.id, 'invalid')
-    assert.equal((await e2b.getE2BKeyStatus(admin, other.id)).lastErrorCode, 'invalid')
+    await assert.rejects(e2b.getUserE2BApiKey(solo, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_missing')
+    await e2b.setE2BKey(solo, mine.id, { apiKey: KEY }, { verify: async () => ({ ok: true }) })
+    assert.equal(await e2b.getUserE2BApiKey(solo, on), KEY)
+    assert.equal(await e2b.getUserE2BApiKey(solo, base), KEY, 'stored BYO key is used regardless of legacy flag')
+    await assert.rejects(e2b.getUserE2BApiKey(solo, { MIKKA_BYO_E2B_KEY: '1' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
+    await e2b.recordE2BKeyError(solo, 'invalid')
+    assert.equal((await e2b.getE2BKeyStatus(solo, mine.id)).lastErrorCode, 'invalid')
   })
 
   await t.test('4e2 runtime: sandbox env + output masking require encryption configuration and stay workspace-scoped', async () => {
@@ -286,11 +300,13 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const { withE2BErrors } = await import('../lib/secrets/e2b-runtime')
     const { AuthenticationError, NotFoundError } = await import('e2b')
     const on = { MIKKA_BYO_E2B_KEY: '1' }
-    await assert.rejects(withE2BErrors(other.id, false, async () => { throw new AuthenticationError('nope') }, {}), (error:unknown)=>error instanceof e2b.E2BKeyError && error.code==='e2b_key_invalid', 'platform fallback is gone')
-    await assert.rejects(withE2BErrors(other.id, true, async () => { throw new NotFoundError('template x not found') }, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_template_unavailable')
-    assert.equal((await e2b.getE2BKeyStatus(admin, other.id)).lastErrorCode, 'template_unavailable')
-    await assert.rejects(withE2BErrors(other.id, false, async () => { throw new AuthenticationError('nope') }, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_invalid')
+    await e2b.setE2BKey(admin, other.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { verify: async () => ({ ok: true }) })
+    await assert.rejects(withE2BErrors(admin, false, async () => { throw new AuthenticationError('nope') }, {}), (error:unknown)=>error instanceof e2b.E2BKeyError && error.code==='e2b_key_invalid', 'platform fallback is gone')
+    await assert.rejects(withE2BErrors(admin, true, async () => { throw new NotFoundError('template x not found') }, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_template_unavailable')
+    assert.equal((await e2b.getE2BKeyStatus(admin, other.id)).lastErrorCode, 'template_unavailable', 'marked on the owner\'s own key')
+    await assert.rejects(withE2BErrors(admin, false, async () => { throw new AuthenticationError('nope') }, on), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_key_invalid')
     assert.equal((await e2b.getE2BKeyStatus(admin, other.id)).lastErrorCode, 'invalid')
+    await e2b.removeE2BKey(admin, other.id)
   })
 
   // ---- #436 QA round (cases from qa-pr436.db.test.ts) ----
@@ -324,17 +340,18 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     assert.equal(await stored(source.id), V)
   })
 
-  await t.test('moved E2B key fails to decrypt: e2b_unavailable, never the raw crypto Error, one id-only log line', async () => {
-    const a = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), b = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+  await t.test('an E2B key moved to another person fails to decrypt: e2b_unavailable, never the raw crypto Error, one id-only log line', async () => {
+    const thief = await seedUser(pool, 'thief'), a = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
     const K = 'e2b_' + randomBytes(16).toString('hex'), on = { MIKKA_BYO_E2B_KEY: '1', WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
     await e2b.setE2BKey(admin, a.id, { apiKey: K }, { verify: async () => ({ ok: true }) })
-    assert.equal(await e2b.getWorkspaceE2BApiKey(a.id, on), K)
-    await pool.query(`insert into workspace_e2b_keys select $1,ciphertext,iv,"keyVersion",last4,"e2bTeamHint","verifiedAt","lastErrorCode","lastErrorAt","createdBy","updatedBy","createdAt","updatedAt" from workspace_e2b_keys where "workspaceId"=$2`, [b.id, a.id])
-    const { result, lines } = await captureLogs(() => e2b.getWorkspaceE2BApiKey(b.id, on))
+    assert.equal(await e2b.getUserE2BApiKey(admin, on), K)
+    await pool.query(`insert into user_e2b_keys select $1,ciphertext,iv,"keyVersion",last4,"e2bTeamHint","verifiedAt","lastErrorCode","lastErrorAt","createdAt","updatedAt" from user_e2b_keys where "userId"=$2`, [thief, admin])
+    const { result, lines } = await captureLogs(() => e2b.getUserE2BApiKey(thief, on))
     const error = (result as { error?: unknown }).error
     assert.ok(error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable', 'mapped, not the raw crypto Error')
-    assert.deepEqual(lines, [`[secrets] e2b_unavailable id=${b.id}`])
+    assert.deepEqual(lines, [`[secrets] e2b_unavailable id=${thief}`])
     assert.ok(!JSON.stringify([error, String((error as Error).stack), lines]).includes(K))
+    await e2b.removeE2BKey(admin, a.id)
   })
 
   await t.test('DB failures become a generic SecretsStoreError: params, ciphertext and iv never reach logs or the caller', async () => {
@@ -426,10 +443,14 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     assert.ok((await store.listWorkspaceSecrets(member, w.id)).every(r => !('value' in r)), 'no values for anyone (design update)')
     const status = await e2b.getE2BKeyStatus(member, w.id)
     assert.ok(!('apiKey' in status), 'member E2B view is masked')
+    // E2B keys are personal: a member sets and removes their own; an outsider reaches neither, nor the verify call.
     let verifyCalls = 0
-    await rejects(e2b.setE2BKey(member, w.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { verify: async () => { verifyCalls++; return { ok: true } } }), 'secretPermissionDenied')
-    await rejects(e2b.removeE2BKey(member, w.id), 'secretPermissionDenied')
-    assert.equal(verifyCalls, 0, 'member never reaches the E2B verify call')
+    const outsider = await seedUser(pool, 'outsider')
+    await rejects(e2b.setE2BKey(outsider, w.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { verify: async () => { verifyCalls++; return { ok: true } } }), 'workspaceAccessDenied')
+    await rejects(e2b.removeE2BKey(outsider, w.id), 'workspaceAccessDenied')
+    assert.equal(verifyCalls, 0, 'an outsider never reaches the E2B verify call')
+    assert.equal((await e2b.setE2BKey(member, w.id, { apiKey: 'e2b_' + randomBytes(16).toString('hex') }, { verify: async () => ({ ok: true }) })).configured, true)
+    assert.deepEqual(await e2b.removeE2BKey(member, w.id), { removed: true })
   })
 
   await t.test('members cannot escalate by moving scope; admins can', async () => {

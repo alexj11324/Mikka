@@ -7,6 +7,7 @@ import type { AgentExecution } from '@/lib/agent-kit/store'
 import { SubscriptionRepository } from '@/lib/subscription-repository'
 import { ComputerError } from './store'
 import { subscriptionsUsableSql } from '@/lib/personal-policy'
+import { runCredentialSource } from '@/lib/run-credential-source'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
  * together so the cloud worker never observes an unbound queued run. */
@@ -28,13 +29,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       JOIN agents a ON a.id=$4 AND a."userId"=b."ownerId" AND a."deviceId"=dev.id
       JOIN device_repos repo ON repo.id=$5 AND repo."deviceId"=dev.id AND repo."userId"=b."ownerId"
       WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3
-        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
-        AND ${subscriptionsUsableSql('b."ownerId"', 'b."workspaceId"')}
-        AND EXISTS (SELECT 1 FROM byos_bindings s JOIN byos_connections c ON c.id=s."connectionId" AND c."ownerId"=s."ownerId"
-          AND c.state='connected' AND c.paused=false AND c.epoch=s."connectionRevision"
-          WHERE s.id=(SELECT latest.id FROM byos_bindings latest WHERE latest."ownerId"=b."ownerId" AND latest."consumerId"=a.id::text
-            AND latest.route=CASE a.harness WHEN 'codex' THEN 'codex_cli' WHEN 'claude_code' THEN 'claude_code_cli' ELSE '' END
-            ORDER BY latest."createdAt" DESC,latest.id DESC LIMIT 1) AND s."workspaceId"=b."workspaceId"::text)`,
+        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')`,
     [input.botId, actor.userId, actor.workspaceId, input.agentId, input.deviceRepoId])).rows[0]
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
     const prompt = runPrompt(input.title, input.body, target.instructions, input.note)
@@ -48,10 +43,21 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
         return { runId }
       }
     }
-    // Every cloud run freezes its definition (Agent, model, credential source) when it is created (orchestration.md § 5).
-    const subscription = await new SubscriptionRepository(client).nativeBinding(actor.userId,input.agentId,target.harness)
-    if (!subscription) throw new ComputerError(409,'Bot subscription unavailable')
-    const agentDefinition = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,model:input.model === 'auto' ? undefined : input.model,mailboxEnabled:process.env.MIKKA_PERSONAL_MAILBOX_ENABLED==='1',mailboxScope:{botId:input.reportToCoordinator ? null : input.botId,workspaceId:actor.workspaceId} })
+    // Every cloud run freezes its definition (Agent, model, credential source) when it is created (orchestration.md § 5):
+    // the Agent's subscription bound here, else the person's API key. The key is opened only when the run is claimed.
+    const usable = (await client.query(`SELECT 1 FROM bots b JOIN agents a ON a.id=$3 AND a."userId"=b."ownerId"
+      WHERE b.id=$1 AND b."ownerId"=$2 AND ${subscriptionsUsableSql('b."ownerId"', 'b."workspaceId"')}
+        AND EXISTS (SELECT 1 FROM byos_bindings s JOIN byos_connections c ON c.id=s."connectionId" AND c."ownerId"=s."ownerId"
+          AND c.state='connected' AND c.paused=false AND c.epoch=s."connectionRevision"
+          WHERE s.id=(SELECT latest.id FROM byos_bindings latest WHERE latest."ownerId"=b."ownerId" AND latest."consumerId"=a.id::text
+            AND latest.route=CASE a.harness WHEN 'codex' THEN 'codex_cli' WHEN 'claude_code' THEN 'claude_code_cli' ELSE '' END
+            ORDER BY latest."createdAt" DESC,latest.id DESC LIMIT 1) AND s."workspaceId"=b."workspaceId"::text)`, [input.botId, actor.userId, input.agentId])).rowCount
+    const binding = usable ? await new SubscriptionRepository(client).nativeBinding(actor.userId,input.agentId,target.harness) : null
+    const runBotId = input.reportToCoordinator ? null : input.botId
+    const { subscription, apiKey } = await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model: input.model === 'auto' ? undefined : input.model,
+      botWorkspaceId: runBotId ? actor.workspaceId : null, choiceWorkspaceId: actor.workspaceId, subscription: binding })
+    if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
+    const agentDefinition = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model:input.model === 'auto' ? undefined : input.model,mailboxEnabled:process.env.MIKKA_PERSONAL_MAILBOX_ENABLED==='1',mailboxScope:{botId:input.reportToCoordinator ? null : input.botId,workspaceId:actor.workspaceId} })
     await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId","agentDefinition")
       VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, target.baseBranch, prompt, input.reportToCoordinator ? null : input.botId,JSON.stringify(agentDefinition)])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])

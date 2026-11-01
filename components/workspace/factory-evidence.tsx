@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { withBasePath } from '@/lib/base-path'
 import { cn } from '@/lib/utils'
-import { activeStep, evidenceMediaPath, formatDuration, mediaKind, stepIndex, type EvidenceEntry } from '@/lib/factory/evidence-view'
+import { activeStep, evidenceMediaPath, formatDuration, mediaKind, stepIndex, stepTime, type EvidenceEntry } from '@/lib/factory/evidence-view'
 import type { AcceptanceItem } from '@/lib/factory/acceptance-view'
 import { ShortSha } from './short-sha'
 
@@ -30,13 +30,13 @@ export function itemLabel(t: Translate, { entry, command }: AcceptanceItem) {
  */
 function RecordingSteps({ steps, current, onSeek }: { steps: { atMs: number; label: string }[]; current: number; onSeek: (ms: number) => void }) {
   const t = useTranslations('FactoryAcceptance')
-  return <section aria-label={t('steps', { count: String(steps.length) })} className="flex max-h-full min-h-0 w-full shrink-0 flex-col gap-1 sm:w-60">
+  return <section aria-label={t('steps', { count: String(steps.length) })} className="flex max-h-full min-h-0 w-full shrink-0 flex-col gap-1 sm:w-60 sm:self-start">
     <h3 className="px-2 text-xs text-muted-foreground">{t('steps', { count: String(steps.length) })}</h3>
     <ol className="flex min-h-0 flex-col gap-0.5 overflow-y-auto">
       {steps.map((step, position) => <li key={`${step.atMs}:${position}`}>
         <Button variant="ghost" aria-current={position === current || undefined} onClick={() => onSeek(step.atMs)}
           className="h-auto w-full min-w-0 items-baseline justify-start gap-3 px-2 py-1.5 text-left font-normal whitespace-normal aria-[current=true]:bg-background">
-          <span className="w-9 shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{formatDuration(step.atMs)}</span>
+          <span className="w-11 shrink-0 font-mono text-xs text-muted-foreground tabular-nums">{stepTime(steps, position)}</span>
           <span className="min-w-0 flex-1 break-words">{step.label}</span>
         </Button>
       </li>)}
@@ -203,8 +203,9 @@ export function EvidenceViewer({ taskId, items, index, title, passed, sha, envir
               <img key={src} src={src!} alt={name} draggable={false} onLoad={() => setLoad({ state: 'ready' })} onError={() => setLoad({ state: 'error' })}
                 className={cn('max-h-full max-w-full rounded-lg object-contain', load.state !== 'ready' && 'invisible')} />
             </>
-              : media === 'video' ? <div className="flex size-full min-h-0 min-w-0 flex-col items-center justify-center gap-4 sm:flex-row">
-                <div className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center">
+              : media === 'video' ? <div className={cn('flex size-full min-h-0 min-w-0 flex-col items-center justify-center gap-4 sm:flex-row', steps.length > 0 && 'sm:items-stretch')}>
+                {/* With steps, the video and its timeline share a top edge. */}
+                <div className={cn('relative flex min-h-0 min-w-0 flex-1 items-center justify-center', steps.length > 0 && 'sm:items-start sm:justify-end')}>
                   {load.state === 'loading' && <Skeleton data-testid="evidence-loading" className="absolute inset-0 m-auto aspect-video max-h-full w-full max-w-[52rem]" />}
                   <video ref={player} key={src} src={src!} controls playsInline preload="metadata" aria-label={name} onLoadedMetadata={() => setLoad({ state: 'ready' })} onError={() => setLoad({ state: 'error' })}
                     onTimeUpdate={event => setPlayingMs(event.currentTarget.currentTime * 1000)}

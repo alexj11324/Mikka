@@ -1,3 +1,4 @@
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
@@ -11,6 +12,6 @@ export const computerRoute = createComputerHandler(new ComputerStore(pool), asyn
   const context = await loadWorkspaceContext(undefined, session.user)
   return { userId: session.user.id, workspaceId: context.workspace.id }
 }, async (actor, botId) => {
-  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1') return
+  if (!cloudComputerTasksEnabled()) return
   await ensureCloudBotWorker(pool, actor, botId)
 })

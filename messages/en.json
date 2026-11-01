@@ -765,7 +765,7 @@
     "connect": {
       "trigger": "Connect device",
       "title": "Add device",
-      "description": "A machine you can reach over SSH. Mikka installs and starts the daemon there, then brings back the Agents it detected.",
+      "description": "A machine you can reach over SSH. Mikka installs and starts the Mikka client there, then brings back the Agents it detected.",
       "host": "Host",
       "hostPlaceholder": "SSH host, hostname, or IP[:port]",
       "actAs": "Connect as",
@@ -775,7 +775,7 @@
       "manualToken": "Use a manual token",
       "connect": "Connect",
       "connectingHost": "Connecting to {host}",
-      "progressDescription": "Install and start the daemon on this machine, then wait for its first heartbeat.",
+      "progressDescription": "Install and start the Mikka client on this machine, then wait for it to connect.",
       "interrupted": "The connection was interrupted.",
       "tokenFailed": "Could not create a token. Please try again.",
       "done": "Done",
@@ -797,18 +797,18 @@
       },
       "manual": {
         "loginComment": "# 1. Sign in on this machine (the token is shown only once)",
-        "startComment": "# 2. Start the daemon; it reports the Agents installed here"
+        "startComment": "# 2. Start the Mikka client; it reports the Agents installed here"
       },
       "sshExitCode": "ssh exited with code {code}",
       "noNode": "node is not installed on this machine",
       "noPnpm": "pnpm is not installed on this machine",
-      "copyDaemon": "Copying the daemon to ~/.mikka",
+      "copyDaemon": "Copying the Mikka client to ~/.mikka",
       "rsyncExitCode": "rsync exited with code {code}",
       "installExitCode": "pnpm install exited with code {code}",
       "depsInstalled": "Dependencies installed",
       "startExitCode": "Failed to start; exit code {code}",
-      "daemonRunning": "The daemon is running in the background",
-      "heartbeatTimeout": "Timed out waiting for a heartbeat. Check ~/.mikka/daemon.log",
+      "daemonRunning": "The Mikka client is running in the background",
+      "heartbeatTimeout": "The Mikka client did not connect. Its log is at ~/.mikka/daemon.log",
       "connectionError": "The connection failed",
       "commands": {
         "install": "1 Install",
@@ -830,15 +830,15 @@
     "commands": {
       "sent": {
         "redetect": "Asked {name} to re-detect agents",
-        "restart": "Asked {name} to restart its connection",
-        "update": "Asked {name} to update its client"
+        "restart": "Asked {name} to restart the Mikka client",
+        "update": "Asked {name} to update the Mikka client"
       },
       "queued": "{name} is offline; it runs when it reconnects"
     },
     "actions": {
       "rename": "Rename",
-      "restart": "Restart connection",
-      "update": "Update client",
+      "restart": "Restart Mikka client",
+      "update": "Update Mikka client",
       "redetect": "Re-detect agents",
       "remove": "Remove device"
     },
@@ -852,9 +852,9 @@
       "title": "Remove “{name}”?",
       "cancel": "Cancel",
       "confirm": "Remove",
-      "uninstall": "This also uninstalls the daemon on {name}; its credentials stop working at once.",
-      "offline": "{name} is offline, so its daemon can’t be uninstalled; its credentials stop working at once and it gets no more work.",
-      "uninstalling": "Uninstalling the daemon on {name}"
+      "uninstall": "This also uninstalls the Mikka client on {name}; its credentials stop working at once.",
+      "offline": "{name} is offline, so its Mikka client can’t be uninstalled; its credentials stop working at once and it gets no more work.",
+      "uninstalling": "Uninstalling the Mikka client on {name}"
     },
     "ssh": {
       "title": "Add device",
@@ -871,7 +871,7 @@
       "progress": "Install progress",
       "steps": {
         "connect": "Connect",
-        "install": "Install daemon",
+        "install": "Install Mikka client",
         "start": "Start",
         "online": "Online"
       },
@@ -3621,7 +3621,7 @@
     "approving": "Approving…",
     "approved": "Approved",
     "denied": "Denied",
-    "returnToTerminal": "Return to your terminal to start the daemon",
+    "returnToTerminal": "Return to your terminal to start the Mikka client",
     "done": "Done",
     "invalid": "This code is invalid or expired",
     "failed": "Connection failed",
@@ -3989,7 +3989,6 @@
     "computerYes": "Turn on",
     "computerNo": "Not now",
     "computerLater": "You can turn on the cloud computer later in Settings.",
-    "computerMember": "Once a workspace admin adds an E2B API key in Settings, I can use a cloud computer.",
     "keyLabel": "E2B API key",
     "keyLink": "Get a key from E2B",
     "keyConnect": "Connect",

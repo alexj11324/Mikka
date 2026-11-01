@@ -52,7 +52,7 @@ async function start(config, remainder) {
       )
     )
       fail();
-    if (key === "CLAUDE_CODE_OAUTH_TOKEN" && value !== PLACEHOLDER) fail();
+    if ((key === "CLAUDE_CODE_OAUTH_TOKEN" || key === "MIKKA_MODEL_API_KEY") && value !== PLACEHOLDER) fail();
   }
   delete config.env.CLAUDE_CODE_OAUTH_TOKEN;
   if (config.githubBin !== undefined && (typeof config.githubBin !== 'string' || !config.githubBin.startsWith('/') || !config.githubBin.endsWith('/github/bin') || config.githubBin.includes(':') || config.githubBin.includes('\n'))) fail();
@@ -126,6 +126,9 @@ async function start(config, remainder) {
         args[i + 1] = JSON.stringify(value);
       }
   } else {
+    // An API-key run names its provider; its requests also go to the task broker, which adds the key.
+    for (let i = 0; i < args.length; i++)
+      if (args[i].startsWith("model_providers.mikka.base_url=")) args[i] = `model_providers.mikka.base_url=${JSON.stringify(base)}`;
     args.push(
       "-c",
       `chatgpt_base_url=${JSON.stringify(base + "/backend-api/")}`,

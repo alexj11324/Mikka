@@ -1,4 +1,5 @@
 import 'server-only'
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
@@ -17,6 +18,7 @@ import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATT
 import { autoScheduleOn } from '@/lib/device-auto-schedule'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { afterRunEnded } from '@/lib/run-completion-effects'
+import { ownE2BKeySql } from './secrets/e2b-owner-sql'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -206,16 +208,16 @@ async function reclaimLostRun(run: Run, now: Date) {
 
 type CloudTarget = { botId: string; workspaceId: string; harness: 'codex' | 'claude_code'; agentId: string; repoId: string; deviceId: string; remoteUrl: string }
 
-/** The person's own E2B cloud for a lost run: an E2B key and the run's own bot's cloud runtime (never another bot's). */
+/** The person's own E2B cloud for a lost run: their own E2B key and the run's own bot's cloud runtime (never another bot's). */
 async function cloudTarget(run: Run): Promise<CloudTarget | null> {
-  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return null
+  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return null
   if (run.agentDefinition?.repositoryAdmission || !run.deviceRepoId || !run.botId) return null
   const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
   if (!repo?.remoteUrl) return null
   const harness = run.agentDefinition?.harness ?? null
   const { rows: [row] } = await pool.query(`SELECT r."botId",r."workspaceId",r.harness,r."agentId",r."repoId",a."deviceId" FROM bot_cloud_runtimes r
-      JOIN workspace_e2b_keys k ON k."workspaceId"=r."workspaceId" JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId"
-      WHERE r."ownerId"=$1 AND r."botId"=$2 AND a."deviceId" IS NOT NULL
+      JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId"
+      WHERE r."ownerId"=$1 AND r."botId"=$2 AND a."deviceId" IS NOT NULL AND ${ownE2BKeySql('r."ownerId"')}
       ORDER BY (r.harness=$3) DESC NULLS LAST LIMIT 1`, [run.userId, run.botId, harness])
   return row ? { ...row, remoteUrl: repo.remoteUrl } : null
 }

@@ -77,7 +77,7 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await expect.poll(async () => (await db().query('SELECT kind FROM device_management_commands WHERE "deviceId" = $1', [ids.server])).rows.map(item => item.kind)).toEqual(['redetect'])
 
   await row(page, 'gpu-box').getByRole('button', { name: 'gpu-box 的更多操作' }).click()
-  await page.getByRole('menuitem', { name: '重启连接' }).click()
+  await page.getByRole('menuitem', { name: '重启 Mikka 客户端' }).click()
   await expect(page.getByText('gpu-box 离线，上线后执行')).toBeVisible()
 
   await row(page, 'build-01').getByRole('button', { name: 'build-01 的更多操作' }).click()
@@ -90,7 +90,7 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
 
   await row(page, 'dev-vps').getByRole('button', { name: 'dev-vps 的更多操作' }).click()
   await page.getByRole('menuitem', { name: '移除设备' }).click()
-  await expect(page.getByRole('alertdialog', { name: '移除「dev-vps」？' })).toContainText('也会卸载 dev-vps 上的 daemon')
+  await expect(page.getByRole('alertdialog', { name: '移除「dev-vps」？' })).toContainText('也会卸载 dev-vps 上的 Mikka 客户端')
   await page.getByRole('button', { name: '移除', exact: true }).click()
   await expect(page.getByText('dev-vps', { exact: true })).toHaveCount(0)
   await expect.poll(async () => (await db().query('SELECT "removedAt" IS NOT NULL AS removed FROM devices WHERE id = $1', [ids.bare])).rows[0]?.removed).toBe(true)
