@@ -33,6 +33,7 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     await pool.query('DELETE FROM repository_settings WHERE "userId" = ANY($1)', [users])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
+  const seeded = new Map<string, string>()
   const person = async (label: string) => {
     const id = await seedUser(pool, label)
     users.push(id)
@@ -42,6 +43,7 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     const issueId = await seedIssue(pool, id)
     // A numbered task, so its thread gets a publication branch.
     await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
+    seeded.set(id, ws.id)
     return { id, workspaceId: ws.id, issueId }
   }
   const onlineMac = async (userId: string, autoSchedule: boolean | null = true, deviceType = 'laptop') => {
@@ -52,7 +54,12 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
   }
   // No bot named: the Coordinator of the person's own workspace (each person here has one), as the app resolves it.
   const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
-  const ownWorkspace = async (userId: string) => (await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId"=$1 AND status=\'active\' LIMIT 1', [userId])).rows[0].workspaceId
+  // The workspace the person was seeded with: the first Coordinator lookup also creates their personal workspace, so "any membership" is not it.
+  const ownWorkspace = async (userId: string) => {
+    const workspaceId = seeded.get(userId)
+    assert.ok(workspaceId, 'a person seeded by this test')
+    return workspaceId
+  }
   const dispatch = async (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId ?? await chatBotId(userId, null, await ownWorkspace(userId)))
   type NoMachine = { error: string; card: { title: string; description: string; options: { value: string; action: string }[] } }
   const actions = (result: NoMachine) => result.card.options.map(option => option.action)
