@@ -162,6 +162,38 @@ test('In a chat, BeCitations leaves its links to the reply\'s one sources toggle
   assert.doesNotMatch(html, /OpenUI docs/)
 })
 
+test('A task or run chip is boxed with no underline and only its title; a source chip keeps its unboxed underline (R-15)', () => {
+  const task = '00000000-0000-4000-8000-000000000043'
+  const run = '00000000-0000-4000-8000-0000000000a1'
+  const sources = {
+    [task]: { kind: 'issue', id: task, number: 43, identifier: 'MIK-43', title: 'Move the chat to OpenUI', status: 'doing', priority: 'high' },
+    [run]: { kind: 'run', id: run, agentName: 'Worker', harness: 'claude_code', status: 'running', issue: { id: task, number: 43, identifier: 'MIK-43', title: 'Move the chat to OpenUI' }, name: 'Fix the shell', summary: null, steps: 1, createdAt: '2026-11-01T00:00:00.000Z', finishedAt: null },
+  } as const
+  const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages}><AgentCitationsContext value={{ sources, previews: {}, onOpenIssue: () => {} }}>
+    <AgentGenerativeUI response={`root = InlineText(["See ", TaskChip("${task}"), " and ", RunChip("${run}"), ", PR ", SourceChip("https://github.com/alexj11324/Mikka/pull/92", "Mikka#92")])`} isStreaming={false} onAction={() => {}} />
+  </AgentCitationsContext></NextIntlClientProvider>)
+  const chips = [...html.matchAll(/<(?:button|a)[^>]*data-slot="inline-citation-trigger"[^>]*>.*?<\/(?:button|a)>/g)].map(match => match[0])
+  assert.equal(chips.length, 3)
+  const [taskChip, runChip, sourceChip] = chips
+  for (const chip of [taskChip, runChip]) {
+    const className = chip.match(/class="([^"]*)"/)?.[1] ?? ''
+    assert.match(chip, /data-variant="object"/)
+    assert.ok(className.split(' ').includes('bg-object-chip'), 'object chip has a fill')
+    assert.ok(className.split(' ').includes('rounded-[5px]'), 'object chip is rounded')
+    assert.ok(className.split(' ').includes('no-underline'), 'object chip title is not underlined')
+    assert.ok(!className.split(' ').includes('underline'), 'object chip has no underline')
+    assert.ok(className.split(' ').includes('whitespace-nowrap'), 'object chip does not break across lines')
+    assert.ok(className.split(' ').includes('text-object-chip-foreground'), 'object chip title is in the accent')
+  }
+  assert.match(taskChip, />Move the chat to OpenUI</)
+  assert.doesNotMatch(taskChip, /MIK-43/)
+  assert.match(runChip, />Fix the shell</)
+  const sourceClass = sourceChip.match(/class="([^"]*)"/)?.[1] ?? ''
+  assert.match(sourceChip, /data-variant="source"/)
+  assert.ok(sourceClass.split(' ').includes('underline'), 'source chip keeps its underline')
+  assert.ok(!sourceClass.split(' ').includes('bg-object-chip'), 'source chip has no box')
+})
+
 test('Text inside an OpenUI card is part of the card, not a chat bubble', () => {
   const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages}><ReplyBubbles value>
     <AgentGenerativeUI response={'root = Stack([TextContent("Outside"), Card([TextContent("Inside")])])'} isStreaming={false} onAction={() => {}} />

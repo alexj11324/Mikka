@@ -273,7 +273,8 @@ export class SessionMailbox {
       const inserted = await client.query('insert into run_messages (id,"userId",text,"mailboxId","senderMailboxId","dedupeKey","replyTo",origin) values ($1,$2,$3,$4,$5,$6,$7,$8) returning "createdAt"', [id, actor.userId, input.text, target.id, actor.mailboxId, input.key, input.replyTo ?? null, owner ? 'owner' : 'peer'])
       if (target.disabled) await client.query('update run_messages set failure=$1 where id=$2', ['recipient_disabled', id])
       if (target.kind === 'coordinator' && !target.disabled) {
-        await client.query(`insert into coordinator_events (id,"userId",kind,"dedupeKey","runId",payload,tier) values ($1,$2,$3,$4,$5,$6,'result')`, [randomUUID(), actor.userId, owner ? 'user_message' : 'run_report', `mailbox:${id}`, actor.runId ?? null, JSON.stringify({ text: owner ? input.text : personalPeerText({ id, senderMailboxId: actor.mailboxId, text: input.text, sourceRunId: actor.runId, createdAt: inserted.rows[0]?.createdAt }) })])
+        // The owner's own message is delivered as theirs; a peer's report gets no preset tier, so triage (the Decisions API) classifies it.
+        await client.query(`insert into coordinator_events (id,"userId",kind,"dedupeKey","runId",payload,tier) values ($1,$2,$3,$4,$5,$6,$7)`, [randomUUID(), actor.userId, owner ? 'user_message' : 'run_report', `mailbox:${id}`, actor.runId ?? null, JSON.stringify({ text: owner ? input.text : personalPeerText({ id, senderMailboxId: actor.mailboxId, text: input.text, sourceRunId: actor.runId, createdAt: inserted.rows[0]?.createdAt }) }), owner ? 'result' : null])
       }
       return { id, queued: true, duplicate: false, failure: target.disabled ? 'recipient_disabled' : null }
     }, client => this.authorize(client, actor))

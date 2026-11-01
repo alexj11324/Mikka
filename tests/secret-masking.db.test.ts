@@ -107,6 +107,17 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     const { rows: [run] } = await pool.query(`select error from agent_runs where id=$1`, [runId])
     assert.equal(run.error, 'boom [secret:API_TOKEN]')
 
+    // A failed run's reason (the terminal patch, just before /complete) is kept, masked;
+    // the patch does not move the run's state, and the first reason wins.
+    const failedRun = await newRun()
+    const before = (await pool.query(`select status from agent_runs where id=$1`, [failedRun])).rows[0].status
+    const failed = await runRoute.PATCH(call('PATCH', `/v1/runs/${failedRun}`, { state: 'failed', error: `docker create timed out ${SECRET}` }), { params: Promise.resolve({ runId: failedRun }) })
+    assert.equal(failed.status, 204)
+    await runRoute.PATCH(call('PATCH', `/v1/runs/${failedRun}`, { state: 'failed', error: 'a later reason' }), { params: Promise.resolve({ runId: failedRun }) })
+    const { rows: [failedRow] } = await pool.query(`select error, status from agent_runs where id=$1`, [failedRun])
+    assert.equal(failedRow.error, 'docker create timed out [secret:API_TOKEN]')
+    assert.equal(failedRow.status, before)
+
     const checkpoint = await import('../app/v1/runs/[runId]/checkpoint/route')
     const diff = `--- a/.env\n+++ b/.env\n@@ -0,0 +1 @@\n+API_TOKEN=${SECRET}\n`
     const cp = await checkpoint.POST(call('POST', `/v1/runs/${runId}/checkpoint`, { baseCommit: 'a'.repeat(40), patch: gzipSync(diff).toString('base64'), files: 1, takenAt: new Date().toISOString() }), { params: Promise.resolve({ runId }) })

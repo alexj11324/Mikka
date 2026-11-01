@@ -39,7 +39,8 @@ export const groupRuntime: GroupRuntime = {
     const scope = hostedBillingScope.getStore()
     if (!scope) throw new Error('verification_required')
     if (agent.memberType === 'bot' && !scope.ownerId) throw new Error('verification_required')
-    const signal = AbortSignal.timeout(20000)
+    // 停止 in the group aborts it too (lib/coordinator/group-turns.ts).
+    const signal = input.signal ? AbortSignal.any([AbortSignal.timeout(20000), input.signal]) : AbortSignal.timeout(20000)
     const options = {
       model: agent.memberType === 'bot'
         ? await resolveGroupBotModel({ ownerId: scope.ownerId!, workspaceId: scope.workspaceId, botId: agent.id }, input.modelRuntime ?? (() => { throw Error('group_bot_model_unavailable') })(), signal)

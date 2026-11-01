@@ -17,7 +17,9 @@ import { BotAvatar } from '@/components/nav/bot-avatar'
 import { UserMessageText } from '@/components/workspace/user-message-text'
 import { cn } from '@/lib/utils'
 import { mentionsIn } from '@/lib/group-mentions'
-import { authorRuns, chronological, fetchGroupMessages, GroupMessagesRequestError, postGroupMessage, type GroupMessagePage } from '@/lib/group-messages'
+import { authorRuns, chronological, fetchGroupMessages, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMessagePage } from '@/lib/group-messages'
+import { toast } from 'sonner'
+import { useActionError } from '@/lib/use-action-error'
 
 /** A message the person sent that the server has not stored yet; a failed one waits for 重试. */
 type Pending = { key: string; body: string; failed: boolean; sentId?: string }
@@ -80,6 +82,16 @@ export function GroupChatView({ group, userId, people }: {
     void deliver(item)
   }
   const first = pages?.[0]
+  // 停止: the reply ends on the server; the button waits until the group stops answering.
+  const actionError = useActionError()
+  const [stopping, setStopping] = useState(false)
+  const replying = !!first?.agentStatus
+  useEffect(() => { if (!replying) setStopping(false) }, [replying])
+  const stop = async () => {
+    setStopping(true)
+    try { await stopGroupReply(group.id) } catch { setStopping(false); toast.error(actionError()) }
+    await mutate()
+  }
   const unsent = pending.filter(item => !item.sentId || !messages.some(message => message.id === item.sentId))
   // The newest message, a sent one or a bot answering keeps the chat at its end; loading older ones does not move it.
   const scroller = useRef<HTMLDivElement>(null)
@@ -124,11 +136,13 @@ export function GroupChatView({ group, userId, people }: {
                     {first?.agentStatus && <li aria-label={t('answering')} className="flex"><span className="rounded-2xl bg-muted px-4 py-3"><Spinner aria-hidden="true" /></span></li>}
                   </ol>
                   {first?.routingError && !first.agentStatus && <p className="text-center text-xs text-muted-foreground">{t('noTaker')}</p>}
+                  {first?.stopped && !first.agentStatus && <p role="status" className="text-center text-xs text-muted-foreground">{t('stopped')}</p>}
                 </>}
       </div>
     </div>
     <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
-      <ChatComposer ref={null} value={draft} onChange={setDraft} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!code} />
+      <ChatComposer ref={null} value={draft} onChange={setDraft} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!code}
+        sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />
     </div>
   </section>
 }
