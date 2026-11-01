@@ -770,10 +770,10 @@ export class Daemon {
     return info.harness === 'claude_code' || (info.harness === 'codex' && codexSupportsRunApproval(info.version)) ? true : undefined
   }
 
-  /** A subscription run here goes through the server's broker (subscription-local-runner.ts). */
+  /** A subscription run here takes a per-run access lease (subscription-local-runner.ts). */
   private localSubscriptionCapable(info: HarnessInfo) {
     return (info.harness === "claude_code" || info.harness === "codex") && info.installed &&
-      this.supportsToolApproval(info) === true && Boolean(this.options.link.nativeContext && this.options.link.nativeRequest)
+      this.supportsToolApproval(info) === true && Boolean(this.options.link.nativeLease)
   }
 
   /** Report a CLI the daemon cannot run as present but not installed, so no run is pinned here. */
@@ -945,16 +945,16 @@ export class Daemon {
   }
 
   /**
-   * Subscription runs on this device: model requests go through the server,
-   * which holds the owner's credential (subscription-local-runner.ts).
+   * Subscription runs on this device: the server hands each run its
+   * short-lived access token, never the refresh grant (subscription-local-runner.ts).
    */
   private localSubscriptions() {
     const link = this.options.link
     const options = this.adapterOptions()
-    if (!options || !link.nativeContext || !link.nativeRequest) return undefined
+    if (!options || !link.nativeLease) return undefined
     return createLocalSubscriptionRunner({
       stateDir: this.paths.adapterState,
-      link: { nativeContext: link.nativeContext.bind(link), nativeRequest: link.nativeRequest.bind(link) },
+      link: { nativeLease: link.nativeLease.bind(link) },
       claude: options.claude,
       codex: options.codex,
     })

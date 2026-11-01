@@ -76,8 +76,6 @@ export interface CodexAdapterOptions {
   ensureBinary?: () => Promise<string>
   /** Docker mode (run-container.ts): set by the daemon when this device runs harnesses in containers. */
   openContainer?: (run: Omit<RunContainerOptions, "image" | "owner">) => Promise<RunContainer>
-  /** The run's local subscription broker; see ClaudeAdapterOptions.modelEndpoint. */
-  modelEndpoint?: string
   /** Trusted hosted transport, retaining the existing app-server adapter. */
   spawnCli?: typeof spawnCli
   /** Persist an owner-bound session before any prompt can execute. */
@@ -331,15 +329,14 @@ export class CodexAdapter implements AgentAdapter {
     const codexHome = prepareCodexHome(join(runDir, "codex-home"), log)
     const assignedComputer = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
     // Docker mode: the CLI runs in a disposable container of the runner image.
-    const inContainer = !this.options.spawnCli && this.options.sandbox.kind !== 'none' && !assignedComputer && !this.options.modelEndpoint && Boolean(this.options.openContainer)
+    const inContainer = !this.options.spawnCli && this.options.sandbox.kind !== 'none' && !assignedComputer && Boolean(this.options.openContainer)
     const binary = this.options.binary ?? (inContainer ? "codex" : await this.options.ensureBinary?.()) ?? "codex"
     if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_AUTH_ERROR)
     const credential = codexCredential(options.credential)
     const providerDomain = credentialDomain(options.credential)
-    const modelEndpoint = this.options.modelEndpoint ? new URL(this.options.modelEndpoint).host : undefined
     const ctx = new RunContext({
       ...(inContainer ? { nodeBinary: "node" } : {}),
-      harnessDomains: [...(providerDomain ? [providerDomain] : []), ...(modelEndpoint ? [modelEndpoint] : [])],
+      harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
@@ -385,13 +382,6 @@ export class CodexAdapter implements AgentAdapter {
       ] : []),
       ...codexAppArgs(options.apps),
       ...credential.args,
-      // ChatGPT-login traffic goes to the run's local broker, over plain HTTP.
-      ...(this.options.modelEndpoint ? [
-        "-c", `chatgpt_base_url=${toml(`${this.options.modelEndpoint}/backend-api/`)}`,
-        "-c", "model_providers.openai.supports_websockets=false",
-        "-c", "features.responses_websockets=false",
-        "-c", "features.responses_websockets_v2=false",
-      ] : []),
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
         "-c",
@@ -417,7 +407,7 @@ export class CodexAdapter implements AgentAdapter {
       ? (launcher = container.spawn(argv[0], argv.slice(1), spawnOptions.env))
       : this.options.spawnCli || this.options.sandbox.kind === 'none'
       ? await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
-      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps),modelEndpoint) }))
+      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps)) }))
     if (launcher) {
       const ownedLauncher = launcher
       const off = options.toolApproval!.onRevoke(() => { void ownedLauncher.revoke().catch(() => undefined) })

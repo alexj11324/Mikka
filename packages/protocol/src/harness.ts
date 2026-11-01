@@ -41,9 +41,9 @@ export const harnessInfoSchema = z.object({
   /** Deprecated (#312, 2026-10-27): could host the native Coordinator. The server keeps that runtime switched off. */
   coordinator: z.boolean().optional(),
   /**
-   * Set only by a runner whose subscription runs go through an owner-bound
-   * broker: the hosted runner, or a device daemon whose model requests the
-   * server signs (the token never reaches the device).
+   * Set only by a runner that runs subscriptions under owner-bound custody:
+   * the hosted runner's broker, or a device daemon that takes one run's
+   * short-lived access lease (never the refresh grant) and wipes it at run end.
    */
   subscriptionBroker: z.literal(true).optional(),
   /** Set only by an E2B worker with the guarded Bot computer broker. */
