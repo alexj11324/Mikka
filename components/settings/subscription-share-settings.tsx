@@ -16,8 +16,8 @@ type Change = { shared: boolean; allowOthers?: boolean }
  * 在这里使用我的订阅: a member shares their own subscriptions into this team
  * workspace for their own bots; 分享给团队成员 lets other members' bots use
  * them too. Turning it on asks first, in Alex's words: whose quota pays, that
- * the credential sits on the running computer (maybe a member's own) until
- * the task ends, and to share only with people you trust. Turning it off
+ * tasks may run on members' own computers while the credential stays on Mikka's
+ * servers, and to share only with people you trust. Turning it off
  * takes effect at once, without asking. A personal
  * workspace always uses its owner's subscriptions, so it shows nothing here
  * (decision 2026-10-31-2225).
