@@ -6,6 +6,8 @@
 - Replaces:
   - [2026-10-31-2225-bindings-belong-to-the-person](2026-10-31-2225-bindings-belong-to-the-person.md) rule 3: sharing a subscription into a team as the member's own choice (模型与额度 › 在这里使用我的订阅), and the admin switch 「允许成员使用个人订阅」.
   - [2026-10-31-2130-personal-vs-workspace](2026-10-31-2130-personal-vs-workspace.md): a team admin switching off personal subscriptions.
+  - [orchestration.md](../orchestration.md) § 6: a member's own credential on their own device described as a "share".
+  - [2026-10-31-2225-bindings-belong-to-the-person](2026-10-31-2225-bindings-belong-to-the-person.md) rule 3, "App connections and devices … get no further switch for now" (the app policy switch exists; see below).
   - [orchestration.md](../orchestration.md) § 2 step 1: "allowed when the owner shared it there and the admin has not turned off 「允许成员使用个人订阅和 API Key」".
 
 A person's own subscriptions and API keys run that person's own bots and
@@ -16,6 +18,17 @@ never fails because its owner's own credential is "not allowed" here.
 Only 「分享给团队成员」 needs turning on: it lets other members' bots use the
 credential in that workspace. It stays off by default, and it is the only
 thing a workspace admin can switch off.
+
+**App and computer policies.** A workspace admin's app policy
+(`workspace_app_policies`) or computer policy governs only sharing with other
+members and the workspace's own resources. It never stops a person using
+their own app connections or their own bots. This corrects
+[2225](2026-10-31-2225-bindings-belong-to-the-person.md) rule 3, which says
+app connections and devices "get no further switch": the app policy switch
+exists.
+
+**Open:** whether a computer policy can stop a person running cloud work on
+their own E2B key. Waiting for Alex.
 
 Unchanged: a credential never runs another member's bot unless shared; an
 admin never sees or uses a member's credential; a paused (已暂停) row still

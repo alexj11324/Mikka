@@ -166,8 +166,12 @@ still pick any of their own devices by hand.
 
 This replaces the old 「设备离线时」 setting.
 
-A device runs only its owner's work. A team admin's 「个人设备」 switch can
-leave members' devices out of that workspace.
+A device runs only its owner's work. A team admin's computer policy governs
+only sharing with others and the workspace's own resources; it never stops a
+member running their own bots on their own device
+([2240](decisions/2026-11-01-2240-own-credentials-always-usable.md), which
+replaces the 「个人设备」 switch that left members' devices out). Whether it
+can stop cloud work on the member's own E2B key is open.
 
 ## 5. Scheduling and concurrency
 
@@ -223,14 +227,15 @@ token or key.
    own CLI config.
    On a device, a subscription run gets only that run's short-lived access
    token, on a pipe or in memory, never on disk; the refresh grant never
-   leaves the server. A member's share used on the member's own device works
-   the same way. Each lease request is checked again (run, device, binding,
+   leaves the server. A member's own credential used on the member's own
+   device works the same way; it needs no share
+   ([2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). Each lease request is checked again (run, device, binding,
    revocation). Codex asks again when the token expires; a Claude Code run
    ends when its token does.
    A subscription on a device or a sandbox never leaves the server: the
    Agent holds a placeholder and sends its model requests to Mikka, which
    checks the run and adds the token to each one. That holds for a member's
-   share used on the member's own device too.
+   own credential on the member's own device too.
 3. **At run end:** the run token is revoked and the injected credential is
    deleted. The environment pauses or idles without it.
 
