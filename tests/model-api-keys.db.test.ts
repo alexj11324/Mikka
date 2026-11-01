@@ -29,12 +29,16 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY);
       INSERT INTO "user" VALUES ('alice'),('bob'),('carol');
       CREATE TABLE byos_connections ("ownerId" text, "workspaceId" text, "removedAt" timestamptz);
-      CREATE TABLE bots (id uuid PRIMARY KEY, "workspaceId" uuid NOT NULL);
+      CREATE TABLE bots (id uuid PRIMARY KEY, "workspaceId" uuid NOT NULL, "ownerId" text);
+      CREATE TABLE bot_model_choices ("ownerId" text NOT NULL, "workspaceId" uuid NOT NULL, "botKey" text NOT NULL, "bindingId" uuid NOT NULL, PRIMARY KEY ("ownerId","workspaceId","botKey"));
       CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "botId" uuid, status text NOT NULL, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz)`)
     await pool.query(await readFile(new URL('../drizzle/20261101002002_workspace_personal_policies.sql', import.meta.url), 'utf8'))
     const migration = await readFile(new URL('../drizzle/20261101003800_model_api_keys.sql', import.meta.url), 'utf8')
     await pool.query(migration)
     await pool.query(migration)
+    const choiceMigration = await readFile(new URL('../drizzle/20261101005500_bot_api_key_choice.sql', import.meta.url), 'utf8')
+    await pool.query(choiceMigration)
+    await pool.query(choiceMigration)
     assert.equal(await store.apiKeyAfterQuota(pool, 'alice'), true, 'on by default')
 
     const personal = { id: randomUUID(), kind: 'personal' as const }
@@ -99,6 +103,25 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.deepEqual(await store.usableApiKeys(pool, 'alice', team.id), [], 'the admin switch turns off members\' credentials')
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1', [team.id])
 
+    // A bot's saved model can be an API key's: usable here, reaching bot chats, a model the key lists.
+    const scope = { ownerId: 'alice', workspaceId: team.id }
+    const aliceBot = randomUUID()
+    await pool.query('INSERT INTO bots (id,"workspaceId","ownerId") VALUES ($1,$2,$3)', [aliceBot, team.id, 'alice'])
+    await assert.rejects(store.setBotApiKeyChoice(pool, scope, aliceBot, anthropic.id, 'not-listed'), { code: 'executionModelUnknown' })
+    await assert.rejects(store.setBotApiKeyChoice(pool, scope, randomUUID(), anthropic.id, 'claude-opus-5-5'), { code: 'botNotFound' })
+    assert.deepEqual(await store.setBotApiKeyChoice(pool, scope, aliceBot, gateway.id, 'qwen-max'), { keyId: gateway.id, model: 'qwen-max', harness: 'codex' })
+    assert.deepEqual(await store.setBotApiKeyChoice(pool, scope, null, anthropic.id, 'claude-opus-5-5'), { keyId: anthropic.id, model: 'claude-opus-5-5', harness: 'claude_code' })
+    assert.deepEqual(await store.botApiKeyChoice(pool, scope, aliceBot), { keyId: gateway.id, model: 'qwen-max', harness: 'codex' })
+    await assert.rejects(pool.query(`INSERT INTO bot_model_choices VALUES ('alice',$1,'both',$2,$3,'m')`, [team.id, randomUUID(), anthropic.id]), { code: '23514' }, 'a choice is a binding or a key, not both')
+    // An Anthropic-only custom provider serves threads, not bot chats.
+    await store.setApiKeyShare(pool, 'bob', team, local.id, true)
+    await assert.rejects(store.setBotApiKeyChoice(pool, scope, aliceBot, local.id, 'glm-5'), { code: 'executionModelUnknown' })
+    await store.setApiKeyShare(pool, 'bob', team, local.id, false)
+    // Each bot-chat model call opens the key again through the same rule.
+    assert.deepEqual(await store.openApiKeyForChat(pool, 'alice', team.id, gateway.id, env), { apiKey: gatewayKey, baseUrl: 'https://gateway.example.com/v1', keyOwnerId: 'bob' })
+    assert.equal((await store.openApiKeyForChat(pool, 'alice', team.id, anthropic.id, env)).baseUrl, 'https://api.anthropic.com/v1')
+    await assert.rejects(store.openApiKeyForChat(pool, 'carol', team.id, anthropic.id, env), { code: 'apiKeyNotFound' })
+
     // Run injection: only an active run whose owner may use the key here.
     const teamBot = randomUUID(), personalBot = randomUUID()
     await pool.query('INSERT INTO bots VALUES ($1,$2),($3,$4)', [teamBot, team.id, personalBot, personal.id])
@@ -135,6 +158,10 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL')
     assert.deepEqual(await store.removeApiKey(pool, 'alice', local.id), { removed: false }, 'only the owner removes a key')
     assert.deepEqual(await store.removeApiKey(pool, 'bob', local.id), { removed: true })
+    // Deleting a key deletes the bot choices on it; those bots fall back to the usual order.
+    await store.removeApiKey(pool, 'alice', anthropic.id)
+    assert.equal(await store.botApiKeyChoice(pool, scope, null), undefined)
+    assert.ok(await store.botApiKeyChoice(pool, scope, aliceBot), 'Bob\'s gateway choice stays')
     assert.equal(await stopped(loose), true, 'deleting a key stops the run that has it')
     assert.equal(await stopped(run), false, 'other keys\' runs go on')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM model_api_key_shares')).rows[0].n, 0)

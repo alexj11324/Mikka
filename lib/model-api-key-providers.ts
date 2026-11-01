@@ -17,20 +17,32 @@ interface PresetEndpoint {
   /** The read-only list the key is checked against when it is added. */
   modelsUrl: string
   modelsAuth: ApiKeyProtocol
+  /** The OpenAI-compatible chat endpoint a bot chat (Mikka's own harness, R-05) talks to. */
+  chatBaseUrl: string
 }
 
 export const API_KEY_PRESET_ENDPOINTS: Record<ApiKeyPreset, PresetEndpoint> = {
-  anthropic: { baseUrl: 'https://api.anthropic.com', protocol: 'anthropic', modelsUrl: 'https://api.anthropic.com/v1/models?limit=1000', modelsAuth: 'anthropic' },
-  openai: { baseUrl: 'https://api.openai.com/v1', protocol: 'openai', modelsUrl: 'https://api.openai.com/v1/models', modelsAuth: 'openai' },
+  anthropic: { baseUrl: 'https://api.anthropic.com', protocol: 'anthropic', modelsUrl: 'https://api.anthropic.com/v1/models?limit=1000', modelsAuth: 'anthropic', chatBaseUrl: 'https://api.anthropic.com/v1' },
+  openai: { baseUrl: 'https://api.openai.com/v1', protocol: 'openai', modelsUrl: 'https://api.openai.com/v1/models', modelsAuth: 'openai', chatBaseUrl: 'https://api.openai.com/v1' },
   // DeepSeek and Kimi answer Claude Code on their Anthropic-compatible endpoints; their model lists are OpenAI-style.
-  deepseek: { baseUrl: 'https://api.deepseek.com/anthropic', protocol: 'anthropic', modelsUrl: 'https://api.deepseek.com/models', modelsAuth: 'openai' },
-  kimi: { baseUrl: 'https://api.moonshot.cn/anthropic', protocol: 'anthropic', modelsUrl: 'https://api.moonshot.cn/v1/models', modelsAuth: 'openai' },
+  deepseek: { baseUrl: 'https://api.deepseek.com/anthropic', protocol: 'anthropic', modelsUrl: 'https://api.deepseek.com/models', modelsAuth: 'openai', chatBaseUrl: 'https://api.deepseek.com/v1' },
+  kimi: { baseUrl: 'https://api.moonshot.cn/anthropic', protocol: 'anthropic', modelsUrl: 'https://api.moonshot.cn/v1/models', modelsAuth: 'openai', chatBaseUrl: 'https://api.moonshot.cn/v1' },
 }
 
 /** The models list a custom provider is checked against, by its protocol. */
 export function customModelsUrl(baseUrl: string, protocol: ApiKeyProtocol): string {
   const base = baseUrl.replace(/\/+$/, '')
   return protocol === 'anthropic' ? `${base}/v1/models` : `${base}/models`
+}
+
+/**
+ * Where a bot chat reaches a key's models: the preset's OpenAI-compatible
+ * endpoint, or a custom provider's base URL when it speaks the OpenAI protocol.
+ * An Anthropic-only custom provider serves threads (Claude Code) but not bot chats.
+ */
+export function apiKeyChatBaseUrl(key: Pick<ApiKeyView, 'provider' | 'baseUrl' | 'protocol'>): string | null {
+  if (key.provider !== 'custom') return API_KEY_PRESET_ENDPOINTS[key.provider].chatBaseUrl
+  return key.protocol === 'openai' ? key.baseUrl : null
 }
 
 /** The Agent that runs a key's models: Codex for OpenAI-protocol credentials, Claude Code for the rest (§ 3). */

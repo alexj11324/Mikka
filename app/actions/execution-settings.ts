@@ -5,6 +5,8 @@ import { ActionFailureError } from "@/lib/action-error";
 import { loadWorkspaceContext } from "@/lib/workspace-access";
 import { pool } from "@/lib/db";
 import { ExecutionSettings } from "@/lib/execution-settings";
+import { botApiKeyChoice, setBotApiKeyChoice } from "@/lib/model-api-keys";
+import { WorkspaceError } from "@/lib/workspace-access";
 async function context(workspaceId?: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ActionFailureError("authRequired");
@@ -76,6 +78,20 @@ export async function setBotModel(
     botId,
     bindingId,
   );
+}
+/** A bot's model served by an API key or custom provider (C22); the model picker (#708) saves it here. */
+export async function setBotApiKeyModel(botId: string | null, keyId: string, model: string) {
+  const scope = await context();
+  try {
+    return await setBotApiKeyChoice(pool, scope, botId, keyId, model);
+  } catch (error) {
+    if (error instanceof WorkspaceError) throw new ActionFailureError(error.code === "botNotFound" ? "botNotFound" : "executionModelUnknown");
+    throw error;
+  }
+}
+/** The saved API key model, or undefined when the bot's model is a subscription's (getBotModel). */
+export async function getBotApiKeyModel(botId: string | null) {
+  return botApiKeyChoice(pool, await context(), botId);
 }
 export async function getBotModel(botId: string | null) {
   return new ExecutionSettings(pool).botModelOption(await context(), botId);

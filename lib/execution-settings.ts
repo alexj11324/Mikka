@@ -577,7 +577,7 @@ export class ExecutionSettings {
     if (!choice) throw new ActionFailureError("executionModelUnknown");
     bindingId = await this.bindingForBot(scope, botId, bindingId);
     await this.pool.query(
-      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId"',
+      'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL',
       [scope.ownerId, scope.workspaceId, key, bindingId],
     );
   }
@@ -623,13 +623,15 @@ export class ExecutionSettings {
     scope: ExecutionSettingsScope,
     botId: string | null,
   ): Promise<string | undefined> {
-    const saved = (
+    const row = (
       await this.pool.query(
-        'SELECT "bindingId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+        'SELECT "bindingId","apiKeyId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
         [scope.ownerId, scope.workspaceId, botId ?? "coordinator"],
       )
-    ).rows[0]?.bindingId;
-    if (saved) return saved;
+    ).rows[0];
+    if (row?.bindingId) return row.bindingId;
+    // The saved choice is an API key's model (lib/model-api-keys.ts botApiKeyChoice), not a binding.
+    if (row?.apiKeyId) return undefined;
     // Decision 2026-10-30 (#537): a Claude subscription first, otherwise ChatGPT/Codex, as `suggested` does.
     const models = await this.botModels(scope);
     const first = models.find((m) => m.provider === "claude") ?? models[0];

@@ -10,7 +10,7 @@ import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { openSecret, sealSecret, SecretsKeyMissingError } from '@/lib/secrets/crypto'
 import { WorkspaceError } from '@/lib/workspace-access'
 import {
-  API_KEY_PRESET_ENDPOINTS, API_KEY_PRESETS, apiKeyHarness, customModelsUrl,
+  API_KEY_PRESET_ENDPOINTS, API_KEY_PRESETS, apiKeyChatBaseUrl, apiKeyHarness, customModelsUrl,
   type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView,
 } from '@/lib/model-api-key-providers'
 
@@ -215,6 +215,60 @@ export type ApiKeyRunCredential =
     /** Codex config: `model_provider = "mikka"` and `[model_providers.mikka]`. The key stays in the env var named by env_key. */
     codex: { model_provider: 'mikka'; model_providers: { mikka: { name: string; base_url: string; env_key: 'MIKKA_MODEL_API_KEY'; wire_api: 'responses' | 'chat' } } } }
 
+async function openKey(query: Query, keyId: string, env: Env) {
+  const { rows: [row] } = await query.query<Row & { ciphertext: string; iv: string; keyVersion: number }>(`SELECT ${COLUMNS},ciphertext,iv,"keyVersion" FROM model_api_keys WHERE id=$1`, [keyId])
+  if (!row) throw new WorkspaceError('apiKeyNotFound')
+  try { return { row, apiKey: openSecret(row, keyAad(row.id, row.ownerId), env) } } catch (error) {
+    if (error instanceof SecretsKeyMissingError) throw new WorkspaceError('secretsUnavailable')
+    console.error(`[model-api-keys] open_failed id=${row.id}`)
+    throw new WorkspaceError('apiKeyNotFound')
+  }
+}
+
+/** A bot's saved API key model (bot_model_choices), with the Agent its threads run on (§ 3). */
+export interface BotApiKeyChoice { keyId: string; model: string; harness: 'claude_code' | 'codex' }
+
+export async function botApiKeyChoice(query: Query, scope: { ownerId: string; workspaceId: string }, botId: string | null): Promise<BotApiKeyChoice | undefined> {
+  const { rows: [row] } = await query.query<{ apiKeyId: string; apiKeyModel: string; protocol: ApiKeyProtocol }>(
+    `SELECT c."apiKeyId",c."apiKeyModel",k.protocol FROM bot_model_choices c JOIN model_api_keys k ON k.id=c."apiKeyId"
+    WHERE c."ownerId"=$1 AND c."workspaceId"=$2 AND c."botKey"=$3`, [scope.ownerId, scope.workspaceId, botId ?? 'coordinator'])
+  return row && { keyId: row.apiKeyId, model: row.apiKeyModel, harness: apiKeyHarness(row.protocol) }
+}
+
+/**
+ * Saves a bot's model as one an API key serves. The key must be usable by
+ * the bot's owner here and reach bot chats, and the model one it lists (any
+ * model when the key lists none). Saving a subscription model later replaces it.
+ */
+export async function setBotApiKeyChoice(query: Query, scope: { ownerId: string; workspaceId: string }, botId: string | null, keyId: string, model: string): Promise<BotApiKeyChoice> {
+  z.uuid().parse(keyId)
+  const modelName = modelId.parse(model)
+  if (botId !== null) {
+    if (!z.uuid().safeParse(botId).success) throw new WorkspaceError('botNotFound')
+    const { rowCount } = await query.query('SELECT 1 FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [botId, scope.ownerId, scope.workspaceId])
+    if (!rowCount) throw new WorkspaceError('botNotFound')
+  }
+  const key = (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).find(item => item.id === keyId)
+  if (!key || !apiKeyChatBaseUrl(key) || (key.models.length && !key.models.includes(modelName))) throw new WorkspaceError('executionModelUnknown')
+  await query.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel") VALUES ($1,$2,$3,NULL,$4,$5)
+    ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel"`,
+  [scope.ownerId, scope.workspaceId, botId ?? 'coordinator', keyId, modelName])
+  return { keyId, model: modelName, harness: apiKeyHarness(key.protocol) }
+}
+
+/**
+ * The key and chat endpoint for one model call of a bot chat frozen on it.
+ * Checked on every call, so a withdrawn share or a deleted key stops the
+ * chat instead of switching (§ 2). Throws WorkspaceError('apiKeyNotFound').
+ */
+export async function openApiKeyForChat(query: Query, userId: string, workspaceId: string, keyId: string, env: Env = process.env): Promise<{ apiKey: string; baseUrl: string; keyOwnerId: string }> {
+  const usable = (await usableApiKeys(query, userId, workspaceId)).find(key => key.id === keyId)
+  const baseUrl = usable && apiKeyChatBaseUrl(usable)
+  if (!usable || !baseUrl) throw new WorkspaceError('apiKeyNotFound')
+  const { row, apiKey } = await openKey(query, keyId, env)
+  return { apiKey, baseUrl, keyOwnerId: row.ownerId }
+}
+
 const ACTIVE_RUN = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']
 
 /**
@@ -234,14 +288,7 @@ export async function apiKeyForRun(query: Query, runId: string, keyId: string, e
     ? (await usableApiKeys(query, run.userId, run.workspaceId)).some(key => key.id === keyId)
     : Boolean((await query.query('SELECT 1 FROM model_api_keys WHERE id=$1 AND "ownerId"=$2', [keyId, run.userId])).rowCount)
   if (!usable) throw new WorkspaceError('apiKeyNotFound')
-  const { rows: [row] } = await query.query<Row & { ciphertext: string; iv: string; keyVersion: number }>(`SELECT ${COLUMNS},ciphertext,iv,"keyVersion" FROM model_api_keys WHERE id=$1`, [keyId])
-  if (!row) throw new WorkspaceError('apiKeyNotFound')
-  let apiKey: string
-  try { apiKey = openSecret(row, keyAad(row.id, row.ownerId), env) } catch (error) {
-    if (error instanceof SecretsKeyMissingError) throw new WorkspaceError('secretsUnavailable')
-    console.error(`[model-api-keys] open_failed id=${row.id}`)
-    throw new WorkspaceError('apiKeyNotFound')
-  }
+  const { row, apiKey } = await openKey(query, keyId, env)
   // Recorded so withdrawing the key or its share stops this run (stopRunsUsingApiKeys).
   await query.query(`INSERT INTO model_api_key_runs ("runId","keyId","workspaceId") VALUES ($1,$2,$3)
     ON CONFLICT ("runId") DO UPDATE SET "keyId"=EXCLUDED."keyId","workspaceId"=EXCLUDED."workspaceId"`, [runId, keyId, run.workspaceId])

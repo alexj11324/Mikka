@@ -123,7 +123,9 @@ export const executionRules = pgTable('execution_rules', {
 }, table=>[index('execution_rules_scope_idx').on(table.ownerId,table.workspaceId), uniqueIndex('execution_rules_default_idx').on(table.ownerId,table.workspaceId).where(sql`${table.label} IS NULL`)])
 export const botModelChoices = pgTable('bot_model_choices', {
   ownerId:text('ownerId').notNull().references(()=>users.id,{onDelete:'cascade'}),workspaceId:uuid('workspaceId').notNull(),
-  botKey:text('botKey').notNull(),bindingId:uuid('bindingId').notNull(),
+  botKey:text('botKey').notNull(),bindingId:uuid('bindingId'),
+  /** Or a model an API key / custom provider serves (C22); exactly one of the two. */
+  apiKeyId:uuid('apiKeyId'),apiKeyModel:text('apiKeyModel'),
 }, table=>[primaryKey({columns:[table.ownerId,table.workspaceId,table.botKey]})])
 
 export const agentSessions = pgTable('agent_sessions', {
