@@ -18,9 +18,19 @@ export async function savedWorkspace(): Promise<string | null> {
   return SecureStore.getItemAsync(WORKSPACE_KEY)
 }
 
+const workspaceListeners = new Set<() => void>()
+
+/** Runs `listener` whenever the person switches workspace; returns the unsubscribe. */
+export function onWorkspaceChange(listener: () => void) {
+  workspaceListeners.add(listener)
+  return () => { workspaceListeners.delete(listener) }
+}
+
 export async function saveWorkspace(id: string) {
   if (Platform.OS === 'web') document.cookie = `mikka-workspace=${id}; path=/; samesite=lax`
   else await SecureStore.setItemAsync(WORKSPACE_KEY, id)
+  // Every screen's data belongs to the workspace: reload it now, not at the next poll.
+  for (const listener of workspaceListeners) listener()
 }
 
 /**

@@ -1,12 +1,13 @@
-import { SectionList, StyleSheet, View } from 'react-native'
+import { Pressable, RefreshControl, SectionList, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Circle, CircleCheck, CircleDashed, CircleDot, CircleX } from 'lucide-react-native'
-import { useDrawer } from '@/components/Drawer'
-import { MenuIcon, Spinner } from '@/components/icons'
+import { ArrowUpRight, Circle, CircleCheck, CircleDashed, CircleDot, CircleX } from 'lucide-react-native'
+import { Spinner } from '@/components/icons'
+import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import type { Task } from '@/lib/types'
-import { useApi } from '@/lib/useApi'
+import { useApi, useRefresh } from '@/lib/useApi'
+import { openOnWeb } from '@/lib/web'
 import { colors } from '@/lib/theme'
 
 /** The web's task statuses (lib/issue-meta.ts) in board order, with their names. */
@@ -29,27 +30,30 @@ function TaskIcon({ status }: { status: string }) {
 
 /** 任务: a list grouped by status; no board on mobile (mobile.md, out of scope). */
 export default function TasksScreen() {
-  const drawer = useDrawer()
   const insets = useSafeAreaInsets()
-  const { data, error, loading } = useApi<{ tasks: Task[] }>('/api/mobile/tasks', 30_000)
+  const { data, error, loading, reload } = useApi<{ tasks: Task[] }>('/api/mobile/tasks', 30_000)
+  const refresh = useRefresh(reload)
   const sections = SECTIONS.map(s => ({ title: s.title, data: (data?.tasks ?? []).filter(t => s.status.includes(t.status)) })).filter(s => s.data.length)
   return (
     <View style={styles.screen}>
-      <NavBar left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }} title="任务" />
+      <NavBar title="任务" />
       <SectionList
         sections={sections}
         keyExtractor={t => t.id}
         stickySectionHeadersEnabled={false}
         {...underBar}
+        refreshControl={<RefreshControl {...refresh} />}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : <Text style={styles.empty}>{error ? '任务加载失败。' : '还没有任务。'}</Text>}
         renderSectionHeader={({ section }) => <Text style={styles.section}>{section.title}</Text>}
         renderItem={({ item }) => (
-          <View style={styles.row}>
+          // The task opens on the web, signed in: issue editing stays there (mobile.md, out of scope).
+          <Pressable accessibilityRole="link" onPress={() => void openOnWeb(`/?issue=${item.id}`)} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
             <TaskIcon status={item.status} />
             {item.identifier ? <Text style={styles.key}>{item.identifier}</Text> : null}
             <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-          </View>
+            <Symbol name="arrow.up.right" size={12} color={colors.tertiary} web={<ArrowUpRight size={15} color={colors.tertiary} strokeWidth={2} />} />
+          </Pressable>
         )}
       />
     </View>

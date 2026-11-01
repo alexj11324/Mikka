@@ -18,6 +18,11 @@ import { useAgentInteraction } from './agent-interaction'
 import { CitationChip } from './agent-citations'
 import { ReplyBubbles } from './agent-text-bubble'
 import { type AgentComponentRenderers } from '@/lib/agent-ui-catalog'
+import { ConnectDeviceDialog } from '@/components/devices/connect-device-dialog'
+import { E2BKeyDialog } from '@/components/settings/e2b-key-dialog'
+import { usePresence } from '@/lib/use-presence'
+import { useActionError } from '@/lib/use-action-error'
+import { setDeviceAutoSchedule } from '@/app/actions/agents'
 
 export function useAgentDecision() {
   const agentCopy = useAgentCopy()
@@ -177,16 +182,35 @@ export const ReplyAnswer = createContext<string | null>(null)
 /** Where the user stores their own E2B key (the cloud computer runs on it). */
 export const CLOUD_KEY_SETTINGS = '/settings?section=secrets'
 
-function ChoiceCard({ title, options, task }: { title: string; options: { value: string; label: string; action?: 'cloudKeySettings' }[]; task?: string }) {
+/** Where the person connects a server: Settings › 电脑 (one-click SSH in the desktop app). */
+export const CONNECT_SERVER_SETTINGS = '/settings?section=computers'
+
+type ChoiceAction = 'cloudKeySettings' | 'enableThisMac' | 'connectServer' | 'e2bKey' | 'allowAutoSchedule' | 'serverOnline'
+
+function ChoiceCard({ title, options, task }: { title: string; options: { value: string; label: string; action?: ChoiceAction }[]; task?: string }) {
   const agentCopy = useAgentCopy()
   const bubbles = use(ReplyBubbles)
   const answer = use(ReplyAnswer)
   const { send, sent, pending, error, status } = useAgentDecision()
+  const actionError = useActionError()
   const [picked, setPicked] = useState<string | null>(null)
+  // 这个任务需要一台电脑来跑 (waiting_machine): rows open the setup they name instead of answering.
+  const [dialog, setDialog] = useState<'mac' | 'e2b' | null>(null)
+  const e2bDialog = usePresence(dialog === 'e2b')
+  const [autoError, setAutoError] = useState('')
+  async function allowAutoSchedule(deviceId: string, label: string) {
+    setAutoError('')
+    const result = await setDeviceAutoSchedule({ deviceId, autoSchedule: true }).catch(() => ({ error: 'deviceSaveFailed' as const }))
+    if ('error' in result) { setAutoError(actionError(result.error)); return }
+    setPicked(deviceId)
+    void send(label)
+  }
   const chosen = picked ?? options.find(option => [option.label, option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : null].includes(answer?.trim() ?? ''))?.value ?? null
   const answered = sent || answer !== null
   // Dispatch options are localized by value (BE-13 sends English labels); anything else shows as written.
-  const copy = (option: { value: string; label: string; action?: 'cloudKeySettings' }) => option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup
+  const copy = (option: { value: string; label: string; action?: ChoiceAction }) => option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup
+    : option.action === 'enableThisMac' ? agentCopy.needsMachineMac : option.action === 'connectServer' ? agentCopy.needsMachineServer : option.action === 'e2bKey' ? agentCopy.needsMachineE2B
+    : option.action === 'allowAutoSchedule' ? agentCopy.needsMachineAuto : option.action === 'serverOnline' ? agentCopy.needsMachineServerOnline
     : option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : option.label
   return <div role="group" aria-label={title} data-slot="choice-card" className="flex w-full max-w-sm min-w-0 flex-col gap-2">
     <p className={cn('w-fit max-w-full min-w-0', bubbles ? 'rounded-2xl bg-muted px-4 py-2.5' : 'font-medium')}>
@@ -204,6 +228,21 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
           <ItemContent><ItemTitle>{label}</ItemTitle></ItemContent>
           <ItemActions><ChevronRight aria-hidden="true" /></ItemActions>
         </Item>
+        // 这个任务需要一台电脑来跑: 允许这台电脑自动调度 switches that device on, then tells the bot to dispatch again.
+        if (option.action === 'allowAutoSchedule') return <Button key={option.value} type="button" variant={selected ? 'default' : 'secondary'} aria-pressed={selected}
+          disabled={answered || status !== 'pending'} onClick={() => { void allowAutoSchedule(option.value, label) }}>
+          <Kbd data-icon="inline-start">{letter}</Kbd>{label}
+          {selected && (pending ? <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} /> : answered && <Check data-icon="inline-end" aria-hidden="true" />)}
+        </Button>
+        // The other rows open their setup (a dialog, or Settings › 电脑); a saved E2B key also tells the bot to dispatch again.
+        if (option.action === 'connectServer' || option.action === 'serverOnline') return <Button key={option.value} variant="secondary" nativeButton={false} role="link" aria-disabled={answered || undefined}
+          className={cn(answered && 'pointer-events-none opacity-50')} render={<Link href={CONNECT_SERVER_SETTINGS} />}>
+          <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ChevronRight data-icon="inline-end" aria-hidden="true" />
+        </Button>
+        if (option.action === 'enableThisMac' || option.action === 'e2bKey') return <Button key={option.value} type="button" variant="secondary" disabled={answered}
+          onClick={() => setDialog(option.action === 'e2bKey' ? 'e2b' : 'mac')}>
+          <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ChevronRight data-icon="inline-end" aria-hidden="true" />
+        </Button>
         // Answered rows stay the same Button, disabled, so nothing changes height or colour.
         return <Button key={option.value} type="button" variant={selected ? 'default' : 'secondary'} aria-pressed={selected}
           disabled={answered || status !== 'pending'} onClick={() => { setPicked(option.value); void send(label) }}>
@@ -212,6 +251,12 @@ function ChoiceCard({ title, options, task }: { title: string; options: { value:
         </Button>
       })}
     </div>
-    {error && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert></div>}
+    {(error || autoError) && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertDescription>{error || autoError}</AlertDescription></Alert></div>}
+    <ConnectDeviceDialog open={dialog === 'mac'} onOpenChange={open => setDialog(open ? 'mac' : null)} hideTrigger />
+    {e2bDialog.value && <E2BKeyDialog open={e2bDialog.open} onOpenChangeComplete={e2bDialog.onOpenChangeComplete} configured={false} onClose={changed => {
+      setDialog(null)
+      const e2b = options.find(option => option.action === 'e2bKey')
+      if (changed && e2b && !answered) { setPicked(e2b.value); void send(copy(e2b)) }
+    }} />}
   </div>
 }

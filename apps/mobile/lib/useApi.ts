@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, onWorkspaceChange } from '@/lib/api'
 
 /**
  * Loads `path`, reloads it every `every` ms while the app is in front (0: no
@@ -31,6 +31,8 @@ export function useApi<T>(path: string | null, every = 0) {
     return () => { alive.current = false }
   }, [load, path])
 
+  useEffect(() => onWorkspaceChange(() => void load()), [load])
+
   useEffect(() => {
     if (!every || !path) return
     let timer: ReturnType<typeof setInterval> | null = setInterval(load, every)
@@ -42,4 +44,14 @@ export function useApi<T>(path: string | null, every = 0) {
   }, [every, load, path])
 
   return { data, error, loading, reload: load, setData }
+}
+
+/** Pull to refresh for a list (the system's RefreshControl): reloads and shows the spinner until the data is back. */
+export function useRefresh(reload: () => Promise<void>) {
+  const [refreshing, setRefreshing] = useState(false)
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try { await reload() } finally { setRefreshing(false) }
+  }, [reload])
+  return { refreshing, onRefresh }
 }

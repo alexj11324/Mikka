@@ -5,7 +5,7 @@ import useSWR from 'swr'
 import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { listDevices, removeDevice, renameDevice, sendDeviceCommand, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
+import { listDevices, removeDevice, renameDevice, sendDeviceCommand, setDeviceAutoSchedule, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
 import { HarnessLabel, harnessName } from '@/components/labels/entity-labels'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -121,6 +121,10 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
     <span className="flex items-center gap-2 text-xs text-muted-foreground">
       <span aria-hidden="true" className="max-sm:hidden">{t('allowScheduling')}</span>
       <Switch checked={device.enabled} aria-label={t('allowSchedulingTo', { name: device.name })} onCheckedChange={enabled => { void run(() => setDeviceEnabled({ deviceId: device.id, enabled })) }} />
+    </span>
+    <span className="flex items-center gap-2 text-xs text-muted-foreground">
+      <span aria-hidden="true" className="max-sm:hidden">{t('autoSchedule')}</span>
+      <Switch checked={device.autoSchedule} disabled={!device.enabled} aria-label={t('autoScheduleTo', { name: device.name })} onCheckedChange={autoSchedule => { void run(() => setDeviceAutoSchedule({ deviceId: device.id, autoSchedule })) }} />
     </span>
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('menu', { name: device.name })} />}><MoreHorizontal data-icon="inline-start" /></DropdownMenuTrigger>
