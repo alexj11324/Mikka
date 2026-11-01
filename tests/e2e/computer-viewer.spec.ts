@@ -48,7 +48,7 @@ test('computer viewer keeps the desktop through handoff and renewal, with full p
       if (holdFrames) pending.add(send)
       else send()
     })
-    socket.onClose(() => sockets.delete(socket))
+    socket.onClose(() => { sockets.delete(socket); socket.close() })
   })
   await page.route('**/api/settings/e2b-key?*', route => route.fulfill({ json: { configured: true } }))
   await page.route('**/api/bots/*/computer', route => route.fulfill({ json: { machine: 'running', control: controlled ? 'user' : 'agent', ...(controlled ? { controlledBy: { userId } } : {}) } }))
