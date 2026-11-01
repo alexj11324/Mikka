@@ -3058,7 +3058,11 @@
     "retryStop": "重试停止",
     "waiting": "等你回复",
     "chatTab": "对话",
-    "acceptanceTab": "验收"
+    "acceptanceTab": "验收",
+    "runInfo": {
+      "paidBy": "{owner} 的 {plan}",
+      "movedTo": "已换到 {machine} 继续"
+    }
   },
   "Computer": {
     "status": {

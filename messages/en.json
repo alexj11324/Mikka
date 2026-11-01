@@ -3058,7 +3058,11 @@
     "retryStop": "Try stopping again",
     "waiting": "Waiting for you",
     "chatTab": "Chat",
-    "acceptanceTab": "Acceptance"
+    "acceptanceTab": "Acceptance",
+    "runInfo": {
+      "paidBy": "{owner}'s {plan}",
+      "movedTo": "Moved to {machine} to continue"
+    }
   },
   "Computer": {
     "status": {

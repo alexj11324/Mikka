@@ -7,7 +7,8 @@ import 'server-only'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { runInfo } from '@/lib/run-info'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, pendingActions, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { z } from 'zod'
 import { taskDestinationSchema } from '@/lib/task-destination'
@@ -377,6 +378,7 @@ export async function citationSources(userId: string, texts: readonly string[], 
     const steps = new Map((ownIds.length ? await db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
       .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId) : [])
       .map(row => [row.runId, Number(row.count)]))
+    const infos = await runInfo(pool, userId, ownIds)
     for (const row of rows) {
       const task = row.issueId ? await issueForUser(userId, row.issueId) : null
       const identifiers = task ? await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }]) : new Map<string, string>()
@@ -384,7 +386,8 @@ export async function citationSources(userId: string, texts: readonly string[], 
       sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue,
         pullRequests: task ? readIssueMetadata(task.content).pullRequests : [],
         name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
-        createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
+        createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null,
+        ...(infos.get(row.id) ? { info: infos.get(row.id) } : {}) }
     }
   }
   return sources

@@ -21,6 +21,8 @@ export interface IssueSource { kind: 'issue'; id: string; identifier: string | n
 export interface RunSource {
   kind: 'run'; id: string; name: string; agentName: string; harness: string; status: string
   issue: { id: string; identifier: string | null; number: number | null; title: string } | null
+  /** 运行信息, on the person's own runs. */
+  info?: import('@/lib/run-info').RunInfo
 }
 export type CitationSource = IssueSource | RunSource
 

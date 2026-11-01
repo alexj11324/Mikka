@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import type { RunSource } from '@/lib/coordinator/citations'
+import { machineName, runInfoParts } from '@/lib/run-info-view'
 import type { IssuePullRequest } from '@/lib/issue-metadata'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -58,7 +59,18 @@ export function ThreadCard({ run, onOpen }: { run: RunSource; onOpen: (thread: {
     <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-2">
       <span className="truncate text-sm leading-5 font-medium">{run.name}</span>
       {Boolean(run.pullRequests?.length) && <ThreadOutputs pullRequests={run.pullRequests!} />}
+      {run.info && <RunInfoLine info={run.info} />}
     </div>
     <ChevronRight aria-hidden="true" className="pointer-events-none relative size-4 shrink-0 text-muted-foreground" />
   </div>
+}
+
+/** 运行信息: one secondary line, only from what the run froze; a move adds 「已换到 … 继续」. */
+function RunInfoLine({ info }: { info: NonNullable<RunSource['info']> }) {
+  const t = useTranslations('IssueThreads.runInfo')
+  const parts = runInfoParts(info, (owner, plan) => t('paidBy', { owner, plan }))
+  if (!parts.length && !info.movedTo) return null
+  return <span data-slot="run-info" className="truncate text-xs text-muted-foreground">
+    {[parts.join(' · '), info.movedTo ? t('movedTo', { machine: machineName(info.movedTo) }) : null].filter(Boolean).join(' · ')}
+  </span>
 }
