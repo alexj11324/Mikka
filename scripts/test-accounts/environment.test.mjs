@@ -33,7 +33,7 @@ test('environment binds all explicit database aliases, origin, SHA and capabilit
     { MIKKA_TEST_DEPLOYMENT_SHA: 'b'.repeat(40) }, { RESEND_API_KEY: 'synthetic-mail-canary' }, { VERCEL_ENV: 'production' }, { VERCEL: '1' }, { MIKKA_NATIVE_COORDINATOR: '1' },
     { AI_GATEWAY_API_KEY: 'synthetic-model-canary' }, { OPENAI_API_KEY: 'synthetic-model-canary' },
     { ANTHROPIC_API_KEY: 'synthetic-model-canary' }, { COMPOSIO_API_KEY: 'synthetic-service-canary' }, { E2B_API_KEY: 'synthetic-service-canary' }, { EXPO_ACCESS_TOKEN: 'synthetic-service-canary' },
-    { POSTHOG_SECRET_KEY: 'synthetic-service-canary' }, { DECISION_GATEWAY_API_KEY: 'synthetic-model-canary' },
+    { POSTHOG_SECRET_KEY: 'synthetic-service-canary' }, { AI_GATEWAY_API_KEY: MVP_DECISION_KEY },
   ]) assert.throws(() => validateEnvironment(descriptor, { ...env, ...change }))
 })
 
@@ -114,7 +114,7 @@ test('only the exact isolated MVP key with a proven current loopback transport c
   const fixtureEnv = {
     ...env, MIKKA_TEST_ENVIRONMENT_FILE: file,
     CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1',
-    DECISION_GATEWAY_API_KEY: MVP_DECISION_KEY,
+    AI_GATEWAY_API_KEY: MVP_DECISION_KEY,
   }
   let upstreamCalls = 0
   // This is a pure transport/descriptor fixture. No database, app server or
@@ -135,7 +135,6 @@ test('only the exact isolated MVP key with a proven current loopback transport c
     assert.equal(upstreamCalls, 0, 'attestation challenge must be answered inside the transport, without a server request')
 
     for (const change of [
-      { DECISION_GATEWAY_API_KEY: 'synthetic-live-key-canary' },
       { CI: undefined }, { GITHUB_ACTIONS: undefined }, { MIKKA_MVP_E2E: undefined }, { MIKKA_TEST_MODE: undefined },
       { VERCEL: '1' }, { VERCEL_ENV: 'production' }, { MIKKA_NATIVE_COORDINATOR: '1' },
       { E2E_BASE_URL: 'https://outside.invalid' }, { BETTER_AUTH_URL: 'https://outside.invalid' },

@@ -20,7 +20,7 @@ test('fixture refuses remote targets, split databases, native runtime and every 
 })
 
 test('synthetic MVP transport binds the active fetch path, preserves requests and refuses other external services', async () => {
-  const env = { ...isolated, DECISION_GATEWAY_API_KEY: MVP_DECISION_KEY }
+  const env = { ...isolated, AI_GATEWAY_API_KEY: MVP_DECISION_KEY }
   const requests = []
   const nextPatch = Symbol.for('next-patch')
   const previousNextPatch = Object.getOwnPropertyDescriptor(globalThis, nextPatch)

@@ -5,7 +5,7 @@ import { DECISION_MODEL, decisionRequestInput, validatedAnswers } from './decisi
 import { deliverWake } from './wake-recovery'
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='
 const priorVercel=process.env.VERCEL
-const priorKey=process.env.DECISION_GATEWAY_API_KEY, priorFetch=globalThis.fetch, priorConsole=console.error
+const priorKey=process.env.AI_GATEWAY_API_KEY, priorFetch=globalThis.fetch, priorConsole=console.error
 let events: Array<{id:string;kind:'run_finished'|'run_question'|'run_blocked'|'issue_done'|'user_message';payload:Record<string,unknown>;tier:string|null;lastTriageAttemptAt?:Date|null}>=[]
 let starts=0
 const requests: Array<Record<string,unknown>>=[]
@@ -45,8 +45,8 @@ before(async()=>{
  globalThis.fetch=async(input,init)=>{assert.equal(String(input),'https://ai-gateway.vercel.sh/v1/decisions');requests.push(JSON.parse(String(init?.body)));return Response.json({model:DECISION_MODEL,provider_metadata:{gateway:{generationId:"synthetic-generation"}},...(response as object)})}
  wake=await import('./wake');group=await import('./route-group');transport=await import('./decide')
 })
-beforeEach(()=>{process.env.VERCEL='1';process.env.DECISION_GATEWAY_API_KEY='synthetic-no-provider';events=[];starts=0;requests.length=0;response={answers:[{type:'choice',name:'tier',choice:'result'}]}})
-after(()=>{if(priorVercel===undefined)delete process.env.VERCEL;else process.env.VERCEL=priorVercel;globalThis.fetch=priorFetch;console.error=priorConsole;if(priorKey===undefined)delete process.env.DECISION_GATEWAY_API_KEY;else process.env.DECISION_GATEWAY_API_KEY=priorKey})
+beforeEach(()=>{process.env.VERCEL='1';process.env.AI_GATEWAY_API_KEY='synthetic-no-provider';events=[];starts=0;requests.length=0;response={answers:[{type:'choice',name:'tier',choice:'result'}]}})
+after(()=>{if(priorVercel===undefined)delete process.env.VERCEL;else process.env.VERCEL=priorVercel;globalThis.fetch=priorFetch;console.error=priorConsole;if(priorKey===undefined)delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=priorKey})
 test('every runtime event reaches the actual model adapter instead of failed/blocked heuristics',async()=>{
  events=['run_finished','run_question','run_blocked','issue_done'].map((kind,i)=>({id:String(i),kind:kind as 'run_finished',payload:{status:'failed',reason:'already recoverable'},tier:null}))
  await wake.wakeCoordinator('synthetic')
@@ -57,11 +57,11 @@ test('unavailable or malformed model results leave the event pending and do not 
   events=[{id:'pending',kind:'run_finished',payload:{status:'failed'},tier:null}];response=body;starts=0
   await wake.wakeCoordinator('synthetic');assert.equal(events[0].tier,null);assert.equal(starts,0)
  }
- delete process.env.DECISION_GATEWAY_API_KEY;requests.length=0
+ delete process.env.AI_GATEWAY_API_KEY;requests.length=0
  await wake.wakeCoordinator('synthetic');assert.equal(requests.length,0)
 })
 test('direct user delivery does not require a semantic classification or a new confirmation layer',async()=>{
- delete process.env.DECISION_GATEWAY_API_KEY;events=[{id:'user',kind:'user_message',payload:{text:'authorized task'},tier:null}]
+ delete process.env.AI_GATEWAY_API_KEY;events=[{id:'user',kind:'user_message',payload:{text:'authorized task'},tier:null}]
  await wake.wakeCoordinator('synthetic');assert.equal(events[0].tier,'attention');assert.equal(starts,1);assert.equal(requests.length,0)
 })
 test('actual pixels reach input_image; a visual request without pixels remains pending',async()=>{
@@ -84,7 +84,7 @@ test('a single member is still judged; low confidence alone never creates clarif
  assert.deepEqual(withoutExecution(await group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:'role'}],'one')),{by:'model',responders:['one'],confidence:0.1});assert.equal(requests.length,1)
  response={answers:[{type:'choice',name:'responder',choice:'one'},{type:'choice',name:'audience',choice:'selected'}]}
  assert.deepEqual(withoutExecution(await group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:''}],'one')),{by:'model',responders:['one']})
- delete process.env.DECISION_GATEWAY_API_KEY
+ delete process.env.AI_GATEWAY_API_KEY
  await assert.rejects(group.routeGroupMessage({text:'task',mentions:[]},[{id:'one',name:'One',description:''}],'one'),group.GroupDecisionPendingError)
 })
 test('group clarification is model-selected; member identity guards remain enforced',async()=>{
@@ -146,11 +146,17 @@ test('response validation keeps the questions actually sent despite in-flight ca
   assert.deepEqual((requests[0].questions as typeof questions)[0].choices,[{value:'result'}])
  }finally{globalThis.fetch=originalFetch}
 })
-test('the Decisions call authenticates with DECISION_GATEWAY_API_KEY, else with the Vercel deployment OIDC token', async () => {
+test('the Decisions call uses the app\'s one gateway credential: AI_GATEWAY_API_KEY, else the deployment OIDC token', async () => {
+ const { gatewayAuth } = await import('../ai-gateway-auth')
  const oidc = async () => 'oidc-token'
- assert.equal(await transport.decisionGatewayToken({ DECISION_GATEWAY_API_KEY: 'key', VERCEL: '1' }, oidc), 'key')
- // Production sets no DECISION_GATEWAY_API_KEY: on Vercel the deployment's OIDC token signs the call, as the Coordinator's model does.
- assert.equal(await transport.decisionGatewayToken({ VERCEL: '1' }, oidc), 'oidc-token')
- assert.equal(await transport.decisionGatewayToken({ VERCEL: '1' }, async () => { throw Error('no oidc') }), null)
- assert.equal(await transport.decisionGatewayToken({}, oidc), null)
+ assert.deepEqual(await gatewayAuth({ AI_GATEWAY_API_KEY: 'key' }, oidc), { token: 'key', method: 'api-key' })
+ // Production sets no key: the deployment's OIDC token signs the call, as it does the Coordinator's model.
+ assert.deepEqual(await gatewayAuth({ VERCEL: '1' }, oidc), { token: 'oidc-token', method: 'oidc' })
+ assert.equal(await gatewayAuth({}, async () => { throw Error('no oidc') }), null)
+ // No credential at all: the call is not made and is logged as no-gateway-auth.
+ delete process.env.AI_GATEWAY_API_KEY; delete process.env.VERCEL_OIDC_TOKEN; requests.length = 0
+ const logged: unknown[] = []; console.error = (...args: unknown[]) => { logged.push(args) }
+ assert.equal(await transport.decide('test', 'x', [{ type: 'predicate', name: 'p', instructions: 'p' }]), null)
+ assert.equal(requests.length, 0)
+ assert.deepEqual(logged.at(-1), ['Decision unavailable', { purpose: 'no-gateway-auth' }])
 })

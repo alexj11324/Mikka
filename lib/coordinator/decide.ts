@@ -1,5 +1,6 @@
 import { gatewayCost,gatewayGenerationId } from '@/lib/abuse/policy'
 import 'server-only'
+import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { createHash, randomUUID } from 'node:crypto'
 import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_URL, type DecisionInput, type DecisionQuestion } from './decision'
 
@@ -18,23 +19,12 @@ export interface DecisionExecution {
   imageDigests: string[]
   vision: 'image-input-submitted' | 'no-image-input'
 }
-/**
- * The same AI Gateway the Coordinator uses, authenticated by
- * DECISION_GATEWAY_API_KEY when it is set and otherwise, on Vercel, by the
- * deployment's OIDC token (as lib/coordinator/model.ts does). Production has
- * no DECISION_GATEWAY_API_KEY, so without the OIDC path no Decisions call ever
- * ran there. Null when neither exists.
- */
-export async function decisionGatewayToken(env: Record<string, string | undefined> = process.env, oidc: () => Promise<string> = async () => (await import('@vercel/oidc')).getVercelOidcToken()): Promise<string | null> {
-  if (env.DECISION_GATEWAY_API_KEY) return env.DECISION_GATEWAY_API_KEY
-  if (env.VERCEL !== '1') return null
-  try { return await oidc() || null } catch { return null }
-}
 /** Existing gateway/budget only. No alternate provider, program judgment or human-approval fallback. */
 export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal) {
   'use step'
   if (signal?.aborted) return null
-  const key = await decisionGatewayToken()
+  // The app's one gateway credential (lib/ai-gateway-auth.ts), the same the Coordinator's model uses.
+  const key = (await gatewayAuth())?.token
   if (!key) { console.error('Decision unavailable', { purpose: 'no-gateway-auth' }); return null }
   const { hostedBillingScope } = await import('@/lib/abuse/context')
   const scope = hostedBillingScope.getStore()
