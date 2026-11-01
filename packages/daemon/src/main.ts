@@ -67,6 +67,7 @@ import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { sweepRunCredentials } from "./agents/harness-home"
+import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { codexSupportsRunApproval } from "./adapters/codex-version"
 import { ensureSandboxTools, missingSandboxTools } from "./sandbox-tools"
 import { isSafeId } from "./ids"
@@ -417,7 +418,7 @@ export class Daemon {
       outbox: this.outbox,
       worktrees: this.worktrees,
       adapters,
-      startSubscription: hosted?.start,
+      startSubscription: hosted?.start ?? this.localSubscriptions()?.start,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       verifyRunPolicy: this.options.link.verifyRunPolicy ? async (assignment,signal) => {
@@ -546,6 +547,7 @@ export class Daemon {
       // that ceiling. Codex also verifies its pinned interface at initialize.
       toolApproval: this.supportsToolApproval(info),
       coordinator: hosted ? false : coordinatorCapable(info),
+      ...(!hosted && this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}),
     })), ...this.sandboxBlockedHarnesses(detected)]
     // A crash or kill skipped the run-end wipe; resumed runs get fresh credentials.
     sweepRunCredentials(paths.adapterState)
@@ -762,6 +764,12 @@ export class Daemon {
     return info.harness === 'claude_code' || (info.harness === 'codex' && codexSupportsRunApproval(info.version)) ? true : undefined
   }
 
+  /** A subscription run here goes through the server's broker (subscription-local-runner.ts). */
+  private localSubscriptionCapable(info: HarnessInfo) {
+    return (info.harness === "claude_code" || info.harness === "codex") && info.installed &&
+      this.supportsToolApproval(info) === true && Boolean(this.options.link.nativeContext && this.options.link.nativeRequest)
+  }
+
   /** Report a CLI the daemon cannot run as present but not installed, so no run is pinned here. */
   private sandboxBlockedHarnesses(detected: HarnessInfo[]): HarnessInfo[] {
     const issue = this.sandboxIssue
@@ -781,7 +789,8 @@ export class Daemon {
     this.harnessPrint = harnessFingerprint(this.harnessStore())
     this.docker = await dockerAvailable()
     this.harnesses = [...detected.filter(info => this.adapters.has(info.harness)).map(info => {
-      return { ...info, toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info) }
+      return { ...info, toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info),
+        ...(this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}) }
     }), ...this.sandboxBlockedHarnesses(detected)]
     // Adapters and verification are wired at startup, so a repaired sandbox needs a fresh start.
     if (repairing && this.sandboxIssue?.missing.length === 0) {
@@ -896,8 +905,19 @@ export class Daemon {
    * sandbox. Cursor retains the existing daemon AgentSandbox boundary.
    */
   private realAdapters(): [Harness, AgentAdapter][] {
+    const options = this.adapterOptions()
+    if (!options) return []
+    return [
+      ["claude_code", new ClaudeAdapter(options.claude)],
+      ["codex", new CodexAdapter(options.codex)],
+      ["cursor", new CursorAdapter(options.cursor)],
+    ]
+  }
+
+  /** What every real adapter of this daemon is built with, subscription runs included. */
+  private adapterOptions() {
     const sandbox = this.agentSandbox()
-    if (!sandbox) return []
+    if (!sandbox) return undefined
     const stateDir = this.paths.adapterState
     const bin = this.options.harnessBinaries ?? {}
     const computerProvider = (runId: string) => {
@@ -907,11 +927,27 @@ export class Daemon {
         permission: decide('computer_use', { policy: assignment.policy }), readOnly: assignment.policy.readOnly,
         proxyPath: fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url)), nodeBinary: process.execPath })
     }
-    return [
-      ["claude_code", new ClaudeAdapter({ sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), computerProvider })],
-      ["codex", new CodexAdapter({ sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), computerProvider })],
-      ["cursor", new CursorAdapter({ sandbox, stateDir, binary: bin.cursor, computerProvider })],
-    ]
+    return {
+      claude: { sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), computerProvider },
+      codex: { sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), computerProvider },
+      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider },
+    }
+  }
+
+  /**
+   * Subscription runs on this device: model requests go through the server,
+   * which holds the owner's credential (subscription-local-runner.ts).
+   */
+  private localSubscriptions() {
+    const link = this.options.link
+    const options = this.adapterOptions()
+    if (!options || !link.nativeContext || !link.nativeRequest) return undefined
+    return createLocalSubscriptionRunner({
+      stateDir: this.paths.adapterState,
+      link: { nativeContext: link.nativeContext.bind(link), nativeRequest: link.nativeRequest.bind(link) },
+      claude: options.claude,
+      codex: options.codex,
+    })
   }
 
   private revokeLocalComputerGrants() {

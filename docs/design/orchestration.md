@@ -212,6 +212,10 @@ token or key.
    only inside the run's environment: the sandbox, the container, or the
    temporary Agent config dir. It never comes from, or goes to, the person's
    own CLI config.
+   A subscription on a device or a sandbox never leaves the server: the
+   Agent holds a placeholder and sends its model requests to Mikka, which
+   checks the run and adds the token to each one. That holds for a member's
+   share used on the member's own device too.
 3. **At run end:** the run token is revoked and the injected credential is
    deleted. The environment pauses or idles without it.
 
