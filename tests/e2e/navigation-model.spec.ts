@@ -285,3 +285,86 @@ test('全部线程: another bot\'s thread opens beside the current chat, naming 
   await expect(conversationPill(page)).toHaveText('Coordinator')
   await expect(threadIn(page)).toContainText('写作助手 派出线程')
 })
+
+// ── The phone web (PR 5): no rail, so the list's sheet and the chat's pill are the ways in and out ──
+
+const PHONE = { width: 390, height: 844 }
+/** The phone header's list button, on every page but a task (whose own header carries it). */
+const listButton = (page: Page) => page.getByRole('button', { name: '展开或收起侧栏', exact: true })
+const listSheet = (page: Page) => page.getByRole('dialog', { name: '侧栏', exact: true })
+
+test('phone: the board\'s list button opens the bot list, and 主页 returns to the chat', async ({ page }) => {
+  await page.setViewportSize(PHONE)
+  await register(page)
+  await page.goto(app('/?section=all-issues'))
+  await expect(board(page)).toBeVisible()
+  await hydrated(listButton(page))
+  await listButton(page).click()
+  await listSheet(page).getByRole('button', { name: '主页', exact: true }).click()
+  await expect(listSheet(page)).toBeHidden()
+  await expect(chat(page)).toBeVisible()
+  expect(query(page).get('section')).toBeNull()
+  await back(page)
+  await expect(board(page)).toBeVisible()
+})
+
+test('phone: the Artifact page\'s list button reaches 建议', async ({ page }) => {
+  await page.setViewportSize(PHONE)
+  await register(page)
+  await page.goto(app('/?section=artifacts'))
+  await hydrated(listButton(page))
+  await listButton(page).click()
+  await listSheet(page).getByRole('button', { name: '建议', exact: true }).click()
+  await expect(page).toHaveURL(url => url.searchParams.get('section') === 'suggestions')
+  await expect(listSheet(page)).toBeHidden()
+  await back(page)
+  await expect(page).toHaveURL(url => url.searchParams.get('section') === 'artifacts')
+})
+
+test('phone: the chat\'s pill opens 概览 as a page; its 线程 row pushes the thread; back returns to the chat', async ({ page }) => {
+  await page.setViewportSize(PHONE)
+  const { runId } = await chatWithThread(page)
+  await hydrated(conversationPill(page))
+  await expect(conversationPill(page)).toHaveText('Coordinator')
+  await page.locator('[data-slot="conversation-pill"]:visible').click()
+  const overview = page.getByRole('dialog', { name: '右栏', exact: true })
+  await expect(overview).toBeVisible()
+  // A page over the chat, as wide as the page (the html's scrollbar gutter is 0 on a real phone).
+  const pageWidth = await page.evaluate(() => document.documentElement.getBoundingClientRect().width)
+  await expect.poll(async () => (await overview.boundingBox())?.width).toBe(pageWidth)
+  await overview.getByRole('tab', { name: '线程', exact: true }).click()
+  await overview.getByRole('button').filter({ hasText: /线程任务/ }).first().click()
+  await expect(overview).toBeHidden()
+  await expect(threadIn(page).getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
+  expect(query(page).get('thread')).toBe(runId)
+  // The thread is the whole screen, its close in reach.
+  expect(await column(page).boundingBox()).toEqual({ x: 0, y: 0, width: pageWidth, height: PHONE.height })
+  await expect(threadIn(page).getByRole('button', { name: '关闭线程', exact: true })).toBeInViewport()
+
+  await back(page)
+  await expect(column(page)).toHaveCount(0)
+  await expect(chat(page)).toBeVisible()
+  expect(query(page).get('thread')).toBeNull()
+})
+
+test('phone: a group chat keeps its header; the pill opens 详情 as a page and the list button stays', async ({ page }) => {
+  await page.setViewportSize(PHONE)
+  await register(page)
+  const origin = new URL(page.url()).origin
+  const workspaceId = (await (await page.request.get(app('/api/workspace'))).json()).workspace.id as string
+  const title = `手机群 ${randomUUID().slice(0, 8)}`
+  const created = await page.request.post(app('/api/conversations'), { headers: { origin }, data: { workspaceId, title } })
+  expect(created.status()).toBe(201)
+  await page.reload()
+  await hydrated(listButton(page))
+  await listButton(page).click()
+  await listSheet(page).getByRole('button', { name: title, exact: true }).click()
+  await expect(page.getByRole('region', { name: title, exact: true })).toBeVisible()
+  await expect(conversationPill(page)).toHaveText(title)
+  await page.locator('[data-slot="conversation-pill"]:visible').click()
+  const details = page.getByRole('dialog', { name: '右栏', exact: true })
+  await expect(details.getByRole('heading', { name: title, exact: true })).toBeVisible()
+  await details.getByRole('button', { name: '关闭右栏', exact: true }).click()
+  await expect(details).toBeHidden()
+  await expect(listButton(page)).toBeVisible()
+})
