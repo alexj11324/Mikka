@@ -368,7 +368,8 @@ function AppTools({ tools }: { tools: AppDetail['tools'] }) {
   </section>
 }
 
-function ToolGroup({ label, tools }: { label: string; tools: AppTool[] }) {
+/** One collapsible 写入 / 读取 card; `control` puts a tool's own setting at the right of its row. */
+export function ToolGroup({ label, tools, control }: { label: string; tools: AppTool[]; control?: (tool: AppTool) => ReactNode }) {
   const [open, setOpen] = useState(true)
   return <Collapsible open={open} onOpenChange={setOpen} className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/5">
     <CollapsibleTrigger render={<Button type="button" variant="ghost" className="h-auto w-full justify-between rounded-none px-5 py-3 font-medium hover:bg-muted/50" />}>
@@ -376,9 +377,12 @@ function ToolGroup({ label, tools }: { label: string; tools: AppTool[] }) {
     </CollapsibleTrigger>
     <CollapsibleContent>
       <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto pb-3">
-        {tools.map(tool => <li key={tool.slug} className="flex flex-col gap-0.5 px-5 py-1.5">
-          <span className="text-sm">{tool.name}</span>
-          {tool.description && <span className="text-xs text-muted-foreground">{tool.description}</span>}
+        {tools.map(tool => <li key={tool.slug} className="flex items-center gap-3 px-5 py-1.5">
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-sm">{tool.name}</span>
+            {tool.description && <span className="text-xs text-muted-foreground">{tool.description}</span>}
+          </div>
+          {control?.(tool)}
         </li>)}
       </ul>
     </CollapsibleContent>
