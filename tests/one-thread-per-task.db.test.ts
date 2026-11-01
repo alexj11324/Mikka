@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { githubAppStub } from './support/github-app-stub'
 
 const mac = [{ harness: 'codex', installed: true, models: ['gpt-5'], defaultModelSlot: 'default' }]
 // The Decision API's judgment of the person's message, scripted per case.
@@ -29,18 +30,29 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
   const { workspacePool } = await import('../lib/workspace-db')
   const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
   const users: string[] = []
+  // Push is what the person granted on GitHub: the synthetic App is installed on octo/repo with contents: write.
+  const github = githubAppStub()
+  github.install('octo/repo', { contents: 'write', pull_requests: 'write' })
+  let githubAccount = 9_400_000
   t.after(async () => {
+    github.restore()
     await pool.query('DELETE FROM run_messages WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('UPDATE agent_runs SET "continuesRunId"=NULL,"threadReplacedBy"=NULL WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agents WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM repository_settings WHERE "userId" = ANY($1)', [users])
+    await pool.query('DELETE FROM github_repository_installations WHERE "userId" = ANY($1)', [users])
+    await pool.query('DELETE FROM account WHERE "userId" = ANY($1)', [users])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
   const person = async () => {
     const id = await seedUser(pool, 'one-thread')
     users.push(id)
+    // Their own GitHub account, which may write to octo/repo.
+    const githubAccountId = String(++githubAccount)
+    await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubAccountId, id])
+    github.allowWriter('octo/repo', githubAccountId)
     await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
     const issueId = await seedIssue(pool, id)
