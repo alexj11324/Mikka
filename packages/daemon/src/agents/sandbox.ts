@@ -66,7 +66,15 @@ export class SandboxRuntime implements AgentSandbox {
   private ready: Promise<void> | null = null
   private resetting: Promise<void> | null = null
 
-  constructor(private readonly onAsk?: AskNetwork) {}
+  constructor(
+    private readonly onAsk?: AskNetwork,
+    /**
+     * Hosted runs only: the CLI's bootstrap reaches its run's model broker and
+     * egress relay over unix sockets, so Linux's socket blocking is off. Every
+     * other socket a run could see must then be hidden with `denyRead`.
+     */
+    private readonly options: { allowAllUnixSockets?: boolean } = {},
+  ) {}
 
   /** The platform is supported and its tools (Linux: bwrap, socat, rg) exist. */
   static supported(): boolean {
@@ -107,7 +115,11 @@ export class SandboxRuntime implements AgentSandbox {
     this.ready = SandboxManager.initialize(
       {
         // Everything is per run (`registerCommandNetworkLists`).
-        network: { allowedDomains: [], deniedDomains: [] },
+        network: {
+          allowedDomains: [],
+          deniedDomains: [],
+          ...(this.options.allowAllUnixSockets ? { allowAllUnixSockets: true } : {}),
+        },
         filesystem: { denyRead: [], allowWrite: [], denyWrite: [] },
         // Rust and Go CLIs (codex) verify TLS through trustd; without it
         // every HTTPS request from them fails inside the sandbox.
