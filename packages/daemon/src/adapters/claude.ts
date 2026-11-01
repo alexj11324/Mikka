@@ -616,8 +616,9 @@ export class ClaudeAdapter implements AgentAdapter {
         },
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
-        ...(outerLocal ? {spawnClaudeCodeProcess:spawnOuter} : this.options.spawnHosted && externalAuth
-          ? { spawnClaudeCodeProcess: (options:SpawnOptions) => this.options.spawnHosted!(options,nativeToken!) }
+        // A hosted runtime always spawns into its own container; an API-key run there holds the placeholder too.
+        ...(outerLocal ? {spawnClaudeCodeProcess:spawnOuter} : this.options.spawnHosted
+          ? { spawnClaudeCodeProcess: (options:SpawnOptions) => this.options.spawnHosted!(options,nativeToken ?? NATIVE_AUTH_PLACEHOLDER) }
           : binary || externalAuth
           ? { spawnClaudeCodeProcess: spawnBinary(binary, nativeToken) }
           : {}),

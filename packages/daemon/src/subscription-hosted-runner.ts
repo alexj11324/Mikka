@@ -28,6 +28,8 @@ import type { spawnCli } from "./agents/child";
 import type { AgentSandbox } from "./agents/sandbox";
 import { requireRunToolApproval } from "./agents/tool-approval";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
+import { createApiKeyBroker } from "./api-key-broker";
+import type { RunCredential } from "./agents/run-credential";
 import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
 import { withTaskEnv } from "./task-env";
@@ -331,16 +333,21 @@ export async function createHostedBotRunner(host: {
       options: StartOptions,
     ): Promise<AgentSession> {
       const gate = requireRunToolApproval(options.runId, options.toolApproval);
+      // A run has a subscription binding or its own API key, never both. The
+      // key stays in this worker's broker; the container gets a placeholder.
       const selected = assignment.subscriptionBinding;
+      const apiKey = assignment.modelCredential;
       const kind = assignment.harness;
+      const protocol = kind === "codex" ? "openai" as const : "anthropic" as const;
       if (
-        !selected ||
+        Boolean(selected) === Boolean(apiKey) ||
         options.runId !== assignment.runId ||
         (kind !== "codex" && kind !== "claude_code") ||
         !binaries[kind] ||
-        selected.consumerId.length !== 36 ||
-        selected.route !==
-          (kind === "codex" ? "codex_cli" : "claude_code_cli") ||
+        (selected && (selected.consumerId.length !== 36 ||
+          selected.route !==
+            (kind === "codex" ? "codex_cli" : "claude_code_cli"))) ||
+        (apiKey?.kind === "provider" && apiKey.protocol !== protocol) ||
         options.continueSession
       )
         throw unavailable();
@@ -412,26 +419,31 @@ export async function createHostedBotRunner(host: {
       offRevoke = gate.onRevoke(() => { void close().catch(() => undefined); });
       try {
         await live();
-        const context = () =>
-          host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal);
-        const first = nativeBrokerContextSchema.parse(await context());
-        await live();
-        if (first.route !== selected.route || first.modelId !== options.model)
-          throw unavailable();
-        const revision = first.revision;
-        const check = async () => {
+        const subscription = selected ? await (async () => {
+          const context = () =>
+            host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal);
+          const first = nativeBrokerContextSchema.parse(await context());
           await live();
-          const current = await context();
-          await live();
-          if (
-            current.revision !== revision ||
-            current.accountId !== first.accountId ||
-            current.route !== first.route ||
-            current.modelId !== first.modelId
-          )
+          if (first.route !== selected.route || first.modelId !== options.model)
             throw unavailable();
-          return current;
-        };
+          const revision = first.revision;
+          const check = async () => {
+            await live();
+            const current = await context();
+            await live();
+            if (
+              current.revision !== revision ||
+              current.accountId !== first.accountId ||
+              current.route !== first.route ||
+              current.modelId !== first.modelId
+            )
+              throw unavailable();
+            return current;
+          };
+          return { first, revision, check };
+        })() : undefined;
+        // An API-key run is live while its gate is; withdrawing the key stops the run from the server.
+        const check: () => Promise<unknown> = subscription?.check ?? live;
         const paths = runPaths(host.stateDir, assignment.runId);
         mkdirSync(paths.runDir, { recursive: true, mode: 0o700 });
         const shadow = join(paths.runDir, "runtime-git");
@@ -477,34 +489,41 @@ export async function createHostedBotRunner(host: {
           "native-ledgers",
           assignment.runId + ".json",
         );
-        const scope = {
+        const scope = selected && subscription ? {
           runId: assignment.runId,
           bindingId: selected.bindingId,
           ownerId: selected.ownerId,
           workspaceId: selected.workspaceId,
           consumerId: selected.consumerId,
           route: selected.route,
-          revision,
-          accountId: first.accountId,
-          modelId: first.modelId,
-        };
-        const previous = readJson(ledger) as
-          { scope: typeof scope; sessionId: string } | undefined;
+          revision: subscription.revision,
+          accountId: subscription.first.accountId,
+          modelId: subscription.first.modelId,
+        } : undefined;
+        // Only a subscription session is resumed from its ledger; an API-key run starts fresh.
+        const previous = scope ? readJson(ledger) as
+          { scope: typeof scope; sessionId: string } | undefined : undefined;
         if (
+          scope &&
           existsSync(ledger) &&
           (!previous ||
             JSON.stringify(previous.scope) !== JSON.stringify(scope) ||
             typeof previous.sessionId !== "string")
         )
           throw unavailable();
-        mkdirSync(dirname(ledger), { recursive: true, mode: 0o700 });
+        if (scope) mkdirSync(dirname(ledger), { recursive: true, mode: 0o700 });
         const record = async (sessionId: string) => {
           assertOpen();
-          writeJsonAtomic(ledger, { scope, sessionId });
+          if (scope) writeJsonAtomic(ledger, { scope, sessionId });
         };
-        brokerStarting = createNativeSubscriptionBroker({
+        brokerStarting = apiKey ? createApiKeyBroker({
           root: join(host.stateDir, "native-brokers"),
-          revision,
+          protocol,
+          credential: apiKey,
+          check,
+        }) : createNativeSubscriptionBroker({
+          root: join(host.stateDir, "native-brokers"),
+          revision: subscription!.revision,
           check,
           worker: {
             nativeRequest: async (_revision, payload, signal) => {
@@ -557,7 +576,7 @@ export async function createHostedBotRunner(host: {
           throw unavailable();
         }
         const computer = assignment.computer;
-        if (computer && (!host.computerBroker || computer.ownerId !== selected.ownerId)) {
+        if (computer && (!host.computerBroker || (selected && computer.ownerId !== selected.ownerId))) {
           await close();
           throw unavailable();
         }
@@ -658,7 +677,7 @@ export async function createHostedBotRunner(host: {
               (/INFISICAL|E2B_API_KEY|REFRESH_TOKEN|^AWS_|^GOOGLE_|^OPENAI_|^ANTHROPIC_.*(?:KEY|TOKEN)|SECRET|PASSWORD/.test(
                 key,
               ) ||
-                (key === "CLAUDE_CODE_OAUTH_TOKEN" && value !== placeholder))
+                ((key === "CLAUDE_CODE_OAUTH_TOKEN" || key === "MIKKA_MODEL_API_KEY") && value !== placeholder))
             )
               throw unavailable();
           // 4e3: the user variables arrive through their own channel, after the platform guard above.
@@ -702,8 +721,22 @@ export async function createHostedBotRunner(host: {
           };
         };
         try {
-          const adapter =
-            kind === "codex"
+          // The adapter sees a placeholder in the key's place; the broker adds the key.
+          const placeholderCredential: RunCredential | undefined = apiKey && kind === "codex"
+            ? { kind: "provider", protocol: "openai", baseUrl: apiKey.kind === "provider" ? apiKey.baseUrl : "https://api.openai.com/v1", key: placeholder }
+            : undefined;
+          const adapter = apiKey
+            ? kind === "codex"
+              ? new CodexAdapter({ stateDir: host.stateDir, sandbox: blockedSandbox, spawnCli: codexSpawn, computerMcp })
+              : new ClaudeAdapter({
+                  stateDir: host.stateDir,
+                  computerMcp,
+                  spawnHosted: (config, token) => {
+                    if (token !== placeholder) throw unavailable();
+                    return spawnHosted(config);
+                  },
+                })
+            : kind === "codex"
               ? new CodexAdapter({
                   stateDir: host.stateDir,
                   sandbox: blockedSandbox,
@@ -711,12 +744,12 @@ export async function createHostedBotRunner(host: {
                   onHostedSession: record,
                   computerMcp,
                   subscriptionAuth: {
-                    accountId: first.accountId,
+                    accountId: subscription!.first.accountId,
                     verify: async () => {
                       await check();
                     },
                     token: async () => {
-                      const current = await check();
+                      const current = await subscription!.check();
                       return {
                         accessToken: placeholder,
                         chatgptAccountId: current.accountId,
@@ -735,12 +768,12 @@ export async function createHostedBotRunner(host: {
                   },
                   subscriptionAuth: {
                     brokered: true,
-                    accountId: first.accountId,
+                    accountId: subscription!.first.accountId,
                     verify: async () => {
                       await check();
                     },
                     token: async () => {
-                      const current = await check();
+                      const current = await subscription!.check();
                       return {
                         accessToken: placeholder,
                         accountId: current.accountId,
@@ -749,7 +782,7 @@ export async function createHostedBotRunner(host: {
                     },
                   },
                 });
-          const runtimeOptions = { ...options, ...(options.github ? { githubRuntime: { nodeBinary: '/usr/local/bin/node', ghBinary: '/usr/local/bin/mikka-gh' } } : {}) };
+          const runtimeOptions = { ...options, credential: placeholderCredential, ...(options.github ? { githubRuntime: { nodeBinary: '/usr/local/bin/node', ghBinary: '/usr/local/bin/mikka-gh' } } : {}) };
           const session = previous
             ? await adapter.resume(previous.sessionId, runtimeOptions)
             : await adapter.start(runtimeOptions);
