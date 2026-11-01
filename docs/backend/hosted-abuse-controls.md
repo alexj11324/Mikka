@@ -46,7 +46,8 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
   spending and also includes the existing-workspace allowance. A verified card
   that has already claimed its allowance does not create a second gift row.
 - States: `ready`, `verification_required`, `free_allowance_used`,
-  `platform_paused`, `usage_in_progress`, `usage_cost_unavailable`. Model
+  `platform_paused`, `usage_in_progress` (a replayed call ID),
+  `usage_concurrency_limit`, `usage_cost_unavailable`. Model
   execution errors carry the stable code as their message/code, including
   Coordinator failure records. A purchase qualifies as verification even
   after the purchased balance has been consumed.
@@ -134,14 +135,20 @@ receipt afterwards. Any positive balance is sufficient; a model cost estimate
 cannot reject it. There is no new balance freeze or prepayment. Free credit is
 spent before purchased points; `plan` grants are ignored.
 
-One pending/unknown call per workspace is an execution concurrency limit,
-including across processes. The existing `reserve` method records only that
-slot and a receipt ID; all reserved-money fields on new rows are zero. Each
+Calls in one workspace run concurrently (decision
+`docs/design/decisions/2026-11-01-0400-hosted-calls-run-concurrently.md`).
+`reserve` records a receipt ID and a hold of `HOSTED_CALL_HOLD_MICRO_USD`
+(USD 0.10) on the row's `holdMicroUsd`; all reserved-money fields on new rows
+are zero and the hold is never charged. A call is admitted when nothing else is
+in flight and the balance is positive, or when the balance minus the holds of
+pending/unknown calls covers its own hold; otherwise `free_allowance_used`. At
+most `HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE` (8) pending calls run per workspace,
+including across processes; beyond that, `usage_concurrency_limit`. Each
 provider invocation has its own ledger ID; settlement is idempotent. Workflow
-retries cannot silently replay a pending call. A call can finish beyond the
-remaining balance; its entire actual cost remains in the ledger as debt. The
-next call is refused until recorded purchased credit restores a positive net
-balance. Debt never authorizes another call.
+retries cannot silently replay a call (`usage_in_progress`). A call can finish
+beyond the remaining balance; its entire actual cost remains in the ledger as
+debt. The next call is refused until recorded purchased credit restores a
+positive net balance. Debt never authorizes another call.
 
 The text model caps output at 4,096 tokens and provider time at 60 seconds;
 compaction keeps its existing 30-second timeout. Inputs over 16 MB are refused;
@@ -149,7 +156,7 @@ these transport bounds do not reserve money. Subscription calls keep their
 existing capabilities.
 Actual Gateway `providerMetadata.gateway.cost` is rounded upwards to integer
 microdollars. Missing cost or an interrupted provider call retains its
-receipt record and blocks further workspace calls, rather than treating unknown
+receipt record and keeps its hold until reconciled, rather than treating unknown
 usage as free. Operators can reconcile the same call ID with
 `HostedUsageStore.settle(id, actualMicroUsd, ...)` after checking the Gateway
 receipt. No automatic retry discards an uncertain charge.

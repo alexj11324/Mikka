@@ -25,7 +25,7 @@ export function HostedRefusalNotice({ code, retry }: { code: HostedRefusal; retr
   const usage = useSWR(['hosted-usage'], () => getHostedUsage())
   const unverified = usage.data && !usage.data.error && !usage.data.balance.verified
   const Icon = code === 'verification_required' ? CreditCard : code === 'platform_paused' ? Pause : Info
-  const transient = code === 'usage_in_progress' || code === 'usage_cost_unavailable'
+  const transient = code === 'usage_in_progress' || code === 'usage_concurrency_limit' || code === 'usage_cost_unavailable'
   const title = code === 'verification_required'
     ? t.rich('verification_required', { mark: () => <MikkaMarkSmall />, model: chunks => <span className="inline-flex items-center gap-1">{chunks}</span> })
     : transient ? t('unavailable') : t(code)
