@@ -25,3 +25,11 @@ When the task is done, canceled, a duplicate or deleted, its paused sandbox
 is killed and its device retired (the run-recovery sweep). If E2B no longer
 has the sandbox, the task's next run starts a new one from the workspace
 snapshot and continues from the task's branch.
+
+Being schedulable and being recoverable are separate. The device row only
+decides whether a machine can be dispatched to and whether it appears in any
+list: a task's sandbox device never appears in a list or a picker and is
+never dispatched to another task, paused or not. The `thread_machines` rows
+(task → sandbox, with its state) are kept for good: the task finds its own
+paused sandbox through them and resumes it. Only when the task is closed,
+a duplicate or deleted is the sandbox killed; its rows stay as history.
