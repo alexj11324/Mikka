@@ -107,7 +107,8 @@ test('发送失败的消息留在对话里，点重试后发出', async ({ page 
   await page.unroute('**/*', failPost)
   await failed.getByRole('button', { name: '重试', exact: true }).click()
   await expect(failed).toHaveCount(0)
-  await expect(page.getByText('发送失败时保留', { exact: true })).toHaveCount(1)
+  // Once in the conversation; the bot list's preview line also shows the last message.
+  await expect(page.getByRole('region', { name: '与 Coordinator 的对话', exact: true }).getByText('发送失败时保留', { exact: true })).toHaveCount(1)
 })
 
 // A28: the limit is visible near the edge, and over-long input is truncated
