@@ -80,7 +80,7 @@ export function SignOutBoundary({ pending, children }: { pending: boolean; child
   </>
 }
 
-export function AppShellContent({ parent, title, actions, children, variant = 'workspace', hideHeader = false, listToggle = true }: { parent: string; title: string; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean; listToggle?: boolean }) {
+export function AppShellContent({ parent, title, actions, children, variant = 'workspace', hideHeader = false, listToggle = true }: { /** A crumb the person can tell apart from the title (a team, 设置); never the workspace name (R-79). */ parent?: string; title: string; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean; listToggle?: boolean }) {
   const i18nText = useTranslations();
   const { isMobile, openMobile, open, toggleSidebar } = useSidebar()
   // A section's loading placeholder gives way to its content with a short fade.
@@ -92,7 +92,7 @@ export function AppShellContent({ parent, title, actions, children, variant = 'w
       <div className="flex min-w-0 items-center gap-2">
         <SidebarTrigger className="-ml-1" aria-label={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />
         <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
-        <Breadcrumb aria-label={i18nText("Workspace.breadcrumb")}><BreadcrumbList><BreadcrumbItem className="hidden sm:inline-flex"><span>{parent}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /><BreadcrumbItem><BreadcrumbPage>{title}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
+        <Breadcrumb aria-label={i18nText("Workspace.breadcrumb")}><BreadcrumbList>{parent && <><BreadcrumbItem className="hidden sm:inline-flex"><span>{parent}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /></>}<BreadcrumbItem><BreadcrumbPage>{title}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>}
