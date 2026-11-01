@@ -21,15 +21,20 @@ source wins in a conflict is in [`README.md`](README.md).
   right threads and the computer together.
 - **R-04** Every bot comes with its own computer. There is no 新建云端电脑 entry
   anywhere, and no list of per-bot computers.
-- **R-05** Bots run only on Mikka's own AI SDK harness. The 新建 Bot dialog
-  has a big live preview, a shape grid, colours and a name. It has no machine
-  picker, no harness picker and no 说明 field (instructions are edited in chat).
-  The Coordinator has no runtime switch either: the #312 native Claude Code /
-  Codex runtime is deprecated and stays off (decision 2026-10-27).
+- **R-05** 「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过
+  daemon 把任务派给 Claude Code 或 Codex。」 (Alex, 2026-11-01;
+  [orchestration.md §3](orchestration.md)). GPT/OpenAI models go to Codex,
+  every other model to Claude Code; a person can change this per model in
+  「API 与订阅」. The 新建 Bot dialog has a big live preview, a shape grid,
+  colours and a name. It has no machine picker, no Claude Code / Codex picker
+  and no 说明 field (instructions are edited in chat). A bot's own chat never
+  runs inside Claude Code or Codex: that was an old plan (#312), abandoned.
 - **R-06** The Coordinator has no special UI; it is a normal bot (Alex
   2026-10-24). Its role is coordinating, not looking different: the same
-  bloub avatar with no star or badge, the same row, the same chat, the
-  same empty state as any other bot. Never the letter C.
+  bloub avatar with no badge of its own, the same row, the same chat, the
+  same empty state as any other bot. Never the letter C. 星标 = 置顶标记，所有
+  bot 一致: every pinned bot shows the star, the Coordinator only when pinned,
+  like any other bot (Alex 2026-11-01).
 - **R-07** Action entry points (buttons, menu items, the collapsed sidebar
   toggle, the 新建任务 dialog header) never say "Coordinator". Conversation
   headers keep the centred Coordinator pill.

@@ -42,8 +42,9 @@ no search field at the top. The person's avatar (top left) opens the
 「重启以更新」 once an update has downloaded
 ([decision](decisions/2026-10-31-2010-ota-updates.md)); a swipe right on a
 tab's root opens it too. 「+」 (top right) opens 新建 Bot and 新建群聊. The
-Coordinator is pinned on top (a star on its avatar) with the bots the person
-pinned, then every other bot and group chat with its last line and time,
+Coordinator is pinned on top with the bots the person pinned; 星标 = 置顶标记，
+所有 bot 一致 (R-06). 现状（非决定）：the app keeps the Coordinator pinned and
+draws the star only on it. Then every other bot and group chat with its last line and time,
 newest first (the web bot list, R-01).
 **搜索** is the tab bar's search: its field sits at the bottom and matches
 bots and group chats by name.
@@ -267,7 +268,7 @@ mobile tabs.
   web. Chat items carry `images` (a count) and the app loads each photo from
   `GET /api/mobile/chat/image?message=<id>&index=<n>`, which serves only the
   person's own messages.
-- **Not on the server yet**, so the app leaves them out: 待审阅 and 已归档
+- **现状（非决定）:** not on the server yet, so the app leaves them out: 待审阅 and 已归档
   threads, pinned bots, 电脑不在用时 (needs the web to report presence),
   dictation (so the composer has no mic yet), dark mode.
 - **App icon:** the Mikka mark, the same file as the desktop app's

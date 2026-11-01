@@ -85,7 +85,7 @@ more than once.
       same thing, it was filler. Sheets have no subtitle; reassurance is a
       mark (🔒 Secured by Mikka), not a sentence. Reviewers fail any frame
       with such a sentence, even when the brief asked for it.
-- [ ] The Coordinator looks like every other bot: no star, badge or special copy (R-06).
+- [ ] The Coordinator looks like every other bot: no badge or special copy; the star is only the 置顶 mark, the same on every pinned bot (R-06).
 - [ ] All strings in `messages/*.json`; `pnpm i18n:check` passes (R-42).
 - [ ] Glossary words only (R-43).
 
