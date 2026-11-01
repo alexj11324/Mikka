@@ -1,0 +1,100 @@
+# Development workflow
+
+Standing rules for how work moves from a branch to `main`. Decision:
+[`2026-11-01-1440-dev-workflow-local-first`](design/decisions/2026-11-01-1440-dev-workflow-local-first.md).
+Where another document disagrees, this page wins; fix the other document.
+
+## 1. Local first
+
+Build, run the services and the daemon, and do end-to-end acceptance locally,
+in the session's own cloud Linux container. A pull request can be opened at
+any time, and opening one never waits for, or stops, local building and
+verification.
+
+CI is the final gate, not the place to find out whether something works.
+Nobody sits waiting on CI, a merge or a deploy to check what can be checked
+locally. Push, open the PR and keep working; read CI when it reports.
+
+Ordinary acceptance follows [`acceptance.md`](acceptance.md): a local
+application, a real isolated database and, when the flow uses one, a real
+daemon.
+
+## 2. Hot reload
+
+Debugging and pipeline runs use source, not builds:
+
+| Part | Command |
+| --- | --- |
+| Server | `pnpm dev` (`next dev`, via `scripts/dev-preview.mjs`) |
+| Daemon | `pnpm daemon` (`tsx` on `packages/daemon` source) |
+
+Use a production build (`pnpm build` then `next start`) only for production
+screenshots of a UI change, or for a spec that requires one.
+
+## 3. Environment
+
+One command sets up a container: `scripts/dev/bootstrap-local.sh`. Put it in
+the cloud environment's setup script so every session starts ready. It
+provides:
+
+- **Node 24**, the same as CI. Node 22's `mock.module` ignores `{ exports }`
+  and gives false test failures.
+- **PostgreSQL 17** at `127.0.0.1:5433`, database `mikka_e2e`; migrations with
+  `pnpm migrate`.
+- **bubblewrap, socat and ripgrep** for the daemon's sandbox and tools.
+- **Playwright** on the container's Chromium: set
+  `executablePath: '/opt/pw-browsers/chromium'`. Never run
+  `playwright install`.
+
+## 4. CI variables
+
+Never set `GITHUB_ACTIONS`, `RUNNER_ENVIRONMENT`, `GITHUB_RUN_ID` or any other
+CI variable to get past a test guard. A suite that runs only on a
+GitHub-hosted runner is left to CI.
+
+Local test accounts: _to be filled in when the local test-account mode lands
+(session `session_01XDndLRHw24esXi2pKyHX5A`)._ Until then, use the existing
+helpers as [`acceptance.md`](acceptance.md) describes.
+
+## 5. Merge batches
+
+Pull requests waiting to merge go in batches of five:
+
+1. The coordinator makes an integration branch `integration/<date>-<n>` (for
+   example `integration/2026-11-01-1`) from `main`.
+2. Each PR is merged into it with a merge commit. Never squash, and never
+   rebase someone else's branch.
+3. For stacked PRs, take only the top one; it carries the ones below.
+4. A UI change goes in only after its screenshots are reviewed.
+5. The coordinator squash-merges the integration PR into `main`, then closes
+   the original PRs with a link to it.
+
+## 6. Numbers
+
+Rule ids (`R-xx`) and migration timestamps are assigned by the coordinator
+when the work is dispatched, so parallel branches never collide and nothing
+is renamed afterwards. A session that needs one and has none asks the
+coordinator.
+
+## 7. E2B templates
+
+To test worker changes, build a `-dev` template from the branch. Do not wait
+for the automatic publish that follows a merge to `main`
+([`e2b-template.yml`](../.github/workflows/README.md#cloud-worker-template-release)).
+Never overwrite the production template or Vercel's production environment.
+
+## 8. Reaching a local service from outside
+
+Use a Cloudflare tunnel when a local service must be reachable from outside.
+In the cloud environment, outbound traffic goes only through a proxy on
+port 443, and `cloudflared` cannot connect (it needs port 7844). Report that
+as it is. Do not work around it, and never put production credentials on a
+public machine.
+
+## 9. Parallel work and stalls
+
+- Independent work runs in parallel, with subagents.
+- A step that makes no progress for 5 minutes is stopped: change the approach,
+  or move it to the background with a timeout.
+- When the cause is unknown, and before any fix, read the tool's official
+  documentation and put the link in the report.
