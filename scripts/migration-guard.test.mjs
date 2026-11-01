@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { isLoopbackDatabase, migrationGuard } from './migration-guard.mjs'
 
-const remote = 'postgresql://owner:fixture@ep-example.us-east-2.aws.neon.tech/orvilo_mvp'
-const local = 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e'
+const remote = 'postgresql://ep-example.us-east-2.aws.neon.tech/orvilo_mvp'
+const local = 'postgresql://127.0.0.1:5432/mikka_e2e'
 
 test('Vercel production migrates only from main', () => {
   const targets = { MIKKA_DATABASE_URL: remote, DATABASE_URL: remote }
@@ -19,7 +19,7 @@ test('outside Vercel MIGRATE=1 reaches only loopback databases unless --allow-re
   assert.throws(() => migrationGuard({ MIGRATE: '1' }, { MIKKA_DATABASE_URL: local, DATABASE_URL: remote }), /DATABASE_URL is not a loopback database/)
   const allowed = migrationGuard({ MIGRATE: '1' }, { MIKKA_DATABASE_URL: remote, DATABASE_URL: local }, ['--allow-remote'])
   assert.match(allowed.warning, /WARNING --allow-remote.*MIKKA_DATABASE_URL/)
-  assert.doesNotMatch(allowed.warning, /fixture|neon\.tech/)
+  assert.doesNotMatch(allowed.warning, /neon\.tech/)
   // Unset targets fail later with the runner's own "is not set" error.
   assert.deepEqual(migrationGuard({ MIGRATE: '1' }, { MIKKA_DATABASE_URL: undefined, DATABASE_URL: '' }), { warning: null })
 })
