@@ -63,6 +63,7 @@ export async function factory194Fixture(connectionString: string) {
     CREATE TABLE run_tokens (id uuid PRIMARY KEY,"runId" uuid,"userId" text,"tokenHash" text,"revokedAt" timestamptz,"expiresAt" timestamptz);
     CREATE TABLE run_chunks (id uuid PRIMARY KEY,"runId" uuid,chunk jsonb,"createdAt" timestamptz,seq integer NOT NULL DEFAULT 1);
     CREATE TABLE run_captures (id uuid PRIMARY KEY,"userId" text NOT NULL,"runId" uuid NOT NULL,kind text NOT NULL,"contentType" text NOT NULL,status text NOT NULL,title text NOT NULL,size integer,sha256 text,"durationMs" integer,"createdAt" timestamptz NOT NULL DEFAULT now(),"updatedAt" timestamptz NOT NULL DEFAULT now());
+    CREATE TABLE run_capture_steps (id uuid PRIMARY KEY,"captureId" uuid NOT NULL,"userId" text NOT NULL,"atMs" integer NOT NULL,label text NOT NULL,source text NOT NULL,"createdAt" timestamptz NOT NULL DEFAULT now());
   `);
   await pool.query(
     await readFile(

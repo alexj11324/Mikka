@@ -1,3 +1,4 @@
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -8,7 +9,7 @@ import { createComputerPolicyHandler } from '@/lib/computer/policy-route'
 export const runtime = 'nodejs'
 export const maxDuration = 120
 const handle = createComputerPolicyHandler({
-  enabled: () => process.env.MIKKA_CLOUD_COMPUTER_TASKS === '1',
+  enabled: () => cloudComputerTasksEnabled(),
   store: new ComputerStore(pool),
   authorize: async (request, workspaceId, admin) => {
     const session = await auth.api.getSession({ headers: request.headers })

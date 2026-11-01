@@ -1,4 +1,5 @@
 import "server-only";
+import { cloudComputerTasksEnabled } from "./cloud-computer-flag";
 import type { Pool } from "pg";
 import { pool } from "./db";
 import { issueForUser } from "./issue-access";
@@ -25,19 +26,22 @@ export type DeviceTarget = {
 };
 
 /**
- * Cloud means the workspace's own E2B key and this bot's own cloud runtime
- * (MVP: no Mikka-hosted sandboxes). A run with no bot (the Coordinator)
- * never borrows another bot's runtime.
+ * Cloud means the workspace's own E2B key on this bot's own cloud runtime
+ * (MVP: no Mikka-hosted sandboxes). It is on by default: a bot with no runtime
+ * yet gets one when the run is dispatched (`ensureBotCloudRuntime`). The
+ * kill switch and a workspace's 「电脑」 policy set to deny turn it off. A run
+ * with no bot (the Coordinator) never borrows another bot's runtime.
  */
 export async function cloudReady(
   query: Query,
   scope: { ownerId: string; workspaceId: string; botId: string | null; harness: string },
 ) {
-  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== "1" || process.env.MIKKA_BYOS_ENABLED !== "1") return false;
+  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== "1" || !scope.botId) return false;
   const { rowCount } = await query.query(
-    `SELECT 1 FROM workspace_e2b_keys k JOIN bot_cloud_runtimes r ON r."workspaceId"=k."workspaceId"
-      WHERE k."workspaceId"=$1 AND r."botId"=$2 AND r."ownerId"=$3 AND ($4='auto' OR r.harness=$4) LIMIT 1`,
-    [scope.workspaceId, scope.botId, scope.ownerId, scope.harness],
+    `SELECT 1 FROM workspace_e2b_keys k JOIN bots b ON b."workspaceId"=k."workspaceId"
+      WHERE k."workspaceId"=$1 AND b.id=$2 AND b."ownerId"=$3 AND b."archivedAt" IS NULL
+        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=k."workspaceId" AND p.permission='deny') LIMIT 1`,
+    [scope.workspaceId, scope.botId, scope.ownerId],
   );
   return Boolean(rowCount);
 }

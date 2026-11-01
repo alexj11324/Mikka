@@ -768,7 +768,7 @@
     "connect": {
       "trigger": "连接设备",
       "title": "添加设备",
-      "description": "一台你能 ssh 进去的机器。Mikka 会在上面安装并启动 daemon，然后把它检测到的 Agent 带回来。",
+      "description": "一台你能 ssh 进去的机器。Mikka 会在上面安装并启动 Mikka 客户端，然后把它检测到的 Agent 带回来。",
       "host": "主机",
       "hostPlaceholder": "ssh 主机、主机名或 IP[:端口]",
       "actAs": "以谁的身份",
@@ -778,7 +778,7 @@
       "manualToken": "改用手动 token",
       "connect": "连接",
       "connectingHost": "正在连接 {host}",
-      "progressDescription": "在这台机器上安装并启动 daemon，然后把它的心跳接回来。",
+      "progressDescription": "在这台机器上安装并启动 Mikka 客户端，然后等它连上。",
       "interrupted": "连接中断。",
       "tokenFailed": "生成 token 失败，请重试。",
       "done": "完成",
@@ -800,18 +800,18 @@
       },
       "manual": {
         "loginComment": "# 1. 在这台机器上登录（token 只显示这一次）",
-        "startComment": "# 2. 启动 daemon：它会上报本机装好的 Agent"
+        "startComment": "# 2. 启动 Mikka 客户端：它会上报本机装好的 Agent"
       },
       "sshExitCode": "ssh 退出码 {code}",
       "noNode": "这台机器上没有 node",
       "noPnpm": "这台机器上没有 pnpm",
-      "copyDaemon": "复制 daemon 到 ~/.mikka",
+      "copyDaemon": "复制 Mikka 客户端到 ~/.mikka",
       "rsyncExitCode": "rsync 退出码 {code}",
       "installExitCode": "pnpm install 退出码 {code}",
       "depsInstalled": "依赖已安装",
       "startExitCode": "启动失败，退出码 {code}",
-      "daemonRunning": "daemon 已在后台运行",
-      "heartbeatTimeout": "等待心跳超时，请查看 ~/.mikka/daemon.log",
+      "daemonRunning": "Mikka 客户端已在后台运行",
+      "heartbeatTimeout": "Mikka 客户端没有连上，日志在 ~/.mikka/daemon.log",
       "connectionError": "连接过程出错",
       "commands": {
         "install": "1 安装",
@@ -825,7 +825,7 @@
     "offlineSince": "离线 · {time}",
     "noAgent": "未检测到 Agent",
     "sandboxBlocked": "已检测到 {agents}，但沙箱不可用",
-    "sandboxMissing": "daemon 没能自动装好 {packages}。用系统包管理器安装后，daemon 会自动恢复。",
+    "sandboxMissing": "这台设备无法自动安装 {packages}。用系统包管理器安装后会自动恢复。",
     "sandboxRefused": "这台机器的系统设置不允许普通用户创建沙箱，需要管理员开启 user namespace。",
     "sandboxFix": "修复方法",
     "installAgent": "安装方法",
@@ -833,15 +833,15 @@
     "commands": {
       "sent": {
         "redetect": "已让 {name} 重新检测 Agent",
-        "restart": "已让 {name} 重启 daemon",
-        "update": "已让 {name} 更新 daemon"
+        "restart": "已让 {name} 重启 Mikka 客户端",
+        "update": "已让 {name} 更新 Mikka 客户端"
       },
       "queued": "{name} 离线，上线后执行"
     },
     "actions": {
       "rename": "重命名",
-      "restart": "重启 daemon",
-      "update": "更新 daemon",
+      "restart": "重启 Mikka 客户端",
+      "update": "更新 Mikka 客户端",
       "redetect": "重新检测 Agent",
       "remove": "移除设备"
     },
@@ -855,9 +855,9 @@
       "title": "移除「{name}」？",
       "cancel": "取消",
       "confirm": "移除",
-      "uninstall": "也会卸载 {name} 上的 daemon，它的凭证立即失效。",
-      "offline": "{name} 离线，没法卸载上面的 daemon；它的凭证立即失效，不再接任务。",
-      "uninstalling": "正在卸载 {name} 上的 daemon"
+      "uninstall": "也会卸载 {name} 上的 Mikka 客户端，它的凭证立即失效。",
+      "offline": "{name} 离线，没法卸载上面的 Mikka 客户端；它的凭证立即失效，不再接任务。",
+      "uninstalling": "正在卸载 {name} 上的 Mikka 客户端"
     },
     "ssh": {
       "title": "添加设备",
@@ -874,7 +874,7 @@
       "progress": "安装进度",
       "steps": {
         "connect": "连接",
-        "install": "安装 daemon",
+        "install": "安装 Mikka 客户端",
         "start": "启动",
         "online": "已上线"
       },
@@ -3651,7 +3651,7 @@
     "approving": "正在批准…",
     "approved": "已批准",
     "denied": "已拒绝",
-    "returnToTerminal": "回到终端启动 daemon",
+    "returnToTerminal": "回到终端启动 Mikka 客户端",
     "done": "完成",
     "invalid": "验证码无效或已过期",
     "failed": "连接失败",
@@ -3809,7 +3809,8 @@
       "githubMergeHeadMoved": "PR 有新提交",
       "githubMergeClosed": "PR 已关闭",
       "githubUnavailable": "GitHub 暂不可用"
-    }
+    },
+    "steps": "操作 {count}"
   },
   "AccountEmail": {
     "exportSubject": "你的 Mikka 数据导出",

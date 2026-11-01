@@ -1,4 +1,5 @@
 import 'server-only'
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
@@ -208,7 +209,7 @@ type CloudTarget = { botId: string; workspaceId: string; harness: 'codex' | 'cla
 
 /** The person's own E2B cloud for a lost run: an E2B key and the run's own bot's cloud runtime (never another bot's). */
 async function cloudTarget(run: Run): Promise<CloudTarget | null> {
-  if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return null
+  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return null
   if (run.agentDefinition?.repositoryAdmission || !run.deviceRepoId || !run.botId) return null
   const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
   if (!repo?.remoteUrl) return null

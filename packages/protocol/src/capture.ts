@@ -127,12 +127,15 @@ export const screenCaptureRequest = z.discriminatedUnion("action", [
   z.object({ action: z.literal("screenshot"), title }).strict(),
   z.object({ action: z.literal("start_recording"), title, maxSeconds: z.number().int().min(5).max(RECORDING_MAX_SECONDS).optional() }).strict(),
   z.object({ action: z.literal("stop_recording") }).strict(),
+  // A step on the recording's timeline: an action's own description, or a moment the agent marks.
+  z.object({ action: z.literal("step"), label: title, source: z.enum(["action", "mark"]) }).strict(),
 ])
 export type ScreenCaptureRequest = z.infer<typeof screenCaptureRequest>
 export const screenCaptureResponse = z.discriminatedUnion("action", [
   z.object({ action: z.literal("screenshot"), capture: captureView }),
   z.object({ action: z.literal("start_recording"), recordingId: z.uuid(), stopsAt: z.iso.datetime() }),
   z.object({ action: z.literal("stop_recording"), capture: captureView }),
+  z.object({ action: z.literal("step"), recorded: z.boolean() }),
 ])
 export type ScreenCaptureResponse = z.infer<typeof screenCaptureResponse>
 

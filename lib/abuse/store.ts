@@ -3,6 +3,8 @@ import type { Pool, PoolClient } from 'pg'
 import {
   abuseLimits,
   FREE_ALLOWANCE_MICRO_USD,
+  HOSTED_CALL_HOLD_MICRO_USD,
+  HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE,
   MICRO_USD_PER_POINT,
   PaidResourceError,
 } from './policy'
@@ -30,9 +32,8 @@ export class HostedUsageStore {
     ])
   }
   /**
-   * Fail reservations that can no longer settle, so one stuck row never blocks
-   * the workspace forever (the one-pending-per-workspace index would refuse
-   * every later call with usage_in_progress). A real call settles within
+   * Fail reservations that can no longer settle, so a stuck row never keeps its
+   * hold and concurrency slot forever. A real call settles within
    * HOSTED_CALL_TIMEOUT_MS (60s); the 10-minute margin is far wider so a live
    * stream is never cut. A pending row past it crashed before settling; an
    * unknown row with no generationId can never be reconciled (the cost lookup
@@ -124,13 +125,23 @@ export class HostedUsageStore {
       )
     return balance
   }
+  /** Holds and slots of this workspace's calls that have not settled. */
+  private async inFlight(tx: Query, workspaceId: string) {
+    const {
+      rows: [row],
+    } = await tx.query(
+      `SELECT COALESCE(sum("holdMicroUsd"),0)::float8 AS held, count(*) FILTER (WHERE state='pending')::int AS calls
+       FROM hosted_usage WHERE "workspaceId"=$1 AND state IN ('pending','unknown')`,
+      [workspaceId],
+    )
+    return row as { held: number; calls: number }
+  }
   async reserve(
     workspaceId: string,
     model: string,
     id: string,
     env: Record<string, string | undefined> = process.env,
-    // Compatibility for older callers; estimates never reserve or gate money.
-    _maximumCost?: number,
+    estimate = HOSTED_CALL_HOLD_MICRO_USD,
   ) {
     return this.transaction(async (tx) => {
       // One short platform admission lock; no SQL lock spans provider I/O.
@@ -138,10 +149,10 @@ export class HostedUsageStore {
         "SELECT pg_advisory_xact_lock(hashtextextended('hosted-free-budget',0))",
       )
       await this.lock(tx, workspaceId)
-      // Release an abandoned reservation so one stuck call never bricks the
-      // workspace. A hosted call runs at most HOSTED_CALL_TIMEOUT_MS; a pending
-      // row past a wide margin crashed before settling, and an unknown row with
-      // no generationId can never be reconciled (the cost lookup needs it).
+      // Release an abandoned reservation so one stuck call never keeps its hold.
+      // A hosted call runs at most HOSTED_CALL_TIMEOUT_MS; a pending row past a
+      // wide margin crashed before settling, and an unknown row with no
+      // generationId can never be reconciled (the cost lookup needs it).
       await this.releaseAbandoned(tx, workspaceId)
       const prior = (
         await tx.query('SELECT state FROM hosted_usage WHERE id=$1', [id])
@@ -150,17 +161,15 @@ export class HostedUsageStore {
       const balance = await this.balance(workspaceId, tx)
       if (!balance.verified && balance.purchased <= 0)
         throw new PaidResourceError('verification_required')
-      if (balance.free + balance.purchased <= 0)
+      const available = balance.free + balance.purchased
+      if (available <= 0) throw new PaidResourceError('free_allowance_used')
+      const flight = await this.inFlight(tx, workspaceId)
+      if (flight.calls >= HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE)
+        throw new PaidResourceError('usage_concurrency_limit')
+      // Concurrent calls must fit the balance together. A lone call is admitted
+      // on any positive balance, as before, so the last cents stay usable.
+      if (flight.held > 0 && available - flight.held < estimate)
         throw new PaidResourceError('free_allowance_used')
-      if (
-        (
-          await tx.query(
-            `SELECT 1 FROM hosted_usage WHERE "workspaceId"=$1 AND state IN ('pending','unknown')`,
-            [workspaceId],
-          )
-        ).rowCount
-      )
-        throw new PaidResourceError('usage_in_progress')
       const limit = abuseLimits(env)
       const spent = Number(
         (
@@ -171,11 +180,10 @@ export class HostedUsageStore {
       )
       if (spent >= limit.dailyMicroUsd && balance.purchased <= 0)
         throw new PaidResourceError('platform_paused')
-      // This existing row claims only the concurrency slot and receipt identity.
-      // No money is frozen, prepaid or estimated before provider execution.
+      // The hold only gates admission; settlement charges the actual cost.
       await tx.query(
-        `INSERT INTO hosted_usage (id,"workspaceId",model,state) VALUES ($1,$2,$3,'pending')`,
-        [id, workspaceId, model],
+        `INSERT INTO hosted_usage (id,"workspaceId",model,state,"holdMicroUsd") VALUES ($1,$2,$3,'pending',$4)`,
+        [id, workspaceId, model, estimate],
       )
       return { id, workspaceId }
     })
@@ -211,8 +219,8 @@ export class HostedUsageStore {
       await this.lock(tx, row.workspaceId)
       if (generationId && row.generationId && generationId !== row.generationId)
         throw new Error('usage_generation_mismatch')
-      // Unknown cost never means free. Retain the receipt record and block further
-      // workspace calls until the receipt is reconciled using this same method.
+      // Unknown cost never means free. Retain the receipt record and keep its hold
+      // until the receipt is reconciled using this same method.
       if (cost === null) {
         await tx.query(
           'UPDATE hosted_usage SET state=\'unknown\',"generationId"=COALESCE($2,"generationId") WHERE id=$1',
@@ -265,12 +273,7 @@ export class HostedUsageStore {
     env: Record<string, string | undefined> = process.env,
   ) {
     const balance = await this.balance(workspaceId)
-    const pending = (
-      await this.pool.query(
-        `SELECT state FROM hosted_usage WHERE "workspaceId"=$1 AND state IN ('pending','unknown') LIMIT 1`,
-        [workspaceId],
-      )
-    ).rows[0]
+    const flight = await this.inFlight(this.pool, workspaceId)
     const spent = Number(
       (
         await this.pool.query(
@@ -278,17 +281,19 @@ export class HostedUsageStore {
         )
       ).rows[0].n,
     )
+    // Whether the next call would be admitted, by the same rules as reserve().
+    const available = balance.free + balance.purchased
     const state = !balance.verified
       ? 'verification_required'
-      : pending
-        ? pending.state === 'unknown'
-          ? 'usage_cost_unavailable'
-          : 'usage_in_progress'
-        : balance.free + balance.purchased <= 0
-          ? 'free_allowance_used'
-          : spent >= abuseLimits(env).dailyMicroUsd && balance.purchased <= 0
-            ? 'platform_paused'
-            : 'ready'
+      : available <= 0
+        ? 'free_allowance_used'
+        : flight.calls >= HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE
+          ? 'usage_concurrency_limit'
+          : flight.held > 0 && available - flight.held < HOSTED_CALL_HOLD_MICRO_USD
+            ? 'free_allowance_used'
+            : spent >= abuseLimits(env).dailyMicroUsd && balance.purchased <= 0
+              ? 'platform_paused'
+              : 'ready'
     return { state, balance }
   }
   async recent(workspaceId: string) {
