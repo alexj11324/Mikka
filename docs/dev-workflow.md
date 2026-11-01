@@ -79,28 +79,26 @@ Local test accounts: the local mode (`MIKKA_LOCAL_TEST_ACCOUNTS=1` with a
 loopback `*_e2e` database) is described in
 [`test-accounts.md`](test-accounts.md#local-mode-a-developers-own-disposable-database).
 
-## 5. Merge batches
+## 5. Trunk-based merging
 
-Pull requests waiting to merge go in batches of five:
+Decision: [`2026-11-01-1545-trunk-based`](design/decisions/2026-11-01-1545-trunk-based.md).
 
-1. The coordinator makes an integration branch `integration/<date>-<n>` (for
-   example `integration/2026-11-01-1`) from `main`.
-2. Each PR is merged into it with a merge commit. Never squash, and never
-   rebase someone else's branch.
-3. For stacked PRs, take only the top one; it carries the ones below.
-4. A UI change goes in only after its screenshots are reviewed.
-5. The coordinator squash-merges the integration PR into `main`, then closes
-   the original PRs with a link to it.
+1. Every PR branches from `main` and changes one thing.
+2. When its CI is green, the coordinator squash-merges it into `main`. There
+   are no integration batches.
+3. A change to auth, signup, privilege or credentials is reviewed before
+   merging. A UI change merges only after its screenshots are reviewed.
+4. A documentation conflict is resolved by whoever merges: they edit the
+   documents directly.
 
-A documentation conflict is resolved by the integration session, which merges
-the documents' content itself; it is not sent back to the authors and not
-deferred to another batch.
+Each of these modules has an owner. Anyone else who needs to change one asks
+its owner first.
 
-Several small fixes go to an integration branch together and are pushed once,
-instead of a full CI round for each fix.
-
-`integration/` replaces the older `integrate/` prefix; CI accepts both
-(`subagents.yml`).
+| Module | Covers | Owner |
+| --- | --- | --- |
+| Local development environment and fake services | `scripts/dev/bootstrap-local.sh`, local stand-ins for external services | LSV4 session |
+| Local test-mode rules | Local test accounts and the guards that decide where a suite may run | PFe3 session |
+| MVP acceptance | The MVP end-to-end acceptance and its record | QUe session |
 
 ## 6. Numbers
 
@@ -108,7 +106,7 @@ Rule ids (`R-xx`) and migration timestamps are assigned by the coordinator
 when the work is dispatched, so parallel branches do not collide. A session
 that needs one and has none asks the coordinator. The coordinator assigns
 increasing timestamps. `scripts/check-migrations.mjs` refuses a timestamp at or below the newest one on `main`, so if they merge out
-of order, the integration session renames them.
+of order, whoever merges the later one renames it.
 
 ## 7. E2B templates
 
