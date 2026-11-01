@@ -5,7 +5,9 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
-  workers: 1,
+  // One worker unless the CI shard asks for more (PLAYWRIGHT_WORKERS); each
+  // worker leases its own test-account pair.
+  workers: Math.max(1, Number.parseInt(process.env.PLAYWRIGHT_WORKERS ?? '1', 10) || 1),
   timeout: 90000,
   expect: { timeout: 15000 },
   // Keep commit provenance without copying fixture credentials from a PR diff

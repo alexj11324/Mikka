@@ -762,6 +762,7 @@ jobs:
       SLACK_USER_BINDINGS: '{"U456":"ci-only-mikka-user"}'
       NEXT_TELEMETRY_DISABLED: '1'
       BROWSER_SHARDS: '8'
+      PLAYWRIGHT_WORKERS: '2'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
