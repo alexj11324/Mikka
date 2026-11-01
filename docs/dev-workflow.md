@@ -52,13 +52,14 @@ provides:
   `executablePath: '/opt/pw-browsers/chromium'`. Never run
   `playwright install`.
 
-Signup limits never block local work: outside production and Vercel, with
-`MIKKA_LOCAL_TEST_ACCOUNTS=1` and a loopback `*_e2e` app database, the signup
-and verification limits default to CI's (1000 per IP, 10000 overall, each hour)
-instead of 5 per IP; an explicitly set `MIKKA_SIGNUP_*_HOURLY` or
-`MIKKA_VERIFICATION_*_HOURLY` still wins (`lib/abuse/signup.ts`). `next start`
-runs with `NODE_ENV=production`, so a production build keeps the production
-defaults unless those variables are set, as the bootstrap's export line does.
+Signup limits never block local work. In local test-account mode
+(`localTestAccountsMode`, `scripts/test-accounts/database-target.mjs`) and
+outside Vercel, the signup and verification limits default to CI's (1000 per
+IP and 10000 overall each hour, instead of 5 per IP), and Better Auth's
+sign-up rule rises from 3 to 100 per 10 seconds (`lib/abuse/signup.ts`). This
+holds for `next dev` and `next start` alike. A limit set explicitly
+(`MIKKA_SIGNUP_*_HOURLY`, `MIKKA_VERIFICATION_*_HOURLY`) still wins;
+production is unchanged.
 
 ## 4. CI variables
 

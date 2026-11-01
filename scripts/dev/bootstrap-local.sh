@@ -60,6 +60,14 @@ if ! as_pg "'$PG_BIN/pg_ctl' -D '$PGDATA_DIR' status" >/dev/null 2>&1; then
 fi
 PSQL=("$PG_BIN/psql" -h 127.0.0.1 -p "$PG_PORT" -U postgres -qAt)
 "${PSQL[@]}" -c "SELECT 1 FROM pg_roles WHERE rolname='e2e'" | grep -q 1 || "${PSQL[@]}" -c "CREATE ROLE e2e LOGIN SUPERUSER"
+# A generated password for the disposable role, kept in a file only this user reads: URLs that
+# carry one pass scripts/test-accounts' databaseTarget, and the printed line names the file, not the value.
+PW_FILE="$STATE/e2e-password"
+if [ ! -s "$PW_FILE" ]; then
+  ( umask 077; od -An -tx1 -N16 /dev/urandom | tr -d ' \n' | $SUDO tee "$PW_FILE" >/dev/null )
+  [ -z "$SUDO" ] || $SUDO chown "$(id -u):$(id -g)" "$PW_FILE"
+  "${PSQL[@]}" -c "ALTER ROLE e2e PASSWORD '$(cat "$PW_FILE")'" >/dev/null
+fi
 "${PSQL[@]}" -c "SELECT 1 FROM pg_database WHERE datname='mikka_e2e'" | grep -q 1 || "${PSQL[@]}" -c "CREATE DATABASE mikka_e2e OWNER e2e"
 
 # 2. Node at NODE_WANT, as CI's setup-node, from nodejs.org with its checksum.
@@ -111,7 +119,9 @@ if [ -e "$PW_CHROMIUM" ]; then
 fi
 
 # 6. Every tracked migration on mikka_e2e (scripts/setup-e2e-db.mjs runs scripts/migrate.mjs, then the auth tables).
-DB_URL="postgresql://e2e@127.0.0.1:$PG_PORT/mikka_e2e"
+db_url() { echo "postgresql://e2e:$1@127.0.0.1:$PG_PORT/mikka_e2e"; }
+DB_URL="$(db_url "$(cat "$PW_FILE")")"
+PRINT_URL="$(db_url "\$(cat $PW_FILE)")"
 MIGRATIONS="$( (ls "$ROOT/drizzle"/*.sql; cat "$ROOT/scripts/setup-e2e-db.mjs" "$ROOT/pnpm-lock.yaml") | sha256sum | cut -c1-16)"
 if [ "$("${PSQL[@]}" -d mikka_e2e -c "SELECT obj_description('public'::regnamespace)" 2>/dev/null)" != "mikka-bootstrap $MIGRATIONS" ]; then
   log "migrating mikka_e2e"
@@ -123,4 +133,4 @@ log "ready"
 # CI's registration limits (.github/workflows/browser-tests.yml): every local signup shares one IP,
 # so the production default of 5 an hour turns browser tests into 429s.
 LIMITS="MIKKA_SIGNUP_IP_HOURLY=1000 MIKKA_SIGNUP_GLOBAL_HOURLY=10000 MIKKA_VERIFICATION_IP_HOURLY=1000 MIKKA_VERIFICATION_GLOBAL_HOURLY=10000"
-echo "export PATH=$NODE_DIR:\$PATH E2E_DATABASE_URL=$DB_URL MIKKA_DATABASE_URL=$DB_URL DATABASE_URL=$DB_URL MIKKA_TEST_DB_PORT=$PG_PORT $LIMITS$PW_EXPORTS"
+echo "export PATH=$NODE_DIR:\$PATH E2E_DATABASE_URL=$PRINT_URL MIKKA_DATABASE_URL=$PRINT_URL DATABASE_URL=$PRINT_URL MIKKA_TEST_DB_PORT=$PG_PORT MIKKA_LOCAL_TEST_ACCOUNTS=1 $LIMITS$PW_EXPORTS"
