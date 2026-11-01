@@ -4022,8 +4022,9 @@
       "free_allowance_used": "Free allowance used up",
       "points_exhausted": "Points used up",
       "platform_paused": "Free allowance paused",
-      "unavailable": "Mikka Default is unavailable. Please try again later.",
+      "unavailable": "Mikka Default is unavailable",
       "verifyCard": "Verify card",
+      "useSubscription": "Use my {name} subscription",
       "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
     }
   },

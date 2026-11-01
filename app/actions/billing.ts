@@ -70,6 +70,9 @@ export async function getHostedUsage(workspaceId?: string) {
     const { workspacePool } = await import('@/lib/workspace-db')
     // Card verification is the person's and lands on their personal workspace (C19): only there does 验证银行卡 help.
     const personal = (await workspacePool.query<{ kind: string }>('SELECT kind FROM mikka_workspaces WHERE id=$1', [actor.workspaceId])).rows[0]?.kind === 'personal'
-    return { ...await hostedUsage.status(actor.workspaceId), personal, recent:actor.role === 'admin' ? await hostedUsage.recent(actor.workspaceId) : [] }
+    // The person's own subscription serves them in every workspace (#838): with one connected, 连接订阅 is no way on.
+    const { pool } = await import('@/lib/db')
+    const subscribed = (await pool.query(`SELECT 1 FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND "removedAt" IS NULL LIMIT 1`, [actor.userId])).rowCount !== 0
+    return { ...await hostedUsage.status(actor.workspaceId), personal, subscribed, recent:actor.role === 'admin' ? await hostedUsage.recent(actor.workspaceId) : [] }
   })
 }
