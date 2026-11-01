@@ -144,3 +144,42 @@ before you continue.
 
 While CI runs, start the next task. When there is none, ask for one in the
 same message as the report.
+
+## 12. Local substitutes for cloud services
+
+`pnpm dev` in local test-account mode (`MIKKA_LOCAL_TEST_ACCOUNTS=1` with
+every application database a loopback `*_e2e` database, the switch in
+`scripts/test-accounts/database-target.mjs`) also starts loopback substitutes
+for the cloud services development mode needs, on `127.0.0.1:3192`
+(`MIKKA_LOCAL_SERVICES_PORT`). `MIKKA_LOCAL_SERVICES=0` turns them off. They
+never start under `NODE_ENV=production`, `VERCEL` or `VERCEL_ENV`, and a
+production build contains none of them.
+
+```sh
+eval "$(scripts/dev/bootstrap-local.sh)"
+export MIKKA_LOCAL_TEST_ACCOUNTS=1 BETTER_AUTH_SECRET=<any local value>
+pnpm dev
+```
+
+The Next process gets `scripts/dev/local-preload.mjs` (through
+`NODE_OPTIONS=--import`), which sends these requests to the substitutes and
+leaves every other request alone; the application code is unchanged.
+
+| Cloud service | Local substitute |
+| --- | --- |
+| [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) model (`ai-gateway.vercel.sh/v*/ai/language-model`, Mikka 默认 and the Coordinator) | A scripted model. It echoes (`Local model: <text>`); a message `/tool <name> <json>` calls that registered tool for real; a tool result comes back as JSON. Streaming and non-streaming. |
+| AI Gateway Decision API (`/v1/decisions`, triage, run outcome) | The first choice of each choice question, `0.5` for a predicate. |
+| Stripe card verification (the hosted credit gate) | Every local workspace gets a `hosted_verifications` row and a $1000 `hosted_allowances` row, checked every 2 seconds. |
+| [Resend](https://resend.com/docs/api-reference/emails/send-email) (verification and password-reset mail) | A local outbox at `http://127.0.0.1:3192/mail` (JSON at `/mail.json`); the terminal prints one line per mail. |
+
+The Next process alone gets placeholder values for `AI_GATEWAY_API_KEY` and
+`RESEND_API_KEY`, which only the substitutes accept; the shell keeps none, so
+the test-account harness, which refuses provider keys, is unaffected. Any
+real key set in the shell is replaced in that process and never sent.
+
+`scripts/dev/bootstrap-local.sh` prints database URLs with a placeholder
+password (`e2e:local@`), because local mode requires one; trust auth ignores
+it.
+
+`pnpm test:local-services` covers the switch, the routing and the real AI SDK
+gateway provider against the substitutes.

@@ -111,7 +111,9 @@ if [ -e "$PW_CHROMIUM" ]; then
 fi
 
 # 6. Every tracked migration on mikka_e2e (scripts/setup-e2e-db.mjs runs scripts/migrate.mjs, then the auth tables).
-DB_URL="postgresql://e2e@127.0.0.1:$PG_PORT/mikka_e2e"
+# Trust auth ignores the password; the placeholder is there because the local
+# test-account mode (scripts/test-accounts/database-target.mjs) requires one.
+DB_URL="postgresql://e2e:local@127.0.0.1:$PG_PORT/mikka_e2e"
 MIGRATIONS="$( (ls "$ROOT/drizzle"/*.sql; cat "$ROOT/scripts/setup-e2e-db.mjs" "$ROOT/pnpm-lock.yaml") | sha256sum | cut -c1-16)"
 if [ "$("${PSQL[@]}" -d mikka_e2e -c "SELECT obj_description('public'::regnamespace)" 2>/dev/null)" != "mikka-bootstrap $MIGRATIONS" ]; then
   log "migrating mikka_e2e"

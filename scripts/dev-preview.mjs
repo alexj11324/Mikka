@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { stripVTControlCharacters } from 'node:util'
 import { basePath as appBasePath } from '../lib/base-path-config.mjs'
+import { localServicesChildEnv, localServicesEnabled } from './dev/local-mode.mjs'
 
 export const previewWarmupPaths = ['/', '/api/agent', '/api/agent/sessions', '/api/workspace']
 
@@ -23,10 +24,22 @@ export async function warmPreview(origin, { basePath = appBasePath, fetcher = fe
   }))
 }
 
-export function startPreview() {
+/**
+ * Local test-account mode (docs/dev-workflow.md § 12) also starts the local
+ * substitutes for cloud services and loads their transport into Next only.
+ */
+export async function localServices(env = process.env) {
+  if (!localServicesEnabled(env)) return { env: {}, close: async () => {} }
+  const { startLocalServices } = await import('./dev/local-services.mjs')
+  const services = await startLocalServices({ env })
+  return { env: localServicesChildEnv(env, fileURLToPath(new URL('./dev/local-preload.mjs', import.meta.url))), close: services.close }
+}
+
+export async function startPreview() {
   const require = createRequire(import.meta.url)
+  const local = await localServices()
   const child = spawn(process.execPath, [require.resolve('next/dist/bin/next'), 'dev', '--webpack', ...process.argv.slice(2)], {
-    stdio: ['inherit', 'pipe', 'pipe'], env: { ...process.env },
+    stdio: ['inherit', 'pipe', 'pipe'], env: { ...process.env, ...local.env },
   })
   let output = ''
   let warming = false
@@ -54,4 +67,4 @@ export function startPreview() {
   return child
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) startPreview()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await startPreview()
