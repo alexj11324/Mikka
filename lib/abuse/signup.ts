@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { APIError } from 'better-auth'
 import { auditRequestContext } from '../audit/events'
-import { localTestAccountsMode } from '@/scripts/test-accounts/database-target.mjs'
+import { localTestAccountsMode } from '@mikka/protocol/local-test-mode'
 const domains = new Set(
   readFileSync(
     join(process.cwd(), 'lib/abuse/data/disposable-email-domains.txt'),
@@ -84,11 +84,12 @@ export function signupClientIP(
 /**
  * Local test mode: a developer's own disposable database, where every signup
  * comes from one 'local' IP. On in local test-account mode (MIKKA_LOCAL_TEST_ACCOUNTS=1
- * and every configured database a loopback *_e2e one) outside Vercel, for
+ * and every configured database a loopback *_e2e one, never on Vercel:
+ * packages/protocol/src/local-test-mode.ts), for
  * `next dev` and `next start` alike; a production database never qualifies.
  */
 export function localTestSignups(env: Record<string, string | undefined> = process.env) {
-  return !env.VERCEL && !env.VERCEL_ENV && localTestAccountsMode(env)
+  return localTestAccountsMode(env)
 }
 /**
  * Better Auth's own sign-up limit (its default special rule: 3 a window of 10

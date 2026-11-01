@@ -120,6 +120,21 @@ export async function startMvpServices(port = 3191) {
         assert.equal(input.questions?.length, 1)
         const question = input.questions[0]
         assert.equal(question.type, 'choice')
+        if (question.name === 'push') {
+          // Whether a Coordinator reply also goes to the phone (lib/push-reasons.ts):
+          // the answered events and the reply, one per line, as plain text.
+          assert.deepEqual(question.choices?.map(choice => choice.value), ['decide', 'review', 'finished', 'briefing', 'none'])
+          assert.equal(typeof input.input, 'string')
+          const answersPerson = /^answeredEvents: .+\nanswersAMessageFromThePerson: (yes|no)\nreply: .+$/s.exec(input.input)?.[1]
+          assert.ok(answersPerson, 'Unexpected push evidence')
+          observe({ kind: 'push-request', requestId, answersPerson })
+          // The person is in the chat they just wrote in: no phone notification.
+          return reply({
+            model: input.model,
+            provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}`, cost: '0.001' } },
+            answers: [{ type: 'choice', name: 'push', choice: 'none' }],
+          })
+        }
         assert.equal(input.input?.length, 1)
         assert.equal(input.input[0].role, 'user')
         assert.equal(input.input[0].content?.length, 1)
