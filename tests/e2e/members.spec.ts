@@ -22,12 +22,14 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve });
   let initialRequests = 0;
+  // Members are a team workspace's: sign up into one, then hold the first workspace read of a fresh load.
+  await registerInTeam(page);
   await page.route('**/api/workspace', async route => {
     initialRequests++;
     await gate;
     await route.continue();
   });
-  await registerInTeam(page);
+  await page.goto(app('/'));
   const workspaceSidebar = page.locator('[data-slot="settings-list"]');
   await expect(workspaceSidebar.getByRole("link", { name: "成员", exact: true })).toHaveCount(0);
   await expect(workspaceSidebar.getByRole("link", { name: "团队", exact: true })).toHaveCount(0);
