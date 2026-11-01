@@ -16,7 +16,8 @@ export type GroupMessage = {
   replyToId: string | null
   createdAt: string
 }
-export type GroupMessagePage = { messages: GroupMessage[]; nextBefore: string | null }
+/** The first page also says which member is answering (`agentStatus`, null when none) and whether the last message found no taker. */
+export type GroupMessagePage = { messages: GroupMessage[]; nextBefore: string | null; agentStatus?: { status: string } | null; routingError?: { code: string } | null }
 export type GroupMessagesError = 'unauthorized' | 'not_found' | 'unavailable'
 
 export class GroupMessagesRequestError extends Error {
@@ -37,6 +38,19 @@ export async function fetchGroupMessages(id: string, before?: string | null, fet
   catch { throw new GroupMessagesRequestError('unavailable') }
   const body = await response.json().catch(() => null) as GroupMessagePage | null
   if (response.ok && body && Array.isArray(body.messages)) return body
+  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
+}
+
+/** POST a message to the group; the bots it @mentions answer it, else the ones the server judges should. */
+export async function postGroupMessage(id: string, body: string, mentions: GroupMessage['mentions'], fetcher: typeof fetch = fetch): Promise<GroupMessage> {
+  let response: Response
+  try {
+    response = await fetcher(withBasePath(`/api/conversations/${encodeURIComponent(id)}/messages`), {
+      method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body, mentions }),
+    })
+  } catch { throw new GroupMessagesRequestError('unavailable') }
+  const sent = await response.json().catch(() => null) as GroupMessage | null
+  if (response.ok && sent?.id) return sent
   throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
 }
 

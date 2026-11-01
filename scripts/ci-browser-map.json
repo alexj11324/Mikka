@@ -30,6 +30,7 @@
     "coordinator-stop.spec.ts",
     "global-search-scope.spec.ts",
     "bot-list-groups.spec.ts",
+    "group-chat-send.spec.ts",
     "invalid-issue-content.spec.ts",
     "issue-threads.spec.ts",
     "issue-page-overlap.spec.ts",
@@ -365,6 +366,17 @@
         "question-card.spec.ts",
         "bot-image-read.spec.ts",
         "e2b-machine-name.spec.ts"
+      ]
+    },
+    {
+      "area": "groups",
+      "paths": [
+        "^components\\/workspace\\/group-chat-view\\.tsx$",
+        "^lib\\/group-(?:messages|mentions)\\.ts$"
+      ],
+      "specs": [
+        "group-chat-send.spec.ts",
+        "bot-list-groups.spec.ts"
       ]
     }
   ]

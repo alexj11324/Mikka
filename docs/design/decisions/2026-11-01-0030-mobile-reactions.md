@@ -18,8 +18,7 @@
   - A message goes to the bots it names as `@name`. Otherwise it goes to the
     ones Mikka judges should answer.
   - When none takes it, the chat says to @ one.
-  - The web still only reads groups; the phone is the first place to write in
-    them.
+  - The web and the phone both send in groups, through the same API.
 - **Reactions:** the long-press sheet opens with a row of six: ❤️ 👍 👎 😂 🎉 🙏.
   - Each person keeps one reaction per message. Choosing another replaces it;
     choosing the same one removes it.

@@ -63,3 +63,16 @@ test('(mock fetch) the bot list reads group chats and a chat reads its members t
   await assert.rejects(group.fetchGroupMembers(ID, reply({ members: 'nope' })), (error: unknown) => error instanceof group.GroupMessagesRequestError && error.code === 'unavailable')
   await assert.rejects(group.fetchGroups('w1', (async () => { throw new TypeError('offline') }) as typeof fetch), (error: unknown) => error instanceof group.GroupMessagesRequestError && error.code === 'unavailable')
 })
+
+test('(mock fetch) a sent message posts its body and mentions to the basePath route', async () => {
+  const calls: Array<[string, RequestInit | undefined]> = []
+  const stored = { ...message('3', 'u1'), body: '@值班 看下' }
+  const sent = await group.postGroupMessage(ID, '@值班 看下', [{ memberType: 'bot', memberId: 'b1' }], (async (url: string, init?: RequestInit) => { calls.push([url, init]); return Response.json(stored, { status: 201 }) }) as typeof fetch)
+  assert.equal(sent.id, stored.id)
+  assert.equal(calls[0][0], `/mikka/api/conversations/${ID}/messages`)
+  assert.equal(calls[0][1]?.method, 'POST')
+  assert.deepEqual(JSON.parse(String(calls[0][1]?.body)), { body: '@值班 看下', mentions: [{ memberType: 'bot', memberId: 'b1' }] })
+  for (const [response, code] of [[Response.json({ error: 'unprocessable' }, { status: 422 }), 'unavailable'], [Response.json({}, { status: 404 }), 'not_found'], [new TypeError('offline'), 'unavailable']] as const) {
+    await assert.rejects(group.postGroupMessage(ID, 'x', [], (async () => { if (response instanceof Error) throw response; return response }) as typeof fetch), (error: unknown) => error instanceof group.GroupMessagesRequestError && error.code === code)
+  }
+})
