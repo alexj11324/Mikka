@@ -56,13 +56,40 @@ function InstallAgents() {
   </Popover>
 }
 
+/** Ubuntu's own spec for the AppArmor user namespace restriction and its override file. */
+const UBUNTU_USERNS_SPEC = 'https://discourse.ubuntu.com/t/spec-unprivileged-user-namespace-restrictions-via-apparmor-in-ubuntu-23-10/37626'
+const USERNS_NOW = 'sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0'
+const USERNS_PERSIST = "echo 'kernel.apparmor_restrict_unprivileged_userns=0' | sudo tee /etc/sysctl.d/20-apparmor.conf"
+
+/** A command the person runs on the device, with a copy button. */
+function FixCommand({ command }: { command: string }) {
+  const t = useTranslations('Devices')
+  const [copied, setCopied] = useState(false)
+  return <span className="flex items-center gap-1">
+    <code className="min-w-0 flex-1 break-all font-mono text-xs">{command}</code>
+    <Button variant="ghost" size="icon-sm" aria-label={t('copyInstall', { command })} onClick={() => { void navigator.clipboard.writeText(command).then(() => setCopied(true), () => {}) }}>{copied ? <Check /> : <Copy />}</Button>
+  </span>
+}
+
 /** Why a device's agents cannot run. The daemon already tried to fetch the tools itself and rechecks on its own. */
-function SandboxBlocked({ missing }: { missing: string[] }) {
+function SandboxBlocked({ missing, reason, detail }: { missing: string[]; reason?: 'userns_restricted'; detail?: string }) {
   const t = useTranslations('Devices')
   return <Popover>
     <PopoverTrigger className="shrink-0 cursor-pointer text-foreground underline underline-offset-2">{t('sandboxFix')}</PopoverTrigger>
     <PopoverContent align="start" className="w-96 gap-2">
-      <span className="text-xs">{missing.length > 0 ? t('sandboxMissing', { packages: missing.join(', ') }) : t('sandboxRefused')}</span>
+      {missing.length > 0
+        ? <span className="text-xs">{t('sandboxMissing', { packages: missing.join(', ') })}</span>
+        : reason === 'userns_restricted'
+          ? <>
+            <span className="text-xs">{t('sandboxUserns')}</span>
+            <span className="text-xs text-muted-foreground">{t('sandboxUsernsNow')}</span>
+            <FixCommand command={USERNS_NOW} />
+            <span className="text-xs text-muted-foreground">{t('sandboxUsernsPersist')}</span>
+            <FixCommand command={USERNS_PERSIST} />
+            <a className="text-xs underline underline-offset-2" href={UBUNTU_USERNS_SPEC} target="_blank" rel="noreferrer">{t('sandboxUsernsSpec')}</a>
+          </>
+          : <span className="text-xs">{t('sandboxRefused')}</span>}
+      {missing.length === 0 && detail && <span className="break-all text-xs text-muted-foreground">{t('sandboxDetail', { detail })}</span>}
     </PopoverContent>
   </Popover>
 }
@@ -115,7 +142,7 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
           : status}</span>
         {device.online && (agents.length > 0
           ? <AgentMarks harnesses={agents} />
-          : blocked.agents.length > 0 ? <SandboxBlocked missing={blocked.missing} /> : <InstallAgents />)}
+          : blocked.agents.length > 0 ? <SandboxBlocked missing={blocked.missing} reason={blocked.reason} detail={blocked.detail} /> : <InstallAgents />)}
       </span>
     </span>
     {!device.online && <Button variant="secondary" size="sm" onClick={onReconnect}>{t('reconnect')}</Button>}
