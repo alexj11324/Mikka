@@ -15,6 +15,7 @@ import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { ThreadStatus, harnessLabel } from './issue-threads'
 import { ThreadStatusIcon } from './thread-status-icon'
+import { HarnessMark } from '@/components/labels/entity-labels'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
 import { listRunArtifacts } from '@/app/actions/artifacts'
@@ -144,7 +145,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
             {items.map(item => <li key={item.id} className="flex flex-col gap-1">
               {item.kind === 'agent' && <div className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>}
-              {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" />{t('steps', { harness: harnessLabel(detail?.harness ?? ''), count: item.count })}</span>}
+              {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" /><span aria-hidden="true" className="inline-flex"><HarnessMark harness={detail?.harness ?? ''} /></span>{t('steps', { harness: harnessLabel(detail?.harness ?? ''), count: item.count })}</span>}
               {item.kind === 'error' && <FieldError className="text-xs">{item.text}</FieldError>}
               {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : (view?.status ?? data.thread.status) === 'succeeded' ? 'done' : 'failed'} />}
               {item.kind === 'person' && (item.mine
