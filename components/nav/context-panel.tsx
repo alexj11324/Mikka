@@ -45,12 +45,13 @@ function DetailList({ title, empty, items, icon: Icon }: { title: string; empty:
   const t = useTranslations('Shell.panel')
   const [expanded, setExpanded] = useState(false)
   const shown = expanded ? items : items.slice(0, COLLAPSED_ROWS)
-  return <section aria-label={title} className="flex flex-col gap-2">
-    <h3 className="px-1 text-xs text-muted-foreground">{title}</h3>
+  // R-52's group header, as in 线程 and PR.
+  return <section aria-label={title} className="flex flex-col gap-1">
+    <GroupHeader>{title}</GroupHeader>
     {items.length ? <div className="flex flex-col rounded-2xl bg-muted/60 p-1.5">
       <ul className="flex flex-col">{shown.map(item => <li key={item.id} className="flex min-w-0 items-center gap-2.5 px-2.5 py-1.5 text-sm"><Icon aria-hidden="true" className="size-4 shrink-0" /><span className="truncate">{item.label}</span></li>)}</ul>
       {items.length > COLLAPSED_ROWS && !expanded && <Button variant="ghost" size="sm" className="self-center font-normal text-muted-foreground" onClick={() => setExpanded(true)}>{t('expand')}</Button>}
-    </div> : <p className="px-1 text-xs text-muted-foreground">{empty}</p>}
+    </div> : <p className="px-2 py-1.5 text-xs text-muted-foreground">{empty}</p>}
   </section>
 }
 
@@ -165,7 +166,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
               {tabs.map(item => <TabsTrigger key={item} value={item} {...pillTab}>{t(item)}</TabsTrigger>)}
             </TabsList>
           </div>
-          <TabsContent value="details" className="flex min-h-0 flex-col gap-4 overflow-y-auto px-4 pb-4">
+          <TabsContent value="details" className="flex min-h-0 flex-col gap-3 overflow-y-auto px-4 pb-4">
             <DetailList title={t('routines')} empty={t('noRoutines')} items={NO_ITEMS} icon={Clock} />
             <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />
           </TabsContent>
