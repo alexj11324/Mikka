@@ -99,21 +99,23 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
 /**
  * One task, one sandbox (Alex, 2026-11-01: 「任务跟沙箱机器应该是强绑定。不能一个任务用完之后，
  * 另外一个任务接着去用，这是不允许的。」). A new run of a task takes over the task's
- * own paused sandbox: same owner, workspace, bot, task and repository, and the
- * run that left it has ended. The old row ends without a kill and gives up the
+ * own paused sandbox: same owner, workspace, task and repository, and the run
+ * that left it has ended. The machine belongs to the task, not to a bot: a
+ * follow-up the person sends to another bot on the same task still gets it. The old row ends without a kill and gives up the
  * sandbox; the new row resumes it, so the worktree, the agent's sessions and
  * the worker survive. No other task's machine can match. Caller holds BEGIN
  * and the new run's lock.
  */
 async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }) {
+  // The run's bot runtime is recorded on the new row; the old row's bot does not have to match.
   const previous = (await client.query(`SELECT m.* FROM thread_machines m
       JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
       JOIN device_repos repo ON repo.id=m."repoId" AND repo."userId"=m."ownerId"
-    WHERE m."ownerId"=$1 AND m."workspaceId"=$2 AND m."botId"=$3 AND m."issueId"=$4 AND m."runId"<>$5
+    WHERE m."ownerId"=$1 AND m."workspaceId"=$2 AND m."issueId"=$3 AND m."runId"<>$4
       AND m.state='paused' AND m."sandboxId" IS NOT NULL AND m."deviceId" IS NOT NULL
       AND r.status IN ('succeeded','failed','stopped','cancelled')
-      AND repo."repoPath"=$6 AND repo."remoteUrl" IS NOT DISTINCT FROM $7
-    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.runtimeBotId, run.issueId, runId, run.repoPath, run.remoteUrl])).rows[0]
+      AND repo."repoPath"=$5 AND repo."remoteUrl" IS NOT DISTINCT FROM $6
+    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl])).rows[0]
   if (!previous) return null
   await client.query(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL WHERE "runId"=$1`, [previous.runId])
   return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId")
