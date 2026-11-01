@@ -24,7 +24,8 @@ const CATEGORIES: { id: Category; icon: ComponentType<{ className?: string; 'dat
   { id: 'html', icon: AppWindow, label: 'pages' },
 ]
 
-const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_5rem] items-center gap-4 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_7rem]'
+// 名称 takes the rest; 来源 and 上次活动 are fixed and right-aligned, so no gap opens between them.
+const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-4 md:grid-cols-[minmax(0,1fr)_10rem_6rem]'
 
 /**
  * Artifact (rail, Figma F2 `395:27790`): categories on the left; on the right
@@ -53,16 +54,16 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
         </li>)}
       </ul>
     </aside>
-    <section aria-labelledby="artifact-category-title" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-6 pb-6 md:px-12">
-      <h2 id="artifact-category-title" className="pb-6 text-xl leading-7 font-semibold">{t(`category.${current.label}`)}</h2>
+    {/* The category is already selected on the left, so the table has no second 20px title (R-32). */}
+    <section aria-label={t(`category.${current.label}`)} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-6 pb-6 md:px-12">
       {error ? <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-2">{[0, 1, 2, 3].map(index => <Skeleton key={index} className="h-12 w-full" />)}</div>
         : !rows.length ? <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader></Empty>
         : <div className="flex flex-col">
           <div aria-hidden="true" className={cn(COLUMNS, 'h-10 px-2 text-xs text-muted-foreground')}>
             <span>{t('columns.name')}</span>
-            <span className="hidden md:block">{t('columns.source')}</span>
-            <span>{t('columns.updated')}</span>
+            <span className="hidden text-right md:block">{t('columns.source')}</span>
+            <span className="text-right">{t('columns.updated')}</span>
           </div>
           <ul aria-label={t(`category.${current.label}`)} className="flex flex-col">
           {rows.map(item => <li key={item.id}>
@@ -71,8 +72,8 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-foreground"><ArtifactKindIcon kind={item.kind} className="size-4" /></span>
                 <span className="truncate text-sm leading-5 font-medium">{item.title}</span>
               </span>
-              <span className="hidden truncate text-sm text-muted-foreground md:block">{source(item)}</span>
-              <span className="truncate text-sm text-muted-foreground"><time dateTime={item.updatedAt}>{format.relativeTime(new Date(item.updatedAt), now)}</time></span>
+              <span className="hidden truncate text-right text-sm text-muted-foreground md:block">{source(item)}</span>
+              <span className="truncate text-right text-sm text-muted-foreground"><time dateTime={item.updatedAt}>{format.relativeTime(new Date(item.updatedAt), now)}</time></span>
             </Button>
           </li>)}
           </ul>
