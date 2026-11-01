@@ -147,12 +147,13 @@ still pick any of their own devices by hand.
 3. Otherwise the owner's online device that has 「允许自动调度」 on and
    passes the capability check, servers first.
 4. Otherwise 立即警告: no run is created and the bot at once warns that no
-   computer is available (没有可用的电脑), in one action card
-   「这个任务需要一台电脑来跑」 with the rows 允许这台电脑自动调度 /
-   在这台电脑上启用 / 填入 E2B Key / 让服务器重新上线 or 连接我的服务器.
-   Answering a row (the switch turned on, the key saved) makes the bot
-   dispatch again
-   ([run machine fallback](decisions/2026-10-31-2200-run-machine-fallback.md)).
+   computer is available, in one action card 「没有可用的电脑」 that says
+   先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。 It has two rows:
+   连接电脑 (Settings › 电脑) and 填入 E2B Key (the person's own key; no row
+   offers Mikka's cloud). Answering a row (a computer switched on, the key
+   saved) makes the bot dispatch again
+   ([run machine fallback](decisions/2026-10-31-2200-run-machine-fallback.md),
+   [two rows](decisions/2026-11-01-1215-star-is-the-pin.md)).
 
 **When a machine goes away during a thread:**
 

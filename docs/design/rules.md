@@ -177,6 +177,12 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   line before the properties column or an open thread. Nothing else gets a
   line; sections are separated by space. The content column is centred in
   the main area, up to 680px wide.
+- **R-79** No breadcrumb, title bar or page header shows the workspace's
+  name. There is one workspace on screen, the name cannot be clicked there,
+  and it is shown and switched only from the avatar menu at the bottom left.
+  The task page's breadcrumb starts at 看板. A group heading that names the
+  workspace its settings apply to (设置's workspace group) is not a crumb and
+  stays.
 - **R-62** 线程 lists the threads working on the issue, grouped as R-52:
   status icon (never the bot's avatar, `glossary.md`), thread name, time, and
   the opening of its last reply (R-53). Someone who cannot open the thread

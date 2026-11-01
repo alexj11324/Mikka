@@ -46,7 +46,13 @@ const bootstrap = fileURLToPath(
   new URL("./agents/native-container.mjs", import.meta.url),
 );
 const placeholder = "mikka-native-broker-placeholder";
-const unavailable = () => new Error("subscription_hosted_runtime_unavailable");
+const unavailable = (cause?: unknown) =>
+  new Error("subscription_hosted_runtime_unavailable", cause === undefined ? undefined : { cause });
+/** What Docker said, without the CLI's own argv: the reason a run failed. */
+const dockerFailure = (error: unknown) => {
+  const value = error as { stderr?: unknown; message?: unknown };
+  return new Error(String(value.stderr || value.message || error).trim().slice(-500));
+};
 const blockedSandbox: AgentSandbox = {
   kind: "none",
   async wrap() {
@@ -89,6 +95,27 @@ export async function createHostedBotRunner(host: {
     id?: string;
     assets?: string;
   };
+  // A "creating" record whose create has settled (this process awaited it, or
+  // the process that wrote it is gone) is cleared only when no container, under
+  // any name, carries its nonce label; one that does is this record's and is
+  // removed. Absence by name alone is not proof: the label is.
+  const removeLabelled = async (nonce: string) => {
+    let listed: { stdout: string };
+    try {
+      listed = await exec(
+        "docker",
+        ["ps", "--all", "--no-trunc", "--filter", `label=com.mikka.native.resource=${nonce}`, "--format", "{{.ID}}"],
+        { env: bareEnv, timeout: 30000 },
+      );
+    } catch {
+      return false;
+    }
+    const ids = listed.stdout.split("\n").map((line) => line.trim()).filter(Boolean);
+    if (ids.some((id) => !/^[a-f0-9]{64}$/.test(id))) return false;
+    for (const id of ids)
+      await exec("docker", ["rm", "-f", id], { env: bareEnv, timeout: 30000 });
+    return true;
+  };
   const removeResource = async (file: string, record: Resource) => {
     if (
       !/^mikka-native-(?:verify-)?[a-f0-9-]{36}$/.test(record.name) ||
@@ -109,10 +136,10 @@ export async function createHostedBotRunner(host: {
       );
     } catch (error) {
       if (
-        record.state === "created" &&
         /No such (?:container|object)/i.test(
           String((error as { stderr?: string }).stderr),
-        )
+        ) &&
+        (record.state === "created" || (await removeLabelled(record.nonce)))
       ) {
         if (
           record.assets?.startsWith(join(host.stateDir, "native-verify-git-"))
@@ -121,7 +148,7 @@ export async function createHostedBotRunner(host: {
         rmSync(file, { force: true });
         return;
       }
-      throw new Error("native_runtime_cleanup_unconfirmed");
+      throw new Error("native_runtime_cleanup_unconfirmed", { cause: dockerFailure(error) });
     }
     const [id, labels] = described.stdout
       .trim()
@@ -137,8 +164,9 @@ export async function createHostedBotRunner(host: {
       rmSync(record.assets, { recursive: true, force: true });
     rmSync(file, { force: true });
   };
-  // Only this runner's durable references are considered. An uncertain create
-  // with no visible object stays pending; absence is not proof of rollback.
+  // Only this runner's durable references are considered. A record left by an
+  // earlier process is cleared once Docker confirms nothing carries its nonce
+  // (removeLabelled); if Docker cannot confirm that, startup stays blocked.
   for (const name of readdirSync(resources))
     if (name.endsWith(".json")) {
       const file = join(resources, name);
@@ -652,9 +680,18 @@ export async function createHostedBotRunner(host: {
           });
           await creating;
           await live();
-        } catch {
-          await close();
-          throw unavailable();
+        } catch (error) {
+          // Keep Docker's own reason: a cleanup failure must not replace it.
+          const reason = dockerFailure(error);
+          try {
+            await close();
+          } catch (cleanup) {
+            throw new Error("native_runtime_cleanup_unconfirmed", { cause: new AggregateError([reason, cleanup]) });
+          }
+          // A fenced run (revoked, closed) is expected; a Docker failure is not.
+          if (!(error instanceof Error && error.message === "subscription_hosted_runtime_unavailable"))
+            console.warn(`run ${assignment.runId}: hosted container create failed: ${reason.message}`);
+          throw unavailable(reason);
         }
         const spawnHosted = (config: SpawnOptions): SpawnedProcess => {
           assertOpen();
