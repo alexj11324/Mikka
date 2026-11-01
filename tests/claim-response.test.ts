@@ -19,7 +19,8 @@ function fixture() {
     device: {id:'device',ownerId:'member',enabled:true,kind:'local',protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]},
     agent: {id:'agent',userId:'member',deviceId:'device',harness:'codex'},
     repo: {id:'repo',userId:'member',deviceId:'device',baseBranch:'main',repoPath:repository.key,remoteUrl:repository.remoteUrl},
-    cliPolicy: {revision:'a'.repeat(64),policy:defaultRunPolicy(),workspaceIds:[] as string[],workspaceId:null,hierarchy:undefined,policySnapshotRequired:false,layers:{agent:{},worker:{},workspace:{}}},
+    // The CLI layer as resolveTrustedRunPolicy builds it: an unset git_push does not restrict the App grant.
+    cliPolicy: {revision:'a'.repeat(64),policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow' as const}},workspaceIds:[] as string[],workspaceId:null,hierarchy:undefined,policySnapshotRequired:false,layers:{agent:{},worker:{},workspace:{}}},
     policyCapability:undefined as string|undefined,
     publication: {pushBranch:'synthetic-claim-branch',policy:defaultRunPolicy()},
     checkpoint: null as RunCheckpoint | null,
