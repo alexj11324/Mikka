@@ -716,6 +716,8 @@ export const composioAccounts = pgTable('composio_accounts', {
   emailCheckedAt: timestamp('emailCheckedAt', { withTimezone: true }),
   /** The last try, final or not; a failed try waits about an hour before the next. */
   lastAttemptAt: timestamp('lastAttemptAt', { withTimezone: true }),
+  /** When the provider refused the person's authorization (a revoked or expired token); cleared once it works again or is reconnected. */
+  needsReconnectAt: timestamp('needsReconnectAt', { withTimezone: true }),
   isDefault: boolean('isDefault').notNull().default(false),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [

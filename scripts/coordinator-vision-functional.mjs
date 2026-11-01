@@ -65,9 +65,9 @@ const plan = {
   scope: 'shared-decision-transport-only; not HTTP/auth/database/deployed Coordinator acceptance',
 }
 if (!execute) {
-  console.log(JSON.stringify({ ...plan, inferencePerformed: false, requires: 'existing authorized DECISION_GATEWAY_API_KEY injection and known existing budget; no secret lookup' }))
+  console.log(JSON.stringify({ ...plan, inferencePerformed: false, requires: 'existing authorized AI_GATEWAY_API_KEY injection and known existing budget; no secret lookup' }))
 } else {
-  assert.ok(process.env.DECISION_GATEWAY_API_KEY, 'No authorized existing decision key injected')
+  assert.ok(process.env.AI_GATEWAY_API_KEY, 'No authorized existing decision key injected')
   assert.ok(!process.env.MIKKA_AGENT_KIT_LIVE_EVAL && !process.env.MIKKA_NATIVE_COORDINATOR, 'Keep live-eval and native Coordinator unset')
   const actualFetch = globalThis.fetch
   const transport = []

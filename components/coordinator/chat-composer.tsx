@@ -46,7 +46,7 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   editableWhileSending?: boolean
   /** The draft remains editable, but the run no longer accepts new messages. */
   submitDisabled?: boolean
-  /** The conversation takes no messages at all (a group chat until group sending opens): nothing can be typed, attached or sent. */
+  /** The conversation takes no messages at all (a group chat that failed to load): nothing can be typed, attached or sent. */
   disabled?: boolean
   onStop?: () => void
   /** Something quoted into the message (an artifact quote chip): it sits on top, the buttons move to a row below. */
@@ -94,6 +94,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     const { key, shiftKey, metaKey, ctrlKey } = event
+    // Esc stops the reply, as the stop button does.
+    if (key === 'Escape' && stoppable && !event.nativeEvent.isComposing) { event.preventDefault(); onStop?.(); return }
     if (!sendsMessage({ key, shiftKey, metaKey, ctrlKey, isComposing: event.nativeEvent.isComposing }, sendKey)) return
     event.preventDefault()
     if (!sending && !submitDisabled && !disabled && value.trim()) onSubmit()

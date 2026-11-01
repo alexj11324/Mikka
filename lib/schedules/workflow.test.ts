@@ -12,7 +12,7 @@ const scheduledRead={occurrenceId:'f2000000-0000-4000-8000-000000000001',leaseTo
 const result={text:'Actual task status is todo',finishReason:'stop',responseMessages:[{role:'assistant',content:'Actual task status is todo'}]}
 const stub=(path:string,exports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports:exports})
 const writable=new WritableStream()
-mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'existing-workflow'}),getWritable:()=>writable}})
+mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'existing-workflow'}),getWritable:()=>writable,createHook:()=>({async *[Symbol.asyncIterator](){}})}})
 stub('../coordinator/model.ts',{coordinatorStep:()=>({}),turnWarning})
 stub('../attention/handoff.ts',{QUIET_REPLY:'__quiet__'})
 stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unknown[])=>{record('hosted')(...args);return result}})
