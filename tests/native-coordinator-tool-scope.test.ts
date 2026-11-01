@@ -105,7 +105,6 @@ const calls = {
   forget:()=>steps.forget(user,{text:'preference'},scope,COORDINATOR_BOT),
   composioAction:()=>steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope),
   accountWrite:()=>steps.accountWrite(user,'send_email',{},scope),
-  proposeRepositoryPushApproval:()=>steps.proposeRepositoryPushApproval(user,{repo:'owner/repo'},scope,{botId:COORDINATOR_BOT}),
   listIssues:()=>steps.listIssues(user,{},scope),
   getIssue:()=>steps.getIssue(user,{issueId:'issue'},scope,COORDINATOR_BOT),
   createIssue:()=>steps.createIssue(user,{title:'Task'},'tool-call',scope,COORDINATOR_BOT),

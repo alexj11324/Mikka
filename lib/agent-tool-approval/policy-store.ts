@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import type { JSONContent } from '@tiptap/core'
 import { z } from 'zod'
-import { approvalModeSchema, intersectNetworkDomains, CONFIGURABLE_ACTIONS, networkAllowSchema, storedPermissionsSchema } from '@mikka/protocol/agent-policy'
+import { approvalModeSchema, intersectNetworkDomains, CONFIGURABLE_ACTIONS, networkAllowSchema, storedPermissionsSchema, type ConfigurableAction, type PermissionDecision } from '@mikka/protocol/agent-policy'
 import { resolveTrustedRunPolicy } from './policy-snapshot'
 import type { MailboxTransactionLease, MailboxTransactionGuard } from '@/lib/mailbox-transaction-guard'
 import { writeTransaction } from '@/lib/operations/write-transaction'
@@ -147,7 +147,8 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     for (const action of CONFIGURABLE_ACTIONS) {
       if (action === 'computer_use') continue
       const override = layer.permissions?.[action]
-      if (override && rank[override] < rank[policy.permissions[action]]) policy.permissions[action] = override
+      // Stored layers parse git_push to allow / deny only (storedPermissionsSchema).
+      if (override && rank[override] < rank[policy.permissions[action]]) (policy.permissions as Record<ConfigurableAction, PermissionDecision>)[action] = override
     }
     if (layer.networkAllow !== undefined) {
       policy.networkCeiling = policy.networkCeiling === undefined ? [...layer.networkAllow] : intersectNetworkDomains(policy.networkCeiling, layer.networkAllow)

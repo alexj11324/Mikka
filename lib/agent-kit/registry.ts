@@ -44,7 +44,7 @@ export const AGENT_TOOL_IDS = [
   'list_app_tools', 'call_app_tool',
   'search_gmail', 'read_gmail_message', 'list_calendar_events', 'get_calendar_event', 'send_email',
   'create_calendar_event', 'update_calendar_event', 'web_search', 'list_issues', 'get_issue', 'create_issue', 'update_issue',
-  'request_repository_push_approval', 'list_agents', 'dispatch_run', 'list_runs', 'get_run', 'send_to_run', 'remember', 'forget',
+  'list_agents', 'dispatch_run', 'list_runs', 'get_run', 'send_to_run', 'remember', 'forget',
   'stop_run', 'load_skill', 'record_attention',
   ...FACTORY_TOOL_IDS,
   'dispatch_factory_task', 'recover_factory_check', 'intake_factory_request',

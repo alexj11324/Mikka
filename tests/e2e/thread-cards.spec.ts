@@ -86,7 +86,7 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await expect(card).toBeVisible()
   const surface = chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: '打开线程 Speed up the home page', exact: true }) })
   await expect(surface).toContainText('Speed up the home page')
-  await expect(surface.getByRole('img', { name: '运行中', exact: true })).toBeVisible()
+  await expect(surface.getByRole('img', { name: '进行中', exact: true })).toBeVisible()
   // R-66: status icon + title + real output chips; no avatar or progress row.
   await expect(surface).not.toContainText('交给 Codex')
   await expect(surface).not.toContainText('执行了 2 步')

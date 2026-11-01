@@ -489,3 +489,61 @@ test("a done action's step goes on the recording timeline only while recording; 
   await tick();
   assert.equal(relayed.length, count, "a stopped recording takes no more steps");
 });
+test("under ask the Decisions API says which actions need the person; no answer executes, logged", async (t) => {
+  const asked = [];
+  let answer = false;
+  let calls = 0;
+  const b = await fixture(t, {
+    execute: async () => { calls++; return "ok"; },
+    needsPerson: async (runId, evidence) => { asked.push({ runId, ...evidence }); return answer; },
+  });
+  const { token } = b.spec("run", "ask");
+  // No: executes without a review.
+  assert.equal(await b.request(token, { name: "click", arguments: { x: 1, y: 2 } }), "ok");
+  assert.equal(b.list().length, 0);
+  assert.deepEqual(asked[0], { runId: "run", call: { name: "click", arguments: { x: 1, y: 2 } }, recent: [] });
+  // Yes: the existing review queue.
+  answer = true;
+  const pending = b.request(token, { name: "type_text", arguments: { text: "hello" } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(b.list().length, 1);
+  assert.deepEqual(asked[1].recent, ["click"]);
+  const row = b.list()[0];
+  await b.decide(row.id, row.digest, true);
+  assert.equal(await pending, "ok");
+  // Null: reviewed by the person, as before the Decisions API; never executed by default.
+  answer = null;
+  const warnings = [];
+  const warn = console.warn;
+  console.warn = (line) => warnings.push(line);
+  let unanswered;
+  try {
+    unanswered = b.request(token, { name: "get_desktop_state" });
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally { console.warn = warn; }
+  assert.match(warnings[0], /^Decision fallback: computer action get_desktop_state/);
+  assert.equal(calls, 2);
+  assert.equal(b.list().length, 1);
+  const held = b.list()[0];
+  await b.decide(held.id, held.digest, true);
+  assert.equal(await unanswered, "ok");
+  assert.equal(calls, 3);
+});
+test("allow never asks the Decisions API and deny grants nothing", async (t) => {
+  let asked = 0;
+  const b = await fixture(t, { execute: async () => "ok", needsPerson: async () => { asked++; return true; } });
+  const { token } = b.spec("run", "allow");
+  assert.equal(await b.request(token, { name: "get_desktop_state" }), "ok");
+  assert.equal(b.spec("run", "deny"), undefined);
+  assert.equal(asked, 0);
+});
+test("judged reviews keep the pending cap", async (t) => {
+  const b = await fixture(t, { needsPerson: async () => true, ttl: 60000 });
+  const { token } = b.spec("run", "ask");
+  const pending = Array.from({ length: 20 }, () => b.request(token, { name: "get_desktop_state" }).catch(() => {}));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(b.list().length, 20);
+  await assert.rejects(b.request(token, { name: "get_desktop_state" }), /Not permitted/);
+  b.revoke(token);
+  await Promise.all(pending);
+});

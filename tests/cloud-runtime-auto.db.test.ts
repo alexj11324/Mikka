@@ -7,6 +7,7 @@ import test from 'node:test'
 import type { Pool as PgPool } from 'pg'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { recordPushGrant } from './support/github-app-stub'
 
 const harnesses = [{ harness: 'codex', installed: true, subscriptionBroker: true, computerBroker: true }]
 
@@ -41,6 +42,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_bots WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM run_publications WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_bindings WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_connections WHERE "ownerId" = ANY($1)', [users])
@@ -58,7 +60,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   const person = async (label: string, e2bKey = true) => {
     const id = await seedUser(pool, label)
     users.push(id)
-    await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
+    // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+    await recordPushGrant(pool, id, normalizeRepository('octo/repo').key)
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
     // Their own workspace: the personal one, where work with no workspace of its own goes.
     await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [ws.id])
@@ -74,6 +77,12 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   }
   const dispatch = (userId: string, issueId: string, botId: string) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId)
   const count = async (sql: string, values: unknown[]) => (await pool.query(sql, values)).rows[0].n as number
+  // Another numbered task of the same person: a task has one thread (lib/thread-dispatch.ts), so reuse is shown on a second task.
+  const anotherTask = async (userId: string, number: number) => {
+    const issueId = await seedIssue(pool, userId)
+    await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } } })])
+    return issueId
+  }
 
   await t.test('no runtime yet: the run goes to the cloud and the runtime is created; a second dispatch reuses it', async () => {
     const a = await person('auto-runtime')
@@ -88,13 +97,72 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.deepEqual(run, { agentId: runtime[0].agentId, status: 'queued', kind: 'cloud', botId: a.botId }, 'queued on the bot cloud computer')
     assert.equal(await count('SELECT count(*)::int AS n FROM byos_bindings WHERE "consumerId"=$1', [runtime[0].agentId]), 1, 'the owner\'s own Codex subscription is bound to the runtime')
 
-    const second = await dispatch(a.id, a.issueId, a.botId) as unknown as { runId: string; status: string }
+    const second = await dispatch(a.id, await anotherTask(a.id, 8), a.botId) as unknown as { runId: string; status: string }
     assert.equal(second.status, 'queued')
     assert.notEqual(second.runId, first.runId)
     assert.equal(provisioned, 1, 'the computer is woken once')
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [a.botId]), 1, 'no duplicate runtime')
     assert.equal(await count('SELECT count(*)::int AS n FROM byos_bindings WHERE "consumerId"=$1', [runtime[0].agentId]), 1, 'no duplicate binding')
     assert.equal(await count('SELECT count(*)::int AS n FROM cloud_machines WHERE "ownerId"=$1', [a.id]), 1)
+  })
+
+  await t.test('a cloud run pushes on the GitHub App grant like a local run; without it, or read-only, it cannot push', async () => {
+    const g = await person('cloud-grant')
+    const granted = await dispatch(g.id, g.issueId, g.botId) as unknown as { runId: string; status: string }
+    assert.equal(granted.status, 'queued', JSON.stringify(granted))
+    const admitted = (await pool.query(`SELECT r."agentDefinition",p.branch,p."pushApproved" FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d.kind='cloud'
+      LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1`, [granted.runId])).rows[0]
+    assert.equal(admitted.agentDefinition.repositoryAdmission.authority, 'github_app')
+    assert.equal(admitted.agentDefinition.repositoryAdmission.targetBranch, admitted.branch)
+    assert.equal(admitted.pushApproved, true)
+    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [granted.runId])
+
+    await pool.query('UPDATE github_repository_installations SET "pushGrantedAt"=null WHERE "userId"=$1', [g.id])
+    // Each case on its own task of the same person: dispatching the same task again continues its thread (lib/thread-dispatch.ts).
+    const ungranted = await dispatch(g.id, await anotherTask(g.id, 8), g.botId) as unknown as { runId: string; status: string }
+    assert.equal(ungranted.status, 'queued', 'a cloud run without the grant still runs; it just cannot push')
+    const plain = (await pool.query('SELECT r."agentDefinition",(SELECT count(*)::int FROM run_publications p WHERE p."runId"=r.id) AS publications FROM agent_runs r WHERE r.id=$1', [ungranted.runId])).rows[0]
+    assert.equal(plain.agentDefinition.repositoryAdmission, undefined)
+    assert.equal(plain.publications, 0)
+    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [ungranted.runId])
+
+    const readOnly = await steps.dispatchRun(g.id, { issueId: await anotherTask(g.id, 9), repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, g.botId) as unknown as { runId: string; status: string }
+    assert.equal(readOnly.status, 'queued')
+    const definition = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [readOnly.runId])).rows[0].agentDefinition
+    assert.equal(definition.readOnly, true)
+    assert.equal(definition.repositoryAdmission, undefined)
+    assert.equal(await count('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [g.id]), 0, 'no approval card')
+  })
+
+  await t.test('read-only sticks when a cloud thread continues: a read-only ask on a writable thread, and a read-only thread asked again', async () => {
+    const r = await person('cloud-readonly-thread')
+    const definitionOf = async (runId: string) => (await pool.query(`SELECT r."agentDefinition",d.kind,(SELECT count(*)::int FROM run_publications p WHERE p."runId"=r.id) AS publications
+      FROM agent_runs r JOIN devices d ON d.id=r."deviceId" WHERE r.id=$1`, [runId])).rows[0]
+    type Continued = { runId: string; thread: string; threadId: string }
+    // Its own task numbers: another person's task 7 on octo/repo already holds that publication branch.
+    const work = await anotherTask(r.id, 31)
+    const writable = await dispatch(r.id, work, r.botId) as unknown as Continued
+    assert.equal((await definitionOf(writable.runId)).agentDefinition.repositoryAdmission?.authority, 'github_app', 'the thread starts writable')
+    await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [writable.runId])
+    const look = await steps.dispatchRun(r.id, { issueId: work, repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, r.botId) as unknown as Continued
+    assert.deepEqual([look.thread, look.threadId], ['continued', writable.runId])
+    const looked = await definitionOf(look.runId)
+    assert.deepEqual([looked.kind, looked.agentDefinition.readOnly, looked.agentDefinition.repositoryAdmission, looked.publications], ['cloud', true, undefined, 0])
+    await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [look.runId])
+    const again = await dispatch(r.id, work, r.botId) as unknown as Continued
+    assert.deepEqual([again.thread, again.threadId], ['continued', writable.runId])
+    const kept = await definitionOf(again.runId)
+    assert.deepEqual([kept.kind, kept.agentDefinition.readOnly, kept.agentDefinition.repositoryAdmission, kept.publications], ['cloud', true, undefined, 0], 'a read-only thread stays read-only')
+
+    // dispatch_bot_computer: a read-only first run, and its continuation, stay read-only.
+    const task = await anotherTask(r.id, 32)
+    const first = await steps.dispatchComputerThread(r.id, { botId: r.botId, issueId: task, harness: 'codex', readOnly: true }, `call-${randomUUID()}`, undefined, undefined, r.botId) as unknown as Continued
+    assert.equal(first.thread, 'new', JSON.stringify(first))
+    assert.deepEqual([(await definitionOf(first.runId)).agentDefinition.readOnly, (await definitionOf(first.runId)).agentDefinition.repositoryAdmission], [true, undefined])
+    await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [first.runId])
+    const next = await steps.dispatchComputerThread(r.id, { botId: r.botId, issueId: task, harness: 'codex', note: 'Look further.' }, `call-${randomUUID()}`, undefined, undefined, r.botId) as unknown as Continued
+    assert.deepEqual([next.thread, next.threadId], ['continued', first.runId])
+    assert.deepEqual([(await definitionOf(next.runId)).agentDefinition.readOnly, (await definitionOf(next.runId)).agentDefinition.repositoryAdmission], [true, undefined])
   })
 
   await t.test('no E2B key of their own: no cloud runtime; the card, or the person\'s own auto-schedule device', async () => {
@@ -124,7 +192,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const { coordinatorBot } = await import('../lib/coordinator/coordinator-bot')
     // Dispatched from the web in c's workspace: that workspace's Coordinator.
     const coordinator = (await coordinatorBot(c.id, c.workspaceId)).botId
-    const dispatchAsCoordinator = () => steps.dispatchRun(c.id, { issueId: c.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator)
+    const dispatchAsCoordinator = (issueId = c.issueId) => steps.dispatchRun(c.id, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator)
     const first = await dispatchAsCoordinator() as unknown as { runId: string; status: string }
     assert.equal(first.status, 'queued', JSON.stringify(first))
     const mapped = (await pool.query(`SELECT cb."botId",b.name FROM coordinator_bots cb JOIN bots b ON b.id=cb."botId" WHERE cb."ownerId"=$1 AND cb."workspaceId"=$2`, [c.id, c.workspaceId])).rows
@@ -135,7 +203,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(mapped[0].botId, coordinator)
     assert.deepEqual(run, { runBotId: coordinator, botId: coordinator }, 'the runtime and the run are the Coordinator bot\'s, so the run reports to its chat')
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId" = ANY($1)', [[c.botId, theirs]]), 0, 'no other bot\'s runtime is created or borrowed')
-    const second = await dispatchAsCoordinator() as unknown as { status: string }
+    const second = await dispatchAsCoordinator(await anotherTask(c.id, 8)) as unknown as { status: string }
     assert.equal(second.status, 'queued')
     assert.equal(provisioned, before + 1, 'woken once')
     assert.equal(await count('SELECT count(*)::int AS n FROM coordinator_bots WHERE "ownerId"=$1', [c.id]), 1, 'no duplicate Coordinator bot')

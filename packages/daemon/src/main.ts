@@ -20,6 +20,7 @@ import {
   realpathSync,
 } from "node:fs"
 import { arch, hostname, platform } from "node:os"
+import { classifySandboxFailure, type SandboxFailure } from "./sandbox-issue"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -78,6 +79,8 @@ import { Outbox } from "./outbox"
 import { QuotaPoller, type QuotaSource } from "./quota/poller"
 import { DAEMON_VERSION, daemonPaths, type DaemonPaths } from "./paths"
 import { decide, pushDecision, runPolicy } from "./permissions"
+import { judgeComputerAction, noServerDecision } from "./decision-judgments"
+import type { ServerDecide } from "./server-decision"
 import { RpcServer, type RpcHandlers } from "./rpc/server"
 import { RunJournal } from "./runs/journal"
 import {
@@ -202,7 +205,9 @@ function credentialOwner(assignment: RunAssignment): string | undefined {
 const SANDBOX_REPAIR_RETRY_MS = 60 * 60_000
 
 /** A person may install a missing tool themselves; that alone is worth a new attempt. */
-function missingToolsUnchanged(issue: { missing: string[] } | null) {
+type SandboxIssue = { missing: string[] } & SandboxFailure
+
+function missingToolsUnchanged(issue: SandboxIssue | null) {
   return !issue?.missing.length || missingSandboxTools().length === issue.missing.length
 }
 
@@ -315,6 +320,7 @@ export class Daemon {
         driver: this.localComputerDriver,
         socketPath: join(paths.dataDir, 'local-computer.sock'),
         transport: 'tcp',
+        needsPerson: this.computerNeedsPerson(),
         permitted: runId => {
           const assignment = this.journal.get(runId)?.assignment
           return Boolean(!this.stopped && this.registered && assignment?.localComputer && !assignment.computer &&
@@ -356,6 +362,7 @@ export class Daemon {
         return executeDriver(current, call, display, { botId: computer.botId, ownerId: computer.ownerId, policyVersion: computer.policyVersion }, assertLive)
       }
       this.cloudComputerBroker = new ComputerBroker({ driver, socketPath: join(paths.dataDir, 'computer.sock'),
+        needsPerson: this.computerNeedsPerson(),
         permitted: runId => {
           const entry = this.journal.get(runId)
           return Boolean(!this.stopped && this.registered && entry?.assignment.computer && this.supervisor?.computerRunAllowed(runId))
@@ -514,10 +521,7 @@ export class Daemon {
             pushBranch: assignment.pushBranch,
             baseBranch: assignment.remoteUrl ? await this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch) : assignment.baseBranch,
             push: (() => {
-              const decision = pushDecision(
-                runPolicy(assignment.policy),
-                repo.push?.approved === true
-              )
+              const decision = pushDecision(runPolicy(assignment.policy))
               return {
                 approved: decision.push,
                 remote: repo.push?.remote ?? "origin",
@@ -788,7 +792,8 @@ export class Daemon {
     const issue = this.sandboxIssue
     if (!issue) return []
     return detected.filter(info => info.installed && !this.adapters.has(info.harness)).map(info => ({
-      harness: info.harness, installed: false, version: info.version, sandboxBlocked: { missing: issue.missing },
+      harness: info.harness, installed: false, version: info.version,
+      sandboxBlocked: { missing: issue.missing, ...(issue.reason ? { reason: issue.reason } : {}), ...(issue.detail ? { detail: issue.detail } : {}) },
     }))
   }
 
@@ -841,7 +846,7 @@ export class Daemon {
   private lastHarnessScan = Date.now()
   private lastSandboxRepair = Date.now()
   private rescanning = false
-  private sandboxIssue: { missing: string[] } | null = null
+  private sandboxIssue: SandboxIssue | null = null
   private sandbox: AgentSandbox | null = null
   private ownedSandbox: SandboxRuntime | null = null
 
@@ -876,7 +881,8 @@ export class Daemon {
       return sandbox
     } catch (err) {
       this.log.warn({ err }, "agent sandbox unavailable")
-      this.sandboxIssue = { missing: [] }
+      // The device page says why and what the person can do (sandbox-issue.ts).
+      this.sandboxIssue = { missing: [], ...classifySandboxFailure(err) }
       if (!this.options.retainResources) await sandbox.reset().catch((resetError: unknown) => {
         this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
       })
@@ -927,6 +933,18 @@ export class Daemon {
     ]
   }
 
+  /** The server's Decisions API for this daemon's runs; no answer until the link provides one. */
+  private serverDecide(): ServerDecide {
+    const link = this.options.link
+    return link.decide ? link.decide.bind(link) : noServerDecision
+  }
+
+  /** Under computer `ask`: whether one action needs the person, judged with the run's task. */
+  private computerNeedsPerson() {
+    return (runId: string, evidence: { call: unknown; recent: string[] }, signal?: AbortSignal) =>
+      judgeComputerAction(this.serverDecide(), runId, { ...evidence, task: this.journal.get(runId)?.assignment.prompt }, signal)
+  }
+
   /** What every real adapter of this daemon is built with, subscription runs included. */
   private adapterOptions() {
     const sandbox = this.agentSandbox()
@@ -947,7 +965,7 @@ export class Daemon {
     return {
       claude: { sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), openContainer, computerProvider },
       codex: { sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), openContainer, computerProvider },
-      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider },
+      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider, decide: this.serverDecide() },
     }
   }
 

@@ -173,7 +173,13 @@ const MCP_WORKSPACE = null
 
 export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string }) {
   // A run an MCP client dispatches is the person's Coordinator's: its bot row is resolved here, where the run is created.
-  return attempt(async () => ({ status: 'queued', ...(await queueRun(userId, input, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }))
+  // One task, one thread (lib/thread-dispatch.ts): a task with a thread gets this as that thread's work. An MCP client
+  // has no chat message of the person's to show an explicit request for a new thread, so it never starts one.
+  const { dispatchToTask } = await import('@/lib/thread-dispatch')
+  return attempt(async () => dispatchToTask(userId, input.issueId, {
+    note: input.note,
+    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueRun(userId, { ...input, note, ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }),
+  }))
 }
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {

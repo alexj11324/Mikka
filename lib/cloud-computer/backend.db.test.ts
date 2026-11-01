@@ -38,7 +38,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
   try {
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY);INSERT INTO "user" VALUES('alice'),('bob');
       CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,status text,"stopRequestedAt" timestamptz,"finishedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
-      CREATE TABLE devices(id uuid PRIMARY KEY,"ownerId" text,kind text,enabled boolean DEFAULT true);
+      CREATE TABLE devices(id uuid PRIMARY KEY,"ownerId" text,kind text,enabled boolean DEFAULT true,"removedAt" timestamptz);
       CREATE TABLE device_tokens("boundDeviceId" uuid,"revokedAt" timestamptz);
       CREATE TABLE device_repos(id uuid PRIMARY KEY);
       CREATE TABLE suggestions(id uuid PRIMARY KEY,"botId" uuid);
@@ -104,6 +104,9 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     const ended = (await pool.query('SELECT state,"sandboxId","workerLeaseId" FROM thread_machines WHERE "runId"=$1', [cancelledRun])).rows[0]
     assert.deepEqual(ended, { state: 'ended', sandboxId: null, workerLeaseId: null })
     assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1', [cancelledDevice])).rows[0].revokedAt)
+    // An ended machine's device leaves every list and dispatch for good; other devices stay.
+    assert.ok((await pool.query('SELECT "removedAt" FROM devices WHERE id=$1', [cancelledDevice])).rows[0].removedAt, 'ended thread device is retired')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM devices WHERE "removedAt" IS NOT NULL')).rows[0].n, 1, 'no other device is retired')
     assert.equal(await recordCancelledSandbox(pool, cancelledRun, 'late-sandbox', operation), true, 'late resource remains discoverable for cleanup retry')
     await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","deviceId") VALUES ($1,\'alice\',$2,$3)', [alice.workspaceId, randomUUID(), botDevice])
     for (const [runId, deviceId] of [[runA, deviceA], [runB, deviceB]]) {

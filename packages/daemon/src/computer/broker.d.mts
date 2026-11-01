@@ -19,6 +19,8 @@ export class ComputerBroker {
     capture?: (runId: string, call: CaptureCall, signal?: AbortSignal) => Promise<unknown>;
     now?: () => number;
     ttl?: number;
+    /** Under `ask`: the Decisions API's call on one action. false executes, true goes to review, null executes (logged). Absent: every action is reviewed. */
+    needsPerson?: (runId: string, evidence: { call: ComputerCall; recent: string[] }, signal?: AbortSignal) => Promise<boolean | null>;
   });
   spec(
     runId: string,

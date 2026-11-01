@@ -74,7 +74,8 @@ test('a thread that stopped on a question waits for your reply and takes the ans
   await expect(row.getByText('等你回复', { exact: true })).toBeVisible()
   await row.click()
   const panel = page.getByRole('region', { name: 'Speed up the home page', exact: true })
-  await expect(panel.getByRole('img', { name: '等你回复' })).toBeVisible()
+  // The status icon follows the thread's group (R-52): 等待你.
+  await expect(panel.getByRole('img', { name: '等待你', exact: true })).toBeVisible()
   await expect(panel.getByText('等你回复', { exact: true })).toBeVisible()
   const box = panel.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })
   await expect(box).toBeVisible()

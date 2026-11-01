@@ -22,6 +22,7 @@ import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { issueForUser } from '@/lib/issue-access'
 import { latestCheckpoint } from '@/lib/run-leases'
+import { continuationFollowUp } from '@/lib/thread-continuation'
 import { checkpointRecoveryError, quotaContinuationNote, retryNote } from '@/lib/run-retry'
 import { constrainedAssignmentPolicy } from '@/lib/run-assignment-policy'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
@@ -199,6 +200,16 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     // assignment without an encryption key; platform versus BYO billing does not change it.
     try { ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl))) }
     catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
+    // A cloud run admitted to push (its GitHub App grant, decision 2026-11-01-1215)
+    // gets its publication like a local run, before the lease, so a refusal leaves it queued.
+    if (run.agentDefinition?.repositoryAdmission && !run.agentDefinition.readOnly) {
+      const { prepareRunPublication } = await import('@/lib/run-publications')
+      try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
+      catch (error) {
+        if (!(error instanceof PublicationError)) throw error
+        return rejectPublication(error)
+      }
+    }
     const refused = await openRunKey()
     if (refused) return refused
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim)
@@ -259,16 +270,22 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       ...(requireWorktreeContinuation ? { requireWorktreeContinuation: true as const } : {}),
     }
     : {}
+  // The next run of a thread after a new dispatch (lib/thread-dispatch.ts) goes on in the thread's last worktree and,
+  // on the same device, its session, sent only the new note; elsewhere it starts fresh with the full brief.
+  const [earlier] = !run.retryOf && run.continuesRunId
+    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId }).from(agentRuns).where(and(eq(agentRuns.id, run.continuesRunId), eq(agentRuns.userId, caller.userId))).limit(1)
+    : []
+  const followUp = earlier ? continuationFollowUp(run.prompt) : null
+  const threadContinuation = earlier && run.continuesRunId
+    ? { continuesRunId: run.continuesRunId, ...(followUp ? { followUp } : {}), ...(earlier.sessionId && earlier.deviceId === deviceId ? { resumeSessionId: earlier.sessionId } : {}) }
+    : {}
   const settings = device.kind === 'local' && repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
-  // A repository grant resolves its push approval, while an explicit CLI deny
-  // or read-only ceiling remains authoritative for every execution tool.
-  // Without a publication no repository approval was resolved, so a CLI
-  // `git_push: allow` cannot reach the daemon as a push grant.
-  const resolvedPolicy = publication && !cliPolicy.policy.readOnly && cliPolicy.policy.permissions.git_push !== 'deny'
-    ? { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: publication.policy.permissions.git_push } }
-    : !publication && cliPolicy.policy.permissions.git_push === 'allow'
-      ? { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: 'ask' as const } }
-      : cliPolicy.policy
+  // Push authority was decided at admission (the GitHub App grant, decision
+  // 2026-11-01-1215), for local and cloud runs alike: `allow` when admitted,
+  // `deny` otherwise. `ask` is never forwarded, so no push card can appear.
+  // An explicit CLI deny or read-only ceiling stays authoritative.
+  const push = publication && !cliPolicy.policy.readOnly && cliPolicy.policy.permissions.git_push !== 'deny' && publication.policy.permissions.git_push === 'allow' ? 'allow' as const : 'deny' as const
+  const resolvedPolicy = { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: push } }
   // A read-only run (dispatched without push authority) cannot change, commit or push anything.
   const executionPolicy = run.agentDefinition?.readOnly ? applyApprovalMode(resolvedPolicy, 'read_only') : resolvedPolicy
   const computerPermission = computer?.permission ?? localComputer?.permission
@@ -303,6 +320,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...(localComputer ? { localComputer } : {}),
     ...(Object.keys(taskEnv).length ? { taskEnv } : {}),
     ...(taskSecretNames.length ? { taskSecretNames } : {}),
+    ...threadContinuation,
     ...retry,
     ...factoryClaim,
     ...skillAssignment,
