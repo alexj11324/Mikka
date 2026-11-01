@@ -3,10 +3,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
-import { Clock, FileText, Maximize2, Minimize2, Search, X, type LucideIcon } from 'lucide-react'
+import { Clock, FileText, Maximize2, Minimize2, Search, Trash2, X, type LucideIcon } from 'lucide-react'
+import useSWR from 'swr'
+import { toast } from 'sonner'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { deleteLibraryFile, fetchBotLibrary } from '@/lib/bot-library'
 import { SearchInput } from '@/components/ui/search-input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -34,15 +38,19 @@ const TABS: readonly PanelTab[] = ['details', 'threads', 'prs', 'computer']
 export const PANEL_WIDTH = { storageKey: 'mikka:context-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } as const
 const WIDE = 520
 
-/** A read-only row in 详情: a routine or a library file. */
+/** A row in 详情: a routine or a library file. */
 type DetailItem = { id: string; label: string }
 /** Rows shown before 「展开」. */
 const COLLAPSED_ROWS = 5
-// Nothing stores a bot's routines or library files yet; the lists fill once something does.
+// Nothing stores a bot's routines yet; the list fills once something does.
 const NO_ITEMS: DetailItem[] = []
 
-/** One read-only list in 详情 (Figma 402:5699). Routines are set up in chat and files come in through the composer's 「+」, so there is no button here, only 「展开」. */
-function DetailList({ title, empty, items, icon: Icon }: { title: string; empty: string; items: DetailItem[]; icon: LucideIcon }) {
+/**
+ * One list in 详情 (Figma 402:5699). Routines are set up in chat and files come
+ * in through the bot's threads, so there is nothing to add here; a list of the
+ * person's own files offers 删除 on each row (R-51).
+ */
+function DetailList({ title, empty, items, icon: Icon, onDelete }: { title: string; empty: string; items: DetailItem[]; icon: LucideIcon; onDelete?: (item: DetailItem) => void }) {
   const t = useTranslations('Shell.panel')
   const [expanded, setExpanded] = useState(false)
   const shown = expanded ? items : items.slice(0, COLLAPSED_ROWS)
@@ -50,10 +58,48 @@ function DetailList({ title, empty, items, icon: Icon }: { title: string; empty:
   return <section aria-label={title} className="flex flex-col gap-1">
     <GroupHeader>{title}</GroupHeader>
     {items.length ? <div className="flex flex-col rounded-2xl bg-muted/60 p-1.5">
-      <ul className="flex flex-col">{shown.map(item => <li key={item.id} className="flex min-w-0 items-center gap-2.5 px-2.5 py-1.5 text-sm"><Icon aria-hidden="true" className="size-4 shrink-0" /><span className="truncate">{item.label}</span></li>)}</ul>
+      <ul className="flex flex-col">{shown.map(item => <li key={item.id} className="group/row flex min-h-8 min-w-0 items-center gap-2.5 py-1 pr-1 pl-2.5 text-sm"><Icon aria-hidden="true" className="size-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{item.label}</span>
+        {onDelete && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('deleteFile', { name: item.label })} className="shrink-0 text-muted-foreground opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100" onClick={() => onDelete(item)} />}><Trash2 data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('deleteFileConfirm')}</TooltipContent></Tooltip>}
+      </li>)}</ul>
       {items.length > COLLAPSED_ROWS && !expanded && <Button variant="ghost" size="sm" className="self-center font-normal text-muted-foreground" onClick={() => setExpanded(true)}>{t('expand')}</Button>}
     </div> : <p className="px-2 py-1.5 text-xs text-muted-foreground">{empty}</p>}
   </section>
+}
+
+/**
+ * 资料库: the documents this bot's threads handed over, the same list as the
+ * phone's (decision 2026-11-01-0050). Each is the person's own, so each can be
+ * deleted, after a confirmation, since nothing brings it back.
+ */
+function LibraryList({ botId }: { botId: string | null }) {
+  const t = useTranslations('Shell.panel')
+  const { data, error, mutate } = useSWR(['bot-library', botId ?? 'coordinator'], () => fetchBotLibrary(botId))
+  const [deleting, setDeleting] = useState<DetailItem | null>(null)
+  const [pending, setPending] = useState(false)
+  const items = (data ?? []).map(file => ({ id: file.id, label: file.title }))
+  async function remove(item: DetailItem) {
+    setPending(true)
+    try {
+      await deleteLibraryFile(item.id)
+      await mutate(files => files?.filter(file => file.id !== item.id), { revalidate: true })
+      setDeleting(null)
+    } catch {
+      setDeleting(null)
+      toast.error(t('deleteFileFailed', { name: item.label }))
+    } finally { setPending(false) }
+  }
+  return <>
+    <DetailList title={t('library')} empty={error && !data ? t('libraryError') : t('noLibrary')} items={items} icon={FileText} onDelete={setDeleting} />
+    <AlertDialog open={deleting !== null} onOpenChange={open => { if (!open && !pending) setDeleting(null) }}>
+      <AlertDialogContent size="sm">
+        <AlertDialogHeader><AlertDialogTitle>{t('deleteFileTitle', { name: deleting?.label ?? '' })}</AlertDialogTitle></AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>{t('deleteFileCancel')}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" disabled={pending} onClick={() => { if (deleting) void remove(deleting) }}>{t('deleteFileConfirm')}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
 }
 
 /** Whether `text` contains the panel search's query, ignoring case. An empty query matches everything. */
@@ -195,7 +241,8 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
           </div>
           <TabsContent value="details" className="flex min-h-0 flex-col gap-3 overflow-y-auto px-4 pb-4">
             <DetailList title={t('routines')} empty={t('noRoutines')} items={NO_ITEMS} icon={Clock} />
-            <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />
+            {/* A bot's or the Coordinator's own documents; an agent chat has no library. */}
+            {botId || coordinator ? <LibraryList botId={botId} /> : <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />}
           </TabsContent>
           <TabsContent value="threads" className="min-h-0 overflow-y-auto px-4 pb-4">
             <ThreadResults threads={ownThreads} shown={filter(ownThreads)} issues={issues} onOpenThread={onOpenThread} />
