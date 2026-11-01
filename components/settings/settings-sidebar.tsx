@@ -12,6 +12,7 @@ import { SearchInput } from '@/components/ui/search-input'
 import { RAIL_ITEMS, type RailDestination } from '@/components/nav/icon-rail'
 import { settingsItemVisible } from '@/lib/settings-sidebar-search'
 import { settingsHref, visibleSettingsSections, type SettingsSectionId } from '@/lib/settings-sections'
+import { ResizablePane } from '@/components/ui/resizable-pane'
 
 const icons: Record<SettingsSectionId, LucideIcon> = {
   account: UserRound, security: Shield, preferences: SlidersHorizontal, notifications: Bell, memory: Brain, connections: Blocks,
@@ -90,7 +91,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   </>
   if (isMobile) return <Sidebar collapsible="offcanvas" mobileTitle={i18nText("Settings.title")} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>
   // On desktop the section list is the card's first column, where the bot list sits elsewhere in the app.
-  return <div data-slot="settings-list" className="hidden shrink-0 border-r md:block">
-    <Sidebar collapsible="none" aria-label={i18nText("FeatureCopy.c_a8c7ae4f")} className="w-64 bg-transparent">{body}</Sidebar>
-  </div>
+  return <ResizablePane data-slot="settings-list" storageKey="mikka:settings-list-width" defaultWidth={256} min={208} max={400} edge="end" from="md" label={i18nText('Common.resize.settingsList')} className="hidden shrink-0 border-r md:block">
+    <Sidebar collapsible="none" aria-label={i18nText("FeatureCopy.c_a8c7ae4f")} className="w-full bg-transparent">{body}</Sidebar>
+  </ResizablePane>
 }

@@ -23,7 +23,8 @@ import { GroupHeader } from './group-header'
 import { ThreadList, threadName, TWO_LINE_ROW } from './thread-list'
 import { PullRequestIcon } from '@/components/workspace/pull-request-icon'
 import { useCloudComputer, useComputerTab } from '@/hooks/use-feature-availability'
-import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
+import { useResizableWidth } from '@/hooks/use-resizable-width'
+import { ResizeHandle } from '@/components/ui/resizable-pane'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type PanelView = 'overview' | 'all'
@@ -124,7 +125,8 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   // The header's search filters this column's lists in place (R-50); null while it is closed.
   const [query, setQuery] = useState<string | null>(null)
   const filter = (list: Thread[]) => query ? list.filter(thread => matches(query, threadName(thread, issues, ''), thread.lastReply)) : list
-  const { width, max, dragging, resizeTo, reset, handleProps } = useResizableWidth(PANEL_WIDTH)
+  const resize = useResizableWidth(PANEL_WIDTH)
+  const { width, max, dragging, resizeTo } = resize
   // 加宽 remembers the width it replaced, and the button puts it back.
   const [beforeWide, setBeforeWide] = useState<number | null>(null)
   const wide = beforeWide !== null
@@ -163,7 +165,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   // the width follows the pointer with no spring.
   return <motion.aside ref={asideRef} aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width }} exit={sheet ? undefined : { width: 0 }} transition={dragging ? { duration: 0 } : SPRING_SIDEBAR} className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l bg-background xl:flex', dragging && 'select-none')}>
     {/* Drag the inner edge or use the arrow keys on it to resize the panel; double-click it to reset. */}
-    {!sheet && <div {...handleProps} aria-label={t('resize')} onDoubleClick={() => { setBeforeWide(null); reset() }} className={cn(RESIZE_EDGE, 'absolute inset-y-0 start-0 after:start-0')} />}
+    {!sheet && <ResizeHandle resize={resize} label={t('resize')} edge="start" onDoubleClick={() => setBeforeWide(null)} />}
     <Tabs value={view} onValueChange={value => setView(value as PanelView)} className={cn('min-h-0 flex-1 gap-0', !sheet && 'min-w-[var(--context-panel-width,22.5rem)]')}>
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
         <TabsList aria-label={t('views')} className="gap-1 bg-transparent p-0">

@@ -462,6 +462,19 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `components/app-shell.tsx`; no reUI App Shell blocks. Standing rule: a
   skill audit (unslop, interface-design) never changes the shell layout;
   Alex keeps it as it is (2026-10-31).
+- **R-80** Every vertical line between two columns can be dragged to resize
+  them (Alex: 「只要是这种竖线都可以 resizable」, decision 2026-11-01-1310):
+  the bot list, the right panel, 建议's two halves, Artifact's list, the
+  board's Coordinator sidebar, a task's right panel, the editor's side
+  panel, a project's details, the settings list, the browser. The line is a
+  `ResizablePane` or a `ResizeHandle` (`components/ui/resizable-pane.tsx`,
+  on `hooks/use-resizable-width.ts`): drag it, use the arrow keys on it
+  (Shift for bigger steps, Home and End for the limits), double-click it for
+  the default width; it shows `col-resize` on hover, stays between a minimum
+  and a maximum, and the width is remembered per place on this device. No
+  second way to resize a column. `scripts/split-pane-policy.mjs` fails a
+  fixed-width column with its own side border and no handle; a line that is
+  not between columns says why with `split-pane-exempt: <reason>`.
 - **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`, all 16
   shapes kept); people use letter avatars. A person without an uploaded
   picture gets a generated gradient avatar (`public/avatars/*.webp`): after

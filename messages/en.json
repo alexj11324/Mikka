@@ -14,7 +14,18 @@
     "propertyValue": "{label}: {value}",
     "avatarLabel": "Avatar for {email}",
     "scrollToEnd": "Scroll to end",
-    "scrollToStart": "Scroll to start"
+    "scrollToStart": "Scroll to start",
+    "resize": {
+      "suggestionsChat": "Resize Coordinator chat",
+      "artifactList": "Resize Artifact list",
+      "boardSidebar": "Resize Coordinator sidebar",
+      "taskPanel": "Resize right panel",
+      "editorPanel": "Resize side panel",
+      "projectDetails": "Resize details",
+      "settingsList": "Resize settings list",
+      "groupPanel": "Resize right panel",
+      "browser": "Resize browser"
+    }
   },
   "Issue": {
     "scope": {

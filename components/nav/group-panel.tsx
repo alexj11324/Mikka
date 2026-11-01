@@ -6,7 +6,9 @@ import { X } from 'lucide-react'
 import { InlineLoadError } from '@/components/load-error'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { SPRING_SIDEBAR } from '@/lib/ease'
 import type { GroupMember } from '@/lib/group-messages'
 import { cn } from '@/lib/utils'
@@ -15,7 +17,8 @@ import { GroupAvatar, useGroupMembers } from './group-avatar'
 import { GroupHeader } from './group-header'
 import { LetterAvatar } from './letter-avatar'
 
-const WIDTH = 360
+// The same right column as a bot's 概览, so it shares that column's remembered width.
+const WIDTH = { storageKey: 'mikka:context-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } as const
 
 /** A member row: people with their letter, bots with their bloub (R-36), then the name. */
 function MemberRow({ member }: { member: GroupMember }) {
@@ -35,9 +38,12 @@ export function GroupPanel({ group, onClose, sheet = false }: { group: { id: str
   const t = useTranslations('Shell.panel')
   const { data: members, error, mutate } = useGroupMembers(group.id)
   const label = members ? t('members', { count: members.length }) : t('membersLoading')
-  return <motion.aside aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width: WIDTH }} exit={sheet ? undefined : { width: 0 }} transition={SPRING_SIDEBAR}
-    className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l bg-background xl:flex')}>
-    <div className={cn('flex min-h-0 flex-1 flex-col', !sheet && 'min-w-90')}>
+  const resize = useResizableWidth(WIDTH)
+  const tCommon = useTranslations('Common')
+  return <motion.aside aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width: resize.width }} exit={sheet ? undefined : { width: 0 }} transition={resize.instant ? { duration: 0 } : SPRING_SIDEBAR}
+    className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l bg-background xl:flex', resize.dragging && 'select-none')}>
+    {!sheet && <ResizeHandle resize={resize} label={tCommon('resize.groupPanel')} edge="start" />}
+    <div className={cn('flex min-h-0 flex-1 flex-col', !sheet && 'min-w-80')}>
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
         <p className="flex h-7 items-center rounded-full bg-muted px-2.5 text-sm">{t('details')}</p>
         <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="ml-auto" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
