@@ -223,7 +223,8 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     expect((await pool.query('SELECT "pushGrantedAt" FROM github_repository_installations WHERE "userId" = $1 AND "remoteKey" = $2', [loop.userId, REPOSITORY_KEY])).rows[0]?.pushGrantedAt).toBeTruthy()
     expect(evidence.observations.filter(item => item.kind === 'github-request' && item.path === '/repos/mikka-e2e/core-loop/installation').length, 'dispatch checked the App installation on GitHub').toBeGreaterThan(0)
     loop.checkpoint('published', 'Real verification and push completed; GitHub stub confirmed the commit and stored PR on the task')
-    await loop.thread.getByRole('button', { name: '返回 Coordinator', exact: true }).click()
+    // The thread sits beside the chat (R-82); closing it leaves the chat as it was.
+    await loop.thread.getByRole('button', { name: '关闭线程', exact: true }).click()
     await expect(loop.chat).toContainText('已完成：Added MIKKA_MOCK.md', { timeout: 60_000 })
     await expect(loop.chat.locator(`[data-agent-markdown] a[href="${pr}"]`)).toBeVisible()
     const favicon = loop.chat.locator(`img[src="${GITHUB_FAVICON}"]`).first()

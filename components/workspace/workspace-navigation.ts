@@ -51,21 +51,25 @@ export type WorkspaceLocation = {
   bot: string | null
   /** The task open in the centre. */
   issue: string | null
+  /** The thread (its run id) open in the right column, beside whatever is in the centre (R-82). */
+  thread: string | null
 }
 
 export function readLocation(params: URLSearchParams): WorkspaceLocation {
   const section = sectionFromQuery(params.get('section') ?? undefined)
   const bot = params.get('bot')
   const issue = params.get('issue')
+  const thread = params.get('thread')
   return {
     section,
     bot: section === 'coordinator' && bot && UUID.test(bot) ? bot : null,
     issue: issue && UUID.test(issue) ? issue : null,
+    thread: thread && UUID.test(thread) ? thread : null,
   }
 }
 
 export function sameLocation(a: WorkspaceLocation, b: WorkspaceLocation) {
-  return a.section === b.section && a.bot === b.bot && a.issue === b.issue
+  return a.section === b.section && a.bot === b.bot && a.issue === b.issue && a.thread === b.thread
 }
 
 /** The address with `change` applied to `current`; query keys this file does not own are kept. */
@@ -75,12 +79,17 @@ export function workspaceHref(current: URL, change: Partial<WorkspaceLocation>):
   const before = readLocation(params)
   const next = { ...before, ...change }
   if (next.section !== 'coordinator') next.bot = null
+  const centreMoved = next.section !== before.section || next.bot !== before.bot || next.issue !== before.issue
+  // A thread sits beside the centre it was opened from; a new centre closes it unless the move names one.
+  if (centreMoved && !('thread' in change)) next.thread = null
   if (next.section !== before.section || next.bot !== before.bot) for (const key of PAGE_KEYS) params.delete(key)
   writeSectionQuery(params, next.section)
   if (next.bot) params.set('bot', next.bot)
   else params.delete('bot')
   if (next.issue) params.set('issue', next.issue)
   else params.delete('issue')
+  if (next.thread) params.set('thread', next.thread)
+  else params.delete('thread')
   return `${url.pathname}${url.search}${url.hash}`
 }
 
@@ -153,4 +162,27 @@ export function openAppLink(href: string): boolean {
   if (!pushSettingsHistory(href)) return false
   window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
   return true
+}
+
+/** The workspace listens for this and shows the address it was just given. */
+export const NAVIGATE_EVENT = 'mikka:navigate'
+
+/**
+ * A move made from inside a component (a thread card, a chip, a row in the
+ * right column): writes the address, then the workspace shows it, with the same
+ * unsaved-changes check as back and forward.
+ */
+export function navigate(change: Partial<WorkspaceLocation>, mode: 'push' | 'replace' = 'push') {
+  goTo(change, mode)
+  window.dispatchEvent(new Event(NAVIGATE_EVENT))
+}
+
+/** Opens a thread in the right column beside what is in the centre (R-82). */
+export function openThread(runId: string) {
+  navigate({ thread: runId })
+}
+
+/** Closes the open thread; the right column shows 概览 again. */
+export function closeThread() {
+  navigate({ thread: null })
 }
