@@ -5,6 +5,9 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "packageManager": "pnpm@10.34.3",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "test:mailbox-verification": "node --import tsx --test scripts/personal-mailbox-acceptance/r4-verification.test.mts",
     "test:factory-check-independence-db": "node --import tsx --test lib/factory/check-independence.db.test.ts",
