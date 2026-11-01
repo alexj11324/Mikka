@@ -103,6 +103,8 @@ test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 
   await page.getByTestId('bot-model-chip').click()
   await page.getByRole('menu').getByRole('menuitemradio', { name: /codex-e2e-model/ }).click()
   await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：codex-e2e-model')
+  // The chip shows the pick at once; the reload below must come after it is saved, or it cancels the save.
+  await expect.poll(async () => (await choice(userId)).map(row => row.modelId)).toEqual(['codex-e2e-model'])
   await db().query(`UPDATE byos_connections SET state = 'disconnected' WHERE id = $1`, [connections.codex])
   await page.reload()
   await expect(page.getByTestId('bot-model-chip')).toHaveAccessibleName('模型：codex-e2e-model，不可用')
