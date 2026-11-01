@@ -67,8 +67,9 @@ export function PaymentDesignationSettings({ workspaceId }: { workspaceId: strin
       {shareData?.canShare && <SettingRow title={shareT('mine')}>
         <Switch aria-label={shareT('mine')} checked={shareData.mine} disabled={sharePending} onCheckedChange={shared => void changeShare(shared)} />
       </SettingRow>}
-      {data?.admin && data.payerName && <SettingRow title={t('payer', { name: data.payerName })}>
-        <span className="text-sm text-muted-foreground">{data.graceUntil ? t('until', { date: format.dateTime(new Date(data.graceUntil), { dateStyle: 'medium' }) }) : t('active')}</span>
+      {data?.admin && data.payerName && <SettingRow title={t('payerTitle')}>
+        {/* Whose card pays, not an action: usage is charged as it happens (decision 2026-11-01-1152). */}
+        <span className="text-sm text-muted-foreground">{data.graceUntil ? t('until', { name: data.payerName, date: format.dateTime(new Date(data.graceUntil), { dateStyle: 'medium' }) }) : t('payer', { name: data.payerName })}</span>
       </SettingRow>}
       {shareData?.admin && shareData.sharers.length > 0 && <SettingRow title={shareT('sharers')}>
         <span className="text-sm text-muted-foreground">{shareData.sharers.join('、')}</span>

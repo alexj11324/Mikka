@@ -2314,9 +2314,9 @@
     "paymentDesignation": {
       "heading": "付款",
       "mine": "由我的卡支付这个团队",
-      "payer": "{name} 的卡",
-      "active": "正在支付",
-      "until": "{date} 停止支付"
+      "payerTitle": "付款卡",
+      "payer": "{name}的卡",
+      "until": "{name}的卡 · {date} 停止支付"
     },
     "creditShare": {
       "mine": "我的点数也可用于这个团队",
