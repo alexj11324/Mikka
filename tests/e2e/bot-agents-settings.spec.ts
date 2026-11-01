@@ -17,9 +17,10 @@ async function seed(page: Page) {
   const { rows: [member] } = await db().query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId" = $1 AND status = $2 LIMIT 1', [session.userId, 'active'])
   // A heartbeat in the future keeps the device online for the whole test. Claude Code reports its
   // slots with what they resolve to; the screen shows only the resolved name.
-  await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses) VALUES
-    ($1, $3, 'E2E MacBook', 'local', true, 'laptop', now() + interval '1 hour', $4),
-    ($2, $3, 'gpu-box', 'local', true, 'server', NULL, '[]')`, [randomUUID(), randomUUID(), session.userId, JSON.stringify([
+  // 允许自动调度 is off by default on a personal computer (#703); this one has it on, so the default may place on it.
+  await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses, "autoSchedule") VALUES
+    ($1, $3, 'E2E MacBook', 'local', true, 'laptop', now() + interval '1 hour', $4, true),
+    ($2, $3, 'gpu-box', 'local', true, 'server', NULL, '[]', NULL)`, [randomUUID(), randomUUID(), session.userId, JSON.stringify([
     { harness: 'claude_code', installed: true, version: '1.0.0', modelSlots: [{ slot: 'opus', model: 'E2E Opus Resolved', name: 'E2E Opus Resolved' }, { slot: 'sonnet', model: 'E2E Sonnet Resolved', name: 'E2E Sonnet Resolved' }], defaultModelSlot: 'opus' },
     { harness: 'codex', installed: true, version: '1.0.0', models: ['e2e-reported-model', 'e2e-other-model'] },
   ])])
