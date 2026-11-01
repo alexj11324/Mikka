@@ -30,9 +30,9 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
-      CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb);
+      CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
-    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql"])
+    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql"])
       await pool.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), "utf8"));
 
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
@@ -48,6 +48,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const alice = { ownerId: "alice", workspaceId: workspace };
     const [botA, botB, bobBot] = [randomUUID(), randomUUID(), randomUUID()];
     await pool.query(`INSERT INTO bots VALUES ($1,'alice',$4),($2,'alice',$4),($3,'bob',$4)`, [botA, botB, bobBot, workspace]);
+    // A team workspace uses a member's subscriptions only once they share them there (decision 2026-10-31-2225).
+    await pool.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ('alice',$1),('bob',$1)`, [workspace]);
     const connection = async (owner: string, ws: string, provider: string, state = "connected", q: string | null = null) => {
       const id = randomUUID();
       await pool.query(`INSERT INTO byos_connections VALUES ($1,$2,$3,1,$4,$5,NULL,$6::jsonb)`, [id, owner, ws, state, provider, q]);
@@ -70,13 +72,15 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const bobsModel = await binding("bob", workspace, bobs, "claude-bob-fixture", "claude_cpa");
     const elsewhereModel = await binding("alice", elsewhere, otherWs, "claude-elsewhere-fixture", "claude_cpa");
 
-    // 1. Only credentials usable here: Mikka 默认, then Claude, then ChatGPT; never another person's, another workspace's or a disconnected one.
+    // 1. Only credentials usable here: Mikka 默认, then Claude, then ChatGPT; never another person's or a disconnected one.
+    // A subscription is the person's own from any workspace once shared here (decision 2026-10-31-2130), so the
+    // Claude account first connected elsewhere is listed too, after this workspace's.
     const menu = await botModelMenu(pool, settings, alice, botA);
-    assert.deepEqual(menu.groups.map((group) => [group.kind, group.provider ?? null]), [["hosted", null], ["subscription", "claude"], ["subscription", "codex"]]);
+    assert.deepEqual(menu.groups.map((group) => [group.kind, group.provider ?? null]), [["hosted", null], ["subscription", "claude"], ["subscription", "claude"], ["subscription", "codex"]]);
     assert.equal(menu.groups[1].plan, "Max");
     const listed = menu.groups.flatMap((group) => group.options.map((option) => option.id));
-    assert.deepEqual(new Set(listed), new Set([HOSTED_CHOICE, sonnet, opus, gpt]));
-    for (const id of [stale, bobsModel, elsewhereModel]) assert.ok(!listed.includes(id));
+    assert.deepEqual(new Set(listed), new Set([HOSTED_CHOICE, sonnet, opus, gpt, elsewhereModel]));
+    for (const id of [stale, bobsModel]) assert.ok(!listed.includes(id));
     // Nothing picked: the chip shows what the resolver gives the next run (Claude first), not a saved choice.
     assert.equal(menu.current.provider, "claude");
     assert.equal(menu.current.chosen, false);

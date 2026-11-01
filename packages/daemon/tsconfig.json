@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["bin", "src", "test", "vitest.config.ts"]
+  "include": ["bin", "harness", "src", "test", "vitest.config.ts"]
 }

@@ -1,5 +1,5 @@
 import type { Page, TestInfo } from '@playwright/test'
-import { test, expect, register, BASE_PATH } from './fixtures'
+import { test, expect, register, registerInTeam, BASE_PATH } from './fixtures'
 
 test('移动侧栏在水合与尺寸检测完成前不可点击，就绪后首次点击即可打开', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -88,7 +88,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
   for (const first of ['成员', '团队'] as const) {
     test(`首访${first}、设置互切与缓存返回均不超过 1 秒 (${viewport.width}px)`, { tag: '@performance' }, async ({ page }, info) => {
       await page.setViewportSize(viewport)
-      await register(page)
+      await registerInTeam(page)
       async function sidebarLink(name: string) {
         if (viewport.width < 768) {
           await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()

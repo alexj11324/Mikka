@@ -5,6 +5,7 @@
 // onto start -> events -> send / cancel, plus `resume(sessionId)`. A
 // follow-up run starts by continuing the earlier run's conversation
 // (`StartOptions.continueSession`), so a run never ends the chat.
+import type { RunCredential } from "../agents/run-credential"
 import type { RunApps } from '../agents/run-apps'
 import type {
   HandoffReport,
@@ -58,6 +59,8 @@ export interface AgentCapabilities {
 }
 
 export interface SessionOptions {
+  /** API key or custom provider for this run (agents/run-credential.ts), never written to disk. */
+  credential?: RunCredential
   /** Trusted server-issued delivery binding, never model-selected. */
   github?: { endpoint: string; repository: string; branch: string; runToken: string; issueId: string }
   /** Trusted server-issued app entries (one MCP server each), never model-selected. */

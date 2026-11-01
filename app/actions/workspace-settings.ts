@@ -6,7 +6,7 @@ import { auditRequestContext } from '@/lib/audit/record'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { deleteWorkspaceData, readWorkspaceGeneral, transferWorkspaceOwnership, updateWorkspaceGeneral, workspaceDeletionImpact, workspaceTransferTargets, type UpdateWorkspaceInput, type WorkspaceDeletion, type WorkspaceDeletionImpact, type WorkspaceGeneral, type WorkspaceTransferTarget } from '@/lib/workspace-admin/general'
-import { removeMember, type MemberRemoval } from '@/lib/workspace-admin/members'
+import { archivedBots, removeMember, takeOverBot, type AssetTransfer, type MemberRemoval } from '@/lib/workspace-admin/members'
 
 const COOKIE = 'mikka-workspace'
 
@@ -82,5 +82,22 @@ export async function removeWorkspaceMember(memberId: string, options: { transfe
     const actor = await currentWorkspaceActor()
     const { label: _label, ...removed } = await removeMember(actor.userId, actor.workspaceId, memberId, options.transferTo, auditRequestContext(await headers()))
     return removed
+  })
+}
+
+/** Bot 与 Agents › 已暂停: bots of people who left or were suspended, for admins (§8.3). */
+export async function listArchivedBots(workspaceId?: string): Promise<ActionResult<{ bots: { id: string; name: string; color: string; shape: string }[] }>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    const rows = await archivedBots(actor.userId, actor.workspaceId)
+    return { bots: rows.map(({ id, name, color, shape }) => ({ id, name, color, shape })) }
+  })
+}
+
+/** 接管: the bot becomes the admin's own and runs on the admin's resources. */
+export async function takeOverArchivedBot(botId: string, workspaceId?: string): Promise<ActionResult<AssetTransfer>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return takeOverBot(actor.userId, actor.workspaceId, botId)
   })
 }

@@ -20,7 +20,6 @@ import {
   shellQuote,
   type SandboxPolicy,
 } from "../src/agents/sandbox"
-import { guardCodexAuth } from "../src/agents/harness-home"
 import { runVerify } from "../src/agents/verify"
 import type { Logger } from "../src/log"
 import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
@@ -453,28 +452,6 @@ describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
       expect(blocked.stdout).not.toMatch(/^2\d\d$/)
     },
   )
-})
-
-describe("codex auth guard", () => {
-  it("restores auth.json when a run signs it in to another account", () => {
-    const file = join(tempDir("orva-"), "auth.json")
-    const mine = JSON.stringify({ tokens: { account_id: "me", access: "a" } })
-    writeFileSync(file, mine)
-    const log = { warn: () => undefined } as unknown as Logger
-    // A refresh keeps the account: left alone.
-    const refresh = guardCodexAuth(file, log)
-    const refreshed = JSON.stringify({
-      tokens: { account_id: "me", access: "b" },
-    })
-    writeFileSync(file, refreshed)
-    refresh()
-    expect(readFileSync(file, "utf8")).toBe(refreshed)
-    // Another account, or a planted link: put back.
-    const swap = guardCodexAuth(file, log)
-    writeFileSync(file, JSON.stringify({ tokens: { account_id: "evil" } }))
-    swap()
-    expect(readFileSync(file, "utf8")).toBe(refreshed)
-  })
 })
 
 describe("publish", () => {
