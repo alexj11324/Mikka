@@ -17,9 +17,10 @@ async function seed(page: Page) {
   const { rows: [member] } = await db().query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId" = $1 AND status = $2 LIMIT 1', [session.userId, 'active'])
   // A heartbeat in the future keeps the device online for the whole test. Claude Code reports its
   // slots with what they resolve to; the screen shows only the resolved name.
-  await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses) VALUES
-    ($1, $3, 'E2E MacBook', 'local', true, 'laptop', now() + interval '1 hour', $4),
-    ($2, $3, 'gpu-box', 'local', true, 'server', NULL, '[]')`, [randomUUID(), randomUUID(), session.userId, JSON.stringify([
+  // The MacBook has 允许自动调度 on, so it can be the suggested default (personal computers are off by default).
+  await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses, "autoSchedule") VALUES
+    ($1, $3, 'E2E MacBook', 'local', true, 'laptop', now() + interval '1 hour', $4, true),
+    ($2, $3, 'gpu-box', 'local', true, 'server', NULL, '[]', NULL)`, [randomUUID(), randomUUID(), session.userId, JSON.stringify([
     { harness: 'claude_code', installed: true, version: '1.0.0', modelSlots: [{ slot: 'opus', model: 'E2E Opus Resolved', name: 'E2E Opus Resolved' }, { slot: 'sonnet', model: 'E2E Sonnet Resolved', name: 'E2E Sonnet Resolved' }], defaultModelSlot: 'opus' },
     { harness: 'codex', installed: true, version: '1.0.0', models: ['e2e-reported-model', 'e2e-other-model'] },
   ])])
@@ -45,7 +46,8 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
   await expect(fallback.getByRole('button', { name: '默认 运行位置：E2E MacBook', exact: true })).toBeVisible()
   await expect(fallback.getByRole('button', { name: '默认 Agent：Claude Code', exact: true })).toBeVisible()
   await expect(fallback.getByRole('button', { name: '默认 模型：E2E Opus Resolved', exact: true })).toBeVisible()
-  await expect(fallback.getByRole('button', { name: '默认 设备离线时：等它上线', exact: true })).toBeVisible()
+  // 设备离线时 is gone: an offline machine follows the fixed order (decision 2026-10-31-2200-run-machine-fallback).
+  await expect(fallback.getByRole('button', { name: /设备离线时/ })).toHaveCount(0)
   await expect(fallback.getByRole('button', { name: /更多操作/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Coordinator 模型：claude-e2e-model', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '额度用完时：停下等我', exact: true })).toBeVisible()
@@ -97,15 +99,15 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
   await testInfo.attach('bot-agents', { body: await page.screenshot(), contentType: 'image/png' })
 
   // The fallbacks save too: a reload keeps the choice.
-  await fallback.getByRole('button', { name: '默认 设备离线时：等它上线', exact: true }).click()
+  await page.getByRole('button', { name: '额度用完时：停下等我', exact: true }).click()
   // The choice is one save (a server action); wait for it before reloading.
   const saved = page.waitForResponse(response => response.request().method() === 'POST' && Boolean(response.request().headers()['next-action']))
-  await page.getByRole('option', { name: '改到云端运行' }).click()
+  await page.getByRole('option', { name: '换用另一个账号' }).click()
   expect((await saved).ok()).toBe(true)
-  await expect(fallback.getByRole('button', { name: '默认 设备离线时：改到云端运行', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '额度用完时：换用另一个账号', exact: true })).toBeVisible()
   await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
   await page.reload()
-  await expect(fallback.getByRole('button', { name: '默认 设备离线时：改到云端运行', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '额度用完时：换用另一个账号', exact: true })).toBeVisible()
 
   await row.getByRole('button', { name: '前端 的更多操作', exact: true }).click()
   await page.getByRole('menuitem', { name: '删除', exact: true }).click()

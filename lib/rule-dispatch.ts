@@ -3,7 +3,7 @@ import type { Pool } from "pg";
 import { pool } from "./db";
 import { issueForUser } from "./issue-access";
 import { readIssueMetadata } from "./issue-metadata";
-import { resolveExecution, type ExecutionDevice, type ExecutionRule } from "./execution-rules";
+import { DEFAULT_EXECUTION_FALLBACKS, resolveExecution, type ExecutionDevice, type ExecutionRule } from "./execution-rules";
 import { ExecutionSettings, executionWorkspace } from "./execution-settings";
 import { isDeviceOnline } from "@mikka/protocol/device";
 import { ActionFailureError } from "./action-error";
@@ -19,7 +19,6 @@ export type DeviceTarget = {
   model?: string;
   agentId: string;
   pinnedDeviceId?: string;
-  waitFor?: string;
 };
 
 /** Cloud means the workspace's own E2B key and this bot's cloud runtime (MVP: no Mikka-hosted sandboxes). */
@@ -79,9 +78,9 @@ export async function fallbackDevice(
 /**
  * Where an issue's run executes (decision 2026-10-31-2200-run-machine-fallback):
  * a matching rule on an online device runs there; otherwise the workspace's own
- * E2B cloud, then the person's online device with 允许自动调度 on, then the
- * rule's offline device (queued until it is back), else `needsMachine` with the
- * card of what the person can do.
+ * E2B cloud, then the person's online device with 允许自动调度 on, else
+ * `needsMachine` with the card of what the person can do. A rule whose device
+ * is offline takes the same order; nothing waits on an offline device.
  */
 export async function resolveIssueExecution(
   ownerId: string,
@@ -92,8 +91,7 @@ export async function resolveIssueExecution(
   if (!issue) throw new ActionFailureError("issueNotFound");
   const workspaceId = await executionWorkspace(ownerId, botId);
   const settings = new ExecutionSettings(pool);
-  const fallbacks = await settings.fallbacks(ownerId);
-  // No model and no device yet (a new person): nothing to run on, which is a wait, not an error.
+  // No model and no device yet (a new person): nothing to run on, which is the card, not an error.
   const rules = await settings.list({ ownerId, workspaceId }).catch((error: unknown) => {
     if (error instanceof ActionFailureError && error.code === "executionModelUnknown") return null;
     throw error;
@@ -102,33 +100,17 @@ export async function resolveIssueExecution(
   const labels = readIssueMetadata(issue.content).labels.map(
     (label) => label.name,
   );
-  const resolution = rules ? resolveExecution(labels, rules, devices, fallbacks) : null;
-  // The rule's own device, queued while it is offline; the daemon claims it when it returns.
-  const pinned = async (): Promise<DeviceTarget | null> => {
-    if (!rules) return null;
-    const waiting = resolveExecution(labels, rules, devices, { ...fallbacks, whenDeviceOffline: "wait" });
-    if (!("waitFor" in waiting)) return null;
-    const selected = resolveExecution(
-      labels,
-      rules,
-      devices.map((d) => (d.id === waiting.waitFor ? { ...d, online: true, enabled: true } : d)),
-      fallbacks,
-    );
-    if ("waitFor" in selected || selected.place === "cloud") return null;
-    return { ...(await deviceTarget(ownerId, selected)), pinnedDeviceId: waiting.waitFor, waitFor: waiting.waitFor };
-  };
-  if (resolution && "waitFor" in resolution) {
-    const target = await pinned();
-    if (!target) throw new ActionFailureError("agentNoDevice");
-    return { ...target, workspaceId, issue };
-  }
+  // 设备离线时 is gone: a rule whose device is offline follows the same order as
+  // any other run (own E2B, then an auto-schedule device, else the card).
+  const resolution = rules ? resolveExecution(labels, rules, devices, { ...DEFAULT_EXECUTION_FALLBACKS, whenDeviceOffline: "cloud" }) : null;
+  if (resolution && "waitFor" in resolution) throw new ActionFailureError("agentNoDevice");
   if (resolution && resolution.place !== "cloud") {
     const target = await deviceTarget(ownerId, resolution);
     return { ...target, workspaceId, issue, pinnedDeviceId: resolution.place };
   }
   // Cloud, by rule or because nothing else matched. A device is the fallback.
   const harness = resolution?.harness ?? null;
-  const fallback = (await fallbackDevice(pool, ownerId, devices, rules, harness)) ?? (await pinned());
+  const fallback = await fallbackDevice(pool, ownerId, devices, rules, harness);
   if (resolution && (await cloudReady(pool, { ownerId, workspaceId, botId, harness: resolution.harness })))
     return { ...resolution, place: "cloud" as const, workspaceId, issue, ...(fallback ? { fallback } : {}) };
   if (fallback) return { ...fallback, workspaceId, issue };

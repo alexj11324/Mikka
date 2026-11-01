@@ -79,7 +79,10 @@ export function runFinishedEvent(run: { id: string; userId: string; botId?: stri
 }
 
 /** A run lost its device and was queued again as `retryRunId`. Background: nobody needs to act. */
-export function runRetriedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null }, retry: { runId: string; attempt: number; maxAttempts: number; movedToDeviceId?: string | null }): CoordinatorEventInput {
+/** Where a lost run went on (decision 2026-10-31-2200-run-machine-fallback): the person's own E2B cloud, or another of their devices. */
+export type RunMovedTo = { kind: 'cloud' } | { kind: 'device'; deviceId: string }
+
+export function runRetriedEvent(run: { id: string; userId: string; botId?: string | null; issueId: string | null }, retry: { runId: string; attempt: number; maxAttempts: number; movedToDeviceId?: string | null; movedTo?: RunMovedTo | null }): CoordinatorEventInput {
   return {
     userId: run.userId,
     ...(run.botId ? { botId: run.botId } : {}),
@@ -87,7 +90,7 @@ export function runRetriedEvent(run: { id: string; userId: string; botId?: strin
     dedupeKey: `run_retried:${run.id}`,
     issueId: run.issueId,
     runId: run.id,
-    payload: { retryRunId: retry.runId, attempt: retry.attempt, maxAttempts: retry.maxAttempts, ...(retry.movedToDeviceId ? { movedToDeviceId: retry.movedToDeviceId } : {}) },
+    payload: { retryRunId: retry.runId, attempt: retry.attempt, maxAttempts: retry.maxAttempts, ...(retry.movedToDeviceId ? { movedToDeviceId: retry.movedToDeviceId } : {}), ...(retry.movedTo ? { movedTo: retry.movedTo } : {}) },
   }
 }
 
