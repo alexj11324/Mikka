@@ -2,8 +2,9 @@
 // The person's explicit allow/ask/deny is applied before any of these is
 // called; hard boundaries (read-only runs, worktree containment, the network
 // ceiling, host:port validation, sandbox capability, git push) never reach
-// them. A null answer means "no decision": the caller lets the agent's own
-// call go ahead and records it with `decisionFallback`, never a hardcoded rule.
+// them. A null answer means "no decision": the caller keeps exactly what that
+// point did before the Decisions API (ask stays ask, deny stays deny), never a
+// looser default, and records it with `decisionFallback`.
 import { createHash } from "node:crypto"
 
 import {

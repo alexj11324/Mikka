@@ -84,8 +84,8 @@ export interface CommandJudgment {
  * The workspace decision for a shell command that is not `git push`. When
  * the person's settings give every action a command could be the same
  * decision, that decision stands and nothing is asked. Otherwise the
- * Decisions API names the action and its policy applies; no answer lets the
- * agent's command go ahead (logged), never a hardcoded classification.
+ * Decisions API names the action and its policy applies; no answer keeps the
+ * decision this command had before the Decisions API (logged).
  */
 async function commandDecision(command: string, policy: RunPolicy, judgment: CommandJudgment | undefined): Promise<PermissionDecision> {
   const decisionFor = (action: CommandAction): PermissionDecision => action === "other" ? "allow" : decide(action, { policy })
@@ -101,8 +101,11 @@ async function commandDecision(command: string, policy: RunPolicy, judgment: Com
   const action = await pending
   if (action) return decisionFor(action)
   if (cache?.get(digest) === pending) cache.delete(digest)
-  decisionFallback(`cursor command ${digest.slice(0, 12)} allowed without a judgment`)
-  return "allow"
+  // No answer: the classification in force before the Decisions API, so nothing is looser than it was.
+  const legacy = classifyCommand(command, true)
+  const previous = legacy ? decide(legacy, { policy }) : "allow"
+  decisionFallback(`cursor command ${digest.slice(0, 12)} kept its previous decision (${previous}) without a judgment`)
+  return previous
 }
 
 /**

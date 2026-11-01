@@ -62,7 +62,7 @@ export function decide(
  * `decide`, with the Decisions API in place of the fixed `ask` for an action
  * the person set nothing for: an unknown action, or a setup recipe nobody
  * approved. A read-only run still denies, and an approved recipe or a
- * configured action never asks. No answer lets the agent's call go ahead.
+ * configured action never asks. No answer keeps the previous decision (ask).
  */
 export async function decideWithJudgment(
   action: string,
@@ -76,8 +76,9 @@ export async function decideWithJudgment(
   if (fixed === "deny" || !(unknown || unapprovedRecipe)) return fixed
   const judged = await judge({ action, subject })
   if (judged) return judged
-  decisionFallback(`${action} allowed without a judgment`)
-  return "allow"
+  // No answer: what this point did before the Decisions API (ask), never a looser default.
+  decisionFallback(`${action} kept its previous decision (${fixed}) without a judgment`)
+  return fixed
 }
 
 /** The policy a run applies: what the server sent, or the defaults. */
@@ -162,9 +163,9 @@ const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
  * Wrappers (`sudo`, `env`, `command`, `xargs`, `sh -c …`) are unwrapped so
  * `env git push` and `/usr/bin/git push` cannot slip past the git rule.
  */
-export function classifyCommand(command: string): PermissionAction | null {
+export function classifyCommand(command: string, legacy = false): PermissionAction | null {
   for (const segment of command.split(/&&|\|\||;|\||\n/)) {
-    const action = classifySegment(segment, 0)
+    const action = classifySegment(segment, 0, legacy)
     if (action) return action
   }
   return null
@@ -175,7 +176,7 @@ const SHELLS = new Set(["sh", "bash", "zsh", "dash", "fish"])
 /** Wrapper options that take the next word as their value (`sudo -u deploy`). */
 const OPTION_VALUES = new Set(["-u", "-g", "-p", "-C", "-h", "-r", "-t", "-U", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "-I", "-S"])
 
-function classifySegment(segment: string, depth: number): PermissionAction | null {
+function classifySegment(segment: string, depth: number, legacy: boolean): PermissionAction | null {
   const words = segment
     .trim()
     .split(/\s+/)
@@ -205,11 +206,16 @@ function classifySegment(segment: string, depth: number): PermissionAction | nul
     const index = words.findIndex((word) => word === "--command" || /^-[A-Za-z]*c[A-Za-z]*$/.test(word))
     if (index !== -1) {
       const nested = words.slice(index + 1).join(" ").replace(/^['"]|['"]$/g, "")
-      const action = classifyCommand(nested)
+      const action = classifyCommand(nested, legacy)
       if (action) return action
     }
   }
   if (name === "git" && words.slice(1).some((word) => word === "push")) return "git_push"
+  // Only when the Decisions API gave no answer: the classification in force before it, so a fallback never loosens anything.
+  if (legacy) {
+    const entry = INSTALL_COMMANDS.find(([command]) => command === name)
+    if (entry && words[1] && entry[1].includes(words[1])) return "install_dependency"
+  }
   return null
 }
 

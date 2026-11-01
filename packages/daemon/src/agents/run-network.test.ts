@@ -148,12 +148,12 @@ it('under ask, the Decisions API preauthorizes a destination inside the ceiling;
   const asked = gateWith(answering(0.1))
   expect(await runNetworkApproval('run-a', 'codex', asked.gate, ['*'])({ host: 'paste.invalid', port: 443 }, signal)).toBe(false)
   expect(asked.ask).toHaveBeenCalledOnce()
-  // Null: goes ahead with a fallback line.
+  // Null: the person is asked, as before the Decisions API; never allowed by default.
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   try {
     const unanswered = gateWith(answering(null))
-    expect(await runNetworkApproval('run-a', 'codex', unanswered.gate, ['*'])({ host: 'example.invalid', port: 443 }, signal)).toBe(true)
-    expect(unanswered.ask).not.toHaveBeenCalled()
+    expect(await runNetworkApproval('run-a', 'codex', unanswered.gate, ['*'])({ host: 'example.invalid', port: 443 }, signal)).toBe(false)
+    expect(unanswered.ask).toHaveBeenCalledOnce()
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^Decision fallback: network example\.invalid:443/))
   } finally { warn.mockRestore() }
   // The ceiling and an explicit deny are never asked.

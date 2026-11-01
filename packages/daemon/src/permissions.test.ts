@@ -74,10 +74,11 @@ describe("permission policy (ADR 0009)", () => {
     expect(await decideWithJudgment("git_push", { policy: policy({ git_push: "deny" }) }, judge(unasked))).toBe("deny")
     expect(await decideWithJudgment("format_disk", { policy: { ...policy({}), readOnly: true } }, judge(unasked))).toBe("deny")
     expect(unasked).not.toHaveBeenCalled()
-    // No answer: the agent's call goes ahead, logged.
+    // No answer: the decision this point had before the Decisions API (ask), never allow.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
     try {
-      expect(await decideWithJudgment("format_disk", {}, judge(answering(null)))).toBe("allow")
+      expect(await decideWithJudgment("format_disk", {}, judge(answering(null)))).toBe("ask")
+      expect(await decideWithJudgment("run_setup_recipe", {}, judge(answering(null)))).toBe("ask")
       expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^Decision fallback: /))
     } finally {
       warn.mockRestore()
@@ -329,10 +330,11 @@ describe("applying the workspace's policy (ADR 0028)", () => {
       await chosen("pip install x", denied, once, cache)
       await chosen("pip install x", denied, once, cache)
       expect(once).toHaveBeenCalledTimes(1)
-      // No answer: the agent's command goes ahead, logged, never a hardcoded list.
+      // No answer: the decision the command had before the Decisions API, never looser.
       warn.mockClear()
-      expect(await chosen("npm install zod", denied, answering(null))).toBe("yes")
+      expect(await chosen("npm install zod", denied, answering(null))).toBe("no")
       expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^Decision fallback: /))
+      expect(await chosen("npm test", denied, answering(null))).toBe("yes")
       // git push stays a hard deny, never asked.
       const push = answering("other")
       expect(await chosen("git push", policy({ git_push: "allow" }), push)).toBe("no")

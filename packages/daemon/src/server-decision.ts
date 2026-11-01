@@ -6,9 +6,9 @@
  * answers, or null when there is no usable answer.
  *
  * Callers treat null as "no decision": the person's explicit allow/ask/deny
- * still wins first, and a judgment the API could not make falls back to the
- * agent's own call (allowed and logged), never to a hardcoded rule (Alex,
- * 2026-11-01). Hard boundaries (read-only runs, worktree containment, the
+ * still wins first, and a judgment the API could not make keeps what that
+ * point did before the Decisions API (ask stays ask, deny stays deny), logged;
+ * a permission never fails open. Hard boundaries (read-only runs, worktree containment, the
  * network ceiling, the git push deny) stay in code and are not asked.
  */
 export type ServerDecisionPurpose =

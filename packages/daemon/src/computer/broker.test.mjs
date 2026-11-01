@@ -511,15 +511,22 @@ test("under ask the Decisions API says which actions need the person; no answer 
   const row = b.list()[0];
   await b.decide(row.id, row.digest, true);
   assert.equal(await pending, "ok");
-  // Null: executes with a fallback line.
+  // Null: reviewed by the person, as before the Decisions API; never executed by default.
   answer = null;
   const warnings = [];
   const warn = console.warn;
   console.warn = (line) => warnings.push(line);
+  let unanswered;
   try {
-    assert.equal(await b.request(token, { name: "get_desktop_state" }), "ok");
+    unanswered = b.request(token, { name: "get_desktop_state" });
+    await new Promise((resolve) => setImmediate(resolve));
   } finally { console.warn = warn; }
   assert.match(warnings[0], /^Decision fallback: computer action get_desktop_state/);
+  assert.equal(calls, 2);
+  assert.equal(b.list().length, 1);
+  const held = b.list()[0];
+  await b.decide(held.id, held.digest, true);
+  assert.equal(await unanswered, "ok");
   assert.equal(calls, 3);
 });
 test("allow never asks the Decisions API and deny grants nothing", async (t) => {

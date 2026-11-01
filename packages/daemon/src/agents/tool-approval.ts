@@ -85,11 +85,12 @@ export class ToolApprovalGate {
       let judged: boolean | null
       try { judged = await abortable(this.host.preauthorizeNetwork(request, signal), signal) }
       catch { return 'deny' }
+      if (judged === true) return 'allow'
       if (judged === null) {
+        // No answer: as before the Decisions API, the person is asked.
         const { host, port } = request.input as { host: string; port: number }
-        decisionFallback(`network ${host}:${port} allowed without a judgment`)
+        decisionFallback(`network ${host}:${port} asked as before without a judgment`)
       }
-      if (judged !== false) return 'allow'
     }
     return this.request({ ...request, requestId: `network:${randomUUID()}` }, signal)
   }

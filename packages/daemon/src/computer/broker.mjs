@@ -133,7 +133,7 @@ export class ComputerBroker {
       });
     }
     // Under `ask`, the Decisions API says whether this action needs the
-    // person; no goes ahead, yes is reviewed, no answer goes ahead (logged).
+    // person; no goes ahead, yes is reviewed, no answer is reviewed as before (logged).
     if (this.needsPerson) {
       const recent = this.noteKind(grant.runId, call);
       return Promise.resolve()
@@ -147,8 +147,11 @@ export class ComputerBroker {
           return null;
         })
         .then((needsPerson) => {
-          if (needsPerson === true) return this.review(token, grant, call, actionId, assertLive, signal);
-          if (needsPerson !== false) console.warn(`Decision fallback: computer action ${call.name} executed without a judgment`);
+          if (needsPerson !== false) {
+            // Yes, or no answer: reviewed by the person, as every ask action was before the Decisions API.
+            if (needsPerson !== true) console.warn(`Decision fallback: computer action ${call.name} reviewed as before without a judgment`);
+            return this.review(token, grant, call, actionId, assertLive, signal);
+          }
           assertLive();
           return this.execute(this.driver, call, grant.display, grant.runId, { actionId, assertLive });
         });
