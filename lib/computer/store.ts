@@ -99,8 +99,11 @@ export class ComputerStore {
     await this.bot(actor, botId)
     const { rows } = await this.pool.query('SELECT m.state AS machine,m."sandboxId",d.control,d."controlledBy",d."controlUntil",d."lastAction" FROM bot_desktops d JOIN cloud_machines m ON m."workspaceId"=d."workspaceId" AND m."ownerId"=d."ownerId" WHERE d."botId"=$1 AND d."ownerId"=$2', [botId, actor.userId])
     const row = rows[0]
-    if (!row) return { machine: 'sleeping', control: 'idle' }
-    if (row.sandboxId && row.machine !== 'error') row.machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId)
+    if (!row) {
+      const machine = (await this.pool.query('SELECT state FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
+      return { machine: machine?.state === 'waking' ? 'waking' : 'sleeping', control: 'idle' }
+    }
+    if (row.sandboxId && row.machine !== 'error' && row.machine !== 'waking') row.machine = await this.runtime.computerState(actor.workspaceId, row.sandboxId)
     const held = row.control === 'user' && new Date(row.controlUntil).getTime() > Date.now()
     const review = (await this.pool.query(`SELECT v.id,v.digest,v."runId",v.call,v."expiresAt"
       FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" AND r."userId"=v."userId" AND r."deviceId"=v."deviceId"
