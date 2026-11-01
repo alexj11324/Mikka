@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils'
 export function ThreadStatusIcon({ status, waiting = false }: { status: string; /** 等你回复 (Figma 382:6469). */ waiting?: boolean }) {
   const t = useTranslations('Coordinator.citation.runStatus')
   const threads = useTranslations('IssueThreads')
-  if (waiting) return <span role="img" aria-label={threads('waiting')} className="pointer-events-none relative shrink-0">
+  // A run waiting for input is waiting on the person, not working: the same mark as a question (R-34).
+  if (waiting || status === 'waiting_input') return <span role="img" aria-label={waiting ? threads('waiting') : t('waiting_input')} className="pointer-events-none relative shrink-0">
     <CircleHelp aria-hidden="true" className="size-5 text-warning" />
   </span>
   const active = runIsActive(status)

@@ -16,11 +16,9 @@ export interface ExecutionDevice {
 }
 export type ExecutionFallbacks = {
   whenDeviceOffline: "wait" | "cloud";
-  whenQuotaExhausted: "stop" | "switchAccount";
 };
 export const DEFAULT_EXECUTION_FALLBACKS: ExecutionFallbacks = {
   whenDeviceOffline: "wait",
-  whenQuotaExhausted: "stop",
 };
 export type ExecutionResolution =
   { place: string; harness: string; model: string } | { waitFor: string };

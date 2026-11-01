@@ -92,8 +92,11 @@ export type CardPart = { kind: 'text'; text: string } | { kind: 'source'; source
 export function cardParts(card: Pick<SuggestionCard, 'source' | 'title' | 'actionTitle'>, fallbackVerb: string): { verb: string | null; parts: CardPart[] } {
   const line = card.actionTitle?.trim()
   const split = line ? /^([㐀-鿿]{1,4})\s+([\s\S]+)$/.exec(line) : null
-  const verb = split ? split[1] : line ? null : fallbackVerb
-  const words = split ? split[2] : line || card.title
+  // A Chinese line written without the space after its verb (「处理分配给你的任务」) still gets a chip:
+  // the item's kind, with that verb taken off the front when the line starts with it (R-21, R-45).
+  const unspaced = !split && !!line && /^[㐀-鿿]/.test(line)
+  const verb = split ? split[1] : unspaced || !line ? fallbackVerb : null
+  const words = split ? split[2] : unspaced ? (line.startsWith(fallbackVerb) ? line.slice(fallbackVerb.length).trimStart() || line : line) : line || card.title
   const name = SOURCE_NAMES[card.source]
   const at = words.toLowerCase().indexOf(name.toLowerCase())
   if (at < 0) return { verb, parts: [{ kind: 'source', source: card.source }, { kind: 'text', text: words }] }

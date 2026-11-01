@@ -11,8 +11,9 @@ import { e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { credentialProbeCommand, credentialScrubCommand } from '../../packages/daemon/src/credential-globs'
-async function options(workspaceId: string) {
-  return { apiKey: await e2bApiKey(workspaceId, 'Cloud runtime unavailable'), proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
+/** A thread machine runs on its owner's own E2B key (orchestration § 2); this module only acts for that owner. */
+async function options(ownerId: string) {
+  return { apiKey: await e2bApiKey(ownerId, 'Cloud runtime unavailable'), proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
 }
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 /** Register only while this provisioning lease still owns a non-ended row. */
@@ -69,11 +70,11 @@ export const threadMachineProvider = {
   snapshot: async (client: PoolClient, actor: Actor, botSandboxId: string, repoPath: string) =>
     workspaceSnapshot(client as unknown as Pool, actor, await connectComputer(actor.workspaceId, botSandboxId), repoPath),
   connect: (sandboxId: string, workspaceId: string) => connectComputer(workspaceId, sandboxId),
-  create: async (snapshotId: string, operationId: string, metadata: Record<string, string>, workspaceId: string) => {
-    const base = await options(workspaceId)
-    return withE2BErrors(workspaceId, true, () => Sandbox.create(snapshotId, { ...base, idempotencyKey: operationId, timeoutMs: 15 * 60_000, metadata, lifecycle: { onTimeout: 'pause', autoResume: false } }))
+  create: async (snapshotId: string, operationId: string, metadata: Record<string, string>, ownerId: string) => {
+    const base = await options(ownerId)
+    return withE2BErrors(ownerId, true, () => Sandbox.create(snapshotId, { ...base, idempotencyKey: operationId, timeoutMs: 15 * 60_000, metadata, lifecycle: { onTimeout: 'pause', autoResume: false } }))
   },
-  kill: async (sandboxId: string, workspaceId: string) => { await Sandbox.kill(sandboxId, await options(workspaceId)) },
+  kill: async (sandboxId: string, ownerId: string) => { await Sandbox.kill(sandboxId, await options(ownerId)) },
 }
 
 /**
@@ -114,14 +115,14 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (run.status === 'queued' && run.stopRequestedAt) {
       const stale = await endStopRequestedRun(client, actor, runId)
       await afterRunEnded(actor.userId, runId)
-      if (stale) await provider.kill(stale, actor.workspaceId)
+      if (stale) await provider.kill(stale, actor.userId)
       throw new ComputerError(409, 'Thread stopped')
     }
     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
     if (machine?.state === 'ended') throw new ComputerError(409, 'Thread ended')
     if (machine?.state === 'running' && machine.sandboxId) {
-      const base = await options(actor.workspaceId)
-      const state = await withE2BErrors(actor.workspaceId, false, () => Sandbox.getInfo(machine.sandboxId, base)).catch((error: unknown) => {
+      const base = await options(actor.userId)
+      const state = await withE2BErrors(actor.userId, false, () => Sandbox.getInfo(machine.sandboxId, base)).catch((error: unknown) => {
         if (sandboxGone(error)) return null
         throw error
       })
@@ -153,7 +154,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       machine = await replaceGoneSandbox(pool, runId, leaseId)
       if (!machine) throw new ComputerError(409, 'Thread provisioning cancelled')
     }
-    const sandbox = connected ?? await provider.create(machine.snapshotId, machine.operationId, { application: 'mikka-thread', workspaceId: actor.workspaceId, runId }, actor.workspaceId)
+    const sandbox = connected ?? await provider.create(machine.snapshotId, machine.operationId, { application: 'mikka-thread', workspaceId: actor.workspaceId, runId }, actor.userId)
     connected = null
     const recorded = await recordThreadSandbox(pool, runId, sandbox.sandboxId, leaseId)
     if (!recorded) {
@@ -162,7 +163,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       if (!machine.sandboxId) {
         // Record it even after end so a failed kill remains retryable. A newer
         // lease may share the idempotent sandbox and must not have it killed.
-        if (await recordCancelledSandbox(pool, runId, sandbox.sandboxId, machine.operationId)) await provider.kill(sandbox.sandboxId, actor.workspaceId)
+        if (await recordCancelledSandbox(pool, runId, sandbox.sandboxId, machine.operationId)) await provider.kill(sandbox.sandboxId, actor.userId)
       }
       throw new ComputerError(409, 'Thread provisioning cancelled')
     }
@@ -173,7 +174,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (again?.status === 'queued' && again.stopRequestedAt) {
       const stale = await endStopRequestedRun(client, actor, runId)
       await afterRunEnded(actor.userId, runId)
-      if (stale) await provider.kill(stale, actor.workspaceId)
+      if (stale) await provider.kill(stale, actor.userId)
       throw new ComputerError(409, 'Thread stopped')
     }
     await client.query('COMMIT')
@@ -287,7 +288,7 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
     // destroying the dedicated filesystem that still holds their bytes.
     const { screenCaptures } = await import('@/lib/captures/screen')
     await screenCaptures.stopRunRecordings([runId])
-    if (sandboxId) await Sandbox.kill(sandboxId, await options(actor.workspaceId))
+    if (sandboxId) await Sandbox.kill(sandboxId, await options(actor.userId))
     return { runId, state: 'ended' }
   }
   if (action === 'resume') return ensureThreadMachine(pool, actor, runId)

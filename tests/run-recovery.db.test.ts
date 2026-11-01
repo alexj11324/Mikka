@@ -71,6 +71,33 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     assert.equal(Boolean(await verifyRunToken(new Request('http://localhost/mikka/api/mcp'), fresh.token)), true)
   })
 
+  await t.test('ending runs inside transactions that hold every app connection needs no second connection', async () => {
+    // Each ending keeps its transaction open while it records the event; the event's
+    // credential check must read through that transaction, or a full pool stalls every one.
+    const { db, pool: appPool } = await import('../lib/db')
+    const { recordCoordinatorEvent } = await import('../lib/coordinator-event-store')
+    const { runFinishedEvent } = await import('../lib/coordinator-events')
+    const { agentRuns } = await import('../lib/db/schema')
+    const { eq } = await import('drizzle-orm')
+    const size = appPool.options.max ?? 10
+    const runs = await Promise.all(Array.from({ length: size }, () => fixture()))
+    let holding = 0
+    let release!: () => void
+    const full = new Promise<void>(resolve => { release = resolve })
+    const endings = Promise.all(runs.map(run => db.transaction(async tx => {
+      await tx.update(agentRuns).set({ status: 'failed' }).where(eq(agentRuns.id, run.id))
+      if (++holding === size) release()
+      await full
+      await recordCoordinatorEvent(tx, runFinishedEvent({ id: run.id, userId: run.userId, issueId: null, kind: 'run', status: 'failed', stopReason: 'device_lost' }))
+    })))
+    let timer: NodeJS.Timeout | undefined
+    const stalled = new Promise<'stalled'>(resolve => { timer = setTimeout(() => resolve('stalled'), 5000) })
+    try { assert.notEqual(await Promise.race([endings, stalled]), 'stalled', 'an ending waited for a second connection from a full pool') }
+    finally { clearTimeout(timer); await endings.catch(() => undefined) }
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM coordinator_events WHERE kind=\'run_finished\' AND "runId"=ANY($1)', [runs.map(run => run.id)])
+    assert.equal(rows[0].n, size)
+  })
+
   await t.test('STOP arriving during target lookup cannot create a new retry', async () => {
     const run = await fixture()
     await locked(async blocker => {

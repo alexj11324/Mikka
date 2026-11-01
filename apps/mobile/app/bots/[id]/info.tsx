@@ -37,11 +37,13 @@ export default function BotInfo() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const coordinator = id === 'coordinator'
-  const bot = useHome().data?.bots.find(item => item.id === id)
+  const bots = useHome().data?.bots
+  const bot = bots?.find(item => item.id === id)
   const name = coordinator ? 'Coordinator' : bot?.name ?? ''
   const page = useApi<BotPage>(`/api/mobile/bots/${id}`, 15_000)
-  // The Coordinator has no computer (context-panel.tsx).
-  const computer = useApi<ComputerStatus>(coordinator ? null : `/api/bots/${id}/computer`, 15_000)
+  // The Coordinator's computer is its bot row's, like any bot's (context-panel.tsx).
+  const computerBot = coordinator ? bots?.find(item => item.coordinator)?.id : id
+  const computer = useApi<ComputerStatus>(computerBot ? `/api/bots/${computerBot}/computer` : null, 15_000)
   const refresh = useRefresh(async () => { await Promise.all([page.reload(), computer.reload()]) })
   const threads = page.data?.threads ?? []
   const pullRequests = page.data?.pullRequests ?? []

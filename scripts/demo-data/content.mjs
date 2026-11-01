@@ -202,11 +202,11 @@ export const FACTS = [
 
 /** 建议 rows. Dated more than a day back, so the 08:00 briefing never picks them up. */
 export const SUGGESTIONS = [
-  { key: 's-review', source: 'github', action: 'review', title: 'fix(billing): account early stream receipts', actionTitle: '评审 周宁 的 PR：流式中断记账', actor: '周宁', level: 'high', required: true, hoursAgo: 26, url: 'https://github.com/mikka-demo/web/pull/838' },
-  { key: 's-linear', source: 'linear', action: 'handle', title: '桌面端拒绝 handoff 后登录页进入死循环', actionTitle: '处理分配给你的任务：登录死循环', actor: '林晓', level: 'critical', required: true, hoursAgo: 30, url: 'https://linear.app/mikka-demo/issue/APP-12' },
+  { key: 's-review', source: 'github', action: 'review', title: 'fix(billing): account early stream receipts', actionTitle: '评审 周宁的 PR：流式中断记账', actor: '周宁', level: 'high', required: true, hoursAgo: 26, url: 'https://github.com/mikka-demo/web/pull/838' },
+  { key: 's-linear', source: 'linear', action: 'handle', title: '桌面端拒绝 handoff 后登录页进入死循环', actionTitle: '处理 林晓分配的任务：登录死循环', actor: '林晓', level: 'critical', required: true, hoursAgo: 30, url: 'https://linear.app/mikka-demo/issue/APP-12' },
   { key: 's-slack', source: 'slack', action: 'reply', title: '0.9.5 周五能发吗？我们要给客户演示', actionTitle: '回复 Kevin：0.9.5 发版时间', actor: 'Kevin', level: 'ask', required: false, hoursAgo: 40, url: null },
   { key: 's-gmail', source: 'gmail', action: 'read', title: 'Your Apple Developer Program membership renews in 7 days', actionTitle: '查看 Apple 开发者账号续费提醒', actor: 'Apple Developer', level: 'normal', required: false, hoursAgo: 50, url: null },
-  { key: 's-notion', source: 'notion', action: 'read', title: '11 月路线图（草稿）有 3 条新评论', actionTitle: '看路线图草稿的新评论', actor: '陈予', level: 'normal', required: false, hoursAgo: 75, url: null },
+  { key: 's-notion', source: 'notion', action: 'read', title: '11 月路线图（草稿）有 3 条新评论', actionTitle: '查看 路线图草稿的 3 条新评论', actor: '陈予', level: 'normal', required: false, hoursAgo: 75, url: null },
 ]
 
 /** What each bot remembers (coordinator_sessions.memory, Markdown lines). */

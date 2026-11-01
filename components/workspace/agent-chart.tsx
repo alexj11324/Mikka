@@ -1,6 +1,6 @@
 'use client'
 
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { useReducedMotion } from 'motion/react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Label, Line, LineChart, Pie, PieChart, PolarAngleAxis, PolarRadiusAxis, RadialBar, RadialBarChart, XAxis, YAxis } from 'recharts'
 import { cn } from '@/lib/utils'
@@ -15,9 +15,19 @@ const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumF
 function chartData({ labels = [], series = [], unit }: Chart) {
   const config = Object.fromEntries(series.map((item, index) => [`s${index}`, { label: item.name, color: token(index) }])) satisfies ChartConfig
   const data = labels.map((label, row) => ({ label, ...Object.fromEntries(series.map((item, index) => [`s${index}`, item.values?.[row] ?? null])) }))
-  const tick = (value: number) => `${compact.format(value)}${unit ?? ''}`
+  // Ticks are numbers only; the unit is the axis title (AxisUnit), so a long unit never wraps under a tick.
+  const tick = (value: number) => compact.format(value)
   const label = series.map(item => item.name).join(', ')
-  return { config, data, keys: Object.keys(config), tick, label }
+  return { config, data, keys: Object.keys(config), tick, label: unit ? `${label} (${unit})` : label }
+}
+
+/** The value axis's title: the unit once, above the chart, instead of after every tick. */
+function AxisUnit({ unit, children }: { unit?: string; children: ReactNode }) {
+  if (!unit) return children
+  return <div className="flex w-full min-w-0 flex-col gap-1">
+    <p className="text-xs text-muted-foreground">{unit}</p>
+    {children}
+  </div>
 }
 
 /** Bars from the shadcn chart: vertical by default, one row per label when horizontal. */
@@ -27,7 +37,7 @@ export function AgentBarChart({ horizontal, ...chart }: Chart & { horizontal?: b
   // Horizontal bars grow with the number of rows, in fixed steps up to 40rem.
   const rows = data.length * (keys.length + 1)
   const height = !horizontal ? 'h-60' : rows <= 6 ? 'h-48' : rows <= 10 ? 'h-64' : rows <= 14 ? 'h-80' : rows <= 18 ? 'h-96' : rows <= 26 ? 'h-128' : 'h-160'
-  return <ChartContainer config={config} role="img" aria-label={label} className={cn('aspect-auto w-full min-w-0', height)}>
+  return <AxisUnit unit={chart.unit}><ChartContainer config={config} role="img" aria-label={label} className={cn('aspect-auto w-full min-w-0', height)}>
     <BarChart data={data} layout={horizontal ? 'vertical' : 'horizontal'} margin={{ left: 0, right: 8, top: 8, bottom: 0 }} accessibilityLayer>
       <CartesianGrid vertical={!!horizontal} horizontal={!horizontal} />
       {horizontal ? <>
@@ -41,14 +51,14 @@ export function AgentBarChart({ horizontal, ...chart }: Chart & { horizontal?: b
       {keys.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
       {keys.map(key => <Bar key={key} dataKey={key} fill={`var(--color-${key})`} radius={4} isAnimationActive={!reduce} />)}
     </BarChart>
-  </ChartContainer>
+  </ChartContainer></AxisUnit>
 }
 
 /** A trend line per series from the shadcn chart. */
 export function AgentLineChart(chart: Chart) {
   const reduce = useReducedMotion() ?? false
   const { config, data, keys, tick, label } = chartData(chart)
-  return <ChartContainer config={config} role="img" aria-label={label} className="aspect-auto h-60 w-full min-w-0">
+  return <AxisUnit unit={chart.unit}><ChartContainer config={config} role="img" aria-label={label} className="aspect-auto h-60 w-full min-w-0">
     <LineChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 0 }} accessibilityLayer>
       <CartesianGrid vertical={false} />
       <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" minTickGap={8} />
@@ -57,7 +67,7 @@ export function AgentLineChart(chart: Chart) {
       {keys.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
       {keys.map(key => <Line key={key} dataKey={key} type="monotone" stroke={`var(--color-${key})`} strokeWidth={2} dot={false} isAnimationActive={!reduce} />)}
     </LineChart>
-  </ChartContainer>
+  </ChartContainer></AxisUnit>
 }
 
 /** ReUI c-chart-14 (stacked area, dashed strokes) with the series passed in; the first series is the solid one on top. */
@@ -65,7 +75,7 @@ export function AgentAreaChart(chart: Chart) {
   const reduce = useReducedMotion() ?? false
   const id = useId().replace(/:/g, '')
   const { config, data, keys, tick, label } = chartData(chart)
-  return <ChartContainer config={config} role="img" aria-label={label} className="aspect-auto h-60 w-full min-w-0">
+  return <AxisUnit unit={chart.unit}><ChartContainer config={config} role="img" aria-label={label} className="aspect-auto h-60 w-full min-w-0">
     <AreaChart data={data} margin={{ top: 20, right: 0, bottom: 0, left: 0 }} accessibilityLayer>
       <defs>
         {keys.map(key => <linearGradient key={key} id={`${id}-${key}`} x1="0" y1="0" x2="0" y2="1">
@@ -80,15 +90,19 @@ export function AgentAreaChart(chart: Chart) {
       {keys.length > 1 && <ChartLegend content={<ChartLegendContent />} />}
       {[...keys].reverse().map(key => <Area key={key} dataKey={key} type="natural" stackId="1" fill={`url(#${id}-${key})`} fillOpacity={0.4} stroke={`var(--color-${key})`} strokeWidth={key === keys[0] ? 2 : 0.8} strokeDasharray={key === keys[0] ? undefined : '3 3'} isAnimationActive={!reduce} />)}
     </AreaChart>
-  </ChartContainer>
+  </ChartContainer></AxisUnit>
 }
 
-type Donut = { slices?: { name: string; value: number }[]; unit?: string; total?: string }
+type SliceStatus = 'success' | 'destructive' | 'warning' | 'neutral'
+type Donut = { slices?: { name: string; value: number; status?: SliceStatus }[]; unit?: string; total?: string }
+
+// A slice that is an outcome takes its StatusBadge colour (R-34); skipped or unknown is the neutral grey.
+const statusColor: Record<SliceStatus, string> = { success: 'var(--success)', destructive: 'var(--destructive)', warning: 'var(--warning)', neutral: 'var(--muted-foreground)' }
 
 /** ReUI c-chart-19 (donut with the total in the centre) with the slices passed in. */
 export function AgentDonutChart({ slices = [], unit, total }: Donut) {
   const reduce = useReducedMotion() ?? false
-  const config = Object.fromEntries(slices.map((slice, index) => [`s${index}`, { label: slice.name, color: token(index) }])) satisfies ChartConfig
+  const config = Object.fromEntries(slices.map((slice, index) => [`s${index}`, { label: slice.name, color: slice.status ? statusColor[slice.status] : token(index) }])) satisfies ChartConfig
   const data = slices.map((slice, index) => ({ key: `s${index}`, value: slice.value }))
   const sum = slices.reduce((all, slice) => all + slice.value, 0)
   return <ChartContainer config={config} role="img" aria-label={slices.map(slice => slice.name).join(', ')} className="mx-auto aspect-square max-h-70 w-full min-w-0">

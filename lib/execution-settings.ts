@@ -15,6 +15,7 @@ import {
 } from "./execution-rules";
 import { isDeviceOnline } from "@mikka/protocol/device";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
+import { ownE2BKeySql } from "./secrets/e2b-owner-sql";
 
 export interface ExecutionSettingsScope {
   ownerId: string;
@@ -33,20 +34,19 @@ const ruleInput = z
 export class ExecutionSettings {
   constructor(readonly pool: Pool) {}
   async fallbacks(ownerId: string): Promise<ExecutionFallbacks> {
-    return (
-      (
-        await this.pool.query(
-          'SELECT "executionFallbacks" FROM "user" WHERE id=$1',
-          [ownerId],
-        )
-      ).rows[0]?.executionFallbacks ?? DEFAULT_EXECUTION_FALLBACKS
-    );
+    const stored = (
+      await this.pool.query(
+        'SELECT "executionFallbacks" FROM "user" WHERE id=$1',
+        [ownerId],
+      )
+    ).rows[0]?.executionFallbacks;
+    // Rows saved before 订阅额度用完后，自动改用 API Key also carry the retired whenQuotaExhausted.
+    return { whenDeviceOffline: stored?.whenDeviceOffline ?? DEFAULT_EXECUTION_FALLBACKS.whenDeviceOffline };
   }
   async setFallbacks(ownerId: string, value: ExecutionFallbacks) {
     const parsed = z
       .object({
         whenDeviceOffline: z.enum(["wait", "cloud"]),
-        whenQuotaExhausted: z.enum(["stop", "switchAccount"]),
       })
       .strict()
       .safeParse(value);
@@ -85,8 +85,8 @@ export class ExecutionSettings {
       model: model.modelId,
       position: 2147483647,
     };
-    // Cloud first when the workspace has its own E2B key (decision 2026-10-31-2200-run-machine-fallback).
-    if (cloud && (await query.query('SELECT 1 FROM workspace_e2b_keys WHERE "workspaceId"=$1', [scope.workspaceId])).rowCount) return cloud;
+    // Cloud first when the person has their own E2B key (decision 2026-10-31-2200-run-machine-fallback; the key is personal).
+    if (cloud && (await query.query(`SELECT ${ownE2BKeySql("$1")} AS own`, [scope.ownerId])).rows[0]?.own) return cloud;
     const devices = places
       .filter((p) => p.id !== "cloud" && p.enabled && p.online && autoScheduleOn(p))
       .sort(
@@ -457,7 +457,7 @@ export class ExecutionSettings {
   ) {
     return (
       await query.query(
-        `SELECT b.id AS "bindingId",b."ownerId",b."consumerId",b."workspaceId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan
+        `SELECT b.id AS "bindingId",b."ownerId",b."consumerId",b."workspaceId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan,c.quota
        FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
        AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
        WHERE b."ownerId"=$1 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')

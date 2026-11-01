@@ -161,6 +161,8 @@ async function lastDecision(tx: Tx, matterId: string): Promise<HandoffPayload['p
  * Coordinator.
  */
 export async function releaseAttention(userId: string, now = new Date()): Promise<boolean> {
+  // Matters from connected apps enter the person's Coordinator chat: its bot row is resolved here, before the transaction.
+  const { botId } = await (await import('@/lib/coordinator/coordinator-bot')).coordinatorBot(userId)
   return db.transaction(async tx => {
     await lock(tx, userId)
     if (!await attentionEnabled(userId, tx)) return false
@@ -191,7 +193,7 @@ export async function releaseAttention(userId: string, now = new Date()): Promis
       notifyBudget: view(budgetState('notify', await spends(tx, userId, 'notify', now), now, matter.level)),
     }
     await tx.insert(coordinatorEvents).values({
-      id: randomUUID(), userId, kind: 'matter_handoff',
+      id: randomUUID(), userId, botId, kind: 'matter_handoff',
       dedupeKey: `matter_handoff:${matter.id}:${matter.handoffs + 1}`, issueId: null, runId: null,
       payload: { ...payload }, tier: 'attention',
     }).onConflictDoNothing()

@@ -9,6 +9,7 @@ import { agentComponentCatalog, createAgentLibrary } from '../lib/agent-ui-catal
 import { detectAgentUISource } from '../lib/agent-ui-source'
 import { actionPrompt, AgentGenerativeUI } from '../components/workspace/agent-generative-ui'
 import { ReplyBubbles } from '../components/workspace/agent-text-bubble'
+import { AgentCitationsContext } from '../components/workspace/agent-citations'
 
 const library = createAgentLibrary()
 const parser = createParser(library.toJSONSchema(), library.root)
@@ -137,14 +138,28 @@ test('OpenUI Tag, Steps and an EditableTable in a Form render for the Coordinato
     assert.equal(detectAgentUISource(source.replace(/^root = /, '')).isOpenUI, true, source)
   }
   assert.match(render('root = Tag("Done", null, "sm", "success")'), /Done/)
-  assert.match(render('root = Steps([StepsItem("Kickoff", "Agree on scope.")])'), /Agree on scope/)
+  const steps = render('root = Steps([StepsItem("Kickoff", "Agree on scope.")])')
+  assert.match(steps, /Agree on scope/)
+  // The host draws Steps: the title leads in the foreground, the details are muted (R-32).
+  assert.match(steps, /font-medium text-foreground">Kickoff</)
+  assert.doesNotMatch(steps, /openui-step-title/)
   const review = render(reviewTasks)
   assert.match(review, /Write brief/)
   assert.match(review, /Create these tasks/)
+  // The Form's confirm button is the project Button at sm, not OpenUI's own (R-33).
+  assert.match(review, /data-slot="button"[^>]*>Create these tasks</)
+  assert.doesNotMatch(review, /openui-button-base/)
   // OpenUI's own save bar is English-only; ours writes edits into the Form instead.
   assert.doesNotMatch(review, /Save Changes|changes made/)
   const { EditableTable } = agentComponentCatalog
   assert.equal(EditableTable.props.safeParse({ name: 't', columns: Array(7).fill({ type: 'text', key: 'k', header: 'h' }), data: [] }).success, false)
+})
+
+test('In a chat, BeCitations leaves its links to the reply\'s one sources toggle', () => {
+  const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages}><AgentCitationsContext value={{ sources: {}, previews: {}, onOpenIssue: () => {} }}>
+    <AgentGenerativeUI response={samples.BeCitations} isStreaming={false} onAction={() => {}} />
+  </AgentCitationsContext></NextIntlClientProvider>)
+  assert.doesNotMatch(html, /OpenUI docs/)
 })
 
 test('Text inside an OpenUI card is part of the card, not a chat bubble', () => {

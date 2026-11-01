@@ -77,6 +77,35 @@ for (const width of [1280, 1440]) {
   })
 }
 
+test('1024px：Coordinator 侧栏默认收起，展开时浮在看板上；无编号不占位，列表没有版本号', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await register(page)
+  await seedTask(page, '窄窗口里的任务', { status: 'todo' })
+  await page.goto(app('/'))
+  await rail(page, '看板').click()
+
+  // Below 1280 the 360px panel would squeeze the board (R-65): it starts folded, and no column folds to a strip.
+  const card = page.getByRole('group', { name: '窄窗口里的任务', exact: true })
+  await expect(card).toBeVisible()
+  await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true })).toBeHidden()
+  await expect(page.getByRole('button', { name: '展开已完成列', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '展开对话', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Coordinator', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  // Linear sync is off, so the task has no number: no placeholder on the card (R-25, R-40).
+  await expect(card.getByText('正在分配编号', { exact: true })).toHaveCount(0)
+
+  // The list: no number placeholder, no internal version, priority as the card's icon.
+  await page.getByRole('button', { name: '列表视图', exact: true }).click()
+  const list = page.getByLabel('任务列表', { exact: true })
+  const row = list.getByRole('button', { name: /窄窗口里的任务/ })
+  await expect(row).toBeVisible()
+  await expect(row.getByText('正在分配编号', { exact: true })).toHaveCount(0)
+  await expect(row.getByText(/^v\d+$/)).toHaveCount(0)
+  await expect(row.getByRole('img', { name: '中', exact: true })).toBeVisible()
+})
+
 test('看板工具栏：范围切换、筛选和筛选条同高', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await register(page)
@@ -149,5 +178,14 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
     // The personal-task lock explains itself on hover.
     await botCard.getByLabel('个人任务', { exact: true }).hover()
     await expect(page.getByText('个人任务 · 只有你能看到', { exact: true })).toBeVisible()
+
+    // The list shows the card's own group: the Bot's blob on top, the same person, nothing when unassigned.
+    await page.getByRole('button', { name: '列表视图', exact: true }).click()
+    const list = page.getByLabel('任务列表', { exact: true })
+    const listGroup = list.getByRole('button', { name: /Bot 负责的看板任务/ }).locator('[data-slot="avatar-group"]')
+    await expect(listGroup.locator('[data-avatar]')).toHaveCount(4)
+    await expect(listGroup.locator('[data-avatar]').first()).toHaveAttribute('data-avatar', 'bot')
+    await expect(listGroup.locator('[data-avatar="member"]')).toHaveText('回')
+    await expect(list.getByRole('button', { name: /只有 PR 的看板任务/ }).locator('[data-slot="avatar-group"]')).toHaveCount(0)
   })
 })

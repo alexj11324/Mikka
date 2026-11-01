@@ -18,13 +18,14 @@ export { coordinatorTools } from './tools'
 const MAX_ROUNDS = 10
 
 /** Durable host orchestration; native harnesses still own their only model/tool loop. */
-export async function coordinatorTurn(userId: string, botId: string | null = null) {
+export async function coordinatorTurn(userId: string, botId: string) {
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
   const writable = getWritable<CoordinatorWorkflowStreamPart>()
   const computerEnabled = await steps.computerToolsEnabled()
   const mailboxEnabled = await steps.mailboxToolsEnabled()
   const writeEnabled = await steps.personalWriteToolsEnabled()
+  const coordinator = await steps.isCoordinatorChat(userId,botId)
   for (let round = 0; round < MAX_ROUNDS; round++) {
     const inbox = await steps.takeInbox(userId,holder,botId)
     if (!inbox.held) return
@@ -44,9 +45,12 @@ export async function coordinatorTurn(userId: string, botId: string | null = nul
       const scheduledAuthority = inbox.scheduledRead ? {botId,occurrence:inbox.scheduledRead} : undefined
       const streamId = `${holder}:${round}`
       await steps.writeStreamPart(writable,{type:'coordinator-turn-start',id:streamId,quietEligible:inbox.handoffOnly})
+      const hosted = selected.harness === 'ai_sdk' ? execution?.snapshot.runtime ?? await kit.botRuntime(userId,botId) : null
+      // A scheduled read publishes only its fenced result, never a chat line.
+      if (hosted && !inbox.scheduledRead) await steps.noteQuotaSwitch(userId,holder,hosted,botId)
       const result = selected.harness === 'ai_sdk'
-        ? await runHostedWorkflowTurn(execution?.snapshot.runtime ?? await kit.botRuntime(userId,botId),coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ ...scheduleOptions,...sourceOptions,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...(inbox.approvedRepositoryKey ? { approvedRepositoryKey: inbox.approvedRepositoryKey } : {}) }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot,mailboxTools)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,writable,preventClose:true },{ ownerId:userId,botId })
-        : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...(inbox.approvedRepositoryKey ? { approvedRepositoryKey: inbox.approvedRepositoryKey } : {}) }),botId,execution?.snapshot)
+        ? await runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ ...scheduleOptions,...sourceOptions,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...(inbox.approvedRepositoryKey ? { approvedRepositoryKey: inbox.approvedRepositoryKey } : {}) }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot,mailboxTools)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,writable,preventClose:true },{ ownerId:userId,botId })
+        : await nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...(inbox.approvedRepositoryKey ? { approvedRepositoryKey: inbox.approvedRepositoryKey } : {}) }),botId,execution?.snapshot)
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       let through: number
       if(inbox.scheduledRead){

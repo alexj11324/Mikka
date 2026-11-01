@@ -4,7 +4,7 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, SquareKanban, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
 import { runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
@@ -15,6 +15,8 @@ import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { ThreadStatus, harnessLabel } from './issue-threads'
 import { ThreadStatusIcon } from './thread-status-icon'
+import { HarnessMark } from '@/components/labels/entity-labels'
+import { ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
 import { listRunArtifacts } from '@/app/actions/artifacts'
@@ -40,14 +42,14 @@ const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.5 whitesp
  * card it fills the centre column and `back` names the chat it returns to (R-66).
  */
 type ThreadTab = 'chat' | 'acceptance'
-type IssueThreadPanelProps = { issueId: string; runId: string; onClose: () => void; back?: string; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void }
+type IssueThreadPanelProps = { issueId: string; runId: string; onClose: () => void; back?: string; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Opened in the centre: the task it works on, as a header link. */ onOpenTask?: () => void }
 
 export function IssueThreadPanel(props: IssueThreadPanelProps) {
   // Drafts, in-flight callbacks and retry deadlines belong to exactly one run.
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab = 'chat', onOpenThread }: IssueThreadPanelProps) {
+function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab = 'chat', onOpenThread, onOpenTask }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const { mutate: mutateCache } = useSWRConfig()
@@ -124,6 +126,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
       <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{detail?.name ?? t('title')}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
+      {back && onOpenTask && <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={onOpenTask}><SquareKanban data-icon="inline-start" />{t('openTask')}</Button>}
       {/* Frame 06 draws the machine in the wide centre-column header; the side panel has no room for it. */}
       {acceptance && back && <CandidateMachine taskId={acceptance.id} />}
       {acceptance && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
@@ -144,7 +147,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
             {items.map(item => <li key={item.id} className="flex flex-col gap-1">
               {item.kind === 'agent' && <div className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>}
-              {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" />{t('steps', { harness: harnessLabel(detail?.harness ?? ''), count: item.count })}</span>}
+              {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" /><span aria-hidden="true" className="inline-flex"><HarnessMark harness={detail?.harness ?? ''} /></span>{t('steps', { harness: harnessLabel(detail?.harness ?? ''), count: item.count })}</span>}
               {item.kind === 'error' && <FieldError className="text-xs">{item.text}</FieldError>}
               {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : (view?.status ?? data.thread.status) === 'succeeded' ? 'done' : 'failed'} />}
               {item.kind === 'person' && (item.mine
@@ -157,9 +160,14 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
                 </>)}
             </li>)}
           </ol>
+          {/* The subscription ran out and the run went on on the person's key (lib/run-quota.ts). */}
+          {data.thread.quota?.switched.map(item => <ThreadQuotaSwitchLine key={item.runId} switched={item} />)}
           {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
         </>}
     </div>
+    {data?.thread.quota?.paused && <div className={cn('shrink-0 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')}>
+      <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />
+    </div>}
     {(active || question) && detail && <div className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')}>
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}

@@ -69,7 +69,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
   const { data: bots = [] } = useSWR(open ? 'bots' : null, listBots)
-  const cloudBotId = bots[0]?.id
+  // The Coordinator takes the task on Mikka Cloud, on its own bot's computer.
+  const cloudBotId = (bots.find(bot => bot.coordinator) ?? bots[0])?.id
   // Mikka Cloud first and by default: there the Coordinator picks the bot, so no bot is named.
   // Direct daemon devices are 本机, including Linux. OS is not evidence that
   // a computer is an SSH target reached through another machine (R-23).

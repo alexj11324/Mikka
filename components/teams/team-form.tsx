@@ -52,7 +52,7 @@ export function TeamForm({ workspaceId, team, existingIdentifiers = [], editable
   return <section aria-labelledby="team-form-heading">
     <SettingsContent>
       <Button type="button" variant="ghost" size="sm" className="self-start" aria-label={team ? i18nText("FeatureCopy.c_212cf650") : i18nText("Devices.connect.back")} disabled={pending} onClick={close}><ChevronLeft data-icon="inline-start" />{team ? t('teamSettings') : t('back')}</Button>
-      <header className="flex flex-col gap-2"><h1 id="team-form-heading" className="text-2xl font-semibold tracking-tight">{team ? t('general') : t('createHeading')}</h1></header>
+      <header className="flex flex-col gap-2"><h1 id="team-form-heading" className="text-xl font-semibold">{team ? t('general') : t('createHeading')}</h1></header>
       <form aria-label={team ? i18nText("FeatureCopy.c_455685f2") : i18nText("FeatureCopy.c_4eec1ff7")} className="flex flex-col gap-8" onSubmit={event => { event.preventDefault(); void submit() }} onKeyDown={event => { if (event.nativeEvent.isComposing || event.keyCode === 229) return; if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); event.currentTarget.requestSubmit() } }}>
         <SettingsGroup className="bg-card">
           <SettingsRow title={t('iconAndName')} htmlFor="team-name" data-disabled={pending}>

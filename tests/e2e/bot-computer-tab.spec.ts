@@ -2,8 +2,8 @@ import { Pool } from 'pg'
 import { test, expect, register } from './fixtures'
 
 // Every bot's right panel has 电脑 (decisions 2026-10-31). Mikka Cloud runs on the
-// workspace's own E2B key: without one the screen offers 添加 E2B API Key, which opens
-// the same dialog as 密钥与环境; with one it is the bot's screen. Saving a key checks it
+// person's own E2B key: without one the screen offers 添加 E2B API Key, which opens
+// the same dialog as API 与订阅; with one it is the bot's screen. Saving a key checks it
 // against E2B, which no e2e run can reach, so the key row is written straight into the
 // disposable database and the tab picks it up from the shared cache without a reload.
 function e2eDatabase() {
@@ -43,8 +43,9 @@ test('电脑 tab: no E2B key offers 添加 E2B API Key; adding the key shows the
       'SELECT m."workspaceId", m."userId" FROM mikka_workspace_members m JOIN "user" u ON u.id = m."userId" WHERE u.email = $1', [email])
     expect(member).toBeTruthy()
     // Status reads only whether the row exists; the ciphertext is never opened here.
-    await pool.query(`INSERT INTO workspace_e2b_keys ("workspaceId", ciphertext, iv, "keyVersion", last4, "verifiedAt", "createdBy", "updatedBy")
-      VALUES ($1, 'e2e-not-a-key', 'e2e', 1, 'e2e0', now(), $2, $2)`, [member.workspaceId, member.userId])
+    // The key is the person's own (keys are personal).
+    await pool.query(`INSERT INTO user_e2b_keys ("userId", ciphertext, iv, "keyVersion", last4, "verifiedAt")
+      VALUES ($1, 'e2e-not-a-key', 'e2e', 1, 'e2e0', now())`, [member.userId])
     const url = page.url()
     // The key changed outside this page: focus never re-reads it (decision
     // 2026-11-01-0400-no-refetch-on-focus), the next visit does.
@@ -59,7 +60,7 @@ test('电脑 tab: no E2B key offers 添加 E2B API Key; adding the key shows the
     await expect(panel.getByText('云端助手 的屏幕', { exact: true })).toBeVisible()
     await expect(add).toHaveCount(0)
 
-    await pool.query('DELETE FROM workspace_e2b_keys WHERE "workspaceId" = $1', [member.workspaceId])
+    await pool.query('DELETE FROM user_e2b_keys WHERE "userId" = $1', [member.userId])
     await revisit(() => expect(add).toBeVisible())
     expect(page.url()).toBe(url)
   } finally { await pool.end() }

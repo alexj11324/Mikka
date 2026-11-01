@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { Download } from 'lucide-react'
-import { Bar, BarChart, XAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { getUsage } from '@/app/actions/usage'
 import { settingsRead } from '@/lib/settings-read'
 import { creditBillingKey } from '@/components/billing/balance-section'
@@ -43,7 +43,8 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
   const day = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' })
   const number = new Intl.NumberFormat(locale)
   const duration = (seconds: number) => seconds < 3600 ? t('minutes', { count: Math.round(seconds / 60) }) : t('hours', { count: number.format(Math.round(seconds / 360) / 10) })
-  const chartConfig = { threads: { label: t('threads'), color: 'var(--foreground)' } } satisfies ChartConfig
+  // The one accent (R-30), on data.
+  const chartConfig = { threads: { label: t('threads'), color: 'var(--sidebar-primary)' } } satisfies ChartConfig
   const admin = data?.scope === 'workspace'
   const rows: Array<UsageRow | BotUsageRow> = data ? admin && view === 'members' ? data.members : data.bots : []
 
@@ -86,8 +87,11 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
       </dl>
       <div data-settings-card className="rounded-2xl border bg-card p-4">
         <ChartContainer config={chartConfig} className="aspect-auto h-44 w-full" aria-label={t('chartLabel')}>
+          {/* Weekly ticks (days 1, 8, 15, 22, 29) so the axis is evenly spaced; a y axis with grid lines gives the bars a scale. */}
           <BarChart data={data.daily} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
-            <XAxis dataKey="date" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={24} tickFormatter={value => day.format(new Date(`${value}T00:00:00Z`))} />
+            <CartesianGrid vertical={false} />
+            <YAxis tickLine={false} axisLine={false} width={28} allowDecimals={false} tickFormatter={value => number.format(Number(value))} />
+            <XAxis dataKey="date" tickLine={false} axisLine={false} interval={0} ticks={data.daily.filter((_, index) => index % 7 === 0).map(item => item.date)} tickFormatter={value => day.format(new Date(`${value}T00:00:00Z`))} />
             <ChartTooltip cursor={false} content={<ChartTooltipContent labelFormatter={value => day.format(new Date(`${String(value)}T00:00:00Z`))} />} />
             <Bar dataKey="threads" fill="var(--color-threads)" radius={2} />
           </BarChart>

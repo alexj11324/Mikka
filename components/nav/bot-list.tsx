@@ -18,6 +18,7 @@ import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
 import { SPRING_SIDEBAR } from '@/lib/ease'
 import { chatPreview } from '@/lib/agent-history'
 import { fetchGroups } from '@/lib/group-messages'
+import { namedCitations } from '@/lib/coordinator/citations'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
 
@@ -92,8 +93,11 @@ function botMood(threads: Thread[], botId: string, chatting: boolean): BotMood {
 /** Green while the bot is working, orange while it waits on you; otherwise no dot. */
 type RowStatus = 'working' | 'waiting'
 
+/** Hover is one overlay step, the current bot the next one up, so a hovered row never looks selected (R-38). */
+const ROW_FILL = 'hover:bg-control active:bg-control data-active:bg-control-hover data-active:hover:bg-control-hover'
+
 function Row({ name, preview, avatar, status, current, unread, onClick, label }: { name: string; preview: ReactNode; avatar: ReactNode; status?: RowStatus; current: boolean; unread: boolean; onClick: () => void; label: string }) {
-  return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={label} onClick={onClick} className="h-13 gap-2.5 rounded-xl px-2.5">
+  return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={label} onClick={onClick} className={cn('h-13 gap-2.5 rounded-xl px-2.5', ROW_FILL)}>
     <span className="relative shrink-0">
       {avatar}
       {status && <span aria-hidden="true" className={cn('absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-sidebar', status === 'working' ? 'bg-success' : 'bg-attention')} />}
@@ -120,11 +124,14 @@ export function BotList({ bots, workspaceId, threads, active, onOpen, onNewBot, 
   const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: 15000 })
   // Group chats sit among the bots (R-01), ordered by their latest message.
   const { data: groups = [] } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: 15000 })
-  const rows = [...bots.map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
+  // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots.
+  const rows = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
     .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
   const lastReply = coordinator?.items.findLast(item => item.from !== 'event')
   const latest: Record<string, string> = {}
-  for (const [botId, chat] of Object.entries(chats)) if (chat.at) latest[botId] = chat.at
+  // The Coordinator's row is read as 'coordinator', from its chat's latest reply below.
+  const coordinatorId = bots.find(bot => bot.coordinator)?.id
+  for (const [botId, chat] of Object.entries(chats)) if (chat.at && botId !== coordinatorId) latest[botId] = chat.at
   for (const group of groups) if (group.lastMessage) latest[group.id] = group.lastMessage.createdAt
   if (lastReply?.from === 'coordinator') latest.coordinator = lastReply.createdAt
   const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : active?.kind === 'group' ? active.id : null
@@ -165,7 +172,7 @@ export function BotList({ bots, workspaceId, threads, active, onOpen, onNewBot, 
         <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}
           status={coordinator?.working ? 'working' : undefined}
-          preview={previewOf(lastReply?.text)} />
+          preview={previewOf(lastReply?.from === 'coordinator' ? namedCitations(lastReply.text, coordinator?.sources ?? {}) : lastReply?.text)} />
         {rows.map(row => {
           if (row.kind === 'group') {
             const { group } = row

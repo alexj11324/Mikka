@@ -16,9 +16,9 @@ export function agentKitDefaults() {
 }
 export const agentKitStore = new AgentKitStore(pool)
 
-/** Identity is derived from the host, never tool input or imported configuration. */
-export async function agentScope(ownerId: string, botId: string | null, appClient?: Pick<PoolClient, 'query'>, workspaceClient?: Pick<PoolClient, 'query'>): Promise<AgentScope> {
-  if (!botId) return { ownerId,botId:null,workspaceId:null }
+/** Identity is derived from the host, never tool input or imported configuration. No bot: the person's Coordinator, an ordinary bot row. */
+export async function agentScope(ownerId: string, chatBot: string | null, appClient?: Pick<PoolClient, 'query'>, workspaceClient?: Pick<PoolClient, 'query'>): Promise<AgentScope> {
+  const botId = chatBot ?? await (await import('@/lib/coordinator/coordinator-bot')).chatBotId(ownerId, null, { backfill: false })
   const bot = appClient
     ? (await appClient.query<{ workspaceId: string }>('select "workspaceId" from bots where id=$1 and "ownerId"=$2 for share', [botId, ownerId])).rows[0]
     : (await db.select({ workspaceId:bots.workspaceId }).from(bots).where(and(eq(bots.id,botId),eq(bots.ownerId,ownerId))).limit(1))[0]

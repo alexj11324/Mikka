@@ -113,6 +113,14 @@ export const bots = pgTable('bots', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
 
+/** The bot row that is a person's Coordinator in a workspace (drizzle/20261101140000); see lib/coordinator/coordinator-bot.ts. */
+export const coordinatorBots = pgTable('coordinator_bots', {
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull(),
+  botId: uuid('botId').notNull().unique().references(() => bots.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.ownerId, table.workspaceId] })])
+
 /** Personal execution preferences in the same workspace scope as Bots. The
  * default uses a null label and is stored alongside label rules. */
 export const executionRules = pgTable('execution_rules', {
@@ -330,14 +338,16 @@ export const agentRuns = pgTable('agent_runs', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   agentId: uuid('agentId').notNull().references(() => agents.id, { onDelete: 'cascade' }),
-  /** The bot that started this thread; null for runs started from a task directly. */
+  /** The bot that started this thread, the Coordinator included; null for an MCP client's run. */
   botId: uuid('botId').references(() => bots.id, { onDelete: 'set null' }),
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
   /** Authenticated daemon token that claimed this run; unknown for old runs. */
   deviceTokenId: uuid('deviceTokenId'),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
-  pauseReason: text('pauseReason').$type<'human_control' | null>(),
+  pauseReason: text('pauseReason').$type<'human_control' | 'quota_exhausted' | null>(),
+  /** A run paused on `quota_exhausted`: when the CLI said the subscription's quota resets; null when it gave no time. */
+  quotaResetsAt: timestamp('quotaResetsAt', { withTimezone: true }),
   resumeStatus: text('resumeStatus').$type<RunStatus | null>(),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),
@@ -397,7 +407,7 @@ export const runPublications = pgTable('run_publications', {
   remoteUrl: text('remoteUrl').notNull(), remoteKey: text('remoteKey').notNull(),
   identifier: text('identifier'), branch: text('branch'), baseBranch: text('baseBranch'),
   pushApproved: boolean('pushApproved').notNull().default(false),
-  status: text('status').$type<'assigned' | 'pending' | 'processing' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
+  status: text('status').$type<'assigned' | 'pending' | 'processing' | 'awaiting_approval' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
   workflowRunId: text('workflowRunId'), leaseToken: uuid('leaseToken'), leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   attempts: integer('attempts').notNull().default(0),
   pullRequest: jsonb('pullRequest').$type<{ url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed' } | null>(),
@@ -459,7 +469,7 @@ export const runTokens = pgTable('run_tokens', {
  * (lib/attention): the person has not seen it, and the Coordinator alone
  * decides whether to tell them.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff', 'run_dispatch_failed', 'run_redispatched'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff', 'run_dispatch_failed', 'run_redispatched', 'run_credential_switched', 'run_quota_paused'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
@@ -470,7 +480,7 @@ export type CoordinatorEventTier = (typeof COORDINATOR_EVENT_TIERS)[number]
 
 export const coordinatorEvents = pgTable('coordinator_events', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
-  /** The bot whose chat this is for; null for the Coordinator's. */
+  /** The bot whose chat this is for, the Coordinator's bot row included; null only on rows from before it had one (lib/coordinator/coordinator-bot.ts moves them). */
   botId: uuid('botId').references(() => bots.id, { onDelete: 'cascade' }),
   kind: text('kind').$type<CoordinatorEventKind>().notNull(),
   dedupeKey: text('dedupeKey').notNull().unique('coordinator_events_dedupe_key'),
@@ -506,7 +516,7 @@ export const coordinatorEvents = pgTable('coordinator_events', {
  */
 export const coordinatorSessions = pgTable('coordinator_sessions', {
   userId: text('userId').notNull(),
-  /** A bot's own conversation on the same harness; null for the Coordinator. */
+  /** The bot whose conversation this is, the Coordinator's bot row included; null only before its first access (lib/coordinator/coordinator-bot.ts). */
   botId: uuid('botId').references(() => bots.id, { onDelete: 'cascade' }),
   leaseHolder: text('leaseHolder'),
   leaseUntil: timestamp('leaseUntil', { withTimezone: true }),
@@ -537,6 +547,8 @@ export type SuggestionDecider = 'rule' | 'model' | 'fallback'
 
 export const suggestions = pgTable('suggestions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** The person's Coordinator bot row, stored when the suggestion is made: sending it writes to that chat (drizzle/20261101160000). Null on older rows. */
+  botId: uuid('botId'),
   source: text('source').$type<SuggestionSource>().notNull(),
   externalId: text('externalId').notNull(),
   action: text('action').$type<SuggestionAction>().notNull(),
@@ -807,7 +819,7 @@ export const conversationMessages = pgTable('conversation_messages', {
   authorId: text('authorId').notNull(), body: text('body').notNull(), mentions: jsonb('mentions').notNull().default([]),
   replyToId: uuid('replyToId'), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('conversation_messages_position_key').on(t.conversationId, t.position), index('conversation_messages_timeline_idx').on(t.conversationId, t.position.desc())])
-/** A person's 置顶 and 通知 for one chat: a bot's id or 'coordinator' (drizzle/20261101020600). */
+/** A person's 置顶 and 通知 for one chat, keyed by the bot's id (the Coordinator's bot row too; drizzle/20261101020600). */
 export const chatPreferences = pgTable('chat_preferences', {
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }), chatKey: text('chatKey').notNull(),
   pinned: boolean('pinned').notNull().default(false), muted: boolean('muted').notNull().default(false),
@@ -964,6 +976,8 @@ export const PENDING_ACTION_STATUSES = ['pending', 'running', 'done', 'failed', 
 export type PendingActionStatus = (typeof PENDING_ACTION_STATUSES)[number]
 export const pendingActions = pgTable('pending_actions', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** The bot whose chat proposed it (the Coordinator's bot row too): the decision goes back there (drizzle/20261101160000). Null on older rows. */
+  botId: uuid('botId'),
   action: text('action').notNull(),
   connectedAccountId: text('connectedAccountId'),
   input: jsonb('input').$type<Record<string, unknown>>().notNull(),

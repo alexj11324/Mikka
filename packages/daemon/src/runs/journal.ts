@@ -12,9 +12,16 @@ import { readJson, writeJsonAtomic } from "../fs-util"
 import type { RunAssignment } from "../server-link"
 import { withoutTaskEnv } from "../task-env"
 
-/** 4e3: the task's user variables (secrets) live in memory only, never in the journal file. */
+/**
+ * 4e3: the task's user variables (secrets) and the run's model credential live
+ * in memory only, never in the journal file. A run that had a credential is
+ * marked, so a restarted daemon stops it instead of running it without one.
+ */
 function persisted(entries: Record<string, JournalEntry>): Record<string, JournalEntry> {
-  return Object.fromEntries(Object.entries(entries).map(([id, entry]) => [id, { ...entry, assignment: withoutTaskEnv(entry.assignment) as RunAssignment }]))
+  return Object.fromEntries(Object.entries(entries).map(([id, entry]) => {
+    const { modelCredential, ...assignment } = withoutTaskEnv(entry.assignment) as RunAssignment
+    return [id, { ...entry, assignment: assignment as RunAssignment, ...(modelCredential ? { credentialWithheld: true as const } : {}) }]
+  }))
 }
 
 export interface JournalEntry {
@@ -37,6 +44,8 @@ export interface JournalEntry {
   questionResumeState?: "starting" | "accepted"
   /** A durable help request still needs this worktree for its original session. */
   waitingQuestionId?: string
+  /** The run was claimed with a model credential, which the journal file never holds. */
+  credentialWithheld?: true
   updatedAt: string
 }
 

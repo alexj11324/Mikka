@@ -17,7 +17,7 @@ export function runStopTimeoutRemaining(requestedAt: number, now = Date.now()) {
 export function runStatusKey(status: string) {
   switch (status) {
     case 'queued': case 'preparing': case 'running': case 'waiting_input': case 'finishing':
-    case 'succeeded': case 'stopped': case 'failed': case 'cancelled': return status
+    case 'succeeded': case 'stopped': case 'failed': case 'cancelled': case 'paused': return status
     default: return null
   }
 }

@@ -28,6 +28,8 @@ test('建议：卡片列表与 Coordinator 对话各占一半；发出的卡片�
   const card = page.locator('button[data-slot="suggestion-card"]').filter({ hasText: subject })
   await expect(card).toContainText('回复')
   await expect(card.locator('[data-slot="source-mention"]')).toHaveText('Gmail')
+  // The mark keeps 4px off the words after it.
+  expect(await card.locator('[data-slot="source-mention"]').evaluate(mention => parseFloat(getComputedStyle(mention).marginRight))).toBeGreaterThanOrEqual(4)
 
   const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
   const sent = chat.locator('[data-slot="suggestion-card"]').filter({ hasText: 'PR #212 的类型检查' })

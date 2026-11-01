@@ -50,7 +50,9 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
     return deviceId
   }
-  const dispatch = (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId)
+  // No bot named: the person's Coordinator, an ordinary bot row the app resolves.
+  const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
+  const dispatch = async (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, await chatBotId(userId, botId))
   type NoMachine = { error: string; card: { title: string; options: { value: string; action: string }[] } }
   const actions = (result: NoMachine) => result.card.options.map(option => option.action)
   const runOf = async (runId: string) => (await pool.query('SELECT "deviceId",status FROM agent_runs WHERE id=$1', [runId])).rows[0]
@@ -107,8 +109,12 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     const c = await person('cloud')
     const { botId } = await cloudReady(c)
     await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), c.id, c.workspaceId])
-    // The Coordinator has no cloud runtime of its own and never borrows a bot's.
-    const coordinator = await dispatch(c.id, c.issueId) as unknown as NoMachine
+    // The Coordinator uses its own hidden bot's runtime and never borrows a bot's. Here E2B
+    // refuses to wake that hidden bot's desktop, so it gets the card.
+    const { botRuntimeProvisioner } = await import('../lib/computer/auto-runtime')
+    const provision = botRuntimeProvisioner.provision
+    botRuntimeProvisioner.provision = async () => { throw new Error('E2B refused') }
+    const coordinator = await dispatch(c.id, c.issueId).finally(() => { botRuntimeProvisioner.provision = provision }) as unknown as NoMachine
     assert.equal(coordinator.error, 'machineUnavailable')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [c.id])).rows[0].n, 0, 'no cloud run on the bot computer')
     const refused = await dispatch(c.id, c.issueId, botId) as unknown as NoMachine
