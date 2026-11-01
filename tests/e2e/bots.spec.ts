@@ -87,8 +87,8 @@ test('连续按下发送只提交一次', async ({ page }) => {
   await expect(page.getByText('只提交一次', { exact: true })).toHaveCount(1)
 })
 
-// A08: a send that fails must keep the draft and say it failed, then retry.
-test('发送失败后草稿仍保留，恢复后可再发', async ({ page }) => {
+// A08: a send that fails stays in the chat as a failed message with 重试 (iMessage, Slack), and 重试 sends it once.
+test('发送失败的消息留在对话里，点重试后发出', async ({ page }) => {
   await register(page)
   const composer = page.getByLabel('给 Coordinator 发消息', { exact: true })
   await hydrated(composer)
@@ -100,11 +100,14 @@ test('发送失败后草稿仍保留，恢复后可再发', async ({ page }) => 
   }
   await page.route('**/*', failPost)
   await composer.press('Enter')
-  await expect(page.getByRole('alert')).toBeVisible()
-  await expect(composer).toHaveValue('发送失败时保留')
+  const failed = page.getByTestId('failed-message')
+  await expect(failed.getByText('发送失败时保留', { exact: true })).toBeVisible()
+  await expect(failed.getByRole('alert')).toHaveText(/未确认送达/)
+  await expect(composer).toHaveValue('')
   await page.unroute('**/*', failPost)
-  await composer.press('Enter')
-  await expect(page.getByText('发送失败时保留', { exact: true })).toBeVisible()
+  await failed.getByRole('button', { name: '重试', exact: true }).click()
+  await expect(failed).toHaveCount(0)
+  await expect(page.getByText('发送失败时保留', { exact: true })).toHaveCount(1)
 })
 
 // A28: the limit is visible near the edge, and over-long input is truncated
