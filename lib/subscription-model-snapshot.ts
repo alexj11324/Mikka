@@ -10,6 +10,8 @@ export const hostedSubscriptionSnapshotSchema = z.strictObject({
   coordinator: z.literal(true).optional(),
   type: z.literal('subscription'), bindingId: z.uuid(), ownerId: z.string().min(1),
   consumerId: z.uuid(), workspaceId: z.uuid(), connectionId: z.uuid(),
+  /** Set when the bot runs on another member's shared subscription (allowOthers): the run's owner. `ownerId` is the subscription's. */
+  runOwnerId: z.string().min(1).optional(),
   connectionRevision: z.number().int().positive(), modelId: z.string().min(1).max(128),
   route: z.enum(['codex_cpa', 'claude_cpa', 'openai_siwc']),
 })
@@ -29,18 +31,19 @@ function cancelled(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Model resolution cancelled', 'AbortError')
 }
 function checkScope(scope: HostedModelScope, value: HostedSubscriptionSnapshot) {
-  if (scope.ownerId !== value.ownerId || (scope.botId === null ? value.coordinator !== true : scope.botId !== value.consumerId || value.coordinator === true) || scope.workspaceId !== value.workspaceId) throw refuse()
+  if (scope.ownerId !== (value.runOwnerId ?? value.ownerId) || value.runOwnerId === value.ownerId || (value.runOwnerId !== undefined && scope.botId === null) || (scope.botId === null ? value.coordinator !== true : scope.botId !== value.consumerId || value.coordinator === true) || scope.workspaceId !== value.workspaceId) throw refuse()
 }
 /** Called only inside first execution reservation, never before replay lookup. */
-export async function freezeHostedModelSelection(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, selection: unknown, dependencies: HostedModelDependencies): Promise<HostedRuntimeSnapshot> {
+export async function freezeHostedModelSelection(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, selection: unknown, dependencies: HostedModelDependencies, subscriptionOwnerId = scope.ownerId): Promise<HostedRuntimeSnapshot> {
   if (selection === undefined) return { harness: runtime.harness, model: runtime.model }
   if (runtime.harness !== 'ai_sdk' || !scope.workspaceId) throw refuse()
   const requested = agentModelSourceSchema.safeParse(selection)
   if (!requested.success) throw refuse()
   const service = dependencies.service()
-  const binding = await service.repository.binding(scope.ownerId, requested.data.bindingId)
+  const binding = await service.repository.binding(subscriptionOwnerId, requested.data.bindingId)
   const value = hostedSubscriptionSnapshotSchema.parse({
     ...(scope.botId === null ? {coordinator:true} : {}),
+    ...(subscriptionOwnerId !== scope.ownerId ? { runOwnerId: scope.ownerId } : {}),
     type: 'subscription', bindingId: binding.id, ownerId: binding.ownerId,
     consumerId: binding.consumerId, workspaceId: binding.workspaceId,
     connectionId: binding.connectionId, connectionRevision: binding.connectionRevision,
@@ -48,8 +51,9 @@ export async function freezeHostedModelSelection(scope: HostedModelScope, runtim
   })
   checkScope(scope, value)
   await dependencies.workspace(scope.ownerId, value.workspaceId)
-  const connection = await service.repository.connection(scope.ownerId, value.connectionId)
-  if (connection.ownerId !== scope.ownerId || connection.workspaceId !== value.workspaceId || Number(connection.epoch) !== value.connectionRevision || connection.state !== 'connected') throw refuse()
+  const connection = await service.repository.connection(value.ownerId, value.connectionId)
+  // The connection is the subscription owner's, from any workspace; the binding carries the run's workspace.
+  if (connection.ownerId !== value.ownerId || Number(connection.epoch) !== value.connectionRevision || connection.state !== 'connected') throw refuse()
   return { harness: 'ai_sdk', model: value.modelId, modelSelection: value }
 }
 /** Re-check the frozen identity, not the latest/default binding, on every model call. */
@@ -67,16 +71,16 @@ export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime:
     cancelled(signal)
     const { assertSubscriptionModelTransport } = await import('./model-admission/runtime')
     await assertSubscriptionModelTransport({ workspaceId: frozen.workspaceId, ownerId: scope.ownerId }, frozen.modelId, frozen.route, signal, false)
-    const binding = await service.repository.binding(scope.ownerId, frozen.bindingId)
+    const binding = await service.repository.binding(frozen.ownerId, frozen.bindingId)
     for (const [key, expected] of Object.entries({ id: frozen.bindingId, ownerId: frozen.ownerId, consumerId: frozen.consumerId, workspaceId: frozen.workspaceId, connectionId: frozen.connectionId, connectionRevision: frozen.connectionRevision, modelId: frozen.modelId, route: frozen.route })) {
       if (binding[key as keyof typeof binding] !== expected) throw refuse()
     }
-    const connection = await service.repository.connection(scope.ownerId, frozen.connectionId)
-    if (connection.ownerId !== frozen.ownerId || connection.workspaceId !== frozen.workspaceId || Number(connection.epoch) !== frozen.connectionRevision || connection.state !== 'connected') throw refuse()
+    const connection = await service.repository.connection(frozen.ownerId, frozen.connectionId)
+    if (connection.ownerId !== frozen.ownerId || Number(connection.epoch) !== frozen.connectionRevision || connection.state !== 'connected') throw refuse()
     cancelled(signal)
   }
   await verify()
-  const model = await resolveAgentExecutionModel({ ownerId: scope.ownerId, consumerId: frozen.consumerId, source: { type: 'subscription', bindingId: frozen.bindingId }, signal }, {
+  const model = await resolveAgentExecutionModel({ ownerId: frozen.ownerId, consumerId: frozen.consumerId, source: { type: 'subscription', bindingId: frozen.bindingId }, signal }, {
     defaultModel: () => { throw refuse() }, subscriptionService: () => service, workspace: dependencies.workspace,
   }).catch(async (error) => {
     if (
@@ -84,6 +88,8 @@ export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime:
       error.code !== "quota_exhausted"
     )
       throw error;
+    // Switching accounts is the run owner's choice over their own subscriptions, never another member's.
+    if (frozen.runOwnerId) throw error;
     const { ExecutionSettings } = await import("./execution-settings");
     const { pool } = await import("./db");
     const settings = new ExecutionSettings(pool);

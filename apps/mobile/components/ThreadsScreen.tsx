@@ -7,7 +7,7 @@ import { MachineIcon, Spinner, StatusIcon } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Dot } from '@/components/ui'
-import type { Thread, Threads } from '@/lib/types'
+import type { BotPage, Thread, Threads } from '@/lib/types'
 import { openChat } from '@/lib/navigate'
 import { useApi, useRefresh } from '@/lib/useApi'
 import { colors, lift } from '@/lib/theme'
@@ -39,20 +39,21 @@ const STATES: { title: string; match: (status: Thread['status']) => boolean }[] 
 const rank = (thread: Thread) => (thread.status === 'waiting' ? 0 : thread.status === 'running' ? 1 : 2)
 
 /** 线程, like the Claude app's Code screen: 设备 chips, filter menu, 新线程 pill (mobile.md). */
-export function ThreadsScreen({ bot }: { bot?: string }) {
+export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   const router = useRouter()
   // `bot`: one bot's threads, pushed over its chat; otherwise the 线程 tab.
   const pushed = bot !== undefined
   const insets = useSafeAreaInsets()
-  const { data, loading, error, reload } = useApi<Threads>('/api/mobile/threads', 10_000)
+  const { data, loading, error, reload } = useApi<Threads | BotPage>(bot ? `/api/mobile/bots/${bot.id}` : '/api/mobile/threads', 10_000)
+  const devices = data && 'devices' in data ? data.devices : []
   const refresh = useRefresh(reload)
   const [machine, setMachine] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [menu, setMenu] = useState(false)
 
   const list = useMemo(() => (data?.threads ?? [])
-    .filter(t => matches(t, filter) && (!machine || t.device?.id === machine) && (!bot || t.by === bot))
-    .sort((a, b) => rank(a) - rank(b)), [data, filter, machine, bot])
+    .filter(t => matches(t, filter) && (!machine || t.device?.id === machine))
+    .sort((a, b) => rank(a) - rank(b)), [data, filter, machine])
   // 全部: grouped by state, waiting on the person first (mobile.md 线程).
   const rows: (Thread | { title: string })[] = filter !== 'all' ? list : STATES.flatMap(state => {
     const items = list.filter(thread => state.match(thread.status))
@@ -63,7 +64,7 @@ export function ThreadsScreen({ bot }: { bot?: string }) {
     <View style={styles.screen}>
       <NavBar
         back={pushed ? () => router.back() : undefined}
-        title={bot ? `${bot} 的线程` : '线程'}
+        title={bot ? `${bot.name} 的线程` : '线程'}
         large={!pushed}
         right={[{ icon: 'square.and.pencil', label: '新线程', web: <Plus size={20} color={colors.ink} strokeWidth={2} />, onPress: () => openChat({ pathname: '/bots/[id]', params: { id: 'coordinator', compose: '1' } }) }, { icon: 'line.3.horizontal.decrease', label: '筛选', web: <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />, onOpen: () => setMenu(true),
           items: filters.map(f => ({ label: f.label, icon: f.symbol, on: filter === f.id, onPress: () => setFilter(f.id) })) }]}
@@ -76,9 +77,9 @@ export function ThreadsScreen({ bot }: { bot?: string }) {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         ListHeaderComponent={
           <View>
-            {data?.devices.length ? <Text style={styles.section}>设备</Text> : null}
+            {devices.length ? <Text style={styles.section}>设备</Text> : null}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              {(data?.devices ?? []).map(m => {
+              {devices.map(m => {
                 const active = machine === m.id
                 return (
                   <Pressable key={m.id} accessibilityRole="button" onPress={() => setMachine(active ? null : m.id)} style={[styles.chip, active && styles.chipActive]}>
@@ -113,7 +114,7 @@ export function ThreadsScreen({ bot }: { bot?: string }) {
 }
 
 /** Status icon, name, one grey line: the Agent running it (R-78) and the machine icon. Only 等你回复 adds a word (mobile.md). */
-function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => void }) {
+export function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       <View style={styles.rowIcon}><StatusIcon status={thread.status} size={20} /></View>

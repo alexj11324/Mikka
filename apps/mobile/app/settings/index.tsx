@@ -11,6 +11,7 @@ import { Symbol, type SymbolName } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { CloseButton, Group } from '@/components/ui'
 import { authClient } from '@/lib/auth'
+import { clearApiCache } from '@/lib/useApi'
 import { useSettings } from '@/lib/settings'
 import { versionLabel } from '@/lib/updates'
 import { colors } from '@/lib/theme'
@@ -29,6 +30,7 @@ export default function SettingsScreen() {
   const signOut = async () => {
     if (Platform.OS !== 'web') await (await import('@/lib/push')).unregisterPush()
     await authClient.signOut()
+    clearApiCache()
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>

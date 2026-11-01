@@ -4,6 +4,7 @@ import type { SubscriptionService } from './subscription-service'
 import { WorkerRefusal } from '../packages/daemon/src/subscription-worker-client'
 import { noteLogUser } from './request-log'
 import { accountLabel, failedUsage, usageCache } from './subscription-usage'
+import { stopRunsUsingSubscriptions } from './personal-policy'
 
 const id = z.uuid()
 const input = z.discriminatedUnion('action', [
@@ -88,6 +89,8 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         result = { id: row.id, removed: true }
       }
       else { await worker.call(body.action, { revision: body.revision }, request.signal); result = await service.status(session.userId, row.id, request.signal) }
+      // 断开连接 / 移除: runs using this connection stop now, wherever they run.
+      if (body.action === 'disconnect' || body.action === 'remove') await stopRunsUsingSubscriptions(service.repository.pool, { ownerId: session.userId, connectionId: row.id })
       return Response.json(result, { headers })
     } catch (error) {
       const code = refusalCode(error)
@@ -106,9 +109,13 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
     if (session.tokenWorkspaceId && session.tokenWorkspaceId !== workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
     await deps.workspace(session.userId, workspaceId)
-    const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and "removedAt" is null and "credentialVersion">0 and state<>\'disconnected\' order by "createdAt" desc limit 50', [session.userId, workspaceId])
+    // A subscription belongs to the account (decision 2026-10-31-2130): every workspace lists the same
+    // connections. The same provider account connected in two workspaces shows once; nothing is deleted.
+    const { rows: all } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel","providerSubject" from byos_connections where "ownerId"=$1 and "removedAt" is null and "credentialVersion">0 and state<>\'disconnected\' order by "createdAt" desc limit 50', [session.userId])
+    const subjects = new Set<string>()
+    const rows = all.filter(row => !row.providerSubject || (subjects.has(`${row.provider}:${row.providerSubject}`) ? false : (subjects.add(`${row.provider}:${row.providerSubject}`), true)))
     // Which Bots use each connection is a nicety: the list still loads without it.
-    const bots = await service.repository.connectionBots(session.userId, workspaceId).catch(() => [])
+    const bots = await service.repository.connectionBots(session.userId).catch(() => [])
     // Listing needs custody only; sign-in needs the full runtime (connect). Offer
     // 连接 only when that runtime exists, or every click fails the same way.
     let signIn: SubscriptionService | null = null
@@ -133,7 +140,7 @@ export async function subscriptionUsage(request: Request, deps: SubscriptionHTTP
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
     if (session.tokenWorkspaceId && session.tokenWorkspaceId !== workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
     await deps.workspace(session.userId, workspaceId)
-    const { rows } = await service.repository.pool.query('select id,epoch from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and state=\'connected\' order by "createdAt" desc limit 20', [session.userId, workspaceId])
+    const { rows } = await service.repository.pool.query('select id,epoch from byos_connections where "ownerId"=$1 and state=\'connected\' order by "createdAt" desc limit 20', [session.userId])
     const force = new URL(request.url).searchParams.get('refresh') === '1'
     const connections = await Promise.all(rows.map(row => cachedUsage(`${session.userId}:${row.id}:${row.epoch}`, () =>
       service.usage(session.userId, row.id, AbortSignal.timeout(15_000)).catch(() => failedUsage(row.id, 'unavailable')), force)))

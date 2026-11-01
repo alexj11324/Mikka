@@ -50,6 +50,8 @@ jobs:
       - run: pnpm --filter @mikka/protocol exec vitest run src/subscription.test.ts
       - run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
       - run: pnpm --filter @mikka/daemon exec vitest run test/subscription-hosted-runner.test.ts
+      # Docker mode on devices: the runner image (harness/Dockerfile) and one disposable run container.
+      - run: pnpm --filter @mikka/daemon test:run-container
       - run: pnpm test:byos-worker
         env:
           MIKKA_BYOS_BACKEND_ONLY: '1'

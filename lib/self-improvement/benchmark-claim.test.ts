@@ -73,6 +73,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     }},
     '@/lib/subscription-runtime':{},
     '@/lib/computer/native-run-binding':{},
+    '@/lib/personal-policy':{sharedNativeBinding:async()=>null},
     '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
     '@/lib/secrets/runtime':{taskSecretInjection:async()=>({env:{},secretNames:[]}),remoteRepositoryRef:()=>null},
     '@/lib/personal-mailbox-config':{personalMailboxEnabled:()=>false},

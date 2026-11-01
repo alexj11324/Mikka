@@ -10,6 +10,7 @@ export type SettingsSectionId =
 
 export interface SettingsSectionDef {
   id: SettingsSectionId
+  /** 'personal' is the 账号 group (account-level); 'workspace' is the current workspace's group. */
   group: 'personal' | 'workspace'
   /** English name; the sidebar search matches it in any locale. */
   title: string
@@ -84,6 +85,9 @@ export function settingsHref(id: SettingsSectionId, workspaceId?: string): strin
   return `/settings?${search}`
 }
 
-export function visibleSettingsSections({ admin }: { admin: boolean }): SettingsSectionDef[] {
-  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly))
+/** A personal workspace has only its owner, so it has no members, team permissions or audit log (decision 2026-10-31-2130). */
+export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'permissions', 'audit'])
+
+export function visibleSettingsSections({ admin, personal = false }: { admin: boolean; personal?: boolean }): SettingsSectionDef[] {
+  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)))
 }

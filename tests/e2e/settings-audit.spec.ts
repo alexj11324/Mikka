@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
-import { test, expect, register, app } from './fixtures'
+import { test, expect, registerInTeam, app } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
 // N6 审计日志 (Figma 554:9417): a real write (an address change in 常规) shows up for the admin.
 test('审计日志按天列出地址修改，可筛选安全并导出 CSV', async ({ page }, testInfo) => {
-  await register(page, '/settings?section=audit')
+  await registerInTeam(page, '/settings?section=audit')
   await expect(page.getByRole('heading', { level: 1, name: '审计日志' })).toBeVisible()
   await expect(page.getByText('最近 90 天没有记录。')).toBeVisible()
   await attachLightDark(page, testInfo, 'audit-empty')

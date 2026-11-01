@@ -107,6 +107,23 @@ export const devicePaths = {
 
 /** `POST /v1/devices/register` */
 export const deviceComputerCapability = z.object({ installed: z.boolean(), version: z.string().max(100).nullable() }).strict()
+/**
+ * What this machine can run (2026-10-31, devices are runners): the daemon
+ * installs its own pinned harnesses, so this reports their install state,
+ * never which agents the person installed.
+ */
+export const deviceRunnerCapability = z.object({
+  os: z.string().max(50),
+  arch: z.string().max(50),
+  freeDiskBytes: z.number().int().nonnegative().nullable(),
+  docker: z.boolean(),
+  harnesses: z.array(z.object({
+    harness: harnessSchema,
+    state: z.enum(["installed", "not_installed", "unsupported"]),
+    version: z.string().max(100),
+  })).max(20),
+})
+export type DeviceRunnerCapability = z.infer<typeof deviceRunnerCapability>
 export const deviceRegistration = z.object({
   deviceType: z.enum(["laptop", "server"]).optional(),
   name: z.string().trim().min(1).max(200),
@@ -117,6 +134,7 @@ export const deviceRegistration = z.object({
   protocolVersion: z.number().int(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
+  runner: deviceRunnerCapability.optional(),
   /**
    * This machine's one device id, the same in every workspace (ADR ORV-284).
    * Registering with it in another workspace joins the same device there.
@@ -152,6 +170,7 @@ export const deviceHeartbeatSchema = z.object({
   failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
+  runner: deviceRunnerCapability.optional(),
   deviceType: z.enum(["laptop", "server"]).optional(),
   runs: z.array(heartbeatRunSchema).max(500),
   worktreeDiskBytes: z.number().int().nonnegative(),

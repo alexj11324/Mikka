@@ -5,6 +5,7 @@ import { getPreferences } from '@/app/actions/preferences'
 import { listSavedLogins } from '@/app/actions/settings-activity'
 import { getWorkspaceDeletionImpact, getWorkspaceGeneral, getWorkspaceTransferTargets } from '@/app/actions/workspace-settings'
 import { getAppPolicy } from '@/app/actions/app-policy'
+import { getPersonalPolicy } from '@/app/actions/personal-policy'
 import { getE2BKeyCapability, listSecrets } from '@/app/actions/workspace-secrets'
 import { getUsage } from '@/app/actions/usage'
 import { cardVerificationStatus, getBilling, getCreditBilling } from '@/app/actions/billing'
@@ -29,6 +30,7 @@ const READS: Record<SettingsRead, (query: URLSearchParams) => Promise<unknown>> 
   'transfer-targets': query => getWorkspaceTransferTargets(workspace(query)),
   'deletion-impact': query => getWorkspaceDeletionImpact(workspace(query)),
   'app-policy': query => getAppPolicy(workspace(query)),
+  'personal-policy': query => getPersonalPolicy(workspace(query)),
   secrets: query => listSecrets(workspace(query)),
   // The E2B row needs canEdit as well as the key's state.
   'e2b-key': query => getE2BKeyCapability(workspace(query)),

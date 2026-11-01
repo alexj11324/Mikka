@@ -1,4 +1,4 @@
-import { test, expect, register } from './fixtures'
+import { test, expect, registerInTeam } from './fixtures'
 
 // Real application, normal allocated account and browser interaction. Only the
 // computer-policy response is a bounded UI fixture. The actual PostgreSQL policy
@@ -17,7 +17,7 @@ test('电脑操作默认允许，可以禁止再允许，非管理员只看到�
     }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: true, permission, canEdit }) })
   })
-  await register(page, '/settings?section=permissions')
+  await registerInTeam(page, '/settings?section=permissions')
   await expect(page.getByRole('heading', { name: '电脑操作', exact: true })).toBeVisible()
   const controls = page.getByRole('group', { name: 'Bot 操作电脑', exact: true })
   const allow = controls.getByRole('button', { name: '允许', exact: true })
