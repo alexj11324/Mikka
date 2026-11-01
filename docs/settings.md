@@ -35,7 +35,7 @@ the sheet behind the header's sidebar button, with the rail items at its foot.
 
 ## Sections
 
-- **Personal (account):** Preferences, Profile, Memory (记忆), Account (账户), Integrations, Devices (设备), API 与订阅. The same in every workspace.
+- **Personal (account):** Preferences, Profile, profile memory (个人资料类记忆; bot and team memory stay in their workspace), Account (账户), Integrations, Devices (设备), API 与订阅. The same in every workspace.
 - **Personal workspace:** personal 计费 and 用量 only.
 - **Team workspace (administration):** Workspace, Teams, Members, 团队权限, Bot 与 Agents, 密钥与环境, 审计日志, team 用量 and 计费. Never shown in a personal workspace ([decision 2026-11-01-2310](design/decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md)).
 
