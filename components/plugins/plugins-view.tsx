@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowUpRight, ChevronRight, Ellipsis, Plus, Puzzle, Search } from 'lucide-react'
 
+import { goToHref, workspaceLink } from '@/components/workspace/workspace-navigation'
 import { withBasePath } from '@/lib/base-path'
 import { isToolkitSlug } from '@/lib/composio-accounts'
 import type { SkillsSearchResult } from '@/lib/skills-search'
@@ -104,7 +105,7 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
       if (value) url.searchParams.set(key, value)
       else url.searchParams.delete(key)
     }
-    window.history.pushState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    goToHref(`${url.pathname}${url.search}${url.hash}`)
     setApp(next.app ?? null)
     setCategory(next.category ?? null)
   }
@@ -148,7 +149,7 @@ function ConnectedList({ apps, ownStates, href, onOpen }: { apps: ConnectedApps;
         <EmptyMedia variant="icon"><Puzzle aria-hidden="true" /></EmptyMedia>
         <EmptyTitle>{t('noConnections')}</EmptyTitle>
       </EmptyHeader>
-      <Button variant="secondary" size="sm" nativeButton={false} render={<Link href="/?section=plugins" />}>{t('openStore')}</Button>
+      <Button variant="secondary" size="sm" nativeButton={false} render={<Link href={workspaceLink({ section: 'plugins' })} />}>{t('openStore')}</Button>
     </Empty>
   </div>
   return <div className="flex flex-col gap-4">

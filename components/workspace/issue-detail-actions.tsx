@@ -17,6 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { IssueRelationPicker, type RelationKind } from './issue-relations'
+import { workspaceSearch } from './workspace-navigation'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from './issue-properties'
 import type { MetadataRequest } from './issue-metadata-controls'
 
@@ -98,7 +99,7 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
   }
   async function copy(kind: 'link' | 'id' | 'title' | 'markdown' | 'branch') {
     try {
-      const url = new URL(window.location.href); url.search = ''; url.searchParams.set('issue', task.id)
+      const url = new URL(window.location.href); url.search = workspaceSearch({ issue: task.id })
       const identifier = issueIdentifier(task)
       const named = [identifier, task.title].filter(Boolean).join(' ')
       const slug = task.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 60)
@@ -141,7 +142,7 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         <DropdownMenuSub><DropdownMenuSubTrigger><Copy />{tMenu('copy')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{copyItems.map(item => <DropdownMenuItem key={item.kind} onClick={() => { void copy(item.kind) }}>{item.label}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
-        <DropdownMenuItem onClick={() => { const url = new URL(window.location.href); url.search = ''; url.searchParams.set('issue', task.id); window.open(url.href, '_blank', 'noopener,noreferrer') }}><ArrowUpRight />{tMenu('openNewTab')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { const url = new URL(window.location.href); url.search = workspaceSearch({ issue: task.id }); window.open(url.href, '_blank', 'noopener,noreferrer') }}><ArrowUpRight />{tMenu('openNewTab')}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => openDialog('duplicate')}><Copy />{tMenu('createDuplicate')}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => { void toggleFavorite() }}><Star />{favorite ? tMenu('removeFavorite') : tMenu('addFavorite')}</DropdownMenuItem>
         <DropdownMenuItem onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe' })) }}>{subscribed ? <BellOff /> : <Bell />}{subscribed ? tMenu('unsubscribe') : tMenu('subscribe')}</DropdownMenuItem>
