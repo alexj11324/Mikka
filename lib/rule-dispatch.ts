@@ -24,7 +24,11 @@ export type DeviceTarget = {
   pinnedDeviceId?: string;
 };
 
-/** Cloud means the workspace's own E2B key and this bot's cloud runtime (MVP: no Mikka-hosted sandboxes). */
+/**
+ * Cloud means the workspace's own E2B key and this bot's own cloud runtime
+ * (MVP: no Mikka-hosted sandboxes). A run with no bot (the Coordinator)
+ * never borrows another bot's runtime.
+ */
 export async function cloudReady(
   query: Query,
   scope: { ownerId: string; workspaceId: string; botId: string | null; harness: string },
@@ -32,7 +36,7 @@ export async function cloudReady(
   if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== "1" || process.env.MIKKA_BYOS_ENABLED !== "1") return false;
   const { rowCount } = await query.query(
     `SELECT 1 FROM workspace_e2b_keys k JOIN bot_cloud_runtimes r ON r."workspaceId"=k."workspaceId"
-      WHERE k."workspaceId"=$1 AND ($2::uuid IS NULL OR r."botId"=$2) AND r."ownerId"=$3 AND ($4='auto' OR r.harness=$4) LIMIT 1`,
+      WHERE k."workspaceId"=$1 AND r."botId"=$2 AND r."ownerId"=$3 AND ($4='auto' OR r.harness=$4) LIMIT 1`,
     [scope.workspaceId, scope.botId, scope.ownerId, scope.harness],
   );
   return Boolean(rowCount);

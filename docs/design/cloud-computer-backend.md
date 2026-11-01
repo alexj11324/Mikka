@@ -397,6 +397,18 @@ run and the thread goes to the person's own device, or returns an error the
 person can act on
 ([decision 2026-10-31-2200](decisions/2026-10-31-2200-run-machine-fallback.md)).
 
+A cloud run uses the cloud runtime of the bot that dispatched it, never another
+bot's: a Coordinator run, which has no bot, does not borrow one and goes to the
+person's device or the card instead. Every cloud run freezes its definition
+(Agent, model, credential source) when it is queued, with or without a model in
+the request. Moving cloud runs from the bot's computer to a thread machine of
+the run owner is the next change ([orchestration](orchestration.md) § 1, § 5).
+
+The run-recovery cron also reconciles Bot computers (`cloud_machines`): a row
+that has said running or waking for over an hour is checked with E2B. A sandbox
+E2B no longer has becomes `sleeping` with no sandbox (the next wake creates a
+new one); a paused one becomes `sleeping`. An unusable key changes nothing.
+
 Compute time is still tracked: `runningSince` and `computeSeconds` on
 `thread_machines` record each running interval, and paused time is never
 counted. Each machine still ends after the 12-hour lifecycle.

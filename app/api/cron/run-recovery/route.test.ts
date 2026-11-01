@@ -7,6 +7,11 @@ const secret = 'isolated-recovery-cron-fixture'
 mock.module(new URL('../../../../lib/run-leases.ts', import.meta.url).href, { namedExports: {
   sweepExpiredRunLeases: async () => { calls++; if (fail) throw new Error('private-database-error'); return { owners: 3, failed: 1 } },
 } })
+let reconciled = 0
+mock.module(new URL('../../../../lib/computer/reconcile.ts', import.meta.url).href, { namedExports: {
+  reconcileCloudMachines: async () => { reconciled++; return 2 },
+} })
+mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: {}, db: {} } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
 beforeEach(() => { process.env.CRON_SECRET = secret; calls = 0; fail = false })
@@ -25,7 +30,9 @@ test('recovery returns bounded counts and no private database error or cached re
   const response = await call()
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'no-store')
-  assert.deepEqual(await response.json(), { owners: 3, failed: 1 })
+  // Stale Bot computers are reconciled in the same pass.
+  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2 })
+  assert.equal(reconciled, 1)
   fail = true
   const failed = await call()
   assert.equal(failed.status, 502)
