@@ -12,7 +12,9 @@
     "search": "搜索",
     "selected": "已选中",
     "propertyValue": "{label}：{value}",
-    "avatarLabel": "{email} 的头像"
+    "avatarLabel": "{email} 的头像",
+    "scrollToEnd": "滚动到底部",
+    "scrollToStart": "滚动到顶部"
   },
   "Issue": {
     "scope": {
