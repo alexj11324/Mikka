@@ -143,7 +143,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
                 onSelectOff={() => setSelecting(false)}
                 onQuote={element => { setQuote({ artifactId, version, kind: 'element', text: element.text || element.label, label: element.label, selector: element.selector }); setSelecting(false); setPane('chat') }} />}
         </main>
-        <aside aria-label={bot.name} className={cn('w-full flex-col bg-muted/50 md:flex md:w-[25rem] md:shrink-0', pane === 'chat' ? 'flex' : 'hidden')}>
+        <aside aria-label={bot.name} className={cn('w-full flex-col bg-muted/50 md:flex dark:bg-background md:w-[25rem] md:shrink-0', pane === 'chat' ? 'flex' : 'hidden')}>
           <div className="flex h-12 shrink-0 items-center gap-2 px-4">
             {bot.avatar}
             {bot.name ? <span className="truncate text-sm font-medium">{bot.name}</span> : <Skeleton className="h-4 w-40" />}
