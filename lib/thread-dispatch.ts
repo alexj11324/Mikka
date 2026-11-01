@@ -96,6 +96,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
   note?: string
   /** The caller asked for a new thread; it is granted only when `explicit()` says the person asked for it. */
   newThread?: boolean
+  /** The dispatch names another place than where the thread ran: moving a thread is a new thread, granted the same way. */
+  moves?: (previous: TaskThreadRun) => Promise<boolean>
   explicit?: () => Promise<boolean>
   start: (previous: TaskThreadRun | null, note: string | undefined) => Promise<R | E>
 }): Promise<ThreadDispatch<R> | E> {
@@ -110,7 +112,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     const chain = await readRunChain(pool, userId, previous.id)
     const threadId = chain?.rootRunId ?? previous.id
     const working = UNFINISHED_RUN_STATUSES.some(status => status === previous.status)
-    if (input.newThread && await (input.explicit?.() ?? Promise.resolve(false))) {
+    const wantsNew = input.newThread || (await input.moves?.(previous) ?? false)
+    if (wantsNew && await (input.explicit?.() ?? Promise.resolve(false))) {
       // The old thread stops; one thread works on a task at a time.
       if (working && !previous.stopRequestedAt) await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id).catch(() => undefined)
       const result = await input.start(null, input.note)

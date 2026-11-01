@@ -108,7 +108,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       resolve_factory_task: tool({description:'Record a subsequent actual user response to intake clarification. It grants no execution or publication permission. Use the exact current binding and original response event.',inputSchema:resolveInput,execute:input=>steps.resolveFactoryTaskScoped(userId,input,scope,botId)}),
     } : {}),
     list_agents: tool({
-      description: 'List available local execution tools and their computers. Use the internal id as agentId for dispatch_run with a repository URL; no repository registration is needed. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, run by its Agent (Claude Code or Codex).',
+      description: 'List the person\'s computers (name, online or not, deviceId) and their local execution tools. When the person names a computer to run on, match it here and pass its deviceId as dispatch_run target; an offline one cannot take work. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, run by its Agent (Claude Code or Codex).',
       inputSchema: z.object({}),
       execute: () => steps.listAgents(userId, scope),
     }),
@@ -155,13 +155,14 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       }),
     } : {}),
     dispatch_run: tool({
-      description: `Give an issue's work to an agent. ${ONE_THREAD} A new thread uses the saved label execution rules, which select the place, coding harness and model. Returns the run id and what happened (thread: new, message or continued); an [Event] message arrives when the run ends. Machine order (also when a rule names a device that is offline): the workspace's own E2B cloud, else the person's online device that may be picked automatically, else error machineUnavailable with result.card. Then draw result.card as one BeQuestions choice question (title and options as given, each option keeps its value and action), add no explanation, and call dispatch_run again after the person answers.`,
+      description: `Give an issue's work to an agent. ${ONE_THREAD} A new thread uses the saved label execution rules, which select the place, coding harness and model. Returns the run id, what happened (thread: new, message or continued) and result.placement, where it actually runs (one of the person's computers by name, or the cloud); say only that place, never one you did not get. An [Event] message arrives when the run ends. Machine order (also when a rule names a device that is offline): the workspace's own E2B cloud, else the person's online device that may be picked automatically, else error machineUnavailable with result.card. Then draw result.card as one BeQuestions choice question (title and options as given, each option keeps its value and action), add no explanation, and call dispatch_run again after the person answers.`,
       inputSchema: z.object({
         issueId: id, agentId: id.optional(),
         repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
         readOnly: z.boolean().optional().describe('true when the task only reads and reports (investigation, review): no file changes, commit, push or PR. A read-only run needs no repository push approval.'),
         newThread: newThreadInput,
+        target: z.union([z.literal('cloud'), z.object({ deviceId: id })]).optional().describe('Only when the person named where to run it: one of their computers by its deviceId from list_agents, or "cloud". Omit to let the saved rules choose. A named computer that is offline or off returns machineUnavailable with result.card; nothing is queued and no other computer is used.'),
       }),
       execute: (input,call) => {
         const request={...input,requestKey:`dispatch:${call.toolCallId}`,...(sourceEventId ? { sourceEventId } : {})}
