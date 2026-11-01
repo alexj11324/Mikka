@@ -248,7 +248,7 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
 }
 
 /** Provisions a queued cloud run's thread machine; a refusal ends that run with the card. */
-async function startThreadMachine(actor: { userId: string; workspaceId: string }, runId: string) {
+export async function startThreadMachine(actor: { userId: string; workspaceId: string }, runId: string) {
   if (process.env.MIKKA_CLOUD_THREAD_MACHINES !== '1') return
   try {
     await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, actor, runId)

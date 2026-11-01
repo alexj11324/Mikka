@@ -21,6 +21,7 @@ import type { RunChunk } from "../chunks"
 import type { SkillAssignmentReceipt } from '@mikka/protocol/skill'
 import type { Logger } from "../log"
 import type { RunMailbox } from '../run-mailbox'
+import type { QuotaSignal } from '../runs/quota-exhausted'
 
 /**
  * Terminal event of a session; the daemon turns it into the run's end state.
@@ -35,6 +36,8 @@ export interface ExitEvent {
   error?: string
   /** What the agent handed in (submit / ask / blocked call). */
   report?: AgentReport
+  /** A failed session ended on the CLI's quota or rate-limit error (runs/quota-exhausted.ts). */
+  quota?: QuotaSignal
 }
 
 /** The agent's part of the handoff report; the daemon adds the rest. */

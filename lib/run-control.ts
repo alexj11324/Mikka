@@ -47,7 +47,7 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
  */
 export async function stopOwnedRun(database: RunControlDatabase, userId: string, runId: string): Promise<boolean> {
   return database.transaction(async tx => {
-    const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt })
+    const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, pauseReason: agentRuns.pauseReason, stopRequestedAt: agentRuns.stopRequestedAt })
       .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1).for('update')
     if (!run || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
     const now = new Date()
@@ -56,8 +56,10 @@ export async function stopOwnedRun(database: RunControlDatabase, userId: string,
     // and the machine lifecycle acknowledges it. (Follow-up: release the binding directly.)
     const machineBound = run.status === 'queued'
       && (await tx.execute(sql`SELECT 1 FROM thread_machines WHERE "runId"=${runId} LIMIT 1`)).rows.length > 0
-    if (run.status === 'queued' && !machineBound) {
-      await tx.update(agentRuns).set({ status: 'stopped', stopRequestedAt: run.stopRequestedAt ?? now, finishedAt: now, updatedAt: now })
+    // A run paused on its quota has no machine working on it: it ends here too.
+    const quotaPaused = run.status === 'paused' && run.pauseReason === 'quota_exhausted'
+    if ((run.status === 'queued' && !machineBound) || quotaPaused) {
+      await tx.update(agentRuns).set({ status: 'stopped', pauseReason: null, stopRequestedAt: run.stopRequestedAt ?? now, finishedAt: now, updatedAt: now })
         .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
       return true
     }

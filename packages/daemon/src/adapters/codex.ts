@@ -1,3 +1,4 @@
+import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } from "../runs/quota-exhausted"
 import { sandboxComputerSpec, computerSandboxPolicy, computerDomain } from '../computer/transport'
 // Codex adapter (ADR 0003): the user's own signed-in `codex app-server`,
 // one process per session, inside the run's sandbox, with an isolated
@@ -50,6 +51,7 @@ import type {
   DeltaNotification,
   ErrorNotification,
   ItemNotification,
+  RateLimitsNotification,
   ThreadItem,
   ThreadResponse,
   ThreadStartParams,
@@ -427,6 +429,9 @@ export class CodexAdapter implements AgentAdapter {
     let ending = false
     let cancelling = false
     let lastError: string | undefined
+    /** The CLI's quota or rate-limit failure seen this turn, and the plan's latest windows. */
+    let quota: QuotaSignal | undefined
+    let rateLimits: CodexRateLimits | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
     const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
     const registeredMcpTool = (server: string, tool: string) =>
@@ -583,8 +588,12 @@ export class CodexAdapter implements AgentAdapter {
           }
           return
         }
+        case "account/rateLimits/updated":
+          rateLimits = (params as RateLimitsNotification).rateLimits
+          return
         case "error": {
           const { error, willRetry } = params as ErrorNotification
+          if (!willRetry) quota = mergeQuota(quota, codexQuotaSignal(error, rateLimits))
           if (!willRetry)
             lastError = externalAuth
               ? SUBSCRIPTION_EXECUTION_ERROR
@@ -637,8 +646,10 @@ export class CodexAdapter implements AgentAdapter {
         return
       }
       if (turn.status === "failed" || lastError) {
+        quota = mergeQuota(quota, codexQuotaSignal(turn.error, rateLimits))
         return finish({
           outcome: "failed",
+          ...(quota ? { quota } : {}),
           error: externalAuth
             ? SUBSCRIPTION_EXECUTION_ERROR
             : turn.error?.message
@@ -653,6 +664,7 @@ export class CodexAdapter implements AgentAdapter {
     let runtimeModel: string | null = null
     const startTurn = async (message: string) => {
       lastError = undefined
+      quota = undefined
       if (externalAuth?.verify) {
         try { await externalAuth.verify() } catch { throw new Error(SUBSCRIPTION_AUTH_ERROR) }
       }

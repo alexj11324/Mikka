@@ -29,7 +29,7 @@ import { runBotName } from '@/lib/run-bot-name'
 
 export interface RunView {
   id: string
-  pauseReason?: 'human_control' | null
+  pauseReason?: 'human_control' | 'quota_exhausted' | null
   waitFor?: string
   issueId: string | null
   agentId: string

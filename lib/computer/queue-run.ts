@@ -7,12 +7,14 @@ import type { AgentExecution } from '@/lib/agent-kit/store'
 import { SubscriptionRepository } from '@/lib/subscription-repository'
 import { ComputerError } from './store'
 import { subscriptionsUsableSql } from '@/lib/personal-policy'
-import { runCredentialSource } from '@/lib/run-credential-source'
+import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
  * together so the cloud worker never observes an unbound queued run. */
 export async function queueCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, input: {
   botId: string; issueId: string; agentId: string; deviceRepoId: string; title: string; body: string; note?: string; reportToCoordinator?:boolean; model?:string; idempotencyKey?: string; execution?: AgentExecution
+  /** A quota continuation's key (lib/run-quota.ts): frozen as given instead of choosing the credential. */
+  apiKey?: RunApiKey
 }) {
   if (input.idempotencyKey !== undefined && (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 256)) throw new ComputerError(400, 'Invalid task request')
   const digest = input.idempotencyKey === undefined ? undefined : createHash('sha256').update(JSON.stringify([actor.userId, input.idempotencyKey])).digest('hex')
@@ -54,7 +56,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
             ORDER BY latest."createdAt" DESC,latest.id DESC LIMIT 1) AND s."workspaceId"=b."workspaceId"::text)`, [input.botId, actor.userId, input.agentId])).rowCount
     const binding = usable ? await new SubscriptionRepository(client).nativeBinding(actor.userId,input.agentId,target.harness) : null
     const runBotId = input.reportToCoordinator ? null : input.botId
-    const { subscription, apiKey } = await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model: input.model === 'auto' ? undefined : input.model,
+    const { subscription, apiKey } = input.apiKey ? { subscription: null, apiKey: input.apiKey } : await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model: input.model === 'auto' ? undefined : input.model,
       botWorkspaceId: runBotId ? actor.workspaceId : null, choiceWorkspaceId: actor.workspaceId, subscription: binding })
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
     const agentDefinition = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model:input.model === 'auto' ? undefined : input.model,mailboxEnabled:process.env.MIKKA_PERSONAL_MAILBOX_ENABLED==='1',mailboxScope:{botId:input.reportToCoordinator ? null : input.botId,workspaceId:actor.workspaceId} })
