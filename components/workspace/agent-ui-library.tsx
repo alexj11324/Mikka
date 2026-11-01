@@ -18,7 +18,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AgentTextBubble, InsideBlock } from './agent-text-bubble'
 import { Alert as BeAlert, AlertContent as BeAlertContent, AlertDescription as BeAlertDescription, AlertIcon as BeAlertIcon, AlertTitle as BeAlertTitle } from '@/components/motion/alert'
 import { Collapsible as BeCollapsible, CollapsibleContent as BeCollapsibleContent, CollapsibleIndicator as BeCollapsibleIndicator, CollapsibleTrigger as BeCollapsibleTrigger } from '@/components/motion/collapsible'
-import { Tabs as BeTabs, TabsContent as BeTabsContent, TabsList as BeTabsList, TabsTrigger as BeTabsTrigger } from '@/components/motion/tabs'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AgentAreaChart, AgentBarChart, AgentDonutChart, AgentLineChart, AgentRadialChart } from './agent-chart'
 import { AgentCitations, AgentFileDiff, AgentFileTree, AgentTable } from './agent-report'
 import { AgentEditableTable } from './agent-editable-table'
@@ -70,10 +70,11 @@ const renderers = {
   BeAlert: ({ props }) => <BeAlert variant={props.variant} role="status"><BeAlertIcon /><BeAlertContent><BeAlertTitle>{props.title}</BeAlertTitle><BeAlertDescription>{props.description}</BeAlertDescription></BeAlertContent></BeAlert>,
   BeTable: ({ props }) => <AgentTable columns={props.columns} rows={props.rows} />,
   EditableTable: ({ props }) => <AgentEditableTable name={props.name} columns={props.columns} data={props.data} />,
-  BeTabs: ({ props, renderNode }) => <BeTabs defaultValue="0" variant="underline" className="min-w-0">
-    <BeTabsList>{(props.items ?? []).map((item, index) => <BeTabsTrigger key={index} value={String(index)}>{item.title}</BeTabsTrigger>)}</BeTabsList>
-    {(props.items ?? []).map((item, index) => <BeTabsContent key={index} value={String(index)} className="flex min-w-0 flex-col gap-3 pt-3">{renderNode(item.children)}</BeTabsContent>)}
-  </BeTabs>,
+  // The app's one tab list (TabsList: the segment track and gliding pill, decision 2026-10-31-1814), not beUI's underline (R-31).
+  BeTabs: ({ props, renderNode }) => <Tabs defaultValue="0" className="min-w-0 gap-3">
+    <TabsList>{(props.items ?? []).map((item, index) => <TabsTrigger key={index} value={String(index)}>{item.title}</TabsTrigger>)}</TabsList>
+    {(props.items ?? []).map((item, index) => <TabsContent key={index} value={String(index)} className="flex min-w-0 flex-col gap-3">{renderNode(item.children)}</TabsContent>)}
+  </Tabs>,
   BeCollapsible: ({ props, renderNode }) => <BeCollapsible defaultOpen={props.defaultOpen} className="min-w-0">
     <BeCollapsibleTrigger>{props.title}<BeCollapsibleIndicator /></BeCollapsibleTrigger>
     <BeCollapsibleContent contentClassName="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</BeCollapsibleContent>
