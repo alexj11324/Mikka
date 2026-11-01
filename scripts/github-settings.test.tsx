@@ -50,10 +50,17 @@ afterEach(async () => {
 after(() => { browser.close() })
 
 const render = async () => { await act(async () => { root.render(<GitHubSettings />) }) }
+// The mount read starts on SWR's own schedule; wait for that request rather than a fixed delay.
+const requested = async (index: number) => {
+  for (let waited = 0; !requests[index] && waited < 5_000; waited += 10) await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
+  assert.ok(requests[index], `GitHub request ${index} was made`)
+}
 const respond = async (index: number, viewerId: string, fullName: string) => {
+  await requested(index)
   await act(async () => { requests[index].resolve(Response.json({ viewerId, configured: true, connected: true, installed: true, repositories: [{ id: fullName, fullName }] })) })
 }
 const respondNotConnected = async (index: number, viewerId: string) => {
+  await requested(index)
   await act(async () => { requests[index].resolve(Response.json({ viewerId, configured: true, connected: false, installed: false, repositories: [] })) })
 }
 // A fresh visit reads GitHub again; focus never does.
@@ -120,6 +127,7 @@ test('revoked authorization clears repositories and keeps the relink action avai
   await render()
   await respond(0, 'viewer-a', 'a/private')
   await revisit()
+  await requested(1)
   await act(async () => { requests[1].resolve(Response.json({ viewerId: 'viewer-a', error: 'githubReconnectRequired' }, { status: 401 })) })
   assert.ok(!container.textContent?.includes('a/private'))
   assert.ok(container.textContent?.includes('githubReconnectRequired'))
