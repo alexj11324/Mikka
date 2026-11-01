@@ -73,6 +73,16 @@ test('a saved choice whose account is gone, with no subscription bound, replies 
   }
 })
 
+test('Mikka 默认 picked in the composer stays hosted while a subscription is bound', async () => {
+  selected = '00000000-0000-0000-0000-000000000000'
+  available = [{ bindingId: binding.id, provider: 'claude' }]
+  savedBinding = { bindingId: binding.id }
+  for (const botId of [null, id(1)]) {
+    const frozen = await freezeBotModel({ ...scope, botId }, noSubscription)
+    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  }
+})
+
 test('Bot without a subscription replies on the same hosted default as the Coordinator, in its own workspace', async () => {
   const bot = { ...scope, botId: id(1) }
   const frozen = await freezeBotModel({ ...bot, workspaceId: null }, noSubscription)

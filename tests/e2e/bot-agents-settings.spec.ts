@@ -17,9 +17,10 @@ async function seed(page: Page) {
   const { rows: [member] } = await db().query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId" = $1 AND status = $2 LIMIT 1', [session.userId, 'active'])
   // A heartbeat in the future keeps the device online for the whole test. Claude Code reports its
   // slots with what they resolve to; the screen shows only the resolved name.
-  await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses) VALUES
-    ($1, $3, 'E2E MacBook', 'local', true, 'laptop', now() + interval '1 hour', $4),
-    ($2, $3, 'gpu-box', 'local', true, 'server', NULL, '[]')`, [randomUUID(), randomUUID(), session.userId, JSON.stringify([
+  // 允许自动调度 is off by default on a personal computer (#703); this one has it on, so the default may place on it.
+  await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses, "autoSchedule") VALUES
+    ($1, $3, 'E2E MacBook', 'local', true, 'laptop', now() + interval '1 hour', $4, true),
+    ($2, $3, 'gpu-box', 'local', true, 'server', NULL, '[]', NULL)`, [randomUUID(), randomUUID(), session.userId, JSON.stringify([
     { harness: 'claude_code', installed: true, version: '1.0.0', modelSlots: [{ slot: 'opus', model: 'E2E Opus Resolved', name: 'E2E Opus Resolved' }, { slot: 'sonnet', model: 'E2E Sonnet Resolved', name: 'E2E Sonnet Resolved' }], defaultModelSlot: 'opus' },
     { harness: 'codex', installed: true, version: '1.0.0', models: ['e2e-reported-model', 'e2e-other-model'] },
   ])])
@@ -32,7 +33,7 @@ async function seed(page: Page) {
   }
 }
 
-test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用任务默认，改运行位置、Agent 和模型，设置 Coordinator 模型', async ({ page }, testInfo) => {
+test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用任务默认，改运行位置、Agent 和模型', async ({ page }, testInfo) => {
   await register(page, '/settings?section=bots')
   await expect(page.getByRole('heading', { level: 1, name: 'Bot 与 Agents' })).toBeVisible()
   // The first workspace load creates the person's workspace; seed into it.
@@ -49,7 +50,6 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
   await expect(page.getByRole('button', { name: /设备离线时/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /额度用完时/ })).toHaveCount(0)
   await expect(fallback.getByRole('button', { name: /更多操作/ })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Coordinator 模型：claude-e2e-model', exact: true })).toBeVisible()
   await expect(page.getByRole('main').getByText('自动')).toHaveCount(0)
   await expect(page.getByRole('main').getByText(/^opus$/)).toHaveCount(0)
 
@@ -84,16 +84,11 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
   await page.getByRole('option', { name: 'e2e-other-model' }).click()
   await expect(row.getByRole('button', { name: '前端 模型：e2e-other-model', exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Coordinator 模型：claude-e2e-model', exact: true }).click()
-  await page.getByRole('option', { name: 'codex-e2e-model' }).click()
-  await expect(page.getByRole('button', { name: 'Coordinator 模型：codex-e2e-model', exact: true })).toBeVisible()
-
   // Every change saved: a reload shows the same table.
   await page.reload()
   await expect(row.getByRole('button', { name: '前端 运行位置：E2E MacBook', exact: true })).toBeVisible()
   await expect(row.getByRole('button', { name: '前端 Agent：Codex', exact: true })).toBeVisible()
   await expect(row.getByRole('button', { name: '前端 模型：e2e-other-model', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Coordinator 模型：codex-e2e-model', exact: true })).toBeVisible()
   await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
   await testInfo.attach('bot-agents', { body: await page.screenshot(), contentType: 'image/png' })
 
@@ -153,26 +148,11 @@ test('Bot 与 Agents：规则标签从工作区已有标签中选，标签带颜
   await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
 })
 
-test('Bot 与 Agents：没有绑定订阅时，Coordinator 和每个 Bot 都显示 Mikka 默认', async ({ page }) => {
+test('Bot 与 Agents：没有 Coordinator 和各 Bot 的模型行，模型在对话框里选', async ({ page }) => {
   await register(page, '/settings?section=bots')
   await expect(page.getByRole('heading', { level: 1, name: 'Bot 与 Agents' })).toBeVisible()
   await expect(page.getByRole('button', { name: '添加规则', exact: true })).toBeVisible()
-  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
-  if (!cookie) throw new Error('需要已登录的页面。')
-  const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
-  const { rows: [member] } = await db().query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId" = $1 AND status = $2 LIMIT 1', [session.userId, 'active'])
-  // One Bot never chose a model; the other still holds a choice whose Claude account was disconnected.
-  const [fresh, stale, connection, binding] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()]
-  await db().query(`INSERT INTO bots (id, "ownerId", "workspaceId", name) VALUES ($1, $3, $4, 'E2E 新 Bot'), ($2, $3, $4, 'E2E 断开 Bot')`, [fresh, stale, session.userId, member.workspaceId])
-  await db().query(`INSERT INTO byos_connections (id, "ownerId", "workspaceId", provider, state, epoch, "secretName", "secretDigest", "providerSubject")
-    VALUES ($1, $2, $3, 'claude', 'disconnected', 1, $4, $5, 'e2e-subject')`, [connection, session.userId, member.workspaceId, `e2e-fixture-${connection}`, 'a'.repeat(64)])
-  await db().query(`INSERT INTO byos_bindings (id, "ownerId", "workspaceId", "consumerId", "connectionId", "connectionRevision", route, "modelId")
-    VALUES ($1, $2, $3, $4, $5, 1, 'claude_cpa', 'claude-e2e-model')`, [binding, session.userId, member.workspaceId, stale, connection])
-  await db().query(`INSERT INTO bot_model_choices ("ownerId", "workspaceId", "botKey", "bindingId") VALUES ($1, $2, $3, $4)`, [session.userId, member.workspaceId, stale, binding])
-  await page.reload()
-
-  for (const name of ['Coordinator', 'E2E 新 Bot', 'E2E 断开 Bot']) {
-    await expect(page.locator(`[data-bot="${name}"]`).getByRole('button', { name: `${name} 模型：Mikka 默认`, exact: true })).toBeVisible()
-  }
+  await expect(page.locator('[data-bot]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Coordinator 模型/ })).toHaveCount(0)
   await expect(page.getByRole('main').getByText('未连接账号')).toHaveCount(0)
 })

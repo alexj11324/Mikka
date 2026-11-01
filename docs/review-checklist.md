@@ -51,7 +51,7 @@ more than once.
 
 - [ ] No input box in the thread list or under a computer screen; an open
       thread ends in the standard composer (R-10).
-- [ ] No model picker (R-11).
+- [ ] The only model picker is a bot composer's `BotModelPicker` chip (R-11).
 - [ ] No starter or suggestion cards in a chat (R-12).
 - [ ] No avatar or name on messages in a one-to-one chat (R-13).
 - [ ] Nothing from the "Do not use" table in `docs/design/components.md` is
