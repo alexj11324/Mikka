@@ -90,7 +90,7 @@ function BotRow({ bot, onPress }: { bot: HomeBot; onPress: () => void }) {
           <Text style={styles.name} numberOfLines={1}>{bot.name}</Text>
           {bot.working ? <Spinner size={13} /> : bot.at ? <Text style={styles.when}>{shortWhen(bot.at)}</Text> : null}
         </View>
-        {bot.line ? <Text style={styles.line} numberOfLines={1}>{bot.line}</Text> : null}
+        {bot.line !== null ? <Text style={styles.line} numberOfLines={1}>{bot.line || '[卡片]'}</Text> : null}
       </View>
     </Pressable>
   )

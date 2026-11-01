@@ -13,7 +13,7 @@ export function app(path: string) {
 }
 
 /** Buttons on the left icon rail (主页 / 建议 / 看板 / 插件 / Artifact). Phones have no rail. */
-export function rail(page: Page, name: '主页' | '建议' | '看板' | '插件' | '产物') {
+export function rail(page: Page, name: '主页' | '建议' | '看板' | '插件' | 'Artifact') {
   return page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name, exact: true })
 }
 

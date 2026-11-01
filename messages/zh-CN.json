@@ -152,7 +152,8 @@
     "openBotChat": "打开 Bot 对话",
     "archivedConversation": "历史：{title}",
     "suggestions": "建议",
-    "artifacts": "产物"
+    "artifacts": "Artifact",
+    "cardPreview": "[卡片]"
   },
   "Plugins": {
     "title": "插件",
@@ -2021,7 +2022,7 @@
       "exportWait": "刚导出过，{minutes} 分钟后再试。",
       "sharing": "共享",
       "sharedLinks": "已共享的链接",
-      "sharedLinksCount": "{count} 个产物仍可公开访问",
+      "sharedLinksCount": "{count} 个 Artifact 仍可公开访问",
       "sharedLinksNone": "没有公开访问的链接。",
       "manage": "管理",
       "stopSharing": "停止分享",
@@ -2269,7 +2270,7 @@
       "byBot": "按 Bot",
       "byMember": "按成员",
       "exportCsv": "导出 CSV",
-      "threads": "线程",
+      "threads": "新线程",
       "runTime": "运行时长",
       "runSeconds": "运行秒数",
       "bot": "Bot",
@@ -3393,7 +3394,7 @@
     "refreshFailed": "建议没有刷新成功，请稍后再试"
   },
   "ArtifactsPage": {
-    "title": "产物",
+    "title": "Artifact",
     "category": {
       "all": "全部",
       "documents": "文档",
@@ -3404,11 +3405,11 @@
       "source": "来源",
       "updated": "上次活动"
     },
-    "loadError": "产物 加载失败。",
+    "loadError": "Artifact 加载失败。",
     "retry": "重试",
-    "loading": "正在加载 产物",
-    "empty": "还没有 产物",
-    "threadEntry": "产物 · {count}"
+    "loading": "正在加载 Artifact",
+    "empty": "还没有 Artifact",
+    "threadEntry": "Artifact · {count}"
   },
   "Artifact": {
     "kindDocument": "文档",

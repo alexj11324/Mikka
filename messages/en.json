@@ -152,7 +152,8 @@
     "openBotChat": "Open Bot chat",
     "archivedConversation": "Archived: {title}",
     "suggestions": "Suggestions",
-    "artifacts": "Artifact"
+    "artifacts": "Artifact",
+    "cardPreview": "[Card]"
   },
   "Plugins": {
     "title": "Plugins",
@@ -2269,7 +2270,7 @@
       "byBot": "By bot",
       "byMember": "By member",
       "exportCsv": "Export CSV",
-      "threads": "Threads",
+      "threads": "New threads",
       "runTime": "Run time",
       "runSeconds": "Run seconds",
       "bot": "Bot",

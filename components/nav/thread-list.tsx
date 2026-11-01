@@ -26,7 +26,7 @@ export const TWO_LINE_ROW = 'flex h-auto w-full flex-col items-stretch justify-s
 
 export function threadName(thread: Thread, issues: Issue[], fallback: string) {
   const issue = thread.issueId ? issues.find(item => item.id === thread.issueId) : undefined
-  if (issue) return `${issueIdentifier(issue)} ${issue.title}`
+  if (issue) return [issueIdentifier(issue), issue.title].filter(Boolean).join(' ')
   return thread.prompt.split('\n').find(line => line.trim())?.trim().slice(0, 80) || fallback
 }
 

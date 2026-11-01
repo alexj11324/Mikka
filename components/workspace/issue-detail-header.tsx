@@ -9,7 +9,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { issueIdentifier } from './issue-properties'
 
 export type IssueDetailNavigation = { index: number; total: number; onOpen: (offset: -1 | 1) => void }
 
@@ -46,8 +45,9 @@ export function IssueDetailHeader({ workspaceName, identifier, title, saveLabel,
         <BreadcrumbItem className="hidden @2xl/header:inline-flex"><Button variant="ghost" size="xs" disabled={pending} onClick={onClose}>{tDetail('breadcrumbBoard')}</Button></BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem className="min-w-0">
-          <BreadcrumbPage className="shrink-0">{issueIdentifier({ identifier })}</BreadcrumbPage>
-          <span className="hidden min-w-0 truncate @lg/header:inline" title={title}>{title}</span>
+          {identifier ? <><BreadcrumbPage className="shrink-0">{identifier}</BreadcrumbPage>
+            <span className="hidden min-w-0 truncate @lg/header:inline" title={title}>{title}</span></>
+            : <BreadcrumbPage className="min-w-0 truncate" title={title}>{title}</BreadcrumbPage>}
         </BreadcrumbItem>
       </BreadcrumbList></Breadcrumb>
     </div>

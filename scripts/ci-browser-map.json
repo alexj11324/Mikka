@@ -28,6 +28,7 @@
     "coordinator-choice-card.spec.ts",
     "coordinator-scroll.spec.ts",
     "global-search-scope.spec.ts",
+    "bot-list-groups.spec.ts",
     "invalid-issue-content.spec.ts",
     "issue-threads.spec.ts",
     "linear-sync-disabled.spec.ts",

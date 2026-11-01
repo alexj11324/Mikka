@@ -32,7 +32,7 @@ import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
 import { listThreads } from '@/app/actions/task-runs'
 import { listBots, type BotView } from '@/app/actions/bots'
 import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
-import { sessionPreview } from '@/lib/agent-history'
+import { chatPreview } from '@/lib/agent-history'
 import { PanelRight } from 'lucide-react'
 import { ISSUE_STATUSES, issueIdentifier, type IssueStatus, type IssueView } from './issue-properties'
 import { listIssues } from '@/app/actions/issues'
@@ -410,7 +410,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     <NewTaskDialog open={creating} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
     {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot) }} />}
     <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />
-    {search.value && <GlobalSearch open={search.open} onOpenChange={setSearchOpen} onOpenChangeComplete={search.onOpenChangeComplete} bots={bots} sessions={conversationSessions} coordinatorLine={lastCoordinatorItem ? sessionPreview(lastCoordinatorItem.text.replace(/\[\[(?:issue|run):[0-9a-f-]{36}\]\]/gi, ''), null) : undefined} issues={tasks} projects={projects} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
+    {search.value && <GlobalSearch open={search.open} onOpenChange={setSearchOpen} onOpenChangeComplete={search.onOpenChangeComplete} bots={bots} sessions={conversationSessions} coordinatorLine={lastCoordinatorItem ? chatPreview(lastCoordinatorItem.text) ?? i18nText('Nav.cardPreview') : undefined} issues={tasks} projects={projects} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
       onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}
       onProject={id => { void leave(() => { applySelection(null, 'replace'); changeSection('projects'); setTeamId(null); setProjectId(id) }) }} />}
   </>
@@ -423,7 +423,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={<>{isConversation && !browserShown && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}<BrowserToggle open={browserShown} onToggle={() => showBrowser(!browserShown)} /></>} />}
     rail={<IconRail active={rail} onNavigate={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}>
     {/* The board keeps only the rail on its left (MIK-45). */}
-    {!fullPage && <BotList bots={bots} threads={threads} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}
+    {!fullPage && <BotList bots={bots} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} threads={threads} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it. */}
     <AppShellContent listToggle={!fullPage && !selected} hideHeader={!!selected || section === 'agent' || section === 'group'} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : workspaceContext?.workspace.name ?? i18nText("Settings.groups.workspace")} title={sectionTitles[section]} actions={section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? undefined : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} aria-keyshortcuts="Control+k Meta+k" disabled={boardBusy} onClick={() => setSearchOpen(true)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText("Workspace.search.title")}<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>}>
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
