@@ -48,8 +48,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:byos
       - run: pnpm --filter @mikka/protocol exec vitest run src/subscription.test.ts
-      - run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
+      - name: Install sandbox runtime dependencies without changing host namespace policy
+        # Hosted runs execute the CLI under Anthropic's sandbox-runtime (no Docker),
+        # which needs bubblewrap, socat and ripgrep (sandbox-runtime README,
+        # "Platform-Specific Dependencies"). Same step as the UI policy job.
+        timeout-minutes: 5
+        run: |
+          apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get "${apt_options[@]}" update
+          sudo apt-get "${apt_options[@]}" install -y bubblewrap socat ripgrep
       - run: pnpm --filter @mikka/daemon exec vitest run test/subscription-hosted-runner.test.ts
+      - run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
       # Docker mode on devices: the runner image (harness/Dockerfile) and one disposable run container.
       - run: pnpm --filter @mikka/daemon test:run-container
       - run: pnpm test:byos-worker
