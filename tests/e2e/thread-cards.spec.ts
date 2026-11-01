@@ -72,7 +72,7 @@ async function seedResultCards(email: string, fixtures: ResultCardFixture[]) {
   } finally { await pool.end() }
 }
 
-test('A dispatched thread is a card under the reply that opens its conversation in place of the chat (R-66)', async ({ page }, testInfo) => {
+test('A dispatched thread is a card under the reply that opens its conversation beside the chat (R-66, R-82)', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   await page.emulateMedia({ colorScheme: 'light' })
   const { email } = await register(page)
@@ -96,7 +96,9 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   const thread = page.getByRole('region', { name: 'Speed up the home page', exact: true })
   await expect(thread.getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
   await expect(thread.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })).toBeVisible()
-  await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息' })).toHaveCount(0)
+  // The chat stays in the centre and the thread has its own address (R-82).
+  await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息' })).toBeVisible()
+  await expect(page).toHaveURL(url => /^[0-9a-f-]{36}$/.test(url.searchParams.get('thread') ?? ''))
   await testInfo.attach('thread-open', { body: await page.screenshot(), contentType: 'image/png' })
 
   // The folded harness steps open to each call and close again, by pointer and by keyboard.
@@ -120,8 +122,9 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await artifactWindow.getByRole('button', { name: '关闭', exact: true }).click()
   await expect(artifactWindow).toHaveCount(0)
 
-  await thread.getByRole('button', { name: '返回 Coordinator', exact: true }).click()
+  await thread.getByRole('button', { name: '关闭线程', exact: true }).click()
   await expect(thread).toHaveCount(0)
+  await expect(page).toHaveURL(url => !url.searchParams.has('thread'))
   await expect(chat.getByRole('button', { name: '打开线程 Speed up the home page', exact: true })).toBeVisible()
 
   // Review frame 356:4750. Seed only this visual test's state matrix; the MVP

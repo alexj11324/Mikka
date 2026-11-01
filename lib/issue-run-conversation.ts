@@ -32,6 +32,17 @@ export function runSummaryText(run: { report: unknown; error: string | null }): 
   return run.error?.split('\n').find(line => line.trim())?.trim() ?? null
 }
 
+/**
+ * Why a failed run failed, as stored on the run (masked when it was written,
+ * PR #804): shown under its start-up stages so the thread says which stage
+ * stopped and why. Nothing for a run that did not fail.
+ */
+export function runFailureText(status: string, error: string | null | undefined): string | null {
+  if (status !== 'failed') return null
+  const text = error?.trim()
+  return text ? text : null
+}
+
 /** One start-up stage the daemon reported (`data-run-stage`): which, how long, whether it worked. */
 export type ThreadStage = { stage: 'repository' | 'worktree' | 'agent_start'; ms: number; ok: boolean }
 const THREAD_STAGES = new Set<ThreadStage['stage']>(['repository', 'worktree', 'agent_start'])

@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
     const { dispatchToTask } = await import('@/lib/thread-dispatch')
     const result = await dispatchToTask(session.user.id, parsed.data.issueId, {
       note: parsed.data.note,
-      start: (previous, note) => queueCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note, botId, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: issue.title, body: tiptapToText(issue.content), ...(previous ? { idempotencyKey: `thread:${previous.id}:${crypto.randomUUID()}` } : {}) }),
+      start: (previous, note) => queueCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note, botId, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: issue.title, body: tiptapToText(issue.content), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous ? { idempotencyKey: `thread:${previous.id}:${crypto.randomUUID()}` } : {}) }),
     })
     return Response.json(result, { status: 202, headers })
   } catch (error) {

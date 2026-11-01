@@ -114,7 +114,12 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
     if (id === value) return
     setFailed(false)
     try {
-      await menu.mutate(() => chooseBotModel(botId, id), {
+      // A pick that is not saved comes back as `{ error }`: failing here rolls the chip back and shows 未保存.
+      await menu.mutate(async () => {
+        const { error, ...saved } = await chooseBotModel(botId, id)
+        if (error) throw new Error(error)
+        return saved as BotModelMenu
+      }, {
         optimisticData: data => {
           const option = data!.groups.flatMap(group => group.options.map(item => ({ ...item, kind: group.kind }))).find(item => item.id === id)
           return option ? { ...data!, current: { ...option, chosen: true, available: true } } : data!

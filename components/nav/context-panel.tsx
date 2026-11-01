@@ -30,7 +30,8 @@ type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type PanelView = 'overview' | 'all'
 export type PanelTab = 'details' | 'threads' | 'prs' | 'computer'
 const TABS: readonly PanelTab[] = ['details', 'threads', 'prs', 'computer']
-const PANEL_WIDTH = { storageKey: 'mikka:context-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } as const
+/** The right column's width, shared by 概览 and an open thread (R-82): one column, one remembered width. */
+export const PANEL_WIDTH = { storageKey: 'mikka:context-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } as const
 const WIDE = 520
 
 /** A read-only row in 详情: a routine or a library file. */

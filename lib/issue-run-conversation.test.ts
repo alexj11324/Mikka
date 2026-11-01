@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runIsActive, runListRefreshInterval, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
+import { runFailureText, runIsActive, runListRefreshInterval, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
 
 test('only active run states offer messages; completed history stays readable', () => {
   for (const state of ['queued', 'preparing', 'running', 'waiting_input', 'finishing']) assert.equal(runIsActive(state), true)
@@ -90,4 +90,12 @@ test('start-up stages fold into one line in order, keep failures, and ignore mal
     { stage: 'worktree', ms: 400, ok: true },
     { stage: 'agent_start', ms: 65_700, ok: false },
   ] }])
+})
+
+test('a failed run says why; any other run says nothing', () => {
+  assert.equal(runFailureText('failed', '  docker timed out after 65s\n'), 'docker timed out after 65s')
+  assert.equal(runFailureText('failed', null), null)
+  assert.equal(runFailureText('failed', '   '), null)
+  assert.equal(runFailureText('succeeded', 'leftover error'), null)
+  assert.equal(runFailureText('running', 'transient error'), null)
 })
