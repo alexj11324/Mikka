@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { ArrowUpRight, ChevronRight } from 'lucide-react'
@@ -111,8 +111,11 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
     if (!userId) return
     const url = new URL(window.location.href)
     if (url.searchParams.get('github') !== 'link-failed') return
-    setGithubLinkError(t('githubLinkFailed'))
+    const reason = url.searchParams.get('reason')
+    // 关联 GitHub in the header is the retry; the message says what happened.
+    setGithubLinkError(reason === 'cancelled' ? t('githubLinkCancelled') : reason === 'account' ? t('githubLinkAccountChanged') : t('githubLinkFailed'))
     url.searchParams.delete('github')
+    url.searchParams.delete('reason')
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
   }, [t, userId])
 
@@ -189,15 +192,15 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
 
     <p className="max-w-prose text-sm text-muted-foreground">{t('githubDescription')}</p>
 
-    {connected && githubState && <SettingsSection id="github-connection-heading" title={t('githubConnectionHeading')}>
+    {connected && githubState && <PageSection id="github-connection-heading" title={t('githubConnectionHeading')}><SettingsSection>
       <div className="flex items-center gap-3 py-3 pr-4 pl-5">
         <AppTile app="github" />
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{login}</span>
         <Button type="button" variant="secondary" size="sm" disabled={githubLinking} onClick={() => { setGithubLinkError(''); setConfirming(true) }}>{t('githubDisconnect')}</Button>
       </div>
-    </SettingsSection>}
+    </SettingsSection></PageSection>}
 
-    {connected && githubState && <SettingsSection id="github-repositories-heading" title={t('githubRepositoryAccess')}>
+    {connected && githubState && <PageSection id="github-repositories-heading" title={t('githubRepositoryAccess')}><SettingsSection>
       <div className="relative flex items-center gap-3 py-3 pr-4 pl-5 transition-colors has-[[data-repositories]:hover]:bg-muted/50">
         {githubState.installed
           // The whole row opens the list (its hover covers the row); the GitHub link sits above it.
@@ -208,16 +211,13 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
         </Button>
         {githubState.installed && <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
       </div>
-    </SettingsSection>}
+    </SettingsSection></PageSection>}
 
-    <section aria-labelledby="github-abilities-heading" className="flex flex-col gap-3">
-      <div className="flex flex-col gap-0.5">
-        <h2 id="github-abilities-heading" className="text-sm font-medium">{t('githubAbilitiesHeading')}</h2>
-        <p className="text-xs text-muted-foreground">{t('githubAbilitiesSummary', { count: writes.length + reads.length, write: writes.length, read: reads.length })}</p>
-      </div>
-      <ToolGroup label={t('writeTools', { count: writes.length })} tools={writes} control={tool => control(tool.slug as WriteAbility, tool.name)} />
-      <ToolGroup label={t('readTools', { count: reads.length })} tools={reads} />
-    </section>
+    <PageSection id="github-abilities-heading" title={t('githubAbilitiesHeading')} summary={t('githubAbilitiesSummary', { count: writes.length + reads.length, write: writes.length, read: reads.length })}>
+      {/* Rows keep one height in both groups, with or without a control. */}
+      <ToolGroup label={t('writeTools', { count: writes.length })} tools={writes} uniformRows control={tool => control(tool.slug as WriteAbility, tool.name)} />
+      <ToolGroup label={t('readTools', { count: reads.length })} tools={reads} uniformRows />
+    </PageSection>
 
     {githubState && <RepositoriesDialog open={browsing} onOpenChange={setBrowsing} repositories={githubState.repositories} />}
 
@@ -258,4 +258,15 @@ function RepositoriesDialog({ open, onOpenChange, repositories }: { open: boolea
       </ul>
     </DialogContent>
   </Dialog>
+}
+
+/** One heading style for every section on this page, flush with the card edge below it. */
+function PageSection({ id, title, summary, children }: { id: string; title: string; summary?: string; children: ReactNode }) {
+  return <section aria-labelledby={id} className="flex flex-col gap-3">
+    <div className="flex flex-col gap-0.5">
+      <h2 id={id} className="text-sm font-medium">{title}</h2>
+      {summary && <p className="text-xs text-muted-foreground">{summary}</p>}
+    </div>
+    {children}
+  </section>
 }

@@ -165,6 +165,18 @@ test('OAuth callback errors survive initial session confirmation and the keyed r
   assert.equal(new URL(browser.location.href).searchParams.get('github'), null)
 })
 
+test('a failed link names what happened when the callback knows', async () => {
+  for (const [reason, message] of [['cancelled', 'githubLinkCancelled'], ['account', 'githubLinkAccountChanged'], ['other', 'githubLinkFailed']]) {
+    userId = `viewer-reason-${reason}`
+    browser.history.replaceState({}, '', `?section=plugins&app=github&github=link-failed&reason=${reason}`)
+    await render()
+    assert.ok(container.textContent?.includes(message), message)
+    const url = new URL(browser.location.href)
+    assert.equal(url.searchParams.get('github'), null)
+    assert.equal(url.searchParams.get('reason'), null)
+  }
+})
+
 test('linking goes straight to the GitHub connect route, which redirects to github.com', async () => {
   const assigned: string[] = []
   const location = browser.location as unknown as { assign: (url: string) => void }
