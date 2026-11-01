@@ -97,11 +97,11 @@ computer = ComputerCard("{{bot:mobile}}", "{{run:r-testflight}}", "在模拟器�
 note = InlineText(["线程 ", RunChip("{{run:r-testflight}}"), " 在等你确认：要不要把 SecureStore 的读取挪到首帧之后。"])`),
     user('挪吧，但登录态要先读'),
     bot('明白：先读登录 token（一个 key），其他偏好在首帧后补。我已经把这句话转给线程。\n\n首帧时间对比（模拟器，20 次中位数）：\n\n| | 改动前 | 改动后 |\n|---|---|---|\n| 冷启动首帧 | 2.1s | 0.6s |\n| 热启动首帧 | 0.4s | 0.3s |'),
-    user('图片卡片在手机上渲染得怎么样'),
+    user('冷启动回归要覆盖哪几台测试机？'),
     bot(`root = Stack([grid, image, buttons])
-grid = BeCardGrid([BeImageCard("Bot 列表", "iPhone home screen app icons", "首页按 Bot 排列，下拉刷新。", ["首页"]), BeImageCard("对话", "smartphone chat messaging", "左滑引用，长按复制。", ["对话", "手势"]), BeImageCard("线程", "mobile app list interface", "线程 tab 显示运行状态。", ["线程"])])
-image = BeImage("iPhone screen mockup", "手机界面示意", "公共图库示意图，非真实截图")
-buttons = Stack([BeButton("继续细化", "对比三张卡片在小屏上的截断规则", "primary"), BeButton("直接提问", "图片卡片的点击区域多大？", "outline")], "row")`),
+grid = BeCardGrid([BeImageCard("iPhone 13", "iPhone 13", "主力机型，冷启动基线在这台上量。", ["基线"]), BeImageCard("iPhone SE", "iPhone SE 2020", "小屏和老芯片，白屏最明显。", ["小屏", "A13"]), BeImageCard("iPad Air", "iPad Air 2020", "确认分栏布局下首帧也正常。", ["平板"])])
+image = BeImage("Xcode Instruments", "Instruments 时间线", "公共图库示意图")
+buttons = Stack([BeButton("继续细化", "把三台测试机的首帧时间做成表格", "primary"), BeButton("直接提问", "iPhone SE 上还需要测热启动吗？", "outline")], "row")`),
   ],
 
   docs: [

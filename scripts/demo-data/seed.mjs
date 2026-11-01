@@ -44,7 +44,9 @@ function plan(owner) {
   const paragraph = text => ({ type: 'paragraph', content: [{ type: 'text', text }] })
   const issueRows = [...ISSUES.map(issue => ({ ...issue, scope: 'workspace' })), ...PERSONAL_ISSUES.map(issue => ({ ...issue, scope: 'personal' }))].map((issue, index, all) => {
     const metadata = {
-      number: index + 1, assignee: assignee(issue.assignee), project: null, labels: issue.labels ?? [], pullRequests: issue.pullRequests ?? [],
+      // No number: numbers come from the owner's counter ("user"."lastIssueNumber", advanced by a
+      // trigger on insert), and demo rows must not move the account's real numbering.
+      assignee: assignee(issue.assignee), project: null, labels: issue.labels ?? [], pullRequests: issue.pullRequests ?? [],
       parentId: issue.parent ? id(`issue:${issue.parent}`) : null, blockedByIds: [], relatedIds: [],
       duplicateOfId: issue.duplicateOf ? id(`issue:${issue.duplicateOf}`) : null,
       dueDate: issue.due === undefined ? null : day(issue.due), estimate: null,
