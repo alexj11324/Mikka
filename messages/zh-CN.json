@@ -2761,7 +2761,7 @@
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
     "conversationWith": "与 {name} 的对话",
-    "usedTools": "调用了 {tools}",
+    "usedTools": "用了 {count} 个工具",
     "pendingActions": {
       "label": "等你确认",
       "approve_repository_push": "允许推送仓库",

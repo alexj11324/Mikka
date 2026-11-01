@@ -2761,7 +2761,7 @@
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
     "conversationWith": "Conversation with {name}",
-    "usedTools": "Used {tools}",
+    "usedTools": "Used {count, plural, one {# tool} other {# tools}}",
     "pendingActions": {
       "label": "Waiting for your approval",
       "approve_repository_push": "Allow repository push",

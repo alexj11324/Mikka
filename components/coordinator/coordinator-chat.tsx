@@ -30,6 +30,7 @@ import { BotModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
 import { ThreadCard } from './thread-card'
+import { ToolsUsed } from './tools-used'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
 import { UnreadDivider } from '@/components/chat/unread-divider'
@@ -311,7 +312,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                       const run = sources?.[id]
                       return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={setOpenThread} /> : null
                     })}
-                    {footerTools(item).length > 0 && <MessageFooter>{t('usedTools', { tools: footerTools(item).join(', ') })}</MessageFooter>}
+                    {footerTools(item).length > 0 && <MessageFooter><ToolsUsed tools={footerTools(item)} /></MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>
             </Fragment>)}
