@@ -15,7 +15,7 @@ import { validateRepositoryApproval } from '@/lib/repository-approval-proposal'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
-import { citedIds, type CitationSource } from '@/lib/coordinator/citations'
+import { citedIds, namedCitations, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
@@ -423,7 +423,7 @@ export async function chatView(userId: string, limit = 200, botId: string | null
 }
 
 export interface BotChatSummary {
-  /** The latest reply or message, as written; null before the first. */
+  /** The latest reply or message, with cited threads and tasks written as their names; null before the first. */
   line: string | null
   at: string | null
   /** A turn is active, or pending input is new or holds its first live delivery lease. */
@@ -446,10 +446,16 @@ export async function botChats(userId: string): Promise<Record<string, BotChatSu
     if (!session.botId) continue
     result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId)).working }
   }
-  for (const row of latest) {
-    if (!row.botId) continue
+  const lines = latest.flatMap(row => {
+    if (!row.botId) return []
     const [item] = chatItems([{ position: 0, message: row.message as unknown as ModelMessage, createdAt: row.createdAt }])
-    result[row.botId] = { ...(result[row.botId] ?? { working: false }), line: item?.text || null, at: row.createdAt.toISOString() }
+    return [{ botId: row.botId, text: item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
+  })
+  // A reply cites threads and tasks by id; the preview names them as the chat's chips do (R-15).
+  const sources = await citationSources(userId, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))
+  for (const line of lines) {
+    const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
+    result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at }
   }
   return result
 }

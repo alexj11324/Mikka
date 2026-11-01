@@ -18,6 +18,7 @@ import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
 import { SPRING_SIDEBAR } from '@/lib/ease'
 import { chatPreview } from '@/lib/agent-history'
 import { fetchGroups } from '@/lib/group-messages'
+import { namedCitations } from '@/lib/coordinator/citations'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
 
@@ -168,7 +169,7 @@ export function BotList({ bots, workspaceId, threads, active, onOpen, onNewBot, 
         <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}
           status={coordinator?.working ? 'working' : undefined}
-          preview={previewOf(lastReply?.text)} />
+          preview={previewOf(lastReply?.from === 'coordinator' ? namedCitations(lastReply.text, coordinator?.sources ?? {}) : lastReply?.text)} />
         {rows.map(row => {
           if (row.kind === 'group') {
             const { group } = row
