@@ -222,9 +222,13 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const settings = device.kind === 'local' && repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
   // A repository grant resolves its push approval, while an explicit CLI deny
   // or read-only ceiling remains authoritative for every execution tool.
+  // Without a publication no repository approval was resolved, so a CLI
+  // `git_push: allow` cannot reach the daemon as a push grant.
   const executionPolicy = publication && !cliPolicy.policy.readOnly && cliPolicy.policy.permissions.git_push !== 'deny'
     ? { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: publication.policy.permissions.git_push } }
-    : cliPolicy.policy
+    : !publication && cliPolicy.policy.permissions.git_push === 'allow'
+      ? { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: 'ask' as const } }
+      : cliPolicy.policy
   const computerPermission = computer?.permission ?? localComputer?.permission
   // Computer authority comes from its persisted claim; retain every trusted
   // CLI restriction and its revision when attaching that independent grant.
