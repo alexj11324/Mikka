@@ -1,5 +1,6 @@
 import 'server-only'
 import { generateText } from 'ai'
+import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { extractionPrompt, factInput, parseFacts } from './facts'
@@ -19,8 +20,9 @@ const FACT_TIMEOUT_MS = 15_000
  * person's PostHog flag, their 记忆 switch, and their daily call cap. Each
  * call and its tokens are recorded in proactive_usage and sent to PostHog as
  * an $ai_generation event (model and tokens only). Like the action lines
- * it signs in with DECISION_GATEWAY_API_KEY, whose budget caps the total
- * spend; without the key, or when the call fails, nothing is learnt. The
+ * it signs in with the app's one gateway credential (lib/ai-gateway-auth.ts),
+ * and the hosted usage budget caps the spend; without it, or when the call
+ * fails, nothing is learnt. The
  * notification text is read here only, never stored. Never throws.
  */
 export async function extractFacts(notification: ExternalNotification, suggestionId: string): Promise<number> {
@@ -28,13 +30,12 @@ export async function extractFacts(notification: ExternalNotification, suggestio
   const { hostedModel, createTrustedGatewayModel } = await import('@/lib/abuse/model')
   const { modelAdmission } = await import('@/lib/model-admission/runtime')
   const { executionWorkspace } = await import('@/lib/execution-settings')
-  const key = process.env.DECISION_GATEWAY_API_KEY
-  if (!key || !profileEnabled()) return 0
+  if (!profileEnabled() || !await gatewayAuth()) return 0
   try {
     if (!await profileEntitled(notification.userId) || !await memoryEnabled(notification.userId)) return 0
     const workspaceId=await executionWorkspace(notification.userId,null)
     await modelAdmission.gateway({workspaceId,ownerId:notification.userId},FACT_MODEL,undefined,{auditAllowed:false})
-    const model=await hostedModel(workspaceId,FACT_MODEL,await createTrustedGatewayModel(FACT_MODEL,key),notification.userId)
+    const model=await hostedModel(workspaceId,FACT_MODEL,await createTrustedGatewayModel(FACT_MODEL),notification.userId)
     const day = usageDay(new Date())
     if (!await claimExtractionCall(notification.userId, day)) return 0
     const { instructions, prompt } = extractionPrompt(notification)

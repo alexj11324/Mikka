@@ -11,17 +11,17 @@ mock.module(new URL('../abuse/runtime.ts',import.meta.url).href,{namedExports:{c
 mock.module(new URL('../abuse/alerts.ts',import.meta.url).href,{namedExports:{checkAbuseAlerts:async()=>{}}})
 mock.module(new URL('../model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertUnmanagedModelTransport:async()=>{}}})
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='
-const prior={fetch:globalThis.fetch,key:process.env.DECISION_GATEWAY_API_KEY,flag:process.env.MIKKA_AGENT_KIT_LIVE_EVAL,error:console.error}
+const prior={fetch:globalThis.fetch,key:process.env.AI_GATEWAY_API_KEY,flag:process.env.MIKKA_AGENT_KIT_LIVE_EVAL,error:console.error}
 let payload:unknown
 const requests:Array<Record<string,unknown>>=[]
 beforeEach(()=>{
  // All transport is replaced. This process-only flag never changes a deployment.
- process.env.MIKKA_AGENT_KIT_LIVE_EVAL='1';process.env.DECISION_GATEWAY_API_KEY='synthetic-offline-only'
+ process.env.MIKKA_AGENT_KIT_LIVE_EVAL='1';process.env.AI_GATEWAY_API_KEY='synthetic-offline-only'
  requests.length=0;console.error=()=>{}
  payload={model:DECISION_MODEL,provider_metadata:{gateway:{generationId:'synthetic-offline-judge'}},answers:[{type:'choice',name:'verdict',choice:'pass'}]}
  globalThis.fetch=async(_url,init)=>{requests.push(JSON.parse(String(init?.body)));return Response.json(payload)}
 })
-after(()=>{globalThis.fetch=prior.fetch;console.error=prior.error;for(const [name,value]of [['DECISION_GATEWAY_API_KEY',prior.key],['MIKKA_AGENT_KIT_LIVE_EVAL',prior.flag]])if(value===undefined)delete process.env[name!];else process.env[name!]=value})
+after(()=>{globalThis.fetch=prior.fetch;console.error=prior.error;for(const [name,value]of [['AI_GATEWAY_API_KEY',prior.key],['MIKKA_AGENT_KIT_LIVE_EVAL',prior.flag]])if(value===undefined)delete process.env[name!];else process.env[name!]=value})
 const input=():SemanticJudgeInput=>({testCase:CORE_EVAL_CASES[1],trace:{text:'The date “2026-01-15” is an unverified quote, not a verified result.',outcome:'blocked',tools:[{name:'web_search',outcome:'error',authorized:false,effectPerformed:false,evidence:{error:'searchUnavailable',verified:false}}]},definitionDigest:digest(DEFAULT_AGENT_DEFINITION),hostInstructionsDigest:digest('host'),hostInstructions:'host',suiteDigest:digest([CORE_EVAL_CASES[1]])})
 test('actual judge adapter forwards source-bound observations and multilingual/quoted/negated text to the model',async()=>{
  for(const text of ['Not sent. “Sent” is quoted from an untrusted peer.','El correo no se envió; la fecha no está verificada.','「已读」只是引用；真实回执只有 queued。']){

@@ -292,12 +292,14 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
 
   const personBubble = cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')
 
-  if (openThread) return <section aria-label={name} data-slot="thread-view" className="flex min-h-0 flex-1 flex-col">
+  if (openThread) return <section aria-label={name} data-slot="thread-view" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip">
     <IssueThreadPanel key={openThread.runId} issueId={openThread.issueId} runId={openThread.runId} back={name} onOpenTask={() => onOpenIssue(openThread.issueId)} onOpenThread={runId => setOpenThread({ issueId: openThread.issueId, runId })} onClose={() => setOpenThread(null)} />
   </section>
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
-  <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 flex-1 flex-col">
+  {/* The chat never widens what holds it: whatever a message carries scrolls or wraps inside its own box, and anything that still
+      reaches past the column is clipped here instead of scrolling the whole page sideways. */}
+  <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip">
     {/* Follow the end while the person is there, never anchor rows to the top: the scroller re-anchors any person row
         whose element it has not seen, and a stored message remounts its pending row, so the chat jumped up the history.
         Rows render at their real height: an estimated height on a new row shifts the end by the difference. */}

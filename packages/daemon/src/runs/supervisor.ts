@@ -41,6 +41,8 @@ import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/pro
 import { runPolicyDigestInput } from "@mikka/protocol/agent-policy"
 import { createHash, randomUUID } from "node:crypto"
 import { join, resolve } from "node:path"
+import { tmpdir } from "node:os"
+import { withRunGitCredentials } from '../agents/github-runtime'
 
 import { execa } from "execa"
 
@@ -1025,12 +1027,14 @@ export class RunSupervisor {
     const base = await this.deps.baseRef(assignment)
     if (!branch || !pushDecision(runPolicy(assignment.policy), repo.push?.approved === true).push) return base
     try {
-      return await this.deps.worktrees.fetchBranch(
-        repo.path,
-        repo.push?.remote ?? "origin",
-        branch,
-        runId,
-      )
+      return await withRunGitCredentials(assignment, runPaths(this.deps.adapterStateDir ?? join(tmpdir(), "mikka-run-state"), runId).privateDir,
+        env => this.deps.worktrees.fetchBranch(
+          repo.path,
+          repo.push?.remote ?? "origin",
+          branch,
+          runId,
+          env,
+        ))
     } catch (error) {
       this.deps.log.info(
         { run_id: runId, branch, err: error },

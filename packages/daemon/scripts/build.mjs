@@ -36,6 +36,8 @@ for (const path of ['agents/native-container.mjs', 'agents/native-egress.mjs', '
 // run-context is bundled into each root entry; its stdio helper is standalone.
 await copyFile(resolve(root, 'src/agents/mikka-mcp.mjs'), resolve(out, 'mikka-mcp.mjs'))
 await copyFile(resolve(root, 'src/agents/github-credentials.mjs'), resolve(out, 'github-credentials.mjs'))
+// The run sandbox launcher (bundled into each entry) spawns this worker beside it.
+await copyFile(resolve(root, 'src/agents/run-sandbox-worker.mjs'), resolve(out, 'run-sandbox-worker.mjs'))
 await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })
 // The runner image's sources (run-container.ts builds it on a device with Docker).
 for (const path of ['harness/Dockerfile', 'harness/pins.json', 'harness/install.mjs', 'harness/cli.mjs']) {

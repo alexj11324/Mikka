@@ -46,7 +46,7 @@ pinned bots sit on top, each with a star (the star is the pin, the same for
 every bot; the Coordinator is pinned until the person unpins it,
 [decision](decisions/2026-11-01-1215-star-is-the-pin.md)), then every other
 bot and group chat with its last line and time, newest first (the web bot
-list, R-01).
+list, R-01; R-06).
 **搜索** is the tab bar's search: its field sits at the bottom and matches
 bots and group chats by name.
 The Coordinator gets no other special UI (R-06).
@@ -269,7 +269,7 @@ mobile tabs.
   web. Chat items carry `images` (a count) and the app loads each photo from
   `GET /api/mobile/chat/image?message=<id>&index=<n>`, which serves only the
   person's own messages.
-- **Not on the server yet**, so the app leaves them out: 待审阅 and 已归档
+- **现状（非决定）:** not on the server yet, so the app leaves them out: 待审阅 and 已归档
   threads, pinned bots, 电脑不在用时 (needs the web to report presence),
   dictation (so the composer has no mic yet), dark mode.
 - **App icon:** the Mikka mark, the same file as the desktop app's

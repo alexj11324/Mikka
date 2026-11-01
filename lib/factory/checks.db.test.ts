@@ -229,11 +229,11 @@ test(
       let replyAnswers: unknown[] | undefined,
         replyConfidence: number | undefined;
       assert.equal(
-        Object.hasOwn(process.env, "DECISION_GATEWAY_API_KEY"),
+        Object.hasOwn(process.env, "AI_GATEWAY_API_KEY"),
         false,
         "Offline tests must not inherit a provider credential",
       );
-      process.env.DECISION_GATEWAY_API_KEY = "synthetic-offline-fixture";
+      process.env.AI_GATEWAY_API_KEY = "synthetic-offline-fixture";
       installedGatewayFixture = true;
       const networkRequests: unknown[] = [];
       const originalFetch = globalThis.fetch;
@@ -1656,7 +1656,7 @@ test(
         },
       );
     } finally {
-      if (installedGatewayFixture) delete process.env.DECISION_GATEWAY_API_KEY;
+      if (installedGatewayFixture) delete process.env.AI_GATEWAY_API_KEY;
       await modelDatabase?.close();
       await pool?.end();
       await (await import("../db")).pool.end();
