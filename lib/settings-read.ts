@@ -5,7 +5,7 @@ export type SettingsRead =
   | 'password' | 'sessions' | 'preferences' | 'saved-logins'
   | 'workspace-general' | 'transfer-targets' | 'deletion-impact'
   | 'app-policy' | 'personal-policy' | 'secrets' | 'e2b-key' | 'usage' | 'billing' | 'credit-billing' | 'card-verification' | 'audit'
-  | 'execution-rules' | 'execution-fallbacks' | 'execution-places' | 'bot-models' | 'bots'
+  | 'execution-rules' | 'execution-fallbacks' | 'execution-places' | 'bot-models' | 'bots' | 'api-keys'
 
 /**
  * A settings read over GET. The body is what the server action returned, so
