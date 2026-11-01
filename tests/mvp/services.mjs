@@ -79,7 +79,10 @@ export async function startMvpServices(port = 3191) {
         await git(source, ['add', 'README.md'])
         await git(source, ['-c', 'user.name=Mikka CI', '-c', 'user.email=mikka-ci@example.com', 'commit', '-m', 'test: seed isolated origin'])
         await git(source, ['clone', '--bare', '--no-hardlinks', '.', barePath])
-        scenario = { marker: input.marker, title: input.title, repo: REPOSITORY, deviceId: null, barePath, githubAccountId }
+        // dev:local (scripts/dev-local.mjs) runs a real agent, not the mock harness.
+        const harness = input.harness ?? 'mock'
+        assert.ok(harness === 'mock' || harness === 'any')
+        scenario = { marker: input.marker, title: input.title, repo: REPOSITORY, deviceId: null, barePath, githubAccountId, harness }
         return reply({ barePath, repo: REPOSITORY, baseBranch: 'trunk' })
       }
       if (url.pathname === '/scenario/device' && request.method === 'POST') {
@@ -219,7 +222,7 @@ export async function startMvpServices(port = 3191) {
         assert.equal(input.base, 'trunk', 'PR must use the actual origin default branch')
         assert.match(input.body, /<!-- mikka-issue:[a-f0-9-]{36} -->$/)
         const commit = await git(scenario.barePath, ['rev-parse', '--verify', `refs/heads/${input.head}`])
-        assert.match(await git(scenario.barePath, ['show', `${commit}:MIKKA_MOCK.md`]), /Written by the real Mikka mock harness/)
+        if (scenario.harness === 'mock') assert.match(await git(scenario.barePath, ['show', `${commit}:MIKKA_MOCK.md`]), /Written by the real Mikka mock harness/)
         const message = await git(scenario.barePath, ['show', '-s', '--format=%B', commit])
         const runId = message.match(/Mikka-Run: ([a-f0-9-]{36})/)?.[1]
         const issueId = message.match(/Mikka-Issue: ([a-f0-9-]{36})/)?.[1]
