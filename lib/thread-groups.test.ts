@@ -1,85 +1,91 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { activityLabel, freshChunks, groupThreads, LAST_REPLY_CHARS, lastActivity, lastReplyUpdate, nextReply, pullRequestsOf, replyLine, threadGroup, type GroupIssue, type StoredReply } from './thread-groups'
+import { activityLabel, freshChunks, groupThreads, LAST_REPLY_CHARS, lastActivity, lastReplyUpdate, nextReply, pullRequestsOf, replyLine, threadGroup, type GroupIssue, type StoredReply, type ThreadOutcome } from './thread-groups'
 
-const thread = (status: string, issueId: string | null = 'task', extra: { superseded?: boolean; createdAt?: string; id?: string } = {}) =>
-  ({ id: extra.id ?? status, status, issueId, createdAt: extra.createdAt ?? '2026-10-28T10:00:00Z', superseded: extra.superseded ?? false })
+const thread = (status: string, issueId: string | null = 'task', extra: { outcome?: ThreadOutcome | null; createdAt?: string; id?: string } = {}) =>
+  ({ id: extra.id ?? status, status, issueId, createdAt: extra.createdAt ?? '2026-10-28T10:00:00Z', outcome: extra.outcome ?? null })
 const pr = (number: number, state: 'open' | 'merged' | 'closed') => ({ url: `https://github.com/acme/app/pull/${number}`, state })
 const task = (status: string, ...pullRequests: ReturnType<typeof pr>[]): GroupIssue => ({ status, metadata: { pullRequests } })
-const group = (t: ReturnType<typeof thread>, issue?: GroupIssue, newest = true) => threadGroup(t, issue, newest)
+const group = (t: ReturnType<typeof thread>, issue?: GroupIssue) => threadGroup(t, issue)
+const ENDED = ['succeeded', 'stopped', 'failed', 'cancelled']
 
-test('等待回复: waiting for input', () => {
-  assert.equal(group(thread('waiting_input'), task('doing')), 'waiting')
-  assert.equal(group(thread('waiting_input', null)), 'waiting')
-})
-
-test('等待回复: a failed thread nothing replaced', () => {
-  assert.equal(group(thread('failed'), task('doing')), 'waiting')
-  assert.equal(group(thread('failed', null)), 'waiting')
-})
-
-test('已解决: a failed thread that was retried or is not the newest on its task', () => {
-  assert.equal(group(thread('failed', 'task', { superseded: true }), task('doing')), 'resolved')
-  assert.equal(group(thread('failed', null, { superseded: true })), 'resolved')
-  assert.equal(group(thread('failed'), task('doing'), false), 'resolved')
-})
-
-test('等待回复: finished with an open PR on its task, or its task in review', () => {
-  assert.equal(group(thread('succeeded'), task('doing', pr(1, 'open'))), 'waiting')
-  assert.equal(group(thread('succeeded'), task('review')), 'waiting')
-  assert.equal(group(thread('succeeded'), task('doing', pr(1, 'merged'), pr(2, 'open'))), 'waiting')
-})
-
-test('进行中: queued, preparing, running, finishing', () => {
-  for (const status of ['queued', 'preparing', 'running', 'finishing']) assert.equal(group(thread(status), task('done')), 'running', status)
-})
-
-test('空闲: the newest thread on an open task, finished or stopped, no PR waiting', () => {
-  for (const status of ['backlog', 'todo', 'doing']) {
-    assert.equal(group(thread('succeeded'), task(status)), 'idle', status)
-    assert.equal(group(thread('stopped'), task(status)), 'idle', status)
-    assert.equal(group(thread('succeeded'), task(status, pr(3, 'closed'))), 'idle', status)
+test('进行中: queued, preparing, running, finishing, whatever the task or outcome', () => {
+  for (const status of ['queued', 'preparing', 'running', 'finishing']) {
+    assert.equal(group(thread(status), task('done')), 'running', status)
+    assert.equal(group(thread(status, null, { outcome: 'blocked' })), 'running', status)
   }
 })
 
-test('空闲: a stopped thread without a task', () => {
-  assert.equal(group(thread('stopped', null)), 'idle')
+test('等待你: a run asking a question; 受阻: a run paused on its quota', () => {
+  assert.equal(group(thread('waiting_input'), task('doing')), 'waiting')
+  assert.equal(group(thread('paused'), task('doing')), 'blocked')
 })
 
-test('已解决: cancelled', () => {
-  assert.equal(group(thread('cancelled'), task('doing', pr(1, 'open'))), 'resolved')
-  assert.equal(group(thread('cancelled', null)), 'resolved')
+test('受阻: a run that finished but said it was blocked (not logged in, no credentials) is never resolved', () => {
+  // "Not logged in · Please run /login", "gh 拿不到凭证": status succeeded, judged blocked.
+  for (const status of ENDED) {
+    assert.equal(group(thread(status, 'task', { outcome: 'blocked' }), task('doing')), 'blocked', status)
+    assert.equal(group(thread(status, null, { outcome: 'failed' })), 'blocked', status)
+  }
+  // Even with a PR open on its task, a blocked run is 受阻, not a PR to review.
+  assert.equal(group(thread('succeeded', 'task', { outcome: 'blocked' }), task('doing', pr(1, 'open'))), 'blocked')
 })
 
-test('已解决: its task is done, cancelled or a duplicate', () => {
+test('等待你: judged needs_input, or its task has a PR to review', () => {
+  assert.equal(group(thread('succeeded', 'task', { outcome: 'needs_input' }), task('doing')), 'waiting')
+  assert.equal(group(thread('succeeded', 'task', { outcome: 'done' }), task('doing', pr(1, 'open'))), 'waiting')
+  assert.equal(group(thread('succeeded', 'task', { outcome: 'idle' }), task('review')), 'waiting')
+})
+
+test('空闲: judged idle on an open task', () => {
+  assert.equal(group(thread('stopped', 'task', { outcome: 'idle' }), task('todo')), 'idle')
+  assert.equal(group(thread('stopped', null, { outcome: 'idle' })), 'idle')
+})
+
+test('已解决: judged done, or its task closed or its PR merged; nothing else', () => {
+  assert.equal(group(thread('succeeded', 'task', { outcome: 'done' }), task('doing')), 'resolved')
+  assert.equal(group(thread('succeeded', null, { outcome: 'done' })), 'resolved')
   for (const status of ['done', 'canceled', 'duplicate']) {
-    assert.equal(group(thread('succeeded'), task(status, pr(1, 'open'))), 'resolved', status)
-    assert.equal(group(thread('failed'), task(status)), 'resolved', status)
+    assert.equal(group(thread('failed', 'task', { outcome: 'blocked' }), task(status)), 'resolved', status)
     assert.equal(group(thread('stopped'), task(status)), 'resolved', status)
   }
-})
-
-test('已解决: its PR is merged', () => {
   assert.equal(group(thread('succeeded'), task('doing', pr(1, 'merged'))), 'resolved')
-  assert.equal(group(thread('stopped'), task('todo', pr(1, 'merged'))), 'resolved')
 })
 
-test('已解决: a newer thread on its task replaced it', () => {
-  assert.equal(group(thread('succeeded'), task('review'), false), 'resolved')
-  assert.equal(group(thread('stopped'), task('doing'), false), 'resolved')
+test('not judged yet: a failed run is 受阻, any other ended run 等待你, never 已解决', () => {
+  assert.equal(group(thread('failed'), task('doing')), 'blocked')
+  assert.equal(group(thread('failed', null)), 'blocked')
+  for (const status of ['succeeded', 'stopped', 'cancelled']) {
+    assert.equal(group(thread(status), task('doing')), 'waiting', status)
+    assert.equal(group(thread(status, null)), 'waiting', status)
+  }
 })
 
-test('已解决: finished without a task', () => {
-  assert.equal(group(thread('succeeded', null)), 'resolved')
+test('a task\'s failed retries fold into its newest thread, which stays unresolved', () => {
+  // The ZHIX-2 shape: one README task, many runs that failed or finished blocked.
+  const runs = Array.from({ length: 16 }, (_, index) => thread(index % 2 ? 'failed' : 'succeeded', 'zhix-2', {
+    id: `run-${index}`, createdAt: `2026-10-31T${String(index + 1).padStart(2, '0')}:00:00Z`, outcome: index % 2 ? 'failed' : 'blocked',
+  }))
+  const groups = groupThreads([...runs, thread('running', 'other', { id: 'live' })], id => id === 'zhix-2' ? task('todo') : task('doing'))
+  assert.deepEqual(groups.resolved, [])
+  assert.deepEqual(groups.blocked.map(row => [row.id, row.attempts]), [['run-15', 16]])
+  assert.deepEqual(groups.running.map(row => [row.id, row.attempts]), [['live', 1]])
 })
 
-test('groupThreads finds the newest thread on each task by creation time', () => {
-  const older = thread('succeeded', 'a', { id: 'older', createdAt: '2026-10-27T10:00:00Z' })
-  const newer = thread('stopped', 'a', { id: 'newer', createdAt: '2026-10-28T10:00:00Z' })
-  const groups = groupThreads([older, newer, thread('running', 'b', { id: 'run' })], id => id === 'a' ? task('doing') : task('todo'))
-  assert.deepEqual(groups.idle.map(item => item.id), ['newer'])
-  assert.deepEqual(groups.resolved.map(item => item.id), ['older'])
-  assert.deepEqual(groups.running.map(item => item.id), ['run'])
+test('a superseded failed run no longer resolves itself: the task\'s newest run decides', () => {
+  const failed = thread('failed', 'a', { id: 'old', createdAt: '2026-10-27T10:00:00Z', outcome: 'failed' })
+  const retry = thread('failed', 'a', { id: 'retry', createdAt: '2026-10-28T10:00:00Z', outcome: 'blocked' })
+  const groups = groupThreads([failed, retry], () => task('doing'))
+  assert.deepEqual(groups.blocked.map(row => [row.id, row.attempts]), [['retry', 2]])
+  assert.deepEqual(groups.resolved, [])
+  // A retry that got it done resolves the task's row.
+  const done = groupThreads([failed, { ...retry, status: 'succeeded', outcome: 'done' as const }], () => task('doing'))
+  assert.deepEqual(done.resolved.map(row => row.id), ['retry'])
+})
+
+test('threads without a task are their own rows', () => {
+  const groups = groupThreads([thread('stopped', null, { id: 'x', outcome: 'idle' }), thread('stopped', null, { id: 'y', outcome: 'idle' })], () => undefined)
+  assert.deepEqual(groups.idle.map(row => [row.id, row.attempts]), [['x', 1], ['y', 1]])
 })
 
 test('a reply opening is one plain line', () => {

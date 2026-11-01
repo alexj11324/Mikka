@@ -37,6 +37,8 @@ export interface RunView {
   agentName: string
   harness: SupportedHarness
   status: string
+  /** How it came out once it ended (R-52); null while running or not judged yet. */
+  outcome?: string | null
   kind: string
   stopReason: string | null
   error: string | null
@@ -54,7 +56,7 @@ export interface RunDetail {
 
 export const runViewColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: runBotName,
-  harness: sql<SupportedHarness>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`, status: agentRuns.status, pauseReason: agentRuns.pauseReason, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
+  harness: sql<SupportedHarness>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`, status: agentRuns.status, outcome: agentRuns.outcome, pauseReason: agentRuns.pauseReason, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
   error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
   startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
 }

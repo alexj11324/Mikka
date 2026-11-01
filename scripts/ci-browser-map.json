@@ -49,6 +49,7 @@
     "teams.spec.ts",
     "thread-cards.spec.ts",
     "thread-projection.spec.ts",
+    "thread-groups.spec.ts",
     "thread-stop.spec.ts",
     "thread-quota.spec.ts",
     "workspace-menu.spec.ts",
@@ -221,11 +222,14 @@
         "^lib\\/(?:issue-threads|thread-groups|issue-thread-questions|run-control)\\.",
         "^components\\/workspace\\/(?:issue-thread|thread-quota)",
         "^lib\\/run-quota",
-        "^app\\/api\\/(?:threads|coordinator)\\/"
+        "^app\\/api\\/(?:threads|coordinator)\\/",
+        "^lib\\/run-outcome",
+        "^components\\/nav\\/thread-list\\.tsx$"
       ],
       "specs": [
         "thread-cards.spec.ts",
         "thread-projection.spec.ts",
+        "thread-groups.spec.ts",
         "thread-stop.spec.ts",
         "thread-quota.spec.ts",
         "issue-threads.spec.ts",

@@ -25,6 +25,8 @@ export interface RunAttempt {
   /** 1-based, in chain order: the root is attempt 1. */
   attempt: number
   status: string
+  /** How it came out once it ended (R-52); null while running or not judged yet. */
+  outcome?: string | null
   stopRequestedAt: Date | null
   createdAt: Date
   finishedAt: Date | null
@@ -68,7 +70,7 @@ function chainSql(scope: string, depth: string) {
     )`
 }
 
-const SELECT_ATTEMPTS = `a."depthExceeded", a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x."stopRequestedAt", x."createdAt", x."finishedAt"`
+const SELECT_ATTEMPTS = `a."depthExceeded", a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x.outcome, x."stopRequestedAt", x."createdAt", x."finishedAt"`
 
 /**
  * The newest `limit` chains on an issue among `userIds`' runs. Runs are folded by root
@@ -92,7 +94,7 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
   for (const row of rows) {
     const root = String(row.rootRunId)
     const entry = byRoot.get(root) ?? { rootCreatedAt: row.rootCreatedAt as Date, runs: [] }
-    entry.runs.push({ runId: String(row.runId), status: String(row.status), stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
+    entry.runs.push({ runId: String(row.runId), status: String(row.status), outcome: (row.outcome as string | null) ?? null, stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
     byRoot.set(root, entry)
   }
   const order = (a: { createdAt: Date; runId: string }, b: { createdAt: Date; runId: string }) => a.createdAt.getTime() - b.createdAt.getTime() || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0)

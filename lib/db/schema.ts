@@ -330,6 +330,9 @@ export const agents = pgTable('agents', {
 
 export const RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing', 'succeeded', 'stopped', 'failed', 'cancelled'] as const
 export type RunStatus = (typeof RUN_STATUSES)[number]
+/** How an ended run came out (lib/run-outcome.ts). */
+export const RUN_OUTCOMES = ['done', 'blocked', 'needs_input', 'failed', 'idle'] as const
+export type RunOutcome = (typeof RUN_OUTCOMES)[number]
 
 /** One execution of one agent. The daemon claims it, runs it and reports back. */
 export const agentRuns = pgTable('agent_runs', {
@@ -364,6 +367,14 @@ export const agentRuns = pgTable('agent_runs', {
   /** The text part (chunk id) lastReply comes from: more text for it appends, another part replaces it. */
   lastReplyPart: text('lastReplyPart'),
   lastReplyAt: timestamp('lastReplyAt', { withTimezone: true }),
+  /** How the run came out once it ended (lib/run-outcome.ts); null until judged. The right column groups by it. */
+  outcome: text('outcome').$type<RunOutcome | null>(),
+  /** Who judged the outcome: the decision model (`decision`). */
+  outcomeDecidedBy: text('outcomeDecidedBy').$type<'decision' | null>(),
+  /** The judge's one-line reason, for review. */
+  outcomeReason: text('outcomeReason'),
+  /** When it was judged, or last asked without an answer (asked again an hour later). */
+  outcomeAt: timestamp('outcomeAt', { withTimezone: true }),
   /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
   source: text('source').$type<'mcp' | null>(),
   questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true} | null>(),

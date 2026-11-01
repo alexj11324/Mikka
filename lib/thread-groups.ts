@@ -68,16 +68,17 @@ export function activityLabel(at: Date, now: Date): 'justNow' | 'yesterday' | 'r
   return at.getFullYear() === yesterday.getFullYear() && at.getMonth() === yesterday.getMonth() && at.getDate() === yesterday.getDate() ? 'yesterday' : 'relative'
 }
 
-export type ThreadGroup = 'waiting' | 'running' | 'idle' | 'resolved'
-/** The order everywhere: 等待回复 → 进行中 → 空闲 → 已解决. */
-export const THREAD_GROUPS: readonly ThreadGroup[] = ['waiting', 'running', 'idle', 'resolved']
+export type ThreadGroup = 'running' | 'blocked' | 'waiting' | 'idle' | 'resolved'
+/** The order everywhere: 进行中 → 受阻 → 等待你 → 空闲 → 已解决 (R-52). */
+export const THREAD_GROUPS: readonly ThreadGroup[] = ['running', 'blocked', 'waiting', 'idle', 'resolved']
 
 const ACTIVE = new Set(['queued', 'preparing', 'running', 'finishing'])
-const OPEN_ISSUE = new Set(['backlog', 'todo', 'doing'])
 const CLOSED_ISSUE = new Set(['done', 'canceled', 'duplicate'])
 
+/** How an ended run came out, as the decision model judged it (lib/run-outcome.ts). */
+export type ThreadOutcome = 'done' | 'blocked' | 'needs_input' | 'failed' | 'idle'
 type PrLink = { url: string; state: 'open' | 'draft' | 'merged' | 'closed' }
-type GroupedThread = { id: string; status: string; issueId: string | null; createdAt: string; superseded: boolean }
+type GroupedThread = { id: string; status: string; issueId: string | null; createdAt: string; outcome?: ThreadOutcome | null }
 /** The task a thread works on, as far as grouping needs it. */
 export type GroupIssue = { status: string; metadata: { pullRequests: readonly PrLink[] } }
 
@@ -86,42 +87,56 @@ export function threadIsActive(thread: { status: string }) {
 }
 
 /**
- * Which group a thread is in.
- * - 等待回复: waiting for input; a failed thread nothing replaced (no retry of
- *   it, and the newest on its task or without one); a finished thread whose
- *   task has an open PR or is in review.
+ * Which group a thread is in (R-52). The run's state decides only 进行中 and
+ * 等待你 for a run asking a question; for an ended run the judged outcome
+ * decides, and only facts close a thread without one.
  * - 进行中: queued, preparing, running or finishing.
- * - 空闲: the newest thread on a task still open (backlog, todo, doing),
- *   finished or stopped, with no PR waiting; also a stopped thread without a task.
- * - 已解决: cancelled; its task is done, cancelled or a duplicate; its PR is
- *   merged; a newer thread on its task replaced it; finished without a task.
- * A stopped thread whose task has an open PR waits like a finished one.
+ * - 已解决: its task is done, cancelled or a duplicate, or its PR is merged;
+ *   else only when the judged outcome is done.
+ * - 受阻: paused (its quota ran out); judged blocked or failed.
+ * - 等待你: waiting for input; judged needs_input; its task has a PR to review
+ *   (open PR or in review) and the run was not blocked.
+ * - 空闲: judged idle.
+ * Not judged yet (or no judge answered): a failed run is 受阻, any other 等待你.
+ * Never 已解决 without a done outcome or a closed task or merged PR.
  */
-export function threadGroup(thread: GroupedThread, issue: GroupIssue | undefined, newestOnIssue: boolean): ThreadGroup {
-  if (thread.status === 'waiting_input') return 'waiting'
+export function threadGroup(thread: GroupedThread, issue: GroupIssue | undefined): ThreadGroup {
   if (ACTIVE.has(thread.status)) return 'running'
-  if (thread.status === 'cancelled') return 'resolved'
-  if (issue && CLOSED_ISSUE.has(issue.status)) return 'resolved'
-  if (thread.status === 'failed') return !thread.superseded && (!issue || newestOnIssue) ? 'waiting' : 'resolved'
-  if (!issue) return thread.status === 'stopped' ? 'idle' : 'resolved'
-  if (!newestOnIssue) return 'resolved'
-  if (issue.status === 'review' || issue.metadata.pullRequests.some(pr => pr.state === 'open' || pr.state === 'draft')) return 'waiting'
-  if (issue.metadata.pullRequests.some(pr => pr.state === 'merged')) return 'resolved'
-  return OPEN_ISSUE.has(issue.status) ? 'idle' : 'resolved'
+  if (thread.status === 'waiting_input') return 'waiting'
+  if (thread.status === 'paused') return 'blocked'
+  if (issue && (CLOSED_ISSUE.has(issue.status) || issue.metadata.pullRequests.some(pr => pr.state === 'merged'))) return 'resolved'
+  const outcome = thread.outcome ?? null
+  if (outcome === 'blocked' || outcome === 'failed') return 'blocked'
+  if (issue && (issue.status === 'review' || issue.metadata.pullRequests.some(pr => pr.state === 'open' || pr.state === 'draft'))) return 'waiting'
+  if (outcome === 'done') return 'resolved'
+  if (outcome === 'idle') return 'idle'
+  if (outcome === 'needs_input') return 'waiting'
+  return thread.status === 'failed' ? 'blocked' : 'waiting'
 }
 
-/** Threads by group, each kept in the order given. "Newest on its task" compares creation times. */
-export function groupThreads<T extends GroupedThread>(threads: readonly T[], issueOf: (issueId: string) => GroupIssue | undefined): Record<ThreadGroup, T[]> {
-  const groups: Record<ThreadGroup, T[]> = { waiting: [], running: [], idle: [], resolved: [] }
+/** A row of the list: a task's newest thread, with how many threads that task has had (第 N 次尝试). */
+export type ThreadRowOf<T> = T & { attempts: number }
+
+/**
+ * Threads by group, each kept in the order given. A task's threads fold into
+ * its newest one (by creation time), which carries the task's attempt count
+ * and is grouped by its own state and outcome; a thread without a task is its
+ * own row.
+ */
+export function groupThreads<T extends GroupedThread>(threads: readonly T[], issueOf: (issueId: string) => GroupIssue | undefined): Record<ThreadGroup, ThreadRowOf<T>[]> {
+  const groups: Record<ThreadGroup, ThreadRowOf<T>[]> = { running: [], blocked: [], waiting: [], idle: [], resolved: [] }
   const newest = new Map<string, T>()
+  const attempts = new Map<string, number>()
   for (const thread of threads) {
     if (!thread.issueId) continue
+    attempts.set(thread.issueId, (attempts.get(thread.issueId) ?? 0) + 1)
     const current = newest.get(thread.issueId)
     if (!current || thread.createdAt > current.createdAt) newest.set(thread.issueId, thread)
   }
   for (const thread of threads) {
+    if (thread.issueId && newest.get(thread.issueId) !== thread) continue
     const issue = thread.issueId ? issueOf(thread.issueId) : undefined
-    groups[threadGroup(thread, issue, !!thread.issueId && newest.get(thread.issueId) === thread)].push(thread)
+    groups[threadGroup(thread, issue)].push({ ...thread, attempts: thread.issueId ? attempts.get(thread.issueId)! : 1 })
   }
   return groups
 }
@@ -140,7 +155,7 @@ type PrIssue = { id: string; metadata: { pullRequests: readonly PrLink[] } }
  * other open PR waits for review, a merged one is 已合并, and a closed one is
  * left out.
  */
-export function pullRequestsOf(threads: readonly Omit<GroupedThread, 'createdAt' | 'superseded'>[], issues: readonly PrIssue[]): PullRequestRow[] {
+export function pullRequestsOf(threads: readonly Omit<GroupedThread, 'createdAt' | 'outcome'>[], issues: readonly PrIssue[]): PullRequestRow[] {
   const rows: PullRequestRow[] = []
   const seen = new Set<string>()
   for (const thread of threads) {

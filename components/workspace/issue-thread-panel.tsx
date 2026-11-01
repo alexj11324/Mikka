@@ -123,7 +123,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
         <Button variant="ghost" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
         <span aria-hidden="true" className="text-muted-foreground">/</span>
       </>}
-      {detail && view && <ThreadStatusIcon status={view.status} waiting={view.waiting} />}
+      {detail && view && <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} />}
       <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{detail?.name ?? t('title')}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
