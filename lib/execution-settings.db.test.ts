@@ -28,7 +28,9 @@ test(
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now());
-      CREATE TABLE workspace_e2b_keys ("workspaceId" uuid PRIMARY KEY)`);
+      CREATE TABLE workspace_e2b_keys ("workspaceId" uuid PRIMARY KEY);
+      CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
+      CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY,"bindingId" uuid)`);
       await pool.query(
         await readFile(
           new URL(
