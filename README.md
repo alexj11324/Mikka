@@ -327,12 +327,13 @@ factory.yaml         # The reviewed Factory definition
 
 Development and functional acceptance run in cloud Linux against a local
 application, a real isolated Postgres database and, when relevant, a real
-daemon. Builds, type checks and end-to-end tests run there or in CI.
+daemon. Builds, type checks and API/CLI acceptance run there; CI runs source,
+daemon and database checks.
 Credentials live in Infisical Cloud; never commit them or store them in a local
 `.env` file.
 
 In a fresh cloud Linux session, one command sets up PostgreSQL 17 with
-`mikka_e2e` migrated, Node 24, dependencies, the sandbox tools and Playwright
+`mikka_e2e` migrated, Node 24, dependencies, the sandbox tools and Chromium for screenshots
 (see [docs/local-bootstrap.md](docs/local-bootstrap.md)):
 
 ```sh
@@ -361,9 +362,9 @@ pnpm desktop:dev
 ```
 
 While working, run `pnpm typecheck`, `pnpm lint`, the unit tests for what you
-changed and the one browser test for a flow you changed. CI runs source,
-daemon and database checks and no browser tests; browser specs run locally,
-and Vercel, not CI, builds `main`. See
+changed and the local API/CLI acceptance of the flow you changed
+(`pnpm test:local-loop`). No browser tests run, in CI or locally, and Vercel,
+not CI, builds `main`. See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) ("How changes are tested").
 
 Start with these documents:
@@ -374,8 +375,10 @@ Start with these documents:
 - [`docs/design/glossary.md`](docs/design/glossary.md): what bot, thread and
   chat mean.
 - [`docs/acceptance.md`](docs/acceptance.md): how a change is accepted.
-- [`docs/acceptance-mvp-core-loop.md`](docs/acceptance-mvp-core-loop.md): the MVP
-  test boundaries and pending CI / blocked Preview acceptance record.
+- [`docs/acceptance-mvp-cli-2026-11-01.md`](docs/acceptance-mvp-cli-2026-11-01.md):
+  the MVP API/CLI acceptance record.
+- [`docs/dev-workflow.md`](docs/dev-workflow.md): local first, trunk-based
+  merging and module owners.
 - [`docs/review-checklist.md`](docs/review-checklist.md): complete before
   presenting UI to others.
 - [`apps/desktop/README.md`](apps/desktop/README.md): running and packaging

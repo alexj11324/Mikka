@@ -7,6 +7,10 @@ dispatch/due-work objectives in [observability.md](observability.md).
 
 ## Executable client budgets
 
+现状（非决定）：the browser spec named below no longer runs anywhere
+([decision](../design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)), so the first four budgets are
+not enforced until they move to an API or unit check.
+
 | State | Budget | Check |
 | --- | --- | --- |
 | Shared workspace lists, isolated in Artifact view | Tasks every 10 seconds; threads every 15 seconds. Over 60 seconds: 3–6 reads per observed action, 8–10 combined | `tests/e2e/settings-background-polling.spec.ts` |

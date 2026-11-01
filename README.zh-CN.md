@@ -200,7 +200,7 @@ factory.yaml         # 经过审查的 Factory 定义
 
 ## 开发
 
-开发和功能验收在云端 Linux 中进行，使用本地应用、真实的隔离 Postgres 数据库，必要时使用真实的 daemon。构建、类型检查和端到端测试在云端 Linux 或 CI 中运行。凭据统一存放在 Infisical Cloud，不得提交至仓库或写入本地 `.env` 文件。
+开发和功能验收在云端 Linux 中进行，使用本地应用、真实的隔离 Postgres 数据库，必要时使用真实的 daemon。构建、类型检查和 API/CLI 验收在云端 Linux 中运行；CI 运行源码、daemon 和数据库检查。凭据统一存放在 Infisical Cloud，不得提交至仓库或写入本地 `.env` 文件。
 
 安装依赖并运行源码检查：
 
@@ -222,7 +222,7 @@ pnpm dev
 pnpm desktop:dev
 ```
 
-开发过程中，运行 `pnpm typecheck`、`pnpm lint`、所改动部分的单元测试，以及所改动流程对应的一个浏览器测试。CI 运行源码、daemon 和数据库检查，不跑浏览器测试；浏览器测试在本地跑，`main` 由 Vercel 构建，CI 不做生产构建。详见 [`CONTRIBUTING.md`](CONTRIBUTING.md)（"How changes are tested"）。
+开发过程中，运行 `pnpm typecheck`、`pnpm lint`、所改动部分的单元测试，以及所改动流程的本地 API/CLI 验收（`pnpm test:local-loop`）。CI 和本地都不跑浏览器测试；`main` 由 Vercel 构建，CI 不做生产构建。详见 [`CONTRIBUTING.md`](CONTRIBUTING.md)（"How changes are tested"）。
 
 建议首先阅读以下文档：
 
@@ -230,7 +230,8 @@ pnpm desktop:dev
 - [`docs/design/README.md`](docs/design/README.md)：进行任何设计、spec 或 UI 工作前必读。
 - [`docs/design/glossary.md`](docs/design/glossary.md)：bot、线程与对话的定义。
 - [`docs/acceptance.md`](docs/acceptance.md)：变更的验收流程。
-- [`docs/acceptance-mvp-core-loop.md`](docs/acceptance-mvp-core-loop.md)：MVP 测试边界，以及待完成的 CI / 受阻的 Preview 验收记录。
+- [`docs/acceptance-mvp-cli-2026-11-01.md`](docs/acceptance-mvp-cli-2026-11-01.md)：MVP 的 API/CLI 验收记录。
+- [`docs/dev-workflow.md`](docs/dev-workflow.md)：本地优先、主干合并和模块负责人。
 - [`docs/review-checklist.md`](docs/review-checklist.md)：向他人展示 UI 前须完成的检查项。
 - [`apps/desktop/README.md`](apps/desktop/README.md)：桌面应用的运行与打包。
 
