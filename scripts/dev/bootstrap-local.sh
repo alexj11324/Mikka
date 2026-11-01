@@ -42,9 +42,9 @@ as_pg() { if [ "$(id -u)" -eq 0 ]; then su postgres -s /bin/bash -c "$*"; else b
 if [ ! -s "$PGDATA_DIR/PG_VERSION" ]; then
   log "creating cluster in $PGDATA_DIR"
   $SUDO mkdir -p "$PGDATA_DIR"
-  [ "$(id -u)" -ne 0 ] || chown postgres:postgres "$PGDATA_DIR"
+  if [ "$(id -u)" -eq 0 ]; then chown postgres:postgres "$PGDATA_DIR"; else $SUDO chown "$(id -u):$(id -g)" "$PGDATA_DIR"; fi
   # Loopback only, trust auth: a disposable test database with no password to print.
-  as_pg "'$PG_BIN/initdb' -D '$PGDATA_DIR' -U postgres --auth=trust >/dev/null"
+  as_pg "'$PG_BIN/initdb' -D '$PGDATA_DIR' -U postgres --encoding=UTF8 --auth=trust >/dev/null"
 fi
 # Already running on another port (an earlier default): restart it on this one.
 if as_pg "'$PG_BIN/pg_ctl' -D '$PGDATA_DIR' status" >/dev/null 2>&1 && [ "$(sed -n 4p "$PGDATA_DIR/postmaster.pid")" != "$PG_PORT" ]; then
