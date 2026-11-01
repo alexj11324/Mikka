@@ -35,8 +35,8 @@
       }
     },
     "properties": "任务属性",
-    "statusLabel": "任务状态",
-    "priorityLabel": "任务优先级",
+    "statusLabel": "状态",
+    "priorityLabel": "优先级",
     "members": "协作成员",
     "access": "访问权限",
     "restricted": "仅授权成员可访问",
