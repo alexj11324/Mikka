@@ -1,13 +1,12 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
-import { StyleSheet, View, type ScrollViewInstance } from 'react-native'
+import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react'
+import { Pressable, StyleSheet, View, type ScrollViewInstance } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ListChecks } from 'lucide-react-native'
-import { useDrawer } from '@/components/Drawer'
-import { BotAvatar, MenuIcon, Spinner, threadStatus } from '@/components/icons'
+import { Ellipsis } from 'lucide-react-native'
+import { BotAvatar, Spinner, threadStatus } from '@/components/icons'
 import { CardButton } from '@/components/cards'
-import { BotBubble, EventLine, MyBubble, OutgoingBubble, ThreadCard, TimedRow, useChatPhotos, useTimeReveal } from '@/components/chat'
+import { BotBubble, CopyButton, EventLine, MyBubble, OutgoingBubble, ThreadCard, TimedRow, useChatPhotos, useTimeReveal } from '@/components/chat'
 import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { OpenUIReply } from '@/components/OpenUI'
@@ -19,6 +18,8 @@ import { api } from '@/lib/api'
 import { outgoing, type Attachment } from '@/lib/attachments'
 import { clockTime } from '@/lib/clock'
 import { isOpenUI } from '@/lib/openui'
+import { holdMessage } from '@/lib/message-actions'
+import { plainText, quotable } from '@/lib/quote'
 import { delivered, inFlight, marked, outgoingKey, queued, type Outgoing, type OutgoingImage } from '@/lib/outbox'
 import { askForPush, usePushState } from '@/lib/push-state'
 import { runTitle, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
@@ -44,8 +45,9 @@ function eventText(text: string, sources: Record<string, CitationSource>) {
  * person (approve or decline, as on the web); `focus` marks the one a push
  * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
-export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string }) {
-  const drawer = useDrawer()
+export function ChatScreen({ botId, name, color, shape, draft, focus, compose, composerAccessory }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode }) {
+  const [quote, setQuote] = useState<string | null>(null)
+  const self = botId ?? 'coordinator'
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const scroll = useRef<ScrollViewInstance>(null)
@@ -85,7 +87,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId:
   useEffect(() => { if (proactive && push === 'undetermined') void askForPush() }, [proactive, push])
 
   const open = (source: CitationSource) => {
-    if (source.kind === 'run') router.push(`/threads/${source.id}`)
+    if (source.kind === 'run') router.push(`/thread/${source.id}`)
     else router.push('/tasks')
   }
 
@@ -117,17 +119,29 @@ export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId:
 
   const answer = async (message: string) => send(message)
 
+  // A long press: 回复 · 复制 · 选择文本 in a system sheet (app/message.tsx).
+  const actions = (words: string) => {
+    holdMessage({ text: plainText(words), onQuote: () => setQuote(quotable(words)) })
+    router.push('/message')
+  }
+
   return (
     <View style={styles.screen}>
+      {/* Back is the system's (and its edge swipe); the bot's name opens the bot's page. */}
       <NavBar
-        left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }}
         titleView={
-          <Capsule>
-            <BotAvatar color={color} shape={shape} size={22} />
-            <Text style={styles.titleText} numberOfLines={1}>{name}</Text>
-          </Capsule>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${name} 的资料`} onPress={() => router.push(`/bots/${self}/info`)}>
+            <Capsule>
+              <BotAvatar color={color} shape={shape} size={22} />
+              <Text style={styles.titleText} numberOfLines={1}>{name}</Text>
+            </Capsule>
+          </Pressable>
         }
-        right={{ icon: 'checklist', label: '线程', onPress: () => router.push('/threads'), web: <ListChecks size={21} color={colors.ink} strokeWidth={2} /> }}
+        right={{ icon: 'ellipsis', label: '更多', web: <Ellipsis size={21} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push(`/bots/${self}/info`),
+          items: [
+            { label: '资料', icon: 'person.crop.circle', onPress: () => router.push(`/bots/${self}/info`) },
+            { label: '线程', icon: 'checklist', onPress: () => router.push(`/bots/${self}/threads`) },
+          ] }}
       />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
       <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
@@ -137,18 +151,19 @@ export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId:
             return (
               <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
                 {item.from === 'event' ? <EventLine text={eventText(item.text, sources)} /> : null}
-                {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right"><MyBubble text={item.text} photos={photos(item.id, item.images)} /></TimedRow> : null}
+                {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} /></TimedRow> : null}
                 {item.from === 'coordinator' && item.text ? (
-                  <TimedRow time={time} offset={offset}>
+                  <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text)}>
                     {isOpenUI(item.text)
                       ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} webPath={webChatPath(botId)} sources={sources} onOpen={open} />
                       : <BotBubble><Markdown text={item.text} sources={sources} onOpen={open} /></BotBubble>}
+                    <CopyButton text={plainText(item.text)} />
                   </TimedRow>
                 ) : null}
                 {item.threads.map(id => {
                   const run = sources[id]
                   return run?.kind === 'run'
-                    ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runTitle(run)} status={threadStatus(run.status)} onPress={() => router.push(`/threads/${id}`)} /></TimedRow>
+                    ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runTitle(run)} status={threadStatus(run.status)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
                     : null
                 })}
               </Fragment>
@@ -172,7 +187,8 @@ export function ChatScreen({ botId, name, color, shape, draft, focus }: { botId:
         </KeyboardChatScrollView>
       </View>
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} />
+      <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} />
     </View>
   )
 }

@@ -244,6 +244,8 @@ export const devices = pgTable('devices', {
   computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
   enabled: boolean('enabled').notNull().default(true),
+  /** 「允许自动调度」: null is the type default (servers on, personal computers off); see lib/device-auto-schedule.ts. */
+  autoSchedule: boolean('autoSchedule'),
   /** The person renamed it; a daemon re-register keeps this name. */
   nameLocked: boolean('nameLocked').notNull().default(false),
   /** Removed from settings: a tombstone that keeps run history (lib/device-removal.ts). */

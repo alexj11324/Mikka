@@ -7,6 +7,7 @@ import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { PushRow } from '@/components/PushRow'
 import { Avatar, Row } from '@/components/settings'
+import { Symbol, type SymbolName } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { CloseButton, Group } from '@/components/ui'
 import { authClient } from '@/lib/auth'
@@ -14,7 +15,7 @@ import { useSettings } from '@/lib/settings'
 import { versionLabel } from '@/lib/updates'
 import { colors } from '@/lib/theme'
 
-const icon = (Icon: typeof Bell, color: string = colors.ink) => <Icon size={21} color={color} strokeWidth={1.8} />
+const icon = (name: SymbolName, Icon: typeof Bell, color: string = colors.ink) => <Symbol name={name} size={19} color={color} web={<Icon size={21} color={color} strokeWidth={1.8} />} />
 
 /**
  * Settings, a hierarchy (R-70): categories here, each opens its own page.
@@ -47,20 +48,20 @@ export default function SettingsScreen() {
           <PushRow proactive={data.preferences.proactive} />
           <Group>
             <Row icon={<Avatar name={data.user.name || data.user.email} image={data.user.image} size={40} />} label={data.user.name || data.user.email} detail={data.user.email} onPress={() => router.push('/settings/profile')} />
-            <Row icon={icon(BriefcaseBusiness)} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspace')} />
+            <Row icon={icon('briefcase', BriefcaseBusiness)} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspace')} />
           </Group>
           <Group label="Coordinator">
-            <Row icon={icon(Bell)} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />
-            <Row icon={icon(BookOpen)} label="记忆" onPress={() => router.push('/settings/memory')} />
-            <Row icon={icon(Blocks)} label="已连接的 App" onPress={() => router.push('/settings/apps')} />
+            <Row icon={icon('bell', Bell)} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />
+            <Row icon={icon('book', BookOpen)} label="记忆" onPress={() => router.push('/settings/memory')} />
+            <Row icon={icon('square.grid.2x2', Blocks)} label="已连接的 App" onPress={() => { router.dismiss(); router.push('/plugins') }} />
           </Group>
           <Group label="App">
-            <Row icon={icon(Globe)} label="语言" value="简体中文" trailing={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />}
+            <Row icon={icon('globe', Globe)} label="语言" value="简体中文" trailing={<Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}
               onPress={() => { if (Platform.OS !== 'web') void Linking.openSettings() }} />
-            <Row icon={icon(Info)} label="版本" value={versionLabel()} trailing={null} />
+            <Row icon={icon('info.circle', Info)} label="版本" value={versionLabel()} trailing={null} />
           </Group>
           <Group>
-            <Row icon={icon(LogOut, colors.danger)} label="退出登录" destructive onPress={() => void signOut()} />
+            <Row icon={icon('rectangle.portrait.and.arrow.right', LogOut, colors.danger)} label="退出登录" destructive onPress={() => void signOut()} />
           </Group>
         </ScrollView>
       )}

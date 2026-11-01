@@ -5,3 +5,8 @@ import * as Haptics from 'expo-haptics'
 export function tap() {
   if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
 }
+
+/** The firmer tick of a long press opening a menu. */
+export function press() {
+  if (Platform.OS !== 'web') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
+}
