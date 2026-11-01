@@ -51,14 +51,14 @@ test(
       await pool.query(migration);
       // Un-sharing also stops runs on the owner's API keys (lib/model-api-key-runs.ts).
       await pool.query(
-        await readFile(new URL("../drizzle/20261101003800_model_api_keys.sql", import.meta.url), "utf8"),
+        await readFile(new URL("../drizzle/20261101021000_model_api_keys.sql", import.meta.url), "utf8"),
       );
       await pool.query(
-        await readFile(new URL("../drizzle/20261101005500_bot_api_key_choice.sql", import.meta.url), "utf8"),
+        await readFile(new URL("../drizzle/20261101021100_bot_api_key_choice.sql", import.meta.url), "utf8"),
       );
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
-      const personalPolicyMigration = await readFile(new URL("../drizzle/20261101002002_workspace_personal_policies.sql",import.meta.url),"utf8");
+      const personalPolicyMigration = await readFile(new URL("../drizzle/20261101020201_workspace_personal_policies.sql",import.meta.url),"utf8");
       await pool.query(personalPolicyMigration); await pool.query(personalPolicyMigration);
       const explicitMigration = await readFile(new URL("../drizzle/20261031054017_explicit_execution.sql",import.meta.url),"utf8");
       const settings = new ExecutionSettings(pool),
@@ -294,7 +294,7 @@ test(
       await settings.refreshBotModels(alice, connection, async () => []);
       assert.deepEqual(await settings.botModels(alice),[],'empty provider catalogue remains authoritative');
       await settings.refreshBotModels(alice, connection, async () => [{id:'dynamic-model'}]);
-      assert.equal(await settings.botModelOption(alice,secondBot),(await settings.botModels(alice))[0].bindingId,'UI selection maps the saved copy to its visible option');
+      assert.equal((await (await import('./bot-model-menu')).botModelMenu(pool,settings,alice,secondBot)).current.id,(await settings.botModels(alice))[0].bindingId,'the picker maps the saved copy to its visible option');
       await assert.rejects(settings.refreshBotModels(alice, connection, async () => { throw new Error('raw provider response'); }), {code:'executionAccountUnavailable'});
       await assert.rejects(settings.refreshBotModels(alice, connection, async () => {
         await pool.query(`UPDATE byos_connections SET epoch=2 WHERE id=$1`,[connection]);
@@ -341,8 +341,6 @@ test(
         },
       });
       stub("./workspace-access.ts", {
-        // lib/model-api-keys.ts (reached through freezeBotModel) throws it.
-        WorkspaceError: class extends Error { constructor(readonly code: string) { super(code); } },
         loadWorkspaceContext: async () => ({
           workspace: { id: alice.workspaceId },
         }),
@@ -358,7 +356,7 @@ test(
       await settings.setBotModel(alice,null,catalogue.bindingId);
       const coordinator = await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies);
       assert.equal(coordinator.modelSelection?.modelId,'dynamic-model','refreshed catalogue bindings support Coordinator execution');
-      assert.equal(await actions.getBotModel(secondBot),catalogue.bindingId,'action returns the visible option for a saved copied binding');
+      assert.equal((await (await import('./bot-model-menu')).botModelMenu(pool,settings,alice,secondBot)).current.id,catalogue.bindingId,'the picker shows the visible option for a saved copied binding');
       const { COORDINATOR_MODEL } = await import('./coordinator/model');
       const unbound = {ownerId:'bob',workspaceId:randomUUID(),botId:randomUUID()};
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3)',[unbound.botId,unbound.ownerId,unbound.workspaceId]);

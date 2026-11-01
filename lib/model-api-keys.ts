@@ -8,7 +8,7 @@ import { isPrivateAddress } from '@/lib/link-preview-parse'
 import { memberSubscriptionsAllowed, subscriptionsUsable } from '@/lib/personal-policy'
 import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { openSecret, sealSecret, SecretsKeyMissingError } from '@/lib/secrets/crypto'
-import { WorkspaceError } from '@/lib/workspace-access'
+import { WorkspaceError } from '@/lib/workspace-error'
 import {
   API_KEY_PRESET_ENDPOINTS, API_KEY_PRESETS, apiKeyChatBaseUrl, apiKeyHarness, customModelsUrl,
   type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView,

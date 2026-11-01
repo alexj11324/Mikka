@@ -58,6 +58,8 @@ export function daemonPaths(dataDir: string) {
     worktrees: join(dataDir, "worktrees"),
     repos: join(dataDir, "repos"),
     adapterState: join(dataDir, "adapters"),
+    /** Pinned Claude Code and Codex the daemon installs for its runs. */
+    harness: join(dataDir, "harness"),
     logs: join(dataDir, "logs"),
     devRepos: join(dataDir, "dev-repos.json"),
   }

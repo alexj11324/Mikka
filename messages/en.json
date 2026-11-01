@@ -152,7 +152,8 @@
     "openBotChat": "Open Bot chat",
     "archivedConversation": "Archived: {title}",
     "suggestions": "Suggestions",
-    "artifacts": "Artifact"
+    "artifacts": "Artifact",
+    "cardPreview": "[Card]"
   },
   "Plugins": {
     "title": "Plugins",
@@ -2313,7 +2314,7 @@
       "byBot": "By bot",
       "byMember": "By member",
       "exportCsv": "Export CSV",
-      "threads": "Threads",
+      "threads": "New threads",
       "runTime": "Run time",
       "runSeconds": "Run seconds",
       "bot": "Bot",
@@ -2849,7 +2850,23 @@
       "sources": "{count, plural, one {# source} other {# sources}}"
     },
     "sendUncertain": "Could not confirm the message was delivered. Resending it unchanged from this box will not duplicate it; after closing or switching boxes, reloading the page or changing accounts, a resend may.",
-    "lengthCount": "{count} / {max}"
+    "lengthCount": "{count} / {max}",
+    "modelPicker": {
+      "label": "Model: {name}",
+      "labelUnavailable": "Model: {name}, unavailable",
+      "hosted": "Mikka Default",
+      "credits": "Credits",
+      "apiKey": "API Key",
+      "metered": "Pay as you go",
+      "shared": "Shared by teammates",
+      "sharedKey": "{name}'s key",
+      "manage": "Manage API and subscriptions",
+      "unavailable": "Unavailable",
+      "notSaved": "Not saved",
+      "unknownModel": "Unknown model",
+      "refresh": "Refresh models",
+      "refreshFailed": "Refresh failed. Try again"
+    }
   },
   "AgentCopy": {
     "pleaseSignInFirst": "Please sign in first.",
@@ -3402,6 +3419,7 @@
       "discussPrefill": "Let's talk about {id} {title}: ",
       "card": {
         "personal": "Personal task",
+        "personalHint": "Personal task · only you can see it",
         "status": "Status",
         "priority": "Priority",
         "subtasks": "Subtasks",
@@ -3949,7 +3967,7 @@
     "confirm": "Done",
     "nameReply": "Call it {name}",
     "named": "Got it. I'm {name} from now on.",
-    "computerAsk": "I can use a cloud computer to browse the web and run code. Turn it on now?",
+    "computerAsk": "With a cloud computer I can browse the web, and threads can run in the cloud. Turn it on now?",
     "computerYes": "Turn on",
     "computerNo": "Not now",
     "computerLater": "OK. You can add an E2B API key in Settings later.",

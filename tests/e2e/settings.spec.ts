@@ -70,7 +70,7 @@ test.describe('工作区访问拒绝', () => {
   test.use({ allowedConsoleErrors: async ({}, use) => { await use(['/api/workspace', '/api/teams/directory'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' }))) } })
 
 test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', async ({ page }) => {
-  await register(page, '/settings/members')
+  await registerInTeam(page, '/settings/members')
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
   await page.route('**/api/workspace?workspace=00000000-0000-4000-8000-000000000099', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
   await page.route('**/api/teams/directory?workspace=00000000-0000-4000-8000-000000000099', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
@@ -88,7 +88,8 @@ test('默认工作区解析后改用带 workspace 的读取时，管理员分区
   // the admin-only rows must not drop out meanwhile, or the sidebar jumps.
   await page.route('**/api/teams/directory*', async route => { await new Promise(resolve => setTimeout(resolve, 1500)); await route.fallback() })
   await page.route('**/api/workspace?workspace=*', async route => { await new Promise(resolve => setTimeout(resolve, 2000)); await route.fallback() })
-  await register(page, '/settings/members')
+  // 团队权限 and 成员 exist only in a team workspace; a new account's own workspace is personal.
+  await registerInTeam(page, '/settings/members')
   const admin = page.locator('[data-slot="settings-list"]').getByRole('link', { name: '团队权限', exact: true })
   await expect(admin).toBeVisible()
   const gaps: number[] = []
@@ -101,14 +102,15 @@ test('默认工作区解析后改用带 workspace 的读取时，管理员分区
 
 test('设置页打开并空闲后，每个分区首次打开都不显示骨架屏', async ({ page }) => {
   test.setTimeout(120000)
-  await register(page, '/settings?section=preferences')
+  // A team workspace, so every section (members, permissions, audit) is there to open.
+  await registerInTeam(page, '/settings?section=preferences')
   const sidebar = page.locator('[data-slot="settings-list"]')
   await expect(sidebar.getByRole('link', { name: '计费', exact: true })).toBeVisible()
   // Settings loads every section's data once it is idle; after that nothing is left to wait for.
   await page.waitForLoadState('networkidle')
   const skeleton = page.locator('main [data-slot="skeleton"]')
   const flashed: string[] = []
-  const names = (await sidebar.locator('[data-slot="sidebar-group"]').filter({ hasText: /个人|工作区/ }).getByRole('link').allInnerTexts()).map(name => name.trim())
+  const names = (await sidebar.locator('[data-slot="sidebar-group"]').filter({ hasText: /账号|E2E 团队/ }).getByRole('link').allInnerTexts()).map(name => name.trim())
   expect(names.length).toBeGreaterThan(10)
   for (const name of names) {
     const link = sidebar.getByRole('link', { name, exact: true })
@@ -124,7 +126,7 @@ test('设置页打开并空闲后，每个分区首次打开都不显示骨架�
 
 test('设置读取接口沿用原来的权限：仅管理员可读的只给管理员，外人只得到错误', async ({ page, browser, baseURL }) => {
   test.setTimeout(120000)
-  await register(page, '/settings/members')
+  await registerInTeam(page, '/settings/members')
   await page.getByRole('button', { name: '邀请成员', exact: true }).click()
   const invite = page.getByRole('dialog', { name: '邀请成员', exact: true })
   const email = `member-${randomUUID()}@example.com`
@@ -279,8 +281,10 @@ test('团队子页切换复用目录，历史记录和刷新可恢复当前视�
 
 test('成员首屏使用服务端结果，不立即重复读取成员 API', async ({ page }) => {
   const reads: string[] = []
+  // Members are a team workspace's; count reads from the members page's own first load.
+  await registerInTeam(page)
   page.on('request', request => { if (new URL(request.url()).pathname === '/api/workspace') reads.push(request.url()) })
-  await register(page, '/settings/members')
+  await page.goto(app('/settings/members'))
   await expect(page.getByRole('button', { name: '邀请成员', exact: true })).toBeEnabled()
   await page.getByRole('textbox', { name: '搜索成员或邀请', exact: true }).fill('回归测试成员')
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
@@ -407,7 +411,7 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
 })
 
 test('移动端页内创建不横向溢出，返回和侧栏切换保护未保存内容', async ({ page }) => {
-  await register(page, '/settings/teams')
+  await registerInTeam(page, '/settings/teams')
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
   const form = page.getByRole('form', { name: '创建新团队', exact: true, includeHidden: true })

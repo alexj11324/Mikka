@@ -187,12 +187,10 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   })
 
   await t.test('mailbox: a run\'s peer message is masked in run_messages and coordinator_events', async () => {
-    // The mailbox schema is still review-only (docs/backend/personal-mailbox-schema.review.sql), so the
-    // write goes to a throwaway local _e2e database with that SQL applied, never to the shared test DB.
+    // The write goes to a throwaway local _e2e database built from the tracked migrations, never to the shared test DB.
     const { maskWorkerMailboxInput } = await import('../lib/personal-mailbox-runtime')
     const { SessionMailbox } = await import('../lib/session-mailbox')
     const { execFileSync } = await import('node:child_process')
-    const { readFileSync } = await import('node:fs')
     const base = new URL(dbUrl!)
     const name = `mailbox_mask_${randomBytes(8).toString('hex')}_e2e`
     const throwaway = new URL(base); throwaway.pathname = `/${name}`
@@ -200,7 +198,6 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     const mailboxPool = new Pool({ connectionString: throwaway.toString(), max: 3 })
     try {
       execFileSync(process.execPath, ['scripts/setup-e2e-db.mjs'], { env: { ...process.env, E2E_DATABASE_URL: throwaway.toString() }, stdio: 'ignore' })
-      await mailboxPool.query(readFileSync('docs/backend/personal-mailbox-schema.review.sql', 'utf8'))
       const runId = await newRun()
       const input = await maskWorkerMailboxInput(runId, { to: '', key: randomUUID(), text: `use ${SECRET} for the deploy` }) as { to: string; key: string; text: string }
       // Same ids in the throwaway DB, so the run is live there too.

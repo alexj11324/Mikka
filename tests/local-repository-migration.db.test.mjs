@@ -28,7 +28,7 @@ test('migration runner handles historical and new names without replay and rejec
   const sql = await readFile(new URL('../drizzle/' + current, import.meta.url), 'utf8')
   try {
     await mkdir(join(root, 'scripts')); await mkdir(join(root, 'drizzle'))
-    for (const name of ['migrate.mjs', 'migration-order.mjs', 'migration-steps.mjs', 'migration-targets.mjs', 'preview-database-url.mjs', 'scope-migration-history.mjs', 'integration-migration-history.mjs'])
+    for (const name of ['migrate.mjs', 'migration-order.mjs', 'migration-steps.mjs', 'migration-targets.mjs', 'migration-guard.mjs', 'preview-database-url.mjs', 'scope-migration-history.mjs', 'integration-migration-history.mjs'])
       await writeFile(join(root, 'scripts', name), await readFile(new URL('../scripts/' + name, import.meta.url)))
     await symlink(new URL('../node_modules', import.meta.url).pathname, join(root, 'node_modules'))
     // The production runner validates the complete scope manifest before DDL.

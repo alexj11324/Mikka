@@ -30,13 +30,13 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
       INSERT INTO "user" VALUES ('alice'),('bob'),('carol');
       CREATE TABLE byos_connections ("ownerId" text, "workspaceId" text, "removedAt" timestamptz);
       CREATE TABLE bots (id uuid PRIMARY KEY, "workspaceId" uuid NOT NULL, "ownerId" text);
-      CREATE TABLE bot_model_choices ("ownerId" text NOT NULL, "workspaceId" uuid NOT NULL, "botKey" text NOT NULL, "bindingId" uuid NOT NULL, PRIMARY KEY ("ownerId","workspaceId","botKey"));
+      CREATE TABLE bot_model_choices ("ownerId" text NOT NULL, "workspaceId" uuid NOT NULL, "botKey" text NOT NULL, "bindingId" uuid, PRIMARY KEY ("ownerId","workspaceId","botKey"));
       CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "botId" uuid, status text NOT NULL, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz)`)
-    await pool.query(await readFile(new URL('../drizzle/20261101002002_workspace_personal_policies.sql', import.meta.url), 'utf8'))
-    const migration = await readFile(new URL('../drizzle/20261101003800_model_api_keys.sql', import.meta.url), 'utf8')
+    await pool.query(await readFile(new URL('../drizzle/20261101020201_workspace_personal_policies.sql', import.meta.url), 'utf8'))
+    const migration = await readFile(new URL('../drizzle/20261101021000_model_api_keys.sql', import.meta.url), 'utf8')
     await pool.query(migration)
     await pool.query(migration)
-    const choiceMigration = await readFile(new URL('../drizzle/20261101005500_bot_api_key_choice.sql', import.meta.url), 'utf8')
+    const choiceMigration = await readFile(new URL('../drizzle/20261101021100_bot_api_key_choice.sql', import.meta.url), 'utf8')
     await pool.query(choiceMigration)
     await pool.query(choiceMigration)
     assert.equal(await store.apiKeyAfterQuota(pool, 'alice'), true, 'on by default')

@@ -16,10 +16,12 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const steps = await import('../workflows/coordinator/steps')
+  const { reclaimLostRuns } = await import('../lib/run-leases')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const users: string[] = []
   t.after(async () => {
+    await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM thread_machines WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM cloud_machines WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM workspace_subscription_shares WHERE "ownerId" = ANY($1)', [users])
@@ -81,35 +83,30 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     assert.deepEqual(await runOf(result.runId), { deviceId, status: 'queued' })
   })
 
-  await t.test('(c) own E2B refuses at its concurrency cap: the cloud run is ended, a server takes it, else an error card', async () => {
-    const c = await person('cloud')
+  // The bot's own cloud computer is awake, with its runtime, a bound Codex subscription and the
+  // person's own E2B key. The key is not a real one, so E2B refuses to start a thread machine,
+  // which is what its concurrency cap or quota does too.
+  const cloudReady = async (c: { id: string; workspaceId: string }) => {
     const botId = await seedBot(pool, c.workspaceId, c.id)
     const cloudDevice = randomUUID(), cloudAgent = randomUUID(), repoId = randomUUID(), connection = randomUUID()
-    // The bot's own cloud computer is awake, with its runtime and a bound Codex subscription.
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled) VALUES ($1,$2,'Cloud computer','cloud',true)`, [cloudDevice, c.id])
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [c.workspaceId, c.id, randomUUID(), `sbx-${randomUUID()}`, cloudDevice])
     await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [botId, c.workspaceId, c.id])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [cloudAgent, c.id, cloudDevice, `cloud-${cloudAgent.slice(0, 8)}`])
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,'/home/mikka-runner/w','main')`, [repoId, cloudDevice, c.id])
     await pool.query(`INSERT INTO bot_cloud_runtimes ("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES ($1,$2,$3,'codex',$4,$5)`, [botId, c.workspaceId, c.id, cloudAgent, repoId])
-    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") VALUES ($1,$2,$3,'codex','connected',1,'synthetic',$4,'synthetic-subject')`, [connection, c.id, c.workspaceId, 'a'.repeat(64)])
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") VALUES ($1,$2,$3,'codex','connected',1,$5,$4,'synthetic-subject')`, [connection, c.id, c.workspaceId, 'a'.repeat(64), `synthetic-${connection}`])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,1,'codex_cli','gpt-5')`, [randomUUID(), c.id, c.workspaceId, cloudAgent, connection])
     // A team workspace uses a member's subscription once they share it there (decision 2026-10-31-2225).
     await pool.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)`, [c.id, c.workspaceId])
     await pool.query(`INSERT INTO workspace_e2b_keys ("workspaceId",ciphertext,iv,"keyVersion",last4,"createdBy","updatedBy") VALUES ($1,'x','x',1,'abcd',$2,$2)`, [c.workspaceId, c.id])
-    await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), c.id, c.workspaceId])
-    // A teammate's twenty running thread machines fill the workspace (E2B concurrency 20).
-    const teammate = await seedUser(pool, 'teammate')
-    users.push(teammate)
-    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'member','active')`, [c.workspaceId, teammate, `${teammate}@example.invalid`])
-    const teammateAgent = randomUUID()
-    await pool.query(`INSERT INTO agents (id,"userId",harness,name) VALUES ($1,$2,'codex',$3)`, [teammateAgent, teammate, `t-${teammateAgent.slice(0, 8)}`])
-    for (let i = 0; i < 20; i++) {
-      const runId = randomUUID()
-      await pool.query(`INSERT INTO agent_runs (id,"userId","agentId",status) VALUES ($1,$2,$3,'running')`, [runId, teammate, teammateAgent])
-      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'snap',$5,'running')`, [runId, c.workspaceId, teammate, botId, randomUUID()])
-    }
+    return { botId, cloudDevice }
+  }
 
+  await t.test('(c) own E2B refuses (cap, quota, key): the cloud run is ended, a server takes it, else an error card', async () => {
+    const c = await person('cloud')
+    await cloudReady(c)
+    await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), c.id, c.workspaceId])
     const refused = await dispatch(c.id, c.issueId) as unknown as NoMachine
     assert.equal(refused.error, 'machineUnavailable', 'no device: an error the person can act on')
     assert.deepEqual(actions(refused), ['enableThisMac', 'e2bKey', 'connectServer'])
@@ -120,6 +117,47 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     const result = await dispatch(c.id, c.issueId) as unknown as { runId: string; status: string }
     assert.equal(result.status, 'queued')
     assert.equal((await runOf(result.runId)).deviceId, deviceId)
+  })
+
+  await t.test('a server goes offline mid-run: the run moves to the own E2B cloud, which ends it with the card when E2B refuses', async () => {
+    const c = await person('offline')
+    const { cloudDevice } = await cloudReady(c)
+    const server = await onlineMac(c.id, null, 'server')
+    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '10 minutes' WHERE id=$1`, [server])
+    const agentId = (await pool.query('SELECT id FROM agents WHERE "deviceId"=$1', [server])).rows[0].id
+    const repoId = (await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5) RETURNING id`, [randomUUID(), server, c.id, normalizeRepository('octo/repo').key, normalizeRepository('octo/repo').remoteUrl])).rows[0].id
+    const lost = randomUUID()
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"leaseExpiresAt","agentDefinition") VALUES ($1,$2,$3,$4,$5,$6,'running','Lost run',now()-interval '1 minute',$7)`,
+      [lost, c.id, c.issueId, agentId, server, repoId, JSON.stringify({ harness: 'codex' })])
+    await reclaimLostRuns(c.id, new Date())
+    assert.equal((await runOf(lost)).status, 'failed')
+    const moved = (await pool.query(`SELECT r.id,r.attempt,r.status,r."deviceId",b."botId" FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id WHERE r."retryOf"=$1`, [lost])).rows
+    assert.equal(moved.length, 1, 'the retry was queued on the cloud through the normal cloud queue')
+    assert.equal(moved[0].attempt, 2)
+    assert.equal(moved[0].deviceId, cloudDevice, 'queued on the bot cloud computer, not the offline server')
+    const retried = (await pool.query(`SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind='run_retried'`, [lost])).rows[0]
+    assert.deepEqual(retried.payload.movedTo, { kind: 'cloud' })
+    // E2B refuses the new sandbox: the retry ends with the card instead of waiting.
+    assert.equal(moved[0].status, 'failed')
+    const card = (await pool.query(`SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind='run_finished'`, [moved[0].id])).rows[0]
+    assert.ok(card.payload.noMachine)
+  })
+
+  await t.test('a cloud thread whose sandbox is gone continues on a new sandbox of the same thread', async () => {
+    const c = await person('sandbox')
+    const { botId, cloudDevice } = await cloudReady(c)
+    const cloudAgent = (await pool.query('SELECT "agentId" FROM bot_cloud_runtimes WHERE "botId"=$1', [botId])).rows[0].agentId
+    const repoId = (await pool.query('SELECT "repoId" FROM bot_cloud_runtimes WHERE "botId"=$1', [botId])).rows[0].repoId
+    const lost = randomUUID()
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$5,$6,'running','Cloud run',now()-interval '1 minute')`, [lost, c.id, c.issueId, cloudAgent, cloudDevice, repoId])
+    await pool.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [lost, botId, c.workspaceId, c.id])
+    await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'snap',$5,'running')`, [lost, c.workspaceId, c.id, botId, randomUUID()])
+    await reclaimLostRuns(c.id, new Date())
+    const [retry] = (await pool.query(`SELECT r.id,b."botId",m.state FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id JOIN thread_machines m ON m."runId"=r.id WHERE r."retryOf"=$1`, [lost])).rows
+    assert.equal(retry.botId, botId, 'same bot, same thread')
+    assert.ok(retry.state, 'the retry has its own thread machine')
+    const retried = (await pool.query(`SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind='run_retried'`, [lost])).rows[0]
+    assert.deepEqual(retried.payload.movedTo, { kind: 'cloud' })
   })
 
   await t.test('own devices: a server goes ahead of a Mac; a Mac with 允许自动调度 off is never picked', async () => {

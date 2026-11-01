@@ -28,13 +28,13 @@ function plain(children: ReactNode): string {
 
 const components = (title: string): Components => ({
   // The page already shows the title; a first heading repeating it is dropped.
-  h1: ({ children }) => plain(children).trim() === title.trim() ? null : <h2 className="mt-8 mb-2 text-base leading-snug font-semibold text-foreground">{children}</h2>,
-  h2: ({ children }) => <h2 className="mt-8 mb-2 text-base leading-snug font-semibold text-foreground">{children}</h2>,
-  h3: ({ children }) => <h3 className="mt-6 mb-2 text-sm leading-relaxed font-semibold text-foreground">{children}</h3>,
-  h4: ({ children }) => <h4 className="mt-5 mb-1 text-sm leading-relaxed font-semibold text-foreground">{children}</h4>,
-  p: ({ children }) => <p className="my-2 text-sm leading-relaxed text-foreground">{children}</p>,
-  ul: ({ children }) => <ul className="my-2 flex list-disc flex-col gap-1 pl-5 text-sm leading-relaxed marker:text-muted-foreground">{children}</ul>,
-  ol: ({ children }) => <ol className="my-2 flex list-decimal flex-col gap-1 pl-5 text-sm leading-relaxed marker:text-muted-foreground">{children}</ol>,
+  h1: ({ children }) => plain(children).trim() === title.trim() ? null : <h2 className="mt-8 mb-2 text-lg font-semibold text-foreground">{children}</h2>,
+  h2: ({ children }) => <h2 className="mt-8 mb-2 text-lg font-semibold text-foreground">{children}</h2>,
+  h3: ({ children }) => <h3 className="mt-6 mb-2 text-md font-semibold text-foreground">{children}</h3>,
+  h4: ({ children }) => <h4 className="mt-5 mb-1 text-md font-semibold text-foreground">{children}</h4>,
+  p: ({ children }) => <p className="my-2 text-md text-foreground">{children}</p>,
+  ul: ({ children }) => <ul className="my-2 flex list-disc flex-col gap-1 pl-5 text-md marker:text-muted-foreground">{children}</ul>,
+  ol: ({ children }) => <ol className="my-2 flex list-decimal flex-col gap-1 pl-5 text-md marker:text-muted-foreground">{children}</ol>,
   blockquote: ({ children }) => <blockquote className="my-3 rounded-lg bg-muted/50 px-3 py-1 text-muted-foreground">{children}</blockquote>,
   // No rules across the page (R-31): a break is space.
   hr: () => <div role="separator" className="h-6" />,
@@ -68,7 +68,7 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
   markdown: string
   /** The newer version's text: when given, its changes are marked into this one. */
   compareWith?: string | null
-  author: Pick<ArtifactVersionInfo, 'authorName' | 'authorColor' | 'authorShape'>
+  author: Pick<ArtifactVersionInfo, 'authorName' | 'authorColor' | 'authorShape' | 'authorHarness'>
   /** 「Mikka Frontend · 10月24日 17:20 更新」 */
   meta: string
   /** Texts already quoted from this version, underlined. */
@@ -118,9 +118,9 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
 
   return <div className="min-h-0 flex-1 overflow-y-auto" onMouseUp={readSelection} onKeyUp={readSelection}>
     <article className="mx-auto w-full max-w-[40rem] px-6 pt-10 pb-16 md:px-10">
-      <h1 className="text-xl leading-7 font-semibold text-foreground">{title}</h1>
-      <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">{author.authorName && <ArtifactAuthorAvatar author={author} />}{meta}</p>
-      <div ref={articleRef} data-slot="artifact-document" className="mt-4">
+      <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">{author.authorName && <ArtifactAuthorAvatar author={author} />}{meta}</p>
+      <div ref={articleRef} data-slot="artifact-document" className="mt-6">
         <Markdown remarkPlugins={plugins} components={parts}>{source}</Markdown>
       </div>
     </article>

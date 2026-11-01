@@ -23,7 +23,7 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 		if !uuidPattern.MatchString(w.Use.RunID) {
 			return ErrUnavailable
 		}
-		if w.Repo.DB.QueryRowContext(ctx, `select coalesce(r."agentDefinition"->>'cliModelSelection',''),coalesce(r."agentDefinition"->>'model','') from agent_runs r join byos_native_runs n on n."runId"=r.id where r.id=$1 and r."userId"=$2 and r."agentId"::text=$3 and n."bindingId"=$4 and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, w.Use.RunID, w.Scope.OwnerID, w.Use.ConsumerID, w.Use.BindingID).Scan(&runModelMode, &runModel) != nil {
+		if w.Repo.DB.QueryRowContext(ctx, `select coalesce(r."agentDefinition"->>'cliModelSelection',''),coalesce(r."agentDefinition"->>'model','') from agent_runs r join byos_native_runs n on n."runId"=r.id join byos_bindings b on b.id=n."bindingId" where r.id=$1 and `+runMayUseCredential+` and r."agentId"::text=$3 and n."bindingId"=$4 and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, w.Use.RunID, w.Scope.OwnerID, w.Use.ConsumerID, w.Use.BindingID).Scan(&runModelMode, &runModel) != nil {
 			return ErrUnavailable
 		}
 	}
@@ -138,3 +138,12 @@ func (w *Worker) activeRuntime(ctx context.Context, epoch int64, model string) (
 	}
 	return w.Repo.Lookup(ctx, w.Scope)
 }
+
+// The credential owner ($2) may serve this run: it is their own, or they share
+// it in the binding's workspace with 分享给团队成员 while the admin allows member
+// subscriptions. Mirrors runMayUseCredentialSql in lib/personal-policy.ts;
+// membership lives in the workspace database and is checked by the server,
+// and leaving stops the runs (stopRequestedAt), which this query refuses.
+const runMayUseCredential = `($2=r."userId" OR (
+	EXISTS (SELECT 1 FROM workspace_subscription_shares sh WHERE sh."ownerId"=$2 AND sh."allowOthers" AND sh."workspaceId"::text=b."workspaceId"::text)
+	AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies pp WHERE pp."workspaceId"::text=b."workspaceId"::text AND NOT pp.subscriptions)))`

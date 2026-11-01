@@ -12,7 +12,7 @@ import { loadEnvironment, assertDatabaseIdentity } from '../scripts/test-account
 // Mandatory CI-only real PG/handler regression. No schema preparation, model,
 // authentication mock, mailbox migration, retained resources or fixture delete.
 assertPersonalMailboxCITarget()
-test('default-off claim, MCP and Coordinator work on tracked schema without mailbox columns', { timeout: 60_000 }, async t => {
+test('default-off claim, MCP and Coordinator work on the tracked schema with the mailbox flag off', { timeout: 60_000 }, async t => {
   const environment = await loadEnvironment()
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
@@ -34,10 +34,13 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
   try {
     await assertDatabaseIdentity(pool, environment)
     assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
-    await t.test('the reviewed mailbox schema is absent and legacy run columns are selected', async () => {
-      assert.equal((await pool.query("select to_regclass('public.session_mailboxes') as mailbox")).rows[0].mailbox, null)
+    // The tracked schema has the mailbox tables (20261101020100); with the
+    // flag off nothing below may write to them.
+    await t.test('the tracked mailbox schema is present and the flag is off', async () => {
+      assert.equal((await pool.query("select to_regclass('public.session_mailboxes') as mailbox")).rows[0].mailbox, 'session_mailboxes')
       const cols = await pool.query("select table_name,column_name from information_schema.columns where table_schema='public' and table_name in ('agent_runs','run_messages') and column_name in ('mailboxId','senderMailboxId','dedupeKey')")
-      assert.equal(cols.rowCount, 0)
+      assert.equal(cols.rowCount, 4)
+      assert.notEqual(process.env.MIKKA_PERSONAL_MAILBOX_ENABLED, '1')
     })
     // Seven nonce-owned synthetic fixture rows. The only generated credential
     // is a CI-only device token hash; claim issues its normal short-lived run token.
@@ -105,6 +108,10 @@ test('default-off claim, MCP and Coordinator work on tracked schema without mail
       const revoked = await pool.query('update run_tokens set "revokedAt"=now() where "runId"=$1 and "userId"=$2 and "tokenHash"=$3 and "revokedAt" is null', [runId, owner, tokenHash(runToken!)])
       assert.equal(revoked.rowCount, 1)
       assert.equal((await mcp(request('/api/mcp', runToken, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }))).status, 401)
+    })
+    await t.test('nothing wrote to the mailbox tables while the flag was off', async () => {
+      assert.equal((await pool.query('select count(*)::int as count from session_mailboxes where "userId"=$1', [owner])).rows[0].count, 0)
+      assert.equal((await pool.query('select "mailboxId" from agent_runs where id=$1', [runId])).rows[0].mailboxId, null)
     })
   } finally {
     // Retain all records; expire only this nonce's synthetic capabilities.

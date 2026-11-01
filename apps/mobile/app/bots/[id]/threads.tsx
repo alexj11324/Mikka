@@ -6,5 +6,5 @@ import { useHome } from '@/lib/home'
 export default function BotThreads() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const bot = useHome().data?.bots.find(item => item.id === id)
-  return <ThreadsScreen bot={id === 'coordinator' ? undefined : bot?.name} />
+  return <ThreadsScreen bot={{ id, name: id === 'coordinator' ? 'Coordinator' : bot?.name ?? '' }} />
 }

@@ -17,7 +17,7 @@ export type RailDestination = 'chats' | 'suggestions' | 'board' | 'plugins' | 'a
 /** A lucide icon or one of ours drawn the same way (components/icons). */
 type RailIcon = ComponentType<{ className?: string; 'data-icon'?: string }>
 
-// 主页 (the bot chats), 建议, the board, plugins, 产物. `selectedIcon` is the solid twin shown on the current item.
+// 主页 (the bot chats), 建议, the board, plugins, Artifact. `selectedIcon` is the solid twin shown on the current item.
 export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'Nav.home' | 'Nav.suggestions' | 'Nav.board' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
   { id: 'chats', icon: House, selectedIcon: HouseFilled, label: 'Nav.home' },
   { id: 'suggestions', icon: Lightbulb, selectedIcon: LightbulbFilled, label: 'Nav.suggestions' },

@@ -6,6 +6,17 @@ export const HARNESSES = ["claude_code", "codex", "cursor", "mock"] as const
 export const harnessSchema = z.enum(HARNESSES)
 export type Harness = z.infer<typeof harnessSchema>
 
+/**
+ * Which harness runs a model (Alex, 2026-10-31): GPT/OpenAI models run on
+ * Codex; every other model (Mikka 默认, API-key and custom-provider models
+ * included) runs on Claude Code. A per-model override from settings wins.
+ */
+export function harnessForModel(model: string, overrides: Readonly<Record<string, Harness>> = {}): Harness {
+  const chosen = overrides[model]
+  if (chosen) return chosen
+  return /^(?:openai\/)?(?:gpt-|o\d|codex)/i.test(model.trim()) ? "codex" : "claude_code"
+}
+
 /** One harness CLI as detected on a device. */
 export const harnessInfoSchema = z.object({
   harness: harnessSchema,
@@ -29,7 +40,11 @@ export const harnessInfoSchema = z.object({
   defaultModelSlot: z.string().trim().min(1).max(128).optional(),
   /** Deprecated (#312, 2026-10-27): could host the native Coordinator. The server keeps that runtime switched off. */
   coordinator: z.boolean().optional(),
-  /** Set only by a runner with an isolated, owner-bound subscription broker. */
+  /**
+   * Set only by a runner that runs subscriptions under owner-bound custody:
+   * the hosted runner's broker, or a device daemon that takes one run's
+   * short-lived access lease (never the refresh grant) and wipes it at run end.
+   */
   subscriptionBroker: z.literal(true).optional(),
   /** Set only by an E2B worker with the guarded Bot computer broker. */
   computerBroker: z.literal(true).optional(),

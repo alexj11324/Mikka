@@ -13,3 +13,11 @@ export function shortWhen(iso: string) {
   if (days === 1) return '昨天'
   return `${d.getMonth() + 1}月${d.getDate()}日`
 }
+
+/** When a scheduled task runs next: "08:12" today, "明天 08:12", else "11月3日 08:12". */
+export function nextWhen(iso: string) {
+  const d = new Date(iso)
+  const days = Math.round((new Date(d.toDateString()).getTime() - new Date(new Date().toDateString()).getTime()) / 86_400_000)
+  if (days <= 0) return clockTime(iso)
+  return `${days === 1 ? '明天' : `${d.getMonth() + 1}月${d.getDate()}日`} ${clockTime(iso)}`
+}

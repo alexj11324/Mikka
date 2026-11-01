@@ -212,7 +212,7 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
   const loop = await setup(page, testInfo, testAccounts.scope)
   try {
     const reply = '请保留 README 的现有内容。'
-    const composer = loop.thread.getByRole('textbox', { name: '告诉 Coordinator 下一步做什么…', exact: true })
+    const composer = loop.thread.getByRole('textbox', { name: '告诉 mock 下一步做什么…', exact: true })
     await composer.fill(reply)
     await composer.press('Enter')
     await expect(loop.thread.getByRole('list', { name: '线程对话' })).toContainText(`Noted: ${reply}`)
@@ -263,7 +263,7 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
 test('Stopping a thread reaches the real daemon and keeps the draft editable while stopping', async ({ page, testAccounts }, testInfo) => {
   const loop = await setup(page, testInfo, testAccounts.scope)
   try {
-    const composer = loop.thread.getByRole('textbox', { name: '告诉 Coordinator 下一步做什么…', exact: true })
+    const composer = loop.thread.getByRole('textbox', { name: '告诉 mock 下一步做什么…', exact: true })
     // Hold only delivery of the real stop response while sampling optimistic UI.
     // requestRunStop and the daemon execute normally; no response is fabricated.
     // Without this boundary a fast daemon can finish before the draft assertion.

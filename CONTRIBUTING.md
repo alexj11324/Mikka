@@ -53,6 +53,11 @@ cannot.
    suites are partitioned across four isolated PostgreSQL jobs; every shard
    validates the complete inventory before running its share sequentially, and
    the protected gate requires every shard to succeed.
+> Browser tests (items 3–5) are manual only since 2026-11-01
+> (`docs/design/decisions/2026-11-01-0230-browser-tests-manual-only.md`). The
+> check "Browser tests (before merge)" passes at once; CI runs no production
+> build; Vercel builds `main`.
+
 3. **Ready pull requests** (CI job "Browser tests (before merge)"): the browser
    smoke set plus the specs of the areas the change touches, against the PR
    merged with main. Two "Browser tests (pull request)" lanes start directly,
@@ -118,6 +123,17 @@ scenario selection and performance timing are tiered. Test selection
 is printed in the Changed files job and its summary. The browser environment
 remains an isolated PostgreSQL service and the built application on the GitHub
 Linux runner's localhost; this workflow does not test a Vercel Preview.
+
+### Test logins: never ask for a password
+
+Sessions never ask Alex for an account, password or login step. To test
+signed in, create the login yourself: hash a random password with
+`better-auth/crypto`'s `hashPassword`, insert a `credential` row into `account`,
+store the email and password in Infisical (the database's environment), and
+check it through `POST <base>/api/auth/sign-in/email`. Only a click on a
+third-party site under Alex's identity (a GitHub App install, an OAuth consent)
+or a session permission prompt may be asked of him. Details and the current
+test accounts: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
 
 ## License
 

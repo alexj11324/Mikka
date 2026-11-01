@@ -32,7 +32,8 @@
     "build": "node scripts/build.mjs",
     "test:package": "node --test test/package.test.mjs",
     "test:repository-identity": "node --experimental-strip-types --test test/repository-identity-pure.node-test.ts",
-    "test:github-credentials": "node --test test/github-credentials.node-test.mjs"
+    "test:github-credentials": "node --test test/github-credentials.node-test.mjs",
+    "test:run-container": "node --import tsx --test --test-timeout=900000 test/run-container.docker-test.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.9.0",

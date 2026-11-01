@@ -157,9 +157,8 @@ export async function pendingCommands(deviceId: string, skip: readonly string[])
     .where(and(isNull(runMessages.deliveredAt), inArray(runMessages.runId, live.map(run => run.id))))
     .orderBy(asc(runMessages.createdAt))
     .limit(500)
-  const commands: RunCommand[] = messages.map(message => ({
-    kind: 'input' as const, runId: message.runId, messageId: message.id, text: message.text,
-  }))
+  // The runId filter above excludes mailbox messages, whose runId is null.
+  const commands: RunCommand[] = messages.flatMap(({ id, runId, text }) => runId ? [{ kind: 'input' as const, runId, messageId: id, text }] : [])
   for (const run of live) {
     if (run.stopRequestedAt) commands.push({ kind: 'stop' as const, runId: run.id })
   }

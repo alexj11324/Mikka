@@ -15,9 +15,9 @@ import { api } from '@/lib/api'
 import type { ThreadDetail } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
+import { HARNESS } from '@/lib/harness'
 
 const STATUS_WORD = { running: '运行中', waiting: '等你回复', failed: '失败', done: '完成', stopped: '已停止' } as const
-const HARNESS: Record<string, string> = { claude_code: 'Claude Code', codex: 'Codex' }
 
 /** A thread's own page, pushed from a thread card or the 线程 list; back returns (mobile.md). */
 export default function ThreadScreen() {
@@ -55,7 +55,7 @@ export default function ThreadScreen() {
             <View style={{ flexShrink: 1 }}>
               <Text style={styles.title} numberOfLines={1}>{thread.name}</Text>
               <View style={styles.subtitleRow}>
-                <Text style={styles.subtitle} numberOfLines={1}>{STATUS_WORD[thread.status]} · {thread.by} · {HARNESS[thread.harness] ?? thread.harness}</Text>
+                <Text style={styles.subtitle} numberOfLines={1}>{STATUS_WORD[thread.status]} · {HARNESS[thread.harness] ?? thread.harness}</Text>
                 {thread.device ? <MachineIcon machine={thread.device.kind} size={11} /> : null}
               </View>
             </View>

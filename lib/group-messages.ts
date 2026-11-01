@@ -63,3 +63,33 @@ export function authorRuns(messages: GroupMessage[]) {
   }
   return runs
 }
+
+/** GET a group API path; failures map to the same codes as the message pages. */
+async function readGroupApi<T>(path: string, pick: (body: unknown) => T | undefined, fetcher: typeof fetch): Promise<T> {
+  let response: Response
+  try { response = await fetcher(withBasePath(path), { cache: 'no-store', credentials: 'same-origin' }) }
+  catch { throw new GroupMessagesRequestError('unavailable') }
+  const value = response.ok ? pick(await response.json().catch(() => null)) : undefined
+  if (value !== undefined) return value
+  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
+}
+
+const listIn = <T>(key: string) => (body: unknown) => {
+  const value = (body as Record<string, unknown> | null)?.[key]
+  return Array.isArray(value) ? value as T[] : undefined
+}
+
+/** A group chat the person is in, with its latest message (GET /api/conversations). */
+export type GroupSummary = { id: string; workspaceId: string; title: string; createdAt: string; lastMessage: GroupMessage | null }
+
+/** The person's group chats in one workspace, for the bot list (R-01). */
+export function fetchGroups(workspaceId: string, fetcher: typeof fetch = fetch): Promise<GroupSummary[]> {
+  return readGroupApi(`/api/conversations?${new URLSearchParams({ workspaceId })}`, listIn<GroupSummary>('conversations'), fetcher)
+}
+
+/** A group's members as GET /api/conversations/{id}/members returns them; bots carry their colour and shape. */
+export type GroupMember = { id: string; name: string; memberType: 'user' | 'agent' | 'bot'; color?: string | null; shape?: string | null }
+
+export function fetchGroupMembers(id: string, fetcher: typeof fetch = fetch): Promise<GroupMember[]> {
+  return readGroupApi(`/api/conversations/${encodeURIComponent(id)}/members`, listIn<GroupMember>('members'), fetcher)
+}
