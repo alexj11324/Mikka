@@ -407,7 +407,8 @@
       "group": "Assignee",
       "newMember": "New member",
       "invite": "Invite and assign…",
-      "reload": "Reload members"
+      "reload": "Reload members",
+      "delegatedTo": "Delegated to {name}"
     },
     "membersTitle": "Members · Mikka",
     "membersDescription": "Manage workspace members, roles, and invitations, with CSV bulk invites and member export.",
