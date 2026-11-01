@@ -62,7 +62,8 @@ into its newest thread (「第 N 次尝试」); 新线程 and the filter menu si
   bot's name and a machine icon (cloud, laptop, server), never the machine
   as text. Only 等你回复 and 待审阅 add a word before the name; no 完成 or
   失败 word (the icon says it) and no failure reason. Never the bot's bloub avatar (glossary). Icons: grey
-  spinner 进行中, hollow circle 等你回复, red alert 失败, green check 完成.
+  spinner 进行中, red alert 受阻, hollow circle 等待你, slashed circle 空闲,
+  green check 已解决; the icon follows the row's group (R-52), never the run's raw status.
   A thread whose output is a PR shows the PR icon in GitHub's colours: open
   green (待审阅), draft grey, merged purple, closed red. Rows waiting on the person carry a blue unread dot on the right.
 - 设备 chips at the top (Mikka Cloud, Mac, …); an online machine has a green

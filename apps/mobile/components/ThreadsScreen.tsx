@@ -38,6 +38,9 @@ const GROUPS: { id: ThreadGroup; title: string }[] = [
 
 const rank = (thread: Thread) => GROUPS.findIndex(group => group.id === groupOf(thread))
 
+/** The row's icon says its group, not the run's raw status: a run that finished blocked shows the alert, never the check. */
+const ICON: Record<ThreadGroup, Thread['status']> = { running: 'running', blocked: 'failed', waiting: 'waiting', idle: 'stopped', resolved: 'done' }
+
 /** 线程, like the Claude app's Code screen: 设备 chips, filter menu, 新线程 pill (mobile.md). */
 export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   const router = useRouter()
@@ -117,7 +120,7 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
 export function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-      <View style={styles.rowIcon}><StatusIcon status={thread.status} size={20} /></View>
+      <View style={styles.rowIcon}><StatusIcon status={thread.group ? ICON[thread.group] : thread.status} size={20} /></View>
       <View style={{ flex: 1 }}>
         <Text style={styles.rowTitle} numberOfLines={1}>{thread.name}</Text>
         <View style={styles.rowMeta}>
