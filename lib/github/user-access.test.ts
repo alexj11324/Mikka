@@ -15,7 +15,9 @@ mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth:
 } } } })
 let connected: { token: string; githubAccountId: string } | null = null
 let connectionLogin: string | null = null
+let connectConfigured = true
 mock.module(new URL('./connection.ts', import.meta.url).href, { namedExports: {
+  githubConnectConfigured: () => connectConfigured,
   githubConnectionToken: async () => connected,
   githubConnection: async () => connectionLogin ? { githubAccountId: '42', githubLogin: connectionLogin } : null,
   disconnectGitHub: async () => {},
@@ -48,6 +50,7 @@ beforeEach(() => {
   accounts = [{ id: 'internal-account', userId: user, providerId: 'github', accountId: '42' }]
   connected = null
   connectionLogin = null
+  connectConfigured = true
   getAccessToken.mock.resetCalls()
   getAccessToken.mock.mockImplementation(async () => ({ accessToken: 'private-test-token' }))
   fetchMock.mock.resetCalls()
@@ -206,6 +209,10 @@ test('settings API exposes connection/install state and never credentials', asyn
   assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: true, login: null, installed: false, repositories: [] })
   accounts = []
   assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: false, installed: false, repositories: [] })
+  // Link GitHub is offered only when the connect route can start GitHub's authorization.
+  connectConfigured = false
+  assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: false, connected: false, installed: false, repositories: [] })
+  connectConfigured = true
   delete process.env.GITHUB_APP_ID
   assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: false, connected: false, installed: false, repositories: [] })
 })
