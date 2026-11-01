@@ -6,10 +6,8 @@ import { verifyRunToken, workerRun } from '@/lib/mcp/worker'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueTeamAccess } from '@/lib/issue-team-access'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
-import { readRepositorySettings } from '@/lib/device-repositories'
 import { matchesRepositoryAdmission } from '@/lib/repository-admission'
 import { acceptedEventStillMatches } from '@/lib/run-admission-store'
-import { repositoryPushApproved } from '@/lib/run-publication-policy'
 import { linkedGitHubAccountId } from './repository-installation'
 import { githubRepository } from './run-pull-request'
 import type { RunGitHubScope } from './run-token-exchange'
@@ -52,10 +50,10 @@ export async function authorizeRunGitHubToken(request: Request): Promise<RunGitH
     remoteKey: publication.remoteKey, remoteUrl: publication.remoteUrl, targetBranch: publication.branch,
     workspaceId: admission.workspaceId, workspaceLinked: admission.workspaceLinked, requestEventId: admission.requestEventId,
   }) && await acceptedEventStillMatches(admission, run.botId)
-  const settings = await readRepositorySettings(worker.userId, publication.remoteUrl)
-  // Both gates: the owner's live repository approval is required even when
-  // git_push is allow or an accepted admission exists.
-  if (!repositoryPushApproved(settings?.push, worker.userId) || (admission && !accepted)) return null
+  // Push authority is the receipt accepted with the task (the GitHub App
+  // grant); the issuer then checks the installation and the person's write
+  // access on GitHub live before it mints the token.
+  if (!admission || !accepted) return null
   const githubAccountId = await linkedGitHubAccountId(worker.userId)
   if (!githubAccountId) return null
   // Policy/membership/provider-account reads above may overlap STOP or expiry.

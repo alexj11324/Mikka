@@ -24,7 +24,6 @@
     "get_issue",
     "create_issue",
     "update_issue",
-    "request_repository_push_approval",
     "list_agents",
     "dispatch_run",
     "list_runs",

@@ -19,7 +19,8 @@ function fixture() {
     device: {id:'device',ownerId:'member',enabled:true,kind:'local',protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]},
     agent: {id:'agent',userId:'member',deviceId:'device',harness:'codex'},
     repo: {id:'repo',userId:'member',deviceId:'device',baseBranch:'main',repoPath:repository.key,remoteUrl:repository.remoteUrl},
-    cliPolicy: {revision:'a'.repeat(64),policy:defaultRunPolicy(),workspaceIds:[] as string[],workspaceId:null,hierarchy:undefined,policySnapshotRequired:false,layers:{agent:{},worker:{},workspace:{}}},
+    // The CLI layer as resolveTrustedRunPolicy builds it: an unset git_push does not restrict the App grant.
+    cliPolicy: {revision:'a'.repeat(64),policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow' as const}},workspaceIds:[] as string[],workspaceId:null,hierarchy:undefined,policySnapshotRequired:false,layers:{agent:{},worker:{},workspace:{}}},
     policyCapability:undefined as string|undefined,
     publication: {pushBranch:'synthetic-claim-branch',policy:defaultRunPolicy()},
     checkpoint: null as RunCheckpoint | null,
@@ -291,7 +292,7 @@ test('capable workers receive the signed final composed policy, not the earlier 
     const context=policyDistributionContext('http://127.0.0.1/mikka','member','device','run',probe.cliPolicy)
     const verified=verifyPolicySnapshot(body.policySnapshot,context,{runId:'run',deviceId:'device',revision:body.policyRevision,policy:body.policy})
     assert.equal(verified.payload.policy.permissions.git_push,'deny')
-    assert.equal(probe.cliPolicy.policy.permissions.git_push,'ask')
+    assert.equal(probe.cliPolicy.policy.permissions.git_push,'allow','the CLI layer is unchanged by the claim')
     assert.equal(body.policySnapshotRequired,true)
   } finally {if(before===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=before}
 })

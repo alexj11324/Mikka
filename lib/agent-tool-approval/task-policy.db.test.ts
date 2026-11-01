@@ -286,7 +286,8 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     const controlPolicy = await read(control.run)
     await setCliPolicy(pool,owner,control.run,'project',controlPolicy.revision,{permissions:{git_push:'deny'}})
     const old = await read(candidate.run), store = new AgentToolApprovalStore(pool), actor = {userId:owner,deviceId:device}
-    assert.equal(old.policy.permissions.git_push,'ask')
+    // The default before the stricter layer: push is the GitHub App grant (allow), never ask.
+    assert.equal(old.policy.permissions.git_push,'allow')
     const approval = await store.propose(actor,{runId:candidate.run,requestId:randomUUID(),harness:'codex',method:'item/commandExecution/requestApproval',input:{command:'synthetic'},policyRevision:old.revision})
     await store.decide(owner,candidate.run,approval.id,approval.digest,'approve')
     await pool.query(`UPDATE workspace_projects SET "issueIds"=$2,revision=revision+1 WHERE id=$1`,[scopedProject,JSON.stringify([control.issue,candidate.issue])])
@@ -303,7 +304,8 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     const controlPolicy = await read(control.run)
     await setCliPolicy(pool,owner,control.run,'team',controlPolicy.revision,{permissions:{git_push:'deny'}})
     const old = await read(candidate.run), store = new AgentToolApprovalStore(pool), actor = {userId:owner,deviceId:device}
-    assert.equal(old.policy.permissions.git_push,'ask')
+    // The default before the stricter layer: push is the GitHub App grant (allow), never ask.
+    assert.equal(old.policy.permissions.git_push,'allow')
     const approval = await store.propose(actor,{runId:candidate.run,requestId:randomUUID(),harness:'codex',method:'item/commandExecution/requestApproval',input:{command:'synthetic'},policyRevision:old.revision})
     await store.decide(owner,candidate.run,approval.id,approval.digest,'approve')
     await pool.query(`UPDATE mikka_team_issues SET "teamId"=$2 WHERE "issueId"=$1`,[candidate.issue,control.team])

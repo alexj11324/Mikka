@@ -11,10 +11,9 @@ const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
 const created = mock.fn(async () => ({ id: 'created' }))
 const updated = mock.fn(async () => ({ id: 'updated' }))
 const dispatched = mock.fn(async () => ({ runId: 'queued' }))
-const proposed = mock.fn(async () => ({ status: 'awaiting_approval' }))
 const readIssue = mock.fn(async (..._args: unknown[]) => ({ id: 'read-issue' }))
 const scheduled = mock.fn(async (..._args: unknown[]) => ({ id: 'schedule' }))
-mock.module('@/workflows/coordinator/steps', { namedExports: { createIssue: created, updateIssue: updated, dispatchRun: dispatched, proposeRepositoryPushApproval: proposed, getIssue: readIssue, scheduleCommand: scheduled } })
+mock.module('@/workflows/coordinator/steps', { namedExports: { createIssue: created, updateIssue: updated, dispatchRun: dispatched, getIssue: readIssue, scheduleCommand: scheduled } })
 mock.module('@/workflows/coordinator/agent-kit-steps', { namedExports: {} })
 mock.module('@/lib/composio-actions', { namedExports: { createComposioAITools: () => ({}), createGoogleAITools: () => ({}) } })
 let registry: typeof import('@/workflows/coordinator/tools')
@@ -123,12 +122,41 @@ test('dispatch uses the same host event as task creation and exposes no event ar
   const input = { issueId: 'b4000000-0000-4000-8000-000000000005', agentId: 'b4000000-0000-4000-8000-000000000006', repo: 'example/repository' }
   await tools.dispatch_run!.execute!(input, { toolCallId: 'dispatch', messages: [], context: {} })
   assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId])
-  const request = tools.request_repository_push_approval!
-  const schema = request.inputSchema as { safeParse(input: unknown): { success: boolean } }
-  assert.equal(schema.safeParse({ repo: input.repo, taskEventId: 'forged' }).success, false)
-  await request.execute!({ repo: input.repo }, { toolCallId: 'approval', messages: [], context: {} })
-  assert.deepEqual(proposed.mock.calls.at(-1)!.arguments, ['owner', { repo: input.repo }, undefined, { eventId, botId: COORDINATOR_BOT }])
+  assert.equal(tools.request_repository_push_approval, undefined, 'push is what the GitHub App grants; Mikka asks for no approval of its own')
   const resumed = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true,  taskEventId: eventId, approvedRepositoryKey: 'v2:github.com/example/repository' })
   await resumed.dispatch_run!.execute!(input, { toolCallId: 'resumed-dispatch', messages: [], context: {} })
   assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:resumed-dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId, 'v2:github.com/example/repository'])
+})
+
+test('one task, one thread: dispatch takes newThread from the model but the person\'s message only from the host', async () => {
+  const sourceEventId = 'b4000000-0000-4000-8000-000000000007'
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true, sourceEventId })
+  const dispatch = tools.dispatch_run!
+  // Retrying or adding information goes to the existing thread; only an explicit request may start another.
+  assert.match(String(dispatch.description), /one thread at a time/)
+  assert.match(String(dispatch.description), /never to start over/)
+  assert.match(COORDINATOR_INSTRUCTIONS, /Never dispatch a second thread/)
+  const schema = dispatch.inputSchema as { safeParse(input: unknown): { success: boolean; data?: Record<string, unknown> } }
+  const input = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository', newThread: true }
+  assert.equal(schema.safeParse(input).success, true)
+  // A model-supplied message id is not part of the tool's input.
+  assert.equal('sourceEventId' in (schema.safeParse({ ...input, sourceEventId: 'forged' }).data ?? {}), false)
+  await dispatch.execute!({ ...input, sourceEventId: 'forged' } as typeof input, { toolCallId: 'again', messages: [], context: {} })
+  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', { ...input, requestKey: 'dispatch:again', sourceEventId }, undefined, COORDINATOR_BOT, undefined])
+})
+
+test('dispatch takes a named place: one of the person\'s computers by id, or the cloud, and reports where it runs', async () => {
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
+  const dispatch = tools.dispatch_run!
+  const schema = dispatch.inputSchema as { safeParse(input: unknown): { success: boolean } }
+  const base = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository' }
+  assert.equal(schema.safeParse({ ...base, target: { deviceId: 'b4000000-0000-4000-8000-000000000008' } }).success, true)
+  assert.equal(schema.safeParse({ ...base, target: 'cloud' }).success, true)
+  assert.equal(schema.safeParse({ ...base, target: { deviceId: 'e2b.local' } }).success, false, 'a computer is named by its id from list_agents')
+  assert.equal(schema.safeParse({ ...base, target: 'my-mac' }).success, false)
+  assert.match(String(dispatch.description), /result\.placement/)
+  assert.match(String(tools.list_agents!.description), /deviceId as dispatch_run target/)
+  const target = { deviceId: 'b4000000-0000-4000-8000-000000000008' }
+  await dispatch.execute!({ ...base, target }, { toolCallId: 'named', messages: [], context: {} })
+  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', { ...base, target, requestKey: 'dispatch:named' }, undefined, COORDINATOR_BOT, undefined])
 })

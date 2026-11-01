@@ -56,20 +56,22 @@ Controls are the system's where iOS has one
 the iOS navigation bar with its own bar buttons, menus and back button;
 the tab bar, capsules and the composer are Liquid Glass on iOS 26.
 
-**线程** (the tab; like the Claude app's Code screen): grouped by state,
-等你回复 · 进行中 · 失败 · 已完成; 新线程 and the filter menu sit in the bar.
+**线程** (the tab; like the Claude app's Code screen): grouped as on the
+web (R-52), 进行中 · 受阻 · 等待你 · 空闲 · 已解决, a task's attempts folded
+into its newest thread (「第 N 次尝试」); 新线程 and the filter menu sit in the bar.
 
 - A thread row is a status icon, the thread name, and one grey line: the
   bot's name and a machine icon (cloud, laptop, server), never the machine
   as text. Only 等你回复 and 待审阅 add a word before the name; no 完成 or
   失败 word (the icon says it) and no failure reason. Never the bot's bloub avatar (glossary). Icons: grey
-  spinner 进行中, hollow circle 等你回复, red alert 失败, green check 完成.
+  spinner 进行中, red alert 受阻, hollow circle 等待你, slashed circle 空闲,
+  green check 已解决; the icon follows the row's group (R-52), never the run's raw status.
   A thread whose output is a PR shows the PR icon in GitHub's colours: open
   green (待审阅), draft grey, merged purple, closed red. Rows waiting on the person carry a blue unread dot on the right.
 - 设备 chips at the top (Mikka Cloud, Mac, …); an online machine has a green
   dot (R-24). Tapping one filters the list.
-- The filter button (top right) opens a menu: 全部 · 等你回复 · 待审阅 ·
-  进行中 · 已完成 · 已归档.
+- The filter button (top right) opens a menu: 全部 · 等待你 · 进行中 ·
+  已解决 (待审阅 and 已归档 wait for the server to track them).
 - 新线程 (top right, beside the filter) opens the Coordinator's composer to
   dispatch work through it.
 

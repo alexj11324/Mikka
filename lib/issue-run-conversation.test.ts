@@ -42,7 +42,7 @@ test('a thread reads as one conversation: agent text, folded steps and people in
     { chunk: { type: 'text-delta', id: 'c', delta: '  ' }, at: t(21) },
     { chunk: { type: 'error', errorText: 'Interrupted' }, at: t(30) },
   ], [{ id: 'm', text: 'Check the fallback', author: 'Lin', mine: false, at: t(10) }])
-  assert.deepEqual(items.map(item => item.kind === 'steps' ? `steps:${item.count}` : item.kind === 'person' ? `person:${item.author}` : item.kind === 'computer' ? `computer:${item.botId}` : `${item.kind}:${item.text}`),
+  assert.deepEqual(items.map(item => item.kind === 'steps' ? `steps:${item.count}` : item.kind === 'person' ? `person:${item.author}` : item.kind === 'computer' ? `computer:${item.botId}` : item.kind === 'stages' ? `stages:${item.stages.length}` : `${item.kind}:${item.text}`),
     ['agent:Reproduced it.', 'steps:2', 'person:Lin', 'agent:Fixed.', 'error:Interrupted'])
 })
 
@@ -74,4 +74,20 @@ test('a thread shows one computer card only for its own run', () => {
   const chunks = [{ chunk: card, at }, { chunk: card, at }, { chunk: { ...card, data: { ...card.data, runId: 'run-b' } }, at }]
   assert.deepEqual(threadItems(chunks, [], 'run-a').map(item => item.kind), ['computer'])
   assert.deepEqual(threadItems(chunks, [], 'run-c'), [])
+})
+
+test('start-up stages fold into one line in order, keep failures, and ignore malformed stage data', () => {
+  const at = '2026-11-01T12:00:00Z'
+  const items = threadItems([
+    { chunk: { type: 'data-run-stage', data: { stage: 'repository', ms: 3200, ok: true } }, at },
+    { chunk: { type: 'data-run-stage', data: { stage: 'worktree', ms: 400, ok: true } }, at },
+    { chunk: { type: 'data-run-stage', data: { stage: 'agent_start', ms: 65_700, ok: false } }, at },
+    { chunk: { type: 'data-run-stage', data: { stage: 'docker', ms: 1, ok: true } }, at },
+    { chunk: { type: 'data-run-stage', data: { stage: 'worktree', ms: '1', ok: true } }, at },
+  ], [])
+  assert.deepEqual(items, [{ kind: 'stages', id: 'stages:0', at: Date.parse(at), stages: [
+    { stage: 'repository', ms: 3200, ok: true },
+    { stage: 'worktree', ms: 400, ok: true },
+    { stage: 'agent_start', ms: 65_700, ok: false },
+  ] }])
 })

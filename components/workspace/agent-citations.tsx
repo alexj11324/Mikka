@@ -153,7 +153,7 @@ export function RunCitation({ run, onOpen }: { run: RunSource; onOpen?: (thread:
       aria-label={issue && onOpen ? t('openThread', { name: run.name }) : t('runOf', { agent: run.agentName })}
       onClick={issue && onOpen ? () => onOpen({ issueId: issue.id, runId: run.id }) : undefined}
     >
-      <ThreadStatusIcon status={run.status} small />
+      <ThreadStatusIcon status={run.status} outcome={run.outcome} small />
       <InlineCitationLabel>{run.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>

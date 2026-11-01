@@ -6,17 +6,20 @@ test('CLI policy layers accept the four existing CLI actions', () => {
   const permissions = {
     install_dependency: 'allow',
     write_outside_repo: 'deny',
-    git_push: 'ask',
+    git_push: 'deny',
     network: 'allow',
   }
   assert.deepEqual(cliPolicyLayerSchema.parse({ permissions }), { permissions })
   assert.deepEqual(cliPolicyLayerSchema.parse({}), {})
-  for (const action of ['install_dependency', 'git_push', 'network']) {
+  for (const action of ['install_dependency', 'network']) {
     for (const decision of ['allow', 'ask', 'deny']) {
       const layer = { permissions: { [action]: decision } }
       assert.deepEqual(cliPolicyLayerSchema.parse(layer), layer)
     }
   }
+  // Push is what the GitHub App grants (decision 2026-11-01-1310): allow or deny; a stored ask reads as allow.
+  for (const decision of ['allow', 'deny']) assert.deepEqual(cliPolicyLayerSchema.parse({ permissions: { git_push: decision } }), { permissions: { git_push: decision } })
+  assert.deepEqual(cliPolicyLayerSchema.parse({ permissions: { git_push: 'ask' } }), { permissions: { git_push: 'allow' } })
   for (const decision of ['ask', 'deny']) {
     const layer = { permissions: { write_outside_repo: decision } }
     assert.deepEqual(cliPolicyLayerSchema.parse(layer), layer)
