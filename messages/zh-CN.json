@@ -3508,7 +3508,7 @@
         "agent": {
           "running": "运行中",
           "waiting": "等你处理",
-          "failed": "运行失败"
+          "blocked": "受阻"
         }
       },
       "title": "看板",

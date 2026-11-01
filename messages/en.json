@@ -3508,7 +3508,7 @@
         "agent": {
           "running": "Running",
           "waiting": "Waiting on you",
-          "failed": "Run failed"
+          "blocked": "Blocked"
         }
       },
       "title": "Board",
