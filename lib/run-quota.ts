@@ -210,3 +210,9 @@ export function resumeQuotaPausedRunOnApiKey(userId: string, runId: string) {
 export function retryQuotaPausedRun(userId: string, runId: string) {
   return continuePausedRun(userId, runId, 'original')
 }
+
+/** For the quota card: whether a key the paused run could go on with exists now (added since it paused). */
+export async function quotaKeyReady(query: Query, run: Run): Promise<boolean> {
+  const scope = await quotaScope(query, run)
+  return Boolean(scope && await quotaKey(query, run, scope))
+}

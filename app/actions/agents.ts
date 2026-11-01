@@ -214,7 +214,7 @@ async function readableThread(issueId: string, runId: string) {
 
 export interface IssueThreadDetail {
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
-  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean }
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
 }
@@ -252,8 +252,11 @@ export async function getIssueThread(issueId: string, runId: string): Promise<Is
   // A stop request belongs to the live run that send and stop address, not to an earlier attempt.
   const live = chain?.attempts.find(attempt => attempt.runId === thread.latestRunId)
   const stopRequestedAt = live && live.runId !== row.id ? live.stopRequestedAt : row.stopRequestedAt
+  const quota = row.userId === user.id
+    ? await (await import('@/lib/run-quota-view')).threadQuotaView(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
+    : null
   return {
-    thread: { ...thread, prompt: row.prompt, stopRequestedAt, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, prompt: row.prompt, stopRequestedAt, quota, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }
