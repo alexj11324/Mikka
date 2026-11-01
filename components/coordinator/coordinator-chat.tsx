@@ -5,7 +5,7 @@ import useSWR, { useSWRConfig } from 'swr'
 import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { useTranslations } from 'next-intl'
-import { getCoordinatorChat, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { getCoordinatorChat, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
@@ -18,6 +18,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { CircleAlert } from 'lucide-react'
+import { toast } from 'sonner'
 import { useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
@@ -233,6 +234,19 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // A quote just picked in the reader: put the cursor where the request goes.
   useEffect(() => { if (embedded?.quote) inputRef.current?.focus() }, [embedded?.quote])
 
+  // 停止: the turn ends on the server, keeping what it had said; the button waits until the chat stops working.
+  const [stopping, setStopping] = useState(false)
+  const working = Boolean(data?.working)
+  useEffect(() => { if (!working) setStopping(false) }, [working])
+  async function stop() {
+    setStopping(true)
+    try {
+      const result = await stopCoordinatorTurn(botId)
+      if (result.error) { setStopping(false); toast.error(actionError(result.error)) }
+      await mutate()
+    } catch { setStopping(false); toast.error(actionError()) }
+  }
+
   /** Sends `text` to the Coordinator or bot, with the browser's notes when `withNotes`: sent, failed (now a failed bubble), or skipped. */
   async function deliver(text: string, withNotes = false): Promise<'sent' | 'failed' | 'skipped'> {
     if (!text || sending) return 'skipped'
@@ -326,6 +340,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                       const run = sources?.[id]
                       return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={setOpenThread} /> : null
                     })}
+                    {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
                     {footerTools(item).length > 0 && <MessageFooter><ToolsUsed tools={footerTools(item)} /></MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>
@@ -370,7 +385,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />
-      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }}
+      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || stopping} editableWhileSending={stopping} onSubmit={() => { void send() }}
+        running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
         model={<BotModelPicker botId={botId ?? null} />}
         quote={embedded?.quote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
           {embedded?.quote && <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} />}
