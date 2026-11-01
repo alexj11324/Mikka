@@ -35,8 +35,8 @@
       }
     },
     "properties": "任务属性",
-    "statusLabel": "任务状态",
-    "priorityLabel": "任务优先级",
+    "statusLabel": "状态",
+    "priorityLabel": "优先级",
     "members": "协作成员",
     "access": "访问权限",
     "restricted": "仅授权成员可访问",
@@ -404,7 +404,8 @@
       "group": "负责人",
       "newMember": "新成员",
       "invite": "邀请并分配…",
-      "reload": "重新读取成员"
+      "reload": "重新读取成员",
+      "delegatedTo": "交给 {name}"
     },
     "membersTitle": "成员管理 · Mikka",
     "membersDescription": "管理工作区成员、角色与邀请，支持 CSV 拖拽批量邀请和成员导出。",
@@ -3054,6 +3055,7 @@
     "back": "返回 {name}",
     "starting": "正在准备",
     "close": "关闭线程",
+    "openTask": "打开任务",
     "conversation": "线程对话",
     "loading": "正在打开线程",
     "loadFailed": "线程加载失败",

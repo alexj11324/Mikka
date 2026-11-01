@@ -39,8 +39,7 @@ export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, d
   }
   const valueLabel = displayValue ?? (option ? optionLabel(option) : value)
   const ValueIcon = option?.icon ?? FallbackIcon
-  // Statuses carry their color; priorities stay grey, as their bars already say how urgent.
-  const tintTone: StatusTone = option?.indicatorClassName ? option.tone ?? 'neutral' : 'neutral'
+  const tintTone = optionTint(option)
   return <DropdownMenu>
     {/* iconOnly: just the value's own icon (board cards), the name stays in the menu and the tooltip. */}
     {iconOnly ? <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" disabled={disabled} className="size-5 rounded-sm text-muted-foreground" title={valueLabel} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
@@ -48,18 +47,32 @@ export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, d
     </DropdownMenuTrigger> : variant === 'row' ? <DropdownMenuTrigger render={<Button variant="ghost" size="sm" disabled={disabled} className={ROW_VALUE} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
       <ValueIcon data-icon="inline-start" className={cn('shrink-0', statusIconTints[tintTone])} {...option?.iconProps} />
       <span className="truncate">{valueLabel}</span>
-    </DropdownMenuTrigger> : <DropdownMenuTrigger render={<BadgeButton disabled={disabled} variant="outline" size="xl" className={cn('cursor-pointer px-2 py-0.5 hover:brightness-95', statusTones[option?.tone ?? 'neutral'])} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
+    </DropdownMenuTrigger> : <DropdownMenuTrigger render={<BadgeButton disabled={disabled} variant="outline" size="xl" className={cn('cursor-pointer px-2 py-0.5 hover:brightness-95', statusTones[tintTone])} aria-label={t('propertyValue', { label, value: valueLabel })} />}>
       {valueLabel}
     </DropdownMenuTrigger>}
     <DropdownMenuContent align="start" className="w-48">
       <DropdownMenuGroup>
         <DropdownMenuLabel>{label}</DropdownMenuLabel>
         {options.map(item => <DropdownMenuItem key={item.value} onClick={() => { if (item.value !== value) onChange(item.value) }}>
-          <span aria-hidden="true" className={cn('size-2.5 shrink-0 rounded-full', statusDots[item.tone ?? 'neutral'])} />
+          <OptionMark item={item} renderIcon={renderIcon} />
           <span className="flex-1">{optionLabel(item)}</span>
           {item.value === value && <Check aria-label={t('selected')} />}
         </DropdownMenuItem>)}
       </DropdownMenuGroup>
     </DropdownMenuContent>
   </DropdownMenu>
+}
+
+type MenuOption = { value: string; icon?: LucideIcon; iconProps?: Pick<LucideProps, 'viewBox' | 'strokeWidth'>; indicatorClassName?: string; tone?: StatusTone }
+
+/** Statuses carry their color; priorities stay grey, as their bars already say how urgent (R-34). */
+function optionTint(option: MenuOption | undefined): StatusTone {
+  return option?.indicatorClassName ? option.tone ?? 'neutral' : 'neutral'
+}
+
+/** A menu row's mark is the same one the trigger, board card and properties draw: the status icon or the priority bars; a dot only for values without an icon (label colours). */
+function OptionMark({ item, renderIcon }: { item: MenuOption; renderIcon?: (value: string) => ReactNode }) {
+  if (renderIcon) return <span aria-hidden="true" className="flex shrink-0">{renderIcon(item.value)}</span>
+  if (item.icon) { const Icon = item.icon; return <Icon aria-hidden="true" className={cn('shrink-0', statusIconTints[optionTint(item)])} {...item.iconProps} /> }
+  return <span aria-hidden="true" className={cn('size-2.5 shrink-0 rounded-full', statusDots[item.tone ?? 'neutral'])} />
 }

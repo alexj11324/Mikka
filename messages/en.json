@@ -404,7 +404,8 @@
       "group": "Assignee",
       "newMember": "New member",
       "invite": "Invite and assign…",
-      "reload": "Reload members"
+      "reload": "Reload members",
+      "delegatedTo": "Delegated to {name}"
     },
     "membersTitle": "Members · Mikka",
     "membersDescription": "Manage workspace members, roles, and invitations, with CSV bulk invites and member export.",
@@ -3054,6 +3055,7 @@
     "back": "Back to {name}",
     "starting": "Getting ready",
     "close": "Close thread",
+    "openTask": "Open task",
     "conversation": "Thread conversation",
     "loading": "Opening thread",
     "loadFailed": "Thread failed to load",

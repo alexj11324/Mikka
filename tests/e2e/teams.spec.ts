@@ -235,8 +235,10 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     // The closing menu keeps an inert backdrop over the page until it is gone.
     await expect(actions).toHaveCount(0)
     const children = member.getByRole('region', { name: '子任务', exact: true })
+    // Empty sub-tasks show only 添加子任务 (R-40); 添加现有子任务 is in the ⋯ menu either way.
     const addExisting = async () => {
-      await children.getByRole('button', { name: '添加现有任务', exact: true }).click()
+      await member.getByRole('button', { name: '更多任务操作', exact: true }).click()
+      await member.getByRole('menuitem', { name: '添加现有子任务…', exact: true }).click()
       return member.getByRole('dialog', { name: '添加现有子任务', exact: true })
     }
     let picker = await addExisting()
@@ -245,7 +247,7 @@ test('非创建者成员在他人公开任务上改父子关系，关系区与�
     await expect(picker).not.toBeVisible()
     await expect(children.getByRole('button', { name: '子任务 0 / 1', exact: true })).toBeVisible()
     await children.getByRole('button', { name: `移除子任务关系：${childTitle}`, exact: true }).click()
-    await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
+    await expect(children.getByRole('button', { name: '添加子任务', exact: true })).toBeVisible()
     // Hold the picker's search: it must show loading or fresh data, never results from before the unlink.
     let release!: () => void
     const held = new Promise<void>(resolve => { release = resolve })

@@ -21,7 +21,7 @@ test('a teammate thread shows whose it is, its status and time, never its conten
 test('the owner reads their own thread in full', () => {
   const [mine] = projectIssueThreads([make('mine', 'viewer')], 'issue', 'viewer', new Set(['teammate', 'viewer']))
   assert.equal(mine.ownerName, null)
-  assert.deepEqual(mine.detail, { name: 'Route group replies', agentName: 'Mikka Backend', harness: 'codex', summary: 'Done' })
+  assert.deepEqual(mine.detail, { name: 'Route group replies', agentName: 'Mikka Backend', harness: 'codex', summary: 'Done', bot: null })
 })
 
 test('stopping is shared status metadata and disappears when the daemon acknowledges', () => {

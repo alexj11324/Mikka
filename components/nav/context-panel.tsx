@@ -109,13 +109,14 @@ export type PanelConversation = { id?: string | null; name: string; color?: stri
  * 详情 / 线程 / PR / 电脑; 全部线程 lists every bot's threads. ⤢ widens just
  * this column. Picking another bot switches its threads, PRs and computer.
  */
-export function ContextPanel({ issues, threads, conversation, workspaceId, onOpenIssue, onClose, sheet = false }: {
+export function ContextPanel({ issues, threads, conversation, workspaceId, onOpenThread, onClose, sheet = false }: {
   issues: Issue[]
   threads: Thread[]
   conversation: PanelConversation
   /** The current workspace; its E2B key decides whether the 电脑 tab shows the screen or 添加 E2B API Key. */
   workspaceId?: string
-  onOpenIssue: (id: string) => void
+  /** A thread row opens that thread in the centre column (R-50: the panel never replaces the chat with a task page). */
+  onOpenThread: (thread: { issueId: string; runId: string }) => void
   onClose: () => void
   /** Shown in a Sheet below xl, where the column has no room. */
   sheet?: boolean
@@ -195,7 +196,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
             <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />
           </TabsContent>
           <TabsContent value="threads" className="min-h-0 overflow-y-auto px-4 pb-4">
-            <ThreadResults threads={ownThreads} shown={filter(ownThreads)} issues={issues} bots={bots} onOpenIssue={onOpenIssue} />
+            <ThreadResults threads={ownThreads} shown={filter(ownThreads)} issues={issues} bots={bots} onOpenThread={onOpenThread} />
           </TabsContent>
           <TabsContent value="prs" className="min-h-0 overflow-y-auto px-4 pb-4">
             <PullRequests threads={ownThreads} issues={issues} query={query ?? ''} />
@@ -206,7 +207,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
         </Tabs>
       </TabsContent>
       <TabsContent value="all" className="min-h-0 overflow-y-auto px-4 py-3">
-        <ThreadResults threads={threads} shown={filter(threads)} issues={issues} bots={bots} all onOpenIssue={onOpenIssue} />
+        <ThreadResults threads={threads} shown={filter(threads)} issues={issues} bots={bots} all onOpenThread={onOpenThread} />
       </TabsContent>
     </Tabs>
   </motion.aside>

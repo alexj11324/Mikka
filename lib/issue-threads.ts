@@ -16,7 +16,8 @@ export interface IssueThread {
   ownedByCurrentUser: boolean
   /** Whose thread it is, shown on a teammate's thread instead of its content. */
   ownerName: string | null
-  detail: { name: string; agentName: string; harness: string; summary: string | null } | null
+  /** `bot`: the dispatching Bot's own bloub look, so every copy of it matches the bot list (R-36); null for the Coordinator's own runs. */
+  detail: { name: string; agentName: string; harness: string; summary: string | null; bot?: { color: string; shape: string } | null } | null
   /**
    * BE-18 run chain (GitHub Actions run_id + run_attempt): a question continuation is a new
    * run in the same thread. `id` is the root run (attempt 1); stop, status and send act on
@@ -102,6 +103,7 @@ export interface IssueThreadRow {
   report: unknown; error: string | null; createdAt: Date; finishedAt: Date | null
   agentName: string; harness: string; ownerName?: string | null
   stopRequestedAt?: Date | null
+  botColor?: string | null; botShape?: string | null
 }
 
 /** Markdown syntax a prompt may open with ("# Title", "- item", "**bold**"): never part of a name. */
@@ -132,7 +134,7 @@ export function projectIssueThreads(rows: readonly IssueThreadRow[], issueId: st
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
-        ? { name: threadName(row.prompt, row.agentName), agentName: row.agentName, harness: row.harness, summary: runSummaryText({ report: row.report, error: row.error }) }
+        ? { name: threadName(row.prompt, row.agentName), agentName: row.agentName, harness: row.harness, summary: runSummaryText({ report: row.report, error: row.error }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null }
         : null,
       rootRunId: row.id, latestRunId: row.id,
       attempts: [{ runId: row.id, attempt: 1, status: row.status, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
