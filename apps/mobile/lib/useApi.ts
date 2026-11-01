@@ -2,12 +2,34 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 import { api, ApiError, onWorkspaceChange } from '@/lib/api'
 
+// The last answer per path, so a screen opened again draws at once and refreshes behind (a chat is not blank while it loads).
+// Another workspace's answers are dropped.
+const cache = new Map<string, unknown>()
+onWorkspaceChange(() => cache.clear())
+
+/** Loads `path` ahead of its screen, once, so opening it draws at once (对话 warms the top chats). */
+export async function prefetch(path: string) {
+  if (cache.has(path)) return
+  try { cache.set(path, await api(path)) } catch { /* the screen loads it itself */ }
+}
+
+/** On signing out: nothing of this account is drawn for the next. */
+export const clearApiCache = () => cache.clear()
+
 /**
  * Loads `path`, reloads it every `every` ms while the app is in front (0: no
- * polling), and lets the screen reload or patch it after a write.
+ * polling), and lets the screen reload or patch it after a write. It starts
+ * from the path's last answer, when there is one.
  */
 export function useApi<T>(path: string | null, every = 0) {
-  const [data, setData] = useState<T | null>(null)
+  const [data, setStored] = useState<T | null>(() => (path ? cache.get(path) as T | undefined : undefined) ?? null)
+  const setData = useCallback((next: T | null | ((current: T | null) => T | null)) => {
+    setStored(current => {
+      const value = typeof next === 'function' ? (next as (current: T | null) => T | null)(current) : next
+      if (path && value !== null) cache.set(path, value)
+      return value
+    })
+  }, [path])
   const [error, setError] = useState<ApiError | Error | null>(null)
   const [loading, setLoading] = useState(Boolean(path))
   const alive = useRef(true)
@@ -22,10 +44,11 @@ export function useApi<T>(path: string | null, every = 0) {
     } finally {
       if (alive.current) setLoading(false)
     }
-  }, [path])
+  }, [path, setData])
 
   useEffect(() => {
     alive.current = true
+    setStored((path ? cache.get(path) as T | undefined : undefined) ?? null)
     setLoading(Boolean(path))
     void load()
     return () => { alive.current = false }

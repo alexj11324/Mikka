@@ -171,6 +171,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
           })}
           {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} photos={item.images.map(image => image.uri)} failed={item.state === 'failed'} onRetry={() => void retry(item)} />)}
           {working ? <View style={styles.working}><Spinner size={16} /></View> : null}
+          {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
           {data && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
           {error && !data ? (
             <View style={styles.failed}>
@@ -198,6 +199,7 @@ const styles = StyleSheet.create({
   titleText: { fontSize: 17, fontWeight: '600' },
   // Space above the composer (适度留白).
   list: { paddingHorizontal: 16, gap: 12 },
+  loading: { paddingTop: 120, alignItems: 'center' },
   working: { alignSelf: 'flex-start', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
   failed: { alignItems: 'center', gap: 10, marginTop: 24 },
   empty: { alignSelf: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { CircleUser } from 'lucide-react-native'
@@ -11,7 +11,7 @@ import { useHome } from '@/lib/home'
 import { chatPath } from '@/lib/navigate'
 import type { HomeBot } from '@/lib/types'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
-import { useRefresh } from '@/lib/useApi'
+import { prefetch, useRefresh } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
 
 /**
@@ -31,6 +31,12 @@ export default function ChatsScreen() {
     .sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''))
   const showCoordinator = !needle || 'coordinator'.includes(needle)
   const updateReady = useUpdateReady()
+  // The Coordinator's chat and the three latest bots' load ahead, so opening one is not blank while it loads.
+  const latest = bots.slice(0, 3).map(bot => bot.id).join()
+  useEffect(() => {
+    if (!home.data) return
+    for (const id of [null, ...latest.split(',').filter(Boolean)]) void prefetch(`/api/mobile/chat${id ? `?bot=${id}` : ''}`)
+  }, [Boolean(home.data), latest])
 
   return (
     <View style={styles.screen}>
