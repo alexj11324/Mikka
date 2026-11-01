@@ -24,5 +24,6 @@ test('every demo OpenUI reply parses without errors', () => {
 // Run with DEMO_DATA_COVERAGE=1 after adding components, so the demo keeps showing every one of them.
 test('the demo replies use every component the bot can use', { skip: !process.env.DEMO_DATA_COVERAGE }, () => {
   const used = replies.map(reply => reply.source).join('\n')
-  for (const name of Object.keys(agentComponentCatalog)) assert.match(used, new RegExp(`\\b${name}\\(`), name)
+  // BeFollowUps is kept only so saved replies parse; chats show no suggestion cards (R-12).
+  for (const name of Object.keys(agentComponentCatalog).filter(name => name !== 'BeFollowUps')) assert.match(used, new RegExp(`\\b${name}\\(`), name)
 })
