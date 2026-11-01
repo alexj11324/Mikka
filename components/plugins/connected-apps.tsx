@@ -358,7 +358,7 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** 工具: Composio's tools for the app, 写入 and 读取 (by its readOnlyHint), each group collapsible and scrolling inside. */
-function AppTools({ tools }: { tools: AppDetail['tools'] }) {
+export function AppTools({ tools }: { tools: AppDetail['tools'] }) {
   const t = useTranslations('Settings.integrations')
   const total = tools.write.length + tools.read.length
   return <section aria-labelledby="app-tools-heading" className="flex flex-col gap-3">
