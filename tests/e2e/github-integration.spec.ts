@@ -45,7 +45,9 @@ for (const width of [1280, 402]) {
     await expect(dialog).toHaveCount(0)
     // The two writes are this person's own settings, saved for real and read back on the next visit.
     const pullRequest = page.getByRole('group', { name: '创建 Pull Request', exact: true })
-    await expect(page.getByRole('group', { name: '推送分支', exact: true }).getByRole('button', { name: '询问', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    const push = page.getByRole('group', { name: '推送分支', exact: true })
+    await expect(push.getByRole('button', { name: '允许', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(push.getByRole('button', { name: '询问', exact: true })).toHaveCount(0)
     await expect(pullRequest.getByRole('button', { name: '允许', exact: true })).toHaveAttribute('aria-pressed', 'true')
     const saved = page.waitForResponse(response => response.url().endsWith('/api/integrations/github/permissions') && response.request().method() === 'PATCH')
     await pullRequest.getByRole('button', { name: '拒绝', exact: true }).click()

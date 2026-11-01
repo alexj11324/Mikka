@@ -24,7 +24,8 @@ const decision = z.enum(PERMISSION_DECISIONS)
 const versionSchema = z.string().regex(/^(0|[1-9]\d*):(0|[1-9]\d*)$/)
 export const githubPermissionsPatchSchema = z.strictObject({
   version: versionSchema,
-  push: decision.optional(),
+  // No push-time card exists, so for 推送分支 询问 would act as 允许: only allow / deny are offered.
+  push: z.enum(['allow', 'deny']).optional(),
   pullRequest: decision.optional(),
 }).refine(value => value.push !== undefined || value.pullRequest !== undefined)
 

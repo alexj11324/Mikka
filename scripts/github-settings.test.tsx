@@ -255,7 +255,7 @@ test('a connected page shows the account and a repository count; the names open 
   assert.ok(dialog?.querySelector('a[href="https://github.com/octo/site"]'))
 })
 
-test('only the two writes carry allow / ask / deny, set from and saved to the viewer\'s own settings', async () => {
+test('only the two writes carry a control; push offers allow / deny and shows a stored ask as allow', async () => {
   userId = 'viewer-permissions'
   permissions = { viewerId: 'viewer-permissions', push: 'ask', pullRequest: 'allow', version: '3:4' }
   await render()
@@ -264,7 +264,10 @@ test('only the two writes carry allow / ask / deny, set from and saved to the vi
   const groups = [...container.querySelectorAll('[role="group"]')]
   assert.deepEqual(groups.map(group => group.getAttribute('aria-label')), ['githubTool.push', 'githubTool.pullRequest'])
   const pressed = (group: Element) => [...group.querySelectorAll('button')].filter(button => button.getAttribute('aria-pressed') === 'true' || button.hasAttribute('data-pressed')).map(button => button.textContent)
-  assert.deepEqual(pressed(groups[0]), ['githubPermission.ask'])
+  const options = (group: Element) => [...group.querySelectorAll('button')].map(button => button.textContent)
+  assert.deepEqual(options(groups[0]), ['githubPermission.allow', 'githubPermission.deny'])
+  assert.deepEqual(options(groups[1]), ['githubPermission.allow', 'githubPermission.ask', 'githubPermission.deny'])
+  assert.deepEqual(pressed(groups[0]), ['githubPermission.allow'])
   assert.deepEqual(pressed(groups[1]), ['githubPermission.allow'])
   const deny = [...groups[1].querySelectorAll('button')].find(button => button.textContent === 'githubPermission.deny')!
   await act(async () => { deny.click() })

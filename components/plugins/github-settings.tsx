@@ -34,6 +34,10 @@ const PERMISSIONS_PATH = withBasePath('/api/integrations/github/permissions')
 /** The Mikka GitHub App's page where a person picks which repositories it may reach. */
 const INSTALL_URL = 'https://github.com/apps/mikka-github/installations/new'
 const DECISIONS: readonly Decision[] = ['allow', 'ask', 'deny']
+/** 推送分支 has no push-time card (that is a later card on the pull request's mechanism), so 询问 would act as 允许. */
+const CHOICES: Record<WriteAbility, readonly Decision[]> = { push: ['allow', 'deny'], pullRequest: DECISIONS }
+/** A stored 询问 for the push behaves as 允许 once the repository is approved, so it shows as 允许. */
+const shown = (setting: WriteAbility, value: Decision): Decision => setting === 'push' && value === 'ask' ? 'allow' : value
 
 /**
  * What an Agent does through this plugin, from the code that does it. Writes:
@@ -160,11 +164,11 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
   const status = githubLoading ? null : !userId ? t('githubSignInRequired') : githubState && !githubState.configured ? t('githubNotConfigured') : null
   const login = githubState?.login ? t('githubLogin', { login: githubState.login }) : t('github')
   const errors = [githubError, githubLinkError, permissionError].filter(Boolean)
-  const control = (setting: WriteAbility, name: string) => <ToggleGroup aria-label={name} variant="segment" size="sm" spacing={0.5} disabled={!permissions.data} value={permissions.data ? [permissions.data[setting]] : []} onValueChange={values => {
+  const control = (setting: WriteAbility, name: string) => <ToggleGroup aria-label={name} variant="segment" size="sm" spacing={0.5} disabled={!permissions.data} value={permissions.data ? [shown(setting, permissions.data[setting])] : []} onValueChange={values => {
     const next = values[0]
-    if (isDecision(next)) void setPermission(setting, next)
+    if (isDecision(next) && CHOICES[setting].includes(next) && next !== shown(setting, permissions.data![setting])) void setPermission(setting, next)
   }}>
-    {DECISIONS.map(value => <ToggleGroupItem key={value} value={value}>{t(`githubPermission.${value}`)}</ToggleGroupItem>)}
+    {CHOICES[setting].map(value => <ToggleGroupItem key={value} value={value}>{t(`githubPermission.${value}`)}</ToggleGroupItem>)}
   </ToggleGroup>
   const writes = ABILITIES.write.map(({ id, setting }) => ({ slug: setting, name: t(`githubTool.${id}`), description: '' }))
   const reads = ABILITIES.read.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
@@ -177,7 +181,7 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
         : canLink ? <Button type="button" disabled={githubLinking} onClick={() => void linkGitHub()}>{githubLinking ? t('working') : t('githubLink')}</Button>
         : status && <span className="text-xs text-muted-foreground">{status}</span>}
     </header>
-    {errors.map(message => <Alert key={message} variant="destructive"><AlertTitle>{message}</AlertTitle></Alert>)}
+    {errors.map(message => <Alert key={message} variant="destructive" className="border-transparent bg-destructive/10"><AlertTitle>{message}</AlertTitle></Alert>)}
 
     <p className="max-w-prose text-sm text-muted-foreground">{t('githubDescription')}</p>
 

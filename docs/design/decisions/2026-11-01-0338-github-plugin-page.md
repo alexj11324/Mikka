@@ -24,17 +24,21 @@ Plugins › GitHub follows a store app's page, top to bottom:
    GitHub, 私有 marks private ones). Repository names never appear on the
    card itself. 「在 GitHub 上管理 ↗」 (or 授权仓库 before an installation)
    opens the App's installation page.
-6. 能力, connected or not: 写入 2 — 推送分支 and 创建 Pull Request, each with
-   the segmented 允许 / 询问 / 拒绝 — and 读取 4 — 读取代码, 读取 Pull Request,
+6. 能力, connected or not: 写入 2 — 推送分支 with 允许 / 拒绝 and 创建 Pull
+   Request with 允许 / 询问 / 拒绝 — and 读取 4 — 读取代码, 读取 Pull Request,
    读取 Issue, 读取 CI 检查, with no control (reads run directly, R-77). The
    list is what the code does; a new ability is added with its code.
 
 The two writes are the person's own Coordinator settings, with no second
 store:
 
-- 推送分支 is the Coordinator's `git_push` (`agent_kit_heads.cli_run_policy`):
-  the daemon asks with an approval card on 询问, run admission and the
-  run-token issuer refuse on 拒绝. Unset stays 询问.
+- 推送分支 is the Coordinator's `git_push` (`agent_kit_heads.cli_run_policy`).
+  A push also needs the per-repository approval (decision
+  2026-11-01-0500); run admission and the run-token issuer refuse on 拒绝.
+  There is no push-time card, so 询问 would act like 允许: the page offers
+  允许 / 拒绝 only and shows a stored 询问 (the default) as 允许
+  (coordinator, 2026-11-01). A push-time card is after the MVP and reuses
+  the 创建 Pull Request card's mechanism.
 - 创建 Pull Request is `github_pull_request` in the Coordinator's
   `external_write_permissions`. 拒绝 blocks the pull request (the pushed
   branch stays); 询问 shows a 创建 Pull Request card in chat and opens it once

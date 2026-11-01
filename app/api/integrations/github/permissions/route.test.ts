@@ -55,7 +55,7 @@ test('requires a session, the page origin and only the two decisions', async () 
   sessionUser = 'owner'
   for (const from of ['https://other.example', null]) assert.equal((await patch({ version: '0:0', push: 'allow' }, from)).status, 403)
   for (const body of [
-    { version: '0:0' }, { version: '0:0', push: 'always' }, { version: 'x', push: 'allow' }, { push: 'allow' },
+    { version: '0:0' }, { version: '0:0', push: 'always' }, { version: '0:0', push: 'ask' }, { version: 'x', push: 'allow' }, { push: 'allow' },
     { version: '0:0', push: 'allow', userId: 'victim' }, { version: '0:0', network: 'allow' }, null,
   ]) assert.equal((await patch(body)).status, 400, JSON.stringify(body))
   assert.ok(!queries.some(query => query.sql.startsWith('UPDATE')), 'nothing was written')
