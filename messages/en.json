@@ -1899,7 +1899,7 @@
       "githubManage": "Manage access",
       "githubLoadFailed": "Could not load GitHub authorization. Refresh to try again.",
       "githubReconnectRequired": "GitHub authorization expired. Link your account again.",
-      "githubLinkFailed": "Could not link GitHub.",
+      "githubLinkFailed": "Could not link GitHub. Check that this GitHub account is not linked to another Mikka account, then try again.",
       "gmail": "Gmail",
       "googlecalendar": "Google Calendar",
       "notion": "Notion",

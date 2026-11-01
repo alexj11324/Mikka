@@ -42,7 +42,7 @@ export const auth = betterAuth({
   appName: 'Mikka',
   onAPIError: { errorURL: withBasePath('/sign-in?oauth=failed') },
   database: pool,
-  account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [], allowDifferentEmails: true } },
+  account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } },
   databaseHooks: {
     // A new account without a picture gets a default avatar now; older accounts are left as they are.
     user: { create: { before: async user => ({ data: { ...user, image: user.image || newUserAvatar(user.name || user.email) } }) } },

@@ -1899,7 +1899,7 @@
       "githubManage": "管理授权",
       "githubLoadFailed": "无法读取 GitHub 授权，请刷新重试。",
       "githubReconnectRequired": "GitHub 授权已失效，请重新关联。",
-      "githubLinkFailed": "无法关联 GitHub",
+      "githubLinkFailed": "无法关联 GitHub。请确认该 GitHub 账号未关联其他 Mikka 账号后重试。",
       "gmail": "Gmail",
       "googlecalendar": "Google 日历",
       "notion": "Notion",
