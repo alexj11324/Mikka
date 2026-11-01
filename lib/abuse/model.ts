@@ -6,6 +6,7 @@ import { GATEWAY_MODEL_ENDPOINT, managedGatewayOptions, ModelAdmissionError, typ
 import { hostedBillingScope } from './context'
 import { checkAbuseAlerts } from './alerts'
 import { canUseMikkaPaid, hostedUsage } from './runtime'
+import { withSharedCredits } from '@/lib/credit-shares'
 import {
   gatewayCost,
   gatewayGenerationId,
@@ -13,6 +14,7 @@ import {
   PaidResourceError,
 } from './policy'
 type Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
+
 const trustedGatewayModels = new WeakSet<Model>()
 /** Server-owned transport. Neither redirects nor a caller proxy can move data. */
 export async function createTrustedGatewayModel(modelId: string, apiKey?: string): Promise<Model> {
@@ -30,7 +32,7 @@ export async function hostedModel(
   provider?: Model,
   ownerId?: string,
 ): Promise<Model> {
-  await canUseMikkaPaid(workspaceId)
+  await withSharedCredits(workspaceId, canUseMikkaPaid)
   const model = provider ?? gateway(modelId)
   const billing = hostedBillingScope.getStore()
   const scope = { workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) }
@@ -52,7 +54,7 @@ export async function hostedModel(
     )
     if (promptBytes > 16 * 1024 * 1024)
       throw new PaidResourceError('usage_cost_unavailable')
-    await hostedUsage.reserve(workspaceId, modelId, id, process.env)
+    await withSharedCredits(workspaceId, payer => hostedUsage.reserve(payer, modelId, id, process.env))
   }
   const options = (value: Parameters<Model['doGenerate']>[0], admission: GatewayAdmission | null) => ({
     ...value,
