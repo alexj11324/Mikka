@@ -20,7 +20,7 @@
 | **Account** | A person. Owns their sign-in, devices, app connections, cards, credits they verified, model credentials and E2B key. |
 | **Personal workspace** | One per account, with exactly one member. Every account has one. |
 | **Team workspace** | Several members, with the team's policies, secrets, credits and payment method. It has no E2B key of its own. |
-| **Bot** | Lives in one workspace and has one owner. Chats on Mikka's own harness (R-05) and dispatches threads. |
+| **Bot** | Lives in one workspace and has one owner. Runs on Mikka's own AI SDK on Vercel; when it has work to do, it sends a thread through the daemon to Claude Code or Codex (R-05). |
 | **Thread** | The work a bot dispatched (`agent_runs`). Each turn of it is a **run**. |
 | **Agent** | The coding worker that runs a thread: Claude Code or Codex. Code may say `harness`; the UI says Agent (R-43). |
 | **Model credential** | A Claude or ChatGPT/Codex subscription login, an API key, or a custom provider. Bound to the account and managed on the page 「API 与订阅」. |
@@ -83,16 +83,19 @@ Rules that hold everywhere:
     重试 never re-resolves on its own.
 - Conversation compaction uses the same frozen model and credential as the
   turn.
-- The same order serves bot chats and threads. A bot chat runs on Mikka's
-  harness; a thread runs on the Agent mapped to the model (§3).
+- The same order serves bot chats and threads. The bot itself runs on
+  Mikka's own AI SDK on Vercel; a thread goes through the daemon to the Agent
+  mapped to the model (§3).
 
-## 3. Agents (harnesses) and runners
+## 3. Agents and runners
 
 **Model → Agent.** GPT/OpenAI models run on **Codex**. Every other model runs
 on **Claude Code**, including Mikka 默认 and models reached through an API
 key or a custom provider. In 「API 与订阅」 a person can override which Agent
-runs each model; the override is a per-model setting. Bots never run on
-Claude Code or Codex (R-05); those Agents run threads only.
+runs each model; the override is a per-model setting.
+
+「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过 daemon 把任务派给
+Claude Code 或 Codex。」 (Alex, R-05)
 
 **A user's computer or server is a runner, just like E2B.** Every runner meets
 the same contract: a clean environment for the thread, Agents that Mikka
@@ -143,10 +146,12 @@ still pick any of their own devices by hand.
    (R-23).
 3. Otherwise the owner's online device that has 「允许自动调度」 on and
    passes the capability check, servers first.
-4. Otherwise no run is queued and the bot shows one action card,
-   「这个任务需要一台电脑来跑」: 允许这台电脑自动调度 / 在这台电脑上启用 /
-   填入 E2B Key / 让服务器重新上线 or 连接我的服务器. Answering a row (the switch
-   turned on, the key saved) makes the bot dispatch again
+4. Otherwise 立即警告: no run is created and the bot at once warns that no
+   computer is available (没有可用的电脑), in one action card
+   「这个任务需要一台电脑来跑」 with the rows 允许这台电脑自动调度 /
+   在这台电脑上启用 / 填入 E2B Key / 让服务器重新上线 or 连接我的服务器.
+   Answering a row (the switch turned on, the key saved) makes the bot
+   dispatch again
    ([run machine fallback](decisions/2026-10-31-2200-run-machine-fallback.md)).
 
 **When a machine goes away during a thread:**
@@ -157,7 +162,7 @@ still pick any of their own devices by hand.
   1. Move the run to E2B, when the owner has a key.
   2. Otherwise move it to the owner's personal computer that has
      「允许自动调度」 on.
-  3. Otherwise end the run; the bot shows the same action card.
+  3. Otherwise end the run and 立即警告 with the same action card.
 - **A personal computer goes offline:** apply the same three steps.
 
 This replaces the old 「设备离线时」 setting.
@@ -192,8 +197,8 @@ sequenceDiagram
 - **Leases.** A claimed run holds a lease that the heartbeat renews. When a
   lease runs out because the machine is gone, the run is placed again by §4,
   keeping its frozen model and credential.
-- **Queueing.** A run with no machine stays `queued` and shows the action
-  card (§4).
+- **No machine.** A run is created only once a machine is chosen; with none,
+  the bot warns at once with the action card (§4).
 - **Quota exhausted.** For a credential, see §2. For Mikka 默认, the hosted
   refusal line appears with 验证银行卡 / 充值 and 重试. Admission checks only
   that the balance is positive, then charges actual use afterwards.
@@ -270,7 +275,7 @@ The workspace where the work happens pays.
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
 | Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a container where Docker exists, otherwise a worktree plus a temporary config dir, one multi-arch image | — |
 | A device capability check and 「允许自动调度」 instead of Agent detection and 「设备离线时」 | — |
-| An action card when there is no machine; the offline flow of §4 | — |
+| 立即警告 (the action card) when there is no machine; the offline flow of §4 | — |
 | One environment per thread; leases and heartbeats; credentials injected each run and absent while paused | — |
 | Card verification per person; credit and card shares per workspace | — |
 | No Mikka-hosted sandboxes and no free cloud trial | (not planned) |

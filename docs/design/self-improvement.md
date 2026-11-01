@@ -84,7 +84,8 @@ policy, model budgets, approval and branch protection remain untouched.
 #232 requested future delta: trusted run assignment receipt containing Skill
 id, immutable version, digest and source; until then usage stays unrecorded.
 The [minimal proposed reference and trust boundary](self-improvement-skill-source-contract.md)
-are coordination material only; #232 has no implemented receipt path yet.
+are coordination material only. 现状（非决定）：#232 has no implemented receipt
+path yet.
 
 ## Out of scope
 

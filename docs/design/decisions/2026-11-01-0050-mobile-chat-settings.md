@@ -9,7 +9,9 @@
 
 - A bot's page has two switches:
   - **置顶** puts the bot in 对话's pinned row, next to the Coordinator, and
-    takes it out of the list. The Coordinator is always pinned.
+    takes it out of the list. A pinned bot shows the star (星标 = 置顶标记，
+    所有 bot 一致, R-06). 现状（非决定）：the app keeps the Coordinator always
+    pinned, with no 置顶 switch.
   - **通知** off stops that chat's pushes. The person's 通知 settings still
     apply on top.
 - Both are the person's own, per chat, in `chat_preferences`. They can be set

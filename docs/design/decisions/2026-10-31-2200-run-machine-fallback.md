@@ -1,7 +1,7 @@
-# Where a run executes: own E2B, own auto-schedule device, else an action card
+# Where a run executes: own E2B, own auto-schedule device, else an immediate warning
 
 - Date: 2026-10-31
-- Source: Alex, relayed by the coordinator session. A newly signed-up person may have no card, no E2B and no device; chat must never fail. Corrections the same day: 「MVP 不提供 Mikka 自己的 E2B/云沙箱」 (cloud only on the person's own E2B key); then the 「允许自动调度」 switch, and an actionable error instead of a silent queue.
+- Source: Alex, relayed by the coordinator session. A newly signed-up person may have no card, no E2B and no device; chat must never fail. Corrections the same day: 「MVP 不提供 Mikka 自己的 E2B/云沙箱」 (cloud only on the person's own E2B key); then the 「允许自动调度」 switch, and an immediate warning the person can act on.
 - Rule: —
 - Replaces: the `cloudComputerUnavailable` / `executionModelUnknown` refusals of `dispatch_run` when no machine is available.
 - Implements: [orchestration](../orchestration.md) § 4 「Placing a new run」 for `dispatch_run`, which is the source of truth where the two differ.
@@ -19,11 +19,12 @@ A new run goes to the first machine that can take it:
 
 1. **The person's own E2B cloud**, when there is a key and the bot's cloud
    runtime is ready. When that E2B refuses (its concurrency cap, quota, an
-   invalid key, a failed start), it counts as no cloud: the queued cloud run is
-   ended so it is not left stuck, and the next step applies.
+   invalid key, a failed start), it counts as no cloud: that cloud run is ended
+   so it is not left stuck, and the next step applies.
 2. **The person's own online device with 「允许自动调度」 on**: a server first,
    then the default rule's device, else the most recently seen one.
-3. **Otherwise an action card.** No run is queued and nothing waits.
+3. **Otherwise 立即警告.** No run is created; the bot warns at once that no
+   computer is available (没有可用的电脑).
    Chat keeps working; the model is resolved as usual, so a person with no card
    replies on Mikka 默认
    ([bots reply on Mikka 默认](2026-10-31-2110-bots-reply-on-mikka-cloud.md)).
@@ -42,8 +43,8 @@ more):
 
 - A run whose device went offline (its lease ran out) continues on the person's
   own E2B cloud when they have one, else on another of their devices with
-  「允许自动调度」 on (servers first), else it ends and the bot shows the same
-  action card. A rule whose device is offline takes the same order for a new run.
+  「允许自动调度」 on (servers first), else it ends and the bot warns at once
+  with the same action card. A rule whose device is offline takes the same order for a new run.
   Where the run went is the `run_retried` event's `movedTo`
   (`{ kind: 'cloud' }` or `{ kind: 'device', deviceId }`); the thread view
   shows it.

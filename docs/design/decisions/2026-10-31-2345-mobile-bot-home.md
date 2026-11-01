@@ -11,7 +11,7 @@
 - Replaces: the side drawer and the Coordinator chat as the home screen
   (mobile.md "Where it lives", decisions 2026-10-27, 2026-10-31-2200's drawer)
 
-- The app opens on **对话**: the Coordinator pinned on top with a star, then
+- The app opens on **对话**: the Coordinator pinned on top (星标 = 置顶标记，所有 bot 一致, R-06), then
   every bot and group chat with its last line and time, newest first; the
   system search field filters them. The bar's left menu opens 设置, 插件,
   建议 and 任务. 「重启以更新」 sits at the top when an update is ready.
