@@ -122,14 +122,15 @@ export class WorktreeManager {
     repoPath: string,
     remote: string,
     branch: string,
-    runId: string
+    runId: string,
+    env: Record<string, string> = {}
   ): Promise<string> {
     await assertBranchName(branch)
     const ref = `refs/mikka/fetch/${assertSafeId("run id", runId)}`
     const git = (args: string[], timeout?: number) =>
       execa("git", [...FETCH_GIT, ...args], {
         cwd: repoPath,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+        env: { ...process.env, ...env, GIT_TERMINAL_PROMPT: "0" },
         stdin: "ignore",
         timeout,
       })
