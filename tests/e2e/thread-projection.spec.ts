@@ -24,7 +24,8 @@ test('the real events API projects the latest reply into owner-scoped thread lis
       [mcp, `MCP dispatch ${marker}`, 'mcp', user.id],
       [randomUUID(), `Foreign private ${marker}`, null, `foreign-${randomUUID()}`],
     ]) {
-      await pool.query('INSERT INTO agent_runs (id,"userId","agentId","deviceId",status,prompt,source) VALUES ($1,$2,$3,$4,$5,$6,$7)', [id, owner, agent, device, 'running', prompt, source])
+      // The person's app runs are their Coordinator's (its bot row since #757); an MCP client's run has no bot.
+      await pool.query('INSERT INTO agent_runs (id,"userId","agentId","deviceId",status,prompt,source,"botId") VALUES ($1,$2,$3,$4,$5,$6,$7,CASE WHEN $7::text IS NULL THEN (SELECT "botId" FROM coordinator_bots WHERE "ownerId"=$2) END)', [id, owner, agent, device, 'running', prompt, source])
     }
     const response = await page.request.post(app(`/v1/runs/${first}/events`), {
       headers: { authorization: `Bearer ${token}` },

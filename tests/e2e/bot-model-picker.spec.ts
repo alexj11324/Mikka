@@ -29,7 +29,7 @@ async function seed(page: Page) {
 }
 
 const choice = async (userId: string) => (await db().query<{ bindingId: string | null; modelId: string | null }>(
-  `SELECT c."bindingId", b."modelId" FROM bot_model_choices c LEFT JOIN byos_bindings b ON b.id = c."bindingId" WHERE c."ownerId" = $1 AND c."botKey" = 'coordinator'`, [userId])).rows
+  `SELECT c."bindingId", b."modelId" FROM bot_model_choices c LEFT JOIN byos_bindings b ON b.id = c."bindingId" WHERE c."ownerId" = $1 AND c."botKey" = (SELECT "botId"::text FROM coordinator_bots WHERE "ownerId" = $1)`, [userId])).rows
 
 test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 保存，账号断开后显示不可用', async ({ page }, testInfo) => {
   await register(page)

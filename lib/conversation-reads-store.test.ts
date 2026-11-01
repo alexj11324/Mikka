@@ -169,3 +169,29 @@ test("a bot's chat keeps its own read position and unread count", async t => {
   const coordinator = await handleRead(pool!, req({}))
   assert.notEqual((coordinator.body as { lastReadMessageId: string | null }).lastReadMessageId, ids.w2, "reading the bot's chat leaves the Coordinator's alone")
 })
+
+test("the Coordinator conversation reads its bot's rows once the route names that bot (#757)", async t => {
+  if (!needDb(t)) return
+  // carol's Coordinator is an ordinary bot row: its messages carry that botId, none are bot-less.
+  const carol = `test-reads-${randomUUID()}`, carolCoordinator = randomUUID(), message = randomUUID()
+  await pool!.query('insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values ($1, $1, $1 || \'@example.com\', false, now(), now())', [carol])
+  await pool!.query('insert into bots (id, "ownerId", "workspaceId", name) values ($1, $2, $3, $4)', [carolCoordinator, carol, randomUUID(), 'Coordinator'])
+  await pool!.query('insert into coordinator_messages (id, "userId", "botId", position, message) values ($1, $2, $3, 1, $4)', [message, carol, carolCoordinator, { role: 'assistant', content: 'welcome' }])
+  try {
+    let asked = 0
+    const coordinatorBot = async () => { asked++; return carolCoordinator }
+    const carolReq = (over: Partial<ReadRequest>) => req({ userId: carol, coordinatorBot, ...over })
+    assert.equal((await handleRead(pool!, carolReq({ origin: 'https://evil.example' }))).status, 403)
+    assert.equal(asked, 0, 'no lookup before the request is authorized')
+    assert.deepEqual(await handleRead(pool!, carolReq({})), { status: 200, body: { lastReadMessageId: null, lastReadPosition: null, unreadCount: 1 } })
+    assert.deepEqual(await handleRead(pool!, carolReq({ method: 'POST', body: JSON.stringify({ messageId: '1' }) })),
+      { status: 200, body: { lastReadMessageId: message, lastReadPosition: 1, unreadCount: 0 } })
+    // Another person's bot named as the Coordinator is refused like any foreign bot.
+    assert.equal((await handleRead(pool!, carolReq({ coordinatorBot: async () => bobBot }))).status, 404)
+  } finally {
+    await pool!.query('delete from conversation_reads where "userId" = $1', [carol])
+    await pool!.query('delete from coordinator_messages where "userId" = $1', [carol])
+    await pool!.query('delete from bots where id = $1', [carolCoordinator])
+    await pool!.query('delete from "user" where id = $1', [carol])
+  }
+})

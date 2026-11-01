@@ -65,11 +65,16 @@ export async function chatBotId(ownerId: string, botId: string | null | undefine
  * open, as before it had one; the list draws it as the Coordinator, once.
  */
 export async function listOwnerBots(ownerId: string, workspaceId: string) {
-  const [{ db }, { bots }, { and, asc, desc, eq, or, sql }] = await Promise.all([import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm')])
-  const { botId } = await coordinatorBot(ownerId)
+  const [{ db, pool }, { bots }, { and, asc, desc, eq, sql }, { ensureCoordinatorBot }] = await Promise.all([
+    import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm'), import('@/lib/computer/auto-runtime')])
+  // Moves the person's older chat onto their Coordinator first (once per process), as every Coordinator read does.
+  await coordinatorBot(ownerId)
+  // One Coordinator per person per workspace (decision 2026-10-31-2130-personal-vs-workspace): this
+  // workspace's own, created on first use, so it is an ordinary bot of this workspace like the others.
+  const botId = await ensureCoordinatorBot(pool, { userId: ownerId, workspaceId })
   const isCoordinator = sql<boolean>`${bots.id} = ${botId}`
   return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, coordinator: isCoordinator }).from(bots)
-    .where(and(eq(bots.ownerId, ownerId), or(eq(bots.workspaceId, workspaceId), eq(bots.id, botId))))
+    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId)))
     .orderBy(desc(isCoordinator), asc(bots.createdAt))
 }
 
