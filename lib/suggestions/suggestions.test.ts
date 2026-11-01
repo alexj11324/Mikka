@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { actionLocale, actionTitlePrompt, clampTitle, displayTitle, parseActionTitles } from './action-title'
-import { BRIEFING_HOUR, briefingContent, dueBriefingZones, localClock, localDate, localInstant, safeTimeZone } from './briefing'
+import { BRIEFING_HOUR, briefingCandidates, briefingContent, briefingHighlightInput, briefingHighlightQuestions, dueBriefingZones, readBriefingHighlights, localClock, localDate, localInstant, safeTimeZone } from './briefing'
 import { verifyGitHubSignature } from './github-webhook'
 import { composioNotification, githubCandidateIds, githubNotification, gmailNotification, linearCommentNotification, linearIssueNotification, notionNotification, notionSearchNotification, readableText, slackNotification } from './notification'
 import { missingTriggers, needsConfig, triggerSlugs } from './triggers'
@@ -121,16 +121,26 @@ test('notices about one thread share a matter', () => {
   assert.equal(linearCommentNotification({ userId: me, linearUserId: 'lin-me' }, { type: 'Comment', action: 'create', data: { id: 'c1', body: 'hi', issueId: 'i1' } })!.matterKey, 'linear:i1')
 })
 
-test('the briefing names the highest levels first and counts by source', () => {
+test('the briefing counts by source and names what the Decisions API picks, not the highest levels', () => {
   const at = (minutes: number) => new Date(Date.UTC(2026, 9, 23, 8, minutes))
-  const content = briefingContent([
-    { id: 'a', source: 'gmail', action: 'reply', required: false, level: 'high', probability: null, occurredAt: at(1) },
-    { id: 'b', source: 'github', action: 'review', required: true, level: 'normal', probability: null, occurredAt: at(0) },
-    { id: 'c', source: 'gmail', action: 'reply', required: false, level: 'critical', probability: null, occurredAt: at(5) },
-    // A row from before the levels ranks as normal by its old probability.
-    { id: 'd', source: 'slack', action: 'reply', required: false, level: null, probability: 0.9, occurredAt: at(2) },
-  ])
-  assert.deepEqual(content.highlights, ['c', 'a', 'd'])
+  const items = [
+    { id: 'a', source: 'gmail' as const, action: 'reply' as const, required: false, level: 'high' as const, probability: null, occurredAt: at(1), title: 'Invoice overdue' },
+    { id: 'b', source: 'github' as const, action: 'review' as const, required: true, level: 'normal' as const, probability: null, occurredAt: at(0), title: 'Add briefing' },
+    { id: 'c', source: 'gmail' as const, action: 'reply' as const, required: false, level: 'critical' as const, probability: null, occurredAt: at(5), title: 'Domain expires' },
+    { id: 'd', source: 'slack' as const, action: 'reply' as const, required: false, level: null, probability: 0.9, occurredAt: at(2), title: 'Lunch?' },
+  ]
+  const candidates = briefingCandidates(items)
+  assert.deepEqual(candidates.map(item => item.id), ['c', 'd', 'a', 'b'])
+  assert.match(briefingHighlightInput(candidates), /item0: gmail · reply · level critical · "Domain expires"/)
+  assert.equal(briefingHighlightQuestions(candidates).length, 4)
+  const p = (name: string, probability: number) => [name, { type: 'predicate' as const, name, probability }] as const
+  // The model names a normal review over the critical mail; surest first, at most three.
+  const answers = new Map([p('item0', 0.6), p('item1', 0.1), p('item2', 0.7), p('item3', 0.95)])
+  const highlights = readBriefingHighlights(answers, candidates)
+  assert.deepEqual(highlights, ['b', 'a', 'c'])
+  assert.deepEqual(readBriefingHighlights(null, candidates), [])
+  const content = briefingContent(items, highlights)
+  assert.deepEqual(content.highlights, ['b', 'a', 'c'])
   assert.deepEqual(content.counts, { gmail: 2, github: 1, slack: 1 })
   assert.equal(content.total, 4)
 })

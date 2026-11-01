@@ -120,7 +120,8 @@ test('actual existing MCP send records an Agent report and wakes normally withou
   assert.equal(events.length, 1)
   assert.equal(events[0].userId, owner)
   assert.equal(events[0].kind, 'run_report')
-  assert.equal(events[0].tier, 'result')
+  // No preset tier: triage, the Decisions API, classifies it.
+  assert.equal(events[0].tier, undefined)
   assert.equal(events[0].runId, null)
   assert.equal(events[0].botId, bot)
 })

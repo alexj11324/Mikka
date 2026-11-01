@@ -49,11 +49,12 @@ export function userMessageEvent(
 }
 
 /** OAuth delegates access to an Agent; it does not turn Agent prose into a
- * human decision. Result tier preserves the existing wake-on-send behaviour.
+ * human decision. No preset tier: triage (the Decisions API) decides whether
+ * it needs the person, is a result, or is background, like any runtime event.
  */
-export function peerCoordinatorMessageEvent(userId: string, botId: string, text: string): CoordinatorEventInput & { tier: 'result' } {
+export function peerCoordinatorMessageEvent(userId: string, botId: string, text: string): CoordinatorEventInput {
   return { userId, botId, kind: 'run_report', dedupeKey: 'peer_message:' + crypto.randomUUID(), issueId: null, runId: null,
-    payload: { text, source: 'oauth_agent_mcp' }, tier: 'result' }
+    payload: { text, source: 'oauth_agent_mcp' } }
 }
 
 /** Unique Telegram destinations for the user messages in one claimed batch. */
