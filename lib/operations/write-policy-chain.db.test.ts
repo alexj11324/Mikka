@@ -58,9 +58,13 @@ const run={ownerId:owner,botId:null,workspaceId:null,runId}
  const granted=await createApprovedWrites(scopedPool,judged,action,{modelRun:run,judgeWrite:judge('allow')}).proposeFromRun(input,randomUUID())
  assert.equal(granted.status,'done');assert.equal(direct,1)
  assert.deepEqual(judgedCalls[0],{action,tool:'NOTION_APPEND_BLOCK_CHILDREN',annotations:['openWorldHint'],input})
+ // A provider that names no tool slug is still judged by the Decisions API, under the action name.
+ const slugless:WriteProvider={...judged,prepare:async()=>({accountId:'account',version:'v1'})}
+ assert.equal((await createApprovedWrites(scopedPool,slugless,action,{modelRun:run,judgeWrite:judge('allow')}).proposeFromRun(input,randomUUID())).status,'done');assert.equal(direct,2)
+ assert.deepEqual(judgedCalls[1],{action,tool:action,annotations:undefined,input});judgedCalls.splice(1,1)
  const destructiveService=createApprovedWrites(scopedPool,judged,action,{modelRun:run,judgeWrite:judge('ask')}), destructive=await destructiveService.proposeFromRun(input,randomUUID())
- assert.equal(destructive.status,'awaiting_approval');assert.equal(direct,1)
- assert.equal((await destructiveService.decide(actor,destructive.actionId,true)).status,'done');assert.equal(direct,2)
+ assert.equal(destructive.status,'awaiting_approval');assert.equal(direct,2)
+ assert.equal((await destructiveService.decide(actor,destructive.actionId,true)).status,'done');assert.equal(direct,3)
  assert.equal((await createApprovedWrites(scopedPool,judged,action,{modelRun:run}).proposeFromRun(input,randomUUID())).status,'awaiting_approval','without a judge it asks')
  await set('allow')
  const explicit=await createApprovedWrites(scopedPool,judged,action,{modelRun:run,judgeWrite:judge('ask')}).proposeFromRun(input,randomUUID())
