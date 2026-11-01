@@ -55,6 +55,10 @@ provides:
   `executablePath: '/opt/pw-browsers/chromium'`. Never run
   `playwright install`.
 
+Local runs use DeepSeek DS 4.1 Flash through the workspace's own key
+(`DEEPSEEK_API_KEY` in Infisical, `dev:/vercel`), never Mikka 默认 or the AI
+Gateway: [local-runtime.md](local-runtime.md#which-model-local-runs-use).
+
 Signup limits never block local work. In local test-account mode
 (`localTestAccountsMode`, `scripts/test-accounts/database-target.mjs`) and
 outside Vercel, the signup and verification limits default to CI's (1000 per
