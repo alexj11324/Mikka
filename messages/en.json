@@ -12,7 +12,9 @@
     "search": "Search",
     "selected": "Selected",
     "propertyValue": "{label}: {value}",
-    "avatarLabel": "Avatar for {email}"
+    "avatarLabel": "Avatar for {email}",
+    "scrollToEnd": "Scroll to end",
+    "scrollToStart": "Scroll to start"
   },
   "Issue": {
     "scope": {
