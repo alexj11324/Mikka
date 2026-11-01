@@ -79,6 +79,8 @@ const nextConfig = {
     }))]
   },
   experimental: {
+    // Three page-data workers exceeded the standard 8 GB production builder.
+    cpus: 1,
     globalNotFound: true,
     // A copied acceptance checkout can invalidate Turbopack's persistent
     // parent graph and abort next dev. Keep this disposable stack in memory.
