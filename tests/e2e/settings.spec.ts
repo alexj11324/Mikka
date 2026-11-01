@@ -454,6 +454,16 @@ async function paintedAt(page: Page, x: number, y: number) {
   }, { png, x, y })
 }
 
+test('设置沿用应用顶栏：搜索胶囊和浏览器按钮都在，搜索回到应用并打开 ⌘K', async ({ page }) => {
+  await register(page, '/settings?section=preferences')
+  const bar = page.locator('[data-slot="window-bar"]')
+  await expect(bar.getByRole('button', { name: '全局搜索', exact: true })).toBeVisible()
+  await expect(bar.getByRole('button', { name: '浏览器', exact: true })).toBeVisible()
+  await bar.getByRole('button', { name: '全局搜索', exact: true }).click()
+  await expect(page).not.toHaveURL(/\/settings/)
+  await expect(page.getByRole('dialog')).toBeVisible()
+})
+
 test('设置搜索没有结果时显示一行提示，不留下团队分组', async ({ page }) => {
   await register(page, '/settings?section=preferences')
   const sidebar = page.locator('[data-slot="settings-list"]')
