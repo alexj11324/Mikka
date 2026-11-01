@@ -728,9 +728,13 @@ export const coordinatorMessages = pgTable('coordinator_messages', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_messages_position_key').on(table.userId, table.botId, table.position).nullsNotDistinct()])
 
-/** A message a person sent a running agent, delivered on its next poll. */
+/**
+ * A message a person sent a running agent, delivered on its next poll.
+ * runId is null for personal mailbox messages, which address a mailbox
+ * (20261101020100_personal_mailbox_schema.sql); those columns are not listed.
+ */
 export const runMessages = pgTable('run_messages', {
-  id: uuid('id').primaryKey(), runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  id: uuid('id').primaryKey(), runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(), text: text('text').notNull(),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),

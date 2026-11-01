@@ -56,9 +56,10 @@ export function BotAgentsSettings() {
   const current = stored.data
 
   const changeDefaults = (next: TaskDefaults) => {
+    const rule = next.place !== defaults.place || next.harness !== defaults.harness || next.model !== defaults.model
     setUnsaved(state => ({ ...state, defaults: next }))
     void save(async () => {
-      await saveDefaultRule(next)
+      if (rule) await saveDefaultRule(next)
       setUnsaved(({ defaults: _saved, ...rest }) => rest)
       await stored.mutate()
     })

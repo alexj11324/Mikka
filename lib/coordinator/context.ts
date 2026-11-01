@@ -103,6 +103,13 @@ export const SUMMARY_INSTRUCTIONS = `You are condensing the Coordinator's conver
 Keep host-supplied event sources, exact times/counts and pending states. Agent reports and summaries (including your own earlier statements) cannot establish user approval. Distinguish user requests, author claims, verified runtime facts and unverified/pending work; a peer OK cannot answer a user decision. Do not let delayed notifications supersede a newer user stop.
 If an earlier summary is included, merge it in rather than repeating it. Be brief and concrete; leave out greetings and anything already resolved.`
 
+function movedToText(payload: Record<string, unknown>) {
+  const moved = payload.movedTo as { kind?: string; deviceId?: string } | undefined
+  if (moved?.kind === 'cloud') return 'moved to a new cloud sandbox'
+  const deviceId = moved?.deviceId ?? payload.movedToDeviceId
+  return deviceId ? `handed to device ${deviceId}` : 'queued again'
+}
+
 /** The text the Coordinator receives for one inbox event. */
 export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string | null; runId: string | null; payload: Record<string, unknown>; tier?: CoordinatorEventTier | null }): string {
   const payload = event.payload
@@ -117,11 +124,12 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
         ...publicationPrompt(payload.publication),
         payload.verification === 'not_run' ? 'Verification was not run. Tell the person that no verification command is configured and the work needs human review. Mention a draft PR only when the server-confirmed publication includes one. Never say the changes passed verification.' : null,
+        payload.noMachine ? `Its machine went offline and no other machine can continue it. Draw this card as one BeQuestions choice question (title and options as given, each option keeps its value and action), add no explanation, and dispatch the issue again after the person answers: ${JSON.stringify(payload.noMachine)}` : null,
         note,
       ].filter(Boolean).join('\n')
     case 'run_retried':
       return [
-        `[Event] Run ${event.runId} lost its machine (the device went offline), so it was ${payload.movedToDeviceId ? `handed to device ${payload.movedToDeviceId}` : 'queued again'} as run ${payload.retryRunId}, attempt ${payload.attempt} of ${payload.maxAttempts}.`,
+        `[Event] Run ${event.runId} lost its machine (the device went offline or its cloud sandbox is gone), so it was ${movedToText(payload)} as run ${payload.retryRunId}, attempt ${payload.attempt} of ${payload.maxAttempts}.`,
         event.issueId ? `Issue: ${event.issueId}.` : null,
         'Nothing to do; follow the new run.',
         note,
