@@ -51,10 +51,15 @@ const patch = (body: unknown, from: string | null = origin) => PATCH(new Request
   method: 'PATCH', headers: { 'Content-Type': 'application/json', ...(from ? { origin: from } : {}) }, body: JSON.stringify(body),
 }))
 
-test('unset settings read as today: push asks, the pull request opens', async () => {
+test('unset settings: push is the GitHub App grant (allow), the pull request opens', async () => {
   const response = await read()
   assert.equal(response.status, 200)
-  assert.deepEqual(await response.json(), { viewerId: 'owner', push: 'ask', pullRequest: 'allow', version: '0:0' })
+  assert.deepEqual(await response.json(), { viewerId: 'owner', push: 'allow', pullRequest: 'allow', version: '0:0' })
+})
+
+test('an ask stored before decision 2026-11-01-1310 reads as allow for both', async () => {
+  rows.set('owner', { cli: { permissions: { git_push: 'ask' } }, cliVersion: 1, external: { github_pull_request: 'ask' }, externalVersion: 1 })
+  assert.deepEqual(await (await read()).json(), { viewerId: 'owner', push: 'allow', pullRequest: 'allow', version: '1:1' })
 })
 
 test('requires a session, the page origin and only the two decisions', async () => {
@@ -67,6 +72,8 @@ test('requires a session, the page origin and only the two decisions', async () 
     // 推送分支 is the GitHub App grant (decision 2026-11-01-1215): never written here.
     { version: '0:0' }, { version: '0:0', push: 'allow' }, { version: '0:0', push: 'deny' }, { version: '0:0', push: 'always' }, { version: 'x', pullRequest: 'allow' }, { pullRequest: 'allow' },
     { version: '0:0', push: 'allow', userId: 'victim' }, { version: '0:0', network: 'allow' }, null,
+    // 创建 Pull Request is allow or deny; what the App grants is never asked (decision 2026-11-01-1310).
+    { version: '0:0', pullRequest: 'ask' },
   ]) assert.equal((await patch(body)).status, 400, JSON.stringify(body))
   assert.ok(!queries.some(query => query.sql.startsWith('UPDATE')), 'nothing was written')
 })
@@ -74,9 +81,9 @@ test('requires a session, the page origin and only the two decisions', async () 
 test('writes the Coordinator\'s own github_pull_request only, keeping its other choices; push is never written', async () => {
   rows.set('owner', { cli: { permissions: { network: 'deny' }, approvalMode: 'ask' }, cliVersion: 2, external: { gmail_send_email: 'ask' }, externalVersion: 5 })
   assert.equal((await patch({ version: '2:5', push: 'deny' })).status, 400)
-  const second = await patch({ version: '2:5', pullRequest: 'ask' })
-  assert.deepEqual(await second.json(), { viewerId: 'owner', push: 'ask', pullRequest: 'ask', version: '2:6' })
-  assert.deepEqual(rows.get('owner'), { cli: { permissions: { network: 'deny' }, approvalMode: 'ask' }, cliVersion: 2, external: { gmail_send_email: 'ask', github_pull_request: 'ask' }, externalVersion: 6 })
+  const second = await patch({ version: '2:5', pullRequest: 'deny' })
+  assert.deepEqual(await second.json(), { viewerId: 'owner', push: 'allow', pullRequest: 'deny', version: '2:6' })
+  assert.deepEqual(rows.get('owner'), { cli: { permissions: { network: 'deny' }, approvalMode: 'ask' }, cliVersion: 2, external: { gmail_send_email: 'ask', github_pull_request: 'deny' }, externalVersion: 6 })
   for (const query of queries.filter(query => /agent_kit_heads/.test(query.sql))) {
     assert.equal(query.params[0], 'owner')
     assert.ok(query.params.includes(coordinatorOf('owner').botId), 'the row is the Coordinator bot\'s own')
@@ -85,13 +92,13 @@ test('writes the Coordinator\'s own github_pull_request only, keeping its other 
 
 test('a stale version is refused, and one person never reaches another\'s row', async () => {
   rows.set('other', { cli: {}, cliVersion: 0, external: {}, externalVersion: 0 })
-  assert.equal((await patch({ version: '0:0', pullRequest: 'ask' })).status, 200)
-  const stale = await patch({ version: '0:0', pullRequest: 'deny' })
+  assert.equal((await patch({ version: '0:0', pullRequest: 'deny' })).status, 200)
+  const stale = await patch({ version: '0:0', pullRequest: 'allow' })
   assert.equal(stale.status, 409)
   assert.equal((await stale.json()).error, 'githubPermissionsChanged')
   assert.deepEqual(rows.get('other'), { cli: {}, cliVersion: 0, external: {}, externalVersion: 0 })
   sessionUser = 'other'
-  assert.deepEqual(await (await read()).json(), { viewerId: 'other', push: 'ask', pullRequest: 'allow', version: '0:0' })
+  assert.deepEqual(await (await read()).json(), { viewerId: 'other', push: 'allow', pullRequest: 'allow', version: '0:0' })
 })
 
 test('a malformed stored setting is unavailable, never a default', async () => {

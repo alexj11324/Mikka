@@ -1,6 +1,6 @@
 import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import { z } from 'zod'
-import { resolveAgentSettings } from '@mikka/protocol/agent-policy'
+import { gitPushRestriction } from '@mikka/protocol/agent-policy'
 
 /** Immutable evidence of one accepted task's repository authority. */
 const receipt = z.object({
@@ -27,10 +27,7 @@ export type RepositoryAdmission = z.infer<typeof receipt>
  * layer denies; anything else does not ask the person again.
  */
 export function effectiveRepositoryPush(permissions: unknown, workspacePermissions?: unknown): 'allow' | 'deny' {
-  const workspace = resolveAgentSettings({ permissions: workspacePermissions }).policy.permissions.git_push
-  const configured = permissions !== null && typeof permissions === 'object' && Object.hasOwn(permissions, 'git_push')
-  const decision = configured ? resolveAgentSettings({ permissions }).policy.permissions.git_push : workspace
-  return workspace === 'deny' || decision === 'deny' ? 'deny' : 'allow'
+  return gitPushRestriction(workspacePermissions) === 'deny' || gitPushRestriction(permissions) === 'deny' ? 'deny' : 'allow'
 }
 
 /** Call only in the admission transaction, with the recorded GitHub App grant. */

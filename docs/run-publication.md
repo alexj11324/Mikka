@@ -51,8 +51,11 @@ When GitHub refuses, dispatch returns `runInvalid` with a `reason`
 `githubIdentityRequired`, `githubAccessDenied`, `repositoryNotGithub`, …) and a
 sentence with the GitHub installation link (`lib/run-invalid-reason.ts`); the
 Coordinator sends the person to GitHub. Plugins › GitHub shows 推送分支 as
-「由 GitHub App 授权决定」, with no switch; 创建 Pull Request keeps allow / ask /
-deny.
+「由 GitHub App 授权决定」, with no switch. 创建 Pull Request is 允许 or 拒绝,
+default 允许, and never shows a card
+([decision](design/decisions/2026-11-01-1310-no-ask-for-app-granted-abilities.md));
+an ask stored before that decision is migrated to allow. `git_push` likewise
+stores only allow or deny.
 
 Claim sends `pushBranch` and `policy.permissions.git_push`; it sends `allow`
 only for an admitted receipt, and a claim without a publication never forwards
@@ -75,15 +78,8 @@ publication or push branch, and claim sends the read-only policy (`git_push`,
 writes and scripts denied), whatever the CLI policy says. It ends `succeeded`
 with its report and publishes nothing.
 
-A read-only run (`dispatch_run` with `readOnly: true`: an investigation or
-review that changes nothing) is admitted without the repository approval,
-because it never pushes. Its frozen definition carries `readOnly`; it gets no
-admission receipt, no publication or push branch, and claim sends the
-read-only policy (`git_push`, writes and scripts denied), whatever the CLI
-policy says. It ends `succeeded` with its report and publishes nothing. A run
-that may commit still needs both gates; when admission refuses it, the error is
-`runInvalid` with a `reason` (for example `repositoryPushApprovalRequired`)
-and a sentence the Coordinator acts on (`lib/run-invalid-reason.ts`).
+When admission refuses a run that may commit, the error is `runInvalid` with a
+`reason` and a sentence the Coordinator acts on (`lib/run-invalid-reason.ts`).
 
 ## Completion and retries
 
@@ -99,7 +95,7 @@ infrastructure retries enter a final failure step and report a safe result.
 
 `verify: passed` can create an open PR. When there is no configured verification
 command, the daemon snapshots the real submitted tree, retains `verify: not_run`,
-and may commit/push only after repository approval. Without an approved,
+and may commit/push only with the GitHub App's push grant. Without an approved,
 matching, actually pushed result the thread stays stopped/unverified and the
 task is not advanced to review. After a successful approved push the server
 requests a draft PR and tells the Coordinator that human checking remains.

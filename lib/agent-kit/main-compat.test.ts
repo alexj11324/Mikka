@@ -183,10 +183,10 @@ test('a scoped device credential cannot claim a different device even for the sa
 
 
 test('repository push approval composes with CLI limits without broadening unrelated actions', async () => {
- cliPolicy.permissions.git_push='ask'
+ cliPolicy.permissions.git_push='allow'
  const approved=await request();assert.equal(approved.status,200);const accepted=await approved.json()
  assert.equal(accepted.policy.permissions.git_push,'allow');assert.equal(accepted.policy.permissions.network,'deny');assert.equal(accepted.policy.permissions.install_dependency,'deny');assert.equal(accepted.policyRevision,'a'.repeat(64))
- selectIndex=0;cliPolicy.permissions.git_push='allow';publicationPolicy.permissions.git_push='ask'
+ selectIndex=0;cliPolicy.permissions.git_push='allow';publicationPolicy.permissions.git_push='deny'
  const pending=await request();assert.equal(pending.status,200);assert.equal((await pending.json()).policy.permissions.git_push,'deny','a local run never receives ask: no push card')
 })
 
@@ -199,7 +199,7 @@ test('a cloud claim without a push admission denies the push, never asks', async
 })
 
 test('a cloud run admitted with the GitHub App grant gets its publication and allow, like a local run', async () => {
- cloud=true;cliPolicy.permissions.git_push='ask'
+ cloud=true;cliPolicy.permissions.git_push='allow'
  definition={...frozen(),repositoryAdmission:{userId:owner,issueId,deviceId,agentId,remoteKey:'v2/github.com/example/repo',remoteUrl:'https://github.com/example/repo.git',permission:'push_to_origin',targetBranch:'mikka/mik-1',authority:'github_app',approvedAt:'2026-11-01T00:00:00Z',acceptedAt:'2026-11-01T00:00:00Z'}}
  const response=await request();assert.equal(response.status,200);const body=await response.json()
  assert.equal(prepared.mock.callCount(),1,'the admitted cloud run reserves its publication before the lease')

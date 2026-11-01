@@ -6,8 +6,10 @@ import {
   runPolicyDigestInput,
   runPolicySchema,
   CONFIGURABLE_ACTIONS,
+  CONFIGURABLE_PERMISSIONS,
   DEFAULT_NETWORK_ALLOW,
   FIXED_PERMISSIONS,
+  gitPushRestriction,
   PERMISSION_ACTIONS,
   PERMISSION_DEFAULTS,
   applyApprovalMode,
@@ -49,10 +51,23 @@ describe("agent policy table (ADR 0009)", () => {
       run_setup_recipe: "allow",
       install_dependency: "allow",
       write_outside_repo: "ask",
-      git_push: "ask",
+      git_push: "deny",
       network: "ask",
       computer_use: "ask",
     })
+  })
+
+  it("never asks for a push: stored ask reads as allow, a run policy's ask carries no authority (decision 2026-11-01-1310)", () => {
+    expect(CONFIGURABLE_PERMISSIONS.git_push).toEqual(["allow", "deny"])
+    expect(storedPermissionsSchema.parse({ git_push: "ask" })).toEqual({ git_push: "allow" })
+    expect(storedPermissionsSchema.parse({ git_push: "deny" })).toEqual({ git_push: "deny" })
+    const policy = runPolicySchema.parse({ permissions: { install_dependency: "allow", write_outside_repo: "ask", git_push: "ask", network: "ask" }, networkAllow: [] })
+    expect(policy.permissions.git_push).toBe("deny")
+    // Unset resolves to no push; a stored layer can only restrict the server's grant.
+    expect(resolvePermissions({}).git_push).toBe("deny")
+    expect(gitPushRestriction({})).toBe("allow")
+    expect(gitPushRestriction({ git_push: "ask" })).toBe("allow")
+    expect(gitPushRestriction({ git_push: "deny" })).toBe("deny")
   })
 
   it("refuses choices an action does not offer", () => {

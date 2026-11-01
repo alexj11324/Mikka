@@ -24,7 +24,7 @@ type GitHubState = { viewerId: string; configured: boolean; connected: boolean; 
 /** A readable state, or an account link GitHub no longer accepts. */
 type GitHubRead = { state: GitHubState; reconnect: false } | { state: null; reconnect: true }
 type Decision = 'allow' | 'ask' | 'deny'
-type Permissions = { push: Decision; pullRequest: Decision; version: string }
+type Permissions = { pullRequest: Decision; version: string }
 type WriteAbility = keyof Omit<Permissions, 'version'>
 
 const githubKey = (userId: string) => ['integrations:github', userId] as const
@@ -33,7 +33,8 @@ const CONNECT_PATH = withBasePath('/api/integrations/github/connect')
 const PERMISSIONS_PATH = withBasePath('/api/integrations/github/permissions')
 /** The Mikka GitHub App's page where a person picks which repositories it may reach. */
 const INSTALL_URL = 'https://github.com/apps/mikka-github/installations/new'
-const DECISIONS: readonly Decision[] = ['allow', 'ask', 'deny']
+/** 创建 Pull Request is allow or deny: what the App was granted is never asked again (decision 2026-11-01-1215). */
+const DECISIONS: readonly Decision[] = ['allow', 'deny']
 
 /**
  * What an Agent does through this plugin, from the code that does it. Writes:
@@ -63,8 +64,9 @@ async function readGitHub([, userId]: ReturnType<typeof githubKey>): Promise<Git
 
 const isDecision = (value: unknown): value is Decision => typeof value === 'string' && (DECISIONS as readonly string[]).includes(value)
 function readPermissions(userId: string, next: Partial<Permissions> & { viewerId?: unknown }): Permissions {
-  if (next.viewerId !== userId || !isDecision(next.push) || !isDecision(next.pullRequest) || typeof next.version !== 'string') throw new Error('shape')
-  return { push: next.push, pullRequest: next.pullRequest, version: next.version }
+  // push is shown as the GitHub App's own grant, so its stored value is not read here.
+  if (next.viewerId !== userId || !isDecision(next.pullRequest) || typeof next.version !== 'string') throw new Error('shape')
+  return { pullRequest: next.pullRequest, version: next.version }
 }
 async function fetchPermissions([, userId]: ReturnType<typeof permissionsKey>): Promise<Permissions> {
   const response = await fetch(PERMISSIONS_PATH, { cache: 'no-store' })
@@ -169,7 +171,7 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
   const login = githubState?.login ? t('githubLogin', { login: githubState.login }) : t('github')
   const errors = [githubError, githubLinkError, permissionError].filter(Boolean)
   // 推送分支 is whatever the GitHub App was granted on GitHub: shown, not set (decision 2026-11-01-1215).
-  const control = (setting: WriteAbility, name: string) => setting === 'push'
+  const control = (setting: WriteAbility | 'push', name: string) => setting === 'push'
     ? <span className="text-xs text-muted-foreground">{t('githubPushByApp')}</span>
     : <ToggleGroup aria-label={name} variant="segment" size="sm" spacing={0.5} disabled={!permissions.data} value={permissions.data ? [permissions.data[setting]] : []} onValueChange={values => {
       const next = values[0]
@@ -215,7 +217,7 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
 
     <PageSection id="github-abilities-heading" title={t('githubAbilitiesHeading')} summary={t('githubAbilitiesSummary', { count: writes.length + reads.length, write: writes.length, read: reads.length })}>
       {/* Rows keep one height in both groups, with or without a control. */}
-      <ToolGroup label={t('writeTools', { count: writes.length })} tools={writes} uniformRows control={tool => control(tool.slug as WriteAbility, tool.name)} />
+      <ToolGroup label={t('writeTools', { count: writes.length })} tools={writes} uniformRows control={tool => control(tool.slug as WriteAbility | 'push', tool.name)} />
       <ToolGroup label={t('readTools', { count: reads.length })} tools={reads} uniformRows />
     </PageSection>
 

@@ -42,6 +42,10 @@ const testFileOrigin = (remoteKey: string) => remoteKey.startsWith('v2/file/') &
 /** What GitHub says now, recorded for admission. A GitHub outage records nothing. */
 export async function verifyPushGrant(userId: string, remoteKey: string, options: { fetcher?: typeof fetch; env?: Record<string, string | undefined> } = {}): Promise<{ granted: true } | { granted: false; reason: PushGrantRefusal }> {
   if (testFileOrigin(remoteKey)) return { granted: true }
+  // Nothing to look up when the repository is not on GitHub or this server has no App.
+  if (!remoteKey.startsWith('v2/github.com/')) return { granted: false, reason: 'repositoryNotGithub' }
+  const env = options.env ?? process.env
+  if (!env.GITHUB_APP_ID || !env.GITHUB_APP_PRIVATE_KEY) return { granted: false, reason: 'githubNotConfigured' }
   try {
     const binding = await verifyGitHubPushAccess({ remoteKey, githubAccountId: await linkedGitHubAccountId(userId), ...options })
     await db.execute(sql`insert into github_repository_installations ("userId","remoteKey","githubAccountId","installationId","repositoryId","verifiedAt","pushGrantedAt")

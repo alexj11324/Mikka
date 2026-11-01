@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
-import { PERMISSION_DECISIONS, PERMISSION_DEFAULTS, type PermissionDecision } from '@mikka/protocol/agent-policy'
+import { gitPushRestriction, type PermissionDecision } from '@mikka/protocol/agent-policy'
 import { cliPolicyValuesSchema } from '@/lib/agent-tool-approval/policy-store'
 import { writePolicySettingsSchema } from '@/lib/operations/write-policy-settings'
 import { writeTransaction } from '@/lib/operations/write-transaction'
@@ -15,21 +15,21 @@ import { coordinatorBot, type CoordinatorBot } from '@/lib/coordinator/coordinat
  *   is shown, not set: `push` reads the Coordinator's stored `git_push` only so
  *   an older deny stays visible, and a PATCH can no longer change it.
  * - 创建 Pull Request is `github_pull_request` in `external_write_permissions`,
- *   read by publishRunResult before it opens the pull request. Unset keeps
- *   today's behaviour: once the push was approved, the pull request opens.
+ *   read by publishRunResult before it opens the pull request: allow or deny,
+ *   never asked (decision 2026-11-01-1215). Unset, or an ask stored before
+ *   that decision, opens it.
  */
 export const PULL_REQUEST_PERMISSION = 'github_pull_request'
 export const PULL_REQUEST_DEFAULT: PermissionDecision = 'allow'
 
-const decision = z.enum(PERMISSION_DECISIONS)
 /** One version over both columns, so a stale page cannot overwrite either. */
 const versionSchema = z.string().regex(/^(0|[1-9]\d*):(0|[1-9]\d*)$/)
 export const githubPermissionsPatchSchema = z.strictObject({
   version: versionSchema,
-  pullRequest: decision,
+  pullRequest: z.enum(['allow', 'deny']),
 })
 
-export interface GitHubPermissions { push: PermissionDecision; pullRequest: PermissionDecision; version: string }
+export interface GitHubPermissions { push: PermissionDecision; pullRequest: 'allow' | 'deny'; version: string }
 
 export class GitHubPermissionsError extends Error {
   constructor(readonly code: 'githubPermissionsChanged' | 'githubPermissionsUnavailable') { super(code); this.name = 'GitHubPermissionsError' }
@@ -45,8 +45,8 @@ function view(row: Head | undefined): GitHubPermissions & { cli: z.infer<typeof 
   if (!cli.success || !external.success || !versionSchema.safeParse(version).success) throw new GitHubPermissionsError('githubPermissionsUnavailable')
   return {
     cli: cli.data, external: external.data, version,
-    push: cli.data.permissions?.git_push ?? PERMISSION_DEFAULTS.git_push,
-    pullRequest: external.data[PULL_REQUEST_PERMISSION] ?? PULL_REQUEST_DEFAULT,
+    push: gitPushRestriction(cli.data.permissions),
+    pullRequest: (external.data[PULL_REQUEST_PERMISSION] ?? PULL_REQUEST_DEFAULT) === 'deny' ? 'deny' : 'allow',
   }
 }
 

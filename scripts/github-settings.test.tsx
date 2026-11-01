@@ -267,7 +267,7 @@ test('a connected page shows the account and a repository count; the names open 
   assert.ok(dialog?.querySelector('a[href="https://github.com/octo/site"]'))
 })
 
-test('only the pull request carries a control; the push reads as the GitHub App\'s own grant', async () => {
+test('only the pull request carries a control, allow or deny; the push reads as the GitHub App\'s own grant', async () => {
   userId = 'viewer-permissions'
   permissions = { viewerId: 'viewer-permissions', push: 'ask', pullRequest: 'allow', version: '3:4' }
   await render()
@@ -278,7 +278,7 @@ test('only the pull request carries a control; the push reads as the GitHub App\
   assert.ok(container.textContent?.includes('githubPushByApp'), '推送分支 shows 由 GitHub App 授权决定 instead of a switch')
   const pressed = (group: Element) => [...group.querySelectorAll('button')].filter(button => button.getAttribute('aria-pressed') === 'true' || button.hasAttribute('data-pressed')).map(button => button.textContent)
   const options = (group: Element) => [...group.querySelectorAll('button')].map(button => button.textContent)
-  assert.deepEqual(options(groups[0]), ['githubPermission.allow', 'githubPermission.ask', 'githubPermission.deny'])
+  assert.deepEqual(options(groups[0]), ['githubPermission.allow', 'githubPermission.deny'], 'what the App grants is never asked: no 询问')
   assert.deepEqual(pressed(groups[0]), ['githubPermission.allow'])
   const deny = [...groups[0].querySelectorAll('button')].find(button => button.textContent === 'githubPermission.deny')!
   await act(async () => { deny.click() })

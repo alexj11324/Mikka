@@ -34,7 +34,8 @@ export const CONFIGURABLE_PERMISSIONS = {
   // Everything outside the worktree is read-only in the sandbox (ADR 0009,
   // Stage 1 isolation), so writing there cannot be allowed wholesale.
   write_outside_repo: ["ask", "deny"],
-  git_push: ["allow", "ask", "deny"],
+  // Push is what the GitHub App grants (decision 2026-11-01-1215): never asked.
+  git_push: ["allow", "deny"],
   network: ["allow", "ask", "deny"],
   computer_use: ["allow", "ask", "deny"],
 } as const satisfies Partial<
@@ -61,9 +62,21 @@ export const PERMISSION_DEFAULTS: Readonly<
   ...FIXED_PERMISSIONS,
   install_dependency: "allow",
   write_outside_repo: "ask",
-  git_push: "ask",
+  // A run pushes only when the server sends allow for an admitted GitHub App
+  // grant (decision 2026-11-01-1215); a policy that does not say so never pushes.
+  git_push: "deny",
   network: "ask",
   computer_use: "ask",
+}
+
+/**
+ * A stored layer's `git_push` as a restriction. Push itself is the GitHub App
+ * grant the server adds for an admitted run; a stored setting can only deny it.
+ * Unset, or an ask stored before decision 2026-11-01-1215, does not deny.
+ */
+export function gitPushRestriction(permissions: unknown): "allow" | "deny" {
+  return permissions !== null && typeof permissions === "object" &&
+    (permissions as Record<string, unknown>).git_push === "deny" ? "deny" : "allow"
 }
 
 export function isConfigurableAction(
@@ -119,7 +132,8 @@ export const storedPermissionsSchema = z
   .strictObject({
     install_dependency: z.enum(CONFIGURABLE_PERMISSIONS.install_dependency),
     write_outside_repo: z.enum(CONFIGURABLE_PERMISSIONS.write_outside_repo),
-    git_push: z.enum(CONFIGURABLE_PERMISSIONS.git_push),
+    // A stored ask predates decision 2026-11-01-1215 and reads as allow.
+    git_push: z.enum(PERMISSION_DECISIONS).transform(value => value === "ask" ? "allow" as const : value),
     network: z.enum(CONFIGURABLE_PERMISSIONS.network),
     computer_use: z.enum(CONFIGURABLE_PERMISSIONS.computer_use),
   })
@@ -173,7 +187,8 @@ export const runPolicySchema = z.strictObject({
   permissions: z.strictObject({
     install_dependency: z.enum(PERMISSION_DECISIONS),
     write_outside_repo: z.enum(PERMISSION_DECISIONS),
-    git_push: z.enum(PERMISSION_DECISIONS),
+    // Push is allow (admitted) or deny; an older server's ask carries no push authority.
+    git_push: z.enum(PERMISSION_DECISIONS).transform(value => value === "ask" ? "deny" as const : value),
     network: z.enum(PERMISSION_DECISIONS),
     // Older servers omit this field; the daemon treats that as ask, never allow.
     computer_use: z.enum(PERMISSION_DECISIONS).optional(),
@@ -370,7 +385,8 @@ export function resolvePermissions(stored: unknown, environment: ExecutionEnviro
         ? value
         : (environment === 'cloud' && action === 'network' ? 'allow' : PERMISSION_DEFAULTS[action] as PermissionDecision)
   }
-  return out
+  // git_push offers only allow / deny (permissionChoiceAllowed), so it is never ask here.
+  return out as RunPermissions
 }
 
 export function resolveNetworkAllow(stored: unknown): string[] {

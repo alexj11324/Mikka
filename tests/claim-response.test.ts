@@ -291,7 +291,7 @@ test('capable workers receive the signed final composed policy, not the earlier 
     const context=policyDistributionContext('http://127.0.0.1/mikka','member','device','run',probe.cliPolicy)
     const verified=verifyPolicySnapshot(body.policySnapshot,context,{runId:'run',deviceId:'device',revision:body.policyRevision,policy:body.policy})
     assert.equal(verified.payload.policy.permissions.git_push,'deny')
-    assert.equal(probe.cliPolicy.policy.permissions.git_push,'ask')
+    assert.equal(probe.cliPolicy.policy.permissions.git_push,'allow','the CLI layer is unchanged by the claim')
     assert.equal(body.policySnapshotRequired,true)
   } finally {if(before===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=before}
 })

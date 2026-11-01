@@ -130,7 +130,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   // Push authority is the person's GitHub App grant: ask GitHub now, before the
   // admission transaction, which reads the recorded outcome. A host dispatch
   // already inside its transaction (Factory) relies on the recorded check.
-  const pushCheck = !internal && !parsed.data.readOnly ? await (await import('@/lib/github/push-grant')).verifyPushGrant(userId, repo.repoPath) : null
+  const pushCheck = !internal && !parsed.data.readOnly ? await (await import('@/lib/github/push-grant')).verifyPushGrant(userId, requestedRepositoryKey) : null
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = true

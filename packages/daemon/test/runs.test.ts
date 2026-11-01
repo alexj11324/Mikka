@@ -142,7 +142,8 @@ describe("mock runs", () => {
         issueId: `issue-${decision}-${approved}`, repoId: "repo-1",
         remoteUrl: pathToFileURL(origin).href, harness: "mock", prompt: "inspect",
         pushBranch: "mikka/issue-1", fixture: "turn-ended",
-        policy: { ...defaults, permissions: { ...defaults.permissions, git_push: decision } },
+        // ask is what an older server could still send over the wire; it carries no push authority.
+        policy: { ...defaults, permissions: { ...defaults.permissions, git_push: decision as "allow" | "deny" } },
       })
       const run = await runToEnd(daemon, server, runId)
       // An isolated child process observes the same checkout a CLI receives.

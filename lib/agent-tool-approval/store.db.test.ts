@@ -127,7 +127,7 @@ test('legacy local runs materialize stable sandbox defaults without changing exp
   const second=await readCliRunPolicy(pool,legacyRun,user)
   assert.equal(first.policy.permissions.install_dependency,'allow')
   assert.equal(first.policy.permissions.network,'ask')
-  assert.equal(first.policy.permissions.git_push,'ask')
+  assert.equal(first.policy.permissions.git_push,'allow','push is the GitHub App grant, never ask')
   assert.equal(first.revision,second.revision)
   assert.deepEqual(first.layers.agent,{})
   const results = await Promise.allSettled([
