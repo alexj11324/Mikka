@@ -23,7 +23,7 @@ export const CHATS = {
     user('顺便把这周前端相关的 PR 状态列一下'),
     bot(`root = Stack([title, table])
 title = TextContent("前端相关 PR（本周）", "large-heavy")
-table = BeTable(["PR", "标题", "状态", "评审"], [["#845", "看板最后一张卡避开滚动条", "Open", "等 CI"], ["#851", "引用保留 Artifact 版本", "Open", "1 条意见"], ["#790", "半透明窗口去掉对话框模糊", "Merged", "通过"], ["#781", "旧组件名继续解析", "Merged", "通过"]])`),
+table = BeTable(["PR", "标题", "状态", "评审"], [["#845", "看板最后一张卡避开滚动条", "进行中", "等 CI"], ["#851", "引用保留 Artifact 版本", "进行中", "1 条意见"], ["#790", "半透明窗口去掉对话框模糊", "已合并", "通过"], ["#781", "旧组件名继续解析", "已合并", "通过"]])`),
     user('#851 的意见是什么？'),
     bot(`root = Stack([intro, diff, alert])
 intro = InlineText(["评审在 ", SourceChip("https://github.com/mikka-demo/web/pull/851", "PR #851"), " 里指出：引用对象里的 version 用的是字符串，", TaskChip("{{issue:i-quote-artifact}}"), " 的根因其实在序列化那一层。"])
