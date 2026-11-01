@@ -66,7 +66,7 @@ test("offline waits unless cloud fallback is explicit", () => {
         ["backend"],
         [{ ...rule, model: "gpt-reported-model" }],
         devices,
-        { whenDeviceOffline: "cloud", whenQuotaExhausted: "stop" },
+        { whenDeviceOffline: "cloud" },
       ),
       { place: "cloud", harness: "codex", model: "gpt-reported-model" },
     );

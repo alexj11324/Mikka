@@ -1,4 +1,4 @@
-import { modelMessage, summaryMessage, type SourcedMessage, type SummaryTrust } from './message-safety'
+import { modelMessage, summaryMessage, type QuotaSwitchNotice, type SourcedMessage, type SummaryTrust } from './message-safety'
 import { pruneMessages, type ModelMessage } from 'ai'
 import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from '@/lib/attention/handoff'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
@@ -299,6 +299,8 @@ export interface ChatItem {
   images?: number
   /** Artifacts shown as cards under this entry, in order. */
   artifacts: string[]
+  /** An event line the chat draws in the person's language: the turn moved to their API key after the subscription ran out. */
+  notice?: QuotaSwitchNotice
 }
 
 /** The run id a successful local or Bot-computer dispatch carries. */
@@ -368,7 +370,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       flush()
       const base = { ...(id ? { id } : {}), position, tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], ...(pending ? { pending } : {}) }
       // The triage line is for the Coordinator, not the person.
-      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') })
+      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n'), ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : {}) })
       else {
         const { quote, text: unquoted } = splitQuote(raw)
         const { notes, text: rest } = splitBrowserNotes(unquoted)

@@ -6,6 +6,7 @@ import { COORDINATOR_MODEL } from "./coordinator/model";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
 import { botApiKeyChoice, usableApiKeys } from "./model-api-keys";
 import { apiKeyChatBaseUrl } from "./model-api-key-providers";
+import { quotaExhausted } from "./subscription-quota";
 import {
   freezeHostedModelSelection,
   hostedApiKeySnapshotSchema,
@@ -40,6 +41,31 @@ export async function freezeBotModel(
         }),
       };
   }
+  /**
+   * 订阅额度用完后，自动改用 API Key: a subscription known to be out of quota
+   * hands this whole turn to the person's own key, decided here at its start
+   * and never mid-turn. The snapshot says so, and the chat shows it.
+   */
+  const afterQuota = async (row: { modelId: string; provider: string; plan?: string | null; quota?: unknown }) => {
+    if (!quotaExhausted(row.quota)) return null;
+    const { quotaFallbackKey } = await import("./quota-fallback");
+    const fallback = await quotaFallbackKey(pool, scope.ownerId, workspaceId, row.modelId);
+    if (!fallback) return null;
+    return {
+      harness: "ai_sdk",
+      model: fallback.model,
+      modelSelection: hostedApiKeySnapshotSchema.parse({
+        ...(scope.botId === null ? { coordinator: true } : { consumerId: scope.botId }),
+        type: "api_key", keyId: fallback.key.id, ownerId: scope.ownerId, workspaceId, modelId: fallback.model,
+        afterQuota: {
+          subscription: row.provider === "codex" ? "codex" : "claude",
+          plan: row.plan ?? null,
+          keyProvider: fallback.key.provider,
+          keyName: fallback.key.name,
+        },
+      }),
+    } satisfies HostedRuntimeSnapshot;
+  };
   const selected = await settings.botModel(settingsScope, scope.botId);
   // Mikka 默认 picked in the composer: the hosted model, whatever else is connected.
   if (selected === HOSTED_CHOICE) return { harness: "ai_sdk", model: COORDINATOR_MODEL };
@@ -53,6 +79,8 @@ export async function freezeBotModel(
   if (!binding && scope.botId) {
     // The owner has none here: another member's subscription shared with 分享给团队成员 (Alex, 「B」).
     const pooled = (await settings.pooledBindings(settingsScope))[0];
+    const switched = pooled && (await afterQuota(pooled));
+    if (switched) return switched;
     if (pooled)
       return freezeHostedModelSelection(
         { ...scope, workspaceId },
@@ -65,6 +93,8 @@ export async function freezeBotModel(
   // No subscription bound: every bot, the Coordinator included, runs on the hosted default
   // through the same admission (verified card, allowance) and workspace billing.
   if (!binding) return { harness: "ai_sdk", model: COORDINATOR_MODEL };
+  const switched = await afterQuota(binding);
+  if (switched) return switched;
   return freezeHostedModelSelection(
     { ...scope, workspaceId },
     { harness: "ai_sdk", model: null },

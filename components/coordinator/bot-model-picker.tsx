@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
@@ -22,6 +22,13 @@ type T = ReturnType<typeof useTranslations<'Coordinator.modelPicker'>>
 
 /** The SWR key of a chat's model menu. */
 export const botModelMenuKey = (botId: string | null) => ['bot-model-menu', botId ?? 'coordinator'] as const
+
+const OPEN_EVENT = 'mikka:open-model-picker'
+
+/** Opens a chat's model picker from elsewhere in the chat, e.g. 改回 on a quota switch line. */
+export function openModelPicker(botId: string | null) {
+  window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: botId ?? 'coordinator' }))
+}
 
 function providerName(provider: string | undefined) {
   return provider === 'claude' ? 'Claude' : 'ChatGPT'
@@ -63,6 +70,12 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshFailed, setRefreshFailed] = useState(false)
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    const listener = (event: Event) => { if ((event as CustomEvent<string>).detail === (botId ?? 'coordinator')) { setOpen(true); void refresh() } }
+    window.addEventListener(OPEN_EVENT, listener)
+    return () => window.removeEventListener(OPEN_EVENT, listener)
+  })
   // Someone else's bot, or no menu yet: the chip is left out rather than shown wrong.
   if (!menu.data) return null
   const { current, groups } = menu.data
@@ -93,7 +106,7 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
   }
 
   const name = current.id === HOSTED_CHOICE ? t('hosted') : current.modelId || t('unknownModel')
-  return <DropdownMenu onOpenChange={open => { if (open) void refresh() }}>
+  return <DropdownMenu open={open} onOpenChange={next => { setOpen(next); if (next) void refresh() }}>
     <DropdownMenuTrigger render={<InputGroupButton type="button" variant="secondary" size="xs" data-testid="bot-model-chip" data-unavailable={!current.available || undefined}
       className={cn('max-w-56 rounded-full px-2 font-normal', current.available ? 'text-foreground' : 'text-muted-foreground')}
       aria-label={current.available ? t('label', { name }) : t('labelUnavailable', { name })} />}>

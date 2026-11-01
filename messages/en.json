@@ -2854,6 +2854,17 @@
       "retry": "Subscription temporarily unavailable",
       "open": "Models and quota"
     },
+    "quota": {
+      "used": "{name} quota used up",
+      "usedGeneric": "Subscription quota used up",
+      "resets": "Resets {time}",
+      "next": "Next message uses your {key} API key, billed per token",
+      "switched": "{name} quota used up. Continued on your {key} API key, billed per token",
+      "revert": "Switch back",
+      "addKey": "Add API key to continue",
+      "useKey": "Continue with API key",
+      "retryAfterReset": "Retry after reset"
+    },
     "wakeErrors": {
       "wake_failed": "Reply pending retry",
       "wake_start_unconfirmed": "Reply start unconfirmed",
