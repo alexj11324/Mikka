@@ -96,7 +96,7 @@ export async function recordNotice(notification: ExternalNotification, suggestio
     const next = stateAfterNotice(target, score.handOver)
     await tx.update(attentionMatters).set({
       suggestionId, url: notification.url ?? target.url, level: score.level,
-      // An unclear judgment carries no assessment and keeps the earlier one.
+      // A judgment without an assessment keeps the earlier one.
       ...(score.assessment ? { assessment: { ...score.assessment } } : {}),
       evidence: { ...mergeEvidence(target.evidence as unknown as ItemEvidence, notice(notification), matterKey) },
       ...(next ? { state: next, recheck: false, runAt: null } : {}),

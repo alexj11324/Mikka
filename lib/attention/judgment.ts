@@ -165,8 +165,8 @@ export interface AttentionScore {
  * Every notification goes to `judge` (the Decisions API); no rule runs
  * before it and none replaces its answer. An unusable answer is null: nothing
  * is stored or shown. An unclear answer rereads the source and asks again, at
- * most `rejudgments` times; still unclear, it stays in 建议 as normal and is
- * not handed over (when unsure, quiet).
+ * most `rejudgments` times; still unclear, it is no answer either: nothing is
+ * stored, and the next delivery or the hourly backfill asks again.
  */
 export async function judgeAttention(notification: ExternalNotification, matters: readonly MatterContext[], same: MatterContext | null, now: Date, judge: AttentionJudge, reread: (current: ExternalNotification) => Promise<string | null>, rejudgments: number): Promise<AttentionScore | null> {
   let current = notification
@@ -180,5 +180,5 @@ export async function judgeAttention(notification: ExternalNotification, matters
     if (!fuller || fuller.length <= current.excerpt.length) break
     current = { ...current, excerpt: fuller }
   }
-  return { level: 'normal', handOver: false, decidedBy: 'model', assessment: null, continues: null }
+  return null
 }

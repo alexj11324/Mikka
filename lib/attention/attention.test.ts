@@ -94,8 +94,8 @@ test('an unclear answer rereads the source and asks the Decisions API again', as
   const score = await judgeAttention(notification({ excerpt: 'cut' }), [], null, now, judge, async () => 'the whole mail', 2)
   assert.deepEqual(seen, ['cut', 'the whole mail'])
   assert.equal(score!.level, 'high')
-  // Still unclear with nothing more to read: it stays in 建议, not handed over.
-  assert.equal((await judgeAttention(notification({ excerpt: 'cut' }), [], null, now, spyJudge('unclear').judge, noReread, 2))!.level, 'normal')
+  // Still unclear with nothing more to read: no decision, so nothing is stored or shown.
+  assert.equal(await judgeAttention(notification({ excerpt: 'cut' }), [], null, now, spyJudge('unclear').judge, noReread, 2), null)
 })
 
 
