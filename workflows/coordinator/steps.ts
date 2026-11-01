@@ -384,7 +384,8 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         const cloud = await dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId: request.issueId, harness: previous.harness, note, ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}) }, `thread:${previous.id}:${request.requestKey ?? requestEventId ?? crypto.randomUUID()}`, scope, execution)
         if (!('error' in cloud)) return cloud
       } else if (previous?.remoteUrl) {
-        const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: previous.readOnly, requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200) }, botId, execution, requestEventId, null, approvedRepositoryKey).catch(() => null)
+        // Read-only sticks: a read-only request, or a thread that runs read-only, gives a read-only next run.
+        const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200) }, botId, execution, requestEventId, null, approvedRepositoryKey).catch(() => null)
         if (result) return { ...result, status: 'queued' as const }
       }
       return dispatchByRules(userId, { ...request, note }, scope, botId, execution, requestEventId, approvedRepositoryKey)
