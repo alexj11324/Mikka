@@ -116,7 +116,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
         await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1', [createHash('sha256').update(handoff.credential).digest('hex')])
       }
     } } } as unknown as import('e2b').Sandbox
-    const workerRuntime = { ...runtime, ensureHostedRunnerImage: async () => {} } as typeof provider
+    const workerRuntime = { ...runtime, ensureHostedRunnerImage: async () => { assert.fail('hosted workers must not pull the obsolete Docker image') } } as typeof provider
     await assert.rejects(startCloudWorker(pool, bob, sandbox, 'https://mikka.example/mikka', sha, workerRuntime), /busy or unavailable/)
     await assert.rejects(startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', 'b'.repeat(40), workerRuntime), /worker_version_mismatch/)
     const worker = await startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', sha, workerRuntime)

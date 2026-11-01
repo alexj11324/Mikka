@@ -9,6 +9,7 @@
     "./personal-agent-message": "./src/personal-agent-message.ts",
     "./web-url-schema": "./src/web-url-schema.ts",
     "./web-url-policy": "./src/web-url-policy.ts",
+    "./local-test-mode": "./src/local-test-mode.ts",
     ".": "./src/index.ts",
     "./bridge": "./src/bridge.ts",
     "./ipc": "./src/ipc.ts",

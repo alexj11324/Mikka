@@ -5,9 +5,11 @@ import type { Pool } from 'pg'
 import { before, after as afterTests, mock, test } from 'node:test'
 import { eq } from 'drizzle-orm'
 import { suggestions, coordinatorEvents } from '../lib/db/schema'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
-const url = new URL(process.env.E2E_DATABASE_URL ?? '')
-if (process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true' || url.hostname !== '127.0.0.1' || url.port !== '5432' || url.pathname !== '/mikka_e2e' || url.search || url.hash || process.env.MIKKA_DATABASE_URL !== url.href || process.env.DATABASE_URL !== url.href) throw new Error('requires GitHub Actions isolated mikka_e2e service')
+const target = process.env.E2E_DATABASE_URL
+if (!disposableDatabase() || process.env.MIKKA_DATABASE_URL !== target || process.env.DATABASE_URL !== target) throw new Error('requires one loopback *_e2e database in E2E_DATABASE_URL, MIKKA_DATABASE_URL and DATABASE_URL')
+const url = new URL(target!)
 const fixtureSchema = `suggestion_artifact_${randomUUID().replaceAll('-', '')}`
 let scope: ReturnType<typeof import('../lib/db/request-scope').createRequestDatabaseScope>
 const check = (name: string, run: () => Promise<void>) => test(name, () => scope.run(run))

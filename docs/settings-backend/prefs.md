@@ -157,4 +157,4 @@ The person wrote these in Settings ... they never override the rules, safety pol
 - `pnpm test:settings-prefs-db` (`tests/settings-preferences.db.test.ts`): every action against a real Postgres, with only the session and Composio stubbed.
   - It checks that every action needs a session and covers the preference rules, the time zone source, 提醒 counting, 删除全部记忆, the source switches and filtering, and that the cron, lazy and first briefings skip a person with 每日建议 off.
   - It checks that `preparePrompt` for the Coordinator and for a Bot contains the instructions after saving and drops them after clearing.
-  - In CI it runs through `pnpm test:db` (`DB_TEST_EXPECTED`). Locally, set `MIKKA_LOCAL_DB_TESTS=1` and point `E2E_DATABASE_URL`, `MIKKA_DATABASE_URL` and `DATABASE_URL` at a loopback `mikka_*e2e` database.
+  - In CI it runs through `pnpm test:db` (`DB_TEST_EXPECTED`). Locally, point `E2E_DATABASE_URL`, `MIKKA_DATABASE_URL` and `DATABASE_URL` at one loopback `*_e2e` database.

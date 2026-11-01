@@ -44,6 +44,7 @@ import {
 import { CAPTURES_DIR } from "../captures"
 import { ownDir } from "./harness-home"
 import type { SandboxPolicy } from "./sandbox"
+import { localGitOrigin } from './local-git-origin'
 
 /**
  * Model API and login domains per harness: always reachable from that
@@ -312,16 +313,21 @@ export class RunContext {
     // the run dir stays writable so its handoff still lands, and the
     // worktree moves from `allowWrite` to `denyWrite`.
     const readOnly = runPolicy(this.options.policy).readOnly === true
+    const fixtureOrigin = this.options.github?.repository === 'mikka-e2e/core-loop' && !readOnly && runPolicy(this.options.policy).permissions.git_push === 'allow' ? localGitOrigin() : undefined
     return {
       allowWrite: [
         ...(readOnly ? [] : [this.worktree, ...(this.options.gitWritePaths ?? [])]),
         this.runDir,
         ...(this.options.extraWrite ?? []),
+        ...(fixtureOrigin ? [fixtureOrigin] : []),
       ],
       // The daemon runs git here after the agent: the `.git` file (which
       // says where the repo is) stays read-only. Only the daemon-validated
       // per-worktree administration and object/ref paths are writable.
       denyWrite: [
+        // The fixture's refs/objects are writable for push; its configuration
+        // and hooks must remain host-owned because fixture verification runs Git.
+        ...(fixtureOrigin ? [join(fixtureOrigin, 'config'), join(fixtureOrigin, 'hooks')] : []),
         join(this.worktree, ".git"),
         join(this.gitDir, "commondir"),
         join(this.gitDir, "gitdir"),

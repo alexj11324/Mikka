@@ -10,7 +10,8 @@ import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
-import { issuePolicySnapshot, policyDistributionContext, requestPolicyIssuer } from '@/lib/agent-tool-approval/policy-distribution'
+import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
+import { requestDevicePolicyIssuer } from '@/lib/agent-tool-approval/local-cloud-issuer'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
 import { assertUnmanagedModelTransport, assertSubscriptionModelTransport } from '@/lib/model-admission/runtime'
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
@@ -142,7 +143,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if ((snapshotCapability !== null && snapshotCapability !== POLICY_SNAPSHOT_VERSION) || (cliPolicy.policySnapshotRequired && snapshotCapability !== POLICY_SNAPSHOT_VERSION)) return NextResponse.json({error:'Signed policy consumer required.',code:'policyConsumerUpgradeRequired'},{status:409})
   let distribution: ReturnType<typeof policyDistributionContext> | undefined
   if (snapshotCapability === POLICY_SNAPSHOT_VERSION) {
-    try { distribution = policyDistributionContext(requestPolicyIssuer(request),caller.userId,deviceId,runId,cliPolicy) }
+    try { distribution = policyDistributionContext(await requestDevicePolicyIssuer(request,caller,deviceId,runId),caller.userId,deviceId,runId,cliPolicy) }
     catch { return NextResponse.json({error:'Policy signing unavailable.'},{status:503}) }
   }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()

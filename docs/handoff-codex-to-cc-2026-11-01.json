@@ -1,0 +1,112 @@
+{
+  "status": "handed-back-to-CC; cloud acceptance incomplete; production unchanged",
+  "implementationCommit": "4ca4a9376b7f3b8c50e5df2e8d43068773c092e8",
+  "draftPr": "https://github.com/alexj11324/Mikka/pull/847",
+  "localAcceptance": {
+    "items1to6Artifact": "b1be878572d5b9127dbf1b8506f550c61fc71c3a",
+    "item7Artifact": "9e19281e77ba8ec6cde1261d57d747c23d1bc0c7",
+    "runtimeFingerprint": "11707ccd6876788c694b65d8733197ab0179f1d442fc38cd368aae2eead3061e",
+    "githubPrBoundary": "real DeepSeek and real local bare Git push; GitHub PR API fixture, not production GitHub PR"
+  },
+  "cloud8": {
+    "passed": false,
+    "startedAt": "2026-11-01T18:06:31.198Z",
+    "serverArtifact": "9e19281e77ba8ec6cde1261d57d747c23d1bc0c7",
+    "driverArtifact": "4ca4a9376b7f3b8c50e5df2e8d43068773c092e8",
+    "workerHash": "b6762fc81a36b859f85acc749a00c6bf180d5a19",
+    "templateId": "5ho2gh9c6zmfq8mq18vo",
+    "failedStage": "real-model-selection",
+    "failure": "Coordinator doStreamStep (@ai-sdk/workflow 2.0.80): Service Unavailable; 0 retries; 120s without assistant/tool/issue/run",
+    "sourceSandboxesCreated": 1,
+    "taskSandboxesCreated": 0,
+    "cleanupConfirmed": true,
+    "cloudWorkerFirstEventReached": false
+  },
+  "preview": {
+    "id": "dpl_CJ2GJiaf298UtvyJErEsYZ1XKdHX",
+    "url": "https://mikka-fsuzqeysk-mikka-dev.vercel.app",
+    "implementationCommit": "4ca4a9376b7f3b8c50e5df2e8d43068773c092e8",
+    "databaseProject": "raspy-cake-00359612",
+    "databaseBranch": "br-green-glade-b4fc98vb",
+    "database": "mikka_handoff_20261101",
+    "normalIdentity": "signup 200/session 200 on previous 88cd immutable Preview; emailVerified=false; no verification consumed, Smoke Bot or authenticated API smoke"
+  },
+  "production": {
+    "modified": false,
+    "deployment": "dpl_5rfa69VkF41ET3yTkPu6YPpqWRbw",
+    "commit": "7228666f9bd7f23fc81bd205dd685611ae42744c"
+  },
+  "templates": [
+    {
+      "templateId": "smg10mp0xg2gzuuq5gva",
+      "buildId": "c6fe5eaa-83f2-4054-a52e-d39fbdb677c2",
+      "workerHash": "9863eb2db649e7b581305e5b0ccaf46457aea585",
+      "sourceCommitOrSnapshot": "eb30ef3f85504ebd34aea8bf5d56092b0df912b0",
+      "public": false,
+      "metadataPath": "/tmp/mikka-e2b-release-result.json",
+      "filesystemSnapshot": null
+    },
+    {
+      "templateId": "6tj0dt8jj9ckxsznlcef",
+      "buildId": "51cbf01d-79b4-48b9-a5c6-a9bfbc76c937",
+      "workerHash": "f493a5ffb04d6e39ff6c603e4bd16d464c727a97",
+      "sourceCommitOrSnapshot": "1e5e48c1521c6f64d0c3cca5cf49b8c197ffc2d6",
+      "public": false,
+      "metadataPath": "/tmp/mikka-e2b-preload-result.json",
+      "filesystemSnapshot": "alexs-project-a4f0/mikka-private-preload-20261101-163142-filesystem:default"
+    },
+    {
+      "templateId": "bbvzsugj75nkxic7l6dr",
+      "buildId": "dc504f27-50a4-4483-b878-1bd6eae75c3d",
+      "workerHash": "6e26949edc7a06b1ad2276e8a4089191dcc2137a",
+      "sourceCommitOrSnapshot": "ab3a5a912878b45fd14c8af818c88091a41cc876",
+      "public": false,
+      "metadataPath": "/tmp/mikka-e2b-services-build-result.json",
+      "filesystemSnapshot": "alexs-project-a4f0/mikka-private-services-20261101-165020-filesystem:default"
+    },
+    {
+      "templateId": "xnc7xyi7224wimjv6wp7",
+      "buildId": "43a0ce1b-f782-4569-9b8d-195e6f5e1f07",
+      "workerHash": "f3b020cda0ae8ae1b086cff6bb709636ccb8caac",
+      "sourceCommitOrSnapshot": "3aa7a6bf415d9827e8949c6b64ed38439e70c813",
+      "public": false,
+      "metadataPath": "/tmp/mikka-e2b-final-result.json",
+      "filesystemSnapshot": null
+    },
+    {
+      "templateId": "5ho2gh9c6zmfq8mq18vo",
+      "buildId": "920535cd-bd48-45bf-8d95-400fa49050ba",
+      "workerHash": "b6762fc81a36b859f85acc749a00c6bf180d5a19",
+      "sourceCommitOrSnapshot": "88cd4339c1999fdea31ce034595149295f8704ec",
+      "public": false,
+      "metadataPath": "/tmp/mikka-e2b-final-security-result.json",
+      "filesystemSnapshot": null
+    }
+  ],
+  "filesystemSnapshots": [
+    "alexs-project-a4f0/mikka-private-services-20261101-164458:default",
+    "alexs-project-a4f0/mikka-private-services-20261101-164644:default"
+  ],
+  "cleanup": {
+    "allMyDiagnosticSandboxesKilled": true,
+    "lastDiagnosticSandboxKilledByFinally": true,
+    "originalPausedBotUntouched": true,
+    "templatesAndSnapshotsPreserved": true,
+    "noPublicTemplateMutation": true,
+    "noProductionDeployOrEnvMutation": true,
+    "previewAuthRunnerStopped": true,
+    "sensitiveOrchestrationMemoryCleared": true
+  },
+  "secretSelectors": {
+    "credentials": "Mikka/prod:/ SMOKE_OWNER_EMAIL and SMOKE_OWNER_PASSWORD",
+    "emailProvider": "Mikka/staging:/auth-email RESEND_API_KEY",
+    "githubApp": "Mikka/prod:/github GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY",
+    "vercelToken": "Mikka/prod:/platform VERCEL_TEAM_TOKEN"
+  },
+  "temporaryWorkerAliasCapability": "revoked; branch-sensitive variable may retain an invalid value and can be removed",
+  "originalPausedBot": {
+    "botPrefix": "10ed0948",
+    "machine": "if7o8xrdmfzgbd1lmovdc",
+    "touched": false
+  }
+}

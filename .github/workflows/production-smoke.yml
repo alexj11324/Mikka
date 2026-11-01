@@ -28,15 +28,10 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-        with:
-          version: 10.34.3
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: node --test scripts/ops/production-smoke.test.mjs
       - name: Read the smoke account through Infisical workload identity
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
@@ -49,15 +44,15 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - run: pnpm test:smoke
+      - run: node scripts/ops/production-smoke.mjs
         env:
           SMOKE_BASE_URL: https://app.aspectlylabs.com
           SMOKE_EXPECT_ON: credentialVault,cloudComputer
-      - if: failure()
+      - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: production-smoke-report
-          path: playwright-report-smoke
+          path: production-smoke-report
           retention-days: 7
 
   deployment-comparison:

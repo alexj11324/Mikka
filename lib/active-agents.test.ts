@@ -5,6 +5,7 @@ import { activeAgentsResponse, mergeAgentRuns, sortActiveAgents, type ActiveAgen
 import { coordinatorLeaseActive } from './coordinator/lease'
 import { WORKING_RUN_STATUSES, UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import { LEASED_RUN_STATUSES } from './run-retry'
+import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
 
 const copy = { pleaseSignIn: 'sign in', unavailable: 'unavailable', noParameters: 'no params' }
 const url = 'http://local/api/agent/sessions/active'
@@ -68,18 +69,11 @@ test('coordinator lease needs a holder and an unexpired lease', () => {
   assert.equal(coordinatorLeaseActive(null, now), false)
 })
 
-// Database regressions execute only in CI against ephemeral Postgres 17.
-// Local pure tests skip them; REQUIRE_DB=1 makes a missing database fail.
-let databaseUrl: string | undefined
-try {
-  const target = new URL(process.env.E2E_DATABASE_URL ?? '')
-  if (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true'
-    && ['postgres:', 'postgresql:'].includes(target.protocol)
-    && target.hostname === '127.0.0.1' && target.port === '5432' && target.pathname === '/mikka_e2e'
-    && !target.search && !target.hash && process.env.MIKKA_DATABASE_URL === target.href
-    && process.env.DATABASE_URL === target.href) databaseUrl = target.href
-} catch { /* no eligible disposable CI database */ }
-if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')
+// Database regressions run against a disposable loopback *_e2e database in all
+// three URLs. Pure tests skip them otherwise; REQUIRE_DB=1 makes a missing database fail.
+const target = process.env.E2E_DATABASE_URL
+const databaseUrl = disposableDatabase() && process.env.MIKKA_DATABASE_URL === target && process.env.DATABASE_URL === target ? target : undefined
+if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching loopback *_e2e database')
 const dbTest = databaseUrl ? test : test.skip
 
 async function database() {

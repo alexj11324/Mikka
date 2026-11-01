@@ -2,11 +2,12 @@ import { networkDomainSchema, type RunPolicy } from '@mikka/protocol/agent-polic
 import type { ToolApprovalRequest } from './tool-approval'
 import { classifyWrite, rawCliShellAvailable } from '../permissions'
 import { matchesRunSandboxDomain } from './run-sandbox-launcher'
+import { mailboxInputs } from '@mikka/protocol/mailbox'
 
 /** Native CLI callbacks do not attest which Mikka action a shell command
  * performs. Do not infer authority from command text or ask for unrelated
  * approvals. Unsupported callback capabilities remain unavailable. */
-export function toolApprovalDecision(request: Readonly<ToolApprovalRequest>, policy?: RunPolicy, worktree?: string, apps: readonly string[] = [], runHosts: readonly string[] = []): 'unavailable' | 'allow' | 'ask' | 'deny' {
+export function toolApprovalDecision(request: Readonly<ToolApprovalRequest>, policy?: RunPolicy, worktree?: string, apps: readonly string[] = [], runHosts: readonly string[] = [], mailboxEnabled = false): 'unavailable' | 'allow' | 'ask' | 'deny' {
   // This method is emitted only by the host-owned run proxy. Native CLI
   // callbacks use their own method namespace and cannot select this action.
   if (request.method === 'sandbox/network' && policy) {
@@ -28,6 +29,10 @@ export function toolApprovalDecision(request: Readonly<ToolApprovalRequest>, pol
       return policy.readOnly || !policy.permissions.computer_use || policy.permissions.computer_use === 'deny' ? 'deny' : 'allow'
     }
     if (['submit','request_help','ask_human','report_blocked','submit_capture'].some(name => tool === `mcp__mikka__${name}`)) return 'allow'
+    // Only the host-claimed capability registers these strict in-process MCP
+    // tools. Each call still goes through the frozen server tool/scope grant;
+    // this transport permit grants no repository or user action authority.
+    if (mailboxEnabled && Object.keys(mailboxInputs).some(name => tool === `mcp__mikka_mailbox__${name}`)) return 'allow'
     if (tool === 'Bash' || tool === 'PowerShell') return rawCliShellAvailable(policy) ? 'allow' : 'unavailable'
     // App entries this daemon registered for the run reach only the Mikka
     // server, which owns each call's allow/ask/deny; never a model-named server.

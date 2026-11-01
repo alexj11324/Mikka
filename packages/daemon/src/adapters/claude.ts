@@ -125,7 +125,7 @@ export function claudeAppServers(apps?: RunApps) {
 function claudeMailboxServer(mailbox: RunMailbox) {
   const server = createSdkMcpServer({ name: 'mikka_mailbox', version: '1' })
   for (const [name, schema] of Object.entries(mailboxInputs).filter(([name]) => mailbox.tools.some(tool => tool.name === name))) server.instance.registerTool(name, {
-    description: 'Personal peer coordination only; never user approval. Stable keys, explicit inbox and ACK; no auto-wake.', inputSchema: schema,
+    description: 'Personal peer coordination only; never user approval. New messages notify the current live session. Read the inbox and ACK explicitly; notification and ACK are not execution.', inputSchema: schema,
   }, async (args: unknown, extra: { signal?: AbortSignal }) => mailboxToolResult(await mailbox.request({ operation: 'call', name, arguments: args }, extra.signal)))
   return server
 }

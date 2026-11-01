@@ -32,17 +32,21 @@ there. Do not write to the database to make or repair an account.
 
 ## What it checks
 
-[`tests/smoke/production.spec.ts`](../tests/smoke/production.spec.ts) signs in,
-loads the shell and reads. It sends no message, boots no computer and calls no
-provider, so a run costs nothing.
+[`scripts/ops/production-smoke.mjs`](../scripts/ops/production-smoke.mjs) signs in
+through the HTTP API, checks the session, loads the shell HTML and reads. It
+uses Node 24 without a browser. It sends no message, boots no computer and
+calls no model or E2B provider.
 
-- Fails the run: sign-in, the session, the chat composer, the Coordinator
+- Fails the run: sign-in, the session, the shell response, the Coordinator
   runtime, and any feature listed in `SMOKE_EXPECT_ON` that is off.
 - Reports, without failing: whether the credential vault, approved writes and
   the cloud computer are on. The table lands in the job summary.
 
-Factory, per-thread machines and browser sub-agents have no read that tells
-whether they are on; they need an active check (below).
+The cloud computer probe reads the existing Smoke Bot's runtime list; it
+checks the authenticated API and server kill switch. It does not assert that a
+machine can boot, that the computer tab renders or that a model can run. Those
+require separate active acceptance. Reports contain only capability names and
+HTTP status codes; cookies and API response bodies stay in process memory.
 
 ## When it runs
 
@@ -53,8 +57,12 @@ reads `prod:/` through the existing GitHub OIDC identity.
 Locally, with the credentials in the environment:
 
 ```sh
-SMOKE_OWNER_EMAIL=… SMOKE_OWNER_PASSWORD=… pnpm test:smoke
+node scripts/ops/production-smoke.mjs
 ```
+
+Inject `SMOKE_OWNER_EMAIL` and `SMOKE_OWNER_PASSWORD` through the existing secret
+delivery path. Do not put credential values in shell history. The JSON report
+and job summary are written to `production-smoke-report/`.
 
 ## Next
 

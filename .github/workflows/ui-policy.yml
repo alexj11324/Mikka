@@ -292,6 +292,8 @@ jobs:
         run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
       - name: Existing mailbox CLI integration tests
         run: pnpm --filter @mikka/daemon test:mailbox-cli
+      - name: Host Git configuration isolation in the actual sandbox
+        run: pnpm --filter @mikka/daemon test:local-git-origin-sandbox
       - name: Local computer authority through actual daemon and adapter protocol
         run: pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs
         env:

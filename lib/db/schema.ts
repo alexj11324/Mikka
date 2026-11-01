@@ -778,6 +778,8 @@ export const coordinatorMessages = pgTable('coordinator_messages', {
 export const runMessages = pgTable('run_messages', {
   id: uuid('id').primaryKey(), runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(), text: text('text').notNull(),
+  origin: text('origin').notNull().default('owner'),
+  mailboxWakeDepth: integer('mailboxWakeDepth').notNull().default(0),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('run_messages_run_idx').on(table.runId, table.createdAt)])

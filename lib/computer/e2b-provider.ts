@@ -1,5 +1,5 @@
 import 'server-only'
-import { createHmac } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Sandbox, SandboxNotFoundError } from 'e2b'
@@ -62,16 +62,32 @@ export async function createComputer(workspaceId: string, operationId: string) {
   }))
 }
 
+/** One RPC on a current template. Older snapshots get the current guard files
+ * before a viewer service can start; file hashes also catch partial updates. */
 export async function installComputerRuntime(sandbox: Sandbox) {
-  // Created per instance, never baked into a shared template.
-  await sandbox.commands.run("if getent group mikka-runner >/dev/null; then install -d -m 710 -o root -g mikka-runner /run/mikka-viewer; else install -d -m 700 /run/mikka-viewer; fi; umask 077; head -c 32 /dev/urandom > /run/mikka-viewer/key", { user: 'root' })
-  for (const name of ['start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py']) {
-    const content = await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8')
-    await sandbox.files.write(`/opt/mikka/computer/${name}`, content, { user: 'root' })
-  }
-  await sandbox.commands.run('chmod 0755 /opt/mikka/computer/lease-driver.py', { user: 'root', timeoutMs: 10_000 })
-  await sandbox.commands.run('flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py', { user: 'root', background: true, timeoutMs: 0 })
-  await sandbox.commands.run('for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done; exit 1', { user: 'root', timeoutMs: 10_000 })
+  const files = await Promise.all(['start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py'].map(async name => ({
+    path: `/opt/mikka/computer/${name}`, data: await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8'),
+  })))
+  const manifest = files.map(file => `${createHash('sha256').update(file.data).digest('hex')}  ${file.path}`).join('\n')
+  // Only digests and fixed file names enter the command. The key stays private
+  // to this instance, never baked into the public template or logged.
+  const start = `if ! sha256sum --check --status <<'MIKKA_RUNTIME_HASHES'
+${manifest}
+MIKKA_RUNTIME_HASHES
+then printf 'mikka-runtime-install-required'; exit 0; fi
+set -e
+if getent group mikka-runner >/dev/null; then install -d -m 710 -o root -g mikka-runner /run/mikka-viewer; else install -d -m 700 /run/mikka-viewer; fi
+umask 077
+head -c 32 /dev/urandom > /run/mikka-viewer/key
+chmod 0755 /opt/mikka/computer/lease-driver.py
+nohup flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py </dev/null >>/run/mikka-viewer/gateway.log 2>&1 &
+for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done
+exit 1`
+  const result = await sandbox.commands.run(start, { user: 'root', timeoutMs: 10_000 })
+  if (result.stdout.trim() !== 'mikka-runtime-install-required') return
+  await sandbox.files.write(files, { user: 'root' })
+  const installed = await sandbox.commands.run(start, { user: 'root', timeoutMs: 10_000 })
+  if (installed.stdout.trim() === 'mikka-runtime-install-required') throw new Error('Computer runtime installation failed')
 }
 
 /** Start the container service for a dedicated trusted hosted worker. The

@@ -31,6 +31,7 @@ import {
   REPO_ORIGIN_HEADER,
   RECOVERY_WORKTREE_HEADER,
   MODEL_CREDENTIAL_HEADER,
+  MAILBOX_NOTICE_HEADER,
   DAEMON_RPC_ERRORS,
   devicePaths,
   fsPaths,
@@ -166,7 +167,7 @@ export class HttpServerLink implements ServerLink {
     const liveness = new AbortController()
     const gate = new ToolApprovalGate(assignment.runId, {
       permission: request => toolApprovalDecision(request, assignment.policy, worktree, runApps(assignment.mcp)?.apps.map(app => app.name),
-        assignment.github ? [new URL(assignment.github.endpoint).host] : []),
+        assignment.github ? [new URL(assignment.github.endpoint).host] : [], assignment.mcp?.mailbox === true),
       preauthorizeNetwork: (request, signal) => {
         const { host, port } = request.input as { host: string; port: number }
         return judgeNetworkDestination(this.serverDecide(), assignment.runId, {
@@ -297,6 +298,7 @@ export class HttpServerLink implements ServerLink {
           [REPO_ORIGIN_HEADER]: '1',
           [RECOVERY_WORKTREE_HEADER]: '1',
           [MODEL_CREDENTIAL_HEADER]: '1',
+          [MAILBOX_NOTICE_HEADER]: '1',
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
         },
@@ -406,11 +408,11 @@ export class HttpServerLink implements ServerLink {
     return runIds
   }
 
-  async claimRun(deviceId: string, runId: string): Promise<RunAssignment> {
+  async claimRun(deviceId: string, runId: string, signal?: AbortSignal): Promise<RunAssignment> {
     return this.call(
       "POST",
       devicePaths.claim(checkId(deviceId), checkId(runId)),
-      { schema: runAssignmentSchema, claimOf: runId }
+      { schema: runAssignmentSchema, claimOf: runId, signal }
     )
   }
   async validateSkillReceipt(runId:string,receiptId:string) {
@@ -505,7 +507,8 @@ export class HttpServerLink implements ServerLink {
     {
       signal,
       skipRuns = [],
-    }: { signal?: AbortSignal; skipRuns?: readonly string[] } = {}
+      onQueuedRuns,
+    }: { signal?: AbortSignal; skipRuns?: readonly string[]; onQueuedRuns?: (runIds: string[]) => void } = {}
   ): Promise<RunCommand[]> {
     const response = await this.call(
       "GET",
@@ -520,6 +523,7 @@ export class HttpServerLink implements ServerLink {
         signal,
       }
     )
+    if (response.queuedRuns?.length) onQueuedRuns?.(response.queuedRuns)
     return response.commands
   }
 

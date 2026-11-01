@@ -1,4 +1,5 @@
 import { personalRunMessageText } from './personal-run-message'
+import { MAILBOX_NOTIFICATION_LIMIT } from './mailbox-notification-budget'
 import { and, eq, sql } from 'drizzle-orm'
 import { ActionFailureError } from './action-error'
 import { agentRuns, bots, deviceRepos, runMessages } from './db/schema'
@@ -33,7 +34,8 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
       }
     }
     const id = crypto.randomUUID()
-    await tx.insert(runMessages).values({ id, runId: run.id, userId, text: personalRunMessageText(id, input.text, origin) })
+    await tx.insert(runMessages).values({ id, runId: run.id, userId, text: personalRunMessageText(id, input.text, origin),
+      origin: origin === 'user' ? 'owner' : 'peer', mailboxWakeDepth: origin === 'user' ? -1 : MAILBOX_NOTIFICATION_LIMIT })
   })
 }
 

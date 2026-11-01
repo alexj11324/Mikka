@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
+import { dropTestDatabase } from '../../tests/support/drop-test-database';
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -23,7 +24,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
   const target = new URL(url!);
   target.pathname = `/${database}`;
-  const saved = { m: process.env.MIKKA_DATABASE_URL, d: process.env.DATABASE_URL };
+  const saved = { m: process.env.MIKKA_DATABASE_URL, d: process.env.DATABASE_URL, template: process.env.E2B_BYO_COMPUTER_TEMPLATE };
   const pool = new Pool({ connectionString: target.toString(), max: 4 });
   let appPool: { end: () => Promise<void> } | null = null;
   try {
@@ -31,6 +32,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     for (const f of orderMigrations((await readdir(dir)).filter((f) => f.endsWith(".sql"))))
       await pool.query(await readFile(new URL(f, dir), "utf8"));
     process.env.MIKKA_DATABASE_URL = process.env.DATABASE_URL = target.toString();
+    process.env.E2B_BYO_COMPUTER_TEMPLATE = 'ready-template-fixture';
     const db = await import("../db");
     appPool = db.pool;
     const { ensureThreadMachine, parkThreadMachine, endClosedTaskMachines, keepTailBeforeKill, threadMachineProvider } = await import("./thread-machines");
@@ -68,14 +70,15 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     };
     const fake = () => {
       const calls: string[] = [];
+      const sources: string[] = [];
       const provider: typeof threadMachineProvider = {
         snapshot: async () => { calls.push("snapshot"); return "snapshot-fixture"; },
         // The fake sandbox has no runtime: provisioning stops right after the provider step.
         connect: async (id) => { calls.push(`connect:${id}`); return { sandboxId: id } as never; },
-        create: async (_s, op) => { calls.push("create"); return { sandboxId: `sandbox-${op}` } as never; },
+        create: async (source, op) => { calls.push("create"); sources.push(source); return { sandboxId: `sandbox-${op}` } as never; },
         kill: async (id) => { calls.push(`kill:${id}`); },
       };
-      return { calls, provider };
+      return { calls, sources, provider };
     };
     const machine = async (runId: string) => (await pool.query('SELECT state,"sandboxId","deviceId","issueId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
 
@@ -95,13 +98,14 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       ["another repository on the same task", async (issueId: string) => run(issueId, { repo: otherRepo })],
       ["a run with no task", async () => run(null)],
     ] as const) {
-      await t.test(`${label} never gets the task's sandbox: it starts its own from the workspace snapshot`, async () => {
+      await t.test(`${label} never gets the task's sandbox: it starts its own from the ready template`, async () => {
         const issueId = await task();
         const before = await parked(issueId);
         const next = await other(issueId);
-        const { calls, provider } = fake();
+        const { calls, sources, provider } = fake();
         await assert.rejects(ensureThreadMachine(pool, actor, next, provider));
-        assert.deepEqual(calls.slice(0, 2), ["snapshot", "create"]);
+        assert.deepEqual(calls, ["create"], 'repository tasks never clone a bot filesystem');
+        assert.deepEqual(sources, ['ready-template-fixture']);
         assert.notEqual((await machine(next)).sandboxId, before.sandboxId);
         assert.equal((await machine(before.runId)).state, "paused", "the task's sandbox stays parked for the task");
       });
@@ -123,8 +127,28 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       const next = await run(issueId);
       const { calls, provider } = fake();
       await assert.rejects(ensureThreadMachine(pool, actor, next, provider));
-      assert.deepEqual(calls.slice(0, 2), ["snapshot", "create"]);
+      assert.deepEqual(calls, ["create"]);
       assert.equal((await machine(before.runId)).sandboxId, before.sandboxId);
+    });
+
+    await t.test('a non-repository computer task retains its explicit desktop filesystem path', async () => {
+      const computerRepo = randomUUID();
+      await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, botDevice, owner, '/fixture/computer']);
+      const next = await run(await task(), { repo: computerRepo });
+      const { calls, sources, provider } = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, provider));
+      assert.deepEqual(calls, ['snapshot', 'create']);
+      assert.deepEqual(sources, ['snapshot-fixture']);
+    });
+
+    await t.test('a repository identity mismatch refuses before allocating any machine', async () => {
+      const next = await run(await task());
+      const { calls, provider } = fake();
+      await pool.query('UPDATE device_repos SET "remoteUrl"=$2 WHERE id=$1', [repoId, 'https://github.com/foreign/repository.git']);
+      try {
+        await assert.rejects(ensureThreadMachine(pool, actor, next, provider), /Repository identity unavailable/);
+        assert.deepEqual(calls, []);
+      } finally { await pool.query('UPDATE device_repos SET "remoteUrl"=$2 WHERE id=$1', [repoId, 'https://github.com/acme/app.git']); }
     });
 
     await t.test("a finished run parks its sandbox: paused, tokens revoked, device kept; a refused pause records nothing", async () => {
@@ -168,10 +192,11 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(result, { ended: 4, pending: 0 });
     });
   } finally {
-    process.env.MIKKA_DATABASE_URL = saved.m;
-    process.env.DATABASE_URL = saved.d;
+    if (saved.m === undefined) delete process.env.MIKKA_DATABASE_URL; else process.env.MIKKA_DATABASE_URL = saved.m;
+    if (saved.d === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = saved.d;
+    if (saved.template === undefined) delete process.env.E2B_BYO_COMPUTER_TEMPLATE; else process.env.E2B_BYO_COMPUTER_TEMPLATE = saved.template;
     await appPool?.end().catch(() => undefined);
-    await pool.end();
+    await dropTestDatabase(admin, database, pool);
     await admin.end();
   }
 });
