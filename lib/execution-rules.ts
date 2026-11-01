@@ -29,9 +29,11 @@ export type ExecutionResolution =
  * The Agent that runs a thread's model (orchestration.md §3): GPT/OpenAI on
  * Codex, every other model on Claude Code. A model slot ("opus", "default")
  * or a model an Agent reported names a model only within that Agent, so it
- * keeps the rule's Agent.
+ * keeps the rule's Agent; so does any other Agent (Cursor, mock), which runs
+ * its own models.
  */
 export function agentFor(model: string, ruleHarness: string, slotOf: (harness: string) => boolean): string {
+  if (ruleHarness !== "claude_code" && ruleHarness !== "codex") return ruleHarness;
   return slotOf(ruleHarness) ? ruleHarness : harnessForModel(model);
 }
 

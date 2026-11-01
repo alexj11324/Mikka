@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  agentFor,
   resolveExecution,
   type ExecutionRule,
   type ExecutionDevice,
@@ -119,6 +120,8 @@ test("the Agent follows the model (orchestration.md §3), unless the model is th
   // Codex's own "default" slot and its reported model stay on Codex.
   assert.equal((resolveExecution(["backend"], [rule], [device]) as { harness: string }).harness, "codex");
   assert.equal((resolveExecution(["backend"], [{ ...rule, model: "reported-model" }], [device]) as { harness: string }).harness, "codex");
+  // Other Agents run their own models.
+  assert.equal(agentFor("deepseek-v4", "cursor", () => false), "cursor");
   // The suggested default rule names the install's default slot, even when it lists no slots.
   const bare = { ...device, harnesses: [{ ...device.harnesses[0]!, modelSlots: undefined, models: ["gpt-5"], defaultModelSlot: "auto-slot" }] };
   assert.equal((resolveExecution([], [{ ...rule, label: null, model: "auto-slot" }], [bare]) as { harness: string }).harness, "codex");
