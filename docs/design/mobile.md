@@ -240,8 +240,9 @@ mobile tabs.
 - **Settings stored:** 主动消息 is lib/attention's switch
   (`attention_settings.enabled`); the push switches and 使用记忆 (off leaves
   the memory out of the prompt) are in `user_preferences`.
-- **Attachments:** the composer's 「+」 is a native menu: 拍照, 照片 (up to
-  two per message) and 文件 (text files). Photos are re-encoded as JPEG under
+- **Attachments:** the composer's 「+」 opens a sheet from the bottom, as in
+  the Claude app: 相机, 照片 (up to two per message) and 文件 (text files) as
+  tiles; the picker opens over it and the sheet closes after. Photos are re-encoded as JPEG under
   the server's 1 MB limit and sent as `images` with `POST /api/mobile/chat`;
   a text file goes into the message as its contents under its name, as on the
   web. Chat items carry `images` (a count) and the app loads each photo from
