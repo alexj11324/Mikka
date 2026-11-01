@@ -100,7 +100,7 @@ function blockAt(cycle: { duration: number }[], phase: number) {
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** Visible blob sizes. bloub's svg is 1.58× the blob, so it overflows its box on purpose. */
-const SIZES = { row: 16, pill: 22, search: 28, list: 34, cell: 40, profile: 72, hero: 144 } as const
+const SIZES = { row: 16, pill: 22, message: 24, search: 28, list: 34, cell: 40, profile: 72, hero: 144 } as const
 const SVG_SCALE = 1.58
 
 const pick = <T extends string>(value: string | null | undefined, options: readonly T[], fallback: T) => (options as readonly string[]).includes(value ?? '') ? value as T : fallback
@@ -192,6 +192,6 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
   return <span ref={host} role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} data-slot="bot-avatar" data-color={tone} data-shape={form}
     className={cn('relative inline-flex shrink-0 [&>svg]:absolute [&>svg]:top-1/2 [&>svg]:left-1/2 [&>svg]:max-w-none [&>svg]:-translate-1/2',
       // Buttons and sidebar rows size every svg inside them; the blob's svg keeps its own size (1.58× the box).
-      size === 'row' && 'size-4 [&>svg]:size-6.5!', size === 'pill' && 'size-5.5 [&>svg]:size-9!', size === 'search' && 'size-7 [&>svg]:size-11!', size === 'list' && 'size-8.5 [&>svg]:size-13.5!',
+      size === 'row' && 'size-4 [&>svg]:size-6.5!', size === 'pill' && 'size-5.5 [&>svg]:size-9!', size === 'message' && 'size-6 [&>svg]:size-9.5!', size === 'search' && 'size-7 [&>svg]:size-11!', size === 'list' && 'size-8.5 [&>svg]:size-13.5!',
       size === 'cell' && 'size-10 [&>svg]:size-16!', size === 'profile' && 'size-18 [&>svg]:size-28.5!', size === 'hero' && 'size-36 [&>svg]:size-57!')} />
 }

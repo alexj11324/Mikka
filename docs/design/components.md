@@ -13,7 +13,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Centre chat title | `components/nav/conversation-pill.tsx` | Borderless, centred |
 | Right panel | `components/nav/context-panel.tsx` | No input box in the thread list or under a screen; an open thread ends in the composer, R-10 |
 | A bot's shape and colour picker | `BotLookPicker` (`components/nav/bot-look-picker.tsx`) | One picker for 新建 Bot and the right panel's avatar (`BotLookEditor`); the panel's name edits in place with `BotNameEditor`, R-51 |
-| Composer | `ChatComposer` in `components/coordinator/chat-composer.tsx` (`InputGroup` + `InputGroupTextarea`) | Attachment button, no model picker. Reuse it for every chat |
+| Composer | `ChatComposer` in `components/coordinator/chat-composer.tsx` (`InputGroup` + `InputGroupTextarea`) | Attachment button; a bot chat passes `BotModelPicker` (`components/coordinator/bot-model-picker.tsx`) as `model` (R-11). Reuse it for every chat |
 | Personal account approvals above the composer | `PendingActions` and `ApprovedWriteActions` in `components/coordinator/` | Existing card layout; ledger-backed Notion, Slack and Calendar deletion use `/api/approved-writes`, never the legacy decider. Unknown results have no effectful retry button; a verified pending result can explicitly restore approval controls without sending a decision |
 | Messages | `components/ui/message.tsx`, `components/ui/bubble.tsx`, `MessageScroller*` | R-13, R-14 |
 | Task, run and source chips in chat | OpenUI `TaskChip`, `RunChip`, `SourceChip` (`components/workspace/agent-ui-library.tsx`, data from `agent-citations.tsx`) | R-15 |
@@ -50,7 +50,7 @@ new UI; check remaining source and test references before a cleanup removes them
 
 | Component | Why not | What brought it back |
 | --- | --- | --- |
-| `components/agents/prompt-input.tsx` (`models`, `onModelChange`) | Has a model picker (R-11) | Model picker reappeared in a bot chat |
+| `components/agents/prompt-input.tsx` (`models`, `onModelChange`) | Its own model picker, not `BotModelPicker` (R-11) | A second model picker in a bot chat |
 | `components/workspace/agent-starters.tsx` | Starter cards (R-12) | "试试从这些事情开始" in a bot chat |
 | `components/workspace/agent-demo*.tsx` | Demo content | |
 | `components/app-sidebar.tsx`, `nav-main.tsx`, `nav-secondary.tsx` | shadcn sidebar shell, replaced by the Comma shell; no callers left, safe to delete | Shell that "looked like a wireframe" |

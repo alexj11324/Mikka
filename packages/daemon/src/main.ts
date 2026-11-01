@@ -64,14 +64,17 @@ import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
 import { checkLatestVersion, type AutoUpdateRuntime } from "./auto-update"
 import { restartService, uninstallService } from "./service"
 import { detectDeviceType } from "./device-type"
-import { detectHarnesses, harnessFingerprint } from "./harnesses"
+import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
+import { ensureHarness, type HarnessStore } from "./harness-install"
+import { sweepRunCredentials } from "./agents/harness-home"
+import { containerOwner, ensureRunnerImage, openRunContainer, selectIsolation, sweepRunContainers, type RunContainerOptions } from "./run-container"
+import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { codexSupportsRunApproval } from "./adapters/codex-version"
 import { ensureSandboxTools, missingSandboxTools } from "./sandbox-tools"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
 import { Outbox } from "./outbox"
-import { LocalCredentialsSource } from "./quota/local-credentials"
 import { QuotaPoller, type QuotaSource } from "./quota/poller"
 import { DAEMON_VERSION, daemonPaths, type DaemonPaths } from "./paths"
 import { decide, pushDecision, runPolicy } from "./permissions"
@@ -121,8 +124,7 @@ export interface DaemonOptions {
   /** Skip CLI detection (tests). */
   harnesses?: HarnessInfo[]
   /**
-   * Subscription-quota reader. Omit for the local-credential source.
-   * `null` disables polling (tests).
+   * Subscription-quota reader. Omitted or `null`: no polling.
    */
   quotaSource?: QuotaSource | null
   /** Ignored when it is below the poller's minimum interval. */
@@ -368,6 +370,12 @@ export class Daemon {
         },
       })
     }
+    // Docker decides the run isolation (run-container.ts), so probe it before the adapters exist.
+    // Tests drive fake CLIs on the host.
+    if (!this.options.hostedSubscriptions && !this.options.harnesses && !this.options.harnessBinaries && !daemonTestMode(process.env)) {
+      this.docker = await dockerAvailable()
+      if (this.docker) await sweepRunContainers(containerOwner(paths.dataDir)).catch(() => undefined)
+    }
     const hosted = this.options.hostedSubscriptions
       ? await createHostedBotRunner({
           stateDir: paths.adapterState,
@@ -417,7 +425,7 @@ export class Daemon {
       outbox: this.outbox,
       worktrees: this.worktrees,
       adapters,
-      startSubscription: hosted?.start,
+      startSubscription: hosted?.start ?? this.localSubscriptions()?.start,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       verifyRunPolicy: this.options.link.verifyRunPolicy ? async (assignment,signal) => {
@@ -532,11 +540,11 @@ export class Daemon {
     // without an adapter yet is left out; the schema has no "unsupported".)
     const detected = hosted
       ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
-      : (this.options.harnesses ?? (await detectHarnesses()))
+      : (this.options.harnesses ?? detectHarnesses(this.harnessStore()))
     if (this.stopped) throw new Error("daemon stopped during startup")
     // A callback alone is insufficient: the host must own the enforcement
     // boundary and bind its lifetime to the run's authenticated gate.
-    if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint()
+    if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
     this.harnesses = [...detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
       ...info,
       // Local enforcement requires the successful owned SRT probe. Hosted
@@ -545,13 +553,17 @@ export class Daemon {
       // that ceiling. Codex also verifies its pinned interface at initialize.
       toolApproval: this.supportsToolApproval(info),
       coordinator: hosted ? false : coordinatorCapable(info),
+      ...(!hosted && this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}),
     })), ...this.sandboxBlockedHarnesses(detected)]
+    // A crash or kill skipped the run-end wipe; resumed runs get fresh credentials.
+    sweepRunCredentials(paths.adapterState)
     // Runs survive restarts: pick up what the journal says was active.
     await this.supervisor.resumeAll()
-    if (!hosted && this.options.quotaSource !== null) {
+    // The person's own logins are never read (devices are runners), so only
+    // an injected source polls.
+    if (!hosted && this.options.quotaSource) {
       this.quota = new QuotaPoller(
-        this.options.quotaSource ??
-          new LocalCredentialsSource({ log: this.log }),
+        this.options.quotaSource,
         { log: this.log, intervalMs: this.options.quotaPollMs }
       )
       this.quota.start()
@@ -758,6 +770,12 @@ export class Daemon {
     return info.harness === 'claude_code' || (info.harness === 'codex' && codexSupportsRunApproval(info.version)) ? true : undefined
   }
 
+  /** A subscription run here takes a per-run access lease (subscription-local-runner.ts). */
+  private localSubscriptionCapable(info: HarnessInfo) {
+    return (info.harness === "claude_code" || info.harness === "codex") && info.installed &&
+      this.supportsToolApproval(info) === true && Boolean(this.options.link.nativeLease)
+  }
+
   /** Report a CLI the daemon cannot run as present but not installed, so no run is pinned here. */
   private sandboxBlockedHarnesses(detected: HarnessInfo[]): HarnessInfo[] {
     const issue = this.sandboxIssue
@@ -773,10 +791,12 @@ export class Daemon {
       this.lastSandboxRepair = Date.now()
       this.sandboxIssue = { missing: await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log }) }
     }
-    const detected = await detectHarnesses()
-    this.harnessPrint = harnessFingerprint()
+    const detected = detectHarnesses(this.harnessStore())
+    this.harnessPrint = harnessFingerprint(this.harnessStore())
+    this.docker = await dockerAvailable()
     this.harnesses = [...detected.filter(info => this.adapters.has(info.harness)).map(info => {
-      return { ...info, toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info) }
+      return { ...info, toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info),
+        ...(this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}) }
     }), ...this.sandboxBlockedHarnesses(detected)]
     // Adapters and verification are wired at startup, so a repaired sandbox needs a fresh start.
     if (repairing && this.sandboxIssue?.missing.length === 0) {
@@ -790,7 +810,7 @@ export class Daemon {
     if (this.options.hostedSubscriptions || this.options.harnesses || this.rescanning || now - this.lastHarnessScan < HARNESS_RESCAN_MS) return
     this.lastHarnessScan = now
     const retryRepair = Boolean(this.sandboxIssue?.missing.length) && now - this.lastSandboxRepair >= SANDBOX_REPAIR_RETRY_MS
-    if (harnessFingerprint() === this.harnessPrint && !retryRepair && missingToolsUnchanged(this.sandboxIssue)) return
+    if (harnessFingerprint(this.harnessStore()) === this.harnessPrint && !retryRepair && missingToolsUnchanged(this.sandboxIssue)) return
     this.rescanning = true
     void this.redetectHarnesses()
       .then(() => this.syncWithServer())
@@ -799,6 +819,18 @@ export class Daemon {
   }
 
   private harnessPrint = ""
+  private docker = false
+
+  /** The daemon's own pinned harnesses (harness-install.ts). */
+  private harnessStore(): HarnessStore {
+    return { root: this.paths.harness }
+  }
+
+  /** What this machine can run; Docker is probed at startup and on redetect. */
+  private async runnerReport() {
+    if (this.options.hostedSubscriptions) return undefined
+    return deviceCapabilities(this.harnessStore(), this.paths.dataDir, async () => this.docker)
+  }
   private lastHarnessScan = Date.now()
   private lastSandboxRepair = Date.now()
   private rescanning = false
@@ -813,7 +845,11 @@ export class Daemon {
 
   private async createAgentSandbox(): Promise<AgentSandbox | null> {
     if (this.options.agentSandbox !== undefined) return this.options.agentSandbox
-    const missing = await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log })
+    // Tests use the host's tools as they are; fetching them with apt would
+    // make every test daemon's start depend on the network.
+    const missing = daemonTestMode(process.env)
+      ? missingSandboxTools()
+      : await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log })
     if (!SandboxRuntime.supported()) {
       this.log.warn({ missing }, "agent sandbox unavailable: platform or dependencies unsupported")
       this.sandboxIssue = { missing }
@@ -875,10 +911,25 @@ export class Daemon {
    * sandbox. Cursor retains the existing daemon AgentSandbox boundary.
    */
   private realAdapters(): [Harness, AgentAdapter][] {
+    const options = this.adapterOptions()
+    if (!options) return []
+    return [
+      ["claude_code", new ClaudeAdapter(options.claude)],
+      ["codex", new CodexAdapter(options.codex)],
+      ["cursor", new CursorAdapter(options.cursor)],
+    ]
+  }
+
+  /** What every real adapter of this daemon is built with, subscription runs included. */
+  private adapterOptions() {
     const sandbox = this.agentSandbox()
-    if (!sandbox) return []
+    if (!sandbox) return undefined
     const stateDir = this.paths.adapterState
     const bin = this.options.harnessBinaries ?? {}
+    const openContainer = selectIsolation(process.platform, this.docker)
+      === "container" ? async (run: Omit<RunContainerOptions, "image" | "owner">) =>
+        openRunContainer({ ...run, image: await ensureRunnerImage(), owner: containerOwner(this.paths.dataDir) })
+      : undefined
     const computerProvider = (runId: string) => {
       const assignment = this.journal.get(runId)?.assignment
       if (!assignment?.localComputer || assignment.computer || !assignment.policy?.permissions.computer_use) return undefined
@@ -886,11 +937,27 @@ export class Daemon {
         permission: decide('computer_use', { policy: assignment.policy }), readOnly: assignment.policy.readOnly,
         proxyPath: fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url)), nodeBinary: process.execPath })
     }
-    return [
-      ["claude_code", new ClaudeAdapter({ sandbox, stateDir, binary: bin.claude_code, computerProvider })],
-      ["codex", new CodexAdapter({ sandbox, stateDir, binary: bin.codex, computerProvider })],
-      ["cursor", new CursorAdapter({ sandbox, stateDir, binary: bin.cursor, computerProvider })],
-    ]
+    return {
+      claude: { sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), openContainer, computerProvider },
+      codex: { sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), openContainer, computerProvider },
+      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider },
+    }
+  }
+
+  /**
+   * Subscription runs on this device: the server hands each run its
+   * short-lived access token, never the refresh grant (subscription-local-runner.ts).
+   */
+  private localSubscriptions() {
+    const link = this.options.link
+    const options = this.adapterOptions()
+    if (!options || !link.nativeLease) return undefined
+    return createLocalSubscriptionRunner({
+      stateDir: this.paths.adapterState,
+      link: { nativeLease: link.nativeLease.bind(link) },
+      claude: options.claude,
+      codex: options.codex,
+    })
   }
 
   private revokeLocalComputerGrants() {
@@ -945,6 +1012,7 @@ export class Daemon {
         deviceType: process.env.MIKKA_DEVICE_TYPE === "server" ? "server" : process.env.MIKKA_DEVICE_TYPE === "laptop" ? "laptop" : await detectDeviceType(),
         harnesses: this.harnesses,
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
+        runner: await this.runnerReport(),
         ...(workspaceId
           ? { workspaceId }
           : {}),
@@ -1003,6 +1071,7 @@ export class Daemon {
         failedDeviceCommands: this.device.failedDeviceCommands,
         harnesses: this.harnesses,
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
+        runner: await this.runnerReport(),
         runs: this.supervisor.heartbeatRuns(),
         worktreeDiskBytes: await this.worktrees.diskUsage(),
         ...(quotas ? { quotas } : {}),

@@ -50,8 +50,11 @@ type fakeInfisical struct {
 	values                             map[string][]byte
 	rejectCreate, loseCreate, failRead bool
 	unreadableName                     string
-	creates, reads                     int
-	server                             *httptest.Server
+	// A production worker subprocess reads its access projection from its own
+	// path; only a test that sets this accepts reads there.
+	readablePath   string
+	creates, reads int
+	server         *httptest.Server
 }
 
 func newFakeInfisical(t *testing.T) (*fakeInfisical, *Infisical) {
@@ -118,7 +121,7 @@ func newFakeInfisical(t *testing.T) (*fakeInfisical, *Infisical) {
 		case "GET":
 			f.reads++
 			q := r.URL.Query()
-			if q.Get("projectId") != "fixture-project" || q.Get("environment") != "test" || q.Get("secretPath") != "/byos-cpa" || q.Get("version") != "1" || q.Get("expandSecretReferences") != "false" || q.Get("includeImports") != "false" || q.Get("viewSecretValue") != "true" {
+			if q.Get("projectId") != "fixture-project" || q.Get("environment") != "test" || (q.Get("secretPath") != "/byos-cpa" && (f.readablePath == "" || q.Get("secretPath") != f.readablePath)) || q.Get("version") != "1" || q.Get("expandSecretReferences") != "false" || q.Get("includeImports") != "false" || q.Get("viewSecretValue") != "true" {
 				http.Error(w, "bad read contract", 400)
 				return
 			}

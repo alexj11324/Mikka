@@ -49,6 +49,7 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   const searchRoute = await import('../app/api/search/route')
   const mobileTasks = await import('../app/api/mobile/tasks/route')
   const mobileChat = await import('../app/api/mobile/chat/route')
+  const mobileImage = await import('../app/api/mobile/chat/image/route')
   const token = await store.createPersonalAccessToken(owner, ws.id, { name: 'API test' })
   const memberToken = await store.createPersonalAccessToken(member, ws.id, { name: 'Member API test' })
   const server = createServer(async (req, res) => {
@@ -65,9 +66,10 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
         : pathname.startsWith('/api/teams/') ? await teamRoute.GET(request, { params: Promise.resolve({ teamId: pathname.split('/')[3] }) })
         : pathname === '/api/mobile/tasks' ? await mobileTasks.GET(request)
         : pathname === '/api/mobile/chat' ? await (req.method === 'POST' ? mobileChat.POST : mobileChat.GET)(request)
+        : pathname === '/api/mobile/chat/image' ? await mobileImage.GET(request)
         : pathname === '/api/search' ? await searchRoute.GET(request)
         : await policyRoute.GET(request, { params: Promise.resolve({ workspaceId: pathname.split('/')[3] }) })
-      res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(await response.text())
+      res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()))
     } catch { res.writeHead(500); res.end('fixture handler failed') }
   })
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
@@ -132,6 +134,29 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     const messages = (await pool.query(`SELECT "userId","botId",payload FROM coordinator_events WHERE "userId"=$1 AND payload->>'text'='PAT mobile message'`, [owner])).rows
     assert.equal(messages.length, 1)
     assert.equal(messages[0].botId, ownBot)
+  })
+  await t.test('mobile photos are stored with the message and read back only by their sender', async () => {
+    // The smallest valid PNG (1×1), as the app sends a photo.
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+    const dataUrl = `data:image/png;base64,${png}`
+    const callMobile = (path: string, body?: unknown) => fetch(`${origin}${path}`, { method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${token.token}`, origin, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+    assert.equal((await callMobile('/api/mobile/chat', { text: '', botId: ownBot, images: [{ dataUrl }] })).status, 202)
+    assert.equal((await callMobile('/api/mobile/chat', { text: '', botId: ownBot })).status, 400)
+    assert.equal((await callMobile('/api/mobile/chat', { text: 'not an image', botId: ownBot, images: [{ dataUrl: 'data:image/png;base64,AAAA' }] })).status, 400)
+    const [event] = (await pool.query(`SELECT payload FROM coordinator_events WHERE "userId"=$1 AND "botId"=$2 AND payload ? 'images'`, [owner, ownBot])).rows
+    assert.equal(event.payload.images[0].dataUrl, dataUrl)
+    const own = randomUUID(), others = randomUUID()
+    const photoMessage = { role: 'user', content: [{ type: 'text', text: '' }, { type: 'file', data: dataUrl, mediaType: 'image/png' }] }
+    await pool.query(`INSERT INTO coordinator_messages (id,"userId","botId",position,message) VALUES ($1,$2,$3,9001,$4),($5,$6,NULL,9001,$4)`, [own, owner, ownBot, photoMessage, others, member])
+    const photo = await callMobile(`/api/mobile/chat/image?message=${own}&index=0`)
+    assert.equal(photo.status, 200)
+    assert.equal(photo.headers.get('content-type'), 'image/png')
+    assert.deepEqual(Buffer.from(await photo.arrayBuffer()), Buffer.from(png, 'base64'))
+    assert.equal((await callMobile(`/api/mobile/chat/image?message=${own}&index=1`)).status, 404)
+    assert.equal((await callMobile(`/api/mobile/chat/image?message=${others}&index=0`)).status, 404)
+    const chat = await (await callMobile(`/api/mobile/chat?bot=${ownBot}`)).json() as { items: { images?: number; text: string }[] }
+    assert.ok(chat.items.some(item => item.images === 1))
+    assert.ok(!JSON.stringify(chat).includes(png))
   })
   await t.test('the existing browser issue fetcher ignores the SWR cache-key argument', async () => {
     const { actAs } = await import('../lib/acting-user')

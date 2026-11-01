@@ -110,7 +110,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       resolve_factory_task: tool({description:'Record a subsequent actual user response to intake clarification. It grants no execution or publication permission. Use the exact current binding and original response event.',inputSchema:resolveInput,execute:input=>steps.resolveFactoryTaskScoped(userId,input,scope,botId)}),
     } : {}),
     list_agents: tool({
-      description: 'List available local execution tools and their computers. Use the internal id as agentId for dispatch_run with a repository URL; no repository registration is needed. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, never an Agent.',
+      description: 'List available local execution tools and their computers. Use the internal id as agentId for dispatch_run with a repository URL; no repository registration is needed. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, run by its Agent (Claude Code or Codex).',
       inputSchema: z.object({}),
       execute: () => steps.listAgents(userId, scope),
     }),
@@ -157,7 +157,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       }),
     } : {}),
     dispatch_run: tool({
-      description: 'Queue a thread for an issue using the saved label execution rules. The rules select the place, coding harness and model. Returns the run id and queued or waiting-device state; an [Event] message arrives when the run ends.',
+      description: 'Queue a thread for an issue using the saved label execution rules. The rules select the place, coding harness and model. Returns the run id and queued state; an [Event] message arrives when the run ends. Machine order (also when a rule names a device that is offline): the workspace\'s own E2B cloud, else the person\'s online device that may be picked automatically, else error machineUnavailable with result.card. Then draw result.card as one BeQuestions choice question (title and options as given, each option keeps its value and action), add no explanation, and call dispatch_run again after the person answers.',
       inputSchema: z.object({
         issueId: id, agentId: id.optional(),
         repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),

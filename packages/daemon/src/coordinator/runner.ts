@@ -7,7 +7,7 @@ import type { ServerLink } from "../server-link"
 import type { Logger } from "../log"
 import { buildChildEnv } from "../env"
 import { spawnCli } from "../agents/child"
-import { prepareCodexHome, guardCodexAuth } from "../agents/harness-home"
+import { prepareCodexHome } from "../agents/harness-home"
 import { jsonlConnection } from "../agents/jsonl-rpc"
 import { HARNESS_DOMAINS, credentialDenyRead, daemonSecrets } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
@@ -70,10 +70,9 @@ export async function runNativeCoordinatorJob(job: NativeCoordinatorJob, options
         const home = prepareCodexHome(join(dir,"codex-home"),options.log)
         // Never inherit a coding worker's permissive defaults or the user's MCP config.
         writeFileSync(join(home.home,"config.toml"),`approval_policy = "${CODEX_COORDINATOR_APPROVAL_POLICY}"\nsandbox_mode = "read-only"\n`,{ mode: 0o600 })
-        const checkAuth = guardCodexAuth(home.authFile,options.log)
         const child = await spawnCli(options.sandbox,[options.codexBinary ?? "codex","app-server"],{
           cwd, env: { ...buildChildEnv(process.env), CODEX_HOME: home.home },
-          policy: { allowWrite: [dir,...(home.authFile ? [home.authFile] : [])],
+          policy: { allowWrite: [dir],
             denyRead: [...credentialDenyRead("codex"),...daemonSecrets(dirname(options.stateDir))],
             allowDomains: HARNESS_DOMAINS.codex },
           pidFile: join(dir,"private","codex.pid"),marker: dir,
@@ -85,7 +84,7 @@ export async function runNativeCoordinatorJob(job: NativeCoordinatorJob, options
         return { rpc, close: async () => {
           active.removeEventListener("abort",cancel)
           rpc.dispose()
-          try { await child.kill() } finally { checkAuth() }
+          await child.kill()
         } }
       } })
     signal.throwIfAborted()

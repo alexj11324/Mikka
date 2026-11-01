@@ -13,7 +13,7 @@ export function app(path: string) {
 }
 
 /** Buttons on the left icon rail (主页 / 建议 / 看板 / 插件 / Artifact). Phones have no rail. */
-export function rail(page: Page, name: '主页' | '建议' | '看板' | '插件' | '产物') {
+export function rail(page: Page, name: '主页' | '建议' | '看板' | '插件' | 'Artifact') {
   return page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name, exact: true })
 }
 
@@ -100,6 +100,19 @@ export async function seedHostedVerification(page: Page, remaining: number) {
   if (!member) throw new Error('找不到当前登录会话的工作区。')
   await db.query('INSERT INTO hosted_verifications ("workspaceId") VALUES ($1) ON CONFLICT DO NOTHING', [member.workspaceId])
   await db.query('INSERT INTO hosted_allowances ("workspaceId", remaining) VALUES ($1, $2) ON CONFLICT ("workspaceId") DO UPDATE SET remaining = $2', [member.workspaceId, remaining])
+}
+
+/** A team workspace the signed-in person administers, beside their personal one (decision 2026-10-31-2130). */
+export async function seedTeamWorkspace(page: Page, name = 'E2E 团队') {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedTeamWorkspace 需要已登录的页面。')
+  const db = database()
+  const { rows: [user] } = await db.query<{ id: string; name: string; email: string }>('SELECT u.id,u.name,u.email FROM session s JOIN "user" u ON u.id = s."userId" WHERE s.token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!user) throw new Error('找不到当前登录会话。')
+  const id = randomUUID()
+  await db.query(`INSERT INTO mikka_workspaces (id, "userId", name, kind) VALUES ($1, $2, $3, 'team')`, [id, user.id, name])
+  await db.query(`INSERT INTO mikka_workspace_members ("workspaceId", "userId", name, email, role) VALUES ($1, $2, $3, $4, 'admin')`, [id, user.id, user.name, user.email.toLowerCase()])
+  return id
 }
 
 /** The current conversation's title pill over the chat (desktop). */
@@ -228,6 +241,18 @@ export async function skipOnboarding(page: Page, email: string) {
   const guide = page.getByRole('dialog', { name: '创建你的第一个 Bot', exact: true })
   await guide.getByRole('button', { name: '跳过引导', exact: true }).click()
   await expect(guide).toHaveCount(0)
+}
+
+/**
+ * register(), then a team workspace the new person administers, selected as the current one.
+ * A new account's own workspace is personal and has no members, 团队权限 or 审计日志 (decision 2026-10-31-2130).
+ */
+export async function registerInTeam(page: Page, next = '/', email?: string, options: { onboarding?: boolean } = {}) {
+  const account = await register(page, '/', email, options)
+  const workspaceId = await seedTeamWorkspace(page)
+  await page.context().addCookies([{ name: 'mikka-workspace', value: workspaceId, url: new URL(page.url()).origin }])
+  await page.goto(app(next))
+  return { ...account, workspaceId }
 }
 
 export async function register(page: Page, next = '/', email = `e2e-${randomUUID()}@example.com`, { onboarding = false } = {}) {

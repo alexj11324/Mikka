@@ -13,6 +13,13 @@ mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth:
   listUserAccounts: async () => accounts,
   getAccessToken,
 } } } })
+let connected: { token: string; githubAccountId: string } | null = null
+let connectionLogin: string | null = null
+mock.module(new URL('./connection.ts', import.meta.url).href, { namedExports: {
+  githubConnectionToken: async () => connected,
+  githubConnection: async () => connectionLogin ? { githubAccountId: '42', githubLogin: connectionLogin } : null,
+  disconnectGitHub: async () => {},
+} })
 mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_path: string, handler: unknown) => handler } })
 
 const repository = { id: 91, full_name: 'Owner/Project', private: true }
@@ -39,6 +46,8 @@ beforeEach(() => {
   user = 'person-1'
   sessionUsers = []
   accounts = [{ id: 'internal-account', userId: user, providerId: 'github', accountId: '42' }]
+  connected = null
+  connectionLogin = null
   getAccessToken.mock.resetCalls()
   getAccessToken.mock.mockImplementation(async () => ({ accessToken: 'private-test-token' }))
   fetchMock.mock.resetCalls()
@@ -64,6 +73,22 @@ test('only the current session account is selected, and Better Auth receives its
   assert.deepEqual(result, { userId: 'person-1', githubAccountId: '42', installations: ['11'], repositories: [{ id: '91', installationId: '11', fullName: 'Owner/Project', htmlUrl: 'https://github.com/Owner/Project', private: true }] })
   assert.deepEqual(getAccessToken.mock.calls[0].arguments, [{ headers: requestHeaders, body: { accountId: 'internal-account' } }])
   assert.equal(JSON.stringify(result).includes('private-test-token'), false)
+})
+
+test('a Plugins → GitHub connection is used before any GitHub sign-in account, even one for another GitHub id', async () => {
+  connected = { token: 'private-test-token', githubAccountId: '42' }
+  accounts = [{ id: 'internal-account', userId: 'person-1', providerId: 'github', accountId: '77' }]
+  const result = await access.listAuthorizedRepositories(requestHeaders)
+  assert.equal(result.githubAccountId, '42')
+  assert.equal(getAccessToken.mock.callCount(), 0)
+})
+
+test('the integration status names the connected GitHub login', async () => {
+  connected = { token: 'private-test-token', githubAccountId: '42' }
+  connectionLogin = 'octo'
+  const body = await (await GET({ headers: requestHeaders } as Request)).json()
+  assert.equal(body.login, 'octo')
+  assert.equal(body.connected, true)
 })
 
 test('all installation and repository pages are read; other apps, suspended installs and empty repos are excluded', async () => {
@@ -178,7 +203,7 @@ test('settings API exposes connection/install state and never credentials', asyn
   assert.equal('userId' in result, false)
   assert.equal(JSON.stringify(result).includes('private-test-token'), false)
   answer = url => url.pathname === '/user' ? json({ id: 42 }) : json({ installations: [] })
-  assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: true, installed: false, repositories: [] })
+  assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: true, login: null, installed: false, repositories: [] })
   accounts = []
   assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: false, installed: false, repositories: [] })
   delete process.env.GITHUB_APP_ID

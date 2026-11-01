@@ -5,8 +5,10 @@
     "scheme": "mikka",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "icon": "./assets/icon.icon",
       "bundleIdentifier": "com.aspectlylabs.mikka",
       "supportsTablet": false,
       "infoPlist": {
@@ -21,7 +23,15 @@
       "expo-router",
       "expo-secure-store",
       "expo-web-browser",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "用来把照片发给 bot。",
+          "cameraPermission": "用来拍照发给 bot。",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

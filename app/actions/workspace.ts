@@ -11,7 +11,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaceInvitations, workspaces } from '@/lib/db/workspace-schema'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { slugIsReserved } from '@/lib/workspace-admin/general'
-import { transferOnSuspend } from '@/lib/workspace-admin/members'
+import { releaseDepartingMember, restoreReturningMember, transferOnSuspend } from '@/lib/workspace-admin/members'
 import { auditRequestContext } from '@/lib/audit/record'
 import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 
@@ -95,7 +95,9 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; em
     const emails = [...new Set(z.array(z.email().max(254)).min(1).max(20).parse(input.emails.map(email => email.trim().toLowerCase())))]
     const request = auditRequestContext(await headers())
     return workspaceDb.transaction(async tx => {
-      await requireWorkspace(tx, input.workspaceId, user.id, true)
+      const { workspace } = await requireWorkspace(tx, input.workspaceId, user.id, true)
+      // A personal workspace has exactly one member (decision 2026-10-31-2130).
+      if (workspace.kind === 'personal') throw new WorkspaceError('workspacePersonal')
       const members = await tx.select({ email: workspaceMembers.email }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, input.workspaceId))
       if (emails.some(email => members.some(member => member.email.toLowerCase() === email))) throw new WorkspaceError('workspaceMemberExists')
       const links: { email: string; path: string }[] = []
@@ -125,7 +127,7 @@ export async function updateWorkspaceMember(input: { workspaceId: string; userId
     z.string().min(1).max(200).parse(input.userId)
     if (input.transferTo !== undefined && status !== 'suspended') throw new WorkspaceError('validationGeneric')
     const request = auditRequestContext(await headers())
-    await workspaceDb.transaction(async tx => {
+    const previous = await workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, input.workspaceId, user.id, true)
       const [target] = await tx.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId))).limit(1)
       if (!target) throw new WorkspaceError('workspaceMemberNotFound')
@@ -138,8 +140,11 @@ export async function updateWorkspaceMember(input: { workspaceId: string; userId
       if (target.status !== status) await enqueueWorkspaceAudit(tx, { ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
       if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
       await tx.update(workspaceMembers).set({ role, status }).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId)))
-
+      return target.status
     })
+    // §8.3: a suspended member's share and bots leave with them; reactivation brings their bots back.
+    if (previous !== 'suspended' && status === 'suspended') await releaseDepartingMember(input.workspaceId, input.userId)
+    if (previous === 'suspended' && status === 'active') await restoreReturningMember(input.workspaceId, input.userId)
   })
 }
 
@@ -164,7 +169,8 @@ export async function acceptWorkspaceInvitation(token: string) {
     const workspaceId = await workspaceDb.transaction(async tx => {
       const [candidate] = await tx.select({ workspaceId: workspaceInvitations.workspaceId }).from(workspaceInvitations).where(and(eq(workspaceInvitations.tokenHash, hashToken(token)), eq(workspaceInvitations.email, user.email.toLowerCase()), eq(workspaceInvitations.status, 'pending'), gt(workspaceInvitations.expiresAt, new Date()))).limit(1)
       if (!candidate) throw new WorkspaceError('inviteInvalid')
-      await tx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, candidate.workspaceId)).for('update')
+      const [target] = await tx.select({ kind: workspaces.kind }).from(workspaces).where(eq(workspaces.id, candidate.workspaceId)).for('update')
+      if (target?.kind === 'personal') throw new WorkspaceError('inviteInvalid')
       const [invitation] = await tx.select({ id: workspaceInvitations.id, role: workspaceInvitations.role }).from(workspaceInvitations).where(and(eq(workspaceInvitations.workspaceId, candidate.workspaceId), eq(workspaceInvitations.tokenHash, hashToken(token)), eq(workspaceInvitations.email, user.email.toLowerCase()), eq(workspaceInvitations.status, 'pending'), gt(workspaceInvitations.expiresAt, new Date()))).for('update').limit(1)
       if (!invitation) throw new WorkspaceError('inviteExpired')
       const [existing] = await tx.select({ status: workspaceMembers.status }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, candidate.workspaceId), eq(workspaceMembers.userId, user.id))).limit(1)

@@ -351,7 +351,7 @@ describe("HttpServerLink", () => {
         ? Response.redirect("https://sso.example.test/login", 302)
         : json({ error: "Deployment SSO required" }, 401))
     const link = new HttpServerLink("https://preview.example.test/mikka", fetch)
-    const daemon = new Daemon({ dataDir: tempDir(), flavor: "dev", link, log: createLogger({ level: "silent" }) })
+    const daemon = new Daemon({ dataDir: tempDir(), flavor: "dev", agentSandbox: null, link, log: createLogger({ level: "silent" }) })
     const device = { credential: "valid-device-session" }
     // Exercise the sync boundary without starting the daemon's local RPC server.
     Reflect.set(daemon, "device", device)

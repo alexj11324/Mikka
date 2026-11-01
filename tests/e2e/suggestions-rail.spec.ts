@@ -42,8 +42,8 @@ test('建议：卡片列表与 Coordinator 对话各占一半；发出的卡片�
   await expect(page.getByRole('alert').filter({ hasText: 'Coordinator 现在不可用' })).toBeVisible()
   await expect(card).toBeVisible()
 
-  await rail(page, '产物').click()
-  await expect(page.getByRole('heading', { name: '产物', exact: true })).toBeVisible()
-  await expect(page.getByText('还没有 产物', { exact: true })).toBeVisible()
-  await expect(rail(page, '产物')).toHaveAttribute('aria-current', 'page')
+  await rail(page, 'Artifact').click()
+  await expect(page.getByRole('heading', { name: 'Artifact', exact: true })).toBeVisible()
+  await expect(page.getByText('还没有 Artifact', { exact: true })).toBeVisible()
+  await expect(rail(page, 'Artifact')).toHaveAttribute('aria-current', 'page')
 })

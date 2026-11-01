@@ -23,15 +23,17 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 		if !uuidPattern.MatchString(w.Use.RunID) {
 			return ErrUnavailable
 		}
-		if w.Repo.DB.QueryRowContext(ctx, `select coalesce(r."agentDefinition"->>'cliModelSelection',''),coalesce(r."agentDefinition"->>'model','') from agent_runs r join byos_native_runs n on n."runId"=r.id where r.id=$1 and r."userId"=$2 and r."agentId"::text=$3 and n."bindingId"=$4 and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, w.Use.RunID, w.Scope.OwnerID, w.Use.ConsumerID, w.Use.BindingID).Scan(&runModelMode, &runModel) != nil {
+		if w.Repo.DB.QueryRowContext(ctx, `select coalesce(r."agentDefinition"->>'cliModelSelection',''),coalesce(r."agentDefinition"->>'model','') from agent_runs r join byos_native_runs n on n."runId"=r.id join byos_bindings b on b.id=n."bindingId" where r.id=$1 and `+runMayUseCredential+` and r."agentId"::text=$3 and n."bindingId"=$4 and r.status in ('preparing','running','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, w.Use.RunID, w.Scope.OwnerID, w.Use.ConsumerID, w.Use.BindingID).Scan(&runModelMode, &runModel) != nil {
 			return ErrUnavailable
 		}
 	}
+	// The binding belongs to the run's workspace; the connection keeps the one it was made in
+	// (decision 2026-10-31-2130). Both stay fenced to the owner.
 	var route, boundModel, state string
 	var current int64
 	var quota []byte
 	var paused bool
-	err := w.Repo.DB.QueryRowContext(ctx, `select b.route,b."modelId",c.state,c.epoch,c.quota,c.paused from byos_bindings b join byos_connections c on c.id=b."connectionId" where b.id=$1 and b."consumerId"=$2 and b."ownerId"=$3 and b."workspaceId"=$4 and c.id=$5 and c."ownerId"=$3 and c."workspaceId"=$4 and c.provider=$6 and b."connectionRevision"=$7 and c.epoch=$7`, w.Use.BindingID, w.Use.ConsumerID, w.Scope.OwnerID, w.Scope.WorkspaceID, w.Scope.ConnectionID, w.Scope.Provider, epoch).Scan(&route, &boundModel, &state, &current, &quota, &paused)
+	err := w.Repo.DB.QueryRowContext(ctx, `select b.route,b."modelId",c.state,c.epoch,c.quota,c.paused from byos_bindings b join byos_connections c on c.id=b."connectionId" where b.id=$1 and b."consumerId"=$2 and b."ownerId"=$3 and c.id=$5 and c."ownerId"=$3 and c."workspaceId"=$4 and c.provider=$6 and b."connectionRevision"=$7 and c.epoch=$7`, w.Use.BindingID, w.Use.ConsumerID, w.Scope.OwnerID, w.Scope.WorkspaceID, w.Scope.ConnectionID, w.Scope.Provider, epoch).Scan(&route, &boundModel, &state, &current, &quota, &paused)
 	if err != nil || current != epoch || (state != "connected" && state != "refreshing" && state != "publication_pending") {
 		return ErrUnavailable
 	}
@@ -141,3 +143,12 @@ func (w *Worker) activeRuntime(ctx context.Context, epoch int64, model string) (
 	}
 	return w.Repo.Lookup(ctx, w.Scope)
 }
+
+// The credential owner ($2) may serve this run: it is their own, or they share
+// it in the binding's workspace with 分享给团队成员 while the admin allows member
+// subscriptions. Mirrors runMayUseCredentialSql in lib/personal-policy.ts;
+// membership lives in the workspace database and is checked by the server,
+// and leaving stops the runs (stopRequestedAt), which this query refuses.
+const runMayUseCredential = `($2=r."userId" OR (
+	EXISTS (SELECT 1 FROM workspace_subscription_shares sh WHERE sh."ownerId"=$2 AND sh."allowOthers" AND sh."workspaceId"::text=b."workspaceId"::text)
+	AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies pp WHERE pp."workspaceId"::text=b."workspaceId"::text AND NOT pp.subscriptions)))`

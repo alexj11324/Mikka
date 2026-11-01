@@ -1,26 +1,24 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import useSWR, { useSWRConfig } from 'swr'
+import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { Check, ChevronDown, MoreHorizontal, Plus, RotateCw } from 'lucide-react'
-import type { BotView } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
-import { DeviceLabel, HarnessLabel, ModelLabel, ProviderMark, harnessName } from '@/components/labels/entity-labels'
+import { DeviceLabel, HarnessLabel, ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { SettingsLoading, SettingsSaveError } from '@/components/settings/primitives'
 import { LabelDot } from '@/components/workspace/issue-metadata-controls'
 import {
-  BOT_AGENTS_KEYS, addRule, executionSettingsView, listWorkspaceBots, listAccountModels, listPlaces, readBotModel, readExecutionSettings, redetect, removeRule, saveBotModel, saveDefaultRule, saveFallbacks, updateRule,
-  type LabelRule, type StoredExecutionSettings, type TaskDefaults, type WhenDeviceOffline, type WhenQuotaExhausted,
+  BOT_AGENTS_KEYS, addRule, executionSettingsView, listAccountModels, listPlaces, readExecutionSettings, redetect, removeRule, saveDefaultRule, updateRule,
+  type LabelRule, type StoredExecutionSettings, type TaskDefaults,
 } from '@/lib/execution-settings-client'
 import type { ExecutionRule } from '@/lib/execution-rules'
-import { botModelChoice, groupBotModels, harnessOptions, modelName, modelOptions, modelProvider, placeKind, redetectTargets, retarget, withCloudModels, type BotModelRow, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
+import { harnessOptions, modelName, modelOptions, placeKind, redetectTargets, retarget, withCloudModels, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
 import { cn } from '@/lib/utils'
 import { findLabel, listWorkspaceLabels, matchLabels } from '@/lib/workspace-labels'
 import { FieldError } from '@/components/ui/field'
@@ -38,43 +36,31 @@ export function BotAgentsSettings() {
   const t = useTranslations('Settings.botAgents')
   const stored = useSWR(KEYS.settings, readExecutionSettings)
   const places = useSWR(KEYS.places, listPlaces, { refreshInterval: 15_000 })
-  const bots = useSWR(KEYS.bots, listWorkspaceBots)
   const accounts = useSWR(KEYS.accounts, listAccountModels)
   const [failed, setFailed] = useState<(() => Promise<void>) | null>(null)
   /** A choice the server refused stays on screen, marked 未保存, until a retry saves it. */
-  const [unsaved, setUnsaved] = useState<{ defaults?: TaskDefaults; whenQuotaExhausted?: WhenQuotaExhausted }>({})
+  const [unsaved, setUnsaved] = useState<{ defaults?: TaskDefaults }>({})
 
   async function save(change: () => Promise<void>) {
     setFailed(null)
     try { await change() } catch { setFailed(() => change) }
   }
 
-  if (stored.error || places.error || bots.error || accounts.error) return <FieldError>{t('loadFailed')}</FieldError>
-  if (!stored.data || !places.data || !bots.data || !accounts.data) return <SettingsLoading label={t('loading')} rows={4} />
+  if (stored.error || places.error || accounts.error) return <FieldError>{t('loadFailed')}</FieldError>
+  if (!stored.data || !places.data || !accounts.data) return <SettingsLoading label={t('loading')} rows={4} />
 
   const accountRows = accounts.data
   const placeList = withCloudModels(places.data, accountRows)
   const view = executionSettingsView(stored.data, placeList, accountRows)
   const defaults = unsaved.defaults ?? view.defaults
-  const quota = unsaved.whenQuotaExhausted ?? view.whenQuotaExhausted
   const current = stored.data
 
   const changeDefaults = (next: TaskDefaults) => {
     const rule = next.place !== defaults.place || next.harness !== defaults.harness || next.model !== defaults.model
-    const offline = next.whenDeviceOffline !== defaults.whenDeviceOffline
     setUnsaved(state => ({ ...state, defaults: next }))
     void save(async () => {
       if (rule) await saveDefaultRule(next)
-      if (offline) await saveFallbacks({ whenDeviceOffline: next.whenDeviceOffline, whenQuotaExhausted: quota })
       setUnsaved(({ defaults: _saved, ...rest }) => rest)
-      await stored.mutate()
-    })
-  }
-  const changeQuota = (next: WhenQuotaExhausted) => {
-    setUnsaved(state => ({ ...state, whenQuotaExhausted: next }))
-    void save(async () => {
-      await saveFallbacks({ whenDeviceOffline: defaults.whenDeviceOffline, whenQuotaExhausted: next })
-      setUnsaved(({ whenQuotaExhausted: _saved, ...rest }) => rest)
       await stored.mutate()
     })
   }
@@ -97,27 +83,15 @@ export function BotAgentsSettings() {
     await redetect(ids)
     await places.mutate()
   }
-  const refreshAccounts = async () => { await accounts.mutate() }
   const defaultPickers = executionPickers({ t, row: t('default'), value: defaults, places: placeList, wide: true, onChange: value => changeDefaults({ ...defaults, ...value }), onRedetect: refreshDevices })
-  const offline = { wait: t('offlineWait'), cloud: t('offlineCloud') } satisfies Record<WhenDeviceOffline, string>
-  const quotaNames = { stop: t('quotaStop'), switchAccount: t('quotaSwitch') } satisfies Record<WhenQuotaExhausted, string>
 
   return <div className="flex flex-col gap-8">
-    <Group id="bot-agents-bots" title={t('bots')}>
-      <BotRow t={t} botId={null} bot={null} rows={accountRows} onSave={save} onRefresh={refreshAccounts} />
-      {bots.data.map(bot => <BotRow key={bot.id} t={t} botId={bot.id} bot={bot} rows={accountRows} onSave={save} onRefresh={refreshAccounts} />)}
-      <Line title={t('whenQuotaExhausted')}>
-        <ChoicePicker ariaLabel={t('setting', { name: t('whenQuotaExhausted'), value: quotaNames[quota] })} value={quota} names={quotaNames} onChange={changeQuota} />
-      </Line>
-    </Group>
-
+    {/* Each bot's model is picked in its own chat (decision 2026-10-31-2330); 设备离线时 and
+        额度用完时 are account settings in 模型与额度 (decision 2026-10-31-2130). */}
     <Group id="bot-agents-defaults" title={t('defaults')} data-rule="default">
       <Line title={t('columns.place')}>{defaultPickers.place}</Line>
       <Line title={t('columns.harness')}>{defaultPickers.harness}</Line>
       <Line title={t('columns.model')}>{defaultPickers.model}</Line>
-      <Line title={t('whenDeviceOffline')}>
-        <ChoicePicker ariaLabel={t('cell', { row: t('default'), column: t('whenDeviceOffline'), value: offline[defaults.whenDeviceOffline] })} value={defaults.whenDeviceOffline} names={offline} onChange={whenDeviceOffline => changeDefaults({ ...defaults, whenDeviceOffline })} />
-      </Line>
     </Group>
 
     <Group id="bot-agents-labels" title={t('labels')}>
@@ -252,37 +226,6 @@ function RuleRow({ t, rule, places, onChange, onDelete, onRedetect }: {
   </TableRow>
 }
 
-/** A Bot's own model. Bots always run on Mikka, so the row has no place or harness. */
-function BotRow({ t, botId, bot, rows, onSave, onRefresh }: {
-  t: T
-  botId: string | null
-  bot: BotView | null
-  rows: BotModelRow[]
-  onSave: (change: () => Promise<void>) => Promise<void>
-  onRefresh: () => Promise<void>
-}) {
-  const tCoordinator = useTranslations('Coordinator')
-  const { mutate: mutateKey } = useSWRConfig()
-  const choice = useSWR(['bot-model', botId ?? 'coordinator'], () => readBotModel(botId))
-  const title = bot?.name ?? tCoordinator('label')
-  const selected = botModelChoice(rows, choice.data)
-  const accounts = groupBotModels(rows)
-  const choose = (bindingId: string) => onSave(async () => {
-    await choice.mutate(async () => { await saveBotModel(botId, bindingId); return readBotModel(botId) }, { optimisticData: bindingId, rollbackOnError: true, revalidate: false })
-    // Choosing another Bot's model copies its binding to this Bot; list the copy too.
-    await mutateKey(KEYS.accounts)
-  })
-  return <Line data-bot={title} title={title}
-    leading={bot ? <BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} /> : <CoordinatorAvatar size="row" />}>
-    <Picker t={t} wide ariaLabel={t('cell', { row: title, column: t('columns.model'), value: selected?.modelId ?? t('noAccount') })} disabled={choice.data === undefined || rows.length === 0}
-      value={selected ? <ModelLabel model={selected.modelId} source={selected.provider} /> : <span className="truncate text-muted-foreground">{t('noAccount')}</span>}>
-      {close => accounts.map((account, index) => <CommandGroup key={account.connectionId} className={cn(index > 0 && 'border-t')} heading={<PickerHeading t={t} title={<span className="flex items-center gap-1.5"><ProviderMark provider={modelProvider('', account.provider)} small />{account.provider === 'claude' ? t('claudeAccount') : t('openaiAccount')}</span>} onRefresh={onRefresh} />}>
-        {account.models.map(model => <CommandItem key={model.key} value={model.key} keywords={[model.modelId]} data-checked={selected?.key === model.key} onSelect={() => { close(); void choose(model.bindingId) }}><ModelLabel model={model.modelId} source={account.provider} /></CommandItem>)}
-      </CommandGroup>)}
-    </Picker>
-  </Line>
-}
-
 /**
  * Bordered like the select field (Comma's 模型与 API), not R-31's grey fill:
  * as wide as its slot, icon and value on the left, chevron on the right.
@@ -290,7 +233,7 @@ function BotRow({ t, botId, bot, rows, onSave, onRefresh }: {
 const TRIGGER = 'h-9 w-full min-w-0 justify-between gap-2 bg-control px-3 font-normal hover:bg-control-hover aria-expanded:bg-control-hover'
 
 /** A fallback: a fixed list of named choices. They are not devices, harnesses or models, so no icons. */
-function ChoicePicker<V extends string>({ ariaLabel, value, names, onChange }: { ariaLabel: string; value: V; names: Record<V, string>; onChange: (value: V) => void }) {
+export function ChoicePicker<V extends string>({ ariaLabel, value, names, onChange }: { ariaLabel: string; value: V; names: Record<V, string>; onChange: (value: V) => void }) {
   const [open, setOpen] = useState(false)
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger render={<Button variant="ghost" aria-label={ariaLabel} className={TRIGGER} />}>

@@ -2,23 +2,26 @@ import '../global.css'
 
 import { useEffect } from 'react'
 import { Platform, View } from 'react-native'
-import { Stack, useRouter, type Href } from 'expo-router'
+import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
+import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { DrawerHost } from '@/components/Drawer'
 import { Spinner } from '@/components/icons'
 import { SignIn } from '@/components/SignIn'
 import { authClient } from '@/lib/auth'
 import { HomeProvider } from '@/lib/home'
-import { colors } from '@/lib/theme'
+import { openPush } from '@/lib/navigate'
+import { colors, screenOptions } from '@/lib/theme'
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar style="dark" />
-        <SessionGate />
+        <KeyboardProvider>
+          <StatusBar style="dark" />
+          <SessionGate />
+        </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )
@@ -32,11 +35,17 @@ function SessionGate() {
   return (
     <HomeProvider>
       <PushSetup />
-      <DrawerHost>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.page }, animation: 'slide_from_right' }}>
-          <Stack.Screen name="settings" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-        </Stack>
-      </DrawerHost>
+      <Stack screenOptions={screenOptions(colors.page)}>
+        {/* 对话 and 线程; chats, threads and the rest are pushed over them. */}
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* A long press on a message: its actions as a system sheet, and 选择文本 over the chat. */}
+        <Stack.Screen name="message" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.42], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
+        <Stack.Screen name="attach" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.22], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
+        <Stack.Screen name="new-bot" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="new-group" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="message-text" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="settings" options={{ presentation: 'modal', headerShown: false, ...(Platform.OS === 'ios' ? {} : { animation: 'slide_from_bottom' }) }} />
+      </Stack>
     </HomeProvider>
   )
 }
@@ -47,15 +56,14 @@ function SessionGate() {
  * app asks after the Coordinator's first message of its own, or from 通知.
  */
 function PushSetup() {
-  const router = useRouter()
   useEffect(() => {
     if (Platform.OS === 'web') return
     let cleanup: (() => void) | undefined
     let gone = false
     void import('@/lib/push').then(push => {
-      if (!gone) cleanup = push.watchPushes(href => router.push(href as Href))
+      if (!gone) cleanup = push.watchPushes(openPush)
     })
     return () => { gone = true; cleanup?.() }
-  }, [router])
+  }, [])
   return null
 }

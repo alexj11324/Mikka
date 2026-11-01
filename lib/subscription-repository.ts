@@ -48,17 +48,19 @@ export class SubscriptionRepository {
     const { rowCount } = await this.pool.query('update byos_connections set "removedAt"=now() where id=$1 and "ownerId"=$2 and state=\'disconnected\'', [id, ownerId])
     if (!rowCount) throw new SubscriptionRefusal('account_unavailable')
   }
-  /** Bots whose current binding uses each connection revision (Settings 「使用中」). */
-  async connectionBots(ownerId: string, workspaceId: string) {
+  /** Bots whose current binding uses each connection revision (Settings 「使用中」), other members' bots included. */
+  async connectionBots(ownerId: string) {
     const { rows } = await this.pool.query<{ connectionId: string; id: string; name: string; color: string; shape: string }>(`select u."connectionId",u.id,u.name,u.color,u.shape from (
         select distinct on (b."consumerId",b.route) b."connectionId",b."connectionRevision",bot.id,bot.name,bot.color,bot.shape
         from byos_bindings b
-        join bot_cloud_runtimes r on r."agentId"::text=b."consumerId" and r."ownerId"=b."ownerId" and r."workspaceId"::text=b."workspaceId"
-        join bots bot on bot.id=r."botId" and bot."ownerId"=b."ownerId"
-        where b."ownerId"=$1 and b."workspaceId"=$2
+        left join bot_cloud_runtimes r on r."agentId"::text=b."consumerId" and r."ownerId"=b."ownerId" and r."workspaceId"::text=b."workspaceId"
+        -- A cloud computer's runtime (the owner's bot), or a bot using the binding directly: the owner's own,
+        -- or another member's bot on a subscription shared for others too (allowOthers), so the owner sees who used it.
+        join bots bot on (bot.id=r."botId" and bot."ownerId"=b."ownerId") or (r."botId" is null and bot.id::text=b."consumerId" and bot."workspaceId"::text=b."workspaceId")
+        where b."ownerId"=$1
         order by b."consumerId",b.route,b."createdAt" desc,b.id desc) u
       join byos_connections c on c.id=u."connectionId" and c.epoch=u."connectionRevision" and c."ownerId"=$1
-      order by u.name limit 200`, [ownerId, workspaceId])
+      order by u.name limit 200`, [ownerId])
     return rows
   }
   async defaultModelBinding(ownerId: string, consumerId: string): Promise<string | null> {

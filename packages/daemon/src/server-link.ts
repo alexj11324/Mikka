@@ -38,7 +38,7 @@ import type { CaptureUploadRequest, CaptureUploadResponse, CaptureView, ScreenCa
 import type { RunChunk } from "./chunks"
 import type { ToolApprovalGate } from "./agents/tool-approval"
 import type { RunMailbox } from './run-mailbox'
-import type { NativeBrokerContext, NativeBrokerRequest } from '@mikka/protocol/subscription'
+import type { NativeBrokerContext, NativeBrokerRequest, NativeLease } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
 
 export type {
@@ -100,6 +100,8 @@ export interface ServerLink {
   /** Private hosted-run channel; these methods never return provider tokens. */
   nativeContext?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeBrokerContext>
   nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>
+  /** A device run's subscription access lease (never a refresh grant); asked again before it expires. */
+  nativeLease?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeLease>
   /**
    * Screenshots and recordings a run keeps as evidence (`@mikka/protocol/capture`).
    * Optional: links without them keep the files on this machine.

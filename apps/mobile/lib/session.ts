@@ -16,6 +16,8 @@ export function endLostSession(): Promise<void> {
   ending = (async () => {
     if (Platform.OS !== 'web') await (await import('@/lib/push')).forgetPushToken().catch(() => undefined)
     await authClient.signOut().catch(() => undefined)
+    const { clearApiCache } = await import('@/lib/useApi')
+    clearApiCache()
     authClient.$store.notify('$sessionSignal')
   })().finally(() => { ending = null })
   return ending

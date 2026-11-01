@@ -2,6 +2,13 @@
 
 Backend only. The settings UI is maintained separately in #529 and its dependent PRs.
 
+> This describes the code at 2026-10-31. Model resolution, machine fallback and
+> Agent discovery follow [`design/orchestration.md`](design/orchestration.md),
+> which wins where they differ; the pending code changes are listed in
+> [orchestration conflicts](design/research/2026-10-31-orchestration-conflicts.md)
+> (C7, C11–C16, C23, C24). 「设备离线时」 and 「Bot 额度用完时」 are replaced by
+> 「允许自动调度」 and 「订阅额度用完时改用 API Key」.
+
 ## Frontend contract
 
 `app/actions/execution-settings.ts` derives owner/workspace from the authenticated
@@ -24,10 +31,13 @@ session. The existing action names remain:
 - `getExecutionFallbacks()` and `updateExecutionFallbacks(value)`: per-person
   `{whenDeviceOffline: 'wait' | 'cloud', whenQuotaExhausted: 'stop' | 'switchAccount'}`.
   Both fields are required when updating. Defaults are `wait` and `stop`.
+  `whenDeviceOffline` is still stored but no longer read or shown: an offline
+  device follows the fixed order below (decision 2026-10-31-2200).
 - `listBotModels()`, `getBotModel(botId)`, `setBotModel(botId, bindingId)`:
   null Bot means Coordinator. A binding must be explicit; null/`auto` choices
   are refused. First access persists the first connected binding when none is
-  saved. A saved unavailable binding is retained and execution refuses it.
+  saved. A saved unavailable binding is retained; execution resolves the next
+  model in order instead of refusing ([orchestration](design/orchestration.md) § 2).
 
 `auto` in any execution field, or clearing a Bot model, returns the stable
 `executionAutoNotAllowed` action error. Existing field errors remain
@@ -46,7 +56,10 @@ Otherwise a connected Codex subscription prefers Codex's reported default slot.
 Without a matching local install, a connected cloud binding supplies an explicit
 cloud choice. No server model-name constants or guessed model names are used.
 When no usable report/binding exists, return `executionModelUnknown` rather than
-inventing an automatic choice; redetect/connect an account first.
+inventing an automatic choice; redetect/connect an account first. Target: the
+place is Mikka Cloud when the owner has an E2B key, otherwise an online
+device with 「允许自动调度」 on, and the model resolves separately, falling back to Mikka 默认
+([orchestration](design/orchestration.md) § 2, § 4).
 
 `20261031054017_explicit_execution.sql` is idempotent: it makes the label nullable,
 adds a single-default unique index, removes auto column defaults, guards new
@@ -74,12 +87,31 @@ latest heartbeat report at each new dispatch; in-flight snapshots remain frozen.
 
 First matching label by position wins, otherwise the saved default. Explicit
 harness/model values reach the existing local/cloud admission and subscription
-checks. With `wait`, offline/disabled devices remain pinned and queued; takeover
-and offline expiry do not reroute them. `cloud` explicitly routes to cloud using
-the last reported resolved model, retaining runtime and account authorization.
-Device-specific source-event authorization still cannot be redirected to cloud.
+checks. A rule whose device is offline or disabled takes the same order as a
+cloud choice (below), using the last reported resolved model and keeping runtime
+and account authorization. Device-specific source-event authorization still
+cannot be redirected to cloud.
 
-Bot quota `stop` propagates the exhaustion error. `switchAccount` only tries
+When no machine can take the run, `dispatch_run` returns an error the person can
+act on ([decision 2026-10-31-2200](design/decisions/2026-10-31-2200-run-machine-fallback.md)).
+A cloud choice runs on the person's own E2B key only; when there is no key,
+no bot cloud runtime, or that E2B refuses (concurrency cap, quota, key), the run
+goes to the person's online device with 允许调度 and 允许自动调度 on (a server
+first, then the default rule's device, else the most recently seen). With none
+of these it returns
+`error: 'machineUnavailable'` and a card (允许这台电脑自动调度 / 在这台电脑上启用,
+填入 E2B Key, 让服务器重新上线 / 连接我的服务器). 允许自动调度 (`devices."autoSchedule"`)
+defaults to on for servers and off for personal computers, and automatic default
+placement (`suggested`, `auto` rows) uses only devices with it on.
+
+A run that loses its machine (`lib/run-leases.ts`) takes the same order: the
+person's own E2B cloud, else another device with 允许自动调度 on, else it ends
+and the bot gets the card (`run_finished` payload `noMachine`). A cloud run's
+retry gets a new sandbox on the same bot. The `run_retried` event's `movedTo`
+says where it went.
+
+Bot quota `stop` propagates the exhaustion error. Target: no switch inside a
+running run ([orchestration](design/orchestration.md) § 2). Today `switchAccount` only tries
 another connected account of the same owner/workspace, route and model. Each
 candidate is independently bound to the consumer and reauthorized for epoch,
 workspace, connection and quota. No paid provider fallback, model substitution,

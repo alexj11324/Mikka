@@ -41,6 +41,7 @@ describe("quota on the daemon", () => {
     const daemon = await new Daemon({
       dataDir,
       flavor: "dev",
+      agentSandbox: null,
       link: server.link(),
       credential: "cred-1",
       harnesses: [],

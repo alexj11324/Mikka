@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 
@@ -133,6 +133,27 @@ describe("ensureSandboxTools", () => {
     const launcher = readFileSync(join(sandboxToolsDir(root), "socat"), "utf8")
     expect(launcher).toContain(`LD_LIBRARY_PATH='${libDir}' exec '${join(root, "sandbox-tools/libexec/socat")}' "$@"`)
     expect(process.env.LD_LIBRARY_PATH).toBeUndefined()
+  })
+
+  it("installs the real binary when the package ships the command as a symlink", async () => {
+    // socat 1.8 (Ubuntu 24.04) ships /usr/bin/socat as a link to socat1.
+    const { run } = fakeApt()
+    const symlinked: ToolRunner = async (file, args, cwd) => {
+      if (file === "dpkg-deb" && args[1]!.endsWith("socat.deb")) {
+        const bin = join(args[2]!, "usr/bin")
+        mkdirSync(bin, { recursive: true })
+        executable(join(bin, "socat1"))
+        symlinkSync("socat1", join(bin, "socat"))
+        return
+      }
+      return run(file, args, cwd)
+    }
+    expect(await ensureSandboxTools({ dataDir: root, log, run: symlinked, platform: "linux" })).toEqual([])
+    const installed = join(sandboxToolsDir(root), "socat")
+    // The installed command is the real binary, not a link that dangles once staging is gone.
+    expect(existsSync(installed)).toBe(true)
+    expect(lstatSync(installed).isSymbolicLink()).toBe(false)
+    expect(findOnPath("socat")).toBe(installed)
   })
 
   it("does not install a tool that still cannot run", async () => {

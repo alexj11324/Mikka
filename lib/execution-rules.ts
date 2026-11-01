@@ -1,4 +1,4 @@
-import type { HarnessInfo } from "@mikka/protocol/harness";
+import { harnessForModel, type HarnessInfo } from "@mikka/protocol/harness";
 
 export interface ExecutionRule {
   id: string;
@@ -25,6 +25,18 @@ export const DEFAULT_EXECUTION_FALLBACKS: ExecutionFallbacks = {
 export type ExecutionResolution =
   { place: string; harness: string; model: string } | { waitFor: string };
 
+/**
+ * The Agent that runs a thread's model (orchestration.md §3): GPT/OpenAI on
+ * Codex, every other model on Claude Code. A model slot ("opus", "default")
+ * or a model an Agent reported names a model only within that Agent, so it
+ * keeps the rule's Agent; so does any other Agent (Cursor, mock), which runs
+ * its own models.
+ */
+export function agentFor(model: string, ruleHarness: string, slotOf: (harness: string) => boolean): string {
+  if (ruleHarness !== "claude_code" && ruleHarness !== "codex") return ruleHarness;
+  return slotOf(ruleHarness) ? ruleHarness : harnessForModel(model);
+}
+
 export function resolveExecution(
   issueLabels: readonly string[],
   rules: readonly ExecutionRule[],
@@ -40,24 +52,29 @@ export function resolveExecution(
   if (!rule) throw new Error("executionModelUnknown");
   if ([rule.place, rule.harness, rule.model].some((v) => !v || v === "auto"))
     throw new Error("executionAutoNotAllowed");
+  // The rule's Agent knows this model: its default slot, a slot of it, or a model it reported on this device.
+  const slotOn = (candidates: readonly ExecutionDevice[]) => (harness: string) =>
+    candidates.some((d) => d.harnesses.some((h) => h.harness === harness && (h.defaultModelSlot === rule.model ||
+      h.modelSlots?.some((s) => s.slot === rule.model) || h.models?.includes(rule.model))));
   if (rule.place === "cloud")
-    return { place: "cloud", harness: rule.harness, model: rule.model };
+    return { place: "cloud", harness: agentFor(rule.model, rule.harness, slotOn(devices)), model: rule.model };
   const device = devices.find((d) => d.id === rule.place);
+  const agent = agentFor(rule.model, rule.harness, slotOn(device ? [device] : []));
   if (!device?.online || !device.enabled) {
     if (fallbacks.whenDeviceOffline === "cloud")
       return {
         place: "cloud",
-        harness: rule.harness,
+        harness: agent,
         model:
           device?.harnesses
-            .find((h) => h.harness === rule.harness)
+            .find((h) => h.harness === agent)
             ?.modelSlots?.find((s) => s.slot === rule.model)?.model ??
           rule.model,
       };
     return { waitFor: rule.place };
   }
   const harness = device.harnesses.find(
-    (h) => h.installed && h.harness === rule.harness,
+    (h) => h.installed && h.harness === agent,
   );
   if (!harness) throw new Error("agentHarnessMissing");
   // The persisted slot is interpreted by this install, never by a server constant.
@@ -65,5 +82,5 @@ export function resolveExecution(
   const model = slot?.model ?? rule.model;
   if (harness.modelSlots?.some((s) => s.slot === rule.model) && !slot?.model)
     throw new Error("executionModelUnknown");
-  return { place: device.id, harness: rule.harness, model };
+  return { place: device.id, harness: agent, model };
 }

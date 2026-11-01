@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { skillMarkdown, type SkillAssignmentReceipt } from '@mikka/protocol/skill'
@@ -69,6 +69,11 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
       const context = new RunContext({ harness: 'codex', worktree, runDir: runPaths(adapterStateDir, runId).runDir,
         privateDir: root, skills: [BASELINE_SKILL], skillReceipt: receipt })
       if (mode === 'tampered') writeFileSync(join(context.skillsDir, 'run-report', 'SKILL.md'), 'changed')
+      const runDir = runPaths(adapterStateDir, runId).runDir
+      for (const file of ['github/config.json', 'runtime-home/.codex/auth.json', 'runtime-home/.claude/.credentials.json', 'codex-home/auth.json', 'native-home/.claude/.credentials.json']) {
+        mkdirSync(join(runDir, file, '..'), { recursive: true })
+        writeFileSync(join(runDir, file), '{}')
+      }
     }
     if (mode === 'cached-handoff' || replaying) return endedSession('actual-session', { type: 'exit', outcome: 'succeeded', stopReason: 'turn_ended', report: { summary: 'durable handoff' } })
     return { runtimeModel: mode === 'delayed-handoff' ? null : observedModel, sessionId: mode === 'wrong-session' ? 'other-session' : 'actual-session', cancel: async () => { cancelled = true }, send: async () => {},
@@ -169,6 +174,12 @@ it('rereads real RunContext bytes and ignores model-supplied evidence', async ()
   expect(result.report.skillMount).toMatchObject({ receiptId: result.receipt.id, sessionId: 'actual-session', sha256: BASELINE_ARTIFACT.sha256 })
   expect(result.journal.get(result.runId)?.skillMount).toEqual(result.report.skillMount)
   expect(skillMarkdown(BASELINE_SKILL)).toContain('Run report')
+  // A finished turn leaves no credential behind, but keeps what a resume reads.
+  const runDir = runPaths(join(result.worktree, '..', 'adapters'), result.runId).runDir
+  for (const file of ['github', 'runtime-home/.codex/auth.json', 'runtime-home/.claude/.credentials.json', 'codex-home/auth.json', 'native-home/.claude/.credentials.json'])
+    expect(existsSync(join(runDir, file))).toBe(false)
+  expect(existsSync(join(runDir, 'runtime-home'))).toBe(true)
+  expect(existsSync(join(runDir, 'skills'))).toBe(true)
 })
 it.each(['missing', 'tampered'] as const)('does not record a %s mount', async mode => {
   const result = await fixture(mode)

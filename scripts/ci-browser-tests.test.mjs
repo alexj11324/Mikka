@@ -369,7 +369,9 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   assert(selection.includes('fail-fast: false\n'))
   assert(selection.includes('shard: [1, 2, 3, 4]\n'))
   assert(selection.includes('node scripts/ci-browser-tests.mjs --verify-selection-plan=targeted --shard=${{ matrix.shard }}/4'))
-  assert(source.includes("cron: '17 19 * * *'"))
+  // Manual only (decision 2026-11-01-0230); browser-gate.yml keeps the PR check name.
+  assert(!source.includes('  pull_request:\n') && !source.includes('  schedule:\n') && !source.includes('  push:\n'))
+  assert(readFileSync('.github/workflows/browser-gate.yml', 'utf8').includes('    name: Browser tests (before merge)\n'))
   assert(source.includes('  workflow_dispatch:\n'))
   for (const name of ['browser-build-${{ github.sha }}', 'browser-test-report-runtime-${{ github.sha }}', 'browser-test-report-pull-request-${{ matrix.lane }}-${{ github.sha }}',
     'browser-test-report-selection-targeted-${{ github.sha }}-${{ matrix.shard }}', 'browser-test-report-shard-${{ matrix.shard }}-${{ github.sha }}']) assert(source.includes(`name: ${name}`), name)

@@ -5,8 +5,9 @@ import { authorizeSubscriptionUse, SubscriptionRefusal, type SubscriptionAccess,
 import type { SubscriptionWorkerClient, WorkerMetadata } from '../packages/daemon/src/subscription-worker-client'
 import { readSubscriptionQuota } from '../packages/daemon/src/subscription-quota'
 import { SubscriptionRepository } from './subscription-repository'
+import { runMayUseCredentialSql } from './personal-policy'
 import { resolveSubscriptionModel } from './subscription-model'
-import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { accountLabel, failedUsage, parseSubscriptionUsage, type SubscriptionUsage, type WorkerUsage } from './subscription-usage'
 
 export interface SubscriptionCapabilities {
@@ -19,16 +20,18 @@ export class SubscriptionService {
     readonly worker: (scope: ReturnType<SubscriptionRepository['scope']>) => SubscriptionWorkerClient,
     readonly capabilities: SubscriptionCapabilities,
     readonly quota: (provider: 'codex' | 'claude', result: {status: number; body: unknown}) => Promise<QuotaSnapshot> | QuotaSnapshot = readSubscriptionQuota,
-    readonly workspace: (ownerId: string, workspaceId: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') },
+    readonly workspace: (ownerId: string, workspaceId: string, consumerId?: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') },
     readonly admitModel: (scope: { ownerId: string; workspaceId: string; runId?: string }, model: string, route: string, signal?: AbortSignal) => Promise<void> = async (...args) => {
       const { assertSubscriptionModelTransport } = await import('./model-admission/runtime')
       await assertSubscriptionModelTransport(...args)
-    }) {}
+    },
+    /** Active membership in the workspace database; a teammate's shared subscription needs it for both people. */
+    readonly member: (userId: string, workspaceId: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') }) {}
 
   async access(use: SubscriptionUse, signal?: AbortSignal): Promise<SubscriptionAccess> {
     const { modelId: _, ...binding } = await this.repository.binding(use.ownerId, use.bindingId)
     if (binding.workspaceId !== use.workspaceId || binding.consumerId !== use.consumerId) throw new SubscriptionRefusal('binding_mismatch')
-    await this.workspace(use.ownerId, binding.workspaceId)
+    await this.workspace(use.ownerId, binding.workspaceId, binding.consumerId)
     const row = await this.repository.connection(use.ownerId, binding.connectionId)
     if (row.paused) throw new SubscriptionRefusal('account_unavailable')
     const revision = Number(row.epoch)
@@ -105,11 +108,16 @@ export class SubscriptionService {
   }
   async check(use: SubscriptionUse, signal?: AbortSignal) { return authorizeSubscriptionUse(use, await this.access(use, signal)) }
   async nativeRun(ownerId: string, deviceId: string, runId: string) {
-    const { rows } = await this.repository.pool.query(`select b.id,b."workspaceId",b."consumerId",b.route,b."modelId",r."agentDefinition",a.harness from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join devices d on d.id=r."deviceId" and d."ownerId"=r."userId" and d.enabled=true join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and b."ownerId"=$2 and b."consumerId"=a.id::text and d.harnesses @> jsonb_build_array(jsonb_build_object('harness',coalesce(r."agentDefinition"->>'harness',a.harness),'installed',true,'subscriptionBroker',true)) and r.status in ('preparing','running','paused','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, [runId,ownerId,deviceId])
+    const { rows } = await this.repository.pool.query(`select b.id,b."ownerId",b."workspaceId",b."consumerId",b.route,b."modelId",r."agentDefinition",a.harness from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join devices d on d.id=r."deviceId" and d."ownerId"=r."userId" and d.enabled=true join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and ${runMayUseCredentialSql('b."ownerId"', '$2', 'b."workspaceId"')} and b."consumerId"=a.id::text and d.harnesses @> jsonb_build_array(jsonb_build_object('harness',coalesce(r."agentDefinition"->>'harness',a.harness),'installed',true,'subscriptionBroker',true)) and r.status in ('preparing','running','paused','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, [runId,ownerId,deviceId])
     if (!rows[0]) throw new SubscriptionRefusal('account_unavailable')
     const row=rows[0]
     if (!workerSubscriptionMatches(row.agentDefinition,row.harness,row)) throw new SubscriptionRefusal('binding_mismatch')
-    return {ownerId,workspaceId:row.workspaceId,consumerId:row.consumerId,bindingId:row.id,execution:'native',runId} as const
+    if (String(row.ownerId) !== ownerId) {
+      try { await this.member(ownerId, row.workspaceId); await this.member(String(row.ownerId), row.workspaceId) }
+      catch { throw new SubscriptionRefusal('account_unavailable') }
+    }
+    // The use belongs to the credential's owner: the run owner, or the member who shared it (分享给团队成员).
+    return {ownerId:String(row.ownerId),workspaceId:row.workspaceId,consumerId:row.consumerId,bindingId:row.id,execution:'native',runId} as const
   }
   async nativeContext(use: SubscriptionUse, signal?: AbortSignal) {
     const binding=await this.repository.binding(use.ownerId,use.bindingId)
@@ -122,6 +130,14 @@ export class SubscriptionService {
     await client.call('prepare',{revision:authorized.binding.connectionRevision},signal)
     const info=await client.call<{accountId:string;plan?:string;expiresAt:string}>('nativeContext',{revision:authorized.binding.connectionRevision},signal)
     return nativeBrokerContextSchema.parse({...info,route:binding.route,modelId:binding.modelId,revision:authorized.binding.connectionRevision})
+  }
+  /** A device run's access lease: the same checks as nativeContext, then the access token only. */
+  async nativeLease(use: SubscriptionUse, signal?: AbortSignal) {
+    const context=await this.nativeContext(use,signal)
+    const binding=await this.repository.binding(use.ownerId,use.bindingId)
+    const row=await this.repository.connection(use.ownerId,binding.connectionId)
+    const lease=await this.worker(this.repository.scope(row)).forUse(use).call<{accessToken?:unknown;expiresAt?:unknown}>('nativeAuth',{revision:context.revision},signal)
+    return nativeLeaseSchema.parse({...context,accessToken:lease.accessToken,...(typeof lease.expiresAt==='string'?{expiresAt:new Date(lease.expiresAt).toISOString()}:{})})
   }
   async nativeRequest(use: SubscriptionUse, request: NativeBrokerRequest, signal?: AbortSignal) {
     const binding=await this.repository.binding(use.ownerId,use.bindingId)
@@ -138,7 +154,7 @@ export class SubscriptionService {
   private async nativeSelectedModel(use: SubscriptionUse, boundModel: string) {
     let selectedModel: string | undefined = boundModel
     if (use.runId) {
-      const row=(await this.repository.pool.query(`SELECT r."agentDefinition" FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id WHERE r.id=$1 AND r."userId"=$2 AND r."agentId"::text=$3 AND n."bindingId"=$4 AND r.status IN ('preparing','running','paused','waiting_input') AND r."leaseExpiresAt">now() AND r."stopRequestedAt" IS NULL`,[use.runId,use.ownerId,use.consumerId,use.bindingId])).rows[0]
+      const row=(await this.repository.pool.query(`SELECT r."agentDefinition" FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id JOIN byos_bindings b ON b.id=n."bindingId" WHERE r.id=$1 AND ${runMayUseCredentialSql('$2', 'r."userId"', 'b."workspaceId"')} AND r."agentId"::text=$3 AND n."bindingId"=$4 AND r.status IN ('preparing','running','paused','waiting_input') AND r."leaseExpiresAt">now() AND r."stopRequestedAt" IS NULL`,[use.runId,use.ownerId,use.consumerId,use.bindingId])).rows[0]
       if (!row) throw new SubscriptionRefusal('binding_mismatch')
       if (row.agentDefinition?.cliModelSelection==='auto') selectedModel=undefined
       if (row.agentDefinition?.cliModelSelection==='explicit') selectedModel=row.agentDefinition.model
@@ -174,8 +190,8 @@ export class SubscriptionService {
   }
   /** Account catalogue refresh; no inference, no static model names or binding required. */
   async models(ownerId: string, id: string, signal?: AbortSignal): Promise<{ id: string; name: string }[]> {
+    // The owner's own account-level read: no workspace membership needed (decision 2026-10-31-2130).
     const row = await this.repository.connection(ownerId, id)
-    await this.workspace(ownerId, row.workspaceId)
     if (row.state !== 'connected') throw new SubscriptionRefusal('account_unavailable')
     const result = await this.worker(this.repository.scope(row)).call<unknown>('models', { revision: Number(row.epoch) }, signal)
     const current = await this.repository.connection(ownerId, id)

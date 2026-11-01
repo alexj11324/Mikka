@@ -28,6 +28,7 @@
     "coordinator-choice-card.spec.ts",
     "coordinator-scroll.spec.ts",
     "global-search-scope.spec.ts",
+    "bot-list-groups.spec.ts",
     "invalid-issue-content.spec.ts",
     "issue-threads.spec.ts",
     "linear-sync-disabled.spec.ts",
@@ -51,6 +52,7 @@
     "settings-billing.spec.ts",
     "settings-general.spec.ts",
     "settings-secrets.spec.ts",
+    "settings-api-keys.spec.ts",
     "settings-team-permissions.spec.ts",
     "settings-tokens.spec.ts",
     "settings-usage.spec.ts",
@@ -63,6 +65,7 @@
     "site-search.spec.ts",
     "slack-webhook.spec.ts",
     "bot-agents-settings.spec.ts",
+    "bot-model-picker.spec.ts",
     "devices-settings.spec.ts",
     "factory-evidence-viewer.spec.ts",
     "onboarding.spec.ts"
@@ -121,7 +124,9 @@
         "^lib\\/workspace-admin\\/",
         "^components\\/teams\\/",
         "^components\\/workspace-menu\\.tsx$",
-        "^components\\/workspace\\/members-settings\\.tsx$"
+        "^components\\/workspace\\/members-settings\\.tsx$",
+        "^lib\\/model-api-key",
+        "^app\\/actions\\/model-api-keys\\.ts$"
       ],
       "specs": [
         "settings.spec.ts",
@@ -143,7 +148,8 @@
         "settings-usage.spec.ts",
         "segmented-control.spec.ts",
         "bot-computer-tab.spec.ts",
-        "bot-agents-settings.spec.ts"
+        "bot-agents-settings.spec.ts",
+        "settings-api-keys.spec.ts"
       ]
     },
     {
@@ -218,7 +224,8 @@
         "thread-question.spec.ts",
         "coordinator-choice-card.spec.ts",
         "coordinator-scroll.spec.ts",
-        "question-card.spec.ts"
+        "question-card.spec.ts",
+        "bot-model-picker.spec.ts"
       ]
     },
     {

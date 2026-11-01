@@ -20,7 +20,7 @@ import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { toolApprovalDecision } from "./agents/tool-approval-policy"
 import { runApps } from "./agents/run-apps"
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
-import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCaptureResponse, type CaptureUploadRequest, type CaptureUploadResponse, type ScreenCaptureRequest } from '@mikka/protocol/capture'
 
@@ -399,6 +399,9 @@ export class HttpServerLink implements ServerLink {
   }
   async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
     return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
+  }
+  async nativeLease(deviceId:string,runId:string,signal?:AbortSignal) {
+    return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription-lease`, {schema:nativeLeaseSchema,signal})
   }
   async nativeRequest(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal) {
     const response=await this.send('POST',`${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`,{action:'request',payload},this.credential,{signal,timeoutMs:275_000})

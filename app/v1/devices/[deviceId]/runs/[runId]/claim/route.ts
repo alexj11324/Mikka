@@ -32,6 +32,7 @@ import { FactoryError } from '@/lib/factory/contract'
 import { blockQuestionRetry } from '@/lib/factory/questions/retry'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
+import { sharedNativeBinding } from '@/lib/personal-policy'
 import { PublicationError } from '@/lib/run-publication-result'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
@@ -115,7 +116,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   try { subscription = process.env.MIKKA_BYOS_ENABLED === '1'
     ? run.agentDefinition && !pinned ? null : device.kind === 'cloud'
       ? await nativeRunBinding(pool, caller.userId, agent.id, harness, caller.scopeWorkspaceId, pinned?.bindingId)
-      : pinned ? await subscriptionRuntime().repository.binding(caller.userId,pinned.bindingId) : await subscriptionRuntime().repository.nativeBinding(caller.userId, agent.id, harness) : null
+      : pinned ? await subscriptionRuntime().repository.binding(caller.userId,pinned.bindingId) : await localRunBinding(caller.userId, agent.id, harness, run.botId ?? null) : null
   } catch { return NextResponse.json({ error:'Subscription unavailable.' },{ status:409 }) }
   if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id || subscription.ownerId !== caller.userId)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
@@ -265,3 +266,20 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
 }
 
 export const POST = withDeviceRoute(handlePOST)
+
+/**
+ * The run owner's own subscription, else one another member shares in the
+ * run's workspace with 分享给团队成员 (orchestration.md §2). The device then
+ * takes that run's access lease; the share is checked again on every lease.
+ */
+async function localRunBinding(userId: string, agentId: string, harness: string, botId: string | null) {
+  const repository = subscriptionRuntime().repository
+  const own = await repository.nativeBinding(userId, agentId, harness)
+  if (own || !botId) return own
+  const { rows: [bot] } = await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL', [botId, userId])
+  if (!bot) return null
+  const id = await sharedNativeBinding(pool, userId, agentId, harness, bot.workspaceId)
+  if (!id) return null
+  const { rows: [row] } = await pool.query<{ ownerId: string }>('SELECT "ownerId" FROM byos_bindings WHERE id=$1', [id])
+  return row ? repository.binding(row.ownerId, id) : null
+}

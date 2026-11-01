@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check, Copy, MoreHorizontal, TriangleAlert } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -42,8 +42,12 @@ async function post(body: unknown, signal?: AbortSignal) {
   return response.json() as Promise<unknown>
 }
 
-/** The provider ceremony stays in this page's memory, never chat or storage. */
-export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
+/**
+ * The provider ceremony stays in this page's memory, never chat or storage.
+ * `extraRows` (the API keys and custom providers) and `action` (添加 API Key)
+ * join the same list (「API 与订阅」, orchestration.md § 1).
+ */
+export function SubscriptionSettings({ workspaceId, extraRows, action }: { workspaceId: string; extraRows?: ReactNode[]; action?: ReactNode }) {
   const t = useTranslations('Settings.subscriptions')
   const [state, setState] = useState<State | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -187,9 +191,14 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     void connect(failure.provider, existing)
   }
 
-  if (loadFailed) return <FieldError className="px-1">{t('loadFailed')}</FieldError>
-  if (!state) return <p role="status" className="px-1 text-sm text-muted-foreground">{t('loading')}</p>
-  if (!state.enabled) return <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p>
+  // Without the subscription service the API keys still form the list.
+  const status = loadFailed ? <FieldError className="px-1">{t('loadFailed')}</FieldError>
+    : !state ? <p role="status" className="px-1 text-sm text-muted-foreground">{t('loading')}</p>
+      : !state.enabled ? <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p> : null
+  if (status || !state) return <div className="flex flex-col gap-3">
+    {extraRows?.length ? <SettingsSection action={action}>{extraRows}</SettingsSection> : action && <div className="flex justify-end">{action}</div>}
+    {status}
+  </div>
   // The oldest read on screen, so the line never overstates how fresh a meter is.
   const reads = usage && usage !== 'failed' ? state.connections.flatMap(connection => {
     const read = connection.state === 'connected' ? usage.get(connection.id) : undefined
@@ -197,7 +206,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   }) : []
   const updated = reads.length > 0 ? Math.max(0, Math.floor((now - Math.min(...reads)) / 60_000)) : null
   return <div className="flex flex-col gap-1">
-    <SettingsSection id="subscriptions-heading" title={t('heading')}>
+    <SettingsSection action={action}>
       {(['codex', 'claude'] as const).map(provider => {
         const available = state.providers.some(item => item.provider === provider && item.available)
         const connections = state.connections.filter(item => item.provider === provider)
@@ -279,6 +288,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
           </div>}
         </div>
       })}
+      {extraRows}
     </SettingsSection>
     {updated !== null && <p className="pt-1 pl-1 text-xs text-muted-foreground">{updated < 1 ? t('updatedJustNow') : t('updatedAgo', { minutes: updated })}</p>}
     {notice && <p role="status" className="pt-1 pl-1 text-xs text-muted-foreground">{notice}</p>}

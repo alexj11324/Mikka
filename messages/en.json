@@ -152,7 +152,8 @@
     "openBotChat": "Open Bot chat",
     "archivedConversation": "Archived: {title}",
     "suggestions": "Suggestions",
-    "artifacts": "Artifact"
+    "artifacts": "Artifact",
+    "cardPreview": "[Card]"
   },
   "Plugins": {
     "title": "Plugins",
@@ -751,6 +752,8 @@
     "thisMachine": "This machine",
     "allowScheduling": "Allow scheduling",
     "allowSchedulingTo": "Allow scheduling to {name}",
+    "autoSchedule": "Auto-schedule",
+    "autoScheduleTo": "Let Mikka pick {name} automatically",
     "recheck": "Check again",
     "agent": "Available tools",
     "toggleSidebar": "Expand or collapse the sidebar",
@@ -1107,6 +1110,8 @@
     "projectIssuesSaveFailed": "Could not link tasks. Check your access and try again.",
     "workspaceAccessDenied": "You do not have permission to manage this workspace, or your membership is suspended.",
     "workspaceNotFound": "No accessible workspace.",
+    "workspacePaymentTaken": "Another member's card already pays for this team.",
+    "workspacePersonal": "A personal workspace has only you. To invite people, create a workspace.",
     "workspaceMemberExists": "One of these emails is already a workspace member. Manage or restore them in the member list.",
     "workspaceMemberNotFound": "This member does not exist.",
     "workspaceLastAdmin": "A workspace must keep at least one active admin.",
@@ -1180,7 +1185,11 @@
     "tokenNotFound": "This token does not exist or was already revoked.",
     "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first.",
     "accountDeletionPending": "Account deletion is pending cleanup.",
-    "SESSION_NOT_FRESH": "Sign in again before deleting your account."
+    "SESSION_NOT_FRESH": "Sign in again before deleting your account.",
+    "apiKeyInvalid": "The key is invalid or has been revoked.",
+    "apiKeyUnverifiable": "Couldn't verify the key right now. Try again later.",
+    "apiKeyBaseUrlInvalid": "The base URL must be a public https address.",
+    "apiKeyNotFound": "This API key no longer exists."
   },
   "Overview": {
     "sections": {
@@ -1618,7 +1627,7 @@
     "searchPlaceholder": "Search settings…",
     "noResults": "No matching settings",
     "groups": {
-      "personal": "Personal",
+      "personal": "Account",
       "workspace": "Workspace",
       "administration": "Administration",
       "yourTeams": "Your teams"
@@ -1652,8 +1661,8 @@
         "title": "Connections"
       },
       "models": {
-        "title": "Models and quota",
-        "keywords": "model subscriptions subscription quota usage"
+        "title": "API and subscriptions",
+        "keywords": "model subscriptions subscription quota usage API key provider models"
       },
       "logins": {
         "title": "Logins and keys"
@@ -1898,7 +1907,9 @@
       "githubManage": "Manage access",
       "githubLoadFailed": "Could not load GitHub authorization. Refresh to try again.",
       "githubReconnectRequired": "GitHub authorization expired. Link your account again.",
-      "githubLinkFailed": "Could not link GitHub. Check that this GitHub account is not linked to another Mikka account, then try again.",
+      "githubLinkFailed": "Could not link GitHub.",
+      "githubDisconnectFailed": "Could not disconnect GitHub.",
+      "githubLogin": "@{login}",
       "gmail": "Gmail",
       "googlecalendar": "Google Calendar",
       "notion": "Notion",
@@ -2250,6 +2261,44 @@
         "notion": "Notion"
       }
     },
+    "subscriptionShare": {
+      "heading": "This workspace",
+      "share": "Use my subscriptions here",
+      "blocked": "Turned off by an admin",
+      "others": "Share with team members",
+      "othersTitle": "Share {name} with team members?",
+      "othersUsage": "Team members can use it to run their own bots. Usage counts against your subscription quota.",
+      "othersRuntime": "While a task runs, the credential is placed temporarily on the computer running it, which may be a member's own computer. It is deleted when the task ends.",
+      "othersTrust": "Share only with people you trust. Some providers' terms don't allow account sharing; check them yourself.",
+      "othersConfirm": "Share",
+      "othersOn": "Shared with team members · Credentials are placed temporarily on members' computers while running",
+      "subscriptionName": "{provider} subscription",
+      "ownFallback": "my subscriptions",
+      "listSeparator": ", ",
+      "cancel": "Cancel",
+      "available": "{name}'s {provider} subscription",
+      "availableState": "Available",
+      "provider": {
+        "claude": "Claude",
+        "codex": "ChatGPT"
+      }
+    },
+    "archivedBots": {
+      "heading": "Paused bots",
+      "takeOver": "Take over"
+    },
+    "paymentDesignation": {
+      "heading": "Payment",
+      "mine": "Pay for this team with my card",
+      "payer": "{name}'s card",
+      "active": "Paying",
+      "until": "Stops paying on {date}"
+    },
+    "personalPolicy": {
+      "loading": "Loading personal subscription settings",
+      "heading": "Personal subscriptions",
+      "subscriptions": "Let members use their own subscriptions and API keys"
+    },
     "appPolicy": {
       "loading": "Loading app permissions",
       "heading": "Apps bots may use",
@@ -2271,7 +2320,7 @@
       "byBot": "By bot",
       "byMember": "By member",
       "exportCsv": "Export CSV",
-      "threads": "Threads",
+      "threads": "New threads",
       "runTime": "Run time",
       "runSeconds": "Run seconds",
       "bot": "Bot",
@@ -2342,16 +2391,41 @@
         "model": "Model",
         "actions": "Actions"
       },
+      "hostedDefault": "Mikka Default",
       "defaults": "Task defaults",
-      "noAccount": "No account connected",
-      "whenQuotaExhausted": "When quota runs out",
-      "quotaStop": "Stop and wait for me",
-      "quotaSwitch": "Switch to another account",
+      "fallbacks": "When something goes wrong",
       "setting": "{name}: {value}",
       "whenDeviceOffline": "When the device is offline",
       "offlineWait": "Wait for it",
       "offlineCloud": "Run in the cloud",
       "labels": "By label"
+    },
+    "apiKeys": {
+      "add": "Add API key",
+      "addConfirm": "Add",
+      "verifying": "Verifying…",
+      "apiKey": "API key",
+      "providerLabel": "Provider",
+      "name": "Name",
+      "protocolLabel": "Protocol",
+      "models": "Models (optional)",
+      "provider": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "deepseek": "DeepSeek",
+        "kimi": "Kimi",
+        "custom": "Custom provider"
+      },
+      "protocol": {
+        "openai": "OpenAI-compatible",
+        "anthropic": "Anthropic-compatible"
+      },
+      "shareLabel": "Share {name} with team members",
+      "removeLabel": "Delete {name}",
+      "removeTitle": "Delete {name}?",
+      "othersUsage": "Team members can use it to run their own bots. Usage is billed to your API account.",
+      "afterQuota": "Use an API key when subscription quota runs out",
+      "afterQuotaBilling": "Billed at the API provider's prices"
     }
   },
   "TelegramBot": {
@@ -2782,7 +2856,23 @@
       "sources": "{count, plural, one {# source} other {# sources}}"
     },
     "sendUncertain": "Could not confirm the message was delivered. Resending it unchanged from this box will not duplicate it; after closing or switching boxes, reloading the page or changing accounts, a resend may.",
-    "lengthCount": "{count} / {max}"
+    "lengthCount": "{count} / {max}",
+    "modelPicker": {
+      "label": "Model: {name}",
+      "labelUnavailable": "Model: {name}, unavailable",
+      "hosted": "Mikka Default",
+      "credits": "Credits",
+      "apiKey": "API Key",
+      "metered": "Pay as you go",
+      "shared": "Shared by teammates",
+      "sharedKey": "{name}'s key",
+      "manage": "Manage API and subscriptions",
+      "unavailable": "Unavailable",
+      "notSaved": "Not saved",
+      "unknownModel": "Unknown model",
+      "refresh": "Refresh models",
+      "refreshFailed": "Refresh failed. Try again"
+    }
   },
   "AgentCopy": {
     "pleaseSignInFirst": "Please sign in first.",
@@ -3025,7 +3115,13 @@
     "sendingChoice": "Sending",
     "cloudKeySetup": "Set up your E2B key",
     "dispatchWait": "Wait for it",
-    "dispatchCloud": "Run on Mikka Cloud"
+    "dispatchCloud": "Run on Mikka Cloud",
+    "needsMachineTitle": "This task needs a computer to run on",
+    "needsMachineAuto": "Let this computer be picked automatically",
+    "needsMachineServerOnline": "Bring the server back online",
+    "needsMachineMac": "Enable on this computer",
+    "needsMachineServer": "Connect my server",
+    "needsMachineE2B": "Add E2B key"
   },
   "IssueThreads": {
     "title": "Threads",
@@ -3329,6 +3425,7 @@
       "discussPrefill": "Let's talk about {id} {title}: ",
       "card": {
         "personal": "Personal task",
+        "personalHint": "Personal task · only you can see it",
         "status": "Status",
         "priority": "Priority",
         "subtasks": "Subtasks",
@@ -3876,7 +3973,7 @@
     "confirm": "Done",
     "nameReply": "Call it {name}",
     "named": "Got it. I'm {name} from now on.",
-    "computerAsk": "I can use a cloud computer to browse the web and run code. Turn it on now?",
+    "computerAsk": "With a cloud computer I can browse the web, and threads can run in the cloud. Turn it on now?",
     "computerYes": "Turn on",
     "computerNo": "Not now",
     "computerLater": "OK. You can add an E2B API key in Settings later.",

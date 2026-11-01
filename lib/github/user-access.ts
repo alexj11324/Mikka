@@ -1,5 +1,6 @@
 import 'server-only'
 import { auth } from '@/lib/auth'
+import { githubConnectionToken } from './connection'
 
 export type GitHubAccessCode = 'authRequired' | 'githubNotConfigured' | 'githubNotConnected' | 'githubReconnectRequired' | 'githubRepositoryForbidden' | 'githubPullRequestInvalid' | 'githubIssueInvalid' | 'githubUnavailable'
 
@@ -45,25 +46,34 @@ async function githubGet(token: string, path: string): Promise<{ data: Json; nex
   catch { throw new GitHubAccessError('githubUnavailable', 502) }
 }
 
+/** The Plugins → GitHub connection first; a GitHub sign-in account linked before connections existed still works. */
+async function userToken(headers: Headers, userId: string): Promise<{ token: string; githubAccountId: string }> {
+  let connected: Awaited<ReturnType<typeof githubConnectionToken>>
+  try { connected = await githubConnectionToken(userId) }
+  catch { throw new GitHubAccessError('githubReconnectRequired', 401) }
+  if (connected) return connected
+  const accounts = await auth.api.listUserAccounts({ headers })
+  const account = accounts.find(row => row.providerId === 'github' && row.userId === userId)
+  if (!account) throw new GitHubAccessError('githubNotConnected', 409)
+  try {
+    // Better Auth takes the internal account row id and decrypts its token.
+    const token = (await auth.api.getAccessToken({ headers, body: { accountId: account.id } })).accessToken
+    if (!token) throw new Error('missingToken')
+    return { token, githubAccountId: account.accountId }
+  } catch (error) {
+    if (error && typeof error === 'object' && 'statusCode' in error && typeof error.statusCode === 'number' && error.statusCode >= 500) throw new GitHubAccessError('githubUnavailable', 502)
+    throw new GitHubAccessError('githubReconnectRequired', 401)
+  }
+}
+
 async function authorizedRepositories(headers: Headers) {
   const session = await auth.api.getSession({ headers })
   if (!session?.user) throw new GitHubAccessError('authRequired', 401)
   const appId = process.env.GITHUB_APP_ID
   if (!appId || !/^[1-9]\d*$/.test(appId)) throw new GitHubAccessError('githubNotConfigured', 503)
-  const accounts = await auth.api.listUserAccounts({ headers })
-  const account = accounts.find(row => row.providerId === 'github' && row.userId === session.user.id)
-  if (!account) throw new GitHubAccessError('githubNotConnected', 409)
-  let token: string
-  try {
-    // Better Auth takes the internal account row id and decrypts its token.
-    token = (await auth.api.getAccessToken({ headers, body: { accountId: account.id } })).accessToken
-    if (!token) throw new Error('missingToken')
-  } catch (error) {
-    if (error && typeof error === 'object' && 'statusCode' in error && typeof error.statusCode === 'number' && error.statusCode >= 500) throw new GitHubAccessError('githubUnavailable', 502)
-    throw new GitHubAccessError('githubReconnectRequired', 401)
-  }
+  const { token, githubAccountId } = await userToken(headers, session.user.id)
   const identity = (await githubGet(token, '/user')).data
-  if (githubId(identity.id) !== account.accountId) throw new GitHubAccessError('githubReconnectRequired', 401)
+  if (githubId(identity.id) !== githubAccountId) throw new GitHubAccessError('githubReconnectRequired', 401)
   const installations: string[] = []
   const repositories: AuthorizedGitHubRepository[] = []
   for (let page = 1; ; page++) {
@@ -88,7 +98,7 @@ async function authorizedRepositories(headers: Headers) {
     }
     if (!result.next) break
   }
-  return { userId: session.user.id, githubAccountId: account.accountId, installations, repositories, token }
+  return { userId: session.user.id, githubAccountId, installations, repositories, token }
 }
 
 /** Live GitHub user/App repository intersection; no access is inferred from installation redirect parameters. */

@@ -4,13 +4,14 @@
  * its bubble, until its POST succeeds and the reloaded chat holds it; a
  * failed one stays with 「未发送 · 重试」 so its words are never lost.
  */
-export interface Outgoing { key: string; text: string; state: 'sending' | 'failed' }
+export interface Outgoing { key: string; text: string; images: OutgoingImage[]; state: 'sending' | 'failed' }
+export interface OutgoingImage { uri: string; dataUrl: string }
 
 let next = 0
 
 export const outgoingKey = () => `out-${Date.now()}-${next++}`
 
-export const queued = (list: Outgoing[], key: string, text: string): Outgoing[] => [...list, { key, text, state: 'sending' }]
+export const queued = (list: Outgoing[], key: string, text: string, images: OutgoingImage[] = []): Outgoing[] => [...list, { key, text, images, state: 'sending' }]
 
 export const marked = (list: Outgoing[], key: string, state: Outgoing['state']) => list.map(item => item.key === key ? { ...item, state } : item)
 
