@@ -56,7 +56,7 @@ flowchart TD
    revoked or paused, quota left) and allowed in this workspace. In the
    personal workspace it is always allowed. In a team it is allowed when the
    owner shared it there and the admin has not turned off
-   「允许成员使用个人订阅」. If several qualify, the bot's saved choice wins;
+   「允许成员使用个人订阅和 API Key」. If several qualify, the bot's saved choice wins;
    after that a subscription comes before an API key, and Claude comes before
    ChatGPT/Codex.
 2. **Otherwise another member's credential** shared in this workspace with

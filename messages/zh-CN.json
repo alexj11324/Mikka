@@ -2290,7 +2290,7 @@
     "personalPolicy": {
       "loading": "正在加载个人订阅设置",
       "heading": "个人订阅",
-      "subscriptions": "允许成员使用个人订阅"
+      "subscriptions": "允许成员使用个人订阅和 API Key"
     },
     "appPolicy": {
       "loading": "正在加载应用权限",

@@ -2290,7 +2290,7 @@
     "personalPolicy": {
       "loading": "Loading personal subscription settings",
       "heading": "Personal subscriptions",
-      "subscriptions": "Let members use their own subscriptions"
+      "subscriptions": "Let members use their own subscriptions and API keys"
     },
     "appPolicy": {
       "loading": "Loading app permissions",

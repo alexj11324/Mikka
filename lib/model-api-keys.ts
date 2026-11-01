@@ -156,7 +156,7 @@ export async function removeApiKey(query: Query, ownerId: string, id: string): P
 /**
  * 分享给团队成员 for one key in one team workspace. The caller has checked
  * that the owner is an active member of it. Turning it on needs the admin's
- * 允许成员使用个人订阅; turning it off always works.
+ * 允许成员使用个人订阅和 API Key; turning it off always works.
  */
 export async function setApiKeyShare(query: Query, ownerId: string, workspace: { id: string; kind: 'personal' | 'team' }, id: string, shared: boolean): Promise<void> {
   z.uuid().parse(id)
