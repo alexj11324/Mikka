@@ -71,3 +71,14 @@ test('PR numbers and bare preview hosts', () => {
   assert.equal(pullNumber('https://github.com/alexj11324/Mikka'), null)
   assert.equal(bareUrl('https://mikka-8quhtq3c9-mikka-dev.vercel.app/'), 'mikka-8quhtq3c9-mikka-dev.vercel.app')
 })
+
+test('the step playing is the last one already reached', async () => {
+  const { activeStep } = await import('./evidence-view')
+  const steps = [{ atMs: 0 }, { atMs: 600 }, { atMs: 1200 }]
+  assert.equal(activeStep([], 500), -1)
+  assert.equal(activeStep([{ atMs: 100 }], 50), -1)
+  assert.equal(activeStep(steps, 0), 0)
+  assert.equal(activeStep(steps, 599), 0)
+  assert.equal(activeStep(steps, 600), 1)
+  assert.equal(activeStep(steps, 5000), 2)
+})

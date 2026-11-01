@@ -3782,7 +3782,8 @@
       "githubMergeHeadMoved": "PR 有新提交",
       "githubMergeClosed": "PR 已关闭",
       "githubUnavailable": "GitHub 暂不可用"
-    }
+    },
+    "steps": "操作 {count}"
   },
   "AccountEmail": {
     "exportSubject": "你的 Mikka 数据导出",

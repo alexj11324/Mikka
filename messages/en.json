@@ -3782,7 +3782,8 @@
       "githubMergeHeadMoved": "New commits on the PR",
       "githubMergeClosed": "PR closed",
       "githubUnavailable": "GitHub unavailable"
-    }
+    },
+    "steps": "Steps {count}"
   },
   "AccountEmail": {
     "exportSubject": "Your Mikka data export",

@@ -4,7 +4,7 @@ import type { PoolClient } from 'pg'
 import { RECORDING_MAX_SECONDS, type CaptureView } from '@mikka/protocol/capture'
 import { pool } from '@/lib/db'
 import * as provider from '@/lib/computer/e2b-provider'
-import { currentRecording, failRecording, finishRecording, openRecording, runRecordings, saveCapture, type CaptureError, type CaptureOwner } from './store'
+import { currentRecording, failRecording, finishRecording, markRecordingStarted, openRecording, recordStep, runRecordings, saveCapture, type CaptureError, type CaptureOwner } from './store'
 
 // The cloud computer's capture tools: a screenshot, and a recording started
 // and stopped, of the Bot desktop a thread is bound to. The daemon relays the
@@ -139,6 +139,7 @@ export class ScreenCaptures {
       if (signal.aborted) { await failRecording(slot.id, 'Recording was not started'); return uncertain }
       try {
         await this.runtime.startScreenRecording(sandbox, target.display, slot.id, seconds, signal)
+        await markRecordingStarted(slot.id)
       } catch {
         // Once issued, failure cannot prove that the remote process did not start.
         // Leave the bounded slot for normal end/expiry reconciliation.
@@ -147,6 +148,11 @@ export class ScreenCaptures {
       signal.throwIfAborted()
       return { recordingId: slot.id, stopsAt: stopsAt.toISOString() }
     }, callerSignal)
+  }
+
+  /** A step on this thread's recording in progress (an action's description or a marked moment); false when none is recording. */
+  async step(caller: ScreenCaller, runId: string, label: string, source: 'action' | 'mark') {
+    return recordStep({ userId: caller.userId, runId }, { label, source }, this.now())
   }
 
   async stopRecording(caller: ScreenCaller, runId: string): Promise<CaptureView | CaptureError> {
