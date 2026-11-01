@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
-import { act, cloneElement, type ReactElement } from 'react'
+import { act, cloneElement, type ComponentProps, type ReactElement } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 
@@ -13,7 +13,7 @@ mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExpor
   linkSocial: async () => ({ error: true }),
 } } })
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useLocale: () => 'en', useFormatter: () => ({}) } })
-mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ render, children, disabled, onClick, role }: { render?: ReactElement; children?: React.ReactNode; disabled?: boolean; onClick?: () => void; role?: string }) => render ? cloneElement(render as ReactElement<{ role?: string }>, { role }, children) : <button disabled={disabled} onClick={onClick}>{children}</button> } })
+mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ render, children, nativeButton: _nativeButton, ...props }: ComponentProps<'button'> & { render?: ReactElement; nativeButton?: boolean }) => render ? cloneElement(render as ReactElement<ComponentProps<'button'>>, props, children) : <button {...props}>{children}</button> } })
 
 const browser = new Window({ url: 'https://mikka.example/en?settings=integrations' })
 const originalFetch = globalThis.fetch
@@ -22,6 +22,9 @@ let composioRequests = 0
 // Plugins › GitHub's write settings, as the permissions route answers them.
 let permissions: Record<string, unknown> | null = null
 const patches: unknown[] = []
+let verification: { viewerId: string; repository: string; verifyCommand: string | null } | null = null
+let verificationSaveFails = false
+const verificationPatches: unknown[] = []
 let container: HTMLDivElement
 let root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -43,12 +46,19 @@ before(async () => {
 beforeEach(() => {
   userId = 'viewer-a'; pending = false; requests.length = 0; composioRequests = 0; patches.length = 0
   permissions = null
+  verification = null; verificationSaveFails = false; verificationPatches.length = 0
   browser.history.replaceState({}, '', '?settings=integrations')
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
   globalThis.fetch = (input, init) => String(input).endsWith('/github')
     ? new Promise<Response>(resolve => { requests.push({ resolve }) })
+    : String(input).includes('/github/repositories/verification')
+      ? init?.method === 'PATCH'
+        ? (verificationPatches.push(JSON.parse(String(init.body))), verificationSaveFails
+          ? Promise.reject(new Error('synthetic response loss'))
+          : Promise.resolve(Response.json({ ...verification, ...JSON.parse(String(init.body)) })))
+        : Promise.resolve(Response.json(verification))
     : String(input).endsWith('/github/permissions')
       ? init?.method === 'PATCH'
         ? (patches.push(JSON.parse(String(init.body))), Promise.resolve(Response.json({ ...permissions, ...JSON.parse(String(init.body)), version: '1:1' })))
@@ -265,6 +275,95 @@ test('a connected page shows the account and a repository count; the names open 
   })
   assert.ok(!dialog?.querySelector('a[href="https://github.com/octo/private"]'))
   assert.ok(dialog?.querySelector('a[href="https://github.com/octo/site"]'))
+})
+
+async function openVerificationEditor() {
+  await render()
+  await respond(0, userId!, 'octo/verification')
+  const repositories = [...container.querySelectorAll('button')].find(button => button.textContent === 'githubRepositories(1)')!
+  await act(async () => { repositories.click() })
+  await frame()
+  const edit = document.body.querySelector<HTMLButtonElement>('button[aria-label="githubVerificationFor(octo/verification)"]')!
+  assert.ok(edit)
+  await act(async () => { edit.click() })
+  await frame()
+  return document.body.querySelector<HTMLElement>('[role="dialog"]')!
+}
+async function enterVerification(input: HTMLInputElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(browser.HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event)
+  })
+}
+
+test('a repository command saves and an empty command explicitly clears it', async () => {
+  userId = 'viewer-verification'
+  verification = { viewerId: userId, repository: 'octo/verification', verifyCommand: 'pnpm check' }
+  const dialog = await openVerificationEditor()
+  const input = dialog.querySelector<HTMLInputElement>('#github-verification-command')!
+  assert.equal(input.value, 'pnpm check')
+  await enterVerification(input, '  pnpm test  ')
+  await act(async () => { dialog.querySelector<HTMLFormElement>('form')!.requestSubmit() })
+  assert.deepEqual(verificationPatches, [{ repository: 'octo/verification', verifyCommand: 'pnpm test' }])
+  assert.ok(dialog.textContent?.includes('githubRepositoriesDialog'))
+  await act(async () => { dialog.querySelector<HTMLButtonElement>('button[aria-label="githubVerificationFor(octo/verification)"]')!.click() })
+  await frame()
+  const saved = dialog.querySelector<HTMLInputElement>('#github-verification-command')!
+  assert.equal(saved.value, 'pnpm test')
+  await enterVerification(saved, '')
+  await act(async () => { dialog.querySelector<HTMLFormElement>('form')!.requestSubmit() })
+  assert.deepEqual(verificationPatches[1], { repository: 'octo/verification', verifyCommand: null })
+})
+
+test('a lost command-save response retains the entered command for an explicit retry', async () => {
+  userId = 'viewer-verification-retry'
+  verification = { viewerId: userId, repository: 'octo/verification', verifyCommand: null }
+  const dialog = await openVerificationEditor()
+  const input = dialog.querySelector<HTMLInputElement>('#github-verification-command')!
+  await enterVerification(input, 'pnpm test')
+  verificationSaveFails = true
+  await act(async () => { dialog.querySelector<HTMLFormElement>('form')!.requestSubmit() })
+  assert.equal(input.value, 'pnpm test')
+  assert.ok(dialog.textContent?.includes('githubVerificationSaveUnconfirmed'))
+  verificationSaveFails = false
+  await act(async () => { dialog.querySelector<HTMLFormElement>('form')!.requestSubmit() })
+  assert.equal(verificationPatches.length, 2)
+  assert.ok(dialog.textContent?.includes('githubRepositoriesDialog'))
+})
+
+test('a verification response for another viewer does not expose a command or enable saving', async () => {
+  userId = 'viewer-verification-own'
+  verification = { viewerId: 'different-viewer', repository: 'octo/verification', verifyCommand: 'private peer command' }
+  const dialog = await openVerificationEditor()
+  assert.ok(dialog.textContent?.includes('githubVerificationLoadFailed'))
+  assert.equal(dialog.querySelector('#github-verification-command'), null)
+  assert.ok(dialog.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled)
+  assert.ok(!dialog.textContent?.includes('private peer command'))
+  assert.equal(verificationPatches.length, 0)
+})
+
+test('an old save completing after dialog dismissal cannot discard the reopened editor draft', async () => {
+  userId = 'viewer-verification-deferred'
+  verification = { viewerId: userId, repository: 'octo/verification', verifyCommand: null }
+  let dialog = await openVerificationEditor()
+  await enterVerification(dialog.querySelector<HTMLInputElement>('#github-verification-command')!, 'pnpm first')
+  const original = globalThis.fetch
+  let complete!: (response: Response) => void
+  globalThis.fetch = (input, init) => init?.method === 'PATCH'
+    ? new Promise(resolve => { complete = resolve })
+    : original(input, init)
+  await act(async () => { dialog.querySelector<HTMLFormElement>('form')!.requestSubmit() })
+  await act(async () => { dialog.querySelector<HTMLButtonElement>('[data-slot="dialog-close"]')!.click() })
+  await frame()
+  await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === 'githubRepositories(1)')!.click() })
+  await frame()
+  dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')!
+  await act(async () => { dialog.querySelector<HTMLButtonElement>('button[aria-label="githubVerificationFor(octo/verification)"]')!.click() })
+  await frame()
+  const current = dialog.querySelector<HTMLInputElement>('#github-verification-command')!
+  await enterVerification(current, 'pnpm newer')
+  await act(async () => { complete(Response.json({ ...verification, verifyCommand: 'pnpm first' })) })
+  assert.equal(dialog.querySelector<HTMLInputElement>('#github-verification-command')?.value, 'pnpm newer')
 })
 
 test('only the pull request carries a control, allow or deny; the push reads as the GitHub App\'s own grant', async () => {

@@ -19,6 +19,16 @@ for (const width of [1280, 402]) {
     const id = await viewerId(page)
     let connected = true
     let mismatchedViewer = false
+    let verifyCommand: string | null = null
+    await page.route('**/api/integrations/github/repositories/verification*', route => {
+      const request = route.request()
+      if (request.method() === 'PATCH') {
+        const input = request.postDataJSON()
+        expect(input.repository).toBe('fixture-owner/non-production-repo')
+        verifyCommand = input.verifyCommand
+      }
+      return route.fulfill({ json: { viewerId: id, repository: 'fixture-owner/non-production-repo', verifyCommand } })
+    })
     await page.route('**/api/integrations/github', route => route.fulfill({ json: {
       viewerId: mismatchedViewer ? 'different-fixture-viewer' : id,
       configured: true, connected, installed: connected,
@@ -38,6 +48,21 @@ for (const width of [1280, 402]) {
     const repositories = dialog.getByRole('list', { name: '你已授权的 GitHub 仓库', exact: true })
     await expect(repositories).toContainText('fixture-owner/non-production-repo')
     await expect(repositories.getByRole('link', { name: /fixture-owner\/non-production-repo/ })).toHaveAttribute('href', 'https://github.com/fixture-owner/non-production-repo')
+    const editVerification = () => page.getByRole('button', { name: 'fixture-owner/non-production-repo 的验证命令', exact: true }).click()
+    await editVerification()
+    const editor = page.getByRole('dialog', { name: 'fixture-owner/non-production-repo', exact: true })
+    const command = editor.getByRole('textbox', { name: '验证命令', exact: true })
+    await expect(command).toBeEnabled()
+    await command.fill('pnpm test')
+    await editor.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(dialog).toBeVisible()
+    expect(verifyCommand).toBe('pnpm test')
+    await editVerification()
+    await expect(command).toHaveValue('pnpm test')
+    await command.fill('')
+    await editor.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(dialog).toBeVisible()
+    expect(verifyCommand).toBeNull()
     await dialog.getByRole('textbox', { name: '搜索仓库', exact: true }).fill('nothing-matches')
     await expect(repositories.getByRole('link')).toHaveCount(0)
     await testInfo.attach(`github-settings-repositories-dialog-${width}`, { body: await page.screenshot(), contentType: 'image/png' })
