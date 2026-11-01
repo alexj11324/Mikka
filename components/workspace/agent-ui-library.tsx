@@ -23,6 +23,7 @@ import { AgentAreaChart, AgentBarChart, AgentDonutChart, AgentLineChart, AgentRa
 import { AgentCitations, AgentFileDiff, AgentFileTree, AgentTable } from './agent-report'
 import { AgentEditableTable } from './agent-editable-table'
 import { AgentSteps } from './agent-steps'
+import { AgentOpenUIButton } from './agent-openui-button'
 
 const renderers = {
   TextContent: AgentTextContent,
@@ -120,5 +121,5 @@ const block = <Render,>(name: string, render: Render): Render => FLOW.has(name) 
 const blocks = Object.fromEntries(Object.entries({ ...renderers, ...legacyRenderers }).map(([name, render]) => [name, block(name, render)])) as typeof renderers & typeof legacyRenderers
 
 // OpenUI built-ins the host draws itself, under OpenUI's own name and schema.
-const builtIns: Record<string, unknown> = { Steps: AgentSteps }
+const builtIns: Record<string, unknown> = { Steps: AgentSteps, Button: AgentOpenUIButton }
 export const agentUILibrary = createAgentLibrary(blocks, (name, render) => block(name, (builtIns[name] as typeof render | undefined) ?? render))
