@@ -6,7 +6,7 @@ export type ThreadStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped'
 export interface Person { id: string; name: string; email: string; image: string | null }
 export interface Workspace { id: string; name: string }
 
-export interface HomeBot { id: string; name: string; color: string; shape: string; line: string | null; at: string | null; working: boolean; pinned?: boolean }
+export interface HomeBot { id: string; name: string; color: string; shape: string; /** Plain text; an empty string is a card with no words. */ line: string | null; at: string | null; working: boolean; pinned?: boolean }
 
 export interface Home {
   user: Person

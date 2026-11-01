@@ -50,3 +50,16 @@ test('consecutive messages from one author form one run', () => {
   const runs = group.authorRuns([message('1', 'u1'), message('2', 'u1'), message('3', 'a1', 'agent'), message('4', 'u1')])
   assert.deepEqual(runs.map(run => [run.authorType, run.authorId, run.messages.length]), [['user', 'u1', 2], ['agent', 'a1', 1], ['user', 'u1', 1]])
 })
+
+test('(mock fetch) the bot list reads group chats and a chat reads its members through the basePath API', async () => {
+  const urls: string[] = []
+  const reply = (body: unknown, status = 200) => (async (input: Parameters<typeof fetch>[0]) => { urls.push(String(input)); return Response.json(body, { status }) }) as typeof fetch
+  const summary = { id: ID, workspaceId: 'w1', title: '0.9.5 发版群', createdAt: '2026-10-26T00:00:00.000Z', lastMessage: message('3', 'b1') }
+  assert.deepEqual(await group.fetchGroups('w1', reply({ conversations: [summary] })), [summary])
+  const bot = { id: 'b1', name: '发布经理', memberType: 'bot', color: 'rouge', shape: 'etoile' }
+  assert.deepEqual(await group.fetchGroupMembers(ID, reply({ members: [bot] })), [bot])
+  assert.deepEqual(urls, ['/mikka/api/conversations?workspaceId=w1', `/mikka/api/conversations/${ID}/members`])
+  await assert.rejects(group.fetchGroups('w1', reply({ error: 'not_found' }, 404)), (error: unknown) => error instanceof group.GroupMessagesRequestError && error.code === 'not_found')
+  await assert.rejects(group.fetchGroupMembers(ID, reply({ members: 'nope' })), (error: unknown) => error instanceof group.GroupMessagesRequestError && error.code === 'unavailable')
+  await assert.rejects(group.fetchGroups('w1', (async () => { throw new TypeError('offline') }) as typeof fetch), (error: unknown) => error instanceof group.GroupMessagesRequestError && error.code === 'unavailable')
+})

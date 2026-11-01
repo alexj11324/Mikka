@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { agentRuns, agents, oauthClients, type ArtifactKind } from '@/lib/db/schema'
 import { submitArtifact, type ArtifactSubmitter } from '@/lib/artifacts/store'
 import { withBasePath } from '@/lib/base-path'
-import { runBotName } from '@/lib/run-bot-name'
+import { runAgentName } from '@/lib/run-bot-name'
 import { maskForRun } from '@/lib/secrets/runtime'
 
 // submit_artifact, the one way any harness hands a document or web page to
@@ -14,9 +14,9 @@ import { maskForRun } from '@/lib/secrets/runtime'
 
 export interface SubmitInput { title: string; kind: ArtifactKind; content: string; artifactId?: string }
 
-/** The submitter for a run token: the run's agent. */
+/** The submitter for a run token: the run's Agent (Claude Code, Codex), never the Bot that dispatched it (R-78). */
 export async function runSubmitter(run: { id: string; userId: string; botId?: string | null; issueId: string | null }): Promise<ArtifactSubmitter> {
-  const [row] = await db.select({ name: runBotName }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, run.id)).limit(1)
+  const [row] = await db.select({ name: runAgentName }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, run.id)).limit(1)
   return { userId: run.userId, botId: run.botId ?? null, runId: run.id, issueId: run.issueId, authorName: row?.name ?? 'Coordinator' }
 }
 

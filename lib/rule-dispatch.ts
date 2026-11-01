@@ -10,6 +10,9 @@ import { ActionFailureError } from "./action-error";
 import type { HarnessInfo } from "@mikka/protocol/harness";
 import { autoScheduleOn } from "./device-auto-schedule";
 import { defaultAgentCopy } from "./agent-copy";
+import { harnessForModel } from "@mikka/protocol/harness";
+import { HOSTED_CHOICE } from "./bot-model-menu-view";
+import { COORDINATOR_MODEL } from "./coordinator/model";
 
 type Query = Pick<Pool, "query">;
 type DeviceRow = ExecutionDevice & { lastSeenAt: Date | null; deviceType?: string | null; autoSchedule?: boolean | null };
@@ -112,13 +115,39 @@ export async function resolveIssueExecution(
     const target = await deviceTarget(ownerId, resolution);
     return { ...target, workspaceId, issue, pinnedDeviceId: resolution.place };
   }
+  // No rule: the thread's model by §2, run on the Agent for that model (§3).
+  const chosen = resolution ?? await (async () => {
+    const thread = await threadModel(settings, { ownerId, workspaceId }, botId);
+    return { place: "cloud", harness: harnessForModel(thread.model), model: thread.model, subscription: thread.subscription };
+  })();
   // Cloud, by rule or because nothing else matched. A device is the fallback.
-  const harness = resolution?.harness ?? null;
-  const fallback = await fallbackDevice(pool, ownerId, devices, rules, harness);
-  if (resolution && (await cloudReady(pool, { ownerId, workspaceId, botId, harness: resolution.harness })))
-    return { ...resolution, place: "cloud" as const, workspaceId, issue, ...(fallback ? { fallback } : {}) };
+  const harness = chosen.harness;
+  const found = await fallbackDevice(pool, ownerId, devices, rules, harness);
+  // A subscription model on the same Agent goes to the device's run; otherwise the device's own default.
+  const fallback = found && !resolution && "subscription" in chosen && chosen.subscription && found.harness === harness
+    ? { ...found, model: chosen.model } : found;
+  if (await cloudReady(pool, { ownerId, workspaceId, botId, harness }))
+    return { place: "cloud" as const, harness, model: chosen.model, workspaceId, issue, ...(fallback ? { fallback } : {}) };
   if (fallback) return { ...fallback, workspaceId, issue };
   return { needsMachine: true as const, workspaceId, issue, card: machineUnavailableCard(devices) };
+}
+
+/**
+ * A thread's model when no rule names one (orchestration.md §2): the same order
+ * as the bot's chat, without saving anything. The bot's saved choice; else the
+ * owner's subscription here (Claude first); else one a teammate shares with
+ * 分享给团队成员; else Mikka 默认. `subscription` tells a device run it may pass
+ * the model to its Agent.
+ */
+export async function threadModel(settings: ExecutionSettings, scope: { ownerId: string; workspaceId: string }, botId: string | null) {
+  const saved = (await pool.query('SELECT "bindingId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+    [scope.ownerId, scope.workspaceId, botId ?? "coordinator"])).rows[0];
+  if (saved && !saved.bindingId) return { model: COORDINATOR_MODEL, subscription: false };
+  const available = await settings.botModels(scope);
+  const binding = (saved?.bindingId && saved.bindingId !== HOSTED_CHOICE ? await settings.botBinding(scope, saved.bindingId) : undefined)
+    ?? available.find((row) => row.provider === "claude") ?? available[0]
+    ?? (botId ? (await settings.pooledBindings(scope))[0] : undefined);
+  return binding ? { model: String(binding.modelId), subscription: true } : { model: COORDINATOR_MODEL, subscription: false };
 }
 
 async function deviceTarget(ownerId: string, selected: { place: string; harness: string; model: string }): Promise<DeviceTarget> {

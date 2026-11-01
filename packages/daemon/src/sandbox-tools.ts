@@ -2,8 +2,8 @@
 // of them needs root to run, so a missing tool is fetched from the machine's
 // own signed apt sources and kept in the daemon's data directory. Never sudo:
 // a background service must not change the system.
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readlinkSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { dirname, isAbsolute, join } from "node:path"
 
 import { execa } from "execa"
 
@@ -80,12 +80,26 @@ export async function ensureSandboxTools(options: {
   return missing
 }
 
+/** The command in a .deb can be a symlink to the real binary: socat 1.8
+ * (Ubuntu 24.04) ships `/usr/bin/socat` as a link to `socat1`. Follow it inside
+ * the unpacked tree so the real executable is installed, not a link that dangles
+ * once the staging directory is removed. */
+function resolveUnpackedBinary(root: string, command: string): string {
+  let path = join(root, "usr", "bin", command)
+  for (let hops = 0; hops < 10; hops++) {
+    if (!lstatSync(path).isSymbolicLink()) return path
+    const target = readlinkSync(path)
+    path = isAbsolute(target) ? join(root, `.${target}`) : join(dirname(path), target)
+  }
+  throw new Error(`${command} resolves through too many symlinks`)
+}
+
 /** Keep the tool if it runs as is; a minimal image may lack its libraries, so bring those too. */
 async function installTool(tool: (typeof TOOLS)[number], context: { work: string; dataDir: string; apt: string[]; run: ToolRunner }) {
   const { work, dataDir, apt, run } = context
   const root = join(work, "root")
   await run("dpkg-deb", ["-x", join(work, debFile(work, tool.package)), root], work)
-  const unpacked = join(root, "usr", "bin", tool.command)
+  const unpacked = resolveUnpackedBinary(root, tool.command)
   chmodSync(unpacked, 0o755)
   const binDir = sandboxToolsDir(dataDir)
   try {

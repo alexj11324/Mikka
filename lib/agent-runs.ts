@@ -33,6 +33,7 @@ export interface RunView {
   waitFor?: string
   issueId: string | null
   agentId: string
+  /** The Bot that dispatched the run; `harness` is the Agent that executes it (R-78). */
   agentName: string
   harness: SupportedHarness
   status: string

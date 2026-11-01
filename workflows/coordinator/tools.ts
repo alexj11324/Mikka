@@ -110,7 +110,7 @@ export function createCoordinatorRegistry(userId: string, botId: string | null, 
       resolve_factory_task: tool({description:'Record a subsequent actual user response to intake clarification. It grants no execution or publication permission. Use the exact current binding and original response event.',inputSchema:resolveInput,execute:input=>steps.resolveFactoryTaskScoped(userId,input,scope,botId)}),
     } : {}),
     list_agents: tool({
-      description: 'List available local execution tools and their computers. Use the internal id as agentId for dispatch_run with a repository URL; no repository registration is needed. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, never an Agent.',
+      description: 'List available local execution tools and their computers. Use the internal id as agentId for dispatch_run with a repository URL; no repository registration is needed. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, run by its Agent (Claude Code or Codex).',
       inputSchema: z.object({}),
       execute: () => steps.listAgents(userId, scope),
     }),

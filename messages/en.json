@@ -152,7 +152,8 @@
     "openBotChat": "Open Bot chat",
     "archivedConversation": "Archived: {title}",
     "suggestions": "Suggestions",
-    "artifacts": "Artifact"
+    "artifacts": "Artifact",
+    "cardPreview": "[Card]"
   },
   "Plugins": {
     "title": "Plugins",
@@ -2310,7 +2311,7 @@
       "byBot": "By bot",
       "byMember": "By member",
       "exportCsv": "Export CSV",
-      "threads": "Threads",
+      "threads": "New threads",
       "runTime": "Run time",
       "runSeconds": "Run seconds",
       "bot": "Bot",
@@ -3939,7 +3940,7 @@
     "confirm": "Done",
     "nameReply": "Call it {name}",
     "named": "Got it. I'm {name} from now on.",
-    "computerAsk": "I can use a cloud computer to browse the web and run code. Turn it on now?",
+    "computerAsk": "With a cloud computer I can browse the web, and threads can run in the cloud. Turn it on now?",
     "computerYes": "Turn on",
     "computerNo": "Not now",
     "computerLater": "OK. You can add an E2B API key in Settings later.",
