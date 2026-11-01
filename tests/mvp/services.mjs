@@ -29,8 +29,12 @@ async function readBody(request) {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {}
 }
 
-/** Loopback only. Real git changes are required before the fake GitHub accepts a PR. */
-export async function startMvpServices(port = 3191) {
+/**
+ * Loopback only. Real git changes are required before the fake GitHub accepts a PR.
+ * `routes` (pnpm dev:local's other substitutes, scripts/dev-local/services.mjs)
+ * sees each request first and returns true when it answered it.
+ */
+export async function startMvpServices(port = 3191, { routes } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-mvp-origin-'))
   await indexMvpResource('origin-directory', directory)
   let scenario = null
@@ -44,6 +48,7 @@ export async function startMvpServices(port = 3191) {
     const url = new URL(request.url, 'http://127.0.0.1')
     const reply = (value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json', 'x-mvp-request-id': requestId }); response.end(JSON.stringify(value)) }
     try {
+      if (routes && await routes(request, response, url)) return
       if (url.pathname === '/health') return reply({ ready: true })
       if (url.pathname === '/observations') return reply({ observations, errors, pullRequests: pullRequests.map(pr => ({ number: pr.number, url: pr.html_url, branch: pr.head.ref, draft: pr.draft })) })
       if (url.pathname === '/streaming/scenario' && request.method === 'POST') {
@@ -123,6 +128,21 @@ export async function startMvpServices(port = 3191) {
         assert.equal(input.questions?.length, 1)
         const question = input.questions[0]
         assert.equal(question.type, 'choice')
+        if (question.name === 'push') {
+          // Whether a Coordinator reply also goes to the phone (lib/push-reasons.ts):
+          // the answered events and the reply, one per line, as plain text.
+          assert.deepEqual(question.choices?.map(choice => choice.value), ['decide', 'review', 'finished', 'briefing', 'none'])
+          assert.equal(typeof input.input, 'string')
+          const answersPerson = /^answeredEvents: .+\nanswersAMessageFromThePerson: (yes|no)\nreply: .+$/s.exec(input.input)?.[1]
+          assert.ok(answersPerson, 'Unexpected push evidence')
+          observe({ kind: 'push-request', requestId, answersPerson })
+          // The person is in the chat they just wrote in: no phone notification.
+          return reply({
+            model: input.model,
+            provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}`, cost: '0.001' } },
+            answers: [{ type: 'choice', name: 'push', choice: 'none' }],
+          })
+        }
         assert.equal(input.input?.length, 1)
         assert.equal(input.input[0].role, 'user')
         assert.equal(input.input[0].content?.length, 1)
