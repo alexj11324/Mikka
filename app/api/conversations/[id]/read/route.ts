@@ -14,9 +14,8 @@ async function respond(request: Request, id: string, method: ReadRequest['method
   const session = await auth.api.getSession({ headers: request.headers })
   const userId = session?.user?.id ?? null
   const result = await handleRead(pool, {
-    // The Coordinator is an ordinary bot (#757): its chat is its bot's rows, resolved at this entry point.
-    coordinatorBot: session?.user ? async () => (await import('@/lib/coordinator/coordinator-bot')).chatBotId(session.user.id, null,
-      (await (await import('@/lib/workspace-access')).loadWorkspaceContext(undefined, session.user)).workspace.id) : undefined,
+    // The Coordinator is an ordinary bot (#757): the `coordinator` conversation is the chat of the open workspace's one.
+    coordinatorBot: session?.user ? async () => (await import('@/lib/coordinator/coordinator-bot')).openChatBotId(session.user, null) : undefined,
     method,
     userId,
     conversationId: id,
