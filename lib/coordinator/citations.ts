@@ -31,6 +31,8 @@ export interface RunSource {
   status: string
   /** How it came out once it ended (R-52); null while running or not judged yet. */
   outcome?: string | null
+  /** Its group in the thread list (R-52), decided on the server: the phone draws it as is. */
+  group?: import('@/lib/thread-groups').ThreadGroup
   issue: { id: string; number: number | null; identifier: string | null; title: string } | null
   /** The thread's name: the first line of what it was asked to do. */
   name: string
