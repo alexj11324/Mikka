@@ -132,13 +132,12 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None):
         context = Path(temp)
         sha = source_context(context, ref)
         template = (Template(file_context_path=str(context)).from_template('desktop')
+                    # The inherited /home/user is 0750. Both build checks and
+                    # envd runtime commands must also start as mikka-runner.
+                    .set_workdir('/')
                     .copy('bootstrap.sh', '/tmp/mikka-bootstrap.sh')
                     .run_cmd('bash /tmp/mikka-bootstrap.sh', user='root')
-                    # The inherited /home/user is 0750; the infrastructure runner
-                    # cannot enter it when envd starts this build-time check.
-                    .set_workdir('/tmp')
                     .run_cmd(NPM_RUNTIME_CHECK, user='mikka-runner')
-                    .set_workdir('/home/user')
                     .copy('worker.tar', '/tmp/mikka-worker.tar')
                     .copy('source-sha', '/opt/mikka/worker-source-sha')
                     .run_cmd('mkdir -p /opt/mikka/worker && tar -xf /tmp/mikka-worker.tar -C /opt/mikka/worker && rm /tmp/mikka-worker.tar && cd /opt/mikka/worker && HOME=/tmp corepack pnpm install --filter @mikka/daemon... --frozen-lockfile && node packages/daemon/scripts/build-cloud-worker.mjs && chown -R root:root /opt/mikka/worker && chmod -R go-w /opt/mikka/worker && chown root:root /opt/mikka/worker-source-sha && chmod 0444 /opt/mikka/worker-source-sha', user='root')
