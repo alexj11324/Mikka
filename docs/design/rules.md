@@ -152,7 +152,7 @@ source wins in a conflict is in [`README.md`](README.md).
   only while online. Without a key Mikka Cloud is grey and marked 填入 E2B Key,
   which opens the key dialog. A dot is green only while the machine is
   actually online (Mikka Cloud: running)
-  ([decision](decisions/2026-11-01-2240-default-first-usable-machine.md)).
+  ([decision](decisions/2026-11-01-2250-default-first-usable-machine.md)).
 - **R-24** A device's online state is a StatusDot on the top-right of its
   icon (green online, grey offline, red error), never a text badge.
 - **R-25** Board cards follow Figma 「看板卡片 v1」 (`714:5283`): a filled card
@@ -204,7 +204,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the right as a conversation that ends in the composer (R-10); people and
   the agent talk there. A thread's content is its owner's alone: teammates
   (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
-  as GitHub Copilot and Cursor keep agent sessions private; what the thread
+  as GitHub Copilot and Cursor keep agent sessions private (Alex:
+  「永远只能自己看」, [decision 2026-11-01-2245](decisions/2026-11-01-2245-thread-privacy-and-local-isolation.md)); what the thread
   produces (a PR, a comment its owner posts) is how the team sees the work. The bot dispatches the thread; the Agent it hands the work
   to (Codex, Claude Code) runs it, and where a thread carries an icon
   other than its status, that icon is the Agent's mark (R-78).
@@ -370,7 +371,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `icons/no-sparkle`).
 - **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
-  value read-only. A stored off is an admin's choice, never a leftover
+  value read-only. A person's own subscriptions and API keys are not such a
+  feature: they always run that person's own bots, with no switch; an admin
+  can switch off only 「分享给团队成员」 (decision
+  [2026-11-01-2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). A stored off is an admin's choice, never a leftover
   default: a migration that turns a default on also rewrites rows that hold
   the old default. A feature stays off only for real per-use cost, an
   incident kill switch or a recorded Alex decision (`decisions.md`). Safety

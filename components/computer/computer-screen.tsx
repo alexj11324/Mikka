@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { MousePointer2, Power } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
@@ -80,13 +80,20 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
 }) {
   const t = useTranslations('Computer')
   const { data: state, error, mutate } = useComputer(botId)
+  const wakeInFlight = useRef(false)
+  const [wakePending, setWakePending] = useState(false)
+  const waking = wakePending || state?.machine === 'waking'
   const running = state?.machine === 'running'
   const { data: grant, error: grantError, mutate: renewGrant } = useViewerGrant(botId, mode, running && live)
   const approval = state?.pendingApproval
   const target = approval?.action.rect ?? (state?.control === 'agent' ? state.lastAction?.rect : undefined)
   const point = approval ? { x: approval.action.x, y: approval.action.y } : state?.control === 'agent' ? { x: state.lastAction?.x, y: state.lastAction?.y } : null
   async function wake() {
+    if (wakeInFlight.current) return
+    wakeInFlight.current = true
+    setWakePending(true)
     try { await computerApi.wake(botId); await mutate() } catch { toast.error(t('wakeFailed')) }
+    finally { wakeInFlight.current = false; setWakePending(false) }
   }
   const label = t('screenOf', { name })
   return <div className={cn('@container/screen relative aspect-[16/10] w-full overflow-hidden bg-screen text-screen-foreground', frame === 'rounded' ? 'rounded-lg' : 'rounded-xl')}>
@@ -97,9 +104,9 @@ export function ComputerScreen({ botId, name, mode = 'view', live = true, showTa
     {running && live && showTarget && point?.x !== undefined && point.y !== undefined && <Cursor x={point.x} y={point.y} />}
     {state && !running && <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-[inherit] bg-screen/80 backdrop-blur-sm">
       {/* The caption under the screen names the state; asleep the cover only offers 唤醒 (Figma 188:3115). */}
-      {state.machine === 'sleeping' && <Button size="sm" className="h-9 rounded-full bg-screen-foreground/15 px-3.5 text-screen-foreground hover:bg-screen-foreground/25" onClick={() => { void wake() }}><Power data-icon="inline-start" />{t('wake')}</Button>}
-      {state.machine === 'waking' && <Progress aria-label={t('waking')} value={null} className="w-1/3 max-w-40" />}
-      {state.machine === 'error' && <>
+      {state.machine === 'sleeping' && !waking && <Button size="sm" className="h-9 rounded-full bg-screen-foreground/15 px-3.5 text-screen-foreground hover:bg-screen-foreground/25" onClick={() => { void wake() }}><Power data-icon="inline-start" />{t('wake')}</Button>}
+      {waking && <Progress aria-label={t('waking')} value={null} className="w-1/3 max-w-40" />}
+      {state.machine === 'error' && !waking && <>
         <p className="text-sm">{t('machineError')}</p>
         <Button size="sm" variant="secondary" className="rounded-lg" onClick={() => { void wake() }}><Power data-icon="inline-start" />{t('retry')}</Button>
       </>}

@@ -2310,7 +2310,6 @@
     },
     "subscriptionShare": {
       "heading": "This workspace",
-      "share": "Use my subscriptions here",
       "blocked": "Turned off by an admin",
       "others": "Share with team members",
       "othersTitle": "Share {name} with team members?",
@@ -3218,6 +3217,10 @@
       "worktree": "Worktree",
       "agent_start": "Agent start",
       "duration": "{seconds}s"
+    },
+    "runInfo": {
+      "paidBy": "{owner}'s {plan}",
+      "movedTo": "Moved to {machine} to continue"
     }
   },
   "Computer": {

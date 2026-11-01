@@ -2310,7 +2310,6 @@
     },
     "subscriptionShare": {
       "heading": "这个工作区",
-      "share": "在这里使用我的订阅",
       "blocked": "管理员已关闭",
       "others": "分享给团队成员",
       "othersTitle": "分享 {name} 给团队成员？",
@@ -3218,6 +3217,10 @@
       "worktree": "创建工作区",
       "agent_start": "启动 agent",
       "duration": "{seconds}s"
+    },
+    "runInfo": {
+      "paidBy": "{owner} 的 {plan}",
+      "movedTo": "已换到 {machine} 继续"
     }
   },
   "Computer": {
