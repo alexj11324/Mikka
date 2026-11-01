@@ -94,6 +94,68 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
   return (m?.sandboxId as string | null) ?? null
 }
 
+/**
+ * One task, one sandbox (Alex, 2026-11-01: 「任务跟沙箱机器应该是强绑定。不能一个任务用完之后，
+ * 另外一个任务接着去用，这是不允许的。」). A new run of a task takes over the task's
+ * own paused sandbox: same owner, workspace, bot, task and repository, and the
+ * run that left it has ended. The old row ends without a kill and gives up the
+ * sandbox; the new row resumes it, so the worktree, the agent's sessions and
+ * the worker survive. No other task's machine can match. Caller holds BEGIN
+ * and the new run's lock.
+ */
+async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }) {
+  const previous = (await client.query(`SELECT m.* FROM thread_machines m
+      JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
+      JOIN device_repos repo ON repo.id=m."repoId" AND repo."userId"=m."ownerId"
+    WHERE m."ownerId"=$1 AND m."workspaceId"=$2 AND m."botId"=$3 AND m."issueId"=$4 AND m."runId"<>$5
+      AND m.state='paused' AND m."sandboxId" IS NOT NULL AND m."deviceId" IS NOT NULL
+      AND r.status IN ('succeeded','failed','stopped','cancelled')
+      AND repo."repoPath"=$6 AND repo."remoteUrl" IS NOT DISTINCT FROM $7
+    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.runtimeBotId, run.issueId, runId, run.repoPath, run.remoteUrl])).rows[0]
+  if (!previous) return null
+  await client.query(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL WHERE "runId"=$1`, [previous.runId])
+  return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'paused',$8,$9,$10)
+    ON CONFLICT ("runId") DO UPDATE SET "issueId"=EXCLUDED."issueId","snapshotId"=EXCLUDED."snapshotId",state='paused',"sandboxId"=EXCLUDED."sandboxId","deviceId"=EXCLUDED."deviceId","repoId"=EXCLUDED."repoId"
+    RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId, previous.snapshotId, randomUUID(), previous.sandboxId, previous.deviceId, previous.repoId])).rows[0]
+}
+
+/**
+ * A finished run of an open task keeps its sandbox for the task's next run:
+ * paused, which E2B neither bills nor expires (docs.e2b.dev/faq/calculate-sandbox-price:
+ * "Paused and killed sandboxes are not billed."; docs.e2b.dev/sandbox/persistence:
+ * "A paused sandbox is kept indefinitely."). Its worker's tokens are revoked;
+ * a resume mints new ones. A refused pause (503, the sandbox keeps running)
+ * throws, and the lifecycle tries again on its next tick.
+ */
+export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string, pause: (sandboxId: string) => Promise<unknown> = sandboxId => withE2BErrors(actor.userId, false, async () => Sandbox.pause(sandboxId, await options(actor.userId)))) {
+  const machine = (await pool.query(`SELECT "sandboxId","deviceId",state FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3`, [runId, actor.userId, actor.workspaceId])).rows[0]
+  if (!machine?.sandboxId || machine.state === 'ended' || machine.state === 'paused') return
+  await pause(machine.sandboxId)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query(`UPDATE thread_machines SET state='paused',"lastActiveAt"=now(),"computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL
+      WHERE "runId"=$1 AND "sandboxId"=$2 AND state<>'ended'`, [runId, machine.sandboxId])
+    await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [machine.deviceId])
+    await client.query('COMMIT')
+  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+}
+
+/** Closed, duplicate or deleted tasks give up their paused sandboxes for good (kill, device retired). */
+export async function endClosedTaskMachines(pool: Pool, end: (actor: Actor, runId: string) => Promise<unknown> = (actor, runId) => threadMachineAction(pool, actor, runId, 'end')) {
+  const { rows } = await pool.query(`SELECT m."runId",m."ownerId",m."workspaceId" FROM thread_machines m
+    LEFT JOIN issues i ON i.id=m."issueId"
+    WHERE m.state='paused' AND m."issueId" IS NOT NULL
+      AND (i.id IS NULL OR i.status IN ('done','canceled','duplicate') OR i.content->'attrs'->'mikka'->>'deletedAt' IS NOT NULL)
+    LIMIT 50`)
+  let ended = 0
+  for (const row of rows) {
+    try { await end({ userId: row.ownerId, workspaceId: row.workspaceId }, row.runId); ended++ } catch { /* retried on the next sweep */ }
+  }
+  return { ended, pending: rows.length - ended }
+}
+
 /** The queued run is moved to a dedicated device before any worker can claim
  * it. Bot workers are denied these runs by claimCloudRun. */
 export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: string, provider = threadMachineProvider) {
@@ -138,9 +200,14 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (machine?.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now() && machine.state !== 'paused') throw new ComputerError(409, 'Thread provisioning in progress')
     // No Mikka caps: the person's own E2B account sets the limit (orchestration.md § 5).
     if (!machine || machine.snapshotId === 'pending') {
-      const snapshotId = await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
-      machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state)
-        VALUES ($1,$2,$3,$4,$5,$6,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, snapshotId, randomUUID()])).rows[0]
+      // The task's own paused sandbox comes first; only its first run starts from the workspace snapshot.
+      const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run) : null
+      if (adopted) machine = adopted
+      else {
+        const snapshotId = await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
+        machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, snapshotId, randomUUID()])).rows[0]
+      }
     }
     // Persist snapshot and operation ID before provider requests.
     await client.query('UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval \'15 minutes\' WHERE "runId"=$1', [runId, leaseId])
