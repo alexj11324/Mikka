@@ -7,6 +7,8 @@ import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { createImprovementStore } from './store'
 import type { FailureQualityProvider } from './regression'
+import type { ProposalJudge } from './proposal-judgment'
+import type { DecisionAnswer } from '../coordinator/decision'
 import { BASELINE_ARTIFACT, BASELINE_MARKDOWN } from './builtin-skill'
 import { handleImprovement } from './http'
 import { digest } from './contract'
@@ -21,6 +23,16 @@ const qualityProvider: FailureQualityProvider = async (_tx, _userId, sources) =>
     commit:{missing:sources.length,incorrect:0}, environment:{missing:sources.length,incorrect:0},
     verification:{missing:sources.length,incorrect:0}, unknowns:{missing:sources.length,incorrect:0} },
 })
+
+// The Decision API is mocked: no network. `judgeAnswer` is the `propose`
+// probability it returns; null is "no usable answer".
+let judgeAnswer: number | null = 0.1
+const judgeInputs: Record<string, unknown>[] = []
+const proposalJudge: ProposalJudge = async (_userId, input, questions) => {
+  assert.deepEqual(questions.map(question => question.name), ['propose'])
+  judgeInputs.push(JSON.parse(input))
+  return judgeAnswer === null ? null : new Map<string, DecisionAnswer>([['propose', { type: 'predicate', name: 'propose', probability: judgeAnswer }]])
+}
 
 const testURL = improvementTestDatabase(process.env)
 const enabled = Boolean(testURL)
@@ -63,7 +75,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → immu
   let access = true
   const authorizedIssues = new Set<string>([issueId])
   const authorize = async (userId: string, issue: string) => access && userId === owner && authorizedIssues.has(issue)
-  let store = createImprovementStore(pool, authorize, qualityProvider)
+  let store = createImprovementStore(pool, authorize, qualityProvider, proposalJudge)
   const runs: string[] = []
   async function makeRun(options: { status?: string; agent?: string; repo?: string; issue?: string; report?: unknown } = {}) {
     const id = randomUUID()
@@ -156,28 +168,41 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → immu
     assert.equal((await propose(first)).pendingDistinctFailures, 1)
   })
 
-  await t.test('24 distinct failures wait; 25 produce exactly one proposal under concurrency and after restart', async () => {
-    for (let i = 1; i < SCORER.distinctFailures - 1; i++) await store.recordFeedback(owner, feedback(await makeRun()))
-    assert.equal((await propose(first)).pendingDistinctFailures, 24)
-    assert.equal((await propose(first)).proposal, null)
-    await store.recordFeedback(owner, feedback(await makeRun()))
+  await t.test('the Decision API decides: no waits at any count; yes with two failures proposes once under concurrency and after restart; a second within 24 hours is capped', async () => {
+    // The first bucket holds one failure so far; thirty is past the old fixed trigger of 25.
+    for (let i = 0; i < 29; i++) await store.recordFeedback(owner, feedback(await makeRun()))
+    judgeAnswer = 0.1
+    const declined = await propose(first)
+    assert.deepEqual([declined.proposal, declined.pendingDistinctFailures, declined.trigger], [null, 30, 'decision_not_ready'])
+    assert.equal(judgeInputs.at(-1)!.distinctFailedRuns, 30)
+    judgeAnswer = null
+    const unavailable = await propose(first)
+    assert.deepEqual([unavailable.proposal, unavailable.pendingDistinctFailures, unavailable.trigger], [null, 30, 'decision_unavailable'])
+    assert.equal((await pool.query('SELECT * FROM improvement_proposals')).rowCount, 0, 'no answer is not replaced by a count rule')
+
+    const yesAgent = randomUUID()
+    await pool.query(`INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,'codex','synthetic-yes-agent')`, [yesAgent, owner])
+    const yesRuns = [await makeRun({ agent: yesAgent }), await makeRun({ agent: yesAgent })]
+    for (const id of yesRuns) await store.recordFeedback(owner, feedback(id))
+    judgeAnswer = 0.9
     await pool.query(`CREATE FUNCTION test_improvement_rollback() RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN RAISE EXCEPTION 'synthetic source commit interruption'; END; $$`)
     await pool.query(`CREATE TRIGGER test_improvement_rollback BEFORE INSERT ON improvement_proposal_sources FOR EACH ROW EXECUTE FUNCTION test_improvement_rollback()`)
-    assert.equal((await post({ action: 'propose', runId: first })).status, 500)
+    assert.equal((await post({ action: 'propose', runId: yesRuns[0] })).status, 500)
     assert.equal((await pool.query('SELECT * FROM improvement_proposals')).rowCount, 0)
     assert.equal((await pool.query('SELECT * FROM improvement_proposal_sources')).rowCount, 0)
     await pool.query('ALTER TABLE improvement_proposal_sources DISABLE TRIGGER test_improvement_rollback')
-    const results = await Promise.all(Array.from({ length: 10 }, () => propose(first)))
+    const results = await Promise.all(Array.from({ length: 10 }, () => propose(yesRuns[0])))
     const proposalId = results[0].proposal.id
     assert.ok(results.every(result => result.proposal.id === proposalId))
+    assert.equal(results.filter(result => result.trigger === 'decision').length, 1)
     assert.equal((await pool.query('SELECT * FROM improvement_proposals')).rowCount, 1)
-    assert.equal((await pool.query('SELECT * FROM improvement_proposal_sources')).rowCount, 25)
+    assert.equal((await pool.query('SELECT * FROM improvement_proposal_sources')).rowCount, 2)
     const proposal = results[0].proposal
     assert.equal(proposal.status, 'awaiting_model_candidate')
     assert.equal(proposal.candidate.baseline, BASELINE_MARKDOWN)
     assert.equal(proposal.candidate.baselineDigest, BASELINE_ARTIFACT.sha256)
-    assert.equal(proposal.candidate.sourceIds.length, 25)
+    assert.equal(proposal.candidate.sourceIds.length, 2)
     assert.deepEqual(proposal.candidate.sourceIds, [...proposal.candidate.sourceIds].sort())
     assert.equal(proposal.candidate.content, undefined)
     assert.equal(proposal.result.kind, 'not_evaluated')
@@ -188,31 +213,26 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → immu
     assert.equal((await pool.query('SELECT count(*) FROM factory_tasks')).rows[0].count, '0', 'Offline proposals must not write Factory state')
     await pool.end()
     pool = new Pool({ connectionString: target.toString(), max: 12 })
-    store = createImprovementStore(pool, authorize, qualityProvider)
-    assert.equal((await propose(first)).proposal.id, proposalId)
-    const read = await fetch(`${origin}?runId=${first}`, { headers: { 'x-test-user': 'owner' } })
+    store = createImprovementStore(pool, authorize, qualityProvider, proposalJudge)
+    assert.equal((await propose(yesRuns[0])).proposal.id, proposalId)
+    const read = await fetch(`${origin}?runId=${yesRuns[0]}`, { headers: { 'x-test-user': 'owner' } })
     assert.equal(read.status, 200)
     assert.equal((await read.json()).proposals[0].id, proposalId)
     assert.equal(read.headers.get('cache-control'), 'private, no-store')
+
+    // Runaway cap: a yes within 24 hours of the bucket's last proposal writes nothing and spends no call.
+    const later = await makeRun({ agent: yesAgent })
+    await store.recordFeedback(owner, feedback(later))
+    const calls = judgeInputs.length
+    const capped = await propose(later)
+    assert.deepEqual([capped.proposal.id, capped.pendingDistinctFailures, capped.trigger], [proposalId, 1, 'proposal_cap'])
+    assert.equal(judgeInputs.length, calls)
+    assert.equal((await pool.query('SELECT * FROM improvement_proposals')).rowCount, 1)
   })
 
-  await t.test('age trigger uses persisted server receipt time and fixed seven-day policy', async () => {
-    // A separate test-only bucket uses an old immutable receipt inserted at
-    // creation; no production API backdates evidence or edits scorer settings.
-    const runId = await makeRun({ report: { verify: { status: 'failed' } } })
-    const id = randomUUID()
-    const bucket = digest({ userId: owner, issueId, agentId, repository: '/synthetic/report', deviceRepoId: repoId,
-      scorer: SCORER_DIGEST, skill: 'lib/self-improvement/skills/run-report/SKILL.md', baseline: digest('# Run report\n\nSummarize the work and the observed result.\n') })
-    await pool.query(`INSERT INTO improvement_feedback(id,"userId","eventId","runId","issueId",fingerprint,verdict,note,"createdAt")
-      VALUES($1,$2,$3,$4,$5,'synthetic-old','unknown','synthetic old receipt',now()-interval '8 days')`, [id, owner, randomUUID(), runId, issueId])
-    await pool.query(`INSERT INTO improvement_scores(id,"userId","runId",bucket,"scorerDigest",outcome,reason,snapshot,"createdAt")
-      VALUES($1,$2,$3,$4,$5,'failure','synthetic-old','{}',now()-interval '8 days')`, [id, owner, runId, bucket, SCORER_DIGEST])
-    // A new immutable source set yields a new generation request, never fixed candidate bytes.
-    const result = await propose(runId)
-    assert.equal(result.trigger, 'oldest_failure')
-    assert.equal(result.pendingDistinctFailures, 0)
-    assert.deepEqual(result.proposal.candidate.sourceIds, [id])
-
+  await t.test('the judgment sees failure ages from persisted server receipt time; age alone proposes nothing; the cap ends after 24 hours', async () => {
+    // A test-only bucket with old immutable receipts inserted at creation; no
+    // production API backdates evidence or edits scorer settings.
     const ageAgent = randomUUID()
     await pool.query(`INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,'codex','synthetic-aged-agent')`, [ageAgent, owner])
     const ageBucket = digest({ userId: owner, issueId, agentId: ageAgent, repository: '/synthetic/report', deviceRepoId: repoId,
@@ -225,11 +245,19 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → immu
         VALUES($1,$2,$3,$4,$5,'failure','synthetic-old','{}',now()-($6 * interval '1 day'))`, [oldId, owner, oldRun, ageBucket, SCORER_DIGEST, days])
       return oldRun
     }
+    judgeAnswer = 0.1
     const recent = await oldFailure(6)
     assert.equal((await propose(recent)).proposal, null)
+    assert.equal(judgeInputs.at(-1)!.oldestFailureHoursAgo, 144)
     const aged = await oldFailure(8)
+    assert.equal((await propose(aged)).trigger, 'decision_not_ready', 'an eight-day-old failure no longer proposes by itself')
+    assert.deepEqual([judgeInputs.at(-1)!.oldestFailureHoursAgo, judgeInputs.at(-1)!.newestFailureHoursAgo, judgeInputs.at(-1)!.hoursSinceLastProposal], [192, 144, null])
+    await pool.query(`INSERT INTO improvement_proposals(id,"userId",bucket,fingerprint,"issueId","scorerDigest",candidate,result,status,"createdAt")
+      VALUES($1,$2,$3,$4,$5,$6,'{}','{}','awaiting_model_candidate',now()-interval '25 hours')`, [randomUUID(), owner, ageBucket, `synthetic-old-proposal-${randomUUID()}`, issueId, SCORER_DIGEST])
+    judgeAnswer = 0.9
     const agedProposal = await propose(aged)
-    assert.equal(agedProposal.trigger, 'oldest_failure')
+    assert.equal(agedProposal.trigger, 'decision')
+    assert.equal(judgeInputs.at(-1)!.hoursSinceLastProposal, 25)
     assert.equal((await pool.query('SELECT * FROM improvement_proposal_sources WHERE "proposalId"=$1', [agedProposal.proposal.id])).rowCount, 2)
   })
 
