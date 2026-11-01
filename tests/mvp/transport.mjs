@@ -10,7 +10,7 @@ const responseHeader = 'x-mikka-fixture-response'
 function binding(env) {
   try {
     assertMvpEnvironment(env)
-    if (env.DECISION_GATEWAY_API_KEY !== MVP_DECISION_KEY) return null
+    if (env.AI_GATEWAY_API_KEY !== MVP_DECISION_KEY) return null
     const value = globalThis[marker]
     return value && Object.isFrozen(value) && value.version === 1 && value.endpoint === MVP_SERVICES
       && typeof value.verify === 'function' && typeof value.isCurrent === 'function' ? value : null
@@ -20,7 +20,7 @@ function binding(env) {
 /** Installed only by the isolated MVP preload. No application provider uses it. */
 export function installMvpTransport(env = process.env, upstreamFetch = globalThis.fetch) {
   assertMvpEnvironment(env)
-  if (env.DECISION_GATEWAY_API_KEY !== MVP_DECISION_KEY) throw new Error('MVP transport requires its public synthetic marker')
+  if (env.AI_GATEWAY_API_KEY !== MVP_DECISION_KEY) throw new Error('MVP transport requires its public synthetic marker')
   const previousFetch = globalThis.fetch
   const previousMarker = Object.getOwnPropertyDescriptor(globalThis, marker)
   const challenges = new Map()

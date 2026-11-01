@@ -31,7 +31,7 @@ const isolatedEnv = {
   MIKKA_DATABASE_URL:application.toString(), DATABASE_URL:application.toString(),
   // This is an ordinary local run with no Factory, Skill or BYOS assignment.
   MIKKA_FACTORY_ROUTING_ENABLED:'0', MIKKA_FACTORY_LIFECYCLE_ENABLED:'0', MIKKA_BYOS_ENABLED:'0',
-  MIKKA_NATIVE_COORDINATOR:'0', AI_GATEWAY_API_KEY:'', DECISION_GATEWAY_API_KEY:'', VERCEL:'', VERCEL_ENV:'',
+  MIKKA_NATIVE_COORDINATOR:'0', AI_GATEWAY_API_KEY:'', VERCEL:'', VERCEL_ENV:'',
 }
 const previousEnv = Object.fromEntries(Object.keys(isolatedEnv).map(key=>[key,process.env[key]]))
 Object.assign(process.env,isolatedEnv)
