@@ -112,12 +112,13 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
     return <>{loading ? <Spinner role="presentation" aria-hidden="true" /> : <Plus />}{loading ? t('search.loadingMore') : t('search.more')}</>
   }
 
-  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-1/2 -translate-y-1/2 sm:max-w-xl">
+  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-[max(1rem,calc(50svh-15rem))] translate-y-0 sm:max-w-xl">
     {/* Filtering is ours: server hits must not be dropped by cmdk's client-side match. */}
     <Command shouldFilter={false} className="**:data-[selected=true]:bg-muted">
       <CommandInput aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={setQuery} maxLength={400} />
       <p role="status" aria-live="polite" className="sr-only">{text ? announce : ''}</p>
-      <CommandList aria-busy={search.searching} className="h-[min(26rem,60svh)] max-h-none">
+      {/* The dialog's top edge stays put and its height follows the results (Linear, Raycast): no blank block under one empty line. */}
+      <CommandList aria-busy={search.searching} className="max-h-[min(26rem,60svh)]">
         {(coordinatorShown || botRows.length > 0) && <CommandGroup heading={t('groups.bots')}>
           {coordinatorShown && <CommandItem value={coordinatorValue} onSelect={() => pick(() => onChat({ kind: 'coordinator' }))} className="gap-3 py-2">
             <CoordinatorAvatar size="search" />
