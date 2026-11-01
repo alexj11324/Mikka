@@ -5,7 +5,8 @@ import { chatItems } from '@/lib/coordinator/context'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { BUDGET_WINDOW_MS, budgetState } from './budget'
 import { handoffPrompt, HANDOFF_PREFIX, mergeEvidence, QUIET_REPLY, stateAfterNotice, type HandoffPayload, type Notice } from './handoff'
-import { attentionQuestions, attentionState, codeLevel, continuedLevel, fallbackLevel, readJudgment, ROUTED_LEVEL_CONFIDENCE, ruleLevel, withFloor, type Assessment } from './judgment'
+import { attentionQuestions, attentionState, codeLevel, continuedLevel, judgeAttention, readJudgment, ROUTED_LEVEL_CONFIDENCE, withFloor, type Assessment, type AttentionJudge } from './judgment'
+import { githubNotification } from '@/lib/suggestions/notification'
 
 const none: Assessment = { cost: false, due: 'unknown', reversible: true, verificationCode: false }
 const cost = (fields: Partial<Assessment> = {}): Assessment => ({ ...none, cost: true, ...fields })
@@ -39,20 +40,71 @@ test('a later notice on an unanswered matter never rates below it', () => {
 
 const notification = (fields: Partial<ExternalNotification> = {}): ExternalNotification => ({ userId: 'u', source: 'gmail', externalId: 'x', matterKey: 'gmail:t', action: 'reply', title: 't', url: null, actor: null, occurredAt: new Date('2026-10-27T08:00:00Z'), required: false, direct: false, fromSelf: false, automated: false, excerpt: '', ...fields })
 
-test('fixed rules: own actions and automated mail not addressed to the person are low', () => {
-  assert.equal(ruleLevel(notification({ fromSelf: true, required: true })), 'low')
-  assert.equal(ruleLevel(notification({ automated: true })), 'low')
-  // An automated notice addressed to the person, such as an account warning, goes to the model.
-  assert.equal(ruleLevel(notification({ automated: true, direct: true })), null)
-  assert.equal(ruleLevel(notification({ direct: true })), null)
-  // Without the model nothing is routed; what was addressed to the person stays in 建议.
-  assert.equal(fallbackLevel(notification({ direct: true })), 'normal')
-  assert.equal(fallbackLevel(notification({ required: true })), 'normal')
-  assert.equal(fallbackLevel(notification()), 'low')
-})
-
 type Answer = Exclude<DecisionAnswer, { type: 'refusal' }>
 const answers = (list: Answer[]) => new Map(list.map(answer => [answer.name, answer]))
+const now = new Date('2026-10-27T08:05:00Z')
+const noReread = async () => null
+
+/** A stand-in for the Decisions API that records every call and answers with `level`. */
+function spyJudge(level: string | null) {
+  const calls: { notification: ExternalNotification; state: Record<string, string> }[] = []
+  const judge: AttentionJudge = async (notification, state) => {
+    calls.push({ notification, state })
+    return level ? answers([{ type: 'choice', name: 'level', choice: level }]) : null
+  }
+  return { calls, judge }
+}
+
+test('every notification goes to the Decisions API; nothing is ruled out before it', async () => {
+  const github = githubNotification({ userId: 'u', githubId: '42' }, 'issue_comment', { repository: { full_name: 'a/b' }, sender: { id: 9, login: 'deploy-preview[bot]', type: 'Bot' }, action: 'created', issue: { number: 1, title: 'Fix login', user: { id: 42 } }, comment: { id: 3, body: 'Preview ready' } })!
+  const cases = [
+    notification({ fromSelf: true, required: true }),
+    notification({ automated: true }),
+    notification({ automated: true, direct: true }),
+    notification(),
+    github,
+  ]
+  for (const item of cases) {
+    const { calls, judge } = spyJudge('normal')
+    const score = await judgeAttention(item, [], null, now, judge, noReread, 2)
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0].notification, item)
+    assert.deepEqual(score, { level: 'normal', decidedBy: 'model', assessment: { cost: false, due: 'unknown', reversible: true, verificationCode: false }, continues: null })
+  }
+  // The facts that used to be rules are evidence the model reads.
+  const { calls, judge } = spyJudge('low')
+  assert.equal((await judgeAttention(github, [], null, now, judge, noReread, 2))!.level, 'low')
+  assert.equal(calls[0].state.automated, 'yes')
+  assert.equal(calls[0].state.from, 'deploy-preview[bot]')
+  assert.equal(calls[0].state.content, 'on a/b#1 Fix login\nPreview ready')
+  assert.match(spyJudgeState(notification({ fromSelf: true })).byThePerson, /^yes/)
+  assert.equal(spyJudgeState(notification()).byThePerson, 'no')
+})
+
+function spyJudgeState(item: ExternalNotification) {
+  return attentionState(item, now, [], null)
+}
+
+test('without an answer from the Decisions API nothing is decided: no fallback level', async () => {
+  for (const item of [notification({ direct: true }), notification({ required: true }), notification()]) {
+    assert.equal(await judgeAttention(item, [], null, now, spyJudge(null).judge, noReread, 2), null)
+    assert.equal(await judgeAttention(item, [], null, now, async () => { throw Error('down') }, noReread, 2), null)
+    // A response with no level is no answer either.
+    assert.equal(await judgeAttention(item, [], null, now, async () => answers([{ type: 'predicate', name: 'cost', probability: 1 }]), noReread, 2), null)
+  }
+})
+
+test('an unclear answer rereads the source and asks the Decisions API again', async () => {
+  const levels = ['unclear', 'high']
+  const seen: string[] = []
+  const judge: AttentionJudge = async (item) => { seen.push(item.excerpt); return answers([{ type: 'choice', name: 'level', choice: levels.shift()! }]) }
+  const score = await judgeAttention(notification({ excerpt: 'cut' }), [], null, now, judge, async () => 'the whole mail', 2)
+  assert.deepEqual(seen, ['cut', 'the whole mail'])
+  assert.equal(score!.level, 'high')
+  // Still unclear with nothing more to read: it stays in 建议, not handed over.
+  assert.equal((await judgeAttention(notification({ excerpt: 'cut' }), [], null, now, spyJudge('unclear').judge, noReread, 2))!.level, 'normal')
+})
+
 
 test('the judgment reads cost, due and reversibility before the level', () => {
   const judged = readJudgment(answers([

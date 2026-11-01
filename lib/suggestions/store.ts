@@ -41,6 +41,8 @@ export async function ingestNotifications(incoming: readonly ExternalNotificatio
     const now = new Date()
     const { same, matters, ids } = await judgmentContext(notification.userId, notification.matterKey, now)
     const score = await scoreNotification(notification, matters, same, now)
+    // No answer from the Decisions API: nothing is stored, so the next delivery or the hourly backfill asks again.
+    if (!score) return
     const continuesId = score.continues ? ids.get(score.continues) ?? null : null
     const earlier = same ?? (continuesId ? await matterContext(notification.userId, continuesId) : null)
     const level = continuedLevel(score.level, earlier)

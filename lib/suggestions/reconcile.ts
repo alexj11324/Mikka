@@ -28,9 +28,9 @@ type Json = Record<string, unknown>
 const record = (value: unknown): Json => value && typeof value === 'object' && !Array.isArray(value) ? value as Json : {}
 const list = (value: unknown): Json[] => Array.isArray(value) ? value.map(record) : []
 
-/** The same mail the Gmail trigger delivers, minus what Gmail files as promotions or social. */
+/** The same mail the Gmail trigger delivers; the Decisions API judges every message, Gmail's categories are only evidence. */
 async function recentGmail(userId: string): Promise<ExternalNotification[]> {
-  const result = await runComposioAction(userId, 'fetch_recent_gmail', { query: 'in:inbox newer_than:2d -category:promotions -category:social', max_results: 50 })
+  const result = await runComposioAction(userId, 'fetch_recent_gmail', { query: 'in:inbox newer_than:2d', max_results: 50 })
   if ('error' in result) throw new Error(result.error)
   return list(result.data.messages).flatMap(message => ((notification => notification ? { ...notification, connectedAccountId: result.accountId } : [])(gmailNotification(userId, message))))
 }

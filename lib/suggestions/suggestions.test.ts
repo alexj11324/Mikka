@@ -61,16 +61,20 @@ test('GitHub: review requests and replies on my PRs', () => {
   assert.equal(botAssigned.automated, true)
 })
 
-test('GitHub: a bot\'s comment or review is not a reply for the person', () => {
+test('GitHub: a bot\'s comment or review is passed on for the Decisions API, marked automated', () => {
   const recipient = { userId: me, githubId: '42' }
   const issue = { number: 1, title: 'x', user: { id: 42 } }
   const pr = { number: 2, title: 'y', user: { id: 42 } }
   for (const sender of [{ id: 9, login: 'deploy-preview[bot]', type: 'Bot' }, { id: 9, login: 'deploy-preview[bot]' }, { id: 9, login: 'ci', type: 'Bot' }]) {
     const repository = { full_name: 'a/b' }
-    assert.equal(githubNotification(recipient, 'issue_comment', { repository, sender, action: 'created', issue, comment: { id: 3, body: 'Preview ready' } }), null)
-    assert.equal(githubNotification(recipient, 'pull_request_review_comment', { repository, sender, action: 'created', pull_request: pr, comment: { id: 4, body: 'Possible issue here' } }), null)
-    assert.equal(githubNotification(recipient, 'pull_request_review', { repository, sender, action: 'submitted', pull_request: pr, review: { id: 5, state: 'commented', body: 'Summary' } }), null)
+    const comment = githubNotification(recipient, 'issue_comment', { repository, sender, action: 'created', issue, comment: { id: 3, body: 'Preview ready' } })!
+    assert.equal(comment.automated, true)
+    assert.equal(comment.title, 'Preview ready')
+    assert.equal(githubNotification(recipient, 'pull_request_review_comment', { repository, sender, action: 'created', pull_request: pr, comment: { id: 4, body: 'Possible issue here' } })!.automated, true)
+    assert.equal(githubNotification(recipient, 'pull_request_review', { repository, sender, action: 'submitted', pull_request: pr, review: { id: 5, state: 'commented', body: 'Summary' } })!.automated, true)
   }
+  // A person's comment is not automated.
+  assert.equal(githubNotification(recipient, 'issue_comment', { repository: { full_name: 'a/b' }, sender: { id: 7, login: 'dana', type: 'User' }, action: 'created', issue, comment: { id: 6, body: 'ok?' } })!.automated, false)
 })
 
 test('GitHub and Linear comments become readable lines, never raw markup', () => {
@@ -81,8 +85,10 @@ test('GitHub and Linear comments become readable lines, never raw markup', () =>
   const body = `${hidden}\n<!-- bot: state -->\n#### ⚠️ Please **rebase** onto [main](https://github.com/a/b/tree/main)\n> quoted line`
   const comment = githubNotification(recipient, 'issue_comment', { ...base, comment: { id: 3, body } })!
   assert.equal(comment.title, '⚠️ Please rebase onto main quoted line')
-  // Nothing readable left: no card.
-  assert.equal(githubNotification(recipient, 'issue_comment', { ...base, comment: { id: 4, body: `${hidden}\n<!-- only metadata -->` } }), null)
+  // Nothing readable left: the title falls back to the issue's, and the Decisions API still judges it (with the raw body as excerpt).
+  const bare = githubNotification(recipient, 'issue_comment', { ...base, comment: { id: 4, body: `${hidden}\n<!-- only metadata -->` } })!
+  assert.equal(bare.title, 'x')
+  assert.match(bare.excerpt, /only metadata/)
   assert.equal(readableText('Ship `v2` in the ~~old~~ new way'), 'Ship v2 in the old new way')
   assert.equal(readableText('- [x] done\n1. next'), 'done next')
   const linear = linearCommentNotification({ userId: me, linearUserId: 'lin-1' }, { type: 'Comment', action: 'create', data: { id: 'c1', body: '## Heads up\nSee [doc](https://x.test)', issue: { title: 'T' } } })!
