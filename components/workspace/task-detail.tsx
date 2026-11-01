@@ -133,7 +133,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
     else { setOpenThread(null); setOpenAcceptance(task) }
   }, [])
   const wide = useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false)
-  // The right column resizes from its left line (decision 2026-11-01-1300); an open thread and the properties keep their own widths.
+  // The right column resizes from its left line (decision 2026-11-01-1310); an open thread and the properties keep their own widths.
   const threadWidth = useResizableWidth({ storageKey: 'mikka:task-thread-width', min: 360, max: 720, initial: 432, edge: 'start' })
   const propertiesWidth = useResizableWidth({ storageKey: 'mikka:task-properties-width', min: 260, max: 480, initial: 320, edge: 'start' })
   const tCommon = useTranslations('Common')

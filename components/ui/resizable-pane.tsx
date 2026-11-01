@@ -9,7 +9,7 @@ import { RESIZE_EDGE, useResizableWidth, type ResizableWidth, type ResizableWidt
  * The line between two columns, as a handle: drag it, use the arrow keys on it
  * (Shift for bigger steps, Home and End for the limits), or double-click it to
  * go back to the default width. Every vertical divider between columns is one
- * of these (decision 2026-11-01-1300); it sits on the column's own border.
+ * of these (decision 2026-11-01-1310); it sits on the column's own border.
  */
 function ResizeHandle({
   resize,

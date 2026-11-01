@@ -1,7 +1,7 @@
 import ts from 'typescript'
 
 // Every vertical line between two columns can be dragged to resize them
-// (decision 2026-11-01-1300, R-35). A column that draws its own side border
+// (decision 2026-11-01-1310, R-80). A column that draws its own side border
 // and keeps a fixed width beside another column is exactly such a line, so it
 // must be a <ResizablePane>, or render a <ResizeHandle> inside it. A line that
 // is not between columns (a loading skeleton, a timeline rule) says so with a

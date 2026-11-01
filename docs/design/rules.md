@@ -455,8 +455,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `components/app-shell.tsx`; no reUI App Shell blocks. Standing rule: a
   skill audit (unslop, interface-design) never changes the shell layout;
   Alex keeps it as it is (2026-10-31).
-- **R-79** Every vertical line between two columns can be dragged to resize
-  them (Alex: 「只要是这种竖线都可以 resizable」, decision 2026-11-01-1300):
+- **R-80** Every vertical line between two columns can be dragged to resize
+  them (Alex: 「只要是这种竖线都可以 resizable」, decision 2026-11-01-1310):
   the bot list, the right panel, 建议's two halves, Artifact's list, the
   board's Coordinator sidebar, a task's right panel, the editor's side
   panel, a project's details, the settings list, the browser. The line is a

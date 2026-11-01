@@ -2,7 +2,7 @@
 
 - Date: 2026-11-01
 - Source: Alex, on the line between 建议 and its Coordinator chat that would not drag: 「这里的 resizable 怎么又没有做？按照道理来说，只要是这种竖线都可以 resizable」; relayed by the coordinator, who added that a fix found page by page is not enough
-- Rule: R-79 (new)
+- Rule: R-80 (new)
 - Replaces: —
 
 Any vertical line between two columns, on any page, can be dragged to resize

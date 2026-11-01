@@ -80,7 +80,7 @@ more than once.
 
 - [ ] Every vertical line between two columns drags to resize them, with a
       `col-resize` cursor on hover, arrow keys, double-click to reset, and a
-      remembered width; it is a `ResizablePane` or `ResizeHandle` (R-79).
+      remembered width; it is a `ResizablePane` or `ResizeHandle` (R-80).
 
 ### Copy
 
