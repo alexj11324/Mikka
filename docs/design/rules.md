@@ -199,7 +199,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the right as a conversation that ends in the composer (R-10); people and
   the agent talk there. A thread's content is its owner's alone: teammates
   (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
-  as GitHub Copilot and Cursor keep agent sessions private; what the thread
+  as GitHub Copilot and Cursor keep agent sessions private (Alex:
+  「永远只能自己看」, [decision 2026-11-01-2245](decisions/2026-11-01-2245-thread-privacy-and-local-isolation.md)); what the thread
   produces (a PR, a comment its owner posts) is how the team sees the work. The bot dispatches the thread; the Agent it hands the work
   to (Codex, Claude Code) runs it, and where a thread carries an icon
   other than its status, that icon is the Agent's mark (R-78).
