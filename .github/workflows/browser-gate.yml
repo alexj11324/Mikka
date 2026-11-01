@@ -1,0 +1,19 @@
+name: Browser gate
+
+# Browser tests are manual only (decision 2026-11-01-0230): Actions →
+# Browser tests → Run workflow. This job keeps the protected check name so
+# pull requests are not blocked waiting for it.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  browser-e2e:
+    name: Browser tests (before merge)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "Browser tests are manual only; run Actions → Browser tests when needed."

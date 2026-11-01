@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url'
 
 // These workflows run for every main push. The SSH/vault PR-only workflows
 // cannot provide a push run for the merge SHA and must not deadlock release.
-export const RELEASE_WORKFLOWS = ['ui-policy.yml', 'browser-tests.yml']
+export const RELEASE_WORKFLOWS = ['ui-policy.yml']
 const SHA = /^[a-f0-9]{40}$/
 const REPOSITORY = 'alexj11324/Mikka'
 

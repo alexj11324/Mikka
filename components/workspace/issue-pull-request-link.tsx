@@ -3,7 +3,7 @@
 import useSWR from 'swr'
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { GitMerge, GitPullRequest, X } from 'lucide-react'
+import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'
 import type { IssuePullRequest } from '@/lib/issue-metadata'
@@ -25,6 +25,8 @@ async function fetchStatus([, userId, issueId, url]: readonly string[]): Promise
     return { error: typeof result.error === 'string' ? result.error : 'githubUnavailable' }
   } catch { return { error: 'githubUnavailable' } }
 }
+
+const PR_ICONS = { open: GitPullRequest, draft: GitPullRequestDraft, merged: GitMerge, closed: GitPullRequestClosed } as const satisfies Record<IssuePullRequest['state'], unknown>
 
 type LinkProps = { issueId: string; pr: IssuePullRequest; compact?: boolean }
 
@@ -48,7 +50,9 @@ function ViewerPullRequestLink({ issueId, pr, compact = false, userId, isPending
     : isPending || isValidating || (userId && (!data || ('state' in data && data.checkedAt < mountedAt))) ? tSync('loading')
       : !userId || error === 'githubNotConnected' || error === 'githubReconnectRequired' ? tSync('disconnected') : tSync('unavailable')
   const title = `${statusLabel} · ${tSync('manual', { state: tState(pr.state) })} · ${pr.url}`
-  const Icon = state === 'merged' ? GitMerge : state === 'closed' ? X : GitPullRequest
+  // The icon's shape is the PR state (Figma icon/14/pr-*): GitHub's when it answered, else the state saved on the task.
+  // Only a state GitHub just confirmed for this viewer gets its colour; a saved or stale one stays grey.
+  const Icon = PR_ICONS[state ?? pr.state]
   const content = <><Icon data-icon="inline-start" className={cn(!state && 'text-muted-foreground', state === 'open' && 'text-success-foreground', state === 'merged' && 'text-info-foreground', state === 'closed' && 'text-destructive')} />#{pr.url.split('/').filter(Boolean).at(-1)}{!compact && <span className="text-muted-foreground">{state ? tState(state) : statusLabel}</span>}</>
   const link = <a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" title={title} aria-label={title} />
   return compact

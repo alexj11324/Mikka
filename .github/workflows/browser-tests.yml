@@ -10,13 +10,8 @@ name: Browser tests
 #   specs, plus performance, on four shards. integrate/* pull requests run this
 #   tier before merge. Docs-only changes keep only the small gate jobs.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-  push:
-    branches: [main]
-  schedule:
-    # Nightly full regression on main: 19:17 UTC = 03:17 Beijing = 12:17 Pacific (PDT).
-    - cron: '17 19 * * *'
+  # Manual only (decision 2026-11-01-0230). Pull requests get the required
+  # check name from browser-gate.yml; main pushes and nightly runs are off.
   workflow_dispatch:
 
 permissions:

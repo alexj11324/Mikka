@@ -1,13 +1,21 @@
 'use client'
 
-import { useState, type ComponentProps, type Ref } from 'react'
+import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { Box, CalendarDays, ChevronsLeftRight, Circle, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
+import { AvatarGroup, AvatarGroupCount } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { BotAvatar } from '@/components/nav/bot-avatar'
+import { LetterAvatar } from '@/components/nav/letter-avatar'
+import { HarnessMark } from '@/components/labels/entity-labels'
+import { AgentSphere } from '@/components/workspace/issue-assignee-menu'
+import type { IssueMetadata } from '@/lib/issue-metadata'
+import { formatDateOnly } from '@/lib/date-only'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { LabelDot, IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from '@/components/workspace/issue-metadata-controls'
@@ -15,7 +23,7 @@ import { IssuePropertyMenu } from '@/components/workspace/issue-property-menu'
 import { IssuePullRequestLink } from '@/components/workspace/issue-pull-request-link'
 import { CardControlBoundary, CardCreatedAt } from '@/components/workspace/issue-card-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier, type IssueStatus } from '@/components/workspace/issue-properties'
-import { BOARD_COLUMNS, type AgentState, type BoardColumns, type BoardTask, type CardProperty } from './data'
+import { BOARD_COLUMNS, type AgentState, type BoardColumns, type BoardTask, type CardProperty, type RunOwner } from './data'
 
 function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Viewport> & { viewportRef: Ref<HTMLDivElement> }) {
   return <ScrollAreaPrimitive.Root data-slot="scroll-area" className="relative min-h-0 w-full min-w-0 flex-1 pb-3">
@@ -33,6 +41,28 @@ function PriorityMark({ priority }: { priority: string }) {
   if (priority === 'urgent') return <svg aria-hidden="true" viewBox="0 0 14 14" className="size-3.5 shrink-0 text-warning"><rect width="14" height="14" rx="3" fill="currentColor" /><path d="M7 3.5v4.25" stroke="var(--card)" strokeWidth="1.75" strokeLinecap="round" /><circle cx="7" cy="10.25" r="1" fill="var(--card)" /></svg>
   const filled = PRIORITY_BARS[priority] ?? 0
   return <svg aria-hidden="true" viewBox="0 0 14 14" className="size-3.5 shrink-0">{[[1, 5], [5.5, 8], [10, 11]].map(([x, height], index) => <rect key={x} x={x} y={12.5 - height} width="3" height={height} rx="1" className={index < filled ? 'fill-muted-foreground' : 'fill-foreground/15'} />)}</svg>
+}
+
+/** Each avatar in the card's group (Figma 看板/负责人组): an 18px circle ringed 2px in the card colour. */
+const GROUP_AVATAR = 'relative flex size-[18px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-card ring-2 ring-card'
+
+/**
+ * The assignee slot (Figma 看板/负责人组, R-25): the owning Bot in its own bloub on top, the assigned
+ * person as a letter avatar, then the coding agents of the task's threads (at most two, then +N),
+ * each tucked behind the one before it. Null when nobody owns the task.
+ */
+function assigneeGroupOf({ assignee, owner }: { assignee: IssueMetadata['assignee']; owner: RunOwner | undefined }) {
+  const avatars: ReactNode[] = []
+  if (owner?.bot) avatars.push(<span key="bot" data-avatar="bot" className={GROUP_AVATAR}><BotAvatar color={owner.bot.color} shape={owner.bot.shape} size="row" /></span>)
+  if (assignee?.kind === 'member') avatars.push(<span key="member" data-avatar="member" className={cn(GROUP_AVATAR, '[&>[data-slot=avatar]]:size-full')}><LetterAvatar name={assignee.name} size="row" /></span>)
+  else if (assignee?.kind === 'agent' && !owner?.bot) avatars.push(<span key="agent" data-avatar="bot" className={GROUP_AVATAR}><AgentSphere name={assignee.name} compact /></span>)
+  if (avatars.length === 0) return null
+  const harnesses = owner?.harnesses ?? []
+  for (const harness of harnesses.slice(0, 2)) avatars.push(<span key={harness} data-avatar="agent" className={GROUP_AVATAR}><HarnessMark harness={harness} /></span>)
+  return <AvatarGroup className="isolate -space-x-1">
+    {avatars.map((avatar, index) => <span key={index} className="flex" style={{ zIndex: avatars.length - index + 1 }}>{avatar}</span>)}
+    {harnesses.length > 2 && <AvatarGroupCount className="z-0 size-[18px] text-[9px] font-medium ring-card">+{harnesses.length - 2}</AvatarGroupCount>}
+  </AvatarGroup>
 }
 
 const AGENT_STATE_BADGES = { running: 'success-light', waiting: 'warning-light', failed: 'destructive-light' } as const satisfies Record<AgentState, string>
@@ -53,6 +83,8 @@ export type CardContext = {
   properties: ReadonlySet<CardProperty>
   agentStates: ReadonlyMap<string, AgentState>
   subtasks: ReadonlyMap<string, { done: number; total: number }>
+  /** The Bot and coding agents working each task, from its threads. */
+  owners?: ReadonlyMap<string, RunOwner>
   /** Cards the person just moved with the status menu (enter) or deleted (leave); others' changes are absent and snap (R-37). */
   motion?: ReadonlyMap<string, 'enter' | 'leave'>
 }
@@ -82,6 +114,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   const done = ['done', 'canceled', 'duplicate'].includes(task.status)
   const overdue = !done && Boolean(metadata.dueDate) && metadata.dueDate! < `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const labels = show('labels') ? metadata.labels : []
+  const assigneeGroup = assigneeGroupOf({ assignee: metadata.assignee, owner: context.owners?.get(task.id) })
   // The newest PR, then a count of the rest (Figma 看板/任务卡片).
   const pullRequest = show('pullRequests') ? metadata.pullRequests.at(-1) : undefined
   const meta = 'flex items-center gap-1 text-xs text-muted-foreground tabular-nums [&_svg]:size-3.5 [&_svg]:shrink-0'
@@ -96,16 +129,16 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     pullRequest && <span key="pr" className="flex items-center gap-1"><CardControlBoundary><IssuePullRequestLink issueId={task.id} pr={pullRequest} compact /></CardControlBoundary>{metadata.pullRequests.length > 1 && <span className="text-xs text-muted-foreground/70 tabular-nums">+{metadata.pullRequests.length - 1}</span>}</span>,
     show('subtasks') && subtasks && subtasks.total > 0 && <span key="subtasks" className={meta} title={tCard('subtasks')}><ListChecks />{subtasks.done}/{subtasks.total}</span>,
     show('agentState') && agentState && <Badge key="agent" variant={AGENT_STATE_BADGES[agentState]} size="lg"><span aria-hidden="true" className={cn('size-1.5 rounded-full', AGENT_STATE_DOTS[agentState])} />{tCard(`agent.${agentState}`)}</Badge>,
-    show('dueDate') && metadata.dueDate && <span key="due" className={cn(meta, overdue && 'text-destructive')}><CalendarDays />{format.dateTime(new Date(`${metadata.dueDate}T00:00:00`), { month: 'short', day: 'numeric' })}</span>,
+    show('dueDate') && metadata.dueDate && <span key="due" className={cn(meta, overdue && 'text-destructive')}><CalendarDays />{formatDateOnly(format, metadata.dueDate, { month: 'short', day: 'numeric' })}</span>,
   ].filter(Boolean)
 
   // Figma 看板/任务卡片: filled, no stroke (R-31); radius 8, padding 12, rows 8 apart.
   const card = <div className={cn('group/card flex flex-col gap-2 rounded-md bg-card p-3 text-card-foreground shadow-xs transition-colors hover:bg-muted/50', isOverlay && 'pointer-events-none rotate-2 shadow-lg')}>
     <div className="flex h-5 min-w-0 items-center gap-1.5">
       {show('identifier') && <span className="truncate text-xs text-muted-foreground tabular-nums">{issueIdentifier(task, tIssue('unassignedNumber'))}</span>}
-      {task.scope === 'personal' && <Lock aria-label={tCard('personal')} className="size-3.5 shrink-0 text-muted-foreground" />}
+      {task.scope === 'personal' && <Tooltip><TooltipTrigger render={<span className="flex shrink-0" />}><Lock aria-label={tCard('personal')} className="size-3.5 text-muted-foreground" /></TooltipTrigger><TooltipContent>{tCard('personalHint')}</TooltipContent></Tooltip>}
       {/* No placeholder circle when nobody owns the task; the control appears on hover and focus. */}
-      {show('assignee') && <div className={cn('ml-auto flex shrink-0 items-center', !metadata.assignee && 'opacity-0 group-hover/card:opacity-100 focus-within:opacity-100')}><CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary></div>}
+      {show('assignee') && <div className={cn('ml-auto flex shrink-0 items-center', !assigneeGroup && 'opacity-0 group-hover/card:opacity-100 focus-within:opacity-100')}><CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary></div>}
     </div>
     <div className="flex min-w-0 items-start gap-[3px]">
       <CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>
