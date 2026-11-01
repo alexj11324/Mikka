@@ -142,8 +142,10 @@ never Mikka 默认 and never the AI Gateway:
   `dev`, folder `/vercel`. Read it with an existing identity
   ([infisical-cloud.md](infisical-cloud.md)) into the process environment
   only; never write it to a file, a commit, a log or a report.
-- Add it as a DeepSeek key in Settings › API 与订阅, then pick DS 4.1 Flash for
-  the Coordinator and the Bot.
+- `pnpm dev:local` adds it to every local account and picks DS 4.1 Flash for
+  the Coordinator and the Bots (`scripts/dev-local/seed-model-keys.ts`). Outside
+  dev:local, add it as a DeepSeek key in Settings › API 与订阅 and pick DS 4.1
+  Flash by hand.
 - Mikka 默认 (hosted, billed through the AI Gateway) is not used for local
   work, so a local run needs neither `AI_GATEWAY_API_KEY` nor a card
   verification.
