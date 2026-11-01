@@ -1,4 +1,4 @@
-"""Build a plain Linux desktop template. E2B_API_KEY is read only from this process's environment.
+"""Extend the official E2B desktop template. E2B_API_KEY is read only from this process's environment.
 
 Run from the repository root with the E2B Python SDK installed.
 Never copy the repository, .env files, credentials or a whole home directory.
@@ -131,16 +131,16 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None):
     with tempfile.TemporaryDirectory(prefix='mikka-e2b-template-') as temp:
         context = Path(temp)
         sha = source_context(context, ref)
-        template = (Template(file_context_path=str(context)).from_base_image()
+        template = (Template(file_context_path=str(context)).from_template('desktop')
                     .copy('bootstrap.sh', '/tmp/mikka-bootstrap.sh')
                     .run_cmd('bash /tmp/mikka-bootstrap.sh', user='root')
                     .run_cmd(NPM_RUNTIME_CHECK, user='mikka-runner')
                     .copy('worker.tar', '/tmp/mikka-worker.tar')
                     .copy('source-sha', '/opt/mikka/worker-source-sha')
                     .run_cmd('mkdir -p /opt/mikka/worker && tar -xf /tmp/mikka-worker.tar -C /opt/mikka/worker && rm /tmp/mikka-worker.tar && cd /opt/mikka/worker && HOME=/tmp corepack pnpm install --filter @mikka/daemon... --frozen-lockfile && node packages/daemon/scripts/build-cloud-worker.mjs && chown -R root:root /opt/mikka/worker && chmod -R go-w /opt/mikka/worker && chown root:root /opt/mikka/worker-source-sha && chmod 0444 /opt/mikka/worker-source-sha', user='root')
-                    # The official, version-pinned native Codex CLI, from the daemon's own pins and
-                    # installer. Its authentication comes later from the owner-bound broker.
-                    .run_cmd('ln -sf "$(node /opt/mikka/worker/packages/daemon/harness/cli.mjs /opt/mikka/harness codex)" /usr/local/bin/codex && chmod -R go+rX,go-w /opt/mikka/harness && /usr/local/bin/codex --version', user='root'))
+                    # The official desktop image has no coding CLIs. Install both once from the
+                    # daemon's verified pins; authentication arrives from the owner-bound broker.
+                    .run_cmd('node /opt/mikka/worker/packages/daemon/harness/cli.mjs /opt/mikka/harness > /tmp/mikka-harnesses && while read -r binary; do ln -sf "$binary" "/usr/local/bin/$(basename "$binary")"; done < /tmp/mikka-harnesses && rm /tmp/mikka-harnesses && chmod -R go+rX,go-w /opt/mikka/harness && claude --version && codex --version', user='root'))
         for runtime_file in COMPUTER_FILES:
             template = template.copy(runtime_file, f'/opt/mikka/computer/{runtime_file}')
         template = template.run_cmd('chown root:root /opt/mikka/computer/start-desktop.sh /opt/mikka/computer/viewer-gateway.py /opt/mikka/computer/lease-driver.py && chmod 0755 /opt/mikka/computer/start-desktop.sh /opt/mikka/computer/viewer-gateway.py /opt/mikka/computer/lease-driver.py', user='root')

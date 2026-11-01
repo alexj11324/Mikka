@@ -16,7 +16,7 @@ from pathlib import Path
 import time
 
 HERE = Path(__file__).resolve().parent
-COMPUTER_FILES = ('start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py')
+COMPUTER_FILES = ('viewer-gateway.py', 'lease-driver.py')
 DOCKER_FREE_WORKER = ('cd /opt/mikka/worker/packages/daemon && '
                      'if test -f dist/cloud/cloud-worker.js; then node dist/cloud/cloud-worker.js; '
                      'else ./node_modules/.bin/tsx bin/cloud-worker.ts; fi')

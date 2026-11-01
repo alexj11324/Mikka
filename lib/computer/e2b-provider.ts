@@ -47,7 +47,7 @@ export async function computerState(workspaceId: string, id: string) {
   return info.state === 'paused' ? 'sleeping' : 'running'
 }
 
-/** Template is built from scripts/e2b/bootstrap.sh, never a third-party CUA image. */
+/** Official E2B desktop base with the Mikka worker and pinned CLIs baked in. */
 export async function createComputer(workspaceId: string, operationId: string) {
   // Flag on: only the public template from E2B_BYO_COMPUTER_TEMPLATE; a 404 becomes e2b_template_unavailable.
   const template = computerTemplate()
@@ -62,10 +62,10 @@ export async function createComputer(workspaceId: string, operationId: string) {
   }))
 }
 
-/** One RPC on a current template. Older snapshots get the current guard files
- * before a viewer service can start; file hashes also catch partial updates. */
+/** Refresh authorization guards without replacing the desktop script baked
+ * with each template's package set. Hashes also catch partial guard updates. */
 export async function installComputerRuntime(sandbox: Sandbox) {
-  const files = await Promise.all(['start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py'].map(async name => ({
+  const files = await Promise.all(['viewer-gateway.py', 'lease-driver.py'].map(async name => ({
     path: `/opt/mikka/computer/${name}`, data: await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8'),
   })))
   const manifest = files.map(file => `${createHash('sha256').update(file.data).digest('hex')}  ${file.path}`).join('\n')

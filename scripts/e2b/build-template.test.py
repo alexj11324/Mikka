@@ -26,6 +26,9 @@ class Publish(unittest.TestCase):
     def test_runtime_files_do_not_replace_requested_template_name(self):
         class Recipe:
             def from_base_image(self): return self
+            def from_template(self, name):
+                called['base_template'] = name
+                return self
             def copy(self, *_): return self
             def run_cmd(self, command, **__):
                 called.setdefault('commands', []).append(command)
@@ -48,11 +51,13 @@ class Publish(unittest.TestCase):
         with patch.dict('sys.modules', {'e2b': sdk}), patch.object(bt, 'source_context', return_value='a' * 40):
             sha, result = bt.build('mikka-versioned-worker', api_key='fixture-key')
         self.assertEqual(called['name'], 'mikka-versioned-worker')
+        self.assertEqual(called.get('base_template'), 'desktop')
         self.assertEqual(sha, 'a' * 40)
         self.assertEqual(result.template_id, 'tpl1')
         self.assertIn('systemctl start mikka-preload.service mikka-viewer.service', called['start'])
         self.assertTrue(any('systemctl enable mikka-preload.service mikka-viewer.service' in command for command in called['commands']))
         self.assertIn('test ! -e /run/mikka-viewer/key', called['ready'])
+        self.assertTrue(any('claude --version && codex --version' in command for command in called['commands']))
 
     def test_cold_boot_scrubs_capabilities_once_before_starting_anonymous_services(self):
         scrub = bt.BOOT_SERVICES['mikka-boot-scrub.service']
