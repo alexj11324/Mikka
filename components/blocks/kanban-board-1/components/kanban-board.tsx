@@ -42,9 +42,10 @@ const GROUP_AVATAR = 'relative flex size-[18px] shrink-0 items-center justify-ce
 /**
  * The assignee slot (Figma 看板/负责人组, R-25): the owning Bot in its own bloub on top, the assigned
  * person as a letter avatar, then the coding agents of the task's threads (at most two, then +N),
- * each tucked behind the one before it. Null when nobody owns the task.
+ * each tucked behind the one before it. Null when nobody owns the task. The board's list view
+ * shows the same group, so a task has one face on both (R-25, R-36, R-60).
  */
-function assigneeGroupOf({ assignee, owner }: { assignee: IssueMetadata['assignee']; owner: RunOwner | undefined }) {
+export function assigneeGroupOf({ assignee, owner }: { assignee: IssueMetadata['assignee']; owner: RunOwner | undefined }) {
   const avatars: ReactNode[] = []
   if (owner?.bot) avatars.push(<span key="bot" data-avatar="bot" className={GROUP_AVATAR}><BotAvatar color={owner.bot.color} shape={owner.bot.shape} size="row" /></span>)
   if (assignee?.kind === 'member') avatars.push(<span key="member" data-avatar="member" className={cn(GROUP_AVATAR, '[&>[data-slot=avatar]]:size-full')}><LetterAvatar name={assignee.name} size="row" /></span>)

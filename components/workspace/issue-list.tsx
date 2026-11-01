@@ -6,17 +6,19 @@ import { cn } from '@/lib/utils'
 import type { listIssues } from '@/app/actions/issues'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import type { CardProperty } from '@/components/blocks/kanban-board-1/components/data'
-import { AssigneeAvatar } from './issue-assignee-menu'
+import type { CardProperty, RunOwner } from '@/components/blocks/kanban-board-1/components/data'
+import { assigneeGroupOf } from '@/components/blocks/kanban-board-1/components/kanban-board'
 import { ISSUE_STATUSES } from './issue-properties'
 import { PriorityIcon } from './priority-icon'
 
 const LIST_COLUMNS: ReadonlySet<CardProperty> = new Set(['identifier', 'priority', 'assignee'])
 
 /** The board's list view: one row per task, its columns the same 显示 properties as the cards. */
-export function IssueList({ issues, properties = LIST_COLUMNS, searching, onOpen, onCreate }: {
+export function IssueList({ issues, properties = LIST_COLUMNS, owners, searching, onOpen, onCreate }: {
   issues: Awaited<ReturnType<typeof listIssues>>
   properties?: ReadonlySet<CardProperty>
+  /** The Bot and coding agents working each task, as on the cards. */
+  owners?: ReadonlyMap<string, RunOwner>
   searching: boolean
   onOpen: (id: string) => void
   onCreate: () => void
@@ -57,7 +59,8 @@ export function IssueList({ issues, properties = LIST_COLUMNS, searching, onOpen
                 <status.icon className={cn('size-3.5 shrink-0', indicatorClassName)} />
                 {showIdentifier && <span className="hidden w-20 shrink-0 text-xs text-muted-foreground tabular-nums sm:block">{issue.identifier}</span>}
                 <span className="min-w-0 flex-1 truncate font-medium">{issue.title}</span>
-                {properties.has('assignee') && <span className="flex size-4 shrink-0 items-center justify-center" title={issue.metadata.assignee?.name}>{issue.metadata.assignee && <><AssigneeAvatar assignee={issue.metadata.assignee} compact /><span className="sr-only">{issue.metadata.assignee.name}</span></>}</span>}
+                {/* The card's avatar group (R-25): the Bot on top, then the person; empty when nobody owns the task. The rings take the row's colour instead of the card's. */}
+                {properties.has('assignee') && <span data-slot="list-assignee" className="flex min-w-[18px] shrink-0 justify-end [&_[data-avatar]]:ring-background" title={issue.metadata.assignee?.name}>{assigneeGroupOf({ assignee: issue.metadata.assignee, owner: owners?.get(issue.id) })}{issue.metadata.assignee && <span className="sr-only">{issue.metadata.assignee.name}</span>}</span>}
                 <time suppressHydrationWarning dateTime={new Date(issue.updatedAt).toISOString()} className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground md:block">{format.dateTime(new Date(issue.updatedAt), { month: 'numeric', day: 'numeric' })}</time>
               </span>
             </Button>

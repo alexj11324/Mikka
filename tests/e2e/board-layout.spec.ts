@@ -178,5 +178,14 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
     // The personal-task lock explains itself on hover.
     await botCard.getByLabel('个人任务', { exact: true }).hover()
     await expect(page.getByText('个人任务 · 只有你能看到', { exact: true })).toBeVisible()
+
+    // The list shows the card's own group: the Bot's blob on top, the same person, nothing when unassigned.
+    await page.getByRole('button', { name: '列表视图', exact: true }).click()
+    const list = page.getByLabel('任务列表', { exact: true })
+    const listGroup = list.getByRole('button', { name: /Bot 负责的看板任务/ }).locator('[data-slot="avatar-group"]')
+    await expect(listGroup.locator('[data-avatar]')).toHaveCount(4)
+    await expect(listGroup.locator('[data-avatar]').first()).toHaveAttribute('data-avatar', 'bot')
+    await expect(listGroup.locator('[data-avatar="member"]')).toHaveText('回')
+    await expect(list.getByRole('button', { name: /只有 PR 的看板任务/ }).locator('[data-slot="avatar-group"]')).toHaveCount(0)
   })
 })
