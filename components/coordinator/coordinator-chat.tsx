@@ -212,7 +212,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const unread = useUnreadIndicators({ conversationId: botId ? `bot:${botId}` : 'coordinator', items: unreadItems, rootRef })
   const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
   const sources = data?.sources
-  const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
+  const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue, onOpenThread: setOpenThread }), [sources, previews, onOpenIssue])
   // What the person said next after each reply, so a choice card shows its answer after a reload.
   const answers = useMemo(() => {
     const next = new Map<number, string>()

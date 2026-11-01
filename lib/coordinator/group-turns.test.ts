@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { handleGroup, type GroupRequest } from '../group-conversations-store'
-import { GroupJudgmentPendingError, processGroupTurn, runGroupRounds, type GroupAgent, type GroupRuntime } from './group-turns'
+import { GroupJudgmentPendingError, processGroupTurn, runGroupRounds, untilStopped, type GroupAgent, type GroupRuntime } from './group-turns'
 import { checkedCorrection, checkedRoute } from './group-correction'
 import { createGroupJudgment } from './group-judgment'
 import { DECISION_MODEL, type DecisionAnswer } from './decision'
@@ -306,8 +306,51 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const revoked = await send(id,'revoked workspace',[a])
     await assert.rejects(processGroupTurn(scoped,id,{...runtime,async authorized() {return false},async generate() {assert.fail('revoked actor must not generate')}}),/no_longer_authorized/)
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[revoked])).rows[0].status,'failed')
+    // 停止: a member stops while a reply generates; the reply in flight is aborted and nothing is posted, the turn reads stopped.
+    const stoppedRoot = await send(id,'stopped mid reply',[a])
+    let aborted = false
+    assert.equal(await processGroupTurn(scoped,id,{...runtime,async generate(_agent,input) {
+      const stop = await handleGroup(scoped,directory,{...base,userId:'member',resource:'stop',id},true)
+      assert.equal(stop.status,200); assert.deepEqual(stop.body,{stopped:1})
+      await new Promise<void>(resolve => input.signal?.addEventListener('abort',() => { aborted = true; resolve() },{once:true}))
+      throw input.signal?.reason
+    }}),true)
+    assert.ok(aborted,'the reply in flight is aborted')
+    assert.deepEqual((await scoped.query('SELECT status,error,"agentId" FROM group_turns WHERE "messageId"=$1',[stoppedRoot])).rows[0],{status:'failed',error:'stopped',agentId:null})
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[stoppedRoot])).rows[0].n,0)
+    assert.equal((await scoped.query(`SELECT status FROM agent_runs WHERE kind='group_chat' ORDER BY "createdAt" DESC LIMIT 1`)).rows[0].status,'stopped')
+    const page = await handleGroup(scoped,directory,{...base,method:'GET',resource:'messages',id},true)
+    assert.equal((page.body as {stopped:boolean;agentStatus:unknown}).stopped,true); assert.equal((page.body as {agentStatus:unknown}).agentStatus,null)
+    // A reply that finishes as the stop lands is not posted either; the next message is answered as usual.
+    const lateRoot = await send(id,'stopped as it finished',[a])
+    assert.equal(await processGroupTurn(scoped,id,{...runtime,async generate() {
+      await handleGroup(scoped,directory,{...base,resource:'stop',id},true)
+      return {text:'too late',mentions:[]}
+    }}),true)
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[lateRoot])).rows[0].n,0)
+    const afterStop = await send(id,'after stop',[a]); assert.equal(await processGroupTurn(scoped,id,runtime),true)
+    assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[afterStop])).rows[0].status,'complete')
+    // Only members stop: someone outside the group gets the same 404 as an unknown group.
+    assert.equal((await handleGroup(scoped,directory,{...base,userId:'stranger',resource:'stop',id},true)).status,404)
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { releasePending(); await scoped.end(); await pool.end() }
+})
+test('停止 ends the rounds: no further reply is generated once the turn is stopped', async () => {
+  const calls: string[] = []
+  let stop = false
+  await runGroupRounds({ by: 'mention', responders: [a,b] }, message, {
+    async eligible() { return members }, async status() {}, async stopped() { return stop },
+    async generate(agent) { calls.push(agent.id); stop = true; return { text: 'first reply', mentions: [b] } },
+    async publish() { return true },
+  })
+  assert.deepEqual(calls, [a])
+})
+test('停止 aborts a reply in flight once the poll sees it, and leaves a finished one alone', async () => {
+  let stop = false
+  const pending = untilStopped(async () => stop, signal => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })), 5)
+  stop = true
+  await assert.rejects(pending, /stopped/)
+  assert.equal(await untilStopped(async () => false, async () => 'done', 5), 'done')
 })
 test('expired execution budget cancels before generation/status publication', async () => {
   await assert.rejects(runGroupRounds({by:'mention',responders:[a]},message,{

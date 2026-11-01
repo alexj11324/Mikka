@@ -17,7 +17,8 @@ export type GroupMessage = {
   createdAt: string
 }
 /** The first page also says which member is answering (`agentStatus`, null when none) and whether the last message found no taker. */
-export type GroupMessagePage = { messages: GroupMessage[]; nextBefore: string | null; agentStatus?: { status: string } | null; routingError?: { code: string } | null }
+/** `stopped`: the latest reply was stopped (停止) by a member. */
+export type GroupMessagePage = { messages: GroupMessage[]; nextBefore: string | null; agentStatus?: { status: string } | null; routingError?: { code: string } | null; stopped?: boolean }
 export type GroupMessagesError = 'unauthorized' | 'not_found' | 'unavailable'
 
 export class GroupMessagesRequestError extends Error {
@@ -52,6 +53,14 @@ export async function postGroupMessage(id: string, body: string, mentions: Group
   const sent = await response.json().catch(() => null) as GroupMessage | null
   if (response.ok && sent?.id) return sent
   throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
+}
+
+/** 停止: ends the reply the group is waiting on. Replies already posted stay. */
+export async function stopGroupReply(id: string, fetcher: typeof fetch = fetch): Promise<void> {
+  let response: Response
+  try { response = await fetcher(withBasePath(`/api/conversations/${encodeURIComponent(id)}/stop`), { method: 'POST', credentials: 'same-origin' }) }
+  catch { throw new GroupMessagesRequestError('unavailable') }
+  if (!response.ok) throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
 }
 
 /** Pages arrive newest first; the chat reads oldest first. Duplicates (a page

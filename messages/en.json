@@ -14,7 +14,18 @@
     "propertyValue": "{label}: {value}",
     "avatarLabel": "Avatar for {email}",
     "scrollToEnd": "Scroll to end",
-    "scrollToStart": "Scroll to start"
+    "scrollToStart": "Scroll to start",
+    "resize": {
+      "suggestionsChat": "Resize Coordinator chat",
+      "artifactList": "Resize Artifact list",
+      "boardSidebar": "Resize Coordinator sidebar",
+      "taskPanel": "Resize right panel",
+      "editorPanel": "Resize side panel",
+      "projectDetails": "Resize details",
+      "settingsList": "Resize settings list",
+      "groupPanel": "Resize right panel",
+      "browser": "Resize browser"
+    }
   },
   "Issue": {
     "scope": {
@@ -2885,7 +2896,7 @@
       "run": "Thread",
       "runOf": "{agent} thread",
       "openIssue": "Open task: {title}",
-      "openRunIssue": "{agent} thread, open task: {title}",
+      "openThread": "Open thread: {name}",
       "noIssue": "No linked task",
       "runStatus": {
         "queued": "Queued",
@@ -3709,7 +3720,8 @@
     "loadingOlder": "Loading…",
     "notSent": "Not sent",
     "answering": "Replying",
-    "noTaker": "No bot took this. @ one by name"
+    "noTaker": "No bot took this. @ one by name",
+    "stopped": "Stopped"
   },
   "DeviceSetup": {
     "title": "Set up {device}",

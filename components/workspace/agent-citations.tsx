@@ -18,14 +18,12 @@ import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { statusIconTints } from '@/lib/status-appearance'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from '@/components/workspace/issue-properties'
+import { ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
 
 export const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-light' | 'warning-light' | 'secondary'> = {
   queued: 'secondary', preparing: 'success-light', running: 'success-light', waiting_input: 'warning-light', finishing: 'success-light',
   succeeded: 'info-light', stopped: 'secondary', failed: 'destructive-light', cancelled: 'secondary',
 }
-
-/** A task chip is wider than a source chip: it carries the title too. */
-const TASK_CHIP = 'max-w-72'
 
 export type LinkPreviews = Record<string, LinkPreview | null>
 
@@ -38,6 +36,8 @@ export interface AgentCitations {
   sources: Record<string, CitationSource>
   previews: LinkPreviews
   onOpenIssue: (id: string) => void
+  /** Opens a thread's own conversation beside or in place of the chat, as a thread card does (R-66, R-50). */
+  onOpenThread?: (thread: { issueId: string; runId: string }) => void
 }
 
 export const AgentCitationsContext = createContext<AgentCitations | null>(null)
@@ -75,7 +75,7 @@ export function CitationSources({ text }: { text: string }) {
   const citations = useAgentCitations()
   const [open, setOpen] = useState(false)
   if (!citations) return null
-  const { sources, previews, onOpenIssue } = citations
+  const { sources, previews, onOpenIssue, onOpenThread } = citations
   const listed = new Map<string, StreamingSource>()
   for (const part of splitCitations(text)) {
     if (part.type === 'link') listed.set(part.url, linkSource(part.url, part.label, previews[part.url]))
@@ -85,7 +85,7 @@ export function CitationSources({ text }: { text: string }) {
       if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
       else {
         const issue = source.issue
-        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <HarnessMark harness={source.harness} />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
+        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <HarnessMark harness={source.harness} />, onSelect: issue && onOpenThread ? () => onOpenThread({ issueId: issue.id, runId: source.id }) : undefined })
       }
     }
   }
@@ -96,7 +96,7 @@ export function CitationSources({ text }: { text: string }) {
   </div>
 }
 
-/** A task mentioned in a reply: status dot, number and title, inline with the text. */
+/** A task mentioned in a reply: a boxed chip with its status icon and title; the number is in the hover card. */
 export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const tIssue = useTranslations('Issue')
@@ -104,10 +104,9 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const identifier = issue.identifier
   return <InlineCitation>
-    <InlineCitationTrigger aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)} className={TASK_CHIP}>
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)}>
       <status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />
-      {identifier && <span className="shrink-0">{identifier}</span>}
-      <InlineCitationLabel className="font-sans">{issue.title}</InlineCitationLabel>
+      <InlineCitationLabel>{issue.title}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
@@ -129,7 +128,7 @@ export function CitationChip({ id, kind }: { id: string; kind: CitationKind }) {
   if (!citations || source?.kind !== kind) return <>{id}</>
   return source.kind === 'issue'
     ? <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
-    : <RunCitation run={source} onOpen={citations.onOpenIssue} />
+    : <RunCitation run={source} onOpen={citations.onOpenThread} />
 }
 
 /** A cited web page as a chip with its link preview; a plain link outside a conversation that cites. */
@@ -139,20 +138,22 @@ export function WebCitation({ url, label }: { url: string; label: string | null 
   return <LinkCitation url={url} label={label} preview={citations.previews[url]} />
 }
 
-export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: string) => void }) {
+/** A thread mentioned in a reply: a boxed chip with its status icon and name; it opens the thread's conversation, never the task. */
+export function RunCitation({ run, onOpen }: { run: RunSource; onOpen?: (thread: { issueId: string; runId: string }) => void }) {
   const t = useTranslations('Coordinator.citation')
   const format = useFormatter()
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
-  // The coding agent runs the thread, so its mark is the thread's face; the bot only dispatched it (R-78).
+  // The chip shows the thread's state, as the thread card and the Threads list do; the coding agent's mark is in the hover card (R-78).
   const issue = run.issue
   const status = t.has(`runStatus.${run.status}` as never) ? t(`runStatus.${run.status}` as never) : run.status
   return <InlineCitation>
     <InlineCitationTrigger
-      aria-label={issue ? t('openRunIssue', { agent: run.agentName, title: issue.title }) : t('runOf', { agent: run.agentName })}
-      onClick={issue ? () => onOpen(issue.id) : undefined}
+      variant="object"
+      aria-label={issue && onOpen ? t('openThread', { name: run.name }) : t('runOf', { agent: run.agentName })}
+      onClick={issue && onOpen ? () => onOpen({ issueId: issue.id, runId: run.id }) : undefined}
     >
-      <SourceAvatar source={{ name: run.agentName, domain: run.agentName, icon: <HarnessMark harness={run.harness} /> }} className="size-4 rounded-full" />
+      <ThreadStatusIcon status={run.status} outcome={run.outcome} small />
       <InlineCitationLabel>{run.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>

@@ -13,6 +13,8 @@ export const colors = {
   tertiary: '#B0B0B5',
   separator: '#E5E5EA',
   accent: '#3478F6',
+  /** A task or thread named in chat: the accent at 10% (R-15). */
+  objectChip: 'rgba(52, 120, 246, 0.10)',
   unread: '#3478F6',
   success: '#34C759',
   danger: '#E5484D',

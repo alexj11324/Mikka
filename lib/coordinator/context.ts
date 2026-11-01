@@ -123,7 +123,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         event.issueId ? `Issue: ${event.issueId}.` : null,
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
         ...publicationPrompt(payload.publication),
-        payload.verification === 'not_run' ? 'Verification was not run. Tell the person that no verification command is configured and the work needs human review. Mention a draft PR only when the server-confirmed publication includes one. Never say the changes passed verification.' : null,
+        payload.verification === 'not_run' ? 'Verification was not run: no verification command is configured. Never say the changes passed verification. Mention a draft PR only when the server-confirmed publication includes one.' : null,
         payload.noMachine ? `Its machine went offline and no other machine can continue it. Draw this card as one BeQuestions choice question (title, description and options as given, each option keeps its value and action), add no explanation, and dispatch the issue again after the person answers: ${JSON.stringify(payload.noMachine)}` : null,
         note,
       ].filter(Boolean).join('\n')
@@ -163,6 +163,8 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
       return [`[Event] Device ${payload.deviceId} is back online; queued Factory run ${event.runId} for task ${payload.taskId} will start there.`, note].filter(Boolean).join('\n')
     case 'issue_done':
       return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to done.`, note].filter(Boolean).join('\n')
+    case 'issue_status_changed':
+      return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to ${payload.status}.`, note].filter(Boolean).join('\n')
     case 'run_report':
       return [event.runId ? `[Event] The agent in run ${event.runId} reports progress: ${payload.text}` : `[Event] An Agent reports coordination data: ${payload.text}`, event.issueId ? `Issue: ${event.issueId}.` : null, note].filter(Boolean).join('\n')
     case 'run_question':

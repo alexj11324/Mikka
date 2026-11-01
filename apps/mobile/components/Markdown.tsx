@@ -102,9 +102,9 @@ function inline(text: string, sources: Record<string, CitationSource>, onOpen: (
   return parts
 }
 
-/** A task or thread named inline: its icon and name; tapping opens it. */
+/** A task or thread named inline: a boxed chip with its icon and title in the accent; tapping opens it (R-15). */
 export function MentionChip({ source, onPress }: { source: CitationSource; onPress?: () => void }) {
-  const label = source.kind === 'issue' ? [source.identifier, source.title].filter(Boolean).join(' ') : runTitle(source)
+  const label = source.kind === 'issue' ? source.title : runTitle(source)
   return (
     <Pressable accessibilityRole="link" onPress={onPress} style={styles.mention}>
       {source.kind === 'run' ? <StatusIcon status={threadStatus(source.status)} size={14} /> : <CircleDot size={14} color={colors.secondary} strokeWidth={2} />}
@@ -122,6 +122,6 @@ const styles = StyleSheet.create({
   code: { fontFamily: font === undefined ? 'Menlo' : 'ui-monospace, Menlo, monospace', fontSize: 14, backgroundColor: 'rgba(0,0,0,0.05)' },
   link: { color: colors.accent },
   mentionWrap: { transform: [{ translateY: 5 }] },
-  mention: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.chip, borderRadius: 8, paddingHorizontal: 7, height: 26, marginHorizontal: 2, maxWidth: 240 },
-  mentionText: { fontSize: 15, flexShrink: 1 },
+  mention: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.objectChip, borderRadius: 6, paddingHorizontal: 7, height: 26, marginHorizontal: 2, maxWidth: 240 },
+  mentionText: { fontSize: 15, flexShrink: 1, color: colors.accent },
 })

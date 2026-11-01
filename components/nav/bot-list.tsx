@@ -11,10 +11,11 @@ import type { Thread } from '@/app/actions/task-runs'
 import { MikkaMark } from '@/components/brand/mikka-mark'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
+import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { cn } from '@/lib/utils'
-import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
+import { useResizableWidth } from '@/hooks/use-resizable-width'
+import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { SPRING_SIDEBAR } from '@/lib/ease'
 import { chatPreview } from '@/lib/agent-history'
 import { fetchGroups } from '@/lib/group-messages'
@@ -142,7 +143,8 @@ export function BotList({ bots, workspaceId, threads, active, onOpen, onNewBot, 
     return line ? <span className="truncate">{line}</span> : null
   }
   const unread = useUnread(activeId, latest)
-  const { width, dragging, instant, endedDrag, reset, handleProps } = useResizableWidth(LIST_WIDTH)
+  const resize = useResizableWidth(LIST_WIDTH)
+  const { width, dragging, instant, endedDrag } = resize
   const foldTimer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(foldTimer.current), [])
   // Enter or a click folds the list; a double-click resets its width instead.
@@ -204,6 +206,6 @@ export function BotList({ bots, workspaceId, threads, active, onOpen, onNewBot, 
   return <motion.div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} initial={false} animate={{ width: open ? width : 0 }} transition={instant ? { duration: 0 } : SPRING_SIDEBAR} className={cn('relative hidden shrink-0 overflow-hidden md:block', open ? 'border-r' : 'border-r-0', dragging && 'select-none')}>
     <Sidebar collapsible="none" className="w-[var(--bot-list-width,16rem)] bg-transparent">{body}</Sidebar>
     {/* Comma's edge strip with a hairline on hover: drag it or use the arrow keys to resize the list, double-click it to reset, click it to fold the list. */}
-    <SidebarRail {...handleProps} aria-expanded={undefined} label={i18nText('Nav.resizeList')} title={i18nText('Nav.collapseList')} onClick={onEdgeClick} onDoubleClick={reset} className={cn(RESIZE_EDGE, 'right-0 left-auto after:start-auto after:right-0')} />
+    <ResizeHandle resize={resize} label={i18nText('Nav.resizeList')} title={i18nText('Nav.collapseList')} edge="end" onClick={onEdgeClick} />
   </motion.div>
 }
