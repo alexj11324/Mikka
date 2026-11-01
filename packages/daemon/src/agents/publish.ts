@@ -44,7 +44,8 @@ export interface PublishOptions {
   baseBranch?: string
   /**
    * Push only when allowed: the repo approved it ("always for this repo")
-   * or the workspace allows pushes (`pushDecision` in ../permissions).
+   * or the run's assignment, after the server checked that approval,
+   * allows pushes (`pushDecision` in ../permissions).
    * `note` says why not otherwise.
    */
   push: { approved: boolean; remote: string; note?: string }
