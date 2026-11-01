@@ -5,7 +5,7 @@ import type * as schema from '@/lib/db/schema'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { WORKING_RUN_STATUSES } from '@/lib/agent-run-statuses'
-import { runAgentName } from '@/lib/run-bot-name'
+import { runBotName } from '@/lib/run-bot-name'
 
 // MIK-7: the agents working for the signed-in person right now, for the
 // "who is working" strip. Only the caller's own runs and agents; no prompt,
@@ -60,7 +60,7 @@ export async function listActiveAgents(database: Database, userId: string, now =
   const onlineSince = new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS)
   const startedAt = sql<Date>`coalesce(${agentRuns.startedAt}, ${agentRuns.createdAt})`.mapWith(agentRuns.createdAt)
   const [rows, [session], workingBots] = await Promise.all([
-    database.select({ agentId: agents.id, name: runAgentName, runId: agentRuns.id, issueId: agentRuns.issueId, status: agentRuns.status, startedAt })
+    database.select({ agentId: agents.id, name: runBotName, runId: agentRuns.id, issueId: agentRuns.issueId, status: agentRuns.status, startedAt })
       .from(agentRuns)
       .innerJoin(agents, and(eq(agents.id, agentRuns.agentId), eq(agents.userId, userId)))
       .leftJoin(devices, and(eq(devices.id, agentRuns.deviceId), eq(devices.ownerId, userId)))

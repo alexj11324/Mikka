@@ -93,7 +93,8 @@ test('device identity convergence, repository URL deduplication and history pres
     const [identity] = await db.select({ name: executionBotName }).from(agents).where(eq(agents.id, codex.id))
     assert.equal(identity?.name, 'Coordinator', 'standalone activity/directory projections hide the device identity too')
     const [activity] = await enrichActivityActors([{ actorType: 'agent' as const, actorId: codex.id }], owner)
-    assert.equal(activity.actor?.name, 'Coordinator')
+    // R-78: a run's activity names its Agent; the device identity stays hidden.
+    assert.equal(activity.actor?.name, 'Codex')
     assert.equal(activity.actor?.id, codex.id, 'display names do not replace the technical actor ID')
     assert.equal((await pool.query('SELECT name FROM agents WHERE id=$1', [codex.id])).rows[0].name, `codex ${first}`, 'read projections never rename stored execution identities')
     await pool.query('UPDATE devices SET harnesses=$1 WHERE id=$2', [JSON.stringify([infos[0]]), first])
