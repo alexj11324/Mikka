@@ -13,9 +13,10 @@ import { useActionError } from '@/lib/use-action-error'
 type Change = { shared: boolean; allowOthers?: boolean }
 
 /**
- * 在这里使用我的订阅: a member shares their own subscriptions into this team
- * workspace for their own bots; 分享给团队成员 lets other members' bots use
- * them too. Turning it on asks first, in Alex's words: whose quota pays, that
+ * 分享给团队成员: a member's own subscriptions always serve their own bots in
+ * every workspace, with no switch (Alex, #838); this switch lets other
+ * members' bots use them too. An admin's 允许成员使用个人订阅 turned off
+ * blocks only this sharing. Turning it on asks first, in Alex's words: whose quota pays, that
  * the credential sits on the running computer (maybe a member's own) until
  * the task ends, and to share only with people you trust. Turning it off
  * takes effect at once, without asking. A personal
@@ -49,20 +50,18 @@ export function SubscriptionShareSettings({ workspaceId }: { workspaceId: string
 
   if (share.data?.error) return <FieldError>{actionError(share.data.error)}</FieldError>
   if (!data || data.personal) return null
+  const othersOn = data.shared && data.allowOthers
   const ownName = data.own.length
     ? data.own.map(provider => t('subscriptionName', { provider: t(`provider.${provider}`) })).join(t('listSeparator'))
     : t('ownFallback')
   return <>
     <SettingsSection id="subscription-share-heading" title={t('heading')}>
-      <SettingRow title={t('share')}>
+      <SettingRow title={t('others')} description={data.allowed && othersOn ? t('othersOn') : undefined}>
         {data.allowed
-          ? <Switch aria-label={t('share')} checked={data.shared} disabled={pending} onCheckedChange={shared => void change({ shared })} />
+          ? <Switch aria-label={t('others')} checked={othersOn} disabled={pending}
+            onCheckedChange={checked => { if (checked) setConfirming(true); else void change({ shared: true, allowOthers: false }) }} />
           : <span className="text-sm text-muted-foreground">{t('blocked')}</span>}
       </SettingRow>
-      {data.allowed && data.shared && <SettingRow title={t('others')} description={data.allowOthers ? t('othersOn') : undefined}>
-        <Switch aria-label={t('others')} checked={data.allowOthers} disabled={pending}
-          onCheckedChange={checked => { if (checked) setConfirming(true); else void change({ shared: true, allowOthers: false }) }} />
-      </SettingRow>}
       {data.allowed && data.available.map(item => <SettingRow key={`${item.name}-${item.provider}`} title={t('available', { name: item.name, provider: t(`provider.${item.provider}`) })}>
         <span className="text-sm text-muted-foreground">{t('availableState')}</span>
       </SettingRow>)}

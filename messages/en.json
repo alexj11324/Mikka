@@ -2310,7 +2310,6 @@
     },
     "subscriptionShare": {
       "heading": "This workspace",
-      "share": "Use my subscriptions here",
       "blocked": "Turned off by an admin",
       "others": "Share with team members",
       "othersTitle": "Share {name} with team members?",
