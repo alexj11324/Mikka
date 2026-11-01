@@ -83,7 +83,7 @@ test('explicit Preview migration never connects to the global application target
 })
 
 
-test('the build runs migrations last, after next build succeeds', () => {
+test('the build runs migrations only after compilation and type checking succeed', () => {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
   assert.equal(manifest.scripts.migrate, 'node scripts/migrate.mjs')
   assert.equal(manifest.scripts.prebuild, undefined)
@@ -95,9 +95,10 @@ test('the build runs migrations last, after next build succeeds', () => {
       const executable = join(dir, name)
       writeFileSync(executable, `#!/bin/sh
 case "${name} $*" in
-  "node scripts/build-subscription-worker.mjs"|"pnpm generate:agent-ui"|"pnpm lint"|"next build"|"node scripts/migrate.mjs") printf '%s\n' "${name} $*" >> "$BUILD_TEST_TRACE" ;;
+  "node scripts/build-subscription-worker.mjs"|"pnpm generate:agent-ui"|"pnpm lint"|"next build"|"pnpm typecheck"|"node scripts/migrate.mjs") printf '%s\n' "${name} $*" >> "$BUILD_TEST_TRACE" ;;
   *) echo UNEXPECTED_BUILD_SIDE_EFFECT >&2; exit 91 ;;
 esac
+if [ "${name} $*" = "$BUILD_TEST_FAIL" ]; then exit 1; fi
 `)
       chmodSync(executable, 0o700)
     }
@@ -105,7 +106,15 @@ esac
       cwd: dir, env: { PATH: dir, VERCEL_ENV: 'production', MIGRATE: '1', BUILD_TEST_TRACE: trace }, encoding: 'utf8',
     })
     assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm lint', 'next build', 'node scripts/migrate.mjs'])
+    assert.deepEqual(readFileSync(trace, 'utf8').trim().split('\n'), ['node scripts/build-subscription-worker.mjs', 'pnpm generate:agent-ui', 'pnpm lint', 'next build', 'pnpm typecheck', 'node scripts/migrate.mjs'])
+    for (const failure of ['next build', 'pnpm typecheck']) {
+      writeFileSync(trace, '')
+      const failed = spawnSync('/bin/sh', ['-c', manifest.scripts.build], {
+        cwd: dir, env: { PATH: dir, VERCEL_ENV: 'production', MIGRATE: '1', BUILD_TEST_TRACE: trace, BUILD_TEST_FAIL: failure }, encoding: 'utf8',
+      })
+      assert.equal(failed.status, 1, failed.stderr)
+      assert.doesNotMatch(readFileSync(trace, 'utf8'), /node scripts\/migrate\.mjs/)
+    }
   } finally { console.error(`Retained test fixture: ${dir}`) }
 })
 
