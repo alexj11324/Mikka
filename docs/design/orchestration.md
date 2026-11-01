@@ -53,10 +53,8 @@ flowchart TD
 ```
 
 1. **The bot owner's own credential**, when it is valid (connected, not
-   revoked or paused, quota left) and allowed in this workspace. In the
-   personal workspace it is always allowed. In a team it is allowed when the
-   owner shared it there and the admin has not turned off
-   「允许成员使用个人订阅和 API Key」. If several qualify, the bot's saved choice wins;
+   revoked or paused, quota left). It is allowed in every workspace the owner
+   belongs to, with no switch and no admin limit ([2026-11-01-2240-own-credentials-always-usable](decisions/2026-11-01-2240-own-credentials-always-usable.md)). If several qualify, the bot's saved choice wins;
    after that a subscription comes before an API key, and Claude comes before
    ChatGPT/Codex.
 2. **Otherwise another member's credential** shared in this workspace with
@@ -69,8 +67,8 @@ Rules that hold everywhere:
   credential gets Mikka 默认.
 - **No switch mid-run.** A run frozen on a credential that disappears stops,
   with the subscription line and 重试. A credential disappears when it is
-  disconnected, revoked, paused, its share is withdrawn, its owner leaves, or
-  the admin switch is turned off.
+  disconnected, revoked, paused, its share is withdrawn (for other members'
+  bots), its owner leaves, or the admin turns 「分享给团队成员」 off there.
 - **Quota exhausted.** The run that hit the limit stops; it never switches.
   - When 「订阅额度用完后，自动改用 API Key」 is on (the default) and the owner has
     an API key of their own, the next run uses that API key. The chat says so
@@ -270,7 +268,7 @@ The workspace where the work happens pays.
 | MVP | Later |
 | --- | --- |
 | A personal workspace for everyone; team workspaces beside it | — |
-| Account-level subscriptions, API keys and custom providers on 「API 与订阅」; per-workspace shares; 「分享给团队成员」; the admin switch | Per-member spend caps |
+| Account-level subscriptions, API keys and custom providers on 「API 与订阅」; own credentials usable in every workspace with no switch; 「分享给团队成员」, which an admin can switch off | Per-member spend caps |
 | Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完后，自动改用 API Key」; a popup when nothing is left | — |
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
