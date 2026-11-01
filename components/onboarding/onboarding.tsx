@@ -38,7 +38,7 @@ type Card = 'intro' | 'name' | 'computer' | 'key' | 'apps' | 'welcome' | null
 
 /** The guide's pacing, in ms (docs/design/onboarding.md §5). */
 const PACE = { dim: 3000, autoStart: 8000, travel: 640, firstLine: 400, botGap: 2500, replyBeat: 1000, lastBeat: 1200, rise: 700 }
-const IDLE_MOVES: BotMood[] = ['wink', 'wide', 'play', 'hexagon']
+const IDLE_MOVES: BotMood[] = ['wink', 'wide', 'hexagon']
 const BUBBLE_SPRING = { type: 'spring', stiffness: 520, damping: 27, mass: 0.52 } as const
 
 /**
@@ -230,7 +230,7 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
       reply(t('keyReply'))
       void run(async () => {
         await wait(PACE.replyBeat)
-        act('comet'); hop()
+        act('wide'); hop()
         await say(t('computerReady'))
         await askApps(bot)
       })

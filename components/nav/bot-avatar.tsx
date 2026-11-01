@@ -8,21 +8,22 @@ export { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotC
 
 /**
  * What the bot is doing, as bloub states (Figma 196:3571): 空闲 idle (it plays
- * its own animations), 工作中 thinking (its own body, blinking), 等你处理 notify, 完成 wink, 出错
+ * its own animations), 工作中 thinking (its own body, blinking), 完成 wink, 出错
  * exclaim, 离线 sleep.
- * The rest are one-off moves (wide eyes, play, the hexagon pose, and the
- * burst and comet effects) for moments like the first-run guide; they play at
- * bloub's own length and the caller sets the mood back to idle afterwards.
- * bloub's orbit move (coloured ribbons circling the body) is never used: Alex
- * asked for it to go.
+ * The rest are one-off moves (wide eyes, the hexagon pose and the burst effect)
+ * for moments like the first-run guide; they play at bloub's own length and the
+ * caller sets the mood back to idle afterwards.
+ * Nothing is drawn on or around an avatar (Alex, 2026-11-01): bloub's notify
+ * badge, and the coloured ribbons and trails of its orbit, play and comet moves,
+ * are never used.
  */
-export type BotMood = 'idle' | 'thinking' | 'notify' | 'wink' | 'exclaim' | 'sleep' | BotMove
+export type BotMood = 'idle' | 'thinking' | 'wink' | 'exclaim' | 'sleep' | BotMove
 
-export type BotMove = 'wide' | 'play' | 'hexagon' | 'burst' | 'comet'
+export type BotMove = 'wide' | 'hexagon' | 'burst'
 
 /** How long each mood lasts at bloub's own pace, in seconds. */
-export const BOT_MOOD_SECONDS: Record<BotMood, number> = { idle: 2.4, thinking: 2.6, notify: 2.2, wink: 1.6, exclaim: 2, sleep: 2.4, wide: 1.8, play: 2, hexagon: 1.6, burst: 2.6, comet: 2.4 }
-const BOT_MOVES = new Set<BotMood>(['wide', 'play', 'hexagon', 'burst', 'comet'])
+export const BOT_MOOD_SECONDS: Record<BotMood, number> = { idle: 2.4, thinking: 2.6, wink: 1.6, exclaim: 2, sleep: 2.4, wide: 1.8, hexagon: 1.6, burst: 2.6 }
+const BOT_MOVES = new Set<BotMood>(['wide', 'hexagon', 'burst'])
 
 /** A steady colour for something that has a name but no colour of its own, such as an agent assignee. */
 export function colorFor(name: string): BotColor {
@@ -62,16 +63,16 @@ if (typeof window !== 'undefined') void loadRuntime()
 /**
  * Idle plays bloub's own animations on its own, with no cursor following
  * (Alex: 「它自己动就行了」): short rests (bloub blinks by itself) between the
- * shape changes, glances and effects. Every block keeps the bot's outline at
- * full size: comet and burst shrink the body to a dot (0.13 and 0.17 of its
- * radius), which read as an avatar that had not loaded (R-36), so they stay
- * one-off moves. The status states (thinking, notify, exclaim, sleep) stay
- * out, so they keep meaning 工作中 / 等你处理 / 出错 / 离线.
+ * shape changes and glances. Every block keeps the bot's outline at full
+ * size: burst shrinks the body to a dot (0.17 of its radius), which read as an
+ * avatar that had not loaded (R-36), so it stays a one-off move. The status
+ * states (thinking, exclaim, sleep) stay out, so they keep meaning 工作中 /
+ * 出错 / 离线.
  * Other moods hold their state.
  */
 const IDLE_MONTAGE = [
   ['idle', 3], ['egg', 1.8], ['idle', 2.5], ['wink', 1.6], ['idle', 2.5], ['hexagon', 1.6],
-  ['idle', 2.5], ['wide', 1.8], ['idle', 2.5], ['play', 2],
+  ['idle', 2.5], ['wide', 1.8],
 ] as const
 
 /**
