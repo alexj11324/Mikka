@@ -20,8 +20,9 @@ import { ComputerViewer } from './computer-viewer'
  * bot's blob and name, exactly as in the left list (never a thread's), then the bot's screen captioned
  * 「<Bot> 的屏幕」 and nothing else. 打开 opens the full-window viewer. Without
  * `header` (the right column's 电脑 tab, under the bot's own header) it starts at the screen.
- * Mikka Cloud runs on the workspace's own E2B key (decisions 2026-10-30): with no
- * key in `workspaceId` the screen offers 添加 E2B API Key instead.
+ * Mikka Cloud runs only on the person's own E2B key
+ * (decisions/2026-11-01-1200-own-e2b-key-is-enough-for-cloud.md): without one the
+ * screen offers 添加 E2B API Key instead. `workspaceId` is the workspace the key is read for.
  */
 export function AgentComputer({ botId, name, header = true, workspaceId }: { botId: string; name: string; header?: boolean; workspaceId: string | undefined }) {
   const { data: bots } = useSWR('bots', listBots)

@@ -21,6 +21,17 @@ export function useE2BKeyStatus(workspaceId: string | null | undefined) {
   return useSWR(workspaceId ? ['settings:e2b-key', workspaceId] : null, () => settingsRead<Awaited<ReturnType<typeof getE2BKeyCapability>>>('e2b-key', { workspace: workspaceId }))
 }
 
+/**
+ * Whether the person has their own E2B key, read for the workspace they have open.
+ * Keys are personal (decisions/2026-11-01-1200-own-e2b-key-is-enough-for-cloud.md), so
+ * Mikka Cloud can run only with one. `undefined` while loading or when the read fails.
+ */
+export function useOwnE2BKey(enabled = true) {
+  const swr = useSWR(enabled ? ['settings:e2b-key', 'current'] : null, () => settingsRead<Awaited<ReturnType<typeof getE2BKeyCapability>>>('e2b-key'))
+  const status = swr.data && !swr.data.error ? swr.data : undefined
+  return { configured: status?.configured, mutate: swr.mutate }
+}
+
 export function E2BKeyDialog({ workspaceId, configured, onClose, open = true, onOpenChangeComplete }: { workspaceId?: string; configured: boolean; onClose: (changed: boolean) => void } & PresenceProps) {
   const t = useTranslations('Settings.secrets.e2b')
   const commonT = useTranslations('Common')
