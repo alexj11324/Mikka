@@ -24,7 +24,7 @@ import { UserMessageText } from '@/components/workspace/user-message-text'
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { ReplyAnswer } from '@/components/workspace/agent-decision'
 import { AgentThemeProvider } from '@/components/workspace/agent-theme'
-import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
+import { openThread } from '@/components/workspace/workspace-navigation'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 import { BotModelPicker } from './bot-model-picker'
@@ -98,10 +98,10 @@ function FollowSentMessages({ count }: { count: number | null }) {
  * `embedded`, with chips instead of cards and the quote from the artifact in
  * the composer.
  */
-/** A thread picked in the right panel's thread list, for the chat it was picked beside (`chat`: the bot id, or 'coordinator'). */
-export type ThreadRequest = { issueId: string; runId: string; chat: string }
+/** A thread card or chip opens the thread in the right column; the chat stays (R-66, R-80). */
+const showThread = ({ runId }: { runId: string }) => openThread(runId)
 
-export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId, threadRequest, onThreadRequestDone }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string; threadRequest?: ThreadRequest | null; onThreadRequestDone?: () => void }) {
+export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string }) {
   const t = useTranslations('Coordinator')
   const tNav = useTranslations('Nav')
   const tCommon = useTranslations('Common')
@@ -146,16 +146,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const [failed, setFailed] = useState<{ text: string; withNotes: boolean; message: string; after: number } | null>(null)
   const { submit, failureMessage } = useCoordinatorSubmit()
   const { mutate: mutateAll } = useSWRConfig()
-  // A thread card opens its conversation in place of the chat; back returns here (R-66).
-  const [openThread, setOpenThread] = useState<{ issueId: string; runId: string } | null>(null)
-  // A row of the right panel's thread list opens here the same way (R-50: the panel never swaps the chat for a task page).
-  useEffect(() => {
-    if (!threadRequest) return
-    setOpenThread({ issueId: threadRequest.issueId, runId: threadRequest.runId })
-    onThreadRequestDone?.()
-  }, [threadRequest, onThreadRequestDone])
-  // Notes pinned in the browser wait in this composer while it is the chat on screen (not inside the reader, not under an open thread).
-  const browser = useBrowserNotesComposer(!embedded && !openThread)
+  // Notes pinned in the browser wait in this composer while it is the chat on screen (not inside the reader).
+  const browser = useBrowserNotesComposer(!embedded)
   const noteCount = browser?.notes.length ?? 0
   useEffect(() => { if (noteCount) inputRef.current?.focus() }, [noteCount])
   // The 建议 item whose text is in the composer: once sent, the Coordinator dispatches a thread for it and it leaves 建议.
@@ -212,7 +204,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const unread = useUnreadIndicators({ conversationId: botId ? `bot:${botId}` : 'coordinator', items: unreadItems, rootRef })
   const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
   const sources = data?.sources
-  const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue, onOpenThread: setOpenThread }), [sources, previews, onOpenIssue])
+  const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
   // What the person said next after each reply, so a choice card shows its answer after a reload.
   const answers = useMemo(() => {
     const next = new Map<number, string>()
@@ -292,10 +284,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
 
   const personBubble = cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')
 
-  if (openThread) return <section aria-label={name} data-slot="thread-view" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip">
-    <IssueThreadPanel key={openThread.runId} issueId={openThread.issueId} runId={openThread.runId} back={name} onOpenTask={() => onOpenIssue(openThread.issueId)} onOpenThread={runId => setOpenThread({ issueId: openThread.issueId, runId })} onClose={() => setOpenThread(null)} />
-  </section>
-
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
   {/* The chat never widens what holds it: whatever a message carries scrolls or wraps inside its own box, and anything that still
       reaches past the column is clipped here instead of scrolling the whole page sideways. */}
@@ -340,7 +328,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     </div>}
                     {item.threads.map(id => {
                       const run = sources?.[id]
-                      return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={setOpenThread} /> : null
+                      return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} /> : null
                     })}
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
                     {footerTools(item).length > 0 && <MessageFooter><ToolsUsed tools={footerTools(item)} /></MessageFooter>}

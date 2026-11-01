@@ -20,6 +20,7 @@ import { IssueMembers } from './issue-members'
 import { IssueDetailProperties } from './issue-detail-properties'
 import { IssueThreads, ThreadEvents } from './issue-threads'
 import { IssueThreadPanel } from './issue-thread-panel'
+import { navigate } from './workspace-navigation'
 import { cn } from '@/lib/utils'
 import { FactoryAcceptance, FactoryAcceptancePanel, type FactoryTask } from './factory-acceptance'
 import { IssueActivityFeed } from './issue-activity-feed'
@@ -41,7 +42,7 @@ async function loadIssue(id: string) {
   return result.issue
 }
 type WorkspaceUser = { id: string; name: string; email: string }
-type DetailProps = { navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
+type DetailProps = { /** The thread open in the right column, from the address (R-80). */ thread: string | null; navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
 
 function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () => void; onClose: () => void }) {
   const t = useTranslations('IssueDetail')
@@ -89,7 +90,7 @@ const READ_ONLY_SNAPSHOT = { ready: false, pending: false, error: false, syncing
 const readOnlySnapshot = () => READ_ONLY_SNAPSHOT
 const noSubscribe = () => () => {}
 
-function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegisterFlush, navigation, onOpen }: DetailProps & { initial: Issue }) {
+function TaskForm({ initial, thread: openThread, user, onSaved, onDirty, onClose, onDeleted, onRegisterFlush, navigation, onOpen }: DetailProps & { initial: Issue }) {
   const t = useTranslations('Workspace.detail')
   const tDetail = useTranslations('IssueDetail')
   const actionError = useActionError()
@@ -123,14 +124,14 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   const composing = useRef(false)
   const [editSequence, setEditSequence] = useState(0)
   const [metadataSaving, setMetadataSaving] = useState(false)
-  const [openThread, setOpenThread] = useState<string | null>(null)
   // 验收 opens on the thread that produced the candidate (Figma 357:4750, frame 06); a task with no known thread opens alone.
   const [threadTab, setThreadTab] = useState<'chat' | 'acceptance'>('chat')
   const [openAcceptance, setOpenAcceptance] = useState<FactoryTask | null>(null)
-  const showThread = useCallback((runId: string | null) => { setOpenAcceptance(null); setThreadTab('chat'); setOpenThread(runId) }, [])
+  // The open thread is the address's (?thread=), so back closes it and a link reopens it beside this task (R-80).
+  const showThread = useCallback((runId: string | null) => { setOpenAcceptance(null); setThreadTab('chat'); navigate({ thread: runId }) }, [])
   const showAcceptance = useCallback((task: FactoryTask) => {
-    if (task.candidateRunId) { setOpenAcceptance(null); setThreadTab('acceptance'); setOpenThread(task.candidateRunId) }
-    else { setOpenThread(null); setOpenAcceptance(task) }
+    if (task.candidateRunId) { setOpenAcceptance(null); setThreadTab('acceptance'); navigate({ thread: task.candidateRunId }) }
+    else { navigate({ thread: null }); setOpenAcceptance(task) }
   }, [])
   const wide = useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false)
   // The right column resizes from its left line (decision 2026-11-01-1310); an open thread and the properties keep their own widths.

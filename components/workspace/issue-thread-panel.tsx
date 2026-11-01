@@ -4,13 +4,14 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ChevronLeft, SquareKanban, X } from 'lucide-react'
+import { SquareKanban, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
 import { runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
@@ -25,7 +26,7 @@ import { ArtifactKindIcon } from '@/components/artifacts/artifact-card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AcceptanceStateBadge, useThreadAcceptance } from './factory-acceptance'
-import { CandidateMachine, FactoryAcceptancePane } from './factory-acceptance-pane'
+import { FactoryAcceptancePane } from './factory-acceptance-pane'
 
 // Loaded on demand: the window itself shows this panel, bare, on its right.
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
@@ -38,18 +39,18 @@ const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whites
 
 /**
  * An open thread: a conversation between people and the agent running it (R-62, R-10).
- * On the issue page it sits on the right with a close button; opened from a chat's thread
- * card it fills the centre column and `back` names the chat it returns to (R-66).
+ * It sits in the right column beside the chat or the task with a close button, wherever it
+ * was opened from (R-80); the header names the bot that dispatched it.
  */
 type ThreadTab = 'chat' | 'acceptance'
-type IssueThreadPanelProps = { issueId: string; runId: string; onClose: () => void; back?: string; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Opened in the centre: the task it works on, as a header link. */ onOpenTask?: () => void }
+type IssueThreadPanelProps = { issueId: string; runId: string; onClose: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void }
 
 export function IssueThreadPanel(props: IssueThreadPanelProps) {
   // Drafts, in-flight callbacks and retry deadlines belong to exactly one run.
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab = 'chat', onOpenThread, onOpenTask }: IssueThreadPanelProps) {
+function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const { mutate: mutateCache } = useSWRConfig()
@@ -118,31 +119,27 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
   }
   return <section aria-label={detail?.name ?? t('title')} className="flex h-full min-h-0 flex-col">
     {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
-      {back && <>
-        {/* The way back reads at the title's size: no button size of its own shrinks it. */}
-        <Button variant="ghost" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
-        <span aria-hidden="true" className="text-muted-foreground">/</span>
-      </>}
       {detail && view && <ThreadStatusIcon status={view.status} waiting={view.waiting} />}
       <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{detail?.name ?? t('title')}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
-      {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
-      {back && onOpenTask && <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={onOpenTask}><SquareKanban data-icon="inline-start" />{t('openTask')}</Button>}
+      <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />
+      {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}
       {/* Frame 06 draws the machine in the wide centre-column header; the side panel has no room for it. */}
-      {acceptance && back && <CandidateMachine taskId={acceptance.id} />}
       {acceptance && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
         <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
       </Tabs>}
-      {!back && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
+      <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
     </header>}
-    {accepting && acceptance ? <div className={cn('flex min-h-0 flex-1 flex-col', back && 'mx-auto w-full max-w-3xl')}><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
-    <div className={cn('flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4', back && 'mx-auto w-full max-w-3xl')}>
+    {accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
       {error ? <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <ThreadStatus status={view?.status ?? data.thread.status} stopping={stopRequested} waiting={question === 'waiting'} />
             <span>{t('started', { time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>
+            {/* The bot that dispatched it, also when it is not the chat beside it (R-78, R-80). */}
+            {detail?.agentName && <span>{detail.agentName} {t('dispatched')}</span>}
           </div>
           {data.thread.prompt.trim() && <p className={cn(BUBBLE, data.thread.ownedByCurrentUser ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}>{data.thread.prompt.trim()}</p>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
@@ -166,10 +163,10 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
           {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
         </>}
     </div>
-    {data?.thread.quota?.paused && <div className={cn('shrink-0 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')}>
+    {data?.thread.quota?.paused && <div className="shrink-0 p-3">
       <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />
     </div>}
-    {(active || question) && detail && <div className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')}>
+    {(active || question) && detail && <div className="flex shrink-0 flex-col gap-1 p-3">
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
         sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={active || question === 'resuming'} onStop={active && data.thread.ownedByCurrentUser && !sending && !stopPending ? () => { void stop() } : undefined} />

@@ -49,7 +49,7 @@ const WORKSPACE_SECTIONS = 'coordinator|agent|plugins|suggestions|artifacts|all-
 const rules = [
   { rule: 'navigation/history', pattern: /\bhistory\.(?:pushState|replaceState)\s*\(/g, message: '不要直接写浏览器历史：用 components/workspace/workspace-navigation.ts 的 goTo / goToHref / dropQueryKeys（R-80）。' },
   { rule: 'navigation/router', pattern: /\brouter\.(?:push|replace)\s*\(/g, message: '应用窗口内的跳转不用 router.push / replace：用 goTo，或从外部入口用 openAppLink（R-80）。' },
-  { rule: 'navigation/address', pattern: new RegExp(String.raw`[?&](?:issue|bot)=(?!=)|searchParams\.(?:set|append)\(\s*['"](?:issue|bot)['"]|[?&]section=(?:${WORKSPACE_SECTIONS})\b|searchParams\.(?:set|append)\(\s*['"]section['"]\s*,\s*['"](?:${WORKSPACE_SECTIONS})['"]`, 'g'), message: '不要手拼工作区地址（?issue= / ?bot= / ?section=…）：用 workspaceLink / workspaceSearch / goTo（R-80）。' },
+  { rule: 'navigation/address', pattern: new RegExp(String.raw`[?&](?:issue|bot|thread)=(?!=)|searchParams\.(?:set|append)\(\s*['"](?:issue|bot|thread)['"]|[?&]section=(?:${WORKSPACE_SECTIONS})\b|searchParams\.(?:set|append)\(\s*['"]section['"]\s*,\s*['"](?:${WORKSPACE_SECTIONS})['"]`, 'g'), message: '不要手拼工作区地址（?issue= / ?bot= / ?section=…）：用 workspaceLink / workspaceSearch / goTo（R-80）。' },
 ]
 
 /** Blanks comments so a doc line that names an address is not a finding; offsets stay put. */

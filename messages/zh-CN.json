@@ -3190,7 +3190,6 @@
     "ownerThread": "{name} 的线程",
     "open": "打开线程 {name}",
     "dispatched": "派出线程",
-    "back": "返回 {name}",
     "starting": "正在准备",
     "close": "关闭线程",
     "openTask": "打开任务",

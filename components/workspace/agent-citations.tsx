@@ -19,6 +19,7 @@ import { OpenAI } from '@/components/ui/svgs/openai'
 import { statusIconTints } from '@/lib/status-appearance'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from '@/components/workspace/issue-properties'
 import { ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
+import { openThread } from '@/components/workspace/workspace-navigation'
 
 export const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-light' | 'warning-light' | 'secondary'> = {
   queued: 'secondary', preparing: 'success-light', running: 'success-light', waiting_input: 'warning-light', finishing: 'success-light',
@@ -36,8 +37,6 @@ export interface AgentCitations {
   sources: Record<string, CitationSource>
   previews: LinkPreviews
   onOpenIssue: (id: string) => void
-  /** Opens a thread's own conversation beside or in place of the chat, as a thread card does (R-66, R-50). */
-  onOpenThread?: (thread: { issueId: string; runId: string }) => void
 }
 
 export const AgentCitationsContext = createContext<AgentCitations | null>(null)
@@ -75,7 +74,7 @@ export function CitationSources({ text }: { text: string }) {
   const citations = useAgentCitations()
   const [open, setOpen] = useState(false)
   if (!citations) return null
-  const { sources, previews, onOpenIssue, onOpenThread } = citations
+  const { sources, previews, onOpenIssue } = citations
   const listed = new Map<string, StreamingSource>()
   for (const part of splitCitations(text)) {
     if (part.type === 'link') listed.set(part.url, linkSource(part.url, part.label, previews[part.url]))
@@ -85,7 +84,7 @@ export function CitationSources({ text }: { text: string }) {
       if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
       else {
         const issue = source.issue
-        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <HarnessMark harness={source.harness} />, onSelect: issue && onOpenThread ? () => onOpenThread({ issueId: issue.id, runId: source.id }) : undefined })
+        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <HarnessMark harness={source.harness} />, onSelect: issue ? () => openThread(source.id) : undefined })
       }
     }
   }
@@ -128,7 +127,7 @@ export function CitationChip({ id, kind }: { id: string; kind: CitationKind }) {
   if (!citations || source?.kind !== kind) return <>{id}</>
   return source.kind === 'issue'
     ? <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
-    : <RunCitation run={source} onOpen={citations.onOpenThread} />
+    : <RunCitation run={source} />
 }
 
 /** A cited web page as a chip with its link preview; a plain link outside a conversation that cites. */
@@ -139,7 +138,7 @@ export function WebCitation({ url, label }: { url: string; label: string | null 
 }
 
 /** A thread mentioned in a reply: a boxed chip with its status icon and name; it opens the thread's conversation, never the task. */
-export function RunCitation({ run, onOpen }: { run: RunSource; onOpen?: (thread: { issueId: string; runId: string }) => void }) {
+export function RunCitation({ run }: { run: RunSource }) {
   const t = useTranslations('Coordinator.citation')
   const format = useFormatter()
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
@@ -150,8 +149,8 @@ export function RunCitation({ run, onOpen }: { run: RunSource; onOpen?: (thread:
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"
-      aria-label={issue && onOpen ? t('openThread', { name: run.name }) : t('runOf', { agent: run.agentName })}
-      onClick={issue && onOpen ? () => onOpen({ issueId: issue.id, runId: run.id }) : undefined}
+      aria-label={issue ? t('openThread', { name: run.name }) : t('runOf', { agent: run.agentName })}
+      onClick={issue ? () => openThread(run.id) : undefined}
     >
       <ThreadStatusIcon status={run.status} small />
       <InlineCitationLabel>{run.name}</InlineCitationLabel>

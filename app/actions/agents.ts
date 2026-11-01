@@ -213,6 +213,20 @@ async function readableThread(issueId: string, runId: string) {
   return { row, user: access.user }
 }
 
+/**
+ * The task a thread works on, for a thread opened from its address alone (R-80).
+ * Null unless the viewer may read that thread, exactly as getIssueThread decides.
+ */
+export async function findThreadIssue(runId: string): Promise<string | null> {
+  if (!z.uuid().safeParse(runId).success) return null
+  const [run] = await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(eq(agentRuns.id, runId)).limit(1)
+  if (!run?.issueId) return null
+  try {
+    await readableThread(run.issueId, runId)
+    return run.issueId
+  } catch { return null }
+}
+
 export interface IssueThreadDetail {
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
   thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null }

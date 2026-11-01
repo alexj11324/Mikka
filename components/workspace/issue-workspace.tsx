@@ -27,13 +27,13 @@ import { GroupPanel } from '@/components/nav/group-panel'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { BrowserPane } from '@/components/browser/browser-pane'
+import { ThreadColumn } from './thread-column'
 import { BrowserNotesProvider } from '@/components/browser/browser-notes'
 import { BrowserToggle, useBrowserFits } from '@/components/browser/browser-toggle'
 import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
 import { listThreads } from '@/app/actions/task-runs'
 import { listBots, type BotView } from '@/app/actions/bots'
 import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
-import type { ThreadRequest } from '@/components/coordinator/coordinator-chat'
 import { chatPreview } from '@/lib/agent-history'
 import { PanelRight } from 'lucide-react'
 import { ISSUE_STATUSES, type IssueStatus, type IssueView } from './issue-properties'
@@ -55,7 +55,7 @@ import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
 import { PluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import { ArtifactLibrary } from '@/components/artifacts/artifact-library'
-import { dropQueryKeys, goTo, queryMoved, readLocation, sameLocation, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
+import { dropQueryKeys, goTo, NAVIGATE_EVENT, openThread, queryMoved, readLocation, sameLocation, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest } from '@/lib/settings-navigation'
 import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
@@ -170,8 +170,8 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
   // Below xl the column has no room, so 打开右栏 shows it in a Sheet instead.
   const [panelSheet, setPanelSheet] = useState(false)
-  // A thread picked in the right panel opens in the centre chat it was picked beside (R-50, R-66).
-  const [threadRequest, setThreadRequest] = useState<ThreadRequest | null>(null)
+  // The thread open in the right column, beside the chat or the task (R-80); its address is ?thread=.
+  const [threadId, setThreadId] = useState<string | null>(() => readLocation(params).thread)
   useEffect(() => {
     const wide = window.matchMedia('(min-width: 80rem)')
     const close = () => { if (wide.matches) setPanelSheet(false) }
@@ -280,14 +280,22 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   const leaveRef = useRef(leave)
   leaveRef.current = leave
+  /** Writes the workspace's own move; a new centre closes the open thread (workspaceHref), so the column follows the address. */
+  function move(change: Partial<WorkspaceLocation>, mode: 'push' | 'replace' = 'push') {
+    goTo(change, mode)
+    setThreadId(readLocation(new URL(window.location.href).searchParams).thread)
+  }
   /** What is on screen, as an address; back and forward compare against it. */
-  const shownRef = useRef<WorkspaceLocation>({ section: initialSection, bot: activeBotId, issue: initialSelected })
+  const shownRef = useRef<WorkspaceLocation>({ section: initialSection, bot: activeBotId, issue: initialSelected, thread: threadId })
   sectionRef.current = section
-  shownRef.current = { section, bot: section === 'coordinator' ? activeBotId : null, issue: selectedRef.current }
-  /** Back or forward landed on `next`: show it without writing the address again. */
+  shownRef.current = { section, bot: section === 'coordinator' ? activeBotId : null, issue: selectedRef.current, thread: threadId }
+  /** Back, forward or a component's navigate() landed on `next`: show it without writing the address again. */
   function showLocation(next: WorkspaceLocation) {
-    applySelection(next.issue)
     const shown = shownRef.current
+    // The same task stays mounted (its editor, scroll and open thread tab) when only the thread changes.
+    if (next.issue !== shown.issue) applySelection(next.issue)
+    setThreadId(next.thread)
+    if (next.thread) setPanelSheet(false)
     if (next.section === shown.section && next.bot === shown.bot) return
     const target: ChatTarget = next.bot ? { kind: 'bot', botId: next.bot } : { kind: 'coordinator' }
     if (next.section === 'coordinator') { lastChat.current = target; setActiveBotId(next.bot) }
@@ -299,18 +307,23 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   useEffect(() => {
     function onPop() {
       if (!queryMoved()) return
+      show()
+    }
+    /** A component moved through navigate(): the address is already written. */
+    function show() {
       const next = readLocation(new URL(window.location.href).searchParams)
       const previous = shownRef.current
       if (sameLocation(next, previous)) return
       void (async () => {
         const ok = await leaveRef.current(() => { showLocationRef.current(next) })
         // A task with unsaved changes stays open, and so does its address.
-        if (!ok) goTo(previous, 'replace')
+        if (!ok) move(previous, 'replace')
       })()
     }
     queryMoved()
     window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
+    window.addEventListener(NAVIGATE_EVENT, show)
+    return () => { window.removeEventListener('popstate', onPop); window.removeEventListener(NAVIGATE_EVENT, show) }
   }, [])
   function closeSettings() {
     setSettingsOpen(false)
@@ -324,7 +337,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       // Its Board breadcrumb must still return to issues, not the default Projects page.
       const back = id === null && directDetail.current ? changeSection(teamId ? 'team-issues' : 'all-issues') : {}
       applySelection(id)
-      goTo({ ...back, issue: id })
+      move({ ...back, issue: id })
     }).finally(() => setPendingSelection(undefined))
     return true
   }
@@ -332,7 +345,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     flushDetail.current = null
     dirtyRef.current = false
     applySelection(null)
-    goTo({ issue: null }, 'replace')
+    move({ issue: null }, 'replace')
   }
   const saved = useCallback((id: string) => { setSelected(id); void mutate() }, [mutate])
   function create() { if (boardBusy) return; setTypedAhead(''); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreating(true) }
@@ -349,12 +362,12 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   }
   function navigate(next: IssueView) {
     if (boardBusy || leaving.current) return false
-    void leave(() => { applySelection(null); const change = ['inbox', 'agent', 'coordinator', 'group', 'views', 'team-home'].includes(section) ? changeSection('team-issues') : {}; goTo({ ...change, issue: null }, 'replace'); setView(next); setQuery('') })
+    void leave(() => { applySelection(null); const change = ['inbox', 'agent', 'coordinator', 'group', 'views', 'team-home'].includes(section) ? changeSection('team-issues') : {}; move({ ...change, issue: null }, 'replace'); setView(next); setQuery('') })
     return true
   }
   function navigateSection(next: WorkspaceSection) {
     if (boardBusy || leaving.current) return false
-    void leave(() => { applySelection(null); goTo({ ...changeSection(next), issue: null }); if (!next.startsWith('team-')) setTeamId(null); setProjectId(null); setView(next === 'my-issues' ? 'mine' : 'all'); setQuery('') })
+    void leave(() => { applySelection(null); move({ ...changeSection(next), issue: null }); if (!next.startsWith('team-')) setTeamId(null); setProjectId(null); setView(next === 'my-issues' ? 'mine' : 'all'); setQuery('') })
     return true
   }
   /** `created` is a bot made a moment ago that the bot list hasn't loaded yet. */
@@ -366,7 +379,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       lastChat.current = target
       if (bot) setCreatedBot(created?.id === bot.id ? created : undefined)
       setActiveBotId(bot?.id ?? null)
-      applySelection(null); goTo({ ...changeSection(target.kind === 'agent' ? 'agent' : target.kind === 'group' ? 'group' : 'coordinator', bot?.id ?? null), issue: null }); setTeamId(null); setProjectId(null)
+      applySelection(null); move({ ...changeSection(target.kind === 'agent' ? 'agent' : target.kind === 'group' ? 'group' : 'coordinator', bot?.id ?? null), issue: null }); setTeamId(null); setProjectId(null)
       if (target.kind === 'agent') setAgentRequest(current => ({ sessionId: target.sessionId, nonce: (current?.nonce ?? 0) + 1 }))
       if (target.kind === 'group') setGroupRequest({ id: target.id, title: target.title, workspaceId: target.workspaceId })
     })
@@ -411,6 +424,10 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const isConversation = !selected && section === 'coordinator'
   // A group chat has its own 详情 in the right column (R-13): members, no computer.
   const groupPanel = !selected && section === 'group' && groupRequest ? groupRequest : null
+  // An open thread takes the right column beside the chat or a page (R-80); a task shows it in its own right column.
+  const threadShown = !selected && threadId ? threadId : null
+  // One thing on the right at a time: the thread, else the browser, else 概览.
+  const rightTaken = browserShown || !!threadShown
   const savedSessions = new Map((agentHistory?.sessions ?? []).map(session => [session.id, session]))
   for (const session of liveSessions) savedSessions.set(session.id, { ...session, preview: session.preview ?? savedSessions.get(session.id)?.preview })
   const conversationSessions = [...savedSessions.values()]
@@ -421,7 +438,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />
     {search.value && <GlobalSearch open={search.open} onOpenChange={setSearchOpen} onOpenChangeComplete={search.onOpenChangeComplete} bots={bots} sessions={conversationSessions} coordinatorLine={lastCoordinatorItem ? chatPreview(lastCoordinatorItem.text) ?? i18nText('Nav.cardPreview') : undefined} issues={tasks} projects={projects} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
       onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}
-      onProject={id => { void leave(() => { applySelection(null); goTo({ ...changeSection('projects'), issue: null }); setTeamId(null); setProjectId(id) }) }} />}
+      onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('projects'), issue: null }); setTeamId(null); setProjectId(id) }) }} />}
   </>
   const leaveSettings = (destination: RailDestination) => { closeSettings(); openRail(destination) }
   if (settingsOpen) return <SignOutBoundary pending={signingOut}><SettingsFrame user={user} onRail={leaveSettings} onSearch={() => { closeSettings(); setSearchOpen(true) }} onBrowser={() => { closeSettings(); showBrowser(true) }} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>
@@ -429,14 +446,14 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     {dialogs}
   </SettingsFrame></SignOutBoundary>
   return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider><AppFrame
-    bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={<>{(isConversation || groupPanel) && !browserShown && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}<BrowserToggle open={browserShown} onToggle={() => showBrowser(!browserShown)} /></>} />}
+    bar={<WindowBar center={<SearchPill onSearch={() => { if (!boardBusy) setSearchOpen(true) }} />} trailing={<>{(isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}<BrowserToggle open={browserShown} onToggle={() => showBrowser(!rightTaken)} /></>} />}
     rail={<IconRail active={rail} onNavigate={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}>
     {/* The board keeps only the rail on its left (MIK-45). */}
     {!fullPage && <BotList bots={bots} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} threads={threads} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />}
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it. */}
     <AppShellContent listToggle={!fullPage && !selected} hideHeader={!!selected || section === 'agent' || section === 'group'} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : undefined} title={sectionTitles[section]} actions={section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? undefined : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} aria-keyshortcuts="Control+k Meta+k" disabled={boardBusy} onClick={() => setSearchOpen(true)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText("Workspace.search.title")}<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>}>
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
-      {selected ? <TaskDetail key={draftKey} id={selected} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null); goTo({ ...changeSection('team-projects'), issue: null }); setProjectId(id) }) }} /> : section === 'group' && groupRequest ? <GroupChatView key={groupRequest.id} group={groupRequest} userId={user.id} people={groupPeople} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} bot={activeBot} threadRequest={threadRequest?.chat === (activeBot?.id ?? 'coordinator') ? threadRequest : null} onThreadRequestDone={() => setThreadRequest(null)} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsPage key={pluginsVisit} /> : section === 'suggestions' ? <SuggestionFeed onOpenIssue={id => { open(id) }} onConnect={() => openRail('plugins')} onSent={() => { if (window.matchMedia('(max-width: 767px)').matches) openChat({ kind: 'coordinator' }) }} /> : section === 'artifacts' ? <ArtifactLibrary onOpenIssue={id => { open(id) }} /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage issues={filtered} userId={user.id} onOpen={open} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
+      {selected ? <TaskDetail key={draftKey} id={selected} thread={threadId} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={setProjectId} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={open} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('team-projects'), issue: null }); setProjectId(id) }) }} /> : section === 'group' && groupRequest ? <GroupChatView key={groupRequest.id} group={groupRequest} userId={user.id} people={groupPeople} /> : isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} bot={activeBot} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsPage key={pluginsVisit} /> : section === 'suggestions' ? <SuggestionFeed onOpenIssue={id => { open(id) }} onConnect={() => openRail('plugins')} onSent={() => { if (window.matchMedia('(max-width: 767px)').matches) openChat({ kind: 'coordinator' }) }} /> : section === 'artifacts' ? <ArtifactLibrary onOpenIssue={id => { open(id) }} /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage issues={filtered} userId={user.id} onOpen={open} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex flex-wrap items-center gap-2"><h1 className="text-sm font-semibold">{section === 'my-issues' ? i18nText("Workspace.myCreatedTasks") : viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge>{section !== 'my-issues' && <NativeSelect aria-label={i18nText("Workspace.filterStatus")} value={view} disabled={boardBusy} onChange={event => navigate(event.target.value as IssueView)}><NativeSelectOption value="all">{i18nText("Projects.allStatuses")}</NativeSelectOption><NativeSelectOption value="favorites">{i18nText("Overview.favorites")}</NativeSelectOption><NativeSelectOption value="following">{i18nText("Overview.following")}</NativeSelectOption>{ISSUE_STATUSES.map(status => <NativeSelectOption key={status.value} value={status.value}>{statusLabel(status.value)}</NativeSelectOption>)}</NativeSelect>}</div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><SearchInput className="min-w-0 sm:w-48" aria-label={i18nText("Workspace.search.title")} placeholder={i18nText("Projects.issuePicker.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /><ToggleGroup aria-label={i18nText("Workspace.taskView")} size="sm" variant="segment" spacing={0.5} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label={i18nText("Workspace.listView")}><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label={i18nText("Workspace.boardView")}><Columns3 /></ToggleGroupItem></ToggleGroup><Button size="sm" disabled={boardBusy} onClick={() => create()}><Plus data-icon="inline-start" />{i18nText("Nav.newTask")}</Button></div>
@@ -444,21 +461,22 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
         <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={open} onCreate={() => create()} />
       </>}
     </AppShellContent>
-    {browserShown && <BrowserPane onClose={() => showBrowser(false)} />}
+    {browserShown && !threadShown && <BrowserPane onClose={() => showBrowser(false)} />}
+    {threadShown && <ThreadColumn runId={threadShown} issueId={threads.find(thread => thread.id === threadShown)?.issueId} />}
     {/* The panel springs only when the person opens or closes it; leaving or entering a conversation shows it at its final width. */}
-    {isConversation && <AnimatePresence initial={false}>{panelOpen && !browserShown && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => setThreadRequest({ ...thread, chat: activeBot?.id ?? 'coordinator' })} onClose={() => showPanel(false)}
+    {isConversation && <AnimatePresence initial={false}>{panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id ?? coordinatorChat?.botId, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}</AnimatePresence>}
-    {groupPanel && <AnimatePresence initial={false}>{panelOpen && !browserShown && <GroupPanel key={`group-panel:${groupPanel.id}`} group={groupPanel} onClose={() => showPanel(false)} />}</AnimatePresence>}
-    {groupPanel && !browserShown && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
+    {groupPanel && <AnimatePresence initial={false}>{panelOpen && !rightTaken && <GroupPanel key={`group-panel:${groupPanel.id}`} group={groupPanel} onClose={() => showPanel(false)} />}</AnimatePresence>}
+    {groupPanel && !rightTaken && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
       <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>
         <GroupPanel sheet group={groupPanel} onClose={() => setPanelSheet(false)} />
       </SheetContent>
     </Sheet>}
-    {isConversation && !browserShown && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
+    {isConversation && !rightTaken && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
       <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>
-        <ContextPanel sheet workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => { setPanelSheet(false); setThreadRequest({ ...thread, chat: activeBot?.id ?? 'coordinator' }) }} onClose={() => setPanelSheet(false)}
+        <ContextPanel sheet workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => { setPanelSheet(false); openThread(thread.runId) }} onClose={() => setPanelSheet(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id ?? coordinatorChat?.botId, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />
       </SheetContent>
     </Sheet>}
