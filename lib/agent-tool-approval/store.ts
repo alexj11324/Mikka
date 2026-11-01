@@ -52,7 +52,9 @@ export class AgentToolApprovalStore {
         FROM computer_run_bindings b JOIN bot_desktops d ON d."botId"=b."botId" AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
         WHERE r.id=$1 AND b."runId"=r.id AND b."ownerId"=r."userId" AND r.status='paused' AND r."pauseReason"='human_control'
           AND (d.control<>'user' OR d."controlUntil" IS NULL OR d."controlUntil"<=now())`, [runId])
-      const row = await client.query('SELECT status FROM agent_runs WHERE id=$1 AND "deviceId"=$2', [runId, actor.deviceId])
+      const row = current.rows[0]?.status === 'paused'
+        ? await client.query('SELECT status FROM agent_runs WHERE id=$1 AND "deviceId"=$2', [runId, actor.deviceId])
+        : current
       if (!row.rowCount) throw new ApprovalUnavailable()
       return { live: (await lockCliRunPolicy(client, runId, actor.userId)).revision === revision, paused: row.rows[0].status === 'paused' }
     }, true)
