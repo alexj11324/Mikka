@@ -207,13 +207,13 @@ Questions waiting on Alex. Move a row to "Decided" when he answers.
 
 | Since | Question | Default until answered |
 | --- | --- | --- |
-| 2026-10-28 | 待 Alex 确认：本机线程只接受可 clone 的远程仓库；没有 origin 的本地仓库不支持。来源：核心闭环 MVP 第 3 项。 | 按请求的 remote URL 在 daemon 缓存中 clone；不读取本地 checkout。 |
-| 2026-10-28 | 待 Alex 确认：线程看不到用户 checkout 里未提交的改动。来源：核心闭环 MVP 第 3 项。 | 每个线程从远程分支建立独立 worktree；用户先提交并推送需要带入的改动。 |
+| 2026-10-28 | ~~待 Alex 确认：本机线程只接受可 clone 的远程仓库；没有 origin 的本地仓库不支持。来源：核心闭环 MVP 第 3 项。~~ 已决定：从远端 main 开新分支，在沙盒里运行，见 [2026-11-01-2245-thread-privacy-and-local-isolation](decisions/2026-11-01-2245-thread-privacy-and-local-isolation.md)。 | ~~按请求的 remote URL 在 daemon 缓存中 clone；不读取本地 checkout。~~ |
+| 2026-10-28 | ~~待 Alex 确认：线程看不到用户 checkout 里未提交的改动。来源：核心闭环 MVP 第 3 项。~~ 已决定：不改本地 checkout，也看不到未提交的改动，见 [2026-11-01-2245-thread-privacy-and-local-isolation](decisions/2026-11-01-2245-thread-privacy-and-local-isolation.md)。 | ~~每个线程从远程分支建立独立 worktree；用户先提交并推送需要带入的改动。~~ |
 | 2026-10-24 | Remove white hairlines app-wide (dialog and popover rings, column borders), not only inputs? | Inputs only |
 | 2026-10-24 | Token drift between Figma and code (`rules.md` § Tokens): which side moves? | Code value ships, Figma follows |
 | 2026-10-28 | How does a group chat lay out in the v9 right panel (概览 tabs, 全部线程)? | Keep the 2026-10-25 group 详情 (R-13) |
 | 2026-10-28 | 待 Alex 确认: a thread's screenshots and recordings are evidence kept with the thread, not artifacts: own table, no card in the chat, no Coordinator wake; the acceptance view (Figma waiting on approval) will show them | Built that way (`docs/mcp.md` § Run captures) |
-| 2026-10-28 | 待 Alex 确认: only the thread's owner sees its captures, as its content (R-62); share links work as artifact links | Owner only, links as artifacts |
+| 2026-10-28 | ~~待 Alex 确认: only the thread's owner sees its captures, as its content (R-62);~~ Decided: only the owner sees a thread's content, captures included ([2026-11-01-2245-thread-privacy-and-local-isolation](decisions/2026-11-01-2245-thread-privacy-and-local-isolation.md)). Still open: share links work as artifact links | Owner only, links as artifacts |
 | 2026-10-28 | 待 Alex 确认: cloud computer captures need no per-call approval (the image never goes to the model), but are refused while the person holds the desktop or the workspace turned computers off. A recording already going keeps going if the person takes over | No approval; refused while held; a running recording continues |
 | 2026-10-28 | 待 Alex 确认: limits: images 10 MB, videos 100 MB; one recording per thread, 120 s by default and at most 300 s, 10 fps MP4; the run's end stops and keeps it | These limits |
 
