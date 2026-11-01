@@ -57,6 +57,16 @@ export interface Thread {
   finishedAt: string | null
 }
 
+/** A bot's page (GET /api/mobile/bots/<id>): its threads, its tasks' PRs and its scheduled tasks. */
+export interface BotPage {
+  threads: Thread[]
+  pullRequests: { url: string; number: number; title: string; group: 'review' | 'running' | 'merged' }[]
+  schedules: { id: string; title: string; status: 'active' | 'paused'; nextAt: string | null }[]
+}
+
+/** A bot's cloud computer (GET /api/bots/<id>/computer), as far as the app shows it. */
+export interface ComputerStatus { machine: 'sleeping' | 'waking' | 'running' | 'error'; control: 'agent' | 'user' | 'idle' }
+
 export interface Threads { threads: Thread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[] }
 
 export type ThreadItem =

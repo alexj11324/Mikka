@@ -159,7 +159,7 @@
     "test:execution-settings-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/execution-settings.db.test.ts",
     "test:audit": "node --import tsx --test lib/audit/events.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/audit-retention-route.test.ts tests/audit-maintenance-route.test.ts",
     "test:audit-db": "node --test-force-exit --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/audit-record.db.test.ts tests/authentication-audit.db.test.ts tests/security-lifecycle-audit.db.test.ts lib/audit/export.db.test.ts lib/audit/retention.db.test.ts tests/audit-delivery.db.test.ts",
-    "test:bot-threads-db": "node --experimental-test-module-mocks --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/bot-threads.db.test.ts tests/thread-waiting-device.db.test.ts tests/bot-update.db.test.ts",
+    "test:bot-threads-db": "node --experimental-test-module-mocks --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/bot-threads.db.test.ts tests/thread-waiting-device.db.test.ts tests/bot-update.db.test.ts tests/mobile-bot.db.test.ts",
     "test:pat-db": "node --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/personal-access-tokens.db.test.ts",
     "test:secrets-db": "node --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/workspace-secrets.db.test.ts tests/secret-masking.db.test.ts tests/secret-masking-points.test.ts",
     "test:smoke": "playwright test -c playwright.smoke.config.ts",

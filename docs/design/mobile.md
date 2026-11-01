@@ -75,6 +75,14 @@ in the blue one, as on the web (R-14). The
 thread card is a status icon and the thread name, with outputs as chips
 (R-66); no step line.
 
+**Bot page** (资料): the avatar and name, then what the web's right panel
+shows beside the chat, as grouped lists: 线程 (the latest five, then 全部线程),
+电脑 with its state (a bot's only; its screen opens on the web), PR (the PRs of
+the tasks its threads worked on, each with 等待审查 / 进行中 / 已合并; opens on
+GitHub) and 例行 (its scheduled tasks and when each runs next, or 已暂停). A
+section with nothing in it is left out. 资料库 and per-bot notifications wait
+for the server to have them.
+
 Message times are hidden. Swiping the chat from right to left reveals each
 message's time on the right, as in iMessage and ChatGPT (Figma 01b); no time
 labels above messages or inside cards, and no date label above the briefing:
