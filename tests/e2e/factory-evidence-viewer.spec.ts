@@ -257,7 +257,7 @@ test('evidence viewer: a recording plays in the viewer', async ({ page, browser 
   await expect.poll(() => video.evaluate(node => (node as HTMLVideoElement).readyState)).toBe(4)
   // Figma 13 「操作」: each step is its time and what was done; a step seeks the video.
   const timeline = viewer.getByRole('region', { name: '操作 3' })
-  await expect(timeline.getByRole('listitem')).toHaveText([/0:00\s*打开首页（4G）/, /0:01\s*首屏出现/, /0:01\s*向下滚动/])
+  await expect(timeline.getByRole('listitem')).toHaveText([/0:00\.0\s*打开首页（4G）/, /0:00\.6\s*首屏出现/, /0:01\s*向下滚动/])
   await expect(timeline.getByText(/run-|click|mcp__/)).toHaveCount(0)
   // A browser-made WebM has no seek index (real recordings are ffmpeg MP4 with byte ranges), so record the seek the step asks for.
   await video.evaluate(node => {
