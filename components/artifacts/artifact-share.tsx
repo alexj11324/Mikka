@@ -29,6 +29,8 @@ type ShareMode = 'idle' | 'create-failed' | 'copy-failed' | 'stop-unconfirmed' |
  * 分享 in the reader's header. A link opens the latest version for anyone,
  * signed in or not. Tokens are stored hashed, so a link shows only right after
  * it is made; later the popover offers a fresh one or stopping every link.
+ * The line under 分享 names who can open it (「拿到链接的人可查看」), as Google
+ * Docs and Notion do; 停止分享 revokes every link.
  */
 export function ArtifactShare({ artifactId, shared, onChange }: { artifactId: string; shared: boolean; onChange: () => void }) {
   const t = useTranslations('Artifact')
@@ -114,7 +116,7 @@ export function ArtifactShare({ artifactId, shared, onChange }: { artifactId: st
     : mode === 'copy-failed' ? t('copyFailed')
     : mode === 'stop-unconfirmed' ? t('stopUnconfirmed')
     : mode === 'stopped' ? t('shareStopped')
-    : link || !shared ? '' : t('sharingOn')
+    : link || !shared ? t('shareAccess') : t('sharingOn')
 
   const showLink = Boolean(link) && mode !== 'stop-unconfirmed' && mode !== 'stopped' && mode !== 'create-failed'
 

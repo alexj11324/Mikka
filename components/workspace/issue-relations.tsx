@@ -71,11 +71,14 @@ export function IssueRelations({ viewerId, task, mode, onOpen, onCreate, onPick,
   if (error) return <Button variant="ghost" size="sm" onClick={() => { void mutate() }}>{t('readFailedRetry')}</Button>
   if (mode === 'subissues') {
     const done = children.filter(row => closed(row.status)).length
+    // Empty: one way in (R-40). 添加现有子任务 stays in the task's ⋯ menu; the header and count arrive with the first sub-task.
+    if (children.length === 0) return <section aria-label={t('subissuesAria')} className="mt-2 flex [&_button]:min-h-11 lg:[&_button]:min-h-0">
+      <Button variant="ghost" size="sm" className="justify-start text-muted-foreground" disabled={disabled || pending} onClick={onCreate}><Plus data-icon="inline-start" />{t('addChild')}</Button>
+    </section>
     return <section aria-label={t('subissuesAria')} className="mt-2 flex flex-col gap-3 rounded-lg bg-muted/30 px-3 py-4 [&_button]:min-h-11 [&_button[aria-label]]:min-w-11 lg:[&_button]:min-h-0 lg:[&_button[aria-label]]:min-w-0">
       <div className="flex items-center justify-between gap-2"><Button variant="ghost" size="xs" onClick={() => setExpanded(value => !value)} aria-expanded={expanded}>{expanded ? <ChevronDown data-icon="inline-start" /> : <ChevronRight data-icon="inline-start" />}{t('subissues')}<span className="text-muted-foreground">{done} / {children.length}</span></Button><div className="flex items-center gap-1"><Button variant="ghost" size="xs" disabled={disabled || pending} onClick={() => onPick('child')}>{t('addExisting')}</Button><Button variant="ghost" size="icon-xs" disabled={disabled || pending} aria-label={t('createChildAria')} onClick={onCreate}><Plus data-icon="inline-start" /></Button></div></div>
-      {children.length > 0 && <Progress value={done / children.length * 100} aria-label={t('progressAria', { done, total: children.length })} className="h-1" />}
+      <Progress value={done / children.length * 100} aria-label={t('progressAria', { done, total: children.length })} className="h-1" />
       {expanded && children.map(row => <div key={row.id} className="group flex min-w-0 items-center gap-2 rounded-md transition-colors hover:bg-muted"><IssuePropertyMenu label={t('statusOf', { title: row.title })} value={row.status} options={statusOptions} icon={Circle} compact disabled={disabled || pending} onChange={value => { void status(row.id, row.revision, value) }} /><Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start hover:bg-transparent dark:hover:bg-transparent" onClick={() => onOpen(row.id)}><span className="shrink-0 text-xs text-muted-foreground">{issueIdentifier(row)}</span><span className="truncate">{row.title}</span></Button><Button variant="ghost" size="icon-xs" disabled={disabled || pending} aria-label={t('removeChildAria', { title: row.title })} onClick={() => { void remove('child', row.id) }}><X data-icon="inline-start" /></Button></div>)}
-      {expanded && children.length === 0 && <Button variant="ghost" size="sm" className="justify-start" disabled={disabled || pending} onClick={onCreate}><Plus data-icon="inline-start" />{t('addChild')}</Button>}
     </section>
   }
   const groups: { kind: RelationKind; label: string; items: NonNullable<typeof rows>; icon: typeof Flag; warning?: boolean }[] = [

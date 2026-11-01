@@ -53,6 +53,8 @@ test('a share link opens for a signed-out reader; stopping it ends that access',
   await page.reload()
   await page.getByRole('button', { name: /验收记录/ }).click()
   await page.getByRole('button', { name: '分享', exact: true }).click()
+  // Who can open it is said before the link exists.
+  await expect(page.locator('[data-slot="popover-description"]')).toHaveText('拿到链接的人可查看')
   await page.getByRole('button', { name: '创建链接', exact: true }).click()
   const link = await page.getByRole('textbox', { name: '分享链接' }).inputValue()
   expect(link).toMatch(/\/a\/[A-Za-z0-9_-]+$/)

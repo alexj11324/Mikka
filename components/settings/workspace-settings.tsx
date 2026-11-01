@@ -232,7 +232,7 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = tr
           ? people.length
             ? <Label className="flex flex-col items-start gap-1.5 font-normal text-muted-foreground">{t('transferTo')}
               <Select value={to} items={items} onValueChange={next => setTo(typeof next === 'string' ? next : null)}>
-                <SelectTrigger aria-label={t('transferTo')} className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('transferTo')} className="w-full"><SelectValue placeholder={t('transferPick')} /></SelectTrigger>
                 <SelectContent><SelectGroup>{items.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
             </Label>
@@ -242,7 +242,7 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = tr
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" disabled={pending} onClick={onClose}>{commonT('cancel')}</Button>
-        <Button type="button" variant="destructive" disabled={pending || !to} onClick={() => void confirm()}>{pending ? t('transferring') : t('transfer')}</Button>
+        <Button type="button" disabled={pending || !to} onClick={() => void confirm()}>{pending ? t('transferring') : t('transfer')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
@@ -287,7 +287,8 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose, open = true, onOpen
           : impact.data?.error ? <FieldError>{actionError(impact.data.error)}</FieldError> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
         <p className="text-muted-foreground">{t('deleteKept')}</p>
         <Label className="flex flex-col items-start gap-1.5 font-normal text-muted-foreground">{t('deleteConfirmLabel', { name })}
-          <Input value={typed} placeholder={name} autoComplete="off" onChange={event => setTyped(event.target.value)} />
+          {/* No placeholder: the name to type is in the label once; a placeholder of it reads as already filled in. */}
+          <Input value={typed} autoComplete="off" onChange={event => setTyped(event.target.value)} />
         </Label>
         {error && <FieldError>{error}</FieldError>}
       </div>

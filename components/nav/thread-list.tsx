@@ -56,7 +56,7 @@ function WaitingChip({ waiting }: { waiting: NonNullable<ThreadView['waitingFor'
  * running it leads the name (R-78; a neutral thread mark when unknown, never
  * the bot's avatar) and the last activity sits on the right.
  */
-function ThreadRow({ thread, issues, all, now, onOpenIssue }: { thread: Thread; issues: Issue[]; all: boolean; now: Date; onOpenIssue: (id: string) => void }) {
+function ThreadRow({ thread, issues, all, now, onOpenThread }: { thread: Thread; issues: Issue[]; all: boolean; now: Date; onOpenThread: (thread: { issueId: string; runId: string }) => void }) {
   const t = useTranslations('Shell.threads')
   const format = useFormatter()
   const name = threadName(thread, issues, t('untitled'))
@@ -75,7 +75,7 @@ function ThreadRow({ thread, issues, all, now, onOpenIssue }: { thread: Thread; 
   </>
   return <li>
     {thread.issueId
-      ? <Button variant="ghost" className={TWO_LINE_ROW} aria-label={name} onClick={() => onOpenIssue(thread.issueId!)}>{body}</Button>
+      ? <Button variant="ghost" className={TWO_LINE_ROW} aria-label={name} onClick={() => onOpenThread({ issueId: thread.issueId!, runId: thread.id })}>{body}</Button>
       : <div className={TWO_LINE_ROW}>{body}</div>}
   </li>
 }
@@ -83,15 +83,16 @@ function ThreadRow({ thread, issues, all, now, onOpenIssue }: { thread: Thread; 
 /**
  * The right column's thread list: 等待回复 → 进行中 → 空闲 → 已解决, each
  * with its count; 已解决 starts collapsed. A failed thread waits for the
- * person, so it sits under 等待回复. Picking a thread opens its task.
+ * person, so it sits under 等待回复. Picking a thread opens it in the centre, as a
+ * thread card does; the chat stays one click away (R-50, R-66).
  */
-export function ThreadList({ threads, issues, all = false, onOpenIssue }: { threads: Thread[]; issues: Issue[]; all?: boolean; onOpenIssue: (id: string) => void }) {
+export function ThreadList({ threads, issues, all = false, onOpenThread }: { threads: Thread[]; issues: Issue[]; all?: boolean; onOpenThread: (thread: { issueId: string; runId: string }) => void }) {
   const t = useTranslations('Shell.threads')
   // One clock for every row's time.
   const now = useNow({ updateInterval: 60_000 })
   if (!threads.length) return <p className="px-2 py-6 text-center text-xs text-muted-foreground">{t('empty')}</p>
   const groups = groupThreads(threads, id => issues.find(issue => issue.id === id))
-  const rows = (list: Thread[]) => <ul className="flex flex-col">{list.map(thread => <ThreadRow key={thread.id} thread={thread} issues={issues} all={all} now={now} onOpenIssue={onOpenIssue} />)}</ul>
+  const rows = (list: Thread[]) => <ul className="flex flex-col">{list.map(thread => <ThreadRow key={thread.id} thread={thread} issues={issues} all={all} now={now} onOpenThread={onOpenThread} />)}</ul>
   return <div role="group" aria-label={t('title')} className="flex flex-col gap-3">
     {THREAD_GROUPS.map(group => {
       const list = groups[group]

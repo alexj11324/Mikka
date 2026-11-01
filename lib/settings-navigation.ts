@@ -51,3 +51,21 @@ export function pushSettingsHistory(href: string, workspaceId?: string, basePath
   }
   return true
 }
+
+/**
+ * Settings keeps the app's window bar (R-35), but opened straight on /settings
+ * there is no app behind it to open ⌘K. The pill asks for search here, then
+ * navigates home; the app takes the request once when it mounts.
+ */
+let searchRequested = false
+export function requestShellSearch() { searchRequested = true }
+export function takeShellSearchRequest() {
+  const requested = searchRequested
+  searchRequested = false
+  return requested
+}
+
+/** The globe from Settings: the browser column's open state is stored, and the app opens it from there when it mounts. */
+export function requestShellBrowser() {
+  try { window.localStorage.setItem('mikka:browser', '1') } catch { /* storage unavailable */ }
+}

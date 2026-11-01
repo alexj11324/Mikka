@@ -121,7 +121,9 @@ export async function readArtifact(userId: string, artifactId: string): Promise<
 
 const LIST_LIMIT = 200
 
-const listColumns = { id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, runId: artifacts.runId, issueId: artifacts.issueId, updatedAt: artifacts.updatedAt, authorName: artifactVersions.authorName }
+const listColumns = { id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, runId: artifacts.runId, issueId: artifacts.issueId, botId: agentRuns.botId, updatedAt: artifacts.updatedAt, authorName: artifactVersions.authorName }
+/** The run that made it, for its bot (a run is the person's own, as the artifact is). */
+const madeBy = and(eq(agentRuns.id, artifacts.runId), eq(agentRuns.userId, artifacts.userId))
 const latestVersion = and(eq(artifactVersions.artifactId, artifacts.id), eq(artifactVersions.version, artifacts.latestVersion))
 /** The issue number as stored in its document; null when it has none. */
 const issueNumber = sql<number | null>`(coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'number')::int`
@@ -159,14 +161,14 @@ async function withAgentAuthors<T extends { runId: string | null; authorName: st
 
 /** The person's artifacts, last changed first, each with its latest author and the task it was made for. */
 export async function listArtifacts(userId: string): Promise<ArtifactListItem[]> {
-  const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion)
+  const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion).leftJoin(agentRuns, madeBy)
     .where(eq(artifacts.userId, userId)).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
   return withIssueKeys(userId, await withAgentAuthors(rows))
 }
 
 /** What one of the person's runs handed over, last changed first. */
 export async function listRunArtifacts(userId: string, runId: string): Promise<ArtifactListItem[]> {
-  const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion)
+  const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion).leftJoin(agentRuns, madeBy)
     .where(and(eq(artifacts.userId, userId), eq(artifacts.runId, runId))).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
   return withIssueKeys(userId, await withAgentAuthors(rows))
 }

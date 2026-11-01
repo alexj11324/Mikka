@@ -12,7 +12,6 @@ import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, Comman
 import { Spinner } from '@/components/ui/spinner'
 import { statusTone, type StatusTone } from '@/lib/status-appearance'
 import { ShortcutKeys } from '@/components/shortcut-keys'
-import { issueIdentifier } from '@/components/workspace/issue-properties'
 import type { SavedAgentSession } from '@/lib/agent-history'
 import { matchesQuery, mergeById, type SiteSearchItem } from '@/lib/site-search'
 import { useSiteSearch, type ListedSource } from '@/hooks/use-site-search'
@@ -87,7 +86,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
   )
   const groupRows = search.state.groups.items.filter((item): item is GroupHit => item.type === 'group')
   const taskRows: (Issue | TaskHit)[] = mergeById(
-    issues.filter(issue => shown(`${issueIdentifier(issue)} ${issue.title}`)),
+    issues.filter(issue => shown(`${issue.identifier ?? ''} ${issue.title}`)),
     search.state.tasks.items.filter((item): item is TaskHit => item.type === 'task'),
   )
   const projectRows = projects.filter(project => shown(`${project.name} ${project.summary}`))
@@ -114,12 +113,13 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
     return <>{loading ? <Spinner role="presentation" aria-hidden="true" /> : <Plus />}{loading ? t('search.loadingMore') : t('search.more')}</>
   }
 
-  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-1/2 -translate-y-1/2 sm:max-w-xl">
+  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-[max(1rem,calc(50svh-15rem))] translate-y-0 sm:max-w-xl">
     {/* Filtering is ours: server hits must not be dropped by cmdk's client-side match. */}
     <Command shouldFilter={false} className="**:data-[selected=true]:bg-muted">
       <CommandInput aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={setQuery} maxLength={400} />
       <p role="status" aria-live="polite" className="sr-only">{text ? announce : ''}</p>
-      <CommandList aria-busy={search.searching} className="h-[min(26rem,60svh)] max-h-none">
+      {/* The dialog's top edge stays put and its height follows the results (Linear, Raycast): no blank block under one empty line. */}
+      <CommandList aria-busy={search.searching} className="max-h-[min(26rem,60svh)]">
         {(coordinatorShown || botRows.length > 0) && <CommandGroup heading={t('groups.bots')}>
           {coordinatorShown && <CommandItem value={coordinatorValue} onSelect={() => pick(() => onChat({ kind: 'coordinator' }))} className="gap-3 py-2">
             <CoordinatorAvatar size="search" />
@@ -154,7 +154,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
             return <CommandItem key={`task:${row.id}`} value={`issue ${row.id}`} onSelect={() => { if (onIssue(row.id)) onOpenChange(false) }} className="gap-3 py-2">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><ListTodo /></span>
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium"><span className="text-muted-foreground tabular-nums">{issueIdentifier(row, tIssue('unassignedNumber'))}</span> {row.title}</span>
+                <span className="truncate font-medium">{row.identifier && <><span className="text-muted-foreground tabular-nums">{row.identifier}</span> </>}{row.title}</span>
                 {assignee && <span className="truncate text-xs text-muted-foreground">{assignee}</span>}
               </span>
               <CommandShortcut className="tracking-normal"><Badge variant={STATUS_BADGES[statusTone(row.status)]} size="sm">{statusLabel(row.status)}</Badge></CommandShortcut>

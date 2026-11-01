@@ -44,7 +44,7 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await page.setViewportSize(viewport)
     await page.emulateMedia({ colorScheme: 'dark' })
 
-    await page.getByRole('button', { name: '创建子任务', exact: true }).click()
+    await page.getByRole('region', { name: '子任务', exact: true }).getByRole('button', { name: '添加子任务', exact: true }).click()
     const create = page.getByRole('dialog', { name: '创建子任务', exact: true })
     await create.getByRole('textbox', { name: '任务标题', exact: true }).fill(child)
     await create.getByRole('button', { name: '创建任务', exact: true }).click()
@@ -68,14 +68,17 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await expect(parentPicker.getByRole('option')).toHaveCount(0)
     await parentPicker.getByRole('button', { name: '关闭', exact: true }).click()
     await children.getByRole('button', { name: `移除子任务关系：${child}`, exact: true }).click()
-    await expect(children.getByRole('button', { name: '子任务 0 / 0', exact: true })).toBeVisible()
+    // Empty sub-tasks are one 添加子任务 button (R-40); 添加现有子任务 lives in the ⋯ menu.
+    await expect(children.getByRole('button', { name: '添加子任务', exact: true })).toBeVisible()
+    await expect(children.getByRole('button', { name: '添加现有任务', exact: true })).toHaveCount(0)
     // Regression: reopening the picker right after unlinking must not show results from before the unlink
     // (where the child still had this parent). Hold the search request so we observe the picker before fresh data arrives.
     let releaseActions!: () => void
     const actionsHeld = new Promise<void>(resolve => { releaseActions = resolve })
     let heldActions = 0
     await page.route(SEARCH, async route => { heldActions++; await actionsHeld; await route.fallback() })
-    await children.getByRole('button', { name: '添加现有任务', exact: true }).click()
+    await page.getByRole('button', { name: '更多任务操作', exact: true }).click()
+    await page.getByRole('menuitem', { name: '添加现有子任务…', exact: true }).click()
     const existing = page.getByRole('dialog', { name: '添加现有子任务', exact: true })
     await expect.poll(() => heldActions).toBeGreaterThan(0)
     await expect(existing.getByText('正在读取任务…', { exact: true }).or(existing.getByRole('option').filter({ hasText: child }))).toBeVisible()
@@ -95,12 +98,12 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await parentSection.getByRole('button').filter({ hasText: parent }).click()
     await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(parent)
     await properties(page)
-    await page.getByRole('button', { name: '任务优先级：中', exact: true }).click()
+    await page.getByRole('button', { name: '优先级：中', exact: true }).click()
     await page.getByRole('menuitem', { name: '高', exact: true }).click()
     await expect(page.getByRole('status').filter({ hasText: /^已自动保存$/ })).toBeVisible()
     await page.reload()
     await properties(page)
-    await expect(page.getByRole('button', { name: '任务优先级：高', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '优先级：高', exact: true })).toBeVisible()
 
     const blocked = await chooseRelation(page, '被以下任务阻塞', blocker, true)
     await expect(blocked).not.toBeVisible()
@@ -119,7 +122,7 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     const cycle = await chooseRelation(page, '被以下任务阻塞', parent, true)
     await expect(cycle.getByRole('alert')).toHaveText('阻塞关系不能形成循环依赖。')
     await cycle.getByRole('button', { name: '关闭', exact: true }).click()
-    await page.getByRole('button', { name: '任务状态：待办', exact: true }).click()
+    await page.getByRole('button', { name: '状态：待办', exact: true }).click()
     await page.getByRole('menuitem', { name: '已完成', exact: true }).click()
     await expect(blocks).not.toBeVisible()
     const related = page.getByRole('region', { name: '关联任务', exact: true })

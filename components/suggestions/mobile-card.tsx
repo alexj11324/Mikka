@@ -14,9 +14,9 @@ export function SourceMark({ source }: { source: SuggestionSource }) {
   return <Icon className="size-3 shrink-0" />
 }
 
-/** The app named inside the sentence: its mark and name, in bold, inline. */
+/** The app named inside the sentence: its mark only, so a bold name does not read as part of the sentence (R-21); the name is for screen readers. 4px either side keeps the mark off the words. */
 function SourceMention({ source }: { source: SuggestionSource }) {
-  return <span data-slot="source-mention" className="mx-0.5 inline-flex items-center gap-1 align-bottom font-semibold whitespace-nowrap"><SourceMark source={source} />{SOURCE_NAMES[source]}</span>
+  return <span data-slot="source-mention" className="mx-1 inline-flex h-5.5 items-center align-bottom"><SourceMark source={source} /><span className="sr-only">{SOURCE_NAMES[source]}</span></span>
 }
 
 /**
