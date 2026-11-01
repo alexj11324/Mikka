@@ -217,6 +217,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot's avatar and name (R-02), then the tabs 详情, 线程, PR, 电脑. 线程
   lists only the threads this bot dispatched (for the Coordinator, the
   threads it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
+  The Coordinator has no 电脑 tab.
   全部线程 lists every bot's threads; each row carries the 16px mark of the
   Agent running it (R-78), the only thread list that shows one, and a
   relative time on the right (2 分钟前, 昨天).
