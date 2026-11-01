@@ -68,7 +68,9 @@ before(async () => {
   await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','Synthetic approval worker')`, [agentId,owner,deviceId])
   await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,\'main\')',[repoId,deviceId,owner,remoteKey(remoteUrl),remoteUrl])
   await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Synthetic approval task\',$3,\'todo\',\'normal\',\'personal\')',[issueId,owner,JSON.stringify({type:'doc',attrs:{mikka:{number:1}},content:[]})])
-  await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id,cli_run_policy) VALUES ($1,'coordinator',NULL,'{"permissions":{"install_dependency":"allow"}}'::jsonb)`, [owner])
+  // Network is open by default (decision 2026-11-01-1230). The owner chose
+  // `ask` for this bot, which is what the approval roundtrip below exercises.
+  await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id,cli_run_policy) VALUES ($1,'coordinator',NULL,'{"permissions":{"install_dependency":"allow","network":"ask"}}'::jsonb)`, [owner])
   await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId","issueId","deviceRepoId",status,"agentId",kind,prompt) VALUES ($1,$2,$3,$4,$5,'queued',$6,'implement','APPROVAL_TEST')`, [runId,owner,deviceId,issueId,repoId,agentId])
   const device = await import('../../app/v1/runs/[runId]/tool-approval/route')
   const policy = await import('../../app/v1/runs/[runId]/policy-snapshot/route')
