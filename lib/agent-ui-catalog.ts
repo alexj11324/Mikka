@@ -145,8 +145,8 @@ export const agentComponentCatalog = {
     props: z.object({ ...chart, unit: z.string().max(12).optional() }).refine(seriesMatchLabels, 'values 必须与 labels 等长'),
   },
   DonutChart: {
-    description: '环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value}，value 不能为负；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。',
-    props: z.object({ slices: z.array(z.object({ name: z.string().min(1).max(40), value: z.number().min(0).max(1e12) })).min(2).max(5), unit: z.string().max(12).optional(), total: z.string().max(20).optional() }),
+    description: '环形图（ReUI c-chart-19），中间显示合计，用于占比。slices 为 2–5 项 {name, value, status?}，value 不能为负；切片是结果状态（通过、失败、跳过等）时给每项 status：success、destructive、warning、neutral，失败用 destructive，跳过用 neutral，颜色取状态色而不是图表色；unit 为数值单位；total 为合计下方的短标签（如「合计」）。数字只能来自用户或工具数据，示例数据须标明。',
+    props: z.object({ slices: z.array(z.object({ name: z.string().min(1).max(40), value: z.number().min(0).max(1e12), status: z.enum(['success', 'destructive', 'warning', 'neutral']).optional() })).min(2).max(5), unit: z.string().max(12).optional(), total: z.string().max(20).optional() }),
   },
   RadialChart: {
     description: '环形进度图（shadcn chart），一条弧表示已用占上限多少，中间显示已用量和上限：额度、预算、完成度。label 为名称，used 为已用量，limit 为上限（大于 0），unit 为单位。数字只能来自用户或工具数据。',
@@ -216,6 +216,7 @@ const MODEL_HIDDEN_NAMES = new Set<string>([
   // OpenUI charts lack the selected theme colours and progressive rendering.
   'RadarChart', 'HorizontalBarChart', 'Series', 'PieChart', 'SingleStackedBarChart', 'Slice', 'ScatterChart', 'ScatterSeries', 'Point',
   'ComputerCard', // Task state and approval UI belong to the host.
+  'BeFollowUps', // No suggestion cards in a chat (R-12); saved replies still parse and draw nothing.
 ])
 
 export const agentComponentGroups: { name: string; components: AgentComponentName[]; notes: string[] }[] = [

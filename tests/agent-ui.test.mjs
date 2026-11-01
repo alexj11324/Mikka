@@ -237,12 +237,12 @@ test('修复仅处理 OpenUI 字符串语法，保留代码、矩阵换行、转
   assert.equal(normalizeAgentUISource(comment), comment)
 })
 
-test('相关追问支持具体问题、上下文及内联继续，不再被提示词压制', async () => {
+test('聊天里没有追问卡片（R-12）：模型不再生成 BeFollowUps，旧回复仍可解析但不显示', async () => {
   const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
   const rules = spec.promptOptions.additionalRules.join('\n')
-  assert.match(rules, /BeFollowUps 展示 1–3 个具体相关追问/)
-  assert.doesNotMatch(rules, /不要添加不必要的续问按钮/)
-  assert.match(rules, /没有实质下一步时不强行添加/)
+  assert.doesNotMatch(rules, /BeFollowUps/)
+  assert.doesNotMatch(spec.promptOptions.examples.join('\n'), /BeFollowUps/)
+  assert.match(rules, /不在回答末尾附追问卡片或建议问题/)
   const response = 'root = Stack([TextContent("已给出完整答案"), BeFollowUps([{label: "如何选择天气服务？", prompt: "我的助手需要美国和全球天气，请比较服务覆盖和商用条件。"}])])'
   const parsed = createParser(library.toJSONSchema(), library.root).parse(response)
   assert.ok(parsed.root)
@@ -251,10 +251,8 @@ test('相关追问支持具体问题、上下文及内联继续，不再被提�
   for (const items of [[], Array(4).fill({ label: '问题', prompt: '上下文' }), [{ label: '', prompt: '背景' }], [{ label: '问题', prompt: '' }]]) {
     assert.equal(agentComponentCatalog.BeFollowUps.props.safeParse({ items }).success, false)
   }
-  const component = await readFile(new URL('../components/workspace/agent-follow-ups.tsx', import.meta.url), 'utf8')
-  assert.match(component, /useAgentDecision/)
-  assert.match(component, /void send\(prompt\)/)
-  assert.doesNotMatch(component, /setInput|updateDraft|fetch\(/)
+  const renderers = await readFile(new URL('../components/workspace/agent-ui-library.tsx', import.meta.url), 'utf8')
+  assert.match(renderers, /BeFollowUps: \(\) => null/)
 })
 
 test('完整正文和可自动补齐的括号不会误报失败', () => {
@@ -315,7 +313,7 @@ test('beUI 组件包含在运行时和可序列化规范中', async () => {
     'Card', 'CardHeader', 'MarkDownRenderer', 'Callout', 'TextCallout', 'Image', 'ImageBlock', 'ImageGallery',
     'CodeBlock', 'Table', 'Col', 'Tabs', 'TabItem', 'Accordion', 'AccordionItem',
     'RadarChart', 'HorizontalBarChart', 'Series', 'PieChart', 'SingleStackedBarChart', 'Slice', 'ScatterChart', 'ScatterSeries', 'Point',
-    'ComputerCard',
+    'ComputerCard', 'BeFollowUps',
   ])
   assert.deepEqual(Object.keys(spec.library.components).sort(), Object.keys(library.components).filter(name => !hidden.has(name)).sort())
   for (const name of hidden) {

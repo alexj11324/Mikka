@@ -433,13 +433,8 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                 {displayTitle}
               </ActionSwapRollText>
             </h3>
-            {questionMode && interactive ? (
-              multipleQuestions ? (
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground/65">
-                  {currentStep + 1}/{questions.length}
-                </span>
-              ) : null
-            ) : (
+            {/* The dots by 上一题 / 下一题 already show the step (and say it to a screen reader); no 「1/4」 here too (R-40). */}
+            {questionMode && interactive ? null : (
               <span
                 className={cn(
                   "shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors",

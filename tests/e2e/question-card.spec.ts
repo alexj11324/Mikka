@@ -62,14 +62,16 @@ test('one real question (the blank step dropped) answers on the first click', as
 test('several questions: a single choice moves on by itself, and the last step submits', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   const chat = await openBot(page, reply(`${start}, ${blank}, ${tone}`))
-  await expect(chat.getByText('1/2', { exact: true })).toBeVisible()
+  // The step is the dots beside the buttons, read out as 「第1 题，共2 题」; no 「1/2」 by the title (R-40).
+  await expect(chat.getByText('第1 题，共2 题', { exact: true })).toBeAttached()
+  await expect(chat.getByText('1/2', { exact: true })).toHaveCount(0)
   await expect(page.getByLabel('给 写作助手 发消息', { exact: true })).toBeVisible()
   await shoot(page, testInfo, 'question-step-1')
 
   await chat.getByRole('radio', { name: '直接写初稿' }).click()
   // No 下一题 press: the next question opens on its own, and it is never the blank step.
   await expect(chat.getByRole('heading', { name: '语气要哪种？' })).toBeVisible()
-  await expect(chat.getByText('2/2', { exact: true })).toBeVisible()
+  await expect(chat.getByText('第2 题，共2 题', { exact: true })).toBeAttached()
   await expect(chat.getByText('确认建议方案')).toHaveCount(0)
 
   const submit = chat.getByRole('button', { name: '提交回答并继续' })
