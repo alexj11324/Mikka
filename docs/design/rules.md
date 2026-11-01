@@ -553,7 +553,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   montage on one shared clock, so every animated copy of one bot shows the
   same pose. Small (`row`) and `still` avatars (group messages, members, the
   group avatar) hold the bot's own shape and do not play the montage.
-- **R-37** Animate only when the user's action changes a size or position.
+- **R-37** Panels and columns open, close and switch instantly: the right
+  column, an open thread taking its place, the bot list, the Artifact window
+  and the sheets that stand in for them get no slide, fade, zoom, width or
+  height animation ([decision](decisions/2026-11-01-2320-panels-open-instantly.md)).
+  Otherwise animate only when the user's action changes a size or position.
   Position and size move with springs; opacity and colour use a duration.
   Springs settle without visible overshoot (no bouncy springs). No hover
   scale or lift: hover is a colour or surface change, a press may scale to
