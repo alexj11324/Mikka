@@ -83,8 +83,9 @@ function UpdateButton() {
   if (!version) return null
   const label = i18nText('Nav.restartToUpdate', { version })
   return <Tooltip>
-    <TooltipTrigger render={<Button variant="ghost" size="icon" className={cn(ITEM, 'animate-in fade-in-0 duration-200 motion-reduce:animate-none')} aria-label={label} onClick={() => { void bridgeFromWindow(window)?.app.installUpdate?.() }} />}>
-      <span className={ITEM_ICON}><CircleArrowDown className="size-5" /></span>
+    <TooltipTrigger render={<Button variant="ghost" size="icon" className={cn(ITEM, 'text-sidebar-primary hover:text-sidebar-primary animate-in fade-in-0 duration-200 motion-reduce:animate-none')} aria-label={label} onClick={() => { void bridgeFromWindow(window)?.app.installUpdate?.() }} />}>
+      {/* The accent (R-30) and a 24px icon in the same 36px target as the other items. */}
+      <span className={cn(ITEM_ICON, 'p-1.5')}><CircleArrowDown className="size-6" /></span>
     </TooltipTrigger>
     <TooltipContent side="right">{label}</TooltipContent>
   </Tooltip>
