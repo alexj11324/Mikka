@@ -1184,7 +1184,11 @@
     "tokenNotFound": "This token does not exist or was already revoked.",
     "tokenLimitReached": "You have reached the limit of 50 active tokens in this workspace. Revoke one first.",
     "accountDeletionPending": "Account deletion is pending cleanup.",
-    "SESSION_NOT_FRESH": "Sign in again before deleting your account."
+    "SESSION_NOT_FRESH": "Sign in again before deleting your account.",
+    "apiKeyInvalid": "The key is invalid or has been revoked.",
+    "apiKeyUnverifiable": "Couldn't verify the key right now. Try again later.",
+    "apiKeyBaseUrlInvalid": "The base URL must be a public https address.",
+    "apiKeyNotFound": "This API key no longer exists."
   },
   "Overview": {
     "sections": {
@@ -1656,8 +1660,8 @@
         "title": "Connections"
       },
       "models": {
-        "title": "Models and quota",
-        "keywords": "model subscriptions subscription quota usage"
+        "title": "API and subscriptions",
+        "keywords": "model subscriptions subscription quota usage API key provider models"
       },
       "logins": {
         "title": "Logins and keys"
@@ -2272,7 +2276,6 @@
         "codex": "ChatGPT"
       }
     },
-
     "archivedBots": {
       "heading": "Paused bots",
       "takeOver": "Take over"
@@ -2384,14 +2387,38 @@
       "hostedDefault": "Mikka Default",
       "defaults": "Task defaults",
       "fallbacks": "When something goes wrong",
-      "whenQuotaExhausted": "When quota runs out",
-      "quotaStop": "Stop and wait for me",
-      "quotaSwitch": "Switch to another account",
       "setting": "{name}: {value}",
       "whenDeviceOffline": "When the device is offline",
       "offlineWait": "Wait for it",
       "offlineCloud": "Run in the cloud",
       "labels": "By label"
+    },
+    "apiKeys": {
+      "add": "Add API key",
+      "addConfirm": "Add",
+      "verifying": "Verifying…",
+      "apiKey": "API key",
+      "providerLabel": "Provider",
+      "name": "Name",
+      "protocolLabel": "Protocol",
+      "models": "Models (optional)",
+      "provider": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "deepseek": "DeepSeek",
+        "kimi": "Kimi",
+        "custom": "Custom provider"
+      },
+      "protocol": {
+        "openai": "OpenAI-compatible",
+        "anthropic": "Anthropic-compatible"
+      },
+      "shareLabel": "Share {name} with team members",
+      "removeLabel": "Delete {name}",
+      "removeTitle": "Delete {name}?",
+      "othersUsage": "Team members can use it to run their own bots. Usage is billed to your API account.",
+      "afterQuota": "Use an API key when subscription quota runs out",
+      "afterQuotaBilling": "Billed at the API provider's prices"
     }
   },
   "TelegramBot": {

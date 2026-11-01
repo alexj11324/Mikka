@@ -60,7 +60,7 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
 
 /**
  * §8.3 (decision 2026-10-31-2225): when someone leaves a team or is suspended,
- * their subscription share leaves with them and their bots there pause until an
+ * their subscription share and API key shares leave with them and their bots there pause until an
  * admin takes one over. Runs frozen on that subscription stop at their next
  * model call (the share and the membership are checked on every call).
  */
@@ -69,6 +69,7 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
   await releasePaymentDesignation(workspaceId, userId)
   await db.transaction(async main => {
     await main.execute(sql`delete from workspace_subscription_shares where "ownerId" = ${userId} and "workspaceId" = ${workspaceId}`)
+    await main.execute(sql`delete from model_api_key_shares s using model_api_keys k where k.id = s."keyId" and k."ownerId" = ${userId} and s."workspaceId" = ${workspaceId}`)
     await main.update(bots).set({ archivedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, userId), isNull(bots.archivedAt)))
   })
