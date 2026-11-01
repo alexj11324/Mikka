@@ -193,7 +193,7 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
       <div className="relative flex items-center gap-3 py-3 pr-4 pl-5 transition-colors has-[[data-repositories]:hover]:bg-muted/50">
         {githubState.installed
           // The whole row opens the list (its hover covers the row); the GitHub link sits above it.
-          ? <Button type="button" variant="ghost" data-repositories onClick={() => setBrowsing(true)} className="h-auto min-w-0 flex-1 justify-start truncate rounded-none p-0 text-sm font-medium after:absolute after:inset-0 hover:bg-transparent focus-visible:ring-0 focus-visible:after:ring-2 focus-visible:after:ring-ring/40 focus-visible:after:ring-inset">{t('githubRepositories', { count: githubState.repositories.length })}</Button>
+          ? <Button type="button" variant="ghost" data-repositories onClick={() => setBrowsing(true)} className="h-auto min-w-0 flex-1 justify-start truncate rounded-none border-0 p-0 text-sm font-medium after:absolute after:inset-0 hover:bg-transparent focus-visible:ring-0 focus-visible:after:ring-2 focus-visible:after:ring-ring/40 focus-visible:after:ring-inset">{t('githubRepositories', { count: githubState.repositories.length })}</Button>
           : <span className="min-w-0 flex-1 truncate text-sm font-medium">{t('githubNotAuthorized')}</span>}
         <Button variant="ghost" size="sm" nativeButton={false} role="link" className="relative z-10 shrink-0 text-muted-foreground" render={<a href={INSTALL_URL} target="_blank" rel="noopener noreferrer" onClick={checkOnReturn} />}>
           {githubState.installed ? t('githubManage') : t('githubAuthorize')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" />
