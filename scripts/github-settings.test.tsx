@@ -26,6 +26,11 @@ let GitHubSettings: typeof import('../components/plugins/github-settings')['GitH
 before(async () => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
   Object.defineProperty(globalThis, 'document', { configurable: true, value: browser.document })
+  // The page's collapsible tool groups and account menu need these DOM globals.
+  for (const key of ['HTMLElement', 'Node', 'Element', 'getComputedStyle', 'requestAnimationFrame', 'cancelAnimationFrame', 'MutationObserver', 'ResizeObserver'] as const) {
+    const value = (browser as unknown as Record<string, unknown>)[key]
+    if (value !== undefined) Object.defineProperty(globalThis, key, { configurable: true, value: typeof value === 'function' && /^[a-z]/.test(key) ? (value as (...args: unknown[]) => unknown).bind(browser) : value })
+  }
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ GitHubSettings } = await import('../components/plugins/github-settings'))
@@ -51,7 +56,10 @@ after(() => { browser.close() })
 
 const render = async () => { await act(async () => { root.render(<GitHubSettings />) }) }
 const respond = async (index: number, viewerId: string, fullName: string) => {
-  await act(async () => { requests[index].resolve(Response.json({ viewerId, configured: true, connected: true, installed: true, repositories: [{ id: fullName, fullName }] })) })
+  await act(async () => { requests[index].resolve(Response.json({ viewerId, configured: true, connected: true, installed: true, repositories: [{ id: fullName, fullName, htmlUrl: `https://github.com/${fullName}`, private: true }] })) })
+}
+const respondNotConnected = async (index: number, viewerId: string) => {
+  await act(async () => { requests[index].resolve(Response.json({ viewerId, configured: true, connected: false, installed: false, repositories: [] })) })
 }
 const focus = async () => { await act(async () => { browser.dispatchEvent(new browser.Event('focus')) }) }
 
@@ -139,4 +147,58 @@ test('OAuth callback errors survive initial session confirmation and the keyed r
   await render()
   assert.ok(container.textContent?.includes('githubLinkFailed'))
   assert.equal(new URL(browser.location.href).searchParams.get('github'), null)
+})
+
+test('linking goes straight to the GitHub connect route, which redirects to github.com', async () => {
+  const assigned: string[] = []
+  const location = browser.location as unknown as { assign: (url: string) => void }
+  const original = location.assign
+  location.assign = url => { assigned.push(url) }
+  try {
+    userId = 'viewer-link'
+    await render()
+    await respondNotConnected(0, 'viewer-link')
+    const link = [...container.querySelectorAll('button')].find(button => button.textContent === 'githubLink')
+    assert.ok(link)
+    await act(async () => { link.click() })
+    assert.deepEqual(assigned, [`${process.env.MIKKA_BASE_PATH ?? ''}/api/integrations/github/connect`])
+    assert.ok(!assigned.some(url => url.includes('settings=')))
+  } finally { location.assign = original }
+})
+
+test('the desktop shell opens the GitHub connect route in the system browser, not a settings page', async () => {
+  const opened: string[] = []
+  Object.assign(browser, { mikka: { app: { version: '0.1.1', flavor: 'prod', runtime: 'electron', openExternal: async (url: string) => { opened.push(url) } } } })
+  try {
+    userId = 'viewer-desktop'
+    await render()
+    await respondNotConnected(0, 'viewer-desktop')
+    const link = [...container.querySelectorAll('button')].find(button => button.textContent === 'githubLink')
+    await act(async () => { link!.click() })
+    assert.equal(opened.length, 1)
+    assert.equal(new URL(opened[0]).pathname, `${process.env.MIKKA_BASE_PATH ?? ''}/api/integrations/github/connect`)
+  } finally { delete (browser as unknown as { mikka?: unknown }).mikka }
+})
+
+test('the page lists what Agents can do, split into write and read, connected or not', async () => {
+  userId = 'viewer-tools'
+  await render()
+  await respondNotConnected(0, 'viewer-tools')
+  const text = container.textContent ?? ''
+  assert.ok(text.includes('githubDescription'))
+  for (const tool of ['githubTool.push', 'githubTool.pullRequest', 'githubTool.readCode', 'githubTool.readPullRequest', 'githubTool.readIssue', 'githubTool.readChecks']) assert.ok(text.includes(tool), tool)
+  assert.ok(text.includes('writeTools') && text.includes('readTools'))
+  assert.ok(!text.includes('githubRepositoriesHeading'))
+})
+
+test('a connected page shows the account, its repositories and where to authorize more', async () => {
+  userId = 'viewer-connected'
+  await render()
+  await respond(0, 'viewer-connected', 'a/private')
+  const text = container.textContent ?? ''
+  assert.ok(text.includes('accountsHeading'))
+  assert.ok(text.includes('githubRepositoriesHeading'))
+  assert.equal(container.querySelector('a[href="https://github.com/a/private"]')?.textContent, 'a/private')
+  assert.ok(text.includes('githubPrivate'))
+  assert.ok(![...container.querySelectorAll('button')].some(button => button.textContent === 'githubLink'))
 })

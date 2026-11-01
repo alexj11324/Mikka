@@ -2,7 +2,7 @@ import { GitHubAccessError, listAuthorizedRepositories } from '@/lib/github/user
 import { auth } from '@/lib/api-auth'
 import { auth as sessionAuth } from '@/lib/auth'
 import { withRequestLog } from '@/lib/request-log'
-import { disconnectGitHub, githubConnection } from '@/lib/github/connection'
+import { disconnectGitHub, githubConnectConfigured, githubConnection } from '@/lib/github/connection'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 
@@ -18,7 +18,7 @@ async function handleGET(request: Request) {
     return Response.json({ viewerId, configured: true, connected: true, login: connection?.githubLogin ?? null, installed: result.installations.length > 0, repositories: result.repositories }, { headers })
   } catch (error) {
     if (error instanceof GitHubAccessError) {
-      if (viewerId && (error.code === 'githubNotConnected' || error.code === 'githubNotConfigured')) return Response.json({ viewerId, configured: error.code !== 'githubNotConfigured', connected: false, installed: false, repositories: [] }, { headers })
+      if (viewerId && (error.code === 'githubNotConnected' || error.code === 'githubNotConfigured')) return Response.json({ viewerId, configured: error.code !== 'githubNotConfigured' && githubConnectConfigured(), connected: false, installed: false, repositories: [] }, { headers })
       return Response.json({ ...(viewerId ? { viewerId } : {}), error: error.code }, { status: error.status, headers })
     }
     return Response.json({ ...(viewerId ? { viewerId } : {}), error: 'githubUnavailable' }, { status: 502, headers })

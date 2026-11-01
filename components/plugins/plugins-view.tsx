@@ -121,11 +121,13 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
         ? <><ConnectedAppsStatus apps={apps} /><ConnectedAppDetail apps={apps} app={app} rootLabel={rootLabel} rootHref={root} onBack={back} /></>
         : <div className="flex flex-col gap-8">
           <PluginBreadcrumb rootLabel={rootLabel} rootHref={root} onBack={back} name={info(app).name} />
-          <header className="flex flex-wrap items-center gap-4">
-            <AppTile app={app} size="xl" />
-            <h2 className="min-w-0 flex-1 text-xl font-semibold">{info(app).name}</h2>
-          </header>
-          {app === 'github' ? <GitHubSettings /> : app === 'linear' ? <LinearSettings notice={linearNotice} /> : <TelegramSettings />}
+          {app === 'github' ? <GitHubSettings /> : <>
+            <header className="flex flex-wrap items-center gap-4">
+              <AppTile app={app} size="xl" />
+              <h2 className="min-w-0 flex-1 text-xl font-semibold">{info(app).name}</h2>
+            </header>
+            {app === 'linear' ? <LinearSettings notice={linearNotice} /> : <TelegramSettings />}
+          </>}
         </div>}
     </div>
   }
