@@ -20,6 +20,7 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
     writeFileSync(join(dir, 'migrate.mjs'), source)
     writeFileSync(join(dir, 'scope.mjs'), scopeStub)
     writeFileSync(join(dir, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url), 'utf8'))
+    writeFileSync(join(dir, 'migration-guard.mjs'), readFileSync(new URL('./migration-guard.mjs', import.meta.url)))
     writeFileSync(join(dir, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
     writeFileSync(join(dir, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
     writeFileSync(join(dir, 'pg.mjs'), 'export class Pool { constructor() { throw new Error("DATABASE_ACCESS") } }')
@@ -34,7 +35,7 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
     // Default production and explicit opt-in must not silently skip migration.
     for (const [environment, mode] of [['production', ''], ['preview', '1']]) {
       const result = spawnSync(process.execPath, [join(dir, 'migrate.mjs')], {
-        env: { ...process.env, DATABASE_URL: 'postgres://user:fixture@preview-fixture:5432/testdb', MIGRATE: mode, VERCEL_ENV: environment }, encoding: 'utf8',
+        env: { ...process.env, DATABASE_URL: 'postgres://user:fixture@preview-fixture:5432/testdb', MIGRATE: mode, VERCEL: '1', VERCEL_ENV: environment, VERCEL_GIT_COMMIT_REF: 'main' }, encoding: 'utf8',
       })
       assert.notEqual(result.status, 0)
       assert.doesNotMatch(result.stdout, /migrate: skipped/)
@@ -60,6 +61,7 @@ test('explicit Preview migration never connects to the global application target
     writeFileSync(join(scripts, 'migrate.mjs'), source)
     writeFileSync(join(scripts, 'scope.mjs'), scopeStub)
     writeFileSync(join(scripts, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url)))
+    writeFileSync(join(scripts, 'migration-guard.mjs'), readFileSync(new URL('./migration-guard.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'order.mjs'), 'export const orderMigrations = x => x; export const alreadyApplied = () => false')
@@ -72,7 +74,7 @@ test('explicit Preview migration never connects to the global application target
     writeFileSync(join(migrations, '0001_application.sql'), '-- target: MIKKA_DATABASE_URL\nSELECT 1;')
     writeFileSync(join(migrations, '0002_workspace.sql'), '-- target: DATABASE_URL\nSELECT 1;')
     const result = spawnSync(process.execPath, [join(scripts, 'migrate.mjs')], {
-      env: { ...process.env, MIGRATE: '1', VERCEL_ENV: 'preview', DATABASE_URL: 'postgres://user:fixture@preview-fixture/testdb', MIKKA_DATABASE_URL: 'postgres://production-fixture' }, encoding: 'utf8',
+      env: { ...process.env, MIGRATE: '1', VERCEL: '1', VERCEL_ENV: 'preview', DATABASE_URL: 'postgres://user:fixture@preview-fixture/testdb', MIKKA_DATABASE_URL: 'postgres://production-fixture' }, encoding: 'utf8',
     })
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /0001_application.sql/)
@@ -121,6 +123,7 @@ test('all files preflight before a database connection, even if an earlier file 
     writeFileSync(join(scripts, 'scope.mjs'), scopeStub)
     writeFileSync(join(scripts, 'migration-order.mjs'), 'export const orderMigrations = x => x.sort(); export const alreadyApplied = (name, applied) => applied.has(name)')
     writeFileSync(join(scripts, 'migration-steps.mjs'), readFileSync(new URL('./migration-steps.mjs', import.meta.url), 'utf8'))
+    writeFileSync(join(scripts, 'migration-guard.mjs'), readFileSync(new URL('./migration-guard.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'migration-targets.mjs'), readFileSync(new URL('./migration-targets.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'preview-database-url.mjs'), readFileSync(new URL('./preview-database-url.mjs', import.meta.url)))
     writeFileSync(join(scripts, 'pg.mjs'), 'export class Pool { constructor() { throw new Error("DATABASE_ACCESS") } }')

@@ -12,7 +12,7 @@ import { mailboxDiagnostic } from './mailbox-diagnostics'
 // Deliberately no global database: the caller supplies its request-scoped pool.
 // A peer never supplies userId/workspaceId or its own sender identity over HTTP.
 export interface MailboxActor { userId: string; workspaceId: string; mailboxId: string; runId?: string; runTokenHash?: string }
-export interface Mailbox { id: string; userId: string; workspaceId: string; kind: 'run' | 'coordinator' | 'bot'; sessionKey: string; latestRunId: string | null; disabled: boolean; wakeBudget: number; harness: string | null }
+export interface Mailbox { id: string; userId: string; workspaceId: string; kind: 'run' | 'coordinator' | 'bot' | 'group'; sessionKey: string; latestRunId: string | null; disabled: boolean; wakeBudget: number; harness: string | null }
 export interface MailboxReceipt { id: string; queued: true; duplicate: boolean; failure: string | null; continuationRunId?: string }
 const LIVE = ['queued', 'preparing', 'running', 'waiting_input', 'finishing']
 function liveLease(value: Date | string | null | undefined): boolean {

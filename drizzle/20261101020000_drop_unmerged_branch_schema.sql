@@ -1,13 +1,10 @@
--- DRAFT — DO NOT MERGE until Alex approves (see the PR). Removes schema that
--- production received on 2026-10-25 from unmerged branches
+-- Removes schema that production received on 2026-10-25 from unmerged branches
 -- (codex/credential-scheduler-prep-20261025, codex/byos-transfer-executor).
 -- main never created, reads or writes any of it; every table here held 0 rows
 -- on 2026-11-01 except credential_requests (3 terminal rows, no secret columns).
 -- Idempotent and a no-op on a database built from main. No CASCADE: an
 -- unexpected dependency fails the deploy instead of dropping main objects.
--- The personal mailbox objects (session_mailboxes, mikka_mailbox_sequence,
--- the run_messages / agent_runs."mailboxId" / coordinator_events.sequence
--- columns) are deliberately left alone: lib/session-mailbox.ts uses them.
+-- The personal mailbox objects stay; 20261101020100 adopts them on main.
 SET LOCAL lock_timeout = '5s';
 
 -- Credential broker: these triggers run an UPDATE on credential_requests on
