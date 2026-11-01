@@ -3435,6 +3435,7 @@
       "offline": "离线",
       "online": "在线",
       "cloud": "Mikka Cloud",
+      "addE2BKey": "填入 E2B Key",
       "contextProject": "项目：{project}",
       "contextSeparator": "，",
       "prompt": "帮我新建一个任务：{text}",

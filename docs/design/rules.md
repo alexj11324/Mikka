@@ -144,10 +144,15 @@ source wins in a conflict is in [`README.md`](README.md).
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
   shows a machine picker.
-- **R-23** Machine picker order: **Mikka Cloud** first and selected by
-  default; then the group **本机** (this Mac, a local Linux machine); then the
-  group **Remote control** (VPS and SSH hosts reached through the user's
-  machine). Settings › 设备 uses the same two groups.
+- **R-23** Machine picker order: **Mikka Cloud** first; then the group
+  **本机** (this Mac, a local Linux machine); then the group **Remote
+  control** (VPS and SSH hosts reached through the user's machine). Settings ›
+  设备 uses the same two groups. The default is the first machine that can
+  run the task now: Mikka Cloud only with the person's own E2B key, a device
+  only while online. Without a key Mikka Cloud is grey and marked 填入 E2B Key,
+  which opens the key dialog. A dot is green only while the machine is
+  actually online (Mikka Cloud: running)
+  ([decision](decisions/2026-11-01-2240-default-first-usable-machine.md)).
 - **R-24** A device's online state is a StatusDot on the top-right of its
   icon (green online, grey offline, red error), never a text badge.
 - **R-25** Board cards follow Figma 「看板卡片 v1」 (`714:5283`): a filled card

@@ -3435,6 +3435,7 @@
       "offline": "Offline",
       "online": "Online",
       "cloud": "Mikka Cloud",
+      "addE2BKey": "Add E2B Key",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",

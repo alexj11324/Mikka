@@ -20,6 +20,7 @@ import {
 import type { ExecutionRule } from '@/lib/execution-rules'
 import { harnessOptions, modelName, modelOptions, placeKind, redetectTargets, retarget, withCloudModels, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
 import { cn } from '@/lib/utils'
+import { useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import { findLabel, listWorkspaceLabels, matchLabels } from '@/lib/workspace-labels'
 import { FieldError } from '@/components/ui/field'
 
@@ -37,6 +38,7 @@ export function BotAgentsSettings() {
   const stored = useSWR(KEYS.settings, readExecutionSettings)
   const places = useSWR(KEYS.places, listPlaces, { refreshInterval: 15_000 })
   const accounts = useSWR(KEYS.accounts, listAccountModels)
+  const e2bKey = useOwnE2BKey()
   const [failed, setFailed] = useState<(() => Promise<void>) | null>(null)
   /** A choice the server refused stays on screen, marked 未保存, until a retry saves it. */
   const [unsaved, setUnsaved] = useState<{ defaults?: TaskDefaults }>({})
@@ -50,7 +52,8 @@ export function BotAgentsSettings() {
   if (!stored.data || !places.data || !accounts.data) return <SettingsLoading label={t('loading')} rows={4} />
 
   const accountRows = accounts.data
-  const placeList = withCloudModels(places.data, accountRows)
+  // Mikka Cloud can run only with the person's own E2B key; a failed read leaves it as the server reports it.
+  const placeList = withCloudModels(places.data, accountRows).map(place => placeKind(place) === 'cloud' && e2bKey.configured === false ? { ...place, online: false } : place)
   const view = executionSettingsView(stored.data, placeList, accountRows)
   const defaults = unsaved.defaults ?? view.defaults
   const current = stored.data
@@ -159,6 +162,7 @@ function executionPickers({ t, row, value, places, wide, disabled, onChange, onR
   const devices = places.filter(place => placeKind(place) !== 'cloud')
   const device = places.find(item => item.id === value.place)
   const placeName = value.place === 'cloud' ? t('cloud') : device?.name ?? t('removedDevice')
+  const cloudOnline = places.some(place => placeKind(place) === 'cloud' && place.online)
   const harnesses = harnessOptions(places, value.place)
   const harnessList = harnesses.includes(value.harness) ? harnesses : [...harnesses, value.harness]
   const models = modelOptions(places, value.place, value.harness)
@@ -171,7 +175,7 @@ function executionPickers({ t, row, value, places, wide, disabled, onChange, onR
 
   return {
     place: <Picker t={t} wide={wide} disabled={disabled} ariaLabel={cell(t('columns.place'), placeName)} heading={t('columns.place')} onRefresh={() => onRedetect(redetectTargets(places, 'cloud'))}
-      value={<DeviceLabel kind={value.place === 'cloud' ? 'cloud' : device ? placeKind(device) : 'unknown'} name={placeName} online={value.place === 'cloud' || Boolean(device?.online)} />}>
+      value={<DeviceLabel kind={value.place === 'cloud' ? 'cloud' : device ? placeKind(device) : 'unknown'} name={placeName} online={value.place === 'cloud' ? cloudOnline : Boolean(device?.online)} />}>
       {close => <CommandGroup>
         {devices.map(item => <CommandItem key={item.id} value={item.id} keywords={[item.name ?? item.id]} data-checked={value.place === item.id} onSelect={() => { close(); move(item.id) }}>
           <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
@@ -179,7 +183,7 @@ function executionPickers({ t, row, value, places, wide, disabled, onChange, onR
             {!item.online && <span className="shrink-0 text-xs text-muted-foreground">{t('offline')}</span>}
           </span>
         </CommandItem>)}
-        <CommandItem value="cloud" keywords={[t('cloud')]} data-checked={value.place === 'cloud'} onSelect={() => { close(); move('cloud') }}><DeviceLabel kind="cloud" name={t('cloud')} online /></CommandItem>
+        <CommandItem value="cloud" keywords={[t('cloud')]} data-checked={value.place === 'cloud'} onSelect={() => { close(); move('cloud') }}><DeviceLabel kind="cloud" name={t('cloud')} online={cloudOnline} /></CommandItem>
       </CommandGroup>}
     </Picker>,
     harness: <Picker t={t} wide={wide} disabled={disabled} ariaLabel={cell(t('columns.harness'), harnessName(value.harness))} heading={t('columns.harness')} onRefresh={refresh} value={<HarnessLabel harness={value.harness} />}>
