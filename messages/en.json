@@ -3532,6 +3532,7 @@
     "frameTitle": "{title} (web page)",
     "share": "Share",
     "createLink": "Create link",
+    "shareAccess": "Anyone with the link can view",
     "copyLink": "Copy link",
     "linkCopied": "Link copied",
     "stopSharing": "Stop sharing",
