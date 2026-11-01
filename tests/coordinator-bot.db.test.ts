@@ -175,7 +175,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     } finally { await pool.query('DELETE FROM workspace_app_policies WHERE "workspaceId"=$1', [workspaceId]) }
   })
 
-  await t.test('the bot list (left column and mobile home) has the Coordinator once, as the Coordinator, in every workspace', async () => {
+  await t.test('the bot list (left column and mobile home) has that workspace\'s own Coordinator once, as the Coordinator', async () => {
     const p = await person('bot-list')
     // A bot the person named "Coordinator" themselves stays an ordinary bot.
     const theirs = await seedBot(pool, p.workspaceId, p.id, 'Coordinator')
@@ -185,7 +185,12 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const here = await bots.listOwnerBots(p.id, p.workspaceId)
     assert.deepEqual(here.map(bot => [bot.id, bot.coordinator]), [[botId, true], [theirs, false]], 'first, once, and marked')
     const there = await bots.listOwnerBots(p.id, team.id)
-    assert.deepEqual(there.map(bot => [bot.id, bot.coordinator]), [[botId, true], [teamBot, false]], 'one per person: listed in the other workspace too')
+    // One Coordinator per person per workspace (decision 2026-10-31-2130): the team has its own, a bot of the team.
+    const teamCoordinator = (await pool.query('SELECT "botId" FROM coordinator_bots WHERE "ownerId"=$1 AND "workspaceId"=$2', [p.id, team.id])).rows[0]?.botId
+    assert.ok(teamCoordinator && teamCoordinator !== botId, 'the team workspace has its own Coordinator')
+    assert.deepEqual(there.map(bot => [bot.id, bot.coordinator]), [[teamCoordinator, true], [teamBot, false]], 'the other workspace lists its own Coordinator, never this one')
+    assert.equal((await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1', [teamCoordinator])).rows[0].workspaceId, team.id)
+    assert.deepEqual((await bots.listOwnerBots(p.id, team.id)).map(bot => bot.id), there.map(bot => bot.id), 'created once')
     // Its chat summary is under the same id, so the list draws one entry from it.
     await pool.query(`INSERT INTO coordinator_messages (id,"userId","botId",position,message) VALUES ($1,$2,$3,1,'{"role":"assistant","content":"Morning"}')`, [randomUUID(), p.id, botId])
     const summaries = await store.botChats(p.id)
