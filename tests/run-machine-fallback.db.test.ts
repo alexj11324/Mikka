@@ -82,6 +82,30 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     assert.equal((await runOf(queued.runId)).deviceId, deviceId)
   })
 
+  await t.test('a read-only task runs without a repository push approval; a committing one says why it cannot', async () => {
+    const r = await person('readonly')
+    await pool.query('DELETE FROM repository_settings WHERE "userId"=$1', [r.id])
+    const deviceId = await onlineMac(r.id)
+    const botId = await chatBotId(r.id, null, await ownWorkspace(r.id))
+    const refused = await steps.dispatchRun(r.id, { issueId: r.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { error: string; reason: string; detail: string }
+    assert.equal(refused.error, 'runInvalid')
+    assert.equal(refused.reason, 'repositoryPushApprovalRequired', 'the Coordinator is told the real cause, not left to guess one')
+    assert.match(refused.detail, /readOnly: true/)
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [r.id])).rows[0].n, 0)
+    const queued = await steps.dispatchRun(r.id, { issueId: r.issueId, repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { runId: string; status: string }
+    assert.equal(queued.status, 'queued')
+    const run = (await pool.query('SELECT "deviceId","agentDefinition" FROM agent_runs WHERE id=$1', [queued.runId])).rows[0]
+    assert.equal(run.deviceId, deviceId)
+    assert.equal(run.agentDefinition.readOnly, true)
+    assert.equal(run.agentDefinition.repositoryAdmission, undefined, 'a read-only run carries no push authority')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_publications WHERE "runId"=$1', [queued.runId])).rows[0].n, 0, 'no push branch is reserved')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM repository_settings WHERE "userId"=$1', [r.id])).rows[0].n, 0, 'nothing granted a push approval')
+    const { persistRunCompletion } = await import('../lib/run-publications')
+    await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`, [queued.runId])
+    await persistRunCompletion(r.id, queued.runId, { stopReason: 'submitted', report: { summary: 'Findings reported.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } })
+    assert.equal((await runOf(queued.runId)).status, 'succeeded', 'a read-only report has nothing to publish, so it is not blocked on a push')
+  })
+
   await t.test('(b) no E2B and an online Mac with 允许自动调度 on: a cloud rule runs on the Mac', async () => {
     const b = await person('mac')
     const deviceId = await onlineMac(b.id)

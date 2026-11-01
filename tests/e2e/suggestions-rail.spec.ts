@@ -4,7 +4,7 @@ import { suggestionMessage } from '../../lib/suggestions/card'
 import { test, expect, register, rail, seedSuggestion } from './fixtures'
 
 // Writes one Coordinator message straight into CI's isolated disposable database: what a tapped card leaves in the chat.
-async function seedSentCard(email: string, message: string) {
+async function seedSentCard(email: string, message: string, position = 1) {
   const connectionString = process.env.E2E_DATABASE_URL
   if (!connectionString) throw new Error('This test requires an isolated E2E_DATABASE_URL')
   const target = new URL(connectionString)
@@ -12,7 +12,7 @@ async function seedSentCard(email: string, message: string) {
   const pool = new Pool({ connectionString, max: 1 })
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
-    await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), 1, $3)', [randomUUID(), user.id, JSON.stringify({ role: 'user', content: message })])
+    await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), $4, $3)', [randomUUID(), user.id, JSON.stringify({ role: 'user', content: message }), position])
   } finally { await pool.end() }
 }
 
@@ -69,4 +69,23 @@ test('建议：一张卡里很长的不换行文字不会撑宽左栏，右边�
   expect(chatBox!.x + chatBox!.width).toBeLessThanOrEqual(1440)
   expect(await card.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test('建议：一条以前存下的 GitHub 原文卡片发进 Coordinator 对话后，只显示可读的文字和链接，不显示机器人的元数据', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 940 })
+  const { email } = await register(page)
+  // Made-up hidden metadata in the shape a deploy bot leaves, stored raw as older rows were.
+  const metadata = `[pv]: #${randomUUID().replaceAll('-', '')}${'QUJDREVGR0hJSktMTU5PUA'.repeat(6)}=:${'eyJmYWtlIjp0cnVlfQ'.repeat(6)}`
+  const url = 'https://github.com/alexj11324/Mikka/pull/1#issuecomment-2'
+  // The message as it was written before this fix: the raw title inside the card.
+  await seedSentCard(email, `<suggestion source="github" action="reply" title="「${metadata}」" actor="「deploy-preview[bot]」" url="「${url}」"></suggestion>`)
+  await seedSentCard(email, suggestionMessage({ source: 'github', action: 'reply', title: '#### ⚠️ Scanner found **1** secret', actionTitle: null, actor: 'scanner[bot]', url: null }), 2)
+
+  await rail(page, '建议').click()
+  const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
+  await expect(chat.getByRole('link', { name: url })).toBeVisible()
+  await expect(chat.locator('[data-slot="suggestion-card"]').filter({ hasText: '⚠️ Scanner found 1 secret' })).toBeVisible()
+  await expect(chat).not.toContainText('QUJDREVG')
+  await expect(chat).not.toContainText('[pv]')
+  await expect(chat).not.toContainText('####')
 })

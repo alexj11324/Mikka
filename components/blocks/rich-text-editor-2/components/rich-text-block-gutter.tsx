@@ -123,10 +123,25 @@ function gutterPoint(
   const x = left - box.left + scroller.scrollLeft - gap
   const y = firstLineCenter(view, target, block) - box.top + scroller.scrollTop
 
+  // The gutter may hang into the page's margin, as on the task page where the
+  // text has no inset; it only stops where a box would clip it.
+  const clip = clippingLeft(scroller) - box.left + scroller.scrollLeft
+
   return {
-    x: Math.round(Math.max(x, gutter.offsetWidth)),
+    x: Math.round(Math.max(x, clip + gutter.offsetWidth)),
     y: Math.round(y),
   }
+}
+
+/** Viewport x where the nearest box that clips horizontally (the scroller
+ * itself or an ancestor) starts its content; 0 when nothing clips. */
+function clippingLeft(scroller: HTMLElement) {
+  for (let node: HTMLElement | null = scroller; node; node = node.parentElement) {
+    if (getComputedStyle(node).overflowX !== "visible") {
+      return node.getBoundingClientRect().left + node.clientLeft
+    }
+  }
+  return 0
 }
 
 /** dragstart on the grip: it sits outside the editor, so ProseMirror's own

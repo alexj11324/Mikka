@@ -24,10 +24,12 @@ export interface WorkerDefinitionSnapshot {
   mailbox?: WorkerMailboxGrant
   /** Server-owned authority accepted with this local task, preserved by retries. */
   repositoryAdmission?: RepositoryAdmission
+  /** A run that changes nothing (investigation, review): read-only policy, no commit, push or PR, so no push approval. */
+  readOnly?: true
 }
 
 /** Captured atomically with dispatch, not retroactively inferred from a renamed Agent. */
-export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; model?: string; pinnedDeviceId?: string; subscription?: { id: string; modelId: string; route: string } | null; apiKey?: { keyId: string; model: string } | null; mailboxEnabled?: boolean; mailboxScope?: WorkerMailboxScope }): WorkerDefinitionSnapshot {
+export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; model?: string; pinnedDeviceId?: string; subscription?: { id: string; modelId: string; route: string } | null; apiKey?: { keyId: string; model: string } | null; mailboxEnabled?: boolean; mailboxScope?: WorkerMailboxScope; readOnly?: boolean }): WorkerDefinitionSnapshot {
   if (Boolean(input.parent) !== Boolean(input.executionId)) throw new Error('agentWorkerParentIncomplete')
   if (input.subscription && input.apiKey) throw new Error('agentWorkerCredentialConflict')
   if (input.apiKey && input.harness !== 'codex' && input.harness !== 'claude_code') throw new Error('agentWorkerApiKeyMismatch')
@@ -44,10 +46,11 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
     ...(input.pinnedDeviceId ? {pinnedDeviceId:z.uuid().parse(input.pinnedDeviceId)} : {}),
     cliModelSelection: model ? 'explicit' : 'auto',
     schemaVersion: 1, kind: 'worker', harness: input.harness, instructions: input.instructions,
-    definitionDigest: digest({ harness: input.harness, instructions: input.instructions, ...(model ? {model} : {}), ...(input.pinnedDeviceId ? {pinnedDeviceId:input.pinnedDeviceId} : {}), ...(subscription ? { subscription } : {}), ...(apiKey ? { apiKey } : {}), ...(mailbox ? { mailbox } : {}) }),
+    definitionDigest: digest({ harness: input.harness, instructions: input.instructions, ...(model ? {model} : {}), ...(input.pinnedDeviceId ? {pinnedDeviceId:input.pinnedDeviceId} : {}), ...(subscription ? { subscription } : {}), ...(apiKey ? { apiKey } : {}), ...(mailbox ? { mailbox } : {}), ...(input.readOnly ? { readOnly: true } : {}) }),
     promptDigest: digest(input.prompt), modelSource: subscription ? 'subscription' : apiKey ? 'api_key' : 'native-default', ...(subscription ? { subscription } : {}), ...(apiKey ? { apiKey } : {}),
     parent: input.parent && input.executionId ? { executionId: input.executionId,revisionId: input.parent.revisionId,revision: input.parent.revision,definitionDigest: input.parent.definitionDigest } : null,
     ...(mailbox ? { mailbox } : {}),
+    ...(input.readOnly ? { readOnly: true as const } : {}),
   }
 }
 
@@ -65,7 +68,7 @@ export function apiKeyWorkerDefinition(snapshot: WorkerDefinitionSnapshot, promp
   const key = { keyId: z.uuid().parse(apiKey.keyId), model: z.string().trim().min(1).max(128).parse(apiKey.model) }
   return {
     ...rest, model: key.model, cliModelSelection: 'explicit', modelSource: 'api_key', apiKey: key, promptDigest: digest(prompt),
-    definitionDigest: digest({ harness: rest.harness, instructions: rest.instructions, model: key.model, ...(rest.pinnedDeviceId ? { pinnedDeviceId: rest.pinnedDeviceId } : {}), apiKey: key, ...(rest.mailbox ? { mailbox: rest.mailbox } : {}) }),
+    definitionDigest: digest({ harness: rest.harness, instructions: rest.instructions, model: key.model, ...(rest.pinnedDeviceId ? { pinnedDeviceId: rest.pinnedDeviceId } : {}), apiKey: key, ...(rest.mailbox ? { mailbox: rest.mailbox } : {}), ...(rest.readOnly ? { readOnly: true } : {}) }),
   }
 }
 

@@ -54,7 +54,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
             {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}
           </span>
           <ThreadStatus status={view.status} stopping={view.stopping} waiting={view.waiting} />
-          <time className="w-14 shrink-0 text-right text-xs font-normal text-muted-foreground" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(threadTime(thread, now), now)}</time>
+          <time className="min-w-14 shrink-0 whitespace-nowrap text-right text-xs font-normal text-muted-foreground tabular-nums" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(threadTime(thread, now), now)}</time>
         </>
         return <li key={thread.id}>
           {thread.detail

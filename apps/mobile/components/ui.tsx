@@ -3,7 +3,7 @@ import { Image, Platform, Pressable, StyleSheet, TextInput, View, type StyleProp
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowUp, ChevronLeft, FileText, X } from 'lucide-react-native'
+import { ArrowUp, ChevronLeft, FileText, Square, X } from 'lucide-react-native'
 import { AttachMenu, type AttachSource } from '@/components/AttachMenu'
 import { Text } from '@/components/Text'
 import { MAX_IMAGES, pickImages, pickText, type Attachment } from '@/lib/attachments'
@@ -67,7 +67,7 @@ export function Header({ left, title, right, subtitle, style }: { left?: ReactNo
  * them), so a failed send loses nothing. Controlled when `value` and
  * `onChangeText` are passed.
  */
-export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory }: {
+export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, onStop }: {
   placeholder: string
   onSend?: (text: string, attachments: Attachment[]) => boolean | void | Promise<boolean | void>
   initial?: string
@@ -85,6 +85,8 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   onClearQuote?: () => void
   /** Beside 「+」 in the field's bottom row (the model menu). */
   accessory?: ReactNode
+  /** While the bot answers: send turns into stop until something is typed. */
+  onStop?: () => void
 }) {
   const input = useRef<TextInputInstance>(null)
   // A new quote is something to answer: the keyboard comes up.
@@ -161,10 +163,16 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
             {attach ? <AttachMenu images={images < MAX_IMAGES} onPick={pick} /> : null}
             {accessory}
             <View style={{ flex: 1 }} />
-            <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: blocked || empty }} onPress={() => void send()} disabled={blocked}
-              style={[styles.send, (blocked || empty) && { backgroundColor: colors.tertiary }]}>
-              <ArrowUp size={20} color="#fff" strokeWidth={2.4} />
-            </Pressable>
+            {onStop && empty && !sending ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="停止" onPress={() => { tap(); onStop() }} style={styles.send}>
+                <Square size={14} color="#fff" fill="#fff" strokeWidth={2.4} />
+              </Pressable>
+            ) : (
+              <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: blocked || empty }} onPress={() => void send()} disabled={blocked}
+                style={[styles.send, (blocked || empty) && { backgroundColor: colors.tertiary }]}>
+                <ArrowUp size={20} color="#fff" strokeWidth={2.4} />
+              </Pressable>
+            )}
           </View>
         </Field>
       </View>

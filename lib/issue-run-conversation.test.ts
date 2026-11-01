@@ -46,6 +46,28 @@ test('a thread reads as one conversation: agent text, folded steps and people in
     ['agent:Reproduced it.', 'steps:2', 'person:Lin', 'agent:Fixed.', 'error:Interrupted'])
 })
 
+test('a folded steps line keeps each tool call so it can open: name, what it ran, whether it failed', () => {
+  const at = new Date()
+  const items = threadItems([
+    { chunk: { type: 'tool-input-available', toolCallId: '1', toolName: 'Bash', input: { command: 'pnpm   test\n --watch=false', description: 'Run tests' } }, at },
+    { chunk: { type: 'tool-output-error', toolCallId: '1', errorText: 'exit 1' }, at },
+    { chunk: { type: 'tool-input-available', toolCallId: '2', toolName: 'apply_patch', input: { files: ['a.ts', 'b.ts'] } }, at },
+    { chunk: { type: 'tool-input-available', toolCallId: '3', toolName: 'Read', input: { file_path: `/${'x'.repeat(300)}` } }, at },
+    { chunk: { type: 'tool-input-available', toolCallId: '4', input: 'raw' }, at },
+  ], [])
+  assert.equal(items.length, 1)
+  const [steps] = items
+  assert.ok(steps.kind === 'steps')
+  assert.equal(steps.count, 4)
+  assert.deepEqual(steps.steps.slice(0, 2), [
+    { id: '1', name: 'Bash', detail: 'pnpm test --watch=false', failed: true },
+    { id: '2', name: 'apply_patch', detail: 'a.ts, b.ts', failed: false },
+  ])
+  assert.equal(steps.steps[2].detail?.length, 200)
+  assert.ok(steps.steps[2].detail?.endsWith('…'))
+  assert.deepEqual(steps.steps[3], { id: '4', name: 'tool', detail: null, failed: false })
+})
+
 test('a thread shows one computer card only for its own run', () => {
   const at = new Date()
   const card = { type: 'data-computer', data: { botId: 'bot-a', runId: 'run-a', task: 'Open the page', state: 'working' } }

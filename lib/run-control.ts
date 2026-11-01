@@ -31,7 +31,7 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
         if (!run.issueId || !run.deviceId || repo.deviceId !== run.deviceId || repo.repoPath !== key || !matchesRepositoryAdmission(receipt, { userId, issueId: run.issueId, deviceId: run.deviceId, agentId: run.agentId,
           remoteKey: key, remoteUrl: repo.remoteUrl, targetBranch: receipt.targetBranch, workspaceId: bot?.workspaceId, workspaceLinked: receipt.workspaceLinked, requestEventId: receipt.requestEventId })
           || !await (await import('./run-admission-store')).acceptedEventStillMatches(receipt, run.botId, tx) || !repositoryPushApproved(setting?.push, userId)) throw new ActionFailureError('runInvalid')
-      } else if (setting?.push?.approved === false) throw new ActionFailureError('runInvalid')
+      } else if (setting?.push?.approved === false && !run.agentDefinition?.readOnly) throw new ActionFailureError('runInvalid')
     }
     const id = crypto.randomUUID()
     await tx.insert(runMessages).values({ id, runId: run.id, userId, text: personalRunMessageText(id, input.text, origin) })

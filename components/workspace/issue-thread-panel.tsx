@@ -4,9 +4,10 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ChevronLeft, ChevronRight, SquareKanban, X } from 'lucide-react'
+import { ChevronLeft, SquareKanban, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
 import { runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
+import { ThreadSteps } from './thread-steps'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { Button } from '@/components/ui/button'
@@ -15,7 +16,6 @@ import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { ThreadStatus, harnessLabel } from './issue-threads'
 import { ThreadStatusIcon } from './thread-status-icon'
-import { HarnessMark } from '@/components/labels/entity-labels'
 import { ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
@@ -33,8 +33,8 @@ import { ThreadFeedback } from './self-improvement'
 import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
 
-// R-32 chat: 14/22, also for the agent's Markdown inside a bubble.
-const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.5 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.5'
+// R-32 chat: 13/21 as in Comma, also for the agent's Markdown inside a bubble.
+const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.25'
 
 /**
  * An open thread: a conversation between people and the agent running it (R-62, R-10).
@@ -147,7 +147,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
             {items.map(item => <li key={item.id} className="flex flex-col gap-1">
               {item.kind === 'agent' && <div className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>}
-              {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" /><span aria-hidden="true" className="inline-flex"><HarnessMark harness={detail?.harness ?? ''} /></span>{t('steps', { harness: harnessLabel(detail?.harness ?? ''), count: item.count })}</span>}
+              {item.kind === 'steps' && <ThreadSteps harness={detail?.harness ?? ''} steps={item.steps} />}
               {item.kind === 'error' && <FieldError className="text-xs">{item.text}</FieldError>}
               {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : (view?.status ?? data.thread.status) === 'succeeded' ? 'done' : 'failed'} />}
               {item.kind === 'person' && (item.mine

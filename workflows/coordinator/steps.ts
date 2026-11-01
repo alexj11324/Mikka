@@ -1,4 +1,5 @@
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
+import { runInvalidDetail } from '@/lib/run-invalid-reason'
 import { FatalError } from 'workflow'
 import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
 import { SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
@@ -54,7 +55,7 @@ import { systemActor } from '@/lib/activity-actor'
 // result is recorded, and a failure is retried. Tools return `{ error }` for
 // expected failures instead of throwing, so a bad id is not retried.
 
-type ToolResult<T> = T | { error: string }
+type ToolResult<T> = T | { error: string; reason?: string; detail?: string }
 
 export async function computerToolsEnabled() {
   'use step'
@@ -65,7 +66,12 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError || error instanceof FactoryError) return { error: error.code }
+    if (error instanceof ActionFailureError) {
+      // A refused run says why, so the Coordinator acts on the cause instead of guessing one.
+      const detail = error.code === 'runInvalid' ? runInvalidDetail(error.params?.reason) : undefined
+      return detail ? { error: error.code, reason: String(error.params!.reason), detail } : { error: error.code }
+    }
+    if (error instanceof FactoryError) return { error: error.code }
     throw error
   }
 }
@@ -115,9 +121,17 @@ export async function failTurn(userId: string, holder: string, error: string, bo
   await store.failTurn(userId, holder, error, botId)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false) {
   'use step'
-  return store.appendMessages(userId, holder, messages, warning, botId, streamId)
+  return store.appendMessages(userId, holder, messages, warning, botId, streamId, stopped)
+}
+
+/** What the model call cut short by 停止 had streamed in turn `streamId`, read back from this run's own stream (lib/coordinator/stop.ts). */
+export async function stoppedStepText(holder: string, streamId: string) {
+  'use step'
+  const { getRun } = await import('workflow/api')
+  const { stoppedStepText: read } = await import('@/lib/coordinator/stop')
+  return read(getRun(holder).getReadable<CoordinatorWorkflowStreamPart>(), streamId)
 }
 
 /**
@@ -345,7 +359,7 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
 }
 
 /** The run belongs to the bot that dispatched it, the Coordinator included, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return asToolResult(async () => {

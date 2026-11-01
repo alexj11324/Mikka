@@ -8,7 +8,7 @@ Three schedules keep the 建议 page and each person's profile current (R-21, R-
 | `0 * * * *` | `GET /mikka/api/cron/suggestions-reconcile` | Backfills events a webhook may have missed in the last 26 hours, and, in parallel, sweeps Factory monitor completions (see below) |
 | `30 * * * *` | `GET /mikka/api/cron/user-facts` | Merges the profile facts of everyone whose local time is past 04:00 and who has not been merged today |
 
-All three endpoints answer 503 without `CRON_SECRET`, 401 for a wrong bearer, and otherwise a JSON summary of counts (no personal data). Reconciliation also returns 503 when GitHub is unconfigured, or 502 when a source fails. Each stops starting new people after about 40–45 seconds; the next run picks up whoever is left.
+All three endpoints answer 503 without `CRON_SECRET`, 401 for a wrong bearer, and otherwise a JSON summary of counts (no personal data). Reconciliation also returns 503 when GitHub is unconfigured, or 502 when a source fails. A provider that refuses one person's own authorization (a revoked or expired token) is not a failed source: that person's app is skipped and counted under `reconnect`, and the run carries on with everyone else. Each stops starting new people after about 40–45 seconds; the next run picks up whoever is left.
 
 ## Daily briefing at 08:00 local time
 
