@@ -41,6 +41,8 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
       await seed('created', created, [['created', 'active']])
       await seed('suspended', suspended, [['suspended', 'suspended']])
       await seed('accepted', accepted, [['accepted', 'active']])
+      const regrown = uuidFrom('orvilo-default:regrown')
+      await seed('regrown', regrown, [['regrown', 'active'], ['peer', 'active']])
       await scoped.query(`INSERT INTO mikka_workspace_invitations VALUES ($1,$2,'accepted')`, [randomUUID(), accepted])
       const migration = await readFile(new URL('../drizzle/20261101002001_personal_workspace_kind.sql', import.meta.url), 'utf8')
       await scoped.query(migration)
@@ -48,9 +50,16 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
       const kinds = Object.fromEntries((await scoped.query('SELECT id,kind FROM mikka_workspaces')).rows.map(row => [row.id, row.kind]))
       assert.deepEqual(kinds, {
         [alone]: 'personal', [accepted]: 'personal',
-        [grown]: 'team', [inviting]: 'team', [created]: 'team', [suspended]: 'team',
+        [grown]: 'team', [inviting]: 'team', [created]: 'team', [suspended]: 'team', [regrown]: 'team',
       })
-      assert.equal((await scoped.query('SELECT count(*)::int AS n FROM mikka_workspaces')).rows[0].n, 6, 'no row added or removed')
+      assert.equal((await scoped.query('SELECT count(*)::int AS n FROM mikka_workspaces')).rows[0].n, 7, 'no row added or removed')
+      // A later re-run (the file was renamed): 'regrown' got a personal workspace lazily, then the peer
+      // left its default one. The default stays a team; the person keeps the personal one they have.
+      const lazy = randomUUID()
+      await scoped.query(`INSERT INTO mikka_workspaces (id,"userId",name,kind) VALUES ($1,'regrown','regrown','personal')`, [lazy])
+      await scoped.query(`DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"='peer'`, [regrown])
+      await scoped.query(migration)
+      assert.deepEqual((await scoped.query(`SELECT id,kind FROM mikka_workspaces WHERE "userId"='regrown' ORDER BY kind`)).rows, [{ id: lazy, kind: 'personal' }, { id: regrown, kind: 'team' }])
       await assert.rejects(scoped.query(`INSERT INTO mikka_workspaces (id,"userId",name,kind) VALUES ($1,'alone','x','personal')`, [randomUUID()]), { code: '23505' }, 'one personal workspace per person')
       await assert.rejects(scoped.query(`UPDATE mikka_workspaces SET kind='shared' WHERE id=$1`, [grown]), { code: '23514' })
     } finally {
