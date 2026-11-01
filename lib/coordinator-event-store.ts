@@ -6,7 +6,7 @@ import type { CoordinatorEventInput } from '@/lib/coordinator-events'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 
-type Executor = Pick<typeof db, 'insert'>
+type Executor = Pick<typeof db, 'insert' | 'execute'>
 
 /**
  * Writes the event once; a repeat with the same dedupe key is ignored. The
@@ -15,7 +15,8 @@ type Executor = Pick<typeof db, 'insert'>
  * the Coordinator lookup.
  */
 export async function recordCoordinatorEvent(executor: Executor, event: CoordinatorEventInput) {
-  await assertCredentialSafeChat(event.userId, event.payload)
+  // Read through the same executor: inside a transaction this keeps to its one connection.
+  await assertCredentialSafeChat(event.userId, event.payload, executor)
   await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey })
 }
 
