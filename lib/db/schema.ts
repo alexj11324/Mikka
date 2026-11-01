@@ -397,7 +397,7 @@ export const runPublications = pgTable('run_publications', {
   remoteUrl: text('remoteUrl').notNull(), remoteKey: text('remoteKey').notNull(),
   identifier: text('identifier'), branch: text('branch'), baseBranch: text('baseBranch'),
   pushApproved: boolean('pushApproved').notNull().default(false),
-  status: text('status').$type<'assigned' | 'pending' | 'processing' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
+  status: text('status').$type<'assigned' | 'pending' | 'processing' | 'awaiting_approval' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
   workflowRunId: text('workflowRunId'), leaseToken: uuid('leaseToken'), leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   attempts: integer('attempts').notNull().default(0),
   pullRequest: jsonb('pullRequest').$type<{ url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed' } | null>(),

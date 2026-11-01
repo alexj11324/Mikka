@@ -17,8 +17,11 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runFinishedEvent } from '@/lib/coordinator-events'
 import { publicationBranch, publicationGate, repositoryPushApproved } from '@/lib/run-publication-policy'
 import { linkedGitHubAccountId, saveRepositoryInstallation } from '@/lib/github/repository-installation'
-import { openRunPullRequest, PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/github/run-pull-request'
+import { githubRepository, openRunPullRequest, PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/github/run-pull-request'
 import { matchesRepositoryAdmission } from './repository-admission'
+import { explicitSetting } from '@/lib/app-tools'
+import { readWriteSettingLayers } from '@/lib/operations/write-setting-layers'
+import { PULL_REQUEST_DEFAULT, PULL_REQUEST_PERMISSION } from '@/lib/github/plugin-permissions'
 import { mayCompleteIssue } from './run-completion'
 import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects } from './run-completion-effects'
 
@@ -27,6 +30,8 @@ type Run = typeof agentRuns.$inferSelect
 type Publication = typeof runPublications.$inferSelect
 const LIVE = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']
 const TERMINAL_PUBLICATIONS = ['published', 'blocked', 'skipped']
+/** Where a publication workflow stops: settled, or waiting for the person's 创建 Pull Request card (deciding it starts a new one). */
+const WORKFLOW_DONE = [...TERMINAL_PUBLICATIONS, 'awaiting_approval']
 const PUBLICATION_LEASE_MS = 120_000
 const MAX_ATTEMPTS = 5
 
@@ -222,7 +227,7 @@ async function settlePublication(claim: Publication, result: { pullRequest?: Pub
  * external mutation. Workspace locks precede app locks, as team promotion
  * does; application locks always follow issue -> run -> publication. The
  * provider callback encloses only its existing eight-second HTTP write. */
-async function withPublicationAuthority<T>(claim: Publication, work: (value: { publication: Publication; run: Run; report: RunReport; allowCreate: boolean }) => Promise<T>): Promise<T> {
+async function withPublicationAuthority<T>(claim: Publication, work: (value: { publication: Publication; run: Run; report: RunReport; allowCreate: boolean; pullRequest: 'allow' | 'ask' | 'deny' }) => Promise<T>): Promise<T> {
   const [hint] = await db.select({ userId: issues.userId }).from(issues).where(eq(issues.id, claim.issueId)).limit(1)
   if (!hint) throw new PublicationError('issue_unavailable')
   const apply = (membershipHeld: boolean) => db.transaction(async tx => {
@@ -243,9 +248,15 @@ async function withPublicationAuthority<T>(claim: Publication, work: (value: { p
       workspaceId: admission.workspaceId, workspaceLinked: admission.workspaceLinked, requestEventId: admission.requestEventId,
     }) && await (await import('./run-admission-store')).acceptedEventStillMatches(admission, run.botId, tx)
     if (admission && !accepted) throw new PublicationError('publication_mismatch')
+    // 创建 Pull Request (Plugins › GitHub) for the run's own Coordinator or Bot.
+    // It narrows the repository push approval below, never replaces it. Read
+    // before that approval's share lock, which stays the last statement held
+    // through the provider write.
+    let pullRequest: 'allow' | 'ask' | 'deny'
+    try { pullRequest = explicitSetting(await readWriteSettingLayers(tx, claim.userId, run.botId), [PULL_REQUEST_PERMISSION]) ?? PULL_REQUEST_DEFAULT } catch { pullRequest = 'ask' }
     const [settings] = await tx.select().from(repositorySettings).where(and(eq(repositorySettings.userId, claim.userId), eq(repositorySettings.remoteKey, publication.remoteKey))).for('share')
     if (!publication.pushApproved || (!accepted && !repositoryPushApproved(settings?.push, claim.userId))) throw new PublicationError('push_not_approved')
-    return work({ publication, run, report, allowCreate: readIssueMetadata(task.content).pullRequests.length < 10 })
+    return work({ publication, run, report, allowCreate: readIssueMetadata(task.content).pullRequests.length < 10, pullRequest })
   })
   if (hint.userId === claim.userId) return apply(false)
   return workspaceDb.transaction(async workspace => {
@@ -263,14 +274,33 @@ export async function publishRunResult(runId: string, openPullRequest = openRunP
   const claim = await claimPublication(runId)
   if (!claim) {
     const [row] = await db.select({ status: runPublications.status }).from(runPublications).where(eq(runPublications.runId, runId))
-    return { done: !row || TERMINAL_PUBLICATIONS.includes(row.status) }
+    return { done: !row || WORKFLOW_DONE.includes(row.status) }
   }
   try {
-    const snapshot = await withPublicationAuthority(claim, async ({ publication, report, allowCreate }) => ({
+    const { decision, ...snapshot } = await withPublicationAuthority(claim, async ({ publication, report, allowCreate, pullRequest }) => ({
       remoteKey: publication.remoteKey, issueId: publication.issueId, identifier: publication.identifier!, title: publication.issueTitle!, summary: report.summary,
       branch: publication.branch!, commit: report.publish!.commit!, baseBranch: publication.baseBranch, draft: report.verify.status === 'not_run', allowCreate,
+      decision: pullRequest,
     }))
-    const pullRequest = await openPullRequest({ ...snapshot, githubAccountId: await linkedGitHubAccountId(claim.userId), onVerified: binding => saveRepositoryInstallation(claim.userId, claim.remoteKey, binding), withWrite: write => withPublicationAuthority(claim, async () => write()) })
+    if (decision === 'deny') throw new PublicationError('pull_request_denied')
+    // Asked: the person's answer on this run's card, or a new card. The branch
+    // stays pushed while the card waits; deciding it restarts this publication.
+    const approved = decision === 'allow' || await (async () => {
+      const { pullRequestApproval } = await import('@/lib/github/pull-request-approval')
+      const answer = await pullRequestApproval(claim.userId, { runId: claim.runId, repo: (({ owner, repo }) => `${owner}/${repo}`)(githubRepository(snapshot.remoteKey)), branch: snapshot.branch, title: snapshot.title.slice(0, 500) })
+      if (answer === 'declined') throw new PublicationError('pull_request_declined')
+      return answer === 'approved'
+    })()
+    if (!approved) {
+      await db.update(runPublications).set({ status: 'awaiting_approval', errorCode: null, leaseToken: null, leaseExpiresAt: null, updatedAt: new Date() }).where(and(eq(runPublications.runId, runId), eq(runPublications.leaseToken, claim.leaseToken!)))
+      return { done: true }
+    }
+    const pullRequest = await openPullRequest({ ...snapshot, githubAccountId: await linkedGitHubAccountId(claim.userId), onVerified: binding => saveRepositoryInstallation(claim.userId, claim.remoteKey, binding), withWrite: write => withPublicationAuthority(claim, async ({ pullRequest: current }) => {
+      // A setting changed since: deny wins at once; a newly asked one needs this run's card.
+      if (current === 'deny') throw new PublicationError('pull_request_denied')
+      if (current === 'ask' && decision !== 'ask') throw new PublicationError('pull_request_approval_changed', true)
+      return write()
+    }) })
     return { done: await settlePublication(claim, { pullRequest }) }
   } catch (error) {
     if (!(error instanceof PublicationError)) throw error
@@ -287,7 +317,7 @@ export async function failRunPublication(runId: string): Promise<{ done: boolean
   const claim = await claimPublication(runId)
   if (claim) return { done: await settlePublication(claim, { errorCode: 'github_unavailable' }) }
   const row = await publicationDelivery(runId)
-  return { done: !row || TERMINAL_PUBLICATIONS.includes(row.status) }
+  return { done: !row || WORKFLOW_DONE.includes(row.status) }
 }
 
 /** Lookup for Workflow launch/delivery. Never returns credentials or daemon report prose. */

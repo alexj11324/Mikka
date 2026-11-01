@@ -65,4 +65,20 @@ test('Plugins → GitHub connections are per Mikka user and leave the login iden
     assert.equal(await handleGitHubConnectCallback(new Request(callback, { headers: { cookie: `${cookie.name}=${cookie.value}` } })), null)
     assert.equal(await handleGitHubConnectCallback(new Request(`http://localhost${connection.GITHUB_CALLBACK_PATH}?code=abc&state=${state}`)), null)
   })
+
+  await t.test('a failed connect callback says why when it can: cancelled on GitHub, or another Mikka session', async () => {
+    const { cookie } = connection.startGitHubConnect(first)
+    const state = cookie.value.slice(0, cookie.value.indexOf('.'))
+    const headers = { cookie: `${cookie.name}=${cookie.value}` }
+    const reason = async (query: string) => {
+      const response = await handleGitHubConnectCallback(new Request(`http://localhost${connection.GITHUB_CALLBACK_PATH}?${query}&state=${state}`, { headers }))
+      const location = new URL(response!.headers.get('location')!)
+      assert.equal(location.searchParams.get('github'), 'link-failed')
+      return location.searchParams.get('reason')
+    }
+    assert.equal(await reason('error=access_denied'), 'cancelled')
+    assert.equal(await reason('error=temporarily_unavailable'), null)
+    // No Mikka session on the callback: the person who started is not the one returning.
+    assert.equal(await reason('code=abc'), 'account')
+  })
 })

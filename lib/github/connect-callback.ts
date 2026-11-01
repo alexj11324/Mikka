@@ -23,18 +23,20 @@ export async function handleGitHubConnectCallback(request: Request): Promise<Res
   if (url.pathname !== GITHUB_CALLBACK_PATH) return null
   const starter = githubConnectUser(url.searchParams.get('state'), cookieValue(request, GITHUB_CONNECT_COOKIE))
   if (!starter) return null
-  const done = (result: 'connected' | 'link-failed') => {
+  /** Why a link failed, when the callback can tell: cancelled on GitHub, or the Mikka account changed meanwhile. */
+  const done = (result: 'connected' | 'link-failed', reason?: 'cancelled' | 'account') => {
     const destination = new URL(GITHUB_PLUGIN_PATH, resolveAppOrigin(process.env) ?? url.origin)
     if (result === 'link-failed') destination.searchParams.set('github', 'link-failed')
+    if (result === 'link-failed' && reason) destination.searchParams.set('reason', reason)
     const response = NextResponse.redirect(destination)
     response.cookies.set(GITHUB_CONNECT_COOKIE, '', { httpOnly: true, sameSite: 'lax', secure: url.protocol === 'https:', path: GITHUB_CALLBACK_PATH, maxAge: 0 })
     return response
   }
   const code = url.searchParams.get('code')
-  if (!code || code.length > 512) return done('link-failed')
+  if (!code || code.length > 512) return done('link-failed', url.searchParams.get('error') === 'access_denied' ? 'cancelled' : undefined)
   try {
     const session = await auth.api.getSession({ headers: request.headers })
-    if (session?.user.id !== starter) return done('link-failed')
+    if (session?.user.id !== starter) return done('link-failed', 'account')
     await completeGitHubConnect(starter, code)
     return done('connected')
   } catch {
