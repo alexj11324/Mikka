@@ -47,6 +47,13 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
   assert.ok(!manifest.dependencies.tsx)
   assert.ok(Object.values(manifest.dependencies).every(version => !version.startsWith('workspace:')))
   for (const path of Object.values(manifest.exports)) assert.ok((await readFile(join(installed, path))).length > 0)
+  // Bundled code finds its helper scripts beside itself; each one must ship.
+  for (const entry of ['mikka.js', 'main.js', 'cli.js']) {
+    const code = await readFile(join(installed, entry), 'utf8')
+    for (const [, sibling] of code.matchAll(/new URL\(\s*["'](\.\/[\w./-]+)["']\s*,\s*import\.meta\.url\s*\)/g)) {
+      assert.ok((await readFile(join(installed, sibling))).length > 0, `${entry} needs ${sibling} in the package`)
+    }
+  }
   // Check actual npm resolution, including on case-insensitive filesystems:
   // every runtime dependency must resolve inside this fresh installation.
   const requireInstalled = createRequire(join(installed, 'package.json'))
