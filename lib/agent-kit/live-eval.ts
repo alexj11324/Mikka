@@ -1,4 +1,5 @@
 import 'server-only'
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { freezeHostedModelSelection, resolveFrozenHostedModel } from '@/lib/subscription-model-snapshot'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
 import { generateText, streamText, isStepCount } from 'ai'
@@ -33,7 +34,7 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
         return { text:testCase.expectedOutcome === 'answered' ? `Fixture response: ${testCase.mustMention.join(' ')}` : testCase.expectedOutcome === 'blocked' ? 'Cannot complete this task without the missing prerequisite.' : 'Awaiting approval.',outcome:testCase.expectedOutcome,tools:testCase.requiredTools.map(name => ({ name,outcome:testCase.expectedOutcome === 'blocked' ? 'error' : testCase.expectedOutcome === 'approval_required' ? 'approval_pending' : 'ok',authorized:false,effectPerformed:false })) }
       }
       const observations: ToolObservation[] = []
-      const registry = selectRegisteredTools(createCoordinatorRegistry(scope.ownerId,scope.botId,undefined,{ computerEnabled:process.env.MIKKA_CLOUD_COMPUTER_TASKS === '1' && process.env.MIKKA_BYOS_ENABLED === '1' }),definition.tools)
+      const registry = selectRegisteredTools(createCoordinatorRegistry(scope.ownerId,scope.botId,undefined,{ computerEnabled:cloudComputerTasksEnabled() && process.env.MIKKA_BYOS_ENABLED === '1' }),definition.tools)
       const tools = evaluationTools(registry,testCase,observations,definition)
       if (!job.execution) throw new AgentKitError('agentEvaluationSnapshotMissing')
       const frozenRuntime = job.execution.snapshot.runtime

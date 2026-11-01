@@ -1,3 +1,4 @@
+import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
 import { and, eq, isNull } from 'drizzle-orm'
@@ -160,7 +161,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   let taskEnv: Record<string, string> = {}
   let taskSecretNames: string[] = []
   if (device.kind === 'cloud') {
-    if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
+    if (!cloudComputerTasksEnabled() || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !subscription || subscription.workspaceId !== caller.scopeWorkspaceId || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
     // claim so a decrypt failure leaves the run queued. The injection helper returns an empty
     // assignment without an encryption key; platform versus BYO billing does not change it.
