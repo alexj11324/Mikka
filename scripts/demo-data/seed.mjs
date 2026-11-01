@@ -15,7 +15,7 @@
 // Every row id starts with de300000- (shared.mjs); cleanup.mjs removes exactly those.
 // Re-running replaces the previous demo rows of the account in one transaction.
 import { connect, countDemoRows, deleteDemoRows, demoId, findOwner, inTransaction, MAIN_TABLES, parseArgs, WORKSPACE_TABLES } from './shared.mjs'
-import { AGENTS, ARTIFACTS, BOT_MEMORY, BOT_THREADS, BOTS, DEVICES, FACTS, ISSUES, PEOPLE, PERSONAL_ISSUES, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG } from './content.mjs'
+import { AGENTS, ARTIFACTS, BOT_MEMORY, BOT_THREADS, BOTS, DEVICES, ISSUES, PEOPLE, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG } from './content.mjs'
 import { CHATS, GROUP } from './chats.mjs'
 import { createHash } from 'node:crypto'
 
@@ -51,7 +51,8 @@ function plan(owner) {
     return { kind: 'member', id: who.id, name: who.name, image: null }
   }
   const paragraph = text => ({ type: 'paragraph', content: [{ type: 'text', text }] })
-  const issueRows = [...ISSUES.map(issue => ({ ...issue, scope: 'workspace' })), ...PERSONAL_ISSUES.map(issue => ({ ...issue, scope: 'personal' }))].map((issue, index, all) => {
+  // Every task is a team task: personal and team workspaces never mix (decision 2026-11-01-2310).
+  const issueRows = ISSUES.map(issue => ({ ...issue, scope: 'workspace' })).map((issue, index, all) => {
     const metadata = {
       // No number: numbers come from the owner's counter ("user"."lastIssueNumber", advanced by a
       // trigger on insert), and demo rows must not move the account's real numbering.
@@ -123,9 +124,9 @@ function summary(p) {
       conversations: 1, conversation_members: p.group.members.length, conversation_messages: p.group.messages.length,
       issues: p.issueRows.length, issue_versions: p.issueRows.length, devices: p.devices.length, agents: p.agents.length, agent_runs: p.runs.length,
       run_chunks: p.runs.reduce((n, run) => n + run.chunks.length, 0), artifacts: p.artifacts.length, artifact_versions: versions,
-      user_facts: FACTS.length, suggestions: SUGGESTIONS.length,
+      suggestions: SUGGESTIONS.length,
     },
-    personal: { issues: PERSONAL_ISSUES.length, devices: p.devices.length, agents: p.agents.length, user_facts: FACTS.length, suggestions: SUGGESTIONS.length },
+    account: { devices: p.devices.length, agents: p.agents.length, suggestions: SUGGESTIONS.length },
   }
 }
 
@@ -195,12 +196,6 @@ async function writeMain(client, owner, p, workspaceId) {
   for (const member of group.members) await client.query('INSERT INTO conversation_members ("conversationId", "memberType", "memberId", role) VALUES ($1, $2, $3, $4)', [group.id, member.type, member.id, member.role])
   for (const message of group.messages) {
     await client.query('INSERT INTO conversation_messages (id, "conversationId", position, "authorType", "authorId", body, mentions, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [message.id, group.id, message.position, message.authorType, message.authorId, message.body, json(message.mentions), message.createdAt])
-  }
-  for (const fact of FACTS) {
-    const subjectKey = fact.subject.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').replace(/^[\s\p{P}\p{S}]+|[\s\p{P}\p{S}]+$/gu, '').trim()
-    // A real fact on the same subject wins; the demo one is then skipped.
-    await client.query('INSERT INTO user_facts (id, "userId", kind, subject, "subjectKey", value, evidence, confidence, "firstSeenAt", "lastSeenAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING',
-      [p.id(`fact:${fact.key}`), owner.id, fact.kind, fact.subject, subjectKey, json(fact.value), json([{ source: 'demo-data', at: ago(60 * 24 * 5).toISOString() }]), fact.confidence, ago(60 * 24 * 12), ago(60 * 24)])
   }
   for (const item of SUGGESTIONS) {
     const at = ago(item.hoursAgo * 60)
