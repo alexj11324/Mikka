@@ -19,7 +19,7 @@ test('新账号走完引导：起名、选外观，进入这个 Bot 的对话，
   await expect(guide.getByText('好的，以后我叫小满。')).toBeVisible({ timeout: 15000 })
   await expect(guide.getByText('开通云电脑后，我可以浏览网页，线程也能在云端运行。现在开通吗？')).toBeVisible({ timeout: 15000 })
   await guide.getByRole('button', { name: '暂不开通', exact: true }).click()
-  await expect(guide.getByText('好的。之后可以在设置中填写 E2B API Key 开通。')).toBeVisible({ timeout: 15000 })
+  await expect(guide.getByText('以后可以在设置里开通云电脑。')).toBeVisible({ timeout: 15000 })
 
   await guide.getByRole('button', { name: '进入 Mikka', exact: true }).click({ timeout: 20000 })
   await expect(guide).toHaveCount(0)
