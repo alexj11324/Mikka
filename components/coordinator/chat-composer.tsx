@@ -94,6 +94,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     const { key, shiftKey, metaKey, ctrlKey } = event
+    // Esc stops the reply, as the stop button does.
+    if (key === 'Escape' && stoppable && !event.nativeEvent.isComposing) { event.preventDefault(); onStop?.(); return }
     if (!sendsMessage({ key, shiftKey, metaKey, ctrlKey, isComposing: event.nativeEvent.isComposing }, sendKey)) return
     event.preventDefault()
     if (!sending && !submitDisabled && !disabled && value.trim()) onSubmit()

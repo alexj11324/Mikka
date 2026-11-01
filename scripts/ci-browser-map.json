@@ -27,6 +27,7 @@
     "computer-policy-settings.spec.ts",
     "coordinator-choice-card.spec.ts",
     "coordinator-scroll.spec.ts",
+    "coordinator-stop.spec.ts",
     "global-search-scope.spec.ts",
     "bot-list-groups.spec.ts",
     "group-chat-send.spec.ts",
@@ -229,6 +230,7 @@
         "thread-question.spec.ts",
         "coordinator-choice-card.spec.ts",
         "coordinator-scroll.spec.ts",
+        "coordinator-stop.spec.ts",
         "question-card.spec.ts",
         "bot-model-picker.spec.ts"
       ]

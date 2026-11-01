@@ -2784,6 +2784,7 @@
   },
   "Coordinator": {
     "stop": "Stop",
+    "stopped": "Stopped",
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
     "conversationWith": "Conversation with {name}",

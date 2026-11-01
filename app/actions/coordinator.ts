@@ -147,6 +147,16 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
   })
 }
 
+/** 停止 in a chat: the turn working there ends, keeping what its reply had said, marked 已停止. */
+export async function stopCoordinatorTurn(botId: string | null = null): Promise<ActionResult<{ stopped: boolean }>> {
+  return runAction(async () => {
+    const user = await getUser()
+    const bot = await ownBot(user, botId)
+    const { stopChatTurn } = await import('@/lib/coordinator/stop-turn')
+    return { stopped: await stopChatTurn(user.id, bot.id) }
+  })
+}
+
 /** 重试 on a failed reply: the same turn again, once per click; the chat shows its normal working state. */
 export async function retryCoordinatorTurn(botId: string | null = null): Promise<ActionResult<{ queued: boolean }>> {
   return runAction(async () => {
