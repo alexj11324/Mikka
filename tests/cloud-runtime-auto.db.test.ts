@@ -42,6 +42,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_bots WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM run_publications WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_bindings WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_connections WHERE "ownerId" = ANY($1)', [users])
@@ -97,6 +98,33 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [a.botId]), 1, 'no duplicate runtime')
     assert.equal(await count('SELECT count(*)::int AS n FROM byos_bindings WHERE "consumerId"=$1', [runtime[0].agentId]), 1, 'no duplicate binding')
     assert.equal(await count('SELECT count(*)::int AS n FROM cloud_machines WHERE "ownerId"=$1', [a.id]), 1)
+  })
+
+  await t.test('a cloud run pushes on the GitHub App grant like a local run; without it, or read-only, it cannot push', async () => {
+    const g = await person('cloud-grant')
+    const granted = await dispatch(g.id, g.issueId, g.botId) as unknown as { runId: string; status: string }
+    assert.equal(granted.status, 'queued', JSON.stringify(granted))
+    const admitted = (await pool.query(`SELECT r."agentDefinition",p.branch,p."pushApproved" FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d.kind='cloud'
+      LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1`, [granted.runId])).rows[0]
+    assert.equal(admitted.agentDefinition.repositoryAdmission.authority, 'github_app')
+    assert.equal(admitted.agentDefinition.repositoryAdmission.targetBranch, admitted.branch)
+    assert.equal(admitted.pushApproved, true)
+    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [granted.runId])
+
+    await pool.query('UPDATE github_repository_installations SET "pushGrantedAt"=null WHERE "userId"=$1', [g.id])
+    const ungranted = await dispatch(g.id, g.issueId, g.botId) as unknown as { runId: string; status: string }
+    assert.equal(ungranted.status, 'queued', 'a cloud run without the grant still runs; it just cannot push')
+    const plain = (await pool.query('SELECT r."agentDefinition",(SELECT count(*)::int FROM run_publications p WHERE p."runId"=r.id) AS publications FROM agent_runs r WHERE r.id=$1', [ungranted.runId])).rows[0]
+    assert.equal(plain.agentDefinition.repositoryAdmission, undefined)
+    assert.equal(plain.publications, 0)
+    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [ungranted.runId])
+
+    const readOnly = await steps.dispatchRun(g.id, { issueId: g.issueId, repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, g.botId) as unknown as { runId: string; status: string }
+    assert.equal(readOnly.status, 'queued')
+    const definition = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [readOnly.runId])).rows[0].agentDefinition
+    assert.equal(definition.readOnly, true)
+    assert.equal(definition.repositoryAdmission, undefined)
+    assert.equal(await count('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [g.id]), 0, 'no approval card')
   })
 
   await t.test('no E2B key of their own: no cloud runtime; the card, or the person\'s own auto-schedule device', async () => {

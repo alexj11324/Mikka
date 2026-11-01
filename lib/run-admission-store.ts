@@ -145,3 +145,4 @@ export async function acceptedEventStillMatches(admission: import('./repository-
   const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
   return Boolean(event?.deliveredAt && destination.success && destination.data.kind === 'device' && destination.data.deviceId === admission.deviceId)
 }
+

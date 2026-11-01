@@ -61,6 +61,13 @@ the same policy for fetching the previous task branch and pushing the next
 commit, with no force push. The run's GitHub token and the pull request check
 the App installation and the person's access on GitHub live.
 
+A cloud (E2B) run follows the same rule. Cloud dispatch checks GitHub live, and
+queueing gives the run a `github_app` receipt and an approved publication when
+the grant is recorded; claim prepares that publication before the lease and
+sends `allow`, with the run-scoped GitHub delivery. A cloud run without the
+grant still runs, with `git_push: deny`. No run, local or cloud, is ever sent
+`ask` for a push.
+
 A read-only run (`dispatch_run` with `readOnly: true`: an investigation or
 review that changes nothing) needs none of this, because it never pushes. Its
 frozen definition carries `readOnly`; it gets no admission receipt, no
