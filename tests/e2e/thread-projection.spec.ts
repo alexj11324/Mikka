@@ -49,6 +49,13 @@ test('the real events API projects the latest reply into owner-scoped thread lis
     expect(names.findIndex(name => name.includes(`Updated status ${marker}`))).toBeLessThan(names.findIndex(name => name.includes(`Recent reply ${marker}`)))
     await expect(panel.getByText(`MCP dispatch ${marker}`, { exact: true })).toBeVisible()
     await expect(panel.getByText(`Foreign private ${marker}`, { exact: true })).toHaveCount(0)
+    // The header's search filters this column in place (R-50), not the global ⌘K.
+    await panel.getByRole('button', { name: '搜索', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await panel.getByRole('textbox', { name: '搜索', exact: true }).fill(`MCP dispatch ${marker}`)
+    await expect(panel.getByRole('region', { name: '进行中（1）', exact: true }).getByRole('listitem')).toHaveCount(1)
+    await panel.getByRole('textbox', { name: '搜索', exact: true }).press('Escape')
+    await expect(running.getByRole('listitem')).toHaveCount(3)
     await page.screenshot({ path: testInfo.outputPath('thread-projection.png') })
   } finally {
     // Revoke this synthetic test token without deleting its audit row or data.
