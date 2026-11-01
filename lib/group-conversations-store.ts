@@ -2,14 +2,16 @@ import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { enqueueGroupTurn } from './coordinator/group-turns'
+import { groupParticipants, type GroupParticipant } from './group-participants'
 
-const member = z.object({ memberType: z.enum(['user', 'agent']), memberId: z.string().min(1).max(256) }).strict()
-const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional() }).strict()
-const configure = z.object({ leadAgentId: z.uuid().nullable() }).strict()
+const member = z.object({ memberType: z.enum(['user', 'agent', 'bot']), memberId: z.string().min(1).max(256) }).strict()
+const create = z.object({ workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional(), leadBotId: z.uuid().nullable().optional() }).strict().refine(input => !input.leadAgentId || !input.leadBotId)
+const configure = z.union([z.object({ leadAgentId: z.uuid().nullable() }).strict(), z.object({ leadBotId: z.uuid().nullable() }).strict()])
 const message = z.object({ body: z.string().trim().min(1).max(32000), mentions: z.array(member).max(100).default([]), replyToId: z.uuid().nullable().optional() }).strict()
+const read = z.object({ messageId: z.string().min(1).max(64) }).strict()
 export type Member = z.infer<typeof member>
 export type Directory = (workspaceId: string, userId: string, members: Member[]) => Promise<boolean>
-export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; limit?: string | null; workspaceId?: string | null }
+export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members' | 'read' | 'links'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; limit?: string | null; workspaceId?: string | null }
 class Failure extends Error { constructor(readonly status: number) { super(String(status)) } }
 const fail = (status: number): never => { throw new Failure(status) }
 function parse<T>(schema: z.ZodType<T>, body?: string): T {
@@ -33,7 +35,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
   try {
     const userId = req.userId
     if (!userId) return fail(401)
-    if (req.method !== 'GET' && req.origin) {
+    if ((req.method !== 'GET' || req.resource === 'read' || req.resource === 'links') && req.origin) {
       let origin: URL
       try { origin = new URL(req.origin) } catch { return fail(403) }
       if (!['https:', 'http:'].includes(origin.protocol) || origin.host !== req.host) return fail(403)
@@ -48,12 +50,14 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       const input = parse(create, req.body)
       if (!await directory(input.workspaceId, userId, input.members)) return fail(404)
       if (input.leadAgentId && (!queueAgents || !input.members.some(m => m.memberType === 'agent' && m.memberId === input.leadAgentId))) return fail(422)
+      if (input.leadBotId && (!queueAgents || !input.members.some(m => m.memberType === 'bot' && m.memberId === input.leadBotId))) return fail(422)
       const id = randomUUID()
       await q('INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy") VALUES ($1,$2,\'group\',$3,$4)', [id, input.workspaceId, input.title, userId])
       await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,\'user\',$2,\'owner\')', [id, userId])
       for (const m of input.members) await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,\'member\') ON CONFLICT DO NOTHING', [id, m.memberType, m.memberId])
       if (queueAgents && input.leadAgentId) await q('UPDATE conversations SET "leadAgentId"=$2 WHERE id=$1', [id, input.leadAgentId])
-      result = { id, title: input.title, ...(queueAgents ? { leadAgentId: input.leadAgentId ?? null } : {}) }; status = 201
+      if (queueAgents && input.leadBotId) await q('UPDATE conversations SET "leadBotId"=$2 WHERE id=$1', [id, input.leadBotId])
+      result = { id, title: input.title, ...(queueAgents ? { leadAgentId: input.leadAgentId ?? null, leadBotId: input.leadBotId ?? null } : {}) }; status = 201
     } else if (req.resource === 'conversations' && req.method === 'GET') {
       if (req.workspaceId && (!z.uuid().safeParse(req.workspaceId).success || !await directory(req.workspaceId, userId, []))) return fail(404)
       const { rows } = await q(`SELECT c.*, last.message AS "lastMessage",
@@ -67,25 +71,68 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       for (const row of rows) if (await directory(row.workspaceId, userId, [])) accessible.push(row)
       result = { conversations: accessible }
     } else {
+      // A link is a bounded view granted by its source group, never membership
+      // in the private DM. Locate the group before taking the normal group lock.
+      let groupId = req.id
+      if (req.resource === 'links') {
+        const { rows: [link] } = await q('SELECT "sourceConversationId" FROM conversation_links WHERE id=$1', [req.id])
+        if (!link) return fail(404)
+        groupId = link.sourceConversationId
+      }
       // Acquire the serialization lock before reading membership in a new statement.
       // A joined SELECT FOR UPDATE can retain a pre-wait membership snapshot.
-      const { rows: groups } = await q(`SELECT * FROM conversations WHERE id=$1 AND kind='group' FOR UPDATE`, [req.id])
+      const { rows: groups } = await q(`SELECT * FROM conversations WHERE id=$1 AND kind='group' FOR UPDATE`, [groupId])
       const group = groups[0]
-      const { rows: memberships } = await q(`SELECT role FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [req.id, userId])
+      const { rows: memberships } = await q(`SELECT role FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [groupId, userId])
       if (!group || !memberships.length || !await directory(group.workspaceId, userId, [])) return fail(404)
       group.role = memberships[0].role
-      if (req.resource === 'conversations' && req.method === 'PATCH') {
+      if (req.resource === 'links' && req.method === 'GET') {
+        const { rows: [link] } = await q(`SELECT l."linkedConversationId",l."firstPosition"::text,l."lastPosition"::text,l."messageCount"::text
+          FROM conversation_links l JOIN conversations dm ON dm.id=l."linkedConversationId"
+          WHERE l.id=$1 AND l."sourceConversationId"=$2 AND dm.kind='agent_dm' AND dm."workspaceId"=$3 AND dm."createdBy"=$4
+          FOR SHARE OF l,dm`, [req.id, group.id, group.workspaceId, group.createdBy])
+        if (!link) return fail(404)
+        const participants = await groupParticipants(client, link.linkedConversationId, group.createdBy, group.workspaceId)
+        if (participants.length !== 2) return fail(404)
+        const before = req.before == null ? null : decimal(req.before, '')
+        const limit = Number(decimal(req.limit, '50'))
+        if (limit > 100) return fail(422)
+        const { rows } = await q(`SELECT id,position::text,body,"authorId","authorType","createdAt" FROM conversation_messages
+          WHERE "conversationId"=$1 AND position BETWEEN $2::bigint AND $3::bigint
+            AND ($4::bigint IS NULL OR position<$4) AND ("authorType" || ':' || "authorId")=ANY($5::text[])
+          ORDER BY position DESC LIMIT $6`, [link.linkedConversationId, link.firstPosition, link.lastPosition, before, participants.map(m => `${m.memberType ?? 'agent'}:${m.id}`), limit + 1])
+        const messages = rows.slice(0, limit).map(m => ({ id: m.id, position: m.position, body: m.body, createdAt: m.createdAt, author: participants.find(p => p.id === m.authorId && (p.memberType ?? 'agent') === m.authorType)! }))
+        result = { linkId: req.id, sourceConversationId: group.id, firstPosition: link.firstPosition, lastPosition: link.lastPosition, messageCount: link.messageCount, participants, messages, nextBefore: rows.length > limit ? messages.at(-1)?.position : null }
+      } else if (req.resource === 'read' && ['GET', 'POST'].includes(req.method)) {
+        if (req.method === 'POST') {
+          const input = parse(read, req.body)
+          const byId = z.uuid().safeParse(input.messageId).success
+          const value = byId ? input.messageId : decimal(input.messageId, '')
+          const { rows: messages } = await q(`SELECT id,position FROM conversation_messages WHERE "conversationId"=$1 AND ${byId ? 'id=$2::uuid' : 'position=$2::bigint'}`, [req.id, value])
+          const selected = messages[0]
+          if (!selected || BigInt(selected.position) > BigInt(2147483647)) return fail(422)
+          await q(`INSERT INTO conversation_reads AS r ("userId","conversationId","lastReadPosition","lastReadMessageId","updatedAt") VALUES ($1,$2,$3,$4,now())
+            ON CONFLICT ("userId","conversationId") DO UPDATE SET
+              "lastReadPosition"=GREATEST(r."lastReadPosition",EXCLUDED."lastReadPosition"),
+              "lastReadMessageId"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."lastReadMessageId" ELSE r."lastReadMessageId" END,
+              "updatedAt"=CASE WHEN EXCLUDED."lastReadPosition">r."lastReadPosition" THEN EXCLUDED."updatedAt" ELSE r."updatedAt" END`, [userId, req.id, selected.position, selected.id])
+        }
+        const { rows: [state] } = await q(`SELECT "lastReadPosition","lastReadMessageId" FROM conversation_reads WHERE "userId"=$1 AND "conversationId"=$2`, [userId, req.id])
+        const { rows: [unread] } = await q(`SELECT count(*)::text AS n FROM conversation_messages WHERE "conversationId"=$1 AND position>$2 AND NOT ("authorType"='user' AND "authorId"=$3)`, [req.id, state?.lastReadPosition ?? 0, userId])
+        result = { lastReadMessageId: state?.lastReadMessageId ?? null, lastReadPosition: state ? Number(state.lastReadPosition) : null, unreadCount: Number(unread.n) }
+      } else if (req.resource === 'conversations' && req.method === 'PATCH') {
         if (group.role !== 'owner' || group.createdBy !== userId) return fail(403)
         if (!queueAgents) return fail(405)
         const input = parse(configure, req.body)
-        if (input.leadAgentId) {
-          const selected = { memberType: 'agent' as const, memberId: input.leadAgentId }
+        const bot = 'leadBotId' in input, id = bot ? input.leadBotId : input.leadAgentId
+        if (id) {
+          const selected: Member = { memberType: bot ? 'bot' : 'agent', memberId: id }
           if (!await directory(group.workspaceId, group.createdBy, [selected])) return fail(422)
-          const { rowCount } = await q(`SELECT 1 FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='agent' AND "memberId"=$2 AND "leftAt" IS NULL`, [req.id, input.leadAgentId])
+          const { rowCount } = await q(`SELECT 1 FROM conversation_members WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3 AND "leftAt" IS NULL`, [req.id, selected.memberType, id])
           if (!rowCount) return fail(422)
         }
-        await q('UPDATE conversations SET "leadAgentId"=$2 WHERE id=$1', [req.id, input.leadAgentId])
-        result = { id: req.id, leadAgentId: input.leadAgentId }
+        await q('UPDATE conversations SET "leadAgentId"=$2,"leadBotId"=$3 WHERE id=$1', [req.id, bot ? null : id, bot ? id : null])
+        result = { id: req.id, leadAgentId: bot ? null : id, leadBotId: bot ? id : null }
       } else if (req.resource === 'messages' && req.method === 'GET') {
         const before = req.before == null ? null : decimal(req.before, '')
         const limit = Number(decimal(req.limit, '50'))
@@ -93,10 +140,27 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const { rows } = await q('SELECT * FROM conversation_messages WHERE "conversationId"=$1 AND ($2::bigint IS NULL OR position < $2) ORDER BY position DESC LIMIT $3', [req.id, before, limit + 1])
         const more = rows.length > limit
         const messages = rows.slice(0, limit)
-        const active = queueAgents ? await q(`SELECT "agentId",status,"updatedAt" FROM group_turns WHERE "conversationId"=$1 AND status IN ('queued','running') ORDER BY "createdAt" LIMIT 1`, [req.id]) : { rows: [] }
+        // Read existing links only; this is not the private-exchange producer.
+        // Links share their source message's page/cursor. They add no message
+        // position or unread event, and never expose the private DM transcript.
+        const links = messages.length ? await q(`SELECT l.id AS "linkId",l."linkedConversationId",l."anchorPosition"::text,l."messageCount"::text AS count
+          FROM conversation_links l JOIN conversations dm ON dm.id=l."linkedConversationId"
+          WHERE l."sourceConversationId"=$1 AND l."anchorPosition"=ANY($2::bigint[])
+            AND dm.kind='agent_dm' AND dm."workspaceId"=$4 AND dm."createdBy"=$3
+          ORDER BY l."anchorPosition" DESC,l.id`, [group.id, messages.map(m => m.position), group.createdBy, group.workspaceId]) : { rows: [] }
+        const exchanges: { type: 'agent_exchange'; linkId: string; anchorPosition: string; count: string; participants: GroupParticipant[] }[] = []
+        for (const link of links.rows) {
+          const participants = await groupParticipants(client, link.linkedConversationId, group.createdBy, group.workspaceId)
+          if (participants.length === 2) exchanges.push({ type: 'agent_exchange', linkId: link.linkId, anchorPosition: link.anchorPosition, count: link.count, participants })
+        }
+        const timeline = messages.flatMap(m => [
+          { type: 'message', ...m },
+          ...exchanges.filter(link => link.anchorPosition === m.position),
+        ])
+        const active = queueAgents ? await q(`SELECT "agentId","botId",status,"updatedAt" FROM group_turns WHERE "conversationId"=$1 AND status IN ('queued','running') ORDER BY "createdAt" LIMIT 1`, [req.id]) : { rows: [] }
         const failed = queueAgents ? await q(`SELECT error FROM group_turns WHERE "conversationId"=$1 ORDER BY "createdAt" DESC,"messageId" DESC LIMIT 1`, [req.id]) : { rows: [] }
-        result = { messages, nextBefore: more ? messages.at(-1)?.position : null, agentStatus: active.rows[0] ?? null,
-          ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, routingError: ['group_judgment_pending','group_lead_required'].includes(failed.rows[0]?.error) ? { code: 'group_judgment_pending' } : null } : {}) }
+        result = { messages, timeline, nextBefore: more ? messages.at(-1)?.position : null, agentStatus: active.rows[0] ?? null,
+          ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, leadBotId: group.leadBotId ?? null, routingError: ['group_judgment_pending','group_lead_required'].includes(failed.rows[0]?.error) ? { code: 'group_judgment_pending' } : null } : {}) }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
         // Group-selected agents belong to the creator, not necessarily this sender.
@@ -116,6 +180,13 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const { rows } = await q('INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body,mentions,"replyToId") VALUES ($1,$2,$3,\'user\',$4,$5,$6,$7) RETURNING *', [id, req.id, position, userId, input.body, JSON.stringify(input.mentions), input.replyToId ?? null])
         if (queueAgents) await enqueueGroupTurn(client, req.id!, id, userId)
         result = rows[0]; status = 201
+      } else if (req.resource === 'members' && req.method === 'GET') {
+        const participants = await groupParticipants(client, group.id, group.createdBy, group.workspaceId)
+        const users = (await q(`SELECT cm."memberId" AS id,u.name,u.image AS "avatarUrl",cm.role FROM conversation_members cm JOIN "user" u ON u.id=cm."memberId"
+          WHERE cm."conversationId"=$1 AND cm."memberType"='user' AND cm."leftAt" IS NULL ORDER BY cm."joinedAt",cm."memberId"`, [group.id])).rows
+        const visibleUsers = []
+        for (const user of users) if (await directory(group.workspaceId, user.id, [])) visibleUsers.push({ ...user, memberType: 'user' })
+        result = { members: [...visibleUsers, ...participants.map(p => ({ ...p, memberType: p.memberType ?? 'agent' }))] }
       } else if (req.resource === 'members' && ['POST', 'DELETE'].includes(req.method)) {
         if (group.role !== 'owner') return fail(403)
         const input = parse(member, req.body)
@@ -129,6 +200,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           if (!rows.length) return fail(404)
           if (rows[0].role === 'owner') return fail(422)
           if (queueAgents && input.memberType === 'agent') await q('UPDATE conversations SET "leadAgentId"=NULL WHERE id=$1 AND "leadAgentId"=$2', [req.id, input.memberId])
+          if (queueAgents && input.memberType === 'bot') await q('UPDATE conversations SET "leadBotId"=NULL WHERE id=$1 AND "leadBotId"=$2', [req.id, input.memberId])
           await q('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3', [req.id, input.memberType, input.memberId])
         }
         result = { ok: true }

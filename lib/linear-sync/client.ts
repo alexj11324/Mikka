@@ -63,6 +63,22 @@ export async function linearIssue(token: string, id: string): Promise<LinearIssu
   return data.issue ? { ...data.issue, labels: data.issue.labels.nodes } : null
 }
 
+/** Minimal readback for retiring a previously verified external target. */
+export async function linearIssueArchiveState(token: string, id: string) {
+  const data = await linearGraphQL<{ issue: { id: string; archivedAt: string | null; team: { id: string } } | null }>(token, `query MikkaLinearArchiveState($id: String!) {
+    issue(id: $id) { id archivedAt team { id } }
+  }`, { id })
+  return data.issue
+}
+
+export async function archiveLinearIssue(token: string, id: string, beforeWrite: () => Promise<void>) {
+  await beforeWrite()
+  const data = await linearGraphQL<{ issueArchive: { success: boolean } }>(token, `mutation MikkaLinearArchiveIssue($id: String!) {
+    issueArchive(id: $id) { success }
+  }`, { id })
+  if (data.issueArchive?.success !== true) throw new Error('Linear archive outcome is unconfirmed')
+}
+
 export async function findLinearUserByEmail(token: string, email: string) {
   let after: string | null = null
   do {

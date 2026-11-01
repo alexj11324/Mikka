@@ -8,6 +8,15 @@ type PausedRequest = {
   responseErrorReason?: string
 }
 export type LocalImageFixture = Readonly<{ url: string; body: Uint8Array }>
+type FailurePhase = 'lease' | 'cdp-continue' | 'cdp-fulfill' | 'cdp-abort' | 'route-continue' | 'route-fulfill' | 'route-abort' | 'detach' | 'setup'
+export type OriginFenceFailure = { phase: FailurePhase; category: 'invalid-interception' | 'target-closed' | 'unknown' }
+
+function failureCategory(error: unknown): OriginFenceFailure['category'] {
+  const message = error instanceof Error ? error.message : ''
+  if (/\bInvalid InterceptionId\.?$/.test(message)) return 'invalid-interception'
+  if (/Target page, context or browser has been closed|Session closed|Target closed/.test(message)) return 'target-closed'
+  return 'unknown'
+}
 
 function imageResponses(fixtures: readonly LocalImageFixture[]) {
   if (fixtures.length > 4) throw new Error('TEST_ACCOUNT_INVALID_IMAGE_FIXTURE')
@@ -44,10 +53,11 @@ export async function installAccountOriginFence(
   // A refusal decision, not successful transport completion. Announce it
   // before abort can emit a browser error; failed aborts still call onFailure.
   onBlocked: () => void,
-  onFailure: () => void,
+  onFailure: (failure?: OriginFenceFailure) => void,
   localImages: readonly LocalImageFixture[] = [],
 ) {
   const localImage = imageResponses(localImages)
+  const reportFailure = (phase: FailurePhase, error?: unknown) => onFailure({ phase, category: failureCategory(error) })
   const sessions = new WeakMap<Page, { ready: Promise<void>; active: boolean }>()
   const closingPages = new WeakSet<Page>()
   let closing = false
@@ -84,34 +94,48 @@ export async function installAccountOriginFence(
       session.on('close', () => {
         entry.active = false
         if (!closing && !closingPages.has(page) && !page.isClosed() && !context.isClosed()) {
-          onFailure()
+          reportFailure('detach')
           void context.close().catch(() => {})
         }
       })
       session.on('Fetch.requestPaused', (event: PausedRequest) => {
         void (async () => {
+          let phase: FailurePhase = 'lease'
+          const continueRequest = async () => {
+            phase = 'cdp-continue'
+            try { await session.send('Fetch.continueRequest', { requestId: event.requestId }) }
+            catch (error) {
+              // Chromium drops the interception of a request canceled while its
+              // lease check awaits: by script, page close or a navigation such as
+              // reload. Navigation cancels often emit no Network event, so none
+              // can confirm them. Nothing was released and nothing left the
+              // browser, so this one outcome is not a fence failure.
+              if (failureCategory(error) !== 'invalid-interception') throw error
+            }
+          }
           try {
             await scope.assertActive()
             // A route-aborted request also emits a response-stage failure.
             // Propagate that existing failure; it is not another outgoing hop.
             if (event.responseErrorReason !== undefined) {
-              await session.send('Fetch.continueRequest', { requestId: event.requestId })
+              await continueRequest()
               return
             }
             const image = localImage(event.request.url, event.request.method, event.resourceType)
             if (image) {
+              phase = 'cdp-fulfill'
               await session.send('Fetch.fulfillRequest', { requestId: event.requestId, responseCode: 200,
                 responseHeaders: [{ name: 'Content-Type', value: 'image/png' }, { name: 'Cache-Control', value: 'no-store' }],
                 body: image.toString('base64') })
               return
             }
-            if (!sameOrigin(event.request.url, origin)) { onBlocked(); await abort(session, event.requestId); return }
-            await session.send('Fetch.continueRequest', { requestId: event.requestId })
-          } catch {
+            if (!sameOrigin(event.request.url, origin)) { onBlocked(); phase = 'cdp-abort'; await abort(session, event.requestId); return }
+            await continueRequest()
+          } catch (error) {
             await abort(session, event.requestId).catch(() => {})
             // Lease loss already closes contexts through the runner callback;
             // an interception failure must also make the fixture fail closed.
-            if (!context.isClosed()) { onFailure(); await context.close().catch(() => {}) }
+            if (!context.isClosed()) { reportFailure(phase, error); await context.close().catch(() => {}) }
           }
         })()
       })
@@ -121,11 +145,12 @@ export async function installAccountOriginFence(
     return entry.ready
   }
   const firstRequest = async (route: Route) => {
+    let phase: FailurePhase = 'lease'
     try {
       await scope.assertActive()
       const request = route.request()
       const image = localImage(request.url(), request.method(), request.resourceType())
-      if (!image && !sameOrigin(request.url(), origin)) { onBlocked(); await route.abort('blockedbyclient'); return }
+      if (!image && !sameOrigin(request.url(), origin)) { onBlocked(); phase = 'route-abort'; await route.abort('blockedbyclient'); return }
       // An initial request needs an already installed Page request gate.
       // Initial popup navigation can precede Page creation. Waiting for 'page'
       // here deadlocks; allowing it would release an unprotected redirect.
@@ -133,6 +158,7 @@ export async function installAccountOriginFence(
       let page: Page
       try { page = route.request().frame().page() } catch {
         onBlocked()
+        phase = 'route-abort'
         await route.abort('blockedbyclient')
         return
       }
@@ -141,18 +167,21 @@ export async function installAccountOriginFence(
       // any earlier navigation is rejected rather than lazily allowed.
       if (!sessions.get(page)?.active) {
         onBlocked()
+        phase = 'route-abort'
         await route.abort('blockedbyclient')
         return
       }
       await scope.assertActive()
       if (image) {
+        phase = 'route-fulfill'
         await route.fulfill({ status: 200, contentType: 'image/png', headers: { 'cache-control': 'no-store' }, body: image })
         return
       }
+      phase = 'route-continue'
       await route.continue()
-    } catch {
+    } catch (error) {
       await route.abort('blockedbyclient').catch(() => {})
-      if (!context.isClosed()) { onFailure(); await context.close().catch(() => {}) }
+      if (!context.isClosed()) { reportFailure(phase, error); await context.close().catch(() => {}) }
     }
   }
   await context.route('**/*', firstRequest)
@@ -161,8 +190,8 @@ export async function installAccountOriginFence(
     configurable: true,
     value: async () => {
       const page = await originalNewPage()
-      try { await protect(page); return page } catch {
-        onFailure()
+      try { await protect(page); return page } catch (error) {
+        reportFailure('setup', error)
         await context.close().catch(() => {})
         throw new Error('TEST_ACCOUNT_ORIGIN_FENCE_FAILED')
       }

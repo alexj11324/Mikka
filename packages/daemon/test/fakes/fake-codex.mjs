@@ -70,12 +70,20 @@ async function runTurn(text) {
     threadId,
     turn: { id: open, status: "inProgress", error: null },
   })
-  if (text === 'MCP_ELICITATION_TEST' || text === 'MIKKA_ELICITATION_TEST') {
+  if (text === 'TOOL_PROGRESS_TEST') {
+    notify('item/commandExecution/outputDelta', { threadId: 'foreign-thread', turnId: open, delta: 'ignored' })
+    notify('item/commandExecution/outputDelta', { threadId, turnId: 'stale-turn', delta: 'ignored' })
+    notify('item/commandExecution/outputDelta', { threadId, turnId: open, delta: '' })
+    notify('item/commandExecution/outputDelta', { threadId, turnId: open, delta: 'CI still pending' })
+    complete()
+    return
+  }
+  if (['MCP_ELICITATION_TEST', 'MIKKA_ELICITATION_TEST', 'MIKKA_CONTEXT_ELICITATION_TEST', 'MIKKA_UNKNOWN_ELICITATION_TEST'].includes(text)) {
     // Synthetic native protocol coverage only. The official-CLI acceptance
     // test separately proves actual MCP execution and the broker transport.
-    const handIn = text === 'MIKKA_ELICITATION_TEST'
+    const handIn = text !== 'MCP_ELICITATION_TEST'
     const server = handIn ? 'mikka' : 'mikka_computer'
-    const call = { type: 'mcpToolCall', id: 'computer-elicitation', server, tool: handIn ? 'submit' : 'get_desktop_state', arguments: {}, status: 'inProgress' }
+    const call = { type: 'mcpToolCall', id: 'computer-elicitation', server, tool: text === 'MIKKA_CONTEXT_ELICITATION_TEST' ? 'request_help' : text === 'MIKKA_UNKNOWN_ELICITATION_TEST' ? 'arbitrary_tool' : handIn ? 'submit' : 'get_desktop_state', arguments: {}, status: 'inProgress' }
     item('started', call)
     const request = (overrides = {}) => new Promise(resolve => {
       const wireId = `elicitation-${randomUUID()}`

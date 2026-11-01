@@ -23,13 +23,36 @@ const SIGNATURES: Record<string, string[]> = {
   BeApproval: ['title', 'description', 'context'],
   BeFollowUps: ['items'],
   BeButton: ['label', 'action', 'variant'],
+  BeCardGrid: ['children'],
+  BeImageCard: ['title', 'query', 'description', 'tags', 'prompt'],
+  BeImage: ['query', 'alt', 'caption'],
   TaskChip: ['id'],
   RunChip: ['id'],
   SourceChip: ['url', 'label'],
 }
 
-/** Whether a reply is OpenUI rather than Markdown; the same test the web's chat uses. */
-export const isOpenUI = (text: string) => /^\s*root\s*=/.test(text)
+/** Image search words the server accepts (agentImageQuery in lib/agent-images.ts): 2–160 characters, no line breaks, tags or links. */
+export function isImageQuery(query: string) {
+  const value = query.trim()
+  return value.length >= 2 && value.length <= 160 && !/[\r\n<>]/.test(value) && !/https?:\/\//i.test(value)
+}
+
+/**
+ * Where a reply's OpenUI starts: the first line that assigns `root`, outside a
+ * fenced code block, as the web's chat finds it (lib/agent-ui-source.ts).
+ * Words the bot wrote before it are its prose, shown above the cards.
+ */
+export function splitOpenUI(text: string): { prose: string; source: string } | null {
+  const match = /(^|\n)[ \t]*root[ \t]*=/.exec(text)
+  if (!match) return null
+  const at = match.index + match[1].length
+  const before = text.slice(0, at)
+  if ((before.match(/(^|\n)[ \t]*(```|~~~)/g) ?? []).length % 2) return null
+  return { prose: before.trim(), source: text.slice(at) }
+}
+
+/** Whether a reply is OpenUI rather than Markdown. */
+export const isOpenUI = (text: string) => splitOpenUI(text) !== null
 
 class Reader {
   i = 0
@@ -147,9 +170,10 @@ export function isComponent(value: Value | undefined): value is Component {
 
 /** The card tree of an OpenUI reply, or null when it does not parse (the caller falls back to its text). */
 export function parseOpenUI(text: string): Value | null {
-  if (!isOpenUI(text)) return null
+  const split = splitOpenUI(text)
+  if (!split) return null
   try {
-    const reader = new Reader(text)
+    const reader = new Reader(split.source)
     const statements = new Map<string, Value>()
     while (reader.peek() !== undefined) {
       const name = reader.identifier()
@@ -221,6 +245,9 @@ export function openUIText(value: Value | undefined): string {
         }
         return
       case 'BeButton': walk(node.props.label); return
+      // The image search words are English for the lookup, not for the person.
+      case 'BeImageCard': walk(node.props.title); walk(node.props.description); return
+      case 'BeImage': walk(node.props.caption); return
       case 'TaskChip': case 'RunChip': case 'SourceChip': lines.push(inlineMarkdown(node)); return
       default:
         // An unknown card: its strings, positional or named (title, text, description…), in order.

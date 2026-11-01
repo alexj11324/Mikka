@@ -110,16 +110,20 @@ const manifest = [
   { ...base, stage: 'verify', kind: 'screenshot', artifact: `run-capture:${shot3}`, captureId: shot3, title: 'Lighthouse 移动端', contentType: 'image/png', size: 1, durationMs: null },
 ]
 const criteria = [
-  { criterionId: 'k1', text: '首页 2 秒内可交互（4G）', passed: true, evidence: `run-capture:${shot1} run-capture:${clip} ${log}` },
+  // #541: the verify agent names the command that checked this criterion; it wins over the run's.
+  { criterionId: 'k1', text: '首页 2 秒内可交互（4G）', passed: true, evidence: `run-capture:${shot1} run-capture:${clip} ${log}`, command: 'pnpm e2e home-cls', exitCode: 0 },
   { criterionId: 'k2', text: '首屏图片懒加载后无布局跳动', passed: true, evidence: `run-capture:${shot2}` },
   { criterionId: 'k3', text: 'Lighthouse 性能分 ≥ 90', passed: true, evidence: `run-capture:${shot3}` },
 ]
 const figma = (candidateId: string): Detail => ({
   checks: [
     { attemptId: randomUUID(), stage: 'review', status: 'passed', candidateId, candidateSha: sha, runId: randomUUID(), independent: true, criteria: [], verify: null },
-    { attemptId: randomUUID(), stage: 'verify', status: 'passed', candidateId, candidateSha: sha, runId: 'verify-run', independent: true, criteria, verify: { status: 'passed', command: 'pnpm e2e home-cls', exitCode: 0 } },
+    { attemptId: randomUUID(), stage: 'verify', status: 'passed', candidateId, candidateSha: sha, runId: 'verify-run', independent: true, criteria, verify: { status: 'passed', command: 'pnpm verify', exitCode: 0 } },
   ],
-  delivery: { candidateSha: sha, pullRequest: { url: 'https://github.com/alexj11324/Mikka/pull/418', state: 'open' }, repository: 'alexj11324/Mikka', environment: 'device:mac', previewUrl: 'https://mikka-8quhtq3c9-mikka-dev.vercel.app', deploymentEnvironment: 'preview' },
+  delivery: {
+    candidateSha: sha, pullRequest: { url: 'https://github.com/alexj11324/Mikka/pull/418', state: 'open', title: 'perf(home): 首屏图片懒加载与字体子集' }, repository: 'alexj11324/Mikka', environment: 'device:mac',
+    previewUrl: 'https://mikka-8quhtq3c9-mikka-dev.vercel.app', deploymentEnvironment: 'preview', previewDatabaseBranch: 'preview/mik-48', machine: { name: 'Alex 的 MacBook', kind: 'device' },
+  },
 })
 const image = png(1280, 800)
 const serveImages: Media = (route, id) => id === clip ? route.fulfill({ status: 409, body: '' }) : route.fulfill({ status: 200, contentType: 'image/png', body: image })
@@ -137,8 +141,9 @@ test('验收 on the thread: criteria with their evidence, independent results, t
   await expect(thread.getByText('待你确认', { exact: true }).first()).toBeVisible()
   const card = thread.getByRole('region', { name: '候选版本' })
   await expect(card.getByRole('link', { name: '#418' })).toHaveAttribute('href', 'https://github.com/alexj11324/Mikka/pull/418')
+  await expect(card.getByText('perf(home): 首屏图片懒加载与字体子集')).toBeVisible()
   await expect(card.getByText('mikka-8quhtq3c9-mikka-dev.vercel.app')).toBeVisible()
-  await expect(card.getByText('Preview', { exact: true })).toHaveCount(2)
+  await expect(card.getByText('Preview · Neon preview/mik-48', { exact: true })).toBeVisible()
   const list = thread.getByRole('region', { name: '验收标准' })
   await expect(list.getByText('3/3', { exact: true })).toBeVisible()
   const first = list.getByRole('listitem').filter({ hasText: '首页 2 秒内可交互（4G）' })

@@ -16,11 +16,22 @@ import { sendsMessage, type SendKey } from '@/lib/send-key'
 const MAX_LENGTH = MESSAGE_MAX
 
 /**
- * The Grok-style composer every chat uses (Coordinator and bots): one rounded
- * bar, attach on the left, send on the right. No model picker: the model is
- * ours unless the person picks their own in settings.
+ * A card, not a form field (R-31 keeps fields fill-only): a 1px `--rule` line
+ * that stays dark grey in dark mode, a soft shadow, and a darker line on focus,
+ * as Codex and Linear draw their composers. The text sits above a button row.
  */
-export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, onStop, quote, sendKey = 'enter' }: {
+// Empty, focused and typing look the same: the 1px rule and a soft shadow. Focus only deepens the
+// shadow (Codex); it never draws a dark outline (Alex 2026-10-31).
+const COMPOSER = 'rounded-2xl border border-rule bg-card shadow-sm transition-shadow has-[[data-slot=input-group-control]:focus-visible]:shadow-md has-[[data-slot=input-group-control]:focus-visible]:ring-0'
+
+/** A send arrow with nothing to send is a solid grey control, not a faded black one. */
+const SEND_DISABLED = 'disabled:bg-control disabled:text-muted-foreground disabled:opacity-100'
+
+/**
+ * The Grok-style composer every chat uses (Coordinator and bots): one rounded
+ * bar, attach and the bot's model chip on the left, send on the right.
+ */
+export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, onStop, quote, model, sendKey = 'enter' }: {
   ref: Ref<HTMLTextAreaElement | null>
   value: string
   onChange: (value: string) => void
@@ -38,6 +49,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   onStop?: () => void
   /** Something quoted into the message (an artifact quote chip): it sits on top, the buttons move to a row below. */
   quote?: ReactNode
+  /** A bot chat's model chip (BotModelPicker), beside 「+」. */
+  model?: ReactNode
   /** The person's send key (偏好设置); the caller reads it from their preferences. */
   sendKey?: SendKey
 }) {
@@ -86,18 +99,18 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
 
   return <form onSubmit={event => { event.preventDefault(); if (!sending && !submitDisabled && value.trim()) onSubmit() }}>
     <FieldGroup className="sr-only w-px"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
-    <InputGroup className={cn('min-h-12 rounded-3xl bg-background shadow-xs has-[[data-slot=input-group-control]:focus-visible]:ring-0', quote && 'rounded-2xl')}>
+    <InputGroup className={COMPOSER}>
       {quote && <InputGroupAddon align="block-start" className="px-2 pt-2 pb-0">{quote}</InputGroupAddon>}
-      {!quote && <InputGroupAddon align="inline-start" className="self-end pb-2">
-        <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
-      </InputGroupAddon>}
       {/* readOnly, not disabled: a disabled field drops focus, so the next key went to page shortcuts. */}
-      <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 min-w-0 overflow-x-hidden py-3.5 wrap-break-word', quote ? 'min-h-10 pb-1' : 'min-h-12')} value={value} maxLength={MAX_LENGTH} rows={1} readOnly={sending && !onStop && !editableWhileSending} aria-busy={sending || undefined} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} />
-      <InputGroupAddon align={quote ? 'block-end' : 'inline-end'} className={cn(quote ? 'justify-between px-2 pt-0 pb-2' : 'self-end pb-2')}>
-        {quote && <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>}
+      <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 min-w-0 overflow-x-hidden px-3.5 pt-3 pb-1 wrap-break-word', quote ? 'min-h-10' : 'min-h-14')} value={value} maxLength={MAX_LENGTH} rows={2} readOnly={sending && !onStop && !editableWhileSending} aria-busy={sending || undefined} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} />
+      <InputGroupAddon align="block-end" className="justify-between px-2 pt-0 pb-2">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
+          {model}
+        </span>
         {stoppable
           ? <InputGroupButton type="button" variant="default" size="icon-sm" className="rounded-full" aria-label={t('stop')} onClick={onStop}><Square className="fill-current" /></InputGroupButton>
-          : <InputGroupButton type="submit" variant="default" size="icon-sm" className="rounded-full" aria-label={t('send')} disabled={sending || submitDisabled || !value.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>}
+          : <InputGroupButton type="submit" variant="default" size="icon-sm" className={cn('rounded-full', SEND_DISABLED)} aria-label={t('send')} disabled={sending || submitDisabled || !value.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>}
       </InputGroupAddon>
     </InputGroup>
     {/* The limit is shown only when it is close enough to matter. */}

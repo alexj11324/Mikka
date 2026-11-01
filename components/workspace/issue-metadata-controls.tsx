@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { moveIssueToProject } from '@/app/actions/projects'
 import useSWR from 'swr'
@@ -11,9 +11,9 @@ import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
-import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldError } from '@/components/ui/field'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { IssueAssigneeMenu } from './issue-assignee-menu'
 import { IssuePropertyMenu } from './issue-property-menu'
@@ -26,12 +26,15 @@ export type MetadataSavedIssue = Extract<Awaited<ReturnType<typeof updateIssueMe
 type Target = 'project' | 'labels' | 'pullRequests' | 'invite'
 export type MetadataRequest = { target: Target | 'assignee'; sequence: number }
 
-export function LabelDot({ color }: { color: IssueLabel['color'] }) {
-  return <Circle data-icon="inline-start" className={cn('fill-current', { 'text-label-violet': color === 'violet', 'text-label-blue': color === 'blue', 'text-success-foreground': color === 'green', 'text-warning-foreground': color === 'yellow', 'text-destructive': color === 'red', 'text-muted-foreground': color === 'gray' })} />
+/** small: the 6px dot of a board card's bare label (Figma 看板/标签). */
+export function LabelDot({ color, small = false }: { color: IssueLabel['color']; small?: boolean }) {
+  return <Circle data-icon="inline-start" className={cn('fill-current', small && 'size-1.5 shrink-0', { 'text-label-violet': color === 'violet', 'text-label-blue': color === 'blue', 'text-success-foreground': color === 'green', 'text-warning-foreground': color === 'yellow', 'text-destructive': color === 'red', 'text-muted-foreground': color === 'gray' })} />
 }
 
-export function IssueMetadataControls({ task, section = 'all', compact = false, disabled = false, onSaved, onBusyChange, request }: {
+export function IssueMetadataControls({ task, section = 'all', compact = false, disabled = false, onSaved, onBusyChange, request, assigneeAvatar }: {
   task: { id: string; revision: number; metadata: IssueMetadata }
+  /** Replaces the assignee button's avatar, as the board card's avatar group (R-25). */
+  assigneeAvatar?: ReactNode
   section?: 'all' | 'assignee' | 'properties' | 'project' | 'labels' | 'pullRequests'
   request?: MetadataRequest | null
   compact?: boolean; disabled?: boolean
@@ -107,7 +110,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   }
   const metadata = task.metadata
   return <>
-    {(section === 'all' || section === 'assignee') && <IssueAssigneeMenu request={request} id={task.id} assignee={metadata.assignee} compact={compact} disabled={busy} onChange={assignee => persist({ assignee })} onInvite={() => open('invite')} />}
+    {(section === 'all' || section === 'assignee') && <IssueAssigneeMenu request={request} id={task.id} assignee={metadata.assignee} avatar={assigneeAvatar} compact={compact} disabled={busy} onChange={assignee => persist({ assignee })} onInvite={() => open('invite')} />}
     {section !== 'assignee' && <>
       {(section === 'all' || section === 'properties' || section === 'project') && <Button variant={section === 'project' ? 'ghost' : 'outline'} size={section === 'project' ? 'sm' : 'xs'} type="button" className={cn(section === 'project' ? ROW_VALUE : 'h-auto max-w-full justify-start whitespace-normal rounded-full text-left')} disabled={busy} onClick={() => open('project')} title={metadata.project ?? tProperty('setProject')} aria-label={tProperty('projectAria', { name: metadata.project ?? tProperty('unset') })}><Box data-icon="inline-start" className="shrink-0" /><span className={cn(section === 'project' && 'truncate', !metadata.project && 'text-muted-foreground')}>{metadata.project ?? tProperty('addToProject')}</span></Button>}
       {(section === 'all' || section === 'properties' || section === 'labels') && <>
@@ -121,10 +124,10 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
       <Button variant={metadata.pullRequests.length ? 'ghost' : 'outline'} size={metadata.pullRequests.length ? 'icon-xs' : 'xs'} type="button" className="rounded-full" disabled={busy} onClick={() => open('pullRequests')} aria-label={tProperty('managePullRequestsAria')}><Link2 data-icon="inline-start" />{!metadata.pullRequests.length && tProperty('pullRequests')}</Button>
       </>}
     </>}
-    {error && !target && <p role="alert" className="w-full text-xs text-destructive">{error}</p>}
+    {error && !target && <FieldError className="w-full text-xs">{error}</FieldError>}
     <Dialog open={target !== null} onOpenChange={value => { if (!value && !pending) { setTarget(null); setError('') } }}>
       <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-md">
-        <DialogHeader><DialogTitle>{target ? titles[target] : tProperty('taskProperties')}</DialogTitle><DialogDescription>{target === 'invite' ? tProperty('inviteDescription') : target === 'pullRequests' ? tProperty('pullRequestsDescription') : target === 'labels' ? tProperty('labelsDescription') : tProperty('defaultDescription')}</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{target ? titles[target] : tProperty('taskProperties')}</DialogTitle></DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-4">
           {target === 'project' && <Command shouldFilter={false}><CommandInput placeholder={tProperty('projectPlaceholder')} aria-label={tProperty('projectNameAria')} value={name} onValueChange={setName} maxLength={100} /><CommandList><CommandEmpty>{tProperty('noProjectFound')}</CommandEmpty><CommandGroup heading={tProperty('projectGroup')}><CommandItem disabled={busy} onSelect={() => { void project(null) }}><Box /><span className="flex-1">{tProperty('noProject')}</span>{!metadata.project && <Check />}</CommandItem>{(options?.projects ?? []).filter(item => item.toLowerCase().includes(name.toLowerCase())).map(item => <CommandItem key={item} disabled={busy} onSelect={() => { void project(item) }}><Box /><span className="flex-1 truncate">{item}</span>{metadata.project === item && <Check />}</CommandItem>)}</CommandGroup></CommandList></Command>}
           {target === 'labels' && <>
@@ -144,7 +147,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
             <FieldGroup><Field><FieldLabel htmlFor={fieldId}>{tProperty('newPrLink')}</FieldLabel><Input id={fieldId} type="url" value={name} onChange={event => setName(event.target.value)} placeholder="https://github.com/owner/repo/pull/81" maxLength={500} disabled={busy} /></Field><Field><FieldLabel>{tProperty('newPrState')}</FieldLabel><IssuePropertyMenu label={tProperty('newPrState')} value={prState} options={prStates} icon={GitPullRequest} disabled={busy} onChange={value => setPrState(value as IssuePullRequest['state'])} /></Field></FieldGroup>
           </>}
           {target === 'invite' && <FieldGroup><Field><FieldLabel htmlFor={fieldId}>{tProperty('memberEmail')}</FieldLabel><Input id={fieldId} type="email" value={name} onChange={event => setName(event.target.value)} placeholder={tProperty('memberEmailPlaceholder')} required maxLength={254} disabled={busy} /></Field></FieldGroup>}
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {error && <FieldError>{error}</FieldError>}
           <DialogFooter><Button type="button" variant="ghost" disabled={pending} onClick={() => setTarget(null)}>{tCommon('cancel')}</Button><Button type="submit" disabled={busy}>{pending ? tCommon('saving') : target === 'invite' ? tProperty('inviteAction') : tCommon('save')}</Button></DialogFooter>
         </form>
       </DialogContent>

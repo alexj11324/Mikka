@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, rail, app, seedTask, openIssueFromSearch } from './fixtures'
+import { test, expect, register, registerInTeam, rail, app, seedTask, openIssueFromSearch } from './fixtures'
 
 test.use({ expectedConsoleErrors: [{ path: app('/api/auth/sign-out'), message: 'Failed to load resource: the server responded with a status of 400 (Bad Request)' }] })
 
 for (const path of ['/', '/settings/members', '/en/settings?section=devices']) {
   test(`sign-out hides private UI while pending, restores failures, and revokes the session: ${path}`, async ({ page, context }) => {
     const english = path.startsWith('/en/')
-    await register(page, english ? '/settings?section=devices' : path)
+    await (path === '/settings/members' ? registerInTeam : register)(page, english ? '/settings?section=devices' : path)
     if (english) await page.goto(app(path))
     const accountMenu = page.getByRole('button', { name: english ? 'Workspace menu' : '工作区菜单', exact: true })
     const pending = page.getByRole('status', { name: english ? 'Signing out…' : '正在退出…', exact: true })
@@ -25,7 +25,7 @@ for (const path of ['/', '/settings/members', '/en/settings?section=devices']) {
         else await route.continue()
       })
       await accountMenu.click()
-      await page.getByRole('menuitem', { name: english ? 'Sign out' : '退出登录', exact: true }).click()
+      await page.getByRole('menu', { name: english ? 'Workspace menu' : '工作区菜单', exact: true }).getByRole('menuitem', { name: english ? 'Sign out' : '退出登录', exact: true }).click()
       await expect(pending).toBeVisible()
       await page.keyboard.press('ControlOrMeta+k')
       await page.keyboard.press('c')
@@ -57,7 +57,7 @@ for (const path of ['/', '/settings/members', '/en/settings?section=devices']) {
     await hold()
     release(false)
     await expect(page).toHaveURL(url => url.pathname === app(`${english ? '/en' : ''}/sign-in`) && url.searchParams.get('login') === '1')
-    await expect(page.getByRole('heading', { name: english ? 'Welcome back' : '欢迎回来', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: english ? 'Sign in to Mikka' : '登录 Mikka', exact: true })).toBeVisible()
     // Replaying the original cookie proves revocation on the server, beyond browser cookie removal.
     const revoked = await page.request.get(app('/api/auth/get-session'), { headers: { cookie } })
     expect(await revoked.json()).toBeNull()
@@ -84,7 +84,7 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
   })
   async function signOut() {
     await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-    await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
+    await page.getByRole('menu', { name: '工作区菜单', exact: true }).getByRole('menuitem', { name: '退出登录', exact: true }).click()
   }
   await title.fill('')
   await signOut()
@@ -126,7 +126,7 @@ test('failed sign-out preserves an invalid project draft and its validation erro
     await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'SIGN_OUT_FAILED', message: 'Sign out failed' }) })
   })
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
-  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
+  await page.getByRole('menu', { name: '工作区菜单', exact: true }).getByRole('menuitem', { name: '退出登录', exact: true }).click()
   await expect(page.getByRole('status', { name: '正在退出…', exact: true })).toBeVisible()
   await expect(name).toHaveCount(0)
   const mountedName = page.locator('[role="textbox"][aria-label="项目名称"]')

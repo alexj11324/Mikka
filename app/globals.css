@@ -8,6 +8,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+--color-brand-claude: #D97757;
 --color-accent-soft: var(--accent);
 --color-accent-soft-foreground: var(--accent-foreground);
 --color-accent-soft-hover: var(--secondary);
@@ -19,14 +20,17 @@
 --font-heading: var(--font-sans);
 --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 --font-serif: var(--font-serif);
+/* R-32 document body: 15/24, between UI body (13/20) and the 18/28 section heading; `text-md`. */
+--text-md: 0.9375rem;
+--text-md--line-height: 1.5rem;
 --color-background: var(--background);
 --color-foreground: var(--foreground);
 --color-card: var(--card);
 --color-card-foreground: var(--card-foreground);
 --color-popover: var(--popover);
 --color-popover-foreground: var(--popover-foreground);
-  --color-workspace-accent: oklch(0.56 0.18 279);
-  --color-workspace-accent-foreground: oklch(1 0 0);
+  --color-workspace-accent: var(--sidebar-primary);
+  --color-workspace-accent-foreground: var(--sidebar-primary-foreground);
   --color-project-action: var(--project-action);
   --color-project-action-foreground: var(--project-action-foreground);
   --color-primary: var(--primary);
@@ -145,12 +149,12 @@
 --bot-gris: #a3a3a3;
 --bot-creme: #f1efe9;
 /* The Coordinator's star (Figma 202:4518). */
---settings-background: oklch(0.98 0.002 286);
+--settings-background: oklch(0.98 0 0);
 --settings-foreground: oklch(0.145 0 0);
 --settings-card: var(--card);
---settings-sidebar: oklch(0.95 0.002 286);
+--settings-sidebar: oklch(0.95 0 0);
 --settings-sidebar-foreground: oklch(0.205 0 0);
---settings-sidebar-accent: oklch(0.905 0.002 286);
+--settings-sidebar-accent: oklch(0.905 0 0);
 --settings-border: oklch(0.905 0 0);
 --settings-input: oklch(0.89 0 0);
 --settings-muted-foreground: oklch(0.49 0 0);
@@ -171,8 +175,8 @@
   --ink-3: color-mix(in oklch, var(--muted-foreground) 65%, var(--background));
   --line: var(--border);
   --line-strong: color-mix(in oklch, var(--border) 80%, var(--foreground));
---project-action: oklch(0.56 0.17 277);
---project-action-foreground: oklch(0.985 0 0);
+--project-action: var(--sidebar-primary);
+--project-action-foreground: var(--sidebar-primary-foreground);
 --label-violet: var(--color-violet-600);
 --label-blue: var(--color-blue-600);
 --shell-chrome: oklch(0.97 0 0);
@@ -208,11 +212,12 @@
 --control: oklch(0 0 0 / 6%);
 --control-hover: oklch(0 0 0 / 10%);
 --ring: oklch(0.708 0 0);
---chart-1: oklch(0.87 0 0);
---chart-2: oklch(0.556 0 0);
---chart-3: oklch(0.439 0 0);
---chart-4: oklch(0.371 0 0);
---chart-5: oklch(0.269 0 0);
+/* Chart series: blue, teal, orange, violet, ochre; each at least 3:1 on the card. */
+--chart-1: oklch(0.546 0.215 262.9);
+--chart-2: oklch(0.6 0.105 185);
+--chart-3: oklch(0.64 0.19 41);
+--chart-4: oklch(0.558 0.22 304);
+--chart-5: oklch(0.66 0.135 85);
 --radius: 0.625rem;
 --sidebar: oklch(0.985 0 0);
 --sidebar-foreground: oklch(0.145 0 0);
@@ -246,7 +251,7 @@
 --github-pr-draft: #9198a1;
 --github-pr-merged: #ab7df8;
 --github-pr-closed: #f85149;
---settings-background: oklch(0.17 0 0);
+--settings-background: rgb(24 24 24);
 --settings-foreground: oklch(0.94 0 0);
 --settings-card: var(--card);
 --settings-sidebar: var(--background);
@@ -266,11 +271,12 @@
 --avatar-4: var(--color-violet-500);
 --avatar-5: var(--color-orange-500);
 --avatar-foreground: oklch(0.985 0 0);
-  --background: oklch(0.145 0 0);
+  /* Codex's dark surfaces: page rgb(24 24 24), boxes and cards rgb(35 35 35). */
+  --background: rgb(24 24 24);
 --foreground: oklch(0.985 0 0);
---card: oklch(0.205 0 0);
+--card: rgb(35 35 35);
 --card-foreground: oklch(0.985 0 0);
---popover: oklch(0.205 0 0);
+--popover: rgb(35 35 35);
 --popover-foreground: oklch(0.985 0 0);
 --primary: oklch(0.922 0 0);
 --primary-foreground: oklch(0.205 0 0);
@@ -287,11 +293,11 @@
 --control: oklch(1 0 0 / 9%);
 --control-hover: oklch(1 0 0 / 14%);
 --ring: oklch(0.556 0 0);
---chart-1: oklch(0.87 0 0);
---chart-2: oklch(0.556 0 0);
---chart-3: oklch(0.439 0 0);
---chart-4: oklch(0.371 0 0);
---chart-5: oklch(0.269 0 0);
+--chart-1: oklch(0.68 0.16 259);
+--chart-2: oklch(0.72 0.12 182);
+--chart-3: oklch(0.72 0.17 45);
+--chart-4: oklch(0.68 0.18 304);
+--chart-5: oklch(0.84 0.15 90);
 --sidebar: oklch(0.115 0 0);
 --sidebar-foreground: oklch(0.985 0 0);
 --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -321,6 +327,11 @@
 @layer base {
 * {
   @apply border-border outline-ring/50;
+  /* Thin scrollbars on a transparent track, like Codex. The platform default
+     is a wide bar between two straight track lines whenever macOS shows
+     scrollbars always or a mouse is connected. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent;
 }
 html {
   scrollbar-gutter: stable;

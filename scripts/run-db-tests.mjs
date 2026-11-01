@@ -10,10 +10,19 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
+  { marker: 'lib/schedules/store.ts', file: 'lib/schedules/store.db.test.ts', script: 'test:schedules-db' },
+  { marker: 'lib/run-leases.ts', file: 'tests/run-recovery.db.test.ts', script: 'test:run-recovery-db' },
+  { marker: 'app/v1/runs/[runId]/checkpoint/route.ts', file: 'tests/checkpoint-recovery.db.test.ts', script: 'test:run-recovery-db' },
+  { marker: 'lib/mcp/worker.ts', file: 'lib/mcp/worker-authorization.db.test.ts', script: 'test:worker-authorization-db' },
+  { marker: 'lib/device-revocation.ts', file: 'lib/device-revocation.db.test.ts', script: 'test:device-revocation-db' },
   { marker:'lib/abuse/store.ts',file:'lib/abuse/store.db.test.ts',script:'test:abuse-db' },
+  { marker:'lib/search/rate-limit.ts',file:'lib/search/rate-limit.db.test.ts',script:'test:abuse-db' },
+  { marker: 'lib/abuse/alerts.ts', file: 'lib/abuse/alerts.db.test.ts', script: 'test:abuse-db' },
   { marker: 'lib/onboarding.ts', file: 'lib/onboarding.db.test.ts', script: 'test:onboarding-db' },
   { marker: 'lib/device-enrollment.ts', file: 'lib/device-enrollment.db.test.ts', script: 'test:device-enrollment-db' },
   { marker:'lib/execution-settings.ts',file:'lib/execution-settings.db.test.ts',script:'test:execution-settings-db' },
+  { marker: 'lib/rule-dispatch.ts', file: 'tests/run-machine-fallback.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-publications.ts', file: 'tests/run-publications.db.test.ts', script: 'test:run-publication-db' },
   { marker: 'lib/cloud-computer/browser-authority.ts', file: 'lib/cloud-computer/unattended.db.test.ts', script: 'test:cloud-backend-db' },
   { marker: 'lib/credentials/store.ts', file: 'lib/credentials/store.db.test.ts', script: 'test:credentials-db' },
@@ -24,6 +33,7 @@ export const REQUIRED_SUITES = [
   { marker:'lib/self-improvement/evaluation-comparison.ts',file:'lib/self-improvement/evaluation-comparison-postgres.test.ts',script:'test:skill-semantic-db' },
   { marker: 'lib/factory/store.ts', file: 'lib/factory/postgres.test.ts', script: 'test:factory' },
   { marker: 'lib/self-improvement/store.ts', file: 'lib/self-improvement/postgres.test.ts', script: 'test:self-improvement-db' },
+  { marker: 'lib/self-improvement/team-skills.ts', file: 'lib/self-improvement/team-skills.db.test.ts', script: 'test:self-improvement-db' },
   { marker: 'lib/factory/checks.ts', file: 'lib/factory/checks.db.test.ts', script: 'test:factory-checks-db' },
   { marker: 'lib/factory/monitor-v2-binding.ts', file: 'lib/factory/monitor-v2-binding.db.test.ts', script: 'test:factory-monitor-db' },
   { marker: 'lib/factory/check-independence.ts', file: 'lib/factory/check-independence.db.test.ts', script: 'test:factory-check-independence-db' },
@@ -34,12 +44,15 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/run-chain.ts', file: 'tests/run-chain.db.test.ts', script: 'test:factory-routing-db' },
   { marker: 'lib/agent-kit/store.ts', file: 'lib/agent-kit/store.db.test.ts', script: 'test:agent-kit-db' },
   { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
+  { marker: 'lib/computer/reconcile.ts', file: 'lib/computer/reconcile.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/captures/store.ts', file: 'lib/captures/store.db.test.ts', script: 'test:captures-db' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },
+  { marker: 'lib/group-conversations-store.ts', file: 'lib/group-reads.db.test.ts', script: 'test:conversation-reads' },
   { marker: 'lib/active-agents.ts', file: 'lib/active-agents.test.ts', script: 'test:active-agents' },
   { marker: 'lib/coordinator/group-turns.ts', file: 'lib/coordinator/group-turns.test.ts', script: 'test:group-turns' },
   { marker: 'lib/profile/store.ts', file: 'lib/profile/store.db.test.ts', script: 'test:user-facts-db' },
   { marker: 'lib/secrets/store.ts', file: 'tests/workspace-secrets.db.test.ts', script: 'test:secrets-db' },
+  { marker: 'lib/session-mailbox.ts', file: 'tests/session-mailbox.db.test.ts', script: 'test:session-mailbox-db' },
   { marker: 'lib/suggestions/time-zone.ts', file: 'tests/settings-preferences.db.test.ts', script: 'test:settings-prefs-db' },
   { marker: 'lib/tokens/store.ts', file: 'tests/personal-access-tokens.db.test.ts', script: 'test:pat-db' },
   { marker: 'lib/api-auth.ts', file: 'tests/personal-access-token-api.db.test.ts', script: 'test:pat-api-db' },
@@ -57,12 +70,31 @@ export const REQUIRED_SUITES = [
   { marker: 'drizzle/20261027164500_artifact_legacy_compat.sql', file: 'tests/artifact-legacy-migration.test.mjs', script: 'test:artifact-migration-db' },
   { marker: 'lib/workspace-admin/general.ts', file: 'tests/workspace-admin.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/app-policy/store.ts', file: 'tests/app-policy.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/model-api-keys.ts', file: 'tests/model-api-keys.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/usage/read.ts', file: 'tests/usage.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/run-bot-name.ts', file: 'tests/run-agent-names.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/billing/service.ts', file: 'tests/billing.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/audit/query.ts', file: 'tests/audit-query.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
   { marker: 'lib/audit/record.ts', file: 'tests/audit-record.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/audit/authentication.ts', file: 'tests/authentication-audit.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/credentials/store.ts', file: 'tests/security-lifecycle-audit.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/audit/delivery.ts', file: 'tests/audit-delivery.db.test.ts', script: 'test:audit-db' },
   { marker: 'lib/account/delete.ts', file: 'lib/account/store.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/account/export-files.ts', file: 'lib/account/export-files.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/agent-tool-approval/task-policy.db.test.ts', file: 'lib/agent-tool-approval/task-policy.db.test.ts', script: 'test:worker-authorization-db' },
+  { marker: 'lib/abuse/store.ts', file: 'lib/abuse/model-postpay.db.test.ts', script: 'test:abuse-db' },
+  { marker: 'lib/abuse/model.ts', file: 'lib/abuse/model-generation.db.test.ts', script: 'test:abuse-db' },
+  { marker: 'lib/model-admission/store.ts', file: 'lib/model-admission/store.db.test.ts', script: 'test:model-admission-db' },
+  { marker: 'lib/model-admission/runtime.ts', file: 'lib/model-admission/revocation-postpay.db.test.ts', script: 'test:model-admission-db' },
+  { marker: 'lib/audit/export.ts', file: 'lib/audit/export.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/audit/retention.ts', file: 'lib/audit/retention.db.test.ts', script: 'test:audit-db' },
+  { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-jobs.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/account/external-cleanup.ts', file: 'lib/account/owner-cleanup.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/account/runtime-cleanup.ts', file: 'lib/account/cloud-cleanup.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/account/deletion-jobs.ts', file: 'lib/account/deletion-restore.db.test.ts', script: 'test:account-db' },
+  { marker: 'lib/ops/monitor.ts', file: 'lib/ops/monitor.db.test.ts', script: 'test:ops-db' },
+  { marker: 'lib/linear-sync/archive.ts', file: 'tests/linear-archive.db.test.ts', script: 'test:scope-detachment-db' },
 ]
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.
@@ -76,6 +108,7 @@ export const SELF_MANAGED = [
 // Register exact files so another pg-backed test in the same folder still fails
 // inventory until it has its own explicit gate.
 export const BROWSER_SUITES = [
+  { file: 'tests/mvp/coordinator-streaming.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
   { file: 'tests/mvp/core-loop.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
 ]
 // These import the locked driver to check its API, with native transport and
@@ -187,14 +220,28 @@ export function readTree(root = '.') {
   return files
 }
 
+export function shardScripts(scripts, shard) {
+  if (shard === undefined) return scripts
+  const parts = typeof shard === 'string' && /^([1-9]\d*)\/([1-9]\d*)$/.exec(shard)
+  if (!parts || parts[0] !== shard) throw new Error('DB_TEST_SHARD must be i/n with 1 <= i <= n')
+  const [index, count] = parts.slice(1).map(Number)
+  if (!Number.isSafeInteger(index) || !Number.isSafeInteger(count) || index > count) throw new Error('DB_TEST_SHARD must be i/n with 1 <= i <= n')
+  const selected = [...scripts].sort().filter((_, position) => position % count === index - 1)
+  if (!selected.length) throw new Error(`DB_TEST_SHARD ${shard} selects no database suites`)
+  return selected
+}
+
 export function main({ root = '.', env = process.env, run = spawnSync } = {}) {
   try {
     validateTarget(env)
     const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).scripts ?? {}
     const plan = inventory(readTree(root), scripts, (env.DB_TEST_EXPECTED ?? '').split(',').filter(Boolean))
     console.log(`Required DB inventory: ${JSON.stringify(plan)}`)
+    const selected = shardScripts(plan.scripts, env.DB_TEST_SHARD)
+    console.log(`Required DB selection: ${JSON.stringify({ shard: env.DB_TEST_SHARD ?? 'all', total: plan.scripts.length, scripts: selected })}`)
     let failed = false
-    for (const script of plan.scripts) {
+    // Suites share destructive fixtures, so only isolated CI jobs run in parallel.
+    for (const script of selected) {
       console.log(`::group::pnpm ${script}`)
       const result = run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: { ...env, REQUIRE_DB: '1', CONVERSATION_READS_REQUIRE_DB: '1', MIKKA_TEST_DB_PORT: new URL(env.E2E_DATABASE_URL).port || '5432' }, maxBuffer: 64 << 20 })
       process.stdout.write(result.stdout ?? ''); process.stderr.write(result.stderr ?? '')

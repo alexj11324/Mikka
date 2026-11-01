@@ -17,6 +17,7 @@
 //
 // The SDK also writes its control requests (`initialize`, …) on the same
 // stdin, and names flags as `--flag=value`; both are handled here.
+import { randomUUID } from 'node:crypto'
 import { writeFileSync } from "node:fs"
 import { createInterface } from "node:readline"
 
@@ -83,7 +84,15 @@ lines.on("line", async (line) => {
   const asked = JSON.parse(line)?.message?.content?.[0]?.text
   if (typeof asked !== "string") return
   const message = asked
+  if (message === 'TOOL_PROGRESS_TEST') {
+    const progress = { type: 'tool_progress', tool_use_id: 'ci-watch', tool_name: 'Bash', parent_tool_use_id: null, elapsed_time_seconds: 11, uuid: randomUUID() }
+    out({ ...progress, session_id: 'foreign-session' })
+    out(progress)
+    result()
+    return
+  }
   const captureApprovals = {
+    REQUEST_HELP_APPROVAL_TEST: ['mcp__mikka__request_help', { question: 'Which existing API is specified?' }],
     CAPTURE_SCREENSHOT_APPROVAL_TEST: ['mcp__mikka_computer__capture_screenshot', { title: 'Synthetic evidence' }],
     START_RECORDING_APPROVAL_TEST: ['mcp__mikka_computer__start_screen_recording', { title: 'Synthetic flow', maxSeconds: 5 }],
     STOP_RECORDING_APPROVAL_TEST: ['mcp__mikka_computer__stop_screen_recording', {}],

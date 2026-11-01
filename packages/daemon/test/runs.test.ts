@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
+import { gzipSync } from 'node:zlib'
 import { RepositoryCache } from "../src/repositories"
 import { runPolicy } from "../src/permissions"
 
@@ -35,6 +36,7 @@ async function boot(
   const daemon = await new Daemon({
     dataDir,
     flavor: "dev",
+    agentSandbox: null,
     link: server.link(),
     credential: "cred-1",
     harnesses: [{ harness: "mock", installed: true, version: "test" }],
@@ -242,7 +244,7 @@ describe("mock runs", () => {
     link.claimRun = async (deviceId, runId) => ({
       ...await claim(deviceId, runId), remoteUrl, expectedRepoRemote: remoteUrl,
     })
-    const daemon = await new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "cred-1",
+    const daemon = await new Daemon({ dataDir: tempDir(), flavor: "dev", agentSandbox: null, link, credential: "cred-1",
       harnesses: [{ harness: "mock", installed: true, version: "test" }], mockSpeed: Number.POSITIVE_INFINITY,
       heartbeatMs: 60_000, quotaSource: null }).start()
     daemons.push(daemon)
@@ -916,6 +918,7 @@ describe("run stops", () => {
       prompt: "do it",
       followUp: "Your machine went offline; continue.",
       continuesRunId: first,
+      requireWorktreeContinuation: true,
       fixture: "success-edit",
       verifyCommand: VERIFY,
     })
@@ -929,6 +932,19 @@ describe("run stops", () => {
     expect(readFileSync(join(worktree, "PARTIAL.md"), "utf8")).toBe(
       "half done\n"
     )
+  })
+
+  it('checkpoint: required local continuation blocks when the original worktree is missing', async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const runId = server.queueRun(DEVICE, { issueId: 'missing-original', repoId: 'repo-1', baseBranch: 'main',
+      harness: 'mock', prompt: 'do it', continuesRunId: 'lost-worktree', requireWorktreeContinuation: true,
+      fixture: 'success-edit', verifyCommand: VERIFY })
+    const result = await runToEnd(daemon, server, runId)
+    expect(result.stopReason).toBe('blocked')
+    expect(result.sessionId).toBe(null)
+    expect(result.worktree).toBe(null)
+    expect(server.runs.get(runId)?.completion?.report.verify.status).toBe('not_run')
   })
 
   it("checkpoint: another machine takes over from the saved work", async () => {
@@ -966,6 +982,7 @@ describe("run stops", () => {
       harness: "mock",
       prompt: "do it",
       resumeFrom: checkpoint,
+      continuesRunId: 'missing-prior-worktree',
       fixture: "success-edit",
       verifyCommand: VERIFY,
     })
@@ -992,5 +1009,23 @@ describe("run stops", () => {
       reason: "needs_human",
     })
     expect(server.unownedRuns()).toEqual([])
+  })
+
+  it.each(['missing-base', 'conflict', 'stale', 'unavailable'])('checkpoint: %s blocks before any agent starts', async failure => {
+    const { repo, server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const checkpoint = {
+      baseCommit: failure === 'missing-base' ? 'f'.repeat(40) : git(repo, 'rev-parse', 'HEAD'),
+      patch: gzipSync(Buffer.from(failure === 'conflict' ? 'not a valid git patch\n' : '')).toString('base64'),
+      files: failure === 'conflict' || failure === 'unavailable' ? 1 : 0,
+      takenAt: new Date(Date.now() - (failure === 'stale' ? 31 * 60_000 : 0)).toISOString(),
+      ...(failure === 'unavailable' ? { unavailableReason: 'too_large' as const } : {}),
+    }
+    const runId = server.queueRun(DEVICE, { issueId: 'blocked-recovery', repoId: 'repo-1', baseBranch: 'main',
+      harness: 'mock', prompt: 'do it', resumeFrom: checkpoint, fixture: 'success-edit', verifyCommand: VERIFY })
+    const result = await runToEnd(daemon, server, runId)
+    expect(result.stopReason).toBe('blocked')
+    expect(result.sessionId).toBe(null)
+    expect(server.runs.get(runId)?.completion?.report.verify.status).toBe('not_run')
   })
 })

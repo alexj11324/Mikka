@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
@@ -8,7 +9,7 @@ import { authenticateDevice, ownedDevice } from '@/lib/device-link'
 export const dynamic = 'force-dynamic'
 
 /** Repository records and owner-scoped settings, never a local path allow-list. */
-export async function GET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
+async function handleGET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
@@ -28,3 +29,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ devi
   }))
   return NextResponse.json({ repos })
 }
+
+export const GET = withDeviceRoute(handleGET)

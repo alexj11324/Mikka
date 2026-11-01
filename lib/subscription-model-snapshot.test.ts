@@ -4,6 +4,8 @@ import { MockLanguageModelV4 } from 'ai/test'
 import type { SubscriptionService } from './subscription-service'
 import type { HostedRuntimeSnapshot } from './subscription-model-snapshot'
 const defaults:Array<{scope:unknown;model:string}>=[]
+let managedSubscriptionDenied = false
+mock.module(new URL('./model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertSubscriptionModelTransport:async()=>{if(managedSubscriptionDenied)throw new Error('modelRouteDenied')}}})
 mock.module(new URL('./abuse/resolve.ts',import.meta.url).href,{namedExports:{resolveDefaultHostedModel:async(scope:unknown,model:string)=>{defaults.push({scope,model});return {modelId:model}}}})
 let freezeHostedModelSelection:typeof import('./subscription-model-snapshot')['freezeHostedModelSelection'],resolveFrozenHostedModel:typeof import('./subscription-model-snapshot')['resolveFrozenHostedModel']
 before(async()=>{({freezeHostedModelSelection,resolveFrozenHostedModel}=await import('./subscription-model-snapshot'))})
@@ -11,6 +13,7 @@ before(async()=>{({freezeHostedModelSelection,resolveFrozenHostedModel}=await im
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12,'0')}`
 const scope = { ownerId:'alice',botId:id(1),workspaceId:id(2) }
 function fixture() {
+  managedSubscriptionDenied = false
   const binding = { id:id(3),ownerId:'alice',consumerId:id(1),workspaceId:id(2),connectionId:id(4),connectionRevision:7,modelId:'fixture-model',route:'claude_cpa' as const }
   const connection = { id:id(4),ownerId:'alice',workspaceId:id(2),epoch:'7',state:'connected' }
   let calls = 0
@@ -19,6 +22,16 @@ function fixture() {
   const deps = { service:() => service,workspace:async () => {} }
   return { binding,connection,deps,calls:() => calls }
 }
+test('an unverified managed subscription transport fails before model construction without default fallback',async()=>{
+  const f=fixture()
+  const frozen=await freezeHostedModelSelection(scope,{harness:'ai_sdk',model:'default'},{type:'subscription',bindingId:id(3)},f.deps)
+  const service=f.deps.service()
+  let models=0
+  f.deps.service=()=>({...service,model:async()=>{models++;throw new Error('must not construct')}} as unknown as SubscriptionService)
+  managedSubscriptionDenied=true
+  await assert.rejects(resolveFrozenHostedModel(scope,frozen,f.deps),/modelRouteDenied/)
+  assert.equal(models,0)
+})
 test('first selection freezes authoritative model, route, owner, consumer, workspace, connection and epoch', async () => {
   const f=fixture()
   const result=await freezeHostedModelSelection(scope,{harness:'ai_sdk',model:'default'}, {type:'subscription',bindingId:id(3)},f.deps)

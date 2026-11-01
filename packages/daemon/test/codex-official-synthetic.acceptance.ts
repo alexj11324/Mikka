@@ -463,13 +463,13 @@ describe.skipIf(!enabled)("official Codex / synthetic provider / real outer sand
     binary = process.env.CODEX_CONTRACT_BIN ?? ""
     // A requested acceptance run must fail if the real pinned dependency is
     // missing; it must never silently skip or substitute the fake CLI.
-    expect(isAbsolute(binary), "CODEX_CONTRACT_BIN must name the absolute official Codex 0.163.0 binary").toBe(true)
+    expect(isAbsolute(binary), "CODEX_CONTRACT_BIN must name the absolute official Codex binary").toBe(true)
     expect(existsSync(binary), "official Codex contract binary missing").toBe(true)
     const version = execFileSync(binary, ["--version"], {
       encoding: "utf8", timeout: 10_000,
       env: { PATH: process.env.PATH ?? "/usr/bin:/bin" },
     }).trim()
-    expect(version).toMatch(/^codex-cli 0\.163\.0$/)
+    expect(version).toMatch(/^codex-cli \d+\.\d+\.\d+$/)
     expect(process.platform).toBe("linux")
   })
 

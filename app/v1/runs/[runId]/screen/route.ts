@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { screenCaptureRequest } from '@mikka/protocol/capture'
 import { screenCaptures } from '@/lib/captures/screen'
 import { maskForWorkspace } from '@/lib/secrets/runtime'
@@ -12,7 +13,7 @@ export const maxDuration = 120
  * by the cloud worker for the thread it runs. Only a worker scoped to the
  * run's workspace may call it; the desktop is the one the run is bound to.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const found = await deviceRun(request, (await params).runId)
   if (found instanceof Response) return found
   if (!found.caller.scopeWorkspaceId) return captureJson({ error: 'Cloud computer worker required.' }, 403)
@@ -35,3 +36,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   const result = await screenCaptures.stopRecording(caller, found.owner.runId)
   return 'error' in result ? captureFailure(result) : captureJson({ action: input.action, capture: result })
 }
+
+export const POST = withDeviceRoute(handlePOST)

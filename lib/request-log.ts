@@ -1,17 +1,24 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'
 
-// One JSON line per API request, written to stdout so Vercel Runtime Logs
+// Start and completion JSON lines per API request, written to stdout so Vercel Runtime Logs
 // (free on every plan) can search it. Only safe fields: never headers,
 // cookies, tokens, bodies, query strings or emails. The user is a sha256 hash.
 
-type Store = { userId?: string }
+export type RequestLogOutcome = 'empty' | 'work' | 'ignored'
+type Store = { userId?: string; outcome?: RequestLogOutcome }
 const requestScope = new AsyncLocalStorage<Store>()
 
 /** Records the signed-in user for the current request's log line. */
 export function noteLogUser(userId: string | null | undefined) {
   const store = requestScope.getStore()
   if (store && userId) store.userId = userId
+}
+
+/** Marks the authenticated business branch without logging response or request data. */
+export function noteLogOutcome(outcome: RequestLogOutcome) {
+  const store = requestScope.getStore()
+  if (store && (outcome === 'empty' || outcome === 'work' || outcome === 'ignored')) store.outcome = outcome
 }
 
 export function hashUserId(userId: string): string {
@@ -28,12 +35,15 @@ export function requestIdFor(request: Request): string {
 export type RequestLogEntry = {
   level: 'info' | 'warn' | 'error'
   msg: 'api_request'
+  timestamp: string
+  invocationId: string
   requestId: string
   route: string
   method: string
   status: number
   durationMs: number
   userIdHash: string | null
+  outcome?: RequestLogOutcome
   error?: string
 }
 
@@ -62,16 +72,22 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
   return async (request, ...rest) => {
     const started = performance.now()
     const store: Store = {}
+    const requestId = requestIdFor(request), invocationId = randomUUID()
+    // A missing completion remains observable when a handler/process is killed.
+    try { sink(JSON.stringify({ level: 'info', msg: 'api_request_started', timestamp: new Date().toISOString(),
+      requestId, invocationId, route, method: request.method }), 'info') } catch { /* best effort */ }
     const write = (status: number, error?: unknown) => {
       const entry: RequestLogEntry = {
         level: levelFor(status),
         msg: 'api_request',
-        requestId: requestIdFor(request),
+        timestamp: new Date().toISOString(),
+        requestId, invocationId,
         route,
         method: request.method,
         status,
         durationMs: Math.round(performance.now() - started),
         userIdHash: store.userId ? hashUserId(store.userId) : null,
+        ...(store.outcome ? { outcome: store.outcome } : {}),
       }
       // Error class name only: messages can echo user input or secrets.
       if (error !== undefined) entry.error = error instanceof Error ? error.name : 'unknown'

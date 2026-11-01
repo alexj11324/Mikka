@@ -1,4 +1,6 @@
-import { test, expect, register, app } from './fixtures'
+import { randomUUID } from 'node:crypto'
+import type { BrowserContext, Page } from '@playwright/test'
+import { test, expect, register, registerInTeam, rail, app, expectItems, browserClientHeaders, BASE_PATH } from './fixtures'
 
 test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立即切走', async ({ page }) => {
   const navigations: string[] = []
@@ -10,7 +12,7 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
     await waitingForData
     await route.continue()
   })
-  await register(page)
+  await registerInTeam(page)
   // The conversation list is an in-flow sidebar (collapsible="none"), not the offcanvas container.
   const workspaceSidebar = page.locator('[data-slot="sidebar"]')
   await expect(workspaceSidebar.getByRole('button', { name: '新建 Bot', exact: true })).toBeVisible()
@@ -29,9 +31,11 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
   await expect(page.getByRole('group', { name: '界面主题', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toHaveCount(1)
+  // Workspaces switch only in the avatar menu; the settings column has no switcher (R-75).
+  await expect(page.locator('[data-slot="settings-list"]').getByRole('button', { name: /切换工作区|工作区菜单/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '账户菜单', exact: true })).toHaveCount(0)
   await expect(page.locator('[data-slot="sidebar-footer"]')).toHaveCount(0)
-  const sidebar = page.locator('[data-slot="sidebar-container"]')
+  const sidebar = page.locator('[data-slot="settings-list"]')
   await sidebar.getByRole('link', { name: '账户', exact: true }).click()
   await expect(page.getByRole('heading', { name: '账户', exact: true })).toBeVisible()
   await sidebar.getByRole('link', { name: '成员', exact: true }).click()
@@ -51,7 +55,7 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
   await expect(page.getByRole('combobox', { name: '团队目录工作区', exact: true })).toHaveCount(0)
   await sidebar.getByRole('link', { name: '成员', exact: true }).click()
   await expect(page.getByRole('textbox', { name: '搜索成员或邀请', exact: true })).toBeVisible()
-  await sidebar.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await rail(page, '主页').click()
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toBeVisible()
   expect(navigations).toEqual([])
   await page.goBack()
@@ -61,11 +65,12 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
 })
 
 test.describe('工作区访问拒绝', () => {
+  // The test denies this workspace on purpose; how often the page refetches it is not the contract.
   // oxlint-disable-next-line no-empty-pattern -- Playwright fixture functions require destructured arguments.
-  test.use({ expectedConsoleErrors: async ({}, use) => { await use(['/api/workspace', '/api/teams/directory', '/api/workspace', '/api/workspace'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' }))) } })
+  test.use({ allowedConsoleErrors: async ({}, use) => { await use(['/api/workspace', '/api/teams/directory'].map(path => ({ path: app(`${path}?workspace=00000000-0000-4000-8000-000000000099`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' }))) } })
 
 test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', async ({ page }) => {
-  await register(page, '/settings/members')
+  await registerInTeam(page, '/settings/members')
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
   await page.route('**/api/workspace?workspace=00000000-0000-4000-8000-000000000099', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
   await page.route('**/api/teams/directory?workspace=00000000-0000-4000-8000-000000000099', route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: '没有查看此工作区的权限。' }) }))
@@ -77,9 +82,132 @@ test('工作区数据等待和拒绝访问时不泄漏上一工作区内容', as
 })
 })
 
+test('默认工作区解析后改用带 workspace 的读取时，管理员分区不闪掉', async ({ page }) => {
+  // Settings first read the default workspace, then name it once the team directory resolves it.
+  // Slow both, so the unnamed read lands first and the named one stays pending for a while:
+  // the admin-only rows must not drop out meanwhile, or the sidebar jumps.
+  await page.route('**/api/teams/directory*', async route => { await new Promise(resolve => setTimeout(resolve, 1500)); await route.fallback() })
+  await page.route('**/api/workspace?workspace=*', async route => { await new Promise(resolve => setTimeout(resolve, 2000)); await route.fallback() })
+  // 团队权限 and 成员 exist only in a team workspace; a new account's own workspace is personal.
+  await registerInTeam(page, '/settings/members')
+  const admin = page.locator('[data-slot="settings-list"]').getByRole('link', { name: '团队权限', exact: true })
+  await expect(admin).toBeVisible()
+  const gaps: number[] = []
+  for (const started = Date.now(); Date.now() - started < 4000;) {
+    if (await admin.count() === 0) gaps.push(Date.now() - started)
+    await page.waitForTimeout(50)
+  }
+  expect(gaps, '管理员分区在读取期间消失').toEqual([])
+})
+
+test('设置页打开并空闲后，每个分区首次打开都不显示骨架屏', async ({ page }) => {
+  test.setTimeout(120000)
+  // A team workspace, so every section (members, permissions, audit) is there to open.
+  await registerInTeam(page, '/settings?section=preferences')
+  const sidebar = page.locator('[data-slot="settings-list"]')
+  await expect(sidebar.getByRole('link', { name: '计费', exact: true })).toBeVisible()
+  // Settings loads every section's data once it is idle; after that nothing is left to wait for.
+  await page.waitForLoadState('networkidle')
+  const skeleton = page.locator('main [data-slot="skeleton"]')
+  const flashed: string[] = []
+  const names = (await sidebar.locator('[data-slot="sidebar-group"]').filter({ hasText: /账号|E2E 团队/ }).getByRole('link').allInnerTexts()).map(name => name.trim())
+  expect(names.length).toBeGreaterThan(10)
+  for (const name of names) {
+    const link = sidebar.getByRole('link', { name, exact: true })
+    await link.click()
+    await expect(link).toHaveAttribute('aria-current', 'page')
+    for (const deadline = Date.now() + 400; Date.now() < deadline;) {
+      if (await skeleton.count()) { flashed.push(name); break }
+      await page.waitForTimeout(20)
+    }
+  }
+  expect(flashed, '这些分区仍显示了骨架屏').toEqual([])
+})
+
+test('设置读取接口沿用原来的权限：仅管理员可读的只给管理员，外人只得到错误', async ({ page, browser, baseURL }) => {
+  test.setTimeout(120000)
+  await registerInTeam(page, '/settings/members')
+  await page.getByRole('button', { name: '邀请成员', exact: true }).click()
+  const invite = page.getByRole('dialog', { name: '邀请成员', exact: true })
+  const email = `member-${randomUUID()}@example.com`
+  await invite.getByLabel('邮箱地址', { exact: true }).fill(email)
+  await invite.getByRole('button', { name: '创建邀请链接', exact: true }).click()
+  const inviteURL = new URL(await invite.getByLabel(`${email} 的邀请链接`, { exact: true }).inputValue())
+  await invite.getByRole('button', { name: '完成', exact: true }).click()
+  const workspace = (await (await page.request.get(app('/api/workspace'))).json()).workspace.id as string
+
+  const memberContext = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
+  const outsiderContext = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
+  const anonymous = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
+  try {
+    const member = await memberContext.newPage()
+    await register(member, inviteURL.pathname.slice(BASE_PATH.length), email)
+    await member.getByRole('button', { name: '接受邀请并加入', exact: true }).click()
+    await expect(member).toHaveURL(/\/settings\/members\?workspace=/)
+    const outsider = await outsiderContext.newPage()
+    await register(outsider)
+
+    const read = async (context: BrowserContext, name: string) => {
+      const response = await context.request.get(app(`/api/settings/${name}?workspace=${workspace}`))
+      expect(response.headers()['cache-control']).toBe('private, no-store')
+      return { status: response.status(), body: await response.json() as { error?: string; canEdit?: boolean; secrets?: Record<string, unknown>[] } | null }
+    }
+    // Admin-only, as the actions were: 审计日志 and 计费.
+    for (const name of ['audit', 'billing']) {
+      const owner = await read(page.context(), name)
+      expect(owner.status, name).toBe(200)
+      expect(owner.body?.error, `管理员读取 ${name}`).toBeUndefined()
+      expect((await read(memberContext, name)).body?.error, `成员读取 ${name}`).toBeTruthy()
+    }
+    // Members read these, as before: secret names without values, and app policy without edit rights.
+    const memberSecrets = await read(memberContext, 'secrets')
+    expect(memberSecrets.body?.error).toBeUndefined()
+    expect(memberSecrets.body?.secrets?.every(secret => !('value' in secret))).toBe(true)
+    expect((await read(memberContext, 'app-policy')).body?.canEdit).toBe(false)
+    expect((await read(page.context(), 'app-policy')).body?.canEdit).toBe(true)
+    for (const name of ['audit', 'billing', 'secrets', 'app-policy', 'workspace-general', 'usage']) {
+      expect((await read(outsiderContext, name)).body?.error, `外人读取 ${name}`).toBeTruthy()
+      const signedOut = await read(anonymous, name)
+      expect(signedOut.status === 401 || Boolean(signedOut.body?.error), `未登录读取 ${name}`).toBe(true)
+    }
+    expect((await page.request.get(app('/api/settings/unknown'))).status()).toBe(404)
+  } finally {
+    await memberContext.close()
+    await outsiderContext.close()
+    await anonymous.close()
+  }
+})
+
+test('悬停预取后首次打开与再次打开设置分区都不显示骨架屏', async ({ page }) => {
+  await register(page, '/settings?section=preferences')
+  const sidebar = page.locator('[data-slot="settings-list"]')
+  const skeleton = page.locator('main [data-slot="skeleton"]')
+  let sawSkeleton = false
+  const watch = async (name: string) => {
+    await expect.poll(async () => {
+      if (await skeleton.count()) sawSkeleton = true
+      return await page.getByRole('heading', { level: 1, name, exact: true }).count() > 0 && await skeleton.count() === 0
+    }, { intervals: [10] }).toBe(true)
+  }
+  for (const name of ['安全', '通知', '常规', '密钥与环境']) {
+    const link = sidebar.getByRole('link', { name, exact: true })
+    await link.hover()
+    // The hover starts the section's reads; once they return, the click has nothing to wait for.
+    await page.waitForLoadState('networkidle')
+    await link.click()
+    await watch(name)
+  }
+  expect(sawSkeleton, '悬停后首次打开不应出现骨架屏').toBe(false)
+  for (const name of ['安全', '通知', '常规', '密钥与环境']) {
+    await sidebar.getByRole('link', { name, exact: true }).click()
+    await watch(name)
+  }
+  expect(sawSkeleton, '再次打开不应出现骨架屏').toBe(false)
+})
+
 test('个人设置切换不请求服务端，并保持 URL、历史记录与跨页导航一致', async ({ page }) => {
   await register(page, '/settings?section=preferences')
-  const sidebar = page.locator('[data-slot="sidebar-container"]')
+  const sidebar = page.locator('[data-slot="settings-list"]')
   await expect(page.getByRole('button', { name: '浅色', exact: true })).toBeEnabled()
   const serverNavigations: string[] = []
   await page.route('**/settings?**', route => {
@@ -153,8 +281,10 @@ test('团队子页切换复用目录，历史记录和刷新可恢复当前视�
 
 test('成员首屏使用服务端结果，不立即重复读取成员 API', async ({ page }) => {
   const reads: string[] = []
+  // Members are a team workspace's; count reads from the members page's own first load.
+  await registerInTeam(page)
   page.on('request', request => { if (new URL(request.url()).pathname === '/api/workspace') reads.push(request.url()) })
-  await register(page, '/settings/members')
+  await page.goto(app('/settings/members'))
   await expect(page.getByRole('button', { name: '邀请成员', exact: true })).toBeEnabled()
   await page.getByRole('textbox', { name: '搜索成员或邀请', exact: true }).fill('回归测试成员')
   await expect(page.getByRole('row').filter({ hasText: '回归测试成员' })).toBeVisible()
@@ -165,8 +295,8 @@ test('成员首屏使用服务端结果，不立即重复读取成员 API', asyn
 })
 
 test('团队创建、常规设置与成员管理都在同一设置页内完成', async ({ page }, testInfo) => {
-  await register(page, '/settings/teams')
-  const sidebar = page.locator('[data-slot="sidebar-container"]')
+  await registerInTeam(page, '/settings/teams')
+  const sidebar = page.locator('[data-slot="settings-list"]')
   await expect(sidebar).toHaveCount(1)
   await expect(page.getByRole('main')).toHaveCount(1)
   await sidebar.getByRole('link', { name: '成员', exact: true }).click()
@@ -234,14 +364,15 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(form).not.toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '设置回归团队', exact: true })).toHaveAttribute('aria-current', 'page')
-  await expect(sidebar.locator('[data-slot="sidebar-group-label"]')).toHaveText(['个人', '工作区', '你的团队'])
-  const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^工作区$/ }) })
-  await expect(administration.locator('[data-slot="sidebar-menu-button"]')).toHaveText(['常规', '成员', '团队', '团队权限', '密钥与环境', '审计日志', '用量', '计费'])
+  // Two groups: 账号, and the current workspace by name (decision 2026-10-31-2130).
+  await expectItems(sidebar.locator('[data-slot="sidebar-group-label"]'), ['账号', 'E2E 团队', '你的团队'])
+  const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^E2E 团队$/ }) })
+  await expectItems(administration.locator('[data-slot="sidebar-menu-button"]'), ['常规', '成员', '团队', 'Bot 与 Agents', '团队权限', '密钥与环境', '审计日志', '用量', '计费'])
   await expect(sidebar.locator('[data-slot="sidebar-menu-sub"]')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '团队常规设置', exact: true })).toHaveCount(0)
   const settings = page.getByRole('region', { name: '团队设置选项', exact: true })
   await expect(settings.getByLabel('1 位成员', { exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { level: 2 })).toHaveText(['任务、项目和文档', '工作流', 'AI 与 Bot', '团队层级', '危险操作'])
+  await expectItems(page.getByRole('heading', { level: 2 }), ['任务、项目和文档', '工作流', 'AI 与 Bot', '团队层级', '危险操作'])
   await expect(page.getByText('Slack 通知', { exact: true })).toBeVisible()
   await expect(page.getByText('任务状态', { exact: true })).toHaveCount(1)
   await page.getByRole('button', { name: '退出团队', exact: true }).click()
@@ -280,7 +411,7 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
 })
 
 test('移动端页内创建不横向溢出，返回和侧栏切换保护未保存内容', async ({ page }) => {
-  await register(page, '/settings/teams')
+  await registerInTeam(page, '/settings/teams')
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
   const form = page.getByRole('form', { name: '创建新团队', exact: true, includeHidden: true })
@@ -314,4 +445,60 @@ test('移动端页内创建不横向溢出，返回和侧栏切换保护未保�
   await expect(navigation).not.toBeVisible()
   await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+})
+
+/** The page's painted colour at a point, from a screenshot, so translucent fills are measured as seen. */
+async function paintedAt(page: Page, x: number, y: number) {
+  const png = (await page.screenshot()).toString('base64')
+  return page.evaluate(async ({ png, x, y }) => {
+    const image = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob())
+    const context = new OffscreenCanvas(image.width, image.height).getContext('2d')!
+    context.drawImage(image, 0, 0)
+    const scale = image.width / window.innerWidth
+    return Array.from(context.getImageData(Math.round(x * scale), Math.round(y * scale), 1, 1).data.slice(0, 3))
+  }, { png, x, y })
+}
+
+test('设置侧栏的搜索框在浅色、深色和半透明窗口里都与侧栏底色区分开', async ({ page }) => {
+  await register(page, '/settings?section=preferences')
+  const field = page.locator('[data-slot="settings-list"] [data-slot="search-input"]')
+  await expect(field.getByRole('textbox', { name: '搜索设置', exact: true })).toBeVisible()
+  const cases = [
+    { name: 'light', scheme: 'light' as const, translucent: false },
+    { name: 'dark', scheme: 'dark' as const, translucent: false },
+    { name: 'translucent light', scheme: 'light' as const, translucent: true },
+    { name: 'translucent dark', scheme: 'dark' as const, translucent: true },
+  ]
+  for (const { name, scheme, translucent } of cases) {
+    await page.emulateMedia({ colorScheme: scheme })
+    // A solid colour stands in for the window material: light behind a light window, dark behind a dark one.
+    const material = scheme === 'dark' ? 'rgb(40 40 40)' : 'rgb(200 200 200)'
+    await page.evaluate(({ on, material }) => {
+      const root = document.documentElement
+      if (on) { root.dataset.desktopPlatform = 'darwin'; root.dataset.desktopTranslucent = ''; document.body.style.background = material }
+      else { delete root.dataset.desktopTranslucent; document.body.style.background = '' }
+    }, { on: translucent, material })
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    const box = (await field.boundingBox())!
+    // Inside the field at its right end (no icon or text there) against the sidebar just below it.
+    const inside = await paintedAt(page, box.x + box.width - 6, box.y + box.height / 2)
+    const outside = await paintedAt(page, box.x + box.width - 6, box.y + box.height + 3)
+    const difference = inside.reduce((sum, value, index) => sum + Math.abs(value - outside[index]), 0)
+    expect(difference, `${name}: 搜索框 ${inside} 与侧栏 ${outside} 几乎同色`).toBeGreaterThanOrEqual(24)
+    expect(await field.evaluate(element => getComputedStyle(element).borderTopWidth), name).toBe('0px')
+  }
+})
+
+test('个人工作区的设置没有成员、团队权限和审计日志，旧链接打开常规', async ({ page }) => {
+  // Decision 2026-10-31-2130: a new account's own workspace is personal, with only that person in it.
+  await register(page, '/settings?section=general')
+  const sidebar = page.locator('[data-slot="settings-list"]')
+  await expect(sidebar.locator('[data-slot="sidebar-group-label"]').first()).toHaveText('账号')
+  await expect(sidebar.getByRole('link', { name: '常规', exact: true })).toBeVisible()
+  for (const name of ['成员', '团队权限', '审计日志']) await expect(sidebar.getByRole('link', { name, exact: true })).toHaveCount(0)
+  for (const path of ['/settings/members', '/settings?section=permissions', '/settings?section=audit']) {
+    await page.goto(app(path))
+    await expect(page).toHaveURL(url => url.pathname === app('/settings') && url.searchParams.get('section') === 'general')
+    await expect(page.getByRole('heading', { level: 1, name: '常规', exact: true })).toBeVisible()
+  }
 })

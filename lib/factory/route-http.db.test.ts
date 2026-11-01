@@ -9,6 +9,7 @@ import { createFactoryStore } from "./store";
 import { factoryCheckIndependent } from "./check-independence";
 import { handleFactoryRoute } from "./route-http";
 import { isE2eTarget, E2E_DB_RULE } from "../../tests/helpers/e2e-target.mjs";
+import { dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) assert.ok(isE2eTarget(url), E2E_DB_RULE);
@@ -58,11 +59,7 @@ test("POST /api/factory/tasks/route routes once, replays, masks and is owner-onl
     assert.ok(!stored.rows[0].text.includes(token), "route, reason and receipts hold only the masked rationale");
     assert.match(stored.rows[0].text, /REDACTED/);
   } finally {
-    await pool.end();
-    // pool.end() resolves before the backends exit; wait before the FORCE drop.
-    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++)
-      await new Promise((r) => setTimeout(r, 50));
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await dropTestDatabase(admin, database, pool);
     await admin.end();
   }
 });
@@ -109,12 +106,7 @@ test("POST /api/factory/tasks/route under concurrency creates one task per sourc
     for (const r of different.filter((r) => r.status !== 200)) assert.deepEqual(r, { status: 409, body: { error: "factoryRouteExists" } });
     assert.deepEqual(await tasks(base.issueId), [(winners[0].body as { taskId: string }).taskId]);
   } finally {
-    await pool.end();
-    // pool.end() resolves before the backends exit; wait for 0 connections before the FORCE drop.
-    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++)
-      await new Promise((r) => setTimeout(r, 50));
-    assert.equal((await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount, 0, "no connections left before drop");
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await dropTestDatabase(admin, database, pool);
     await admin.end();
   }
 });

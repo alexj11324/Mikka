@@ -3,13 +3,21 @@ import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
-/** S-Q: a section that is still loading keeps its shape instead of rendering nothing. */
-export function SettingsLoading({ label, rows = 3 }: { label: string; rows?: number }) {
-  return <div role="status" aria-label={label} className="flex flex-col gap-1">
+/**
+ * S-Q: a section that is still loading keeps its shape instead of rendering nothing.
+ * `bare` is for rows inside a card or dialog that already has a surface: only the rows, no second card.
+ */
+export function SettingsLoading({ label, rows = 3, bare = false }: { label: string; rows?: number; bare?: boolean }) {
+  const skeletonRows = Array.from({ length: rows }, (_, i) => <div key={i} className="flex items-center justify-between gap-3 px-5 py-4"><Skeleton className="h-4 w-40" /><Skeleton className="h-6 w-12" /></div>)
+  if (bare) return <div role="status" aria-label={label} data-loading-placeholder="" className="flex flex-col divide-y divide-border">
+    <span className="sr-only">{label}</span>
+    {skeletonRows}
+  </div>
+  return <div role="status" aria-label={label} data-loading-placeholder="" className="flex flex-col gap-1">
     <span className="sr-only">{label}</span>
     <Skeleton className="mx-1 h-4 w-24" />
     <div className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border bg-card">
-      {Array.from({ length: rows }, (_, i) => <div key={i} className="flex items-center justify-between gap-3 px-5 py-4"><Skeleton className="h-4 w-40" /><Skeleton className="h-6 w-12" /></div>)}
+      {skeletonRows}
     </div>
   </div>
 }

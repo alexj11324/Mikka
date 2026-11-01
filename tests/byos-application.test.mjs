@@ -169,6 +169,9 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
   let browserServer
   let browser
   try {
+    // Native admission initializes the real owner FK/Coordinator head through
+    // readCliRunPolicy; this fixture has no task or Bot workspace membership.
+    await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('alice','BYOS fixture','alice@byos-fixture.invalid',true,now(),now()) ON CONFLICT (id) DO NOTHING`)
     assert.equal((await http(new Request('http://localhost/api/subscriptions', { method: 'POST' }))).status, 401)
     assert.equal((await http(new Request('http://localhost/api/subscriptions', { method: 'POST', headers: { 'sec-fetch-site': 'cross-site' } }))).status, 403)
     assert.equal((await post({ action: 'connect', workspaceId, provider: 'codex', accessToken: 'never-import' })).status, 409)
@@ -336,11 +339,11 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     assert.ok(!secrets.has(fairness[2]), 'two failed connections starved later cleanup')
     for(const name of fairness) blockedDeletes.delete(name)
     for(let pass=0;pass<4;pass++) await service.cleanupBatch()
-    // 移除: a pending (never finished) connection is fenced, then gone from the list for good.
+    // 移除: a pending (never finished) connection is not listed (#690), is fenced, and stays gone once removed.
     const abandoned = await post({ action: 'connect', workspaceId, provider: 'claude' })
     assert.equal(abandoned.status, 200)
     const listedIds = async () => (await (await subscriptionList(new Request(`http://localhost/api/subscriptions?workspace=${workspaceId}`, { headers: { cookie: 'fixture=alice' } }), dependencies)).json()).connections.map(item => item.id)
-    assert.ok((await listedIds()).includes(abandoned.body.connectionId))
+    assert.ok(!(await listedIds()).includes(abandoned.body.connectionId), 'a connection that never finished sign-in is listed')
     assert.equal((await post({ action: 'remove', connectionId: abandoned.body.connectionId, revision: abandoned.body.revision }, 'bob')).status, 409, 'another owner cannot remove it')
     const removed = await post({ action: 'remove', connectionId: abandoned.body.connectionId, revision: abandoned.body.revision })
     assert.equal(removed.status, 200)
@@ -420,7 +423,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
     if (browser) await browser.close()
     if (browserServer) await new Promise(resolve => browserServer.close(resolve))
     await new Promise(resolve => infisical.close(resolve))
-    await pool.end()
+    await Promise.all([pool.end(), (await import('../lib/db/index.ts')).pool.end(), (await import('../lib/workspace-db.ts')).workspacePool.end()])
     await rm(directory, { recursive: true, force: true })
   }
 })

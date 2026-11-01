@@ -5,6 +5,7 @@ import {
   CAPTURE_EXTENSIONS, CAPTURE_MAX_BYTES, captureKind, captureProblem, cleanCaptureTitle, sniffCaptureType,
   type CaptureContentType, type CaptureSource, type CaptureUploadRequest, type CaptureUploadResponse, type CaptureView,
 } from '@mikka/protocol/capture'
+import { withAccountWrite } from '@/lib/account/write-guard'
 import { db } from '@/lib/db'
 import { agentRuns, artifacts, runCaptureShares, runCaptureSteps, runCaptures } from '@/lib/db/schema'
 import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignArtifactPut, putArtifactObject } from '@/lib/artifacts/storage'
@@ -46,6 +47,10 @@ async function place(owner: CaptureOwner, id: string, bytes: Uint8Array, content
 
 /** Stores a finished file as a ready capture of the run. */
 export async function saveCapture(owner: CaptureOwner, input: { bytes: Uint8Array; title: string; source: CaptureSource; durationMs?: number }): Promise<CaptureView | CaptureError> {
+  return withAccountWrite(owner.userId, () => writableSaveCapture(owner, input))
+}
+
+async function writableSaveCapture(owner: CaptureOwner, input: { bytes: Uint8Array; title: string; source: CaptureSource; durationMs?: number }): Promise<CaptureView | CaptureError> {
   const contentType = sniffCaptureType(input.bytes)
   const problem = captureProblem(input.bytes)
   if (!contentType || problem) return { error: contentType ? 'too_large' : 'invalid', message: problem ?? 'Not a capture.' }
@@ -72,6 +77,10 @@ async function dropStaleUploads(owner: CaptureOwner) {
 
 /** Reserves a capture for a file the daemon is about to send and says where to send it. */
 export async function beginUpload(owner: CaptureOwner, input: CaptureUploadRequest): Promise<CaptureUploadResponse | CaptureError> {
+  return withAccountWrite(owner.userId, () => writableBeginUpload(owner, input))
+}
+
+async function writableBeginUpload(owner: CaptureOwner, input: CaptureUploadRequest): Promise<CaptureUploadResponse | CaptureError> {
   const kind = captureKind(input.contentType)
   if (input.size > CAPTURE_MAX_BYTES[kind]) return { error: 'too_large', message: `At most ${CAPTURE_MAX_BYTES[kind]} bytes for a ${kind}.` }
   const storage = artifactStorage()
@@ -83,6 +92,7 @@ export async function beginUpload(owner: CaptureOwner, input: CaptureUploadReque
   // Keep untrusted uploads separate from the immutable evidence namespace so
   // a bucket lifecycle rule can expire even a replayed presigned upload.
   const key = `capture-uploads/${storageKey(owner, id, input.contentType)}`
+  const expiresAt = new Date(Date.now() + UPLOAD_TTL_MS)
   const reserved = await db.transaction(async tx => {
     // Serialize reservation with the run's terminal transition. The route's
     // initial authentication alone cannot prevent a begin/end race.
@@ -97,14 +107,16 @@ export async function beginUpload(owner: CaptureOwner, input: CaptureUploadReque
     const inserted = await tx.insert(runCaptures).values({
       id, userId: owner.userId, runId: owner.runId, issueId: owner.issueId, botId: owner.botId,
       kind, contentType: input.contentType, source: 'local', status: 'uploading', title,
-      storageKey: key, size: input.size, sha256: input.sha256, expiresAt: new Date(Date.now() + UPLOAD_TTL_MS),
+      storageKey: key, size: input.size, sha256: input.sha256, expiresAt,
     }).onConflictDoNothing().returning({ id: runCaptures.id })
     if (!inserted.length) return 'conflict' as const
     return null
   })
   if (reserved) return { error: reserved, message: reserved === 'conflict' ? 'Too many uploads in progress for this run.' : 'Run is no longer accepting uploads.' }
   if (storage === 'inline') return { captureId: id, upload: { target: 'server' } }
-  const signed = await presignArtifactPut(key, input.contentType, UPLOAD_TTL_MS / 1000)
+  const seconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
+  if (seconds < 1) return { error: 'unavailable', message: 'Upload expired.' }
+  const signed = await presignArtifactPut(key, input.contentType, seconds)
   return { captureId: id, upload: { target: 'storage', ...signed } }
 }
 
@@ -117,6 +129,10 @@ async function openUpload(owner: CaptureOwner, captureId: string) {
 
 /** Reissue a target only for the same already-reserved, unexpired upload. */
 export async function resumeUpload(owner: CaptureOwner, captureId: string): Promise<CaptureUploadResponse | CaptureError> {
+  return withAccountWrite(owner.userId, () => writableResumeUpload(owner, captureId))
+}
+
+async function writableResumeUpload(owner: CaptureOwner, captureId: string): Promise<CaptureUploadResponse | CaptureError> {
   const row = await openUpload(owner, captureId)
   if (!row || row.source !== 'local' || !row.storageKey || !row.expiresAt) return { error: 'not_found', message: 'No open upload with that id for this run.' }
   if (artifactStorage() === 'inline') return { captureId, upload: { target: 'server' } }
@@ -142,6 +158,10 @@ export async function receiveUpload(owner: CaptureOwner, captureId: string, byte
  * is deleted.
  */
 export async function completeUpload(owner: CaptureOwner, captureId: string): Promise<CaptureView | CaptureError> {
+  return withAccountWrite(owner.userId, () => writableCompleteUpload(owner, captureId))
+}
+
+async function writableCompleteUpload(owner: CaptureOwner, captureId: string): Promise<CaptureView | CaptureError> {
   // A lost success response is safe to retry for the original upload window.
   const readyUpload = async () => (await db.select().from(runCaptures).where(and(
     eq(runCaptures.id, captureId), eq(runCaptures.runId, owner.runId), eq(runCaptures.userId, owner.userId),
@@ -240,6 +260,10 @@ export async function currentRecording(runId: string) {
 }
 
 export async function finishRecording(row: Row, input: { bytes: Uint8Array; durationMs: number }): Promise<CaptureView | CaptureError> {
+  return withAccountWrite(row.userId, () => writableFinishRecording(row, input))
+}
+
+async function writableFinishRecording(row: Row, input: { bytes: Uint8Array; durationMs: number }): Promise<CaptureView | CaptureError> {
   const problem = captureProblem(input.bytes, 'video/mp4')
   if (problem) { await failRecording(row.id, problem); return { error: 'invalid', message: problem } }
   const file = await place(row, row.id, input.bytes, 'video/mp4')

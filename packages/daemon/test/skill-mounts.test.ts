@@ -1,11 +1,11 @@
 import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { skillMarkdown, type SkillAssignmentReceipt } from '@mikka/protocol/skill'
 import { defaultRunPolicy, runPolicyDigestInput } from '@mikka/protocol/agent-policy'
-import type { RunCompletion } from '@mikka/protocol/run'
+import { emptyRunReport, type RunCompletion } from '@mikka/protocol/run'
 import type { AgentAdapter, AgentReport, SessionOptions, StartOptions } from '../src/adapters/types'
 import { endedSession } from '../src/agents/child'
 import { RunContext, runPaths } from '../src/agents/run-context'
@@ -17,11 +17,11 @@ import { cleanupTempDirs, makeRepo, tempDir, waitFor } from './helpers'
 
 afterEach(cleanupTempDirs)
 
-async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' | 'wrong-receipt' | 'cached-handoff' | 'wrong-fixture' | 'delayed-handoff' = 'valid', resumed = false, benchmark = false, observedModel: string | null = 'observed-model', questionContinuation?: 'valid' | 'expired' | 'wrong-device' | 'missing-worktree') {
+async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' | 'wrong-receipt' | 'cached-handoff' | 'wrong-fixture' | 'delayed-handoff' = 'valid', resumed = false, benchmark = false, observedModel: string | null = 'observed-model', questionContinuation?: 'valid' | 'expired' | 'wrong-device' | 'missing-worktree', team?: 'approved' | 'withdrawn') {
   const root = tempDir(), repo = await makeRepo(), runId = randomUUID(), worktree = join(root, 'worktree')
   execFileSync('git', ['worktree', 'add', '--detach', worktree, 'HEAD'], { cwd: repo, stdio: 'ignore' })
   const receipt: SkillAssignmentReceipt = { id: randomUUID(), runId, issueId: randomUUID(), agentId: randomUUID(), repoId: randomUUID(),
-    deviceId: randomUUID(), assignedAt: new Date().toISOString(), leaseExpiresAt: new Date(Date.now() + 60000).toISOString(), artifact: BASELINE_ARTIFACT }
+    deviceId: randomUUID(), assignedAt: new Date().toISOString(), leaseExpiresAt: new Date(Date.now() + 60000).toISOString(), artifact: team ? {...BASELINE_ARTIFACT,registryId:'mikka-team'} : BASELINE_ARTIFACT }
   const benchmarkPolicy = { ...defaultRunPolicy(), readOnly: true }
   const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: worktree, encoding: 'utf8' }).trim()
   const assignment = { runId, issueId: receipt.issueId, repoId: receipt.repoId, deviceId: receipt.deviceId,
@@ -69,6 +69,11 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
       const context = new RunContext({ harness: 'codex', worktree, runDir: runPaths(adapterStateDir, runId).runDir,
         privateDir: root, skills: [BASELINE_SKILL], skillReceipt: receipt })
       if (mode === 'tampered') writeFileSync(join(context.skillsDir, 'run-report', 'SKILL.md'), 'changed')
+      const runDir = runPaths(adapterStateDir, runId).runDir
+      for (const file of ['github/config.json', 'runtime-home/.codex/auth.json', 'runtime-home/.claude/.credentials.json', 'codex-home/auth.json', 'native-home/.claude/.credentials.json']) {
+        mkdirSync(join(runDir, file, '..'), { recursive: true })
+        writeFileSync(join(runDir, file), '{}')
+      }
     }
     if (mode === 'cached-handoff' || replaying) return endedSession('actual-session', { type: 'exit', outcome: 'succeeded', stopReason: 'turn_ended', report: { summary: 'durable handoff' } })
     return { runtimeModel: mode === 'delayed-handoff' ? null : observedModel, sessionId: mode === 'wrong-session' ? 'other-session' : 'actual-session', cancel: async () => { cancelled = true }, send: async () => {},
@@ -85,7 +90,7 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
         yield { type: 'exit' as const, outcome: 'succeeded' as const, stopReason: 'turn_ended' as const,
         report: { summary: 'test', execution: { observedModel: 'model-fake' }, sourceCommit: 'f'.repeat(40), skillMount: { ...priorMount, sessionId: 'model-lie' } } as AgentReport } } }
   }
-  let startOptions: StartOptions | undefined
+  let startOptions: StartOptions | undefined, revalidations=0
   const adapter: AgentAdapter = { harness: 'codex', capabilities: { supportsResume: true, supportsInterject: false }, envAllow: [],
     start: options => { startOptions = options; return open(options) }, resume: (_id, options) => open(options) }
   const completions: RunCompletion[] = []
@@ -99,7 +104,11 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
     worktrees: { create: async () => worktree, continueFrom: async () => questionContinuation === 'missing-worktree' ? null : worktree, bootstrap: async () => 'test', pathFor: () => worktree, changedFiles: async () => [] },
     outbox: { push: (_id: string, item: { kind: string; completion: RunCompletion }) => { if (item.kind === 'complete') completions.push(item.completion) },
       compact: async () => {}, lastChunkSeq: () => 0 },
-    revalidateSkillAssignment: async () => ({ skillReceipt: receipt, leaseExpiresAt: receipt.leaseExpiresAt }),
+    revalidateSkillAssignment: async () => {
+      revalidations++
+      if(team==='withdrawn')throw new Error('Team Skill withdrawn')
+      return { skillReceipt: receipt, leaseExpiresAt: receipt.leaseExpiresAt }
+    },
   } as unknown as SupervisorDeps
   mkdirSync(adapterStateDir, { recursive: true })
   const supervisor = new RunSupervisor(deps)
@@ -116,7 +125,7 @@ async function fixture(mode: 'valid' | 'missing' | 'tampered' | 'wrong-session' 
     await restarted.resumeAll()
     await restarted.idle()
   } else await supervisor.idle()
-  return { report: completions.at(-1)!.report, journal, cancelled, priorMount, priorExecution, runId, receipt, parentRunId, parentReceipt, startOptions, worktree, stopReason: completions.at(-1)!.stopReason }
+  return { revalidations, report: completions.at(-1)?.report??emptyRunReport(), journal, cancelled, priorMount, priorExecution, runId, receipt, parentRunId, parentReceipt, startOptions, worktree, stopReason: completions.at(-1)?.stopReason }
 }
 
 it('revalidates question continuation bytes and journals a fresh receipt in the original session', async () => {
@@ -165,6 +174,12 @@ it('rereads real RunContext bytes and ignores model-supplied evidence', async ()
   expect(result.report.skillMount).toMatchObject({ receiptId: result.receipt.id, sessionId: 'actual-session', sha256: BASELINE_ARTIFACT.sha256 })
   expect(result.journal.get(result.runId)?.skillMount).toEqual(result.report.skillMount)
   expect(skillMarkdown(BASELINE_SKILL)).toContain('Run report')
+  // A finished turn leaves no credential behind, but keeps what a resume reads.
+  const runDir = runPaths(join(result.worktree, '..', 'adapters'), result.runId).runDir
+  for (const file of ['github', 'runtime-home/.codex/auth.json', 'runtime-home/.claude/.credentials.json', 'codex-home/auth.json', 'native-home/.claude/.credentials.json'])
+    expect(existsSync(join(runDir, file))).toBe(false)
+  expect(existsSync(join(runDir, 'runtime-home'))).toBe(true)
+  expect(existsSync(join(runDir, 'skills'))).toBe(true)
 })
 it.each(['missing', 'tampered'] as const)('does not record a %s mount', async mode => {
   const result = await fixture(mode)
@@ -229,4 +244,21 @@ it('recovers a delayed observation journaled before a durable handoff and daemon
   expect(result.report.execution?.observedModel).toBe('late-observed-model')
   expect(result.report.runtime?.observedModel).toBe('late-observed-model')
   expect(result.journal.get(result.runId)?.execution?.observedModel).toBe('late-observed-model')
+})
+
+it('revalidates a new Team Skill assignment before starting its adapter', async()=>{
+  const result=await fixture('valid',false,false,'observed-model',undefined,'approved')
+  expect(result.revalidations).toBe(1)
+  expect(result.startOptions).toBeDefined()
+  expect(result.stopReason).toBe('turn_ended')
+})
+it('a withdrawn Team Skill never reaches the adapter, including a saved resume', async()=>{
+  for(const resumed of [false,true]) {
+    const result=await fixture('valid',resumed,false,'observed-model',undefined,'withdrawn')
+    expect(result.revalidations).toBe(1)
+    expect(result.startOptions).toBeUndefined()
+    expect(result.report.skillMount).toBeUndefined()
+    expect(result.stopReason).not.toBe('turn_ended')
+    if(resumed)expect(result.journal.get(result.runId)?.error).toMatch(/Skill resume blocked/)
+  }
 })

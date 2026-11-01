@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { deviceHeartbeatSchema } from '@mikka/protocol/device'
@@ -6,7 +7,7 @@ import { ensureDeviceAgents } from '@/lib/device-agents'
 import { devices } from '@/lib/db/schema'
 import { authenticateDevice, linkDeviceToken } from '@/lib/device-link'
 import { reclaimLostRuns, renewRunLeases } from '@/lib/run-leases'
-import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
+import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { skillAssignments } from '@/lib/self-improvement/server'
 import { pendingDeviceCommands } from '@/lib/device-management'
 import { renewCloudDeviceToken } from '@/lib/computer/cloud-device'
@@ -24,7 +25,7 @@ export const dynamic = 'force-dynamic'
  * Afterwards, runs the owner lost on another device are queued again, and
  * (Factory on) queued Factory runs this device could not take are marked re-dispatched once.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
@@ -42,7 +43,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   const [prior] = factoryOn ? await db.select({ enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses }).from(devices).where(eq(devices.id, deviceId)).limit(1) : []
   await db.update(devices).set({ ...(parsed.data.deviceType ? { deviceType: parsed.data.deviceType } : {}), harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
   await ensureDeviceAgents(pool, caller.userId, deviceId, parsed.data.harnesses)
-  const selected=await skillAssignments.renewHeartbeat(caller.userId,deviceId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1')
+  const selected=await skillAssignments.renewHeartbeat(caller.userId,deviceId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1',request.headers.get(TEAM_SKILL_HEADER)==='1')
   const result=await renewRunLeases(deviceId,selected.legacy)
   result.leases={...result.leases,...selected.leases}
   result.revoked=[...new Set([...(result.revoked??[]),...selected.revoked])]
@@ -53,3 +54,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ dev
   after(() => reclaimLostRuns(caller.userId).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error)))
   return NextResponse.json({ ...result, deviceCommands: await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? [], parsed.data.failedDeviceCommands ?? []), ...(cloudCredential ? { cloudCredential } : {}) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
+
+export const POST = withDeviceRoute(handlePOST)

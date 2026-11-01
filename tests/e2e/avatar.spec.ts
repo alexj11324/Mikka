@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { test, expect, register, app } from "./fixtures";
+import { test, expect, registerInTeam, app } from "./fixtures";
 
 test("新注册账号得到默认渐变头像，账号图片优先，没有图片的老账号与加载失败回退邮箱首字母（中文姓名不参与）", async ({ page }) => {
   const email = `alex-${randomUUID()}@example.com`;
-  await register(page, "/settings/members", email);
+  await registerInTeam(page, "/settings/members", email);
   const label = `${email} 的头像`;
   const memberAvatar = page.getByRole("table").getByRole("row").filter({ hasText: email }).getByRole("img", { name: label, exact: true });
   // A new account without a picture gets a default avatar at sign-up, the same one wherever it appears.

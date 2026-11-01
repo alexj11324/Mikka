@@ -9,8 +9,9 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
+import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatView, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatView, retryFailedTurn, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import { and, eq } from 'drizzle-orm'
 import { bots, devices } from '@/lib/db/schema'
 import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
@@ -70,7 +71,7 @@ export async function botChatSummaries(): Promise<Record<string, BotChatSummary>
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[]): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const requestHeaders=await headers()
     const session=await auth.api.getSession({headers:requestHeaders})
@@ -83,7 +84,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
       }catch{/* Missing/malformed origin is no approval provenance. */}
     }
     const bot = await ownBot(userId, botId)
-    const parsed = personalSubmissionInput.safeParse({ text, submissionId })
+    const parsed = personalSubmissionInput.safeParse({ text, submissionId, ...(images?.length ? { images } : {}) })
     if (!parsed.success) throw new ActionFailureError('messageRequired')
     const quoted = quote ? quoteSchema.safeParse(quote) : null
     if (quoted && !quoted.success) throw new ActionFailureError('messageRequired')
@@ -102,7 +103,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
         .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).limit(1)
       if (!device) throw new ActionFailureError('deviceNotFound')
     }
-    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot?.id ?? null, submissionId: parsed.data.submissionId, taskDestination: destination.data, ...(humanSessionId ? { humanSessionId } : {}) }) }
+    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot?.id ?? null, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, ...(humanSessionId ? { humanSessionId } : {}) }) }
     catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error
@@ -124,11 +125,24 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     const bot = await ownBot(session.user.id, botId)
     if (!coordinatorEnabled()) return { queued: false }
     const chat = await chatView(session.user.id, 1, bot?.id ?? null)
-    if (chat.items.length || chat.working) return { queued: false }
+    if (chat.items.length || chat.working || chat.error) return { queued: false }
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
     await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot?.name), { botId: bot?.id ?? null }))
     after(() => wakeCoordinator(session.user.id))
     return { queued: true }
+  })
+}
+
+/** 重试 on a failed reply: the same turn again, once per click; the chat shows its normal working state. */
+export async function retryCoordinatorTurn(botId: string | null = null): Promise<ActionResult<{ queued: boolean }>> {
+  return runAction(async () => {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) throw new ActionFailureError('authRequired')
+    const bot = await ownBot(session.user.id, botId)
+    if (!coordinatorEnabled()) return { queued: false }
+    const queued = await retryFailedTurn(session.user.id, bot?.id ?? null)
+    if (queued) after(() => wakeCoordinator(session.user.id))
+    return { queued }
   })
 }
 

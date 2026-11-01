@@ -299,8 +299,11 @@ for (const kind of ['claude_code', 'codex'] as const) test(`${kind} fake CLI has
 
 test('hosted source preserves original socket mounts/network isolation and passes host callbacks only through existing adapters', () => {
   const source = readFileSync('src/subscription-hosted-runner.ts', 'utf8')
-  assert.match(source, /adapter\.start\(options\)/)
-  assert.match(source, /adapter\.resume\(previous\.sessionId, options\)/)
+  // Container-local executable paths are added without dropping the existing
+  // host-owned callbacks or serializing them into the container bootstrap.
+  assert.match(source, /const runtimeOptions = \{ \.\.\.options,/)
+  assert.match(source, /adapter\.start\(runtimeOptions\)/)
+  assert.match(source, /adapter\.resume\(previous\.sessionId, runtimeOptions\)/)
   assert.doesNotMatch(source, /mailboxSocket|mikka-mailbox\.sock/)
   const bootstrap = readFileSync('src/agents/native-container.mjs', 'utf8')
   assert.doesNotMatch(bootstrap, /mailbox|allowAllUnixSockets/)

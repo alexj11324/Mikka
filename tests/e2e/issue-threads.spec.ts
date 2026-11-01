@@ -56,7 +56,7 @@ test('Issue threads open on the right as a conversation; comments are cards with
   // A running thread ends in the composer; what is said there goes to the agent and stays in the thread.
   await threads.getByRole('button', { name: '打开线程 Route group replies', exact: true }).click()
   panel = page.getByRole('region', { name: 'Route group replies', exact: true })
-  await panel.getByRole('textbox', { name: '告诉 Coordinator 下一步做什么…' }).fill('Check the fallback timer')
+  await panel.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' }).fill('Check the fallback timer')
   await panel.getByRole('button', { name: '发送', exact: true }).click()
   await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('Check the fallback timer')
   expect(feedbackRequests).toEqual([])
@@ -137,7 +137,7 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
 
   await threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true }).click()
   panel = page.getByRole('region', { name: 'Trim the bundle', exact: true })
-  const composer = panel.getByRole('textbox', { name: '告诉 Coordinator 下一步做什么…' })
+  const composer = panel.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })
   const stop = panel.getByRole('button', { name: '停止', exact: true })
   // Typing turns stop into send; clearing the draft brings stop back.
   await composer.fill('Keep the polyfills')
@@ -186,10 +186,15 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
     await expect(panel.getByRole('button', { name: '重试停止', exact: true })).toBeEnabled()
     await testInfo.attach(`thread-stop-timeout-${view.name}-dark`, { body: await page.screenshot(), contentType: 'image/png' })
     await testInfo.attach(`thread-stop-${view.name}-bounds.json`, { body: JSON.stringify({ frame: '372:4786', viewport: { width: view.width, height: view.height }, bounds: await panel.boundingBox(), boundary: 'UI fixture with no daemon acknowledgement; the real stop action and 30-second timeout execute. Terminal acknowledgement below is seeded separately.' }, null, 2), contentType: 'application/json' })
+    const retryRequest = page.waitForRequest(request => request.method() === 'POST' && !!request.headers()['next-action'] && request.postData()?.includes(runs.running) === true)
     await panel.getByRole('button', { name: '重试停止', exact: true }).click()
     await expect(panel.getByRole('alert')).toHaveCount(0)
     await expect(composer).toHaveValue('Keep this draft while stopping')
     await expect(panel.getByText('正在停止…', { exact: true })).toBeVisible()
+    // The stopping UI is optimistic: finish this retry before seeding daemon acknowledgement.
+    const retryResponse = await (await retryRequest).response()
+    expect(retryResponse).not.toBeNull()
+    expect(retryResponse?.status()).toBe(200)
     expect((await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt).toEqual(originalStop)
     // The daemon ends the run: the thread shows it stopped and the composer goes away.
     await check.query('UPDATE agent_runs SET status = $2, "finishedAt" = now() WHERE id = $1', [runs.running, 'stopped'])

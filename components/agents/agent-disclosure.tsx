@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, type HTMLMotionProps, useReducedMotion } from "motion/react";
+import { motion, type HTMLMotionProps } from "motion/react";
+import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import type { CSSProperties } from "react";
 import { EASE_OUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";

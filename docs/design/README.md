@@ -12,10 +12,13 @@ says which source wins when two disagree, and where each kind of rule lives.
    the old components that must not come back.
 4. [`copy.md`](copy.md): how every visible string is written (C-01…C-08), and
    which products set the precedent.
-5. [`decisions.md`](decisions.md): what Alex decided, when, and what it
+5. [`orchestration.md`](orchestration.md): models, Agents, machines,
+   scheduling, credentials in runs and who pays.
+6. [`decisions/`](decisions/README.md) (one file per decision) and the frozen
+   [`decisions.md`](decisions.md): what Alex decided, when, and what it
    replaced. Check it before you reopen a question.
-6. The accepted Figma frames for your feature (listed in `decisions.md`).
-7. [`../review-checklist.md`](../review-checklist.md): run it before you show UI
+7. The accepted Figma frames for your feature (listed in `decisions/` or `decisions.md`).
+8. [`../review-checklist.md`](../review-checklist.md): run it before you show UI
    to anyone.
 
 New feature? Copy [`spec-template.md`](spec-template.md) first.
@@ -37,10 +40,15 @@ source is now out of date and who owns it.
 
 Notes:
 
-- A Figma frame counts only if `decisions.md` lists it as accepted. Frames on
+- A Figma frame counts only if `decisions/` or `decisions.md` lists it as accepted. Frames on
   the 「归档」 page, or marked 已废弃, never count.
 - Figma decides layout, not look. Comma decides look. Old Figma frames use
   zinc greys; the tokens in `rules.md` win.
+- The vendored design skills `unslop` and `interface-design`
+  (`.claude/skills/`) win over `rules.md` for product and visual rules by
+  default (decision 2026-10-31); a skill rule that does not fit a dense SaaS
+  product is skipped with a reason. Change the rule, its check and the code
+  in the same PR.
 - Library defaults are the lowest source. A shadcn default that breaks a rule
   (for example the `border-input` hairline, R-31) is a bug, not a choice.
 - A measured value (a width, a gap) that differs between Figma and code is a
@@ -56,7 +64,7 @@ Notes:
 | Words | `docs/design/glossary.md` | Whoever changes the model, in the same PR |
 | Product and visual rules | `docs/design/rules.md` | Any thread, after Alex decides |
 | Components | `docs/design/components.md` | The thread that adds or retires a component |
-| Decisions | `docs/design/decisions.md` | Whoever hears the decision, the same day |
+| Decisions | `docs/design/decisions/`, one file each (`decisions.md` is frozen) | Whoever hears the decision, the same day |
 | Brand mark | `docs/design/brand.md` | Any thread, after Alex decides |
 | Figma file | `zPe5LKycb2XuT1ivCLRw07`, style guide section `98:2` | Any thread; new work goes on its own page, named with the feature and date |
 | Tokens in code | `app/globals.css`, mapped in `rules.md` § Tokens | Frontend threads; any token change updates Figma too |

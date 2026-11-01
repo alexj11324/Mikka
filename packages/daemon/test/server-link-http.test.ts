@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { CLIENT_VERSION_HEADER, emptyRunReport } from "@mikka/protocol"
 import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
+import { TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
+import { RECOVERY_WORKTREE_HEADER } from "@mikka/protocol/device"
 
 import {
   DaemonError,
@@ -44,6 +46,7 @@ function scripted(respond: (call: Call) => Response | Promise<Response>): {
       body: init?.body ? JSON.parse(String(init.body)) : undefined,
       redirect: init?.redirect,
     }
+    if (call.path.includes("/policy-snapshot?")) return new Response(null,{status:404})
     calls.push(call)
     return respond(call)
   }) as typeof fetch
@@ -84,6 +87,15 @@ const assignment = (runId: string) => ({
 })
 
 describe("HttpServerLink", () => {
+  it('advertises strict local-worktree continuation and preserves the required assignment', async () => {
+    const fetcher = (async (_url, init) => {
+      expect(new Headers(init?.headers).get(RECOVERY_WORKTREE_HEADER)).toBe('1')
+      expect(new Headers(init?.headers).get(TEAM_SKILL_HEADER)).toBe('1')
+      return json({...assignment('run-1'),continuesRunId:'lost-run',requireWorktreeContinuation:true})
+    }) as typeof fetch
+    const result=await new HttpServerLink('http://server.test',fetcher).claimRun('dev-1','run-1')
+    expect(result.requireWorktreeContinuation).toBe(true)
+  })
   it('holds every pending tool callback during human control and continues the same gate on release', async () => {
     vi.useFakeTimers()
     let paused = true, live = true, executed = 0
@@ -154,10 +166,12 @@ describe("HttpServerLink", () => {
     let observed: AbortSignal | undefined
     let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
     try {
-      const fetch=(async (_url: unknown,init?: RequestInit) => new Promise<Response>((_resolve,reject)=>{
+      const fetch=(async (_url: unknown,init?: RequestInit) => {
+        if (String(_url).includes("/policy-snapshot?")) return new Response(null,{status:404})
+        return new Promise<Response>((_resolve,reject)=>{
         observed=init?.signal ?? undefined
         observed?.addEventListener('abort',()=>reject(new Error('aborted')),{once:true})
-      })) as typeof globalThis.fetch
+      })}) as typeof globalThis.fetch
       gate=await new HttpServerLink('http://server.test',fetch).prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy:defaultRunPolicy(),policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
       await vi.advanceTimersByTimeAsync(1000)
       expect(deadline).toHaveBeenCalledWith(5000)
@@ -165,7 +179,7 @@ describe("HttpServerLink", () => {
       gate.revoke()
       expect(observed?.aborted).toBe(true)
       await vi.advanceTimersByTimeAsync(2000)
-      expect(deadline).toHaveBeenCalledTimes(1)
+      expect(deadline).toHaveBeenCalledTimes(2)
     } finally { gate?.revoke(); deadline.mockRestore(); vi.useRealTimers() }
   })
   it('revokes an idle run when its server-side policy revision or lease ceases to be live', async () => {
@@ -337,7 +351,7 @@ describe("HttpServerLink", () => {
         ? Response.redirect("https://sso.example.test/login", 302)
         : json({ error: "Deployment SSO required" }, 401))
     const link = new HttpServerLink("https://preview.example.test/mikka", fetch)
-    const daemon = new Daemon({ dataDir: tempDir(), flavor: "dev", link, log: createLogger({ level: "silent" }) })
+    const daemon = new Daemon({ dataDir: tempDir(), flavor: "dev", agentSandbox: null, link, log: createLogger({ level: "silent" }) })
     const device = { credential: "valid-device-session" }
     // Exercise the sync boundary without starting the daemon's local RPC server.
     Reflect.set(daemon, "device", device)

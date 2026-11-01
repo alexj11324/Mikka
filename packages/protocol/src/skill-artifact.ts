@@ -2,8 +2,10 @@ import { z } from 'zod'
 
 /** Capability marker only, never an authorization grant or binary attestation. */
 export const SKILL_ARTIFACT_HEADER = 'x-mikka-skill-artifacts'
+/** This daemon revalidates a team Skill before starting a new assignment. */
+export const TEAM_SKILL_HEADER = 'x-mikka-team-skills'
 export const skillArtifactRefSchema = z.object({
-  schemaVersion: z.literal(1), registryId: z.literal('mikka-builtin'),
+  schemaVersion: z.literal(1), registryId: z.enum(['mikka-builtin','mikka-team']),
   skillId: z.uuid(), versionId: z.uuid(), format: z.literal('single-skill-md-v1'),
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
 }).strict()

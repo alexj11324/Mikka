@@ -2,10 +2,10 @@ import { test, expect, register, app, openCreateIssue } from './fixtures'
 
 const schemes = ['light', 'dark'] as const
 
-test.describe('E2B 机器名截图', () => {
+test.describe('Mikka Cloud 机器名截图', () => {
   test.setTimeout(240_000)
   for (const colorScheme of schemes) {
-    test(`新建任务：E2B 选中、下拉、休眠/唤醒、移动端 ${colorScheme}`, async ({ page }, testInfo) => {
+    test(`新建任务：Mikka Cloud 选中、下拉、休眠/唤醒、移动端 ${colorScheme}`, async ({ page }, testInfo) => {
       await page.emulateMedia({ colorScheme })
       await register(page, '/')
       const shot = (name: string) => page.screenshot({ path: testInfo.outputPath(`shots/fe7-${name}-${colorScheme}.png`) })
@@ -16,11 +16,11 @@ test.describe('E2B 机器名截图', () => {
         await page.goto(app('/'))
         const dialog = await openCreateIssue(page)
         const trigger = dialog.getByRole('combobox', { name: '运行的机器', exact: true })
-        await expect(trigger).toContainText('E2B')
+        await expect(trigger).toContainText('Mikka Cloud')
         await shot(`dialog-e2b-${machine}`)
         if (machine === 'sleeping') {
           await trigger.click()
-          await expect(page.getByRole('option', { name: /E2B/ })).toBeVisible()
+          await expect(page.getByRole('option', { name: /Mikka Cloud/ })).toBeVisible()
           await shot('dropdown-open')
           await page.keyboard.press('Escape')
         }
@@ -28,7 +28,7 @@ test.describe('E2B 机器名截图', () => {
       await page.setViewportSize({ width: 390, height: 844 })
       await page.goto(app('/'))
       const dialog = await openCreateIssue(page)
-      await expect(dialog.getByRole('combobox', { name: '运行的机器', exact: true })).toContainText('E2B')
+      await expect(dialog.getByRole('combobox', { name: '运行的机器', exact: true })).toContainText('Mikka Cloud')
       await shot('mobile-chips')
     })
   }
@@ -36,7 +36,7 @@ test.describe('E2B 机器名截图', () => {
 
 // The real ComputerCard from a stored agent reply. The reply lives only in this fixture; a demo- bot id uses
 // the existing client-side mock computer: ?computer-mock=sleep opens it asleep, ?computer-mock=waking mid-wake.
-// Asleep or waking the chat card is only the 「E2B · 休眠中/唤醒中」 chip (no screen, so no 唤醒 cover to click);
+// Asleep or waking the chat card is only the 「Mikka Cloud · 休眠中/唤醒中」 chip (no screen, so no 唤醒 cover to click);
 // waking happens from the bot's screen, so each state is its own page load.
 async function seedReply(email: string, content: string) {
   const { randomUUID } = await import('node:crypto')
@@ -64,7 +64,7 @@ for (const colorScheme of schemes) {
     for (const [mock, status] of [['sleep', '休眠中'], ['waking', '唤醒中']] as const) {
       await page.goto(app(`/?section=coordinator&computer-mock=${mock}`))
       await expect(region.getByText(status, { exact: true }).first()).toBeVisible()
-      await expect(region.getByText('E2B', { exact: true }).first()).toBeVisible()
+      await expect(region.getByText('Mikka Cloud', { exact: true }).first()).toBeVisible()
       await page.screenshot({ path: testInfo.outputPath(`shots/fe7-card-${mock === 'sleep' ? 'sleeping' : 'waking'}-${colorScheme}.png`) })
     }
   })

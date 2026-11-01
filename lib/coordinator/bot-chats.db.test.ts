@@ -15,6 +15,64 @@ try {
 if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')
 const dbTest = databaseUrl ? test : test.skip
 
+dbTest('failed wake state stays with its owner and bot, and recovery keeps the original message', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-wake-state-${randomUUID()}`, peer = `test-wake-peer-${randomUUID()}`
+  const botId = randomUUID(), peerBotId = randomUUID()
+  t.after(async () => {
+    t.diagnostic(JSON.stringify({ event: 'coordinator_db_fixture_retained', fixtureOwnerIds: [owner, peer], database: 'mikka_e2e' }))
+    await scope.close()
+  })
+  await scope.run(async () => {
+    for (const id of [owner, peer]) await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${id}, 'Wake fixture', ${`${id}@example.invalid`}, false, now(), now())`)
+    await db.insert(schema.bots).values([
+      { id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Owner bot' },
+      { id: peerBotId, ownerId: peer, workspaceId: randomUUID(), name: 'Peer bot' },
+    ])
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'Original pending request', { botId }))
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'Separate Coordinator request'))
+    await recordCoordinatorEvent(db, userMessageEvent(peer, 'Peer private request', { botId: peerBotId }))
+    const botEvents = and(eq(schema.coordinatorEvents.userId, owner), eq(schema.coordinatorEvents.botId, botId))
+    assert.equal((await store.botChats(owner))[botId].working, true, 'a new pending bot has a spinner even before its session exists')
+    await db.update(schema.coordinatorEvents).set({ wakeAttempts: 1, wakeLeaseUntil: new Date(Date.now() - 1) }).where(botEvents)
+    const unconfirmed = await store.chatView(owner, 200, botId)
+    assert.equal(unconfirmed.cursor,0,'pending input is outside the stored cursor')
+    assert.equal(unconfirmed.streamRunId,undefined,'pending wake never grants a stream run')
+    assert.deepEqual([unconfirmed.working, unconfirmed.error], [false, 'wake_start_unconfirmed'])
+    assert.deepEqual(unconfirmed.items.map(item => [item.text, item.pending]), [['Original pending request', true]])
+    assert.equal((await store.botChats(owner))[botId].working, false)
+    assert.equal((await store.chatView(owner)).working, true, 'another chat keeps its own pending state')
+    assert.deepEqual(Object.keys(await store.botChats(owner)), [botId], 'peer bot metadata stays private')
+    assert.equal((await store.chatView(peer, 200, peerBotId)).working, true)
+    await db.update(schema.coordinatorEvents).set({ wakeLastError: 'wake_failed', wakeLeaseUntil: null }).where(botEvents)
+    assert.equal((await store.chatView(owner, 200, botId)).error, 'wake_failed')
+    await db.update(schema.coordinatorEvents).set({ wakeAttempts: 8, wakeLastError: 'wake_exhausted' }).where(botEvents)
+    assert.equal((await store.chatView(owner, 200, botId)).error, 'wake_exhausted')
+    await store.takeInbox(owner, 'wrun_recovered-turn', botId)
+    assert.equal((await store.chatView(owner,200,botId)).streamRunId,'wrun_recovered-turn')
+    assert.equal((await store.chatView(owner)).streamRunId,undefined,'a bot run stays in its own chat')
+    assert.equal((await store.chatView(peer,200,peerBotId)).streamRunId,undefined,'a peer cannot receive the run')
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'a real turn supersedes old wake errors')
+    const streamId='wrun_recovered-turn:0'
+    assert.equal(await store.appendMessages(owner, 'wrun_recovered-turn', [{ role: 'assistant', content: 'Recovered reply',mikkaStreamId:'forged' } as unknown as import('ai').ModelMessage], null, botId,streamId),2)
+    assert.deepEqual((await store.chatView(owner,200,botId)).persistedStreamIds,[streamId],'polling sees persistence before any stream commit marker')
+    assert.ok((await store.loadConversation(owner,botId)).messages.every(({message})=>!('mikkaStreamId' in message)),'stream markers never reach the model history')
+    assert.equal(await store.appendMessages(owner, 'wrun_recovered-turn', [], null, botId),2,'an empty append returns the existing cursor')
+    await db.update(schema.coordinatorSessions).set({leaseUntil:new Date(Date.now()-1)}).where(and(eq(schema.coordinatorSessions.userId,owner),eq(schema.coordinatorSessions.botId,botId)))
+    assert.equal((await store.chatView(owner,200,botId)).streamRunId,undefined,'expired leases cannot attach')
+    await store.releaseLease(owner, 'wrun_recovered-turn', botId)
+    const recovered = await store.chatView(owner, 200, botId)
+    assert.equal(recovered.cursor,2)
+    assert.equal(recovered.streamRunId,undefined)
+    assert.deepEqual(recovered.persistedStreamIds,[streamId])
+    assert.deepEqual([recovered.working, recovered.error], [false, null])
+    assert.deepEqual(recovered.items.map(item => item.text), ['Original pending request', 'Recovered reply'])
+  })
+})
+
 dbTest('a bot and the Coordinator keep their own conversation, inbox and memory', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
@@ -38,10 +96,11 @@ dbTest('a bot and the Coordinator keep their own conversation, inbox and memory'
     // The bot holding its lease does not block the Coordinator's turn.
     const coordinator = await store.takeInbox(userId, 'turn-coordinator')
     assert.deepEqual([coordinator.held, coordinator.added], [true, 1])
-    await store.appendMessages(userId, 'turn-bot', [{ role: 'assistant', content: 'Writer here' }], null, botId)
+    await store.appendMessages(userId, 'turn-bot', [{ role: 'assistant', content: 'Writer here',mikkaStreamId:'forged' } as unknown as import('ai').ModelMessage], null, botId)
     await store.appendMessages(userId, 'turn-coordinator', [{ role: 'assistant', content: 'Coordinator here' }])
 
     const botView = await store.chatView(userId, 200, botId)
+    assert.deepEqual(botView.persistedStreamIds,[],'a message-carried marker cannot grant stream identity')
     assert.deepEqual(botView.items.map(item => item.text), ['to Writer', 'Writer here'])
     const coordinatorView = await store.chatView(userId)
     assert.deepEqual(coordinatorView.items.map(item => item.text), ['to the Coordinator', 'Coordinator here'])
@@ -343,5 +402,41 @@ dbTest('a workspace Telegram reply reads authorization once without cross-databa
     await pool.query(`UPDATE mikka_workspace_members SET status='removed' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspaceId, userId])
     await assert.rejects(replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ }), /telegramReplySourceUnavailable/)
     assert.equal(sent, 2)
+  })
+})
+
+dbTest('重试 re-runs a failed bot turn once, for the message already sent, in that chat only', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, isNull, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-turn-retry-${randomUUID()}`
+  const botId = randomUUID()
+  t.after(async () => {
+    t.diagnostic(JSON.stringify({ event: 'coordinator_db_fixture_retained', fixtureOwnerIds: [owner], database: 'mikka_e2e' }))
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Retry fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Retry bot' })
+    assert.equal(await store.retryFailedTurn(owner, botId), false, 'nothing failed, nothing to retry')
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'Plan my week', { botId }))
+    await store.takeInbox(owner, 'wrun_failed-turn', botId)
+    assert.equal(await store.retryFailedTurn(owner, botId), false, 'no retry while the turn is still running')
+    await store.failTurn(owner, 'wrun_failed-turn', 'binding_required', botId)
+    const failed = await store.chatView(owner, 200, botId)
+    assert.deepEqual([failed.working, failed.error], [false, 'binding_required'])
+    assert.equal(await store.retryFailedTurn(owner, null), false, 'the Coordinator chat has no failure of its own')
+    assert.equal(await store.retryFailedTurn(owner, botId), true)
+    assert.equal(await store.retryFailedTurn(owner, botId), false, 'a second click on the same failure queues nothing')
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the chat shows its normal working state')
+    const take = await store.takeInbox(owner, 'wrun_retried-turn', botId)
+    assert.equal(take.added, 1, 'the retry starts a turn')
+    const retried = await store.chatView(owner, 200, botId)
+    assert.deepEqual(retried.items.map(item => [item.from, item.text]), [['person', 'Plan my week']], 'the message is not sent twice')
+    const waiting = await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId, owner), isNull(schema.coordinatorEvents.deliveredAt)))
+    assert.equal(waiting.length, 0)
+    await store.failTurn(owner, 'wrun_retried-turn', 'binding_required', botId)
+    assert.equal(await store.retryFailedTurn(owner, botId), true, 'a new failure can be retried again')
   })
 })

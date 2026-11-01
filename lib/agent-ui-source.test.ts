@@ -1,6 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { detectAgentUISource, normalizeAgentUISource } from './agent-ui-source'
+import { detectAgentUISource, isAgentUISourcePrefix, normalizeAgentUISource } from './agent-ui-source'
+
+test('streaming buffers possible OpenUI prefixes but releases ordinary Markdown', () => {
+  for (const source of ['', 'r', 'root ', 'root = ', 'root = Sta', '\n  root = Stack', 'root = Stack ', 'Stack \n', 'BeQue', 'Stack(', 'Stack( ']) {
+    assert.equal(isAgentUISourcePrefix(source), true, source)
+  }
+  for (const source of ['Hello', '# Heading', 'Stack is useful', 'root = /var/www', 'root cause', 'BeQuestions are useful', '```js\nroot = Sta']) {
+    assert.equal(isAgentUISourcePrefix(source), false, source)
+  }
+})
 
 test('plain Markdown stays Markdown, untouched', () => {
   const source = '# 你好\n\n今天先做什么？'

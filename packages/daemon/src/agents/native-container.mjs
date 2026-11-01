@@ -55,7 +55,8 @@ async function start(config, remainder) {
     if (key === "CLAUDE_CODE_OAUTH_TOKEN" && value !== PLACEHOLDER) fail();
   }
   delete config.env.CLAUDE_CODE_OAUTH_TOKEN;
-  config.env.PATH = "/usr/local/bin:/usr/bin:/bin";
+  if (config.githubBin !== undefined && (typeof config.githubBin !== 'string' || !config.githubBin.startsWith('/') || !config.githubBin.endsWith('/github/bin') || config.githubBin.includes(':') || config.githubBin.includes('\n'))) fail();
+  config.env.PATH = `${config.githubBin ? config.githubBin + ':' : ''}/usr/local/bin:/usr/bin:/bin`;
   mkdirSync(config.env.HOME, { recursive: true, mode: 0o700 });
   // Model credentials stay on the original task broker. Public downloads use
   // a separate live, public-IP-only host proxy, never that credential endpoint.
@@ -144,10 +145,12 @@ async function start(config, remainder) {
       "GIT_CONFIG_GLOBAL",
       "GIT_CONFIG_SYSTEM",
       "GIT_TERMINAL_PROMPT",
+      'PATH', 'GH_HOST', 'GH_REPO', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL',
+      ...Object.keys(config.env).filter(key => /^GIT_CONFIG_(?:COUNT|KEY_[0-9]+|VALUE_[0-9]+)$/.test(key)),
       "HOME",
       ...(egress ? ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NO_PROXY", "no_proxy", "NODE_USE_ENV_PROXY"] : []),
     ])
-      args.push(
+      if (config.env[key] !== undefined) args.push(
         "-c",
         `shell_environment_policy.set.${key}=${JSON.stringify(config.env[key])}`,
       );

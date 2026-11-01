@@ -5,10 +5,15 @@
     "scheme": "mikka",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "icon": "./assets/icon.icon",
       "bundleIdentifier": "com.aspectlylabs.mikka",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "web": {
       "bundler": "metro",
@@ -18,10 +23,30 @@
       "expo-router",
       "expo-secure-store",
       "expo-web-browser",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "用来把照片发给 bot。",
+          "cameraPermission": "用来拍照发给 bot。",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "902ffab1-ed16-482e-8b83-2b7535079810"
+      }
+    },
+    "owner": "alexj3653",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/902ffab1-ed16-482e-8b83-2b7535079810"
     }
   }
 }

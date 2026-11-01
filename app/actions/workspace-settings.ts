@@ -2,11 +2,11 @@
 
 import { cookies, headers } from 'next/headers'
 import type { ActionResult } from '@/lib/action-result'
-import { auditRequestContext, recordAuditSafe } from '@/lib/audit/record'
+import { auditRequestContext } from '@/lib/audit/record'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { deleteWorkspaceData, readWorkspaceGeneral, transferWorkspaceOwnership, updateWorkspaceGeneral, workspaceDeletionImpact, workspaceTransferTargets, type UpdateWorkspaceInput, type WorkspaceDeletion, type WorkspaceDeletionImpact, type WorkspaceGeneral, type WorkspaceTransferTarget } from '@/lib/workspace-admin/general'
-import { removeMember, type MemberRemoval } from '@/lib/workspace-admin/members'
+import { archivedBots, removeMember, takeOverBot, type AssetTransfer, type MemberRemoval } from '@/lib/workspace-admin/members'
 
 const COOKIE = 'mikka-workspace'
 
@@ -33,12 +33,7 @@ export async function getWorkspaceDeletionImpact(workspaceId?: string): Promise<
 export async function updateWorkspace(input: UpdateWorkspaceInput, workspaceId?: string): Promise<ActionResult<WorkspaceGeneral>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
-    const before = input.slug === undefined ? null : await readWorkspaceGeneral(actor.userId, actor.workspaceId)
-    const saved = await updateWorkspaceGeneral(actor.userId, actor.workspaceId, input)
-    // Workspace rows live in DATABASE_URL, so the audit row is written after the change commits.
-    if (before?.slug && saved.slug && before.slug !== saved.slug) {
-      await recordAuditSafe({ workspaceId: actor.workspaceId, actor: { type: 'user', id: actor.userId, name: actor.name }, action: 'workspace.slug_changed', target: { type: 'workspace', id: actor.workspaceId, label: saved.name }, metadata: { from: before.slug, to: saved.slug }, ...auditRequestContext(await headers()) })
-    }
+    const saved = await updateWorkspaceGeneral(actor.userId, actor.workspaceId, input, auditRequestContext(await headers()))
     return saved
   })
 }
@@ -55,13 +50,7 @@ export async function getWorkspaceTransferTargets(workspaceId?: string): Promise
 export async function transferWorkspace(toUserId: string, workspaceId?: string): Promise<ActionResult<{ owner: WorkspaceTransferTarget }>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
-    const { owner, previousRole } = await transferWorkspaceOwnership(actor.userId, actor.workspaceId, toUserId)
-    // Workspace rows live in DATABASE_URL, so the audit rows follow the commit.
-    const request = auditRequestContext(await headers())
-    const base = { workspaceId: actor.workspaceId, actor: { type: 'user' as const, id: actor.userId, name: actor.name }, ...request }
-    const target = { type: 'member', id: owner.userId, label: owner.name || owner.email }
-    if (previousRole !== 'admin') await recordAuditSafe({ ...base, action: 'member.role_changed', target, metadata: { oldRole: previousRole, newRole: 'admin' } })
-    await recordAuditSafe({ ...base, action: 'workspace.ownership_transferred', target })
+    const { owner } = await transferWorkspaceOwnership(actor.userId, actor.workspaceId, toUserId, auditRequestContext(await headers()))
     return { owner }
   })
 }
@@ -91,8 +80,24 @@ export async function deleteWorkspace(id: string, confirmName: string): Promise<
 export async function removeWorkspaceMember(memberId: string, options: { transferTo?: string } = {}): Promise<ActionResult<MemberRemoval>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor()
-    const { label, ...removed } = await removeMember(actor.userId, actor.workspaceId, memberId, options.transferTo)
-    await recordAuditSafe({ workspaceId: actor.workspaceId, actor: { type: 'user', id: actor.userId, name: actor.name }, action: 'member.removed', target: { type: 'member', id: memberId, label: label ?? memberId }, ...auditRequestContext(await headers()) })
+    const { label: _label, ...removed } = await removeMember(actor.userId, actor.workspaceId, memberId, options.transferTo, auditRequestContext(await headers()))
     return removed
+  })
+}
+
+/** Bot 与 Agents › 已暂停: bots of people who left or were suspended, for admins (§8.3). */
+export async function listArchivedBots(workspaceId?: string): Promise<ActionResult<{ bots: { id: string; name: string; color: string; shape: string }[] }>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    const rows = await archivedBots(actor.userId, actor.workspaceId)
+    return { bots: rows.map(({ id, name, color, shape }) => ({ id, name, color, shape })) }
+  })
+}
+
+/** 接管: the bot becomes the admin's own and runs on the admin's resources. */
+export async function takeOverArchivedBot(botId: string, workspaceId?: string): Promise<ActionResult<AssetTransfer>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return takeOverBot(actor.userId, actor.workspaceId, botId)
   })
 }

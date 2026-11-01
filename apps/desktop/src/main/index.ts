@@ -2,7 +2,7 @@
 // the UI reads through `window.mikka`. The renderer is treated as untrusted;
 // every privileged call goes through the validated IPC surface in `./bridge`.
 
-import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, session, shell } from 'electron'
+import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, session, shell, webContents } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'node:path'
 
@@ -12,8 +12,11 @@ import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
 import { AppLoadState, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
+import { catchClaudeCallback } from './subscription-callback'
 import { NotificationCenter } from './notification-center'
-import { appExternalUrl, desktopAuthState, externalUrl, navigationDecision } from './security'
+import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision } from './security'
+import { UPDATE_CHECK_INTERVAL_MS, Updates } from './updates'
+import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
 
 const APP_URL = __MIKKA_APP_URL__
 const APP_VERSION = __MIKKA_APP_VERSION__
@@ -185,6 +188,8 @@ function reloadApp(): void {
 }
 
 function createMainWindow(): void {
+  // Read once at launch; a changed Reduce transparency setting applies from the next launch.
+  const appearance = windowAppearance(process.platform, { dark: nativeTheme.shouldUseDarkColors, reduceTransparency: nativeTheme.prefersReducedTransparency })
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -192,9 +197,8 @@ function createMainWindow(): void {
     minHeight: 600,
     show: false,
     // The page paints its own top bar, so the native one must not show as a separate band.
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#000000' : '#f5f5f4',
+    ...appearance.options,
     autoHideMenuBar: true,
-    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 14 } } : {}),
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -208,7 +212,7 @@ function createMainWindow(): void {
       experimentalFeatures: false,
       devTools: !app.isPackaged,
       partition: PARTITION,
-      additionalArguments: [`--mikka-app-origin=${APP_ORIGIN}`],
+      additionalArguments: [`--mikka-app-origin=${APP_ORIGIN}`, ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
     },
   })
   mainWindow.setMenuBarVisibility(false)
@@ -250,71 +254,28 @@ function messageBox(options: Electron.MessageBoxOptions): Promise<Electron.Messa
     : dialog.showMessageBox(options)
 }
 
-let manualUpdateCheck = false
-let updatePromptOpen = false
-
-function reportUpdateError(error: Error): void {
-  if (!manualUpdateCheck) return
-  manualUpdateCheck = false
-  void messageBox({
-    type: 'error',
-    message: 'Could not check for updates.',
-    detail: error.message,
-    buttons: ['OK'],
-  })
-}
-
-function setupUpdates(): void {
-  autoUpdater.autoDownload = false
-  autoUpdater.autoInstallOnAppQuit = true
-
-  autoUpdater.on('update-available', info => {
-    if (updatePromptOpen) return
-    updatePromptOpen = true
-    void messageBox({
-      type: 'info',
-      message: `Mikka ${info.version} is available.`,
-      buttons: ['Download', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    }).then(({ response }) => {
-      updatePromptOpen = false
-      if (response === 0) void autoUpdater.downloadUpdate().catch(reportUpdateError)
-    })
-  })
-  autoUpdater.on('update-not-available', () => {
-    if (!manualUpdateCheck) return
-    manualUpdateCheck = false
-    void messageBox({ type: 'info', message: `Mikka ${APP_VERSION} is up to date.`, buttons: ['OK'] })
-  })
-  autoUpdater.on('update-downloaded', info => {
-    updatePromptOpen = true
-    void messageBox({
-      type: 'info',
-      message: `Mikka ${info.version} is ready.`,
-      buttons: ['Restart', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    }).then(({ response }) => {
-      updatePromptOpen = false
-      if (response === 0) autoUpdater.quitAndInstall()
-    })
-  })
-  autoUpdater.on('error', reportUpdateError)
-}
-
 /**
  * The updater reads the signed ZIP and latest-mac.yml from the published
  * GitHub Release. Draft releases are invisible to it, so a release becomes
- * available only after the draft is published.
+ * available only after the draft is published. A downloaded update is
+ * offered by the rail's restart button and installs on the next quit anyway.
  */
+const updates = new Updates(autoUpdater, {
+  available: version => { void messageBox({ type: 'info', message: `Mikka ${version} installs when you restart.`, buttons: ['OK'] }) },
+  upToDate: () => { void messageBox({ type: 'info', message: `Mikka ${APP_VERSION} is up to date.`, buttons: ['OK'] }) },
+  failed: error => { void messageBox({ type: 'error', message: 'Could not check for updates.', detail: error.message, buttons: ['OK'] }) },
+}, version => {
+  for (const contents of webContents.getAllWebContents()) {
+    if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), APP_URL)) contents.send(IPC.appUpdateReady, version)
+  }
+})
+
 async function checkForUpdates(interactive: boolean): Promise<void> {
   if (!app.isPackaged) {
     if (interactive) await messageBox({ type: 'info', message: 'Updates are checked in the installed app.', buttons: ['OK'] })
     return
   }
-  manualUpdateCheck = interactive
-  await autoUpdater.checkForUpdates().catch(reportUpdateError)
+  await updates.check(interactive)
 }
 
 /**
@@ -401,6 +362,7 @@ function start(): void {
       return shell.openExternal(target)
     },
     prepareAuth,
+    claudeCallback: url => catchClaudeCallback(url, page => shell.openExternal(page)),
     localDevice: localDeviceStatus,
     quota: localQuota,
     notifications,
@@ -409,11 +371,14 @@ function start(): void {
       pendingClick = null
       return href
     },
+    updates,
   })
   createMainWindow()
   installMenu()
-  setupUpdates()
-  if (app.isPackaged) setTimeout(() => { void checkForUpdates(false) }, 15_000)
+  if (app.isPackaged) {
+    setTimeout(() => { void checkForUpdates(false) }, 15_000)
+    setInterval(() => { void checkForUpdates(false) }, UPDATE_CHECK_INTERVAL_MS)
+  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
   })

@@ -54,11 +54,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.34.3
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: pnpm
@@ -99,11 +99,11 @@ jobs:
       AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.34.3
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: pnpm
@@ -140,11 +140,44 @@ jobs:
           MIKKA_SMOKE_SCREENSHOT: /tmp/mikka-desktop-smoke.png
       - name: Keep the dev log and screenshot on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: desktop-smoke-failure
           path: |
             /tmp/mikka-dev.log
             /tmp/mikka-desktop-smoke.png
           if-no-files-found: ignore
+          retention-days: 7
+
+  # Desktop release runs only on main; compile the Icon Composer bundle here so a
+  # broken build/icon.icon or a runner without Xcode 26 fails on the pull request.
+  icon:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Select Xcode 26 for actool
+        run: |
+          xcode=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
+          test -n "$xcode" || { echo "::error::No Xcode 26 on this runner; build/icon.icon needs actool 26+"; exit 1; }
+          sudo xcode-select -s "$xcode"
+          actool --version
+      - name: Compile build/icon.icon as electron-builder does
+        run: |
+          out="$RUNNER_TEMP/icon"
+          mkdir -p "$out"
+          cp -R apps/desktop/build/icon.icon "$RUNNER_TEMP/Icon.icon"
+          actool "$RUNNER_TEMP/Icon.icon" --compile "$out" \
+            --output-format human-readable-text --notices --warnings \
+            --output-partial-info-plist "$out/assetcatalog_generated_info.plist" \
+            --app-icon Icon --include-all-app-icons --accent-color AccentColor \
+            --enable-on-demand-resources NO --development-region en \
+            --target-device mac --minimum-deployment-target 26.0 --platform macosx
+          test -s "$out/Assets.car"
+          test -s "$out/Icon.icns"
+          iconutil -c iconset "$out/Icon.icns" -o "$out/Icon.iconset"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: desktop-icon
+          path: ${{ runner.temp }}/icon
           retention-days: 7

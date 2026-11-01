@@ -13,6 +13,13 @@ mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth:
   listUserAccounts: async () => accounts,
   getAccessToken,
 } } } })
+let connected: { token: string; githubAccountId: string } | null = null
+let connectionLogin: string | null = null
+mock.module(new URL('./connection.ts', import.meta.url).href, { namedExports: {
+  githubConnectionToken: async () => connected,
+  githubConnection: async () => connectionLogin ? { githubAccountId: '42', githubLogin: connectionLogin } : null,
+  disconnectGitHub: async () => {},
+} })
 mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_path: string, handler: unknown) => handler } })
 
 const repository = { id: 91, full_name: 'Owner/Project', private: true }
@@ -39,6 +46,8 @@ beforeEach(() => {
   user = 'person-1'
   sessionUsers = []
   accounts = [{ id: 'internal-account', userId: user, providerId: 'github', accountId: '42' }]
+  connected = null
+  connectionLogin = null
   getAccessToken.mock.resetCalls()
   getAccessToken.mock.mockImplementation(async () => ({ accessToken: 'private-test-token' }))
   fetchMock.mock.resetCalls()
@@ -64,6 +73,22 @@ test('only the current session account is selected, and Better Auth receives its
   assert.deepEqual(result, { userId: 'person-1', githubAccountId: '42', installations: ['11'], repositories: [{ id: '91', installationId: '11', fullName: 'Owner/Project', htmlUrl: 'https://github.com/Owner/Project', private: true }] })
   assert.deepEqual(getAccessToken.mock.calls[0].arguments, [{ headers: requestHeaders, body: { accountId: 'internal-account' } }])
   assert.equal(JSON.stringify(result).includes('private-test-token'), false)
+})
+
+test('a Plugins → GitHub connection is used before any GitHub sign-in account, even one for another GitHub id', async () => {
+  connected = { token: 'private-test-token', githubAccountId: '42' }
+  accounts = [{ id: 'internal-account', userId: 'person-1', providerId: 'github', accountId: '77' }]
+  const result = await access.listAuthorizedRepositories(requestHeaders)
+  assert.equal(result.githubAccountId, '42')
+  assert.equal(getAccessToken.mock.callCount(), 0)
+})
+
+test('the integration status names the connected GitHub login', async () => {
+  connected = { token: 'private-test-token', githubAccountId: '42' }
+  connectionLogin = 'octo'
+  const body = await (await GET({ headers: requestHeaders } as Request)).json()
+  assert.equal(body.login, 'octo')
+  assert.equal(body.connected, true)
 })
 
 test('all installation and repository pages are read; other apps, suspended installs and empty repos are excluded', async () => {
@@ -150,6 +175,23 @@ test('a mismatched repository or malformed PR response is never persisted as tru
   await assert.rejects(access.readAuthorizedPullRequest(requestHeaders, 'https://github.com/Owner/Project/pull/7'), failure('githubUnavailable', 502))
 })
 
+test('issue readback uses the selected repository and rejects PR objects without returning private content', async () => {
+  const previous=answer
+  const issue={id:703,number:7,html_url:'https://github.com/Owner/Project/issues/7',state:'open',updated_at:'2026-10-31T04:00:00Z',body:'private provider body'}
+  answer=url=>url.pathname==='/repos/Owner/Project/issues/7'?json(issue):previous(url)
+  assert.deepEqual(await access.readAuthorizedIssue(requestHeaders,issue.html_url),{userId:'person-1',githubAccountId:'42',repoId:'91',installationId:'11',issueId:'703',number:7,url:issue.html_url,state:'open',updatedAt:issue.updated_at})
+  answer=url=>url.pathname==='/repos/Owner/Project/issues/7'?json({...issue,pull_request:{url:'https://api.github.com/repos/Owner/Project/pulls/7'}}):previous(url)
+  await assert.rejects(access.readAuthorizedIssue(requestHeaders,issue.html_url),failure('githubUnavailable',502))
+})
+
+test('issue URLs cannot choose another host, redirect credentials, or infer an issue from a PR',async()=>{
+  for(const url of ['https://github.com/Owner/Project/pull/7','https://github.com.evil.test/Owner/Project/issues/7','http://github.com/Owner/Project/issues/7','https://github.com/Owner/Project/issues/7?x=1','https://github.com/Owner/Project/issues/7#x'])
+    await assert.rejects(access.readAuthorizedIssue(requestHeaders,url),failure('githubIssueInvalid',400))
+  assert.equal(fetchMock.mock.callCount(),0)
+  await assert.rejects(access.readAuthorizedIssue(requestHeaders,'https://github.com/Owner/Unselected/issues/7'),failure('githubRepositoryForbidden',403))
+  assert.equal(paths().some(path=>path.startsWith('/repos/')),false)
+})
+
 test('settings API exposes connection/install state and never credentials', async () => {
   const call = () => GET({ headers: requestHeaders } as Request)
   let response = await call()
@@ -161,7 +203,7 @@ test('settings API exposes connection/install state and never credentials', asyn
   assert.equal('userId' in result, false)
   assert.equal(JSON.stringify(result).includes('private-test-token'), false)
   answer = url => url.pathname === '/user' ? json({ id: 42 }) : json({ installations: [] })
-  assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: true, installed: false, repositories: [] })
+  assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: true, login: null, installed: false, repositories: [] })
   accounts = []
   assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: false, installed: false, repositories: [] })
   delete process.env.GITHUB_APP_ID

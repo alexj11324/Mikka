@@ -10,8 +10,9 @@ export function writeTarget(action: WriteActionName, input: Record<string, unkno
 export interface WriteProvider {
   name: string
   /** Must resolve exactly one active owner account, pin version, and read/check target
-   * access with that account. A connection or target string is never authority. */
-  prepare(ownerId: string, payload: Record<string, unknown>): Promise<{ accountId: string; version: string; context?: Record<string, unknown> | null }>
+   * access with that account. A connection or target string is never authority.
+   * tool and annotations are the write tool's slug and own provider tags, for the destructive judgment. */
+  prepare(ownerId: string, payload: Record<string, unknown>): Promise<{ accountId: string; version: string; context?: Record<string, unknown> | null; tool?: string; annotations?: readonly string[] }>
   execute(input: { ownerId: string; accountId: string; version: string; payload: Record<string, unknown>; approvalContext: Record<string, unknown> | null; idempotencyKey: string; signal: AbortSignal; beforeSend: () => Promise<void> }): Promise<OperationReceipt>
-  lookup(input: { ownerId: string; accountId: string; idempotencyKey: string }): Promise<OperationReceipt | null>
+  lookup(input: { ownerId: string; accountId: string; version: string; payload: Record<string, unknown>; idempotencyKey: string; signal?: AbortSignal }): Promise<OperationReceipt | null>
 }

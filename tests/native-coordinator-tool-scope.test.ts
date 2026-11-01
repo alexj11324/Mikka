@@ -47,7 +47,7 @@ stub('../lib/composio.ts',{runComposioAction:effect})
 stub('../lib/app-policy/store.ts',{botMayUseApp:policyChecks})
 stub('../lib/composio-actions.ts',{COMPOSIO_ACTIONS:{fetch_recent_gmail:{toolkit:'gmail'},send_email:{toolkit:'gmail'}}})
 stub('../lib/operations/write-runtime.ts',{personalWriteFromRun:effect})
-stub('../lib/pending-action-store.ts',{proposeAction:effect,proposeRepositoryPush:effect})
+stub('../lib/pending-action-store.ts',{writeAccountAction:effect,proposeRepositoryPush:effect})
 stub('../lib/issue-access.ts',{issueForUser:effect})
 stub('../lib/telegram/client.ts',{postTelegramText:effect})
 stub('../lib/attention/store.ts',{recordDecision:effect,settleTurn:effect})
@@ -102,7 +102,7 @@ const calls = {
   remember:()=>steps.remember(user,{note:'preference'},scope),
   forget:()=>steps.forget(user,{text:'preference'},scope),
   composioAction:()=>steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope),
-  proposeAccountAction:()=>steps.proposeAccountAction(user,'send_email',{},scope),
+  accountWrite:()=>steps.accountWrite(user,'send_email',{},scope),
   proposeRepositoryPushApproval:()=>steps.proposeRepositoryPushApproval(user,{repo:'owner/repo'},scope),
   listIssues:()=>steps.listIssues(user,{},scope),
   getIssue:()=>steps.getIssue(user,{issueId:'issue'},scope),
@@ -215,13 +215,13 @@ test('issue creation passes only the host-owned user and request input to persis
   await steps.createIssueFromRequestStep(user,input)
   assert.deepEqual(effect.mock.calls.map(call=>call.arguments),[[user,input]])
 })
-test('unscoped AI SDK calls keep the existing business callbacks and account approval proposals',async()=>{
+test('unscoped AI SDK calls keep the existing business callbacks and account writes',async()=>{
   revoked=true
   await steps.remember(user,{note:'preference'})
-  await steps.proposeAccountAction(user,'send_email',{subject:'proposal'})
+  await steps.accountWrite(user,'send_email',{subject:'proposal'})
   assert.equal(checks.mock.callCount(),0)
   assert.equal(effect.mock.callCount(),2)
-  assert.deepEqual(effect.mock.calls[1].arguments,[user,'send_email',{subject:'proposal'}])
+  assert.deepEqual(effect.mock.calls[1].arguments,[user,'send_email',{subject:'proposal'},undefined,null])
 })
 
 test('candidate registration rechecks native authorization after source fetching before persistence',async()=>{
@@ -284,11 +284,11 @@ test('getRun preserves the restricted teammate projection with no host evidence'
 })
 
 
-test('workspace app denies block reads, approval proposals and personal writes before provider effects', async () => {
+test('workspace app denies block reads, account writes and personal writes before provider effects', async () => {
   appAllowed=false
   const calls = [
     () => steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope,undefined,'owned-bot'),
-    () => steps.proposeAccountAction(user,'send_email',{},scope,undefined,'owned-bot'),
+    () => steps.accountWrite(user,'send_email',{},scope,undefined,'owned-bot'),
     () => steps.personalWrite(user,'owned-bot','execution',{action:'send_slack_message',input:{},toolCallId:'call'},scope),
   ]
   for(const call of calls) assert.deepEqual(await call(),{error:'integrationBlockedByWorkspace'})

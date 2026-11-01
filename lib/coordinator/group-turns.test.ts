@@ -49,6 +49,46 @@ test('failure clears generating status and does not synthesize a response', asyn
   assert.deepEqual(statuses, [a,null]); assert.deepEqual(outcomes,[undefined,'failed'])
 })
 
+test('private peer rounds stay bounded and never become another public responder context', async () => {
+  const publicReplies: string[] = [], privateReplies: string[] = [], calls: string[] = []
+  const peers = [...members, { id: outsider, name: 'Third member', description: '' }]
+  await runGroupRounds({ by: 'mention', responders: [a, outsider] }, message, {
+    async eligible() { return peers }, async status() {},
+    async generate(agent, input) {
+      calls.push(agent.id)
+      if (agent.id === outsider) {
+        assert.deepEqual(input.earlier, [], 'a public responder cannot see peer-private replies')
+        assert.equal(input.privatePeer, undefined)
+        return { text: 'public only', mentions: [] }
+      }
+      if (!input.privatePeer) return { text: 'private question', mentions: [], privateTo: b }
+      assert.equal(input.privatePeer.id, agent.id === a ? b : a)
+      assert.equal(input.earlier.length, agent.id === b ? 1 : 2)
+      return { text: 'private reply', mentions: [] }
+    },
+    async publish(_, reply) { publicReplies.push(reply.text); return true },
+    async publishPrivate(_, __, reply) { privateReplies.push(reply.text); return true },
+  })
+  assert.deepEqual(calls, [a,b,a,outsider])
+  assert.deepEqual(privateReplies, ['private question','private reply','private reply'])
+  assert.deepEqual(publicReplies, ['public only'])
+})
+
+test('private routing rejects foreign/self/third peers and an unavailable writer before exposing text', async () => {
+  const io = { async eligible() { return [...members, { id: outsider, name: 'Third member', description: '' }] }, async status() {},
+    async publish() { assert.fail('private text must not become a public message') } }
+  for (const peer of [a, randomUUID()]) await assert.rejects(runGroupRounds({ by: 'mention', responders: [a] }, message,
+    { ...io, async generate() { return { text: 'private', mentions: [], privateTo: peer } } }), UnknownMentionError)
+  await assert.rejects(runGroupRounds({ by: 'mention', responders: [a] }, message,
+    { ...io, async generate() { return { text: 'private', mentions: [], privateTo: b } } }), /writer_unavailable/)
+  let writes = 0
+  await assert.rejects(runGroupRounds({ by: 'mention', responders: [a] }, message, { ...io,
+    async generate(_, input) { return { text: 'private', mentions: [], privateTo: input.privatePeer ? outsider : b } },
+    async publishPrivate() { writes++; return true },
+  }), /peer_mismatch/)
+  assert.equal(writes, 1, 'the first authorized exchange remains, the third-peer response is never stored')
+})
+
 // Enforce the authorized ephemeral DB boundary, even if REQUIRE_DB is accidentally set locally.
 const dbURL = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' ? process.env.E2E_DATABASE_URL : undefined
 if (process.env.REQUIRE_DB === '1' && !dbURL) throw new Error('REQUIRE_DB=1 requires GitHub Actions ephemeral PG17')
@@ -67,13 +107,14 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await scoped.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql', import.meta.url),'utf8'))
     const migration = await readFile(new URL('../../drizzle/20261029043634_group_turns.sql', import.meta.url),'utf8')
     await Promise.all([scoped.query(migration),scoped.query(migration)]); await scoped.query(migration)
+    await scoped.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql', import.meta.url), 'utf8'))
     // Minimal real agent_runs columns used by the bridge; full tracked schema
     // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
     await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid)`)
     await scoped.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text, "lastSeenAt" timestamptz); CREATE TABLE coordinator_sessions ("userId" text, "botId" uuid, "leaseHolder" text, "leaseUntil" timestamptz, "updatedAt" timestamptz)` )
     // The current active-agent reader resolves public Bot names before its
     // legacy execution-name fallback. Keep those real SQL dependencies present.
-    await scoped.query(`CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text NOT NULL,name text NOT NULL);
+    await scoped.query(`CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" uuid,name text NOT NULL,color text,shape text);
       CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"botId" uuid NOT NULL,"ownerId" text NOT NULL);
       CREATE TABLE bot_cloud_runtimes ("agentId" uuid,"botId" uuid,"ownerId" text)`)
     for (const member of members) await scoped.query('INSERT INTO agents (id,"userId",name) VALUES ($1,$2,$3)', [member.id, 'owner', member.name])

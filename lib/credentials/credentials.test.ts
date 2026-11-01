@@ -11,6 +11,13 @@ import { CredentialStore } from './store'
 import { browserLoginContinuation } from '../cloud-computer/login-result'
 import { assertCredentialPageBinding, type CredentialPageBinding } from './page-binding'
 import { assertNoSecret, fingerprint } from './fingerprint'
+import { credentialVaultEnabled } from './feature'
+
+test('credential vault ships on and retains an explicit incident kill switch', () => {
+  for (const VERCEL_ENV of [undefined, 'production', 'preview', 'development']) assert.equal(credentialVaultEnabled({ VERCEL_ENV }), true)
+  assert.equal(credentialVaultEnabled({ CREDENTIAL_VAULT_ENABLED: '1' }), true)
+  for (const CREDENTIAL_VAULT_ENABLED of ['0', '', 'false', 'true']) assert.equal(credentialVaultEnabled({ CREDENTIAL_VAULT_ENABLED }), false)
+})
 
 function fixtureKms(): Kms {
   const keys = new Map<string, { key: Buffer; context: string }>()
@@ -268,12 +275,13 @@ test('gateway failure after side effects begin reports unknown without exposing 
 
 test('revocation retains rows and disables credential, session and leases', async () => {
   const statements: string[] = []
-  const client = { async query(sql: string) {
+  const client = { async query(query: string | { text: string }) {
+    const sql = typeof query === 'string' ? query : query.text
     statements.push(sql)
     return { rows: sql.includes('UPDATE credentials SET revoked_at') ? [{ id: 'existing' }] : [] }
   }, release() {} }
   const store = new CredentialStore({ async connect() { return client } } as never, fixtureKms())
-  assert.deepEqual(await store.remove({ userId: 'fixture', workspaceId: 'workspace' }, owner.origin, 'fixture-user'), { status: 'revoked' })
+  assert.deepEqual(await store.remove({ userId: 'fixture', workspaceId: '10000000-0000-4000-8000-000000000001' }, owner.origin, 'fixture-user'), { status: 'revoked' })
   assert(statements.some(sql => sql.includes('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now())')))
   assert(statements.some(sql => sql.includes('UPDATE credential_fill_leases SET consumed_at=COALESCE(consumed_at,now()),input_envelope=NULL')))
   assert(statements.includes('COMMIT'))
@@ -283,7 +291,8 @@ test('revocation retains rows and disables credential, session and leases', asyn
 test('saving an existing login retains and expires sessions', async () => {
   process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   const statements: string[] = []
-  const client = { async query(sql: string) {
+  const client = { async query(query: string | { text: string }) {
+    const sql = typeof query === 'string' ? query : query.text
     statements.push(sql)
     if (sql.includes('SELECT id FROM bots') || sql.includes('SELECT id FROM agent_runs')) return { rows: [{ id: 'ok' }], rowCount: 1 }
     if (sql.includes('UPDATE credential_challenges')) return { rows: [{ nonce_hash: 'fixture' }], rowCount: 1 }
@@ -291,7 +300,7 @@ test('saving an existing login retains and expires sessions', async () => {
     return { rows: [], rowCount: 0 }
   }, release() {} }
   const store = new CredentialStore({ async connect() { return client } } as never, fixtureKms())
-  assert.deepEqual(await store.save({ userId: 'fixture', workspaceId: 'workspace', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: randomBytes(24).toString('base64url') }), { status: 'saved', origin: owner.origin })
+  assert.deepEqual(await store.save({ userId: 'fixture', workspaceId: '10000000-0000-4000-8000-000000000001', botId: 'bot', runId: 'run' }, { nonce: 'a'.repeat(43), origin: owner.origin, username: 'fixture', password: randomBytes(24).toString('base64url') }), { status: 'saved', origin: owner.origin })
   assert(statements.some(sql => sql.includes('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now())')))
   assert(statements.includes('COMMIT'))
   assert(!statements.some(sql => /\bDELETE\b/i.test(sql)))

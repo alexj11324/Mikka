@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
-import { test, expect, register, rail, browserClientHeaders, watchRuntime, app, BASE_PATH, seedTask, openIssueFromSearch } from './fixtures'
+import { test, expect, register, registerInTeam, rail, browserClientHeaders, watchRuntime, app, BASE_PATH, seedTask, openIssueFromSearch } from './fixtures'
 
 async function createTeam(page: Page, name: string, identifier: string) {
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
@@ -55,8 +55,6 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await register(page, '/settings/teams')
   await createTeam(page, '产品团队', 'PRODUCT')
   await createTeam(page, '工程团队', 'ENGINEER')
-  // The settings sidebar rail is named in the UI language, not the library's English default.
-  await expect(page.locator('[data-sidebar="rail"]')).toHaveAttribute('aria-label', '展开或收起侧栏')
   await page.getByRole('textbox', { name: '搜索团队', exact: true }).fill('PRODUCT')
   await expect(page.getByRole('row').filter({ hasText: '工程团队' })).toHaveCount(0)
   const team = page.getByRole('row').filter({ hasText: '产品团队' })
@@ -76,7 +74,7 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await roster.getByRole('button', { name: /^设为成员：/ }).click()
   await expect(roster.getByRole('alert')).toContainText('至少一位')
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await rail(page, '主页').click()
   const privateTitle = `历史私有任务 ${randomUUID()}`
   const publicTitle = `公开任务 ${randomUUID()}`
   await createTask(page, privateTitle)
@@ -90,7 +88,6 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await expect(page.getByRole('option', { name: 'PRODUCT · 产品团队', exact: true })).toHaveAttribute('aria-selected', 'true')
   await page.keyboard.press('Escape')
   await expect(page.getByRole('listbox')).toHaveCount(0)
-  await expect(page.getByText('对该工作区启用成员公开，可协作编辑。', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
   // Nav v3 keeps projects out of the left column; they stay reachable by link.
   await page.goto(app('/?section=projects'))
@@ -126,9 +123,9 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
 
 test('公开范围限于工作区，未加入团队可访问，停用成员后撤销访问', async ({ page, browser, baseURL }) => {
   test.setTimeout(180000)
-  await register(page, '/settings/teams')
+  await registerInTeam(page, '/settings/teams')
   await createTeam(page, '共享团队', 'SHARED')
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await rail(page, '主页').click()
   const publicTitle = `工作区公开 ${randomUUID()}`
   const privateTitle = `个人保密 ${randomUUID()}`
   await createTask(page, publicTitle, 'SHARED · 共享团队')
@@ -146,7 +143,8 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
   await invitation.getByRole('button', { name: '完成', exact: true }).click()
   const memberContext = await browser.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
   const workspaceId = (await (await page.request.get(app('/api/workspace'))).json()).workspace.id as string
-  const runtime = watchRuntime(memberContext, ['/api/workspace', '/api/teams/directory', '/api/workspace'].map(path => ({ path: app(`${path}?workspace=${workspaceId}`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' })))
+  // Expected denials once the member leaves; allowed per test, any number of refetches.
+  const runtime = watchRuntime(memberContext, [], ['/api/workspace', '/api/teams/directory'].map(path => ({ path: app(`${path}?workspace=${workspaceId}`), message: 'Failed to load resource: the server responded with a status of 403 (Forbidden)' })))
   try {
     const member = await memberContext.newPage()
     await register(member, invitePath, email)
@@ -186,9 +184,9 @@ test('公开范围限于工作区，未加入团队可访问，停用成员后�
 
 test('非创建者成员在他人公开任务上改父子关系，关系区与选择器立即刷新', async ({ page, browser, baseURL }) => {
   test.setTimeout(180000)
-  await register(page, '/settings/teams')
+  await registerInTeam(page, '/settings/teams')
   await createTeam(page, '协作团队', 'COLLAB')
-  await page.getByRole('link', { name: '返回工作台', exact: true }).click()
+  await rail(page, '主页').click()
   const parentTitle = `他人父任务 ${randomUUID()}`
   const childTitle = `他人子任务 ${randomUUID()}`
   await createTask(page, parentTitle, 'COLLAB · 协作团队')

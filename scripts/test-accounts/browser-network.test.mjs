@@ -6,16 +6,18 @@ import { SYNTHETIC_PNG } from '../../tests/helpers/browser-image.ts'
 
 // Protocol event interleavings only. Actual Chromium and reachable loopback
 // sinks remain covered by test-account-origin-fence.spec.ts in Browser CI.
-async function fixture({ failAbort = false, failFulfill = false, failLease = false, images = [] } = {}) {
+async function fixture({ failAbort, failFulfill = false, failLease = false, failContinue, images = [] } = {}) {
   let blocked = 0, failures = 0, closed = false, routeHandler
+  const diagnostics = []
   const consoleSnapshots = []
   const transport = []
   const session = new EventEmitter()
   session.send = async (method, params) => {
     if (method !== 'Fetch.enable') transport.push({ method, params })
+    if (method === 'Fetch.continueRequest' && failContinue) throw new Error(failContinue)
     if (method === 'Fetch.fulfillRequest' && failFulfill) throw new Error('SYNTHETIC_PROTOCOL_FULFILL_FAILURE')
     if (method !== 'Fetch.failRequest') return
-    if (failAbort) throw new Error('SYNTHETIC_PROTOCOL_ABORT_FAILURE')
+    if (failAbort) throw new Error(failAbort === true ? 'SYNTHETIC_PROTOCOL_ABORT_FAILURE' : failAbort)
     // Chromium can report its blocked resource before the CDP reply arrives.
     consoleSnapshots.push(blocked)
   }
@@ -29,7 +31,7 @@ async function fixture({ failAbort = false, failFulfill = false, failLease = fal
     routeWebSocket: async () => {},
   }
   await installAccountOriginFence(context, { assertActive: async () => { if (failLease) throw new Error('SYNTHETIC_LEASE_LOST') } }, 'http://localhost:3100',
-    () => { blocked++ }, () => { failures++ }, images)
+    () => { blocked++ }, diagnostic => { failures++; diagnostics.push(diagnostic) }, images)
   await context.newPage()
   const defaults = { url: 'http://localhost:3199/foreign', method: 'GET', resourceType: 'image' }
   async function protocolRequest(request = {}) {
@@ -56,9 +58,46 @@ async function fixture({ failAbort = false, failFulfill = false, failLease = fal
   return {
     protocolRefusal: protocolRequest, routeRefusal: routeRequest, protocolRequest, routeRequest,
     transport: () => transport,
+    diagnostics: () => diagnostics,
     state: () => ({ blocked, failures, closed, consoleSnapshots }),
   }
 }
+
+const invalidInterception = 'cdpSession.send: Protocol error (Fetch.continueRequest): Invalid InterceptionId.'
+const allowed = { url: 'http://localhost:3100/allowed', resourceType: 'Fetch' }
+test('a same-origin request canceled before its continue is not a fence failure', async () => {
+  // Chromium drops paused requests on reload, often without any Network event.
+  const f = await fixture({ failContinue: invalidInterception })
+  await f.protocolRequest(allowed)
+  assert.equal(f.state().closed, false)
+  assert.equal(f.state().failures, 0)
+  assert.deepEqual(f.transport().map(call => call.method), ['Fetch.continueRequest'])
+})
+
+test('an invalid interception still fails closed outside the continue of an allowed request', async () => {
+  const abortError = 'cdpSession.send: Protocol error (Fetch.failRequest): Invalid InterceptionId.'
+  for (const [options, request] of [
+    [{ failAbort: abortError }, { url: 'http://localhost:3199/foreign' }],
+    [{ failFulfill: true, images: [{ url: allowed.url, body: SYNTHETIC_PNG }] }, { ...allowed, resourceType: 'Image' }],
+    [{ failLease: true, failContinue: invalidInterception }, allowed],
+    [{ failContinue: 'SYNTHETIC_OTHER_PROTOCOL_FAILURE' }, allowed],
+    [{ failContinue: `${invalidInterception} Trailing` }, allowed],
+  ]) {
+    const f = await fixture(options)
+    await f.protocolRequest(request)
+    assert.equal(f.state().closed, true)
+    assert.equal(f.state().failures, 1)
+  }
+})
+
+test('fence diagnostics expose only fixed phase and category, never protocol payloads', async () => {
+  const privateError = 'Protocol error: https://private:synthetic-secret@localhost/cookie?token=private-value'
+  const f = await fixture({ failContinue: privateError })
+  await f.protocolRequest(allowed)
+  assert.deepEqual(f.diagnostics(), [{ phase: 'cdp-continue', category: 'unknown' }])
+  assert.equal(JSON.stringify(f.diagnostics()).includes('private'), false)
+  assert.equal(JSON.stringify(f.diagnostics()).includes('synthetic-secret'), false)
+})
 
 const imageURL = 'http://localhost:3199/fixture.png'
 for (const channel of ['protocolRequest', 'routeRequest']) {

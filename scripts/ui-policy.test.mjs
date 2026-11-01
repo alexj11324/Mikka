@@ -68,6 +68,9 @@ for (const [label, source, rule] of [
   ['button icon metadata', 'import { Check } from "lucide-react"; const ui = <Button><Check /></Button>', 'icons/data-icon'],
   ['icon dimensions', 'import { Check } from "lucide-react"; const ui = <Button><Check data-icon="inline-start" className="size-4" /></Button>', 'icons/no-size-override'],
   ['font family allowlist', 'import { Roboto } from "next/font/google";', 'typography/font-family'],
+  ['transition all', '<Button className="transition-all" />', 'motion/transition-all'],
+  ['uppercase tracked label', '<Button className="uppercase tracking-wider" />', 'typography/uppercase-label'],
+  ['sparkle icon', 'import { Sparkles } from "lucide-react";', 'icons/no-sparkle'],
 ]) test(label, () => has(`${prefix}\n${source}`, rule))
 
 test('local fonts must be registered with their CSS variable', () => {
@@ -164,6 +167,9 @@ test('arbitrary lengths are typography, not colors', () => {
 test('CSS cannot bypass typography restrictions', () => {
   for (const css of ['.x { font-size: 13px }', '.x { @apply text-[13px] }', '@theme { --text-sm: 13px }', '.x { font: 500 13px Arial }']) assert.ok(auditCss('app/a.css', css, policy).some(d => d.rule.startsWith('typography/')))
   assert.ok(auditCss('app/a.css', '.custom { background: red }', policy).some(d => d.rule === 'style/no-custom-css'))
+  // R-32's document body token passes only at its pinned value.
+  assert.deepEqual(auditCss('app/a.css', '@theme inline { --text-md: 0.9375rem; --text-md--line-height: 1.5rem }', policy), [])
+  assert.ok(auditCss('app/a.css', '@theme inline { --text-md: 16px }', policy).some(d => d.rule === 'typography/no-css-values'))
 })
 
 test('framework html/body shell is not mistaken for a handmade widget', () => {
@@ -262,13 +268,31 @@ test('R-31: a Button may not bring back a white fill with a border', () => {
   has(`${prefix} const ui = <Button variant="outline" className="border-border bg-background" />`, 'style/secondary-button-fill')
   has(`${prefix} const ui = <Button className={cn('border bg-card')} />`, 'style/secondary-button-fill')
   has(`${prefix} const ui = <Button variant="outline" className="rounded-full bg-background" />`, 'style/secondary-button-fill')
+  has(`${prefix} const ui = <Button variant="secondary" className="bg-background hover:bg-background/80" />`, 'style/secondary-button-fill')
   const clean = source => assert.ok(!rules(`${prefix} const ui = ${source}`).includes('style/secondary-button-fill'), source)
   clean('<Button variant="outline" className="rounded-full" />')
   clean('<Button variant="ghost" className="border-transparent hover:bg-background" />')
-  clean('<Button variant="secondary" className="bg-background hover:bg-background/80" />')
   clean('<Button className="border-0 bg-background" />')
   clean('<Button className="focus-visible:border-input bg-card" />')
   clean('<Button className="hover:border bg-card" />')
+})
+
+test('a segmented control track comes from ToggleGroup variant="segment", not call-site classes', () => {
+  has(`${prefix} const ui = <ToggleGroup className="rounded-lg bg-muted p-0.5" />`, 'style/segment-track')
+  has(`${prefix} const ui = <ToggleGroup className={cn('h-7')} />`, 'style/segment-track')
+  const clean = source => assert.ok(!rules(`${prefix} const ui = ${source}`).includes('style/segment-track'), source)
+  clean('<ToggleGroup variant="segment" size="sm" spacing={0.5} />')
+  clean('<ToggleGroup className="ml-auto flex-wrap" />')
+  clean('<ToggleGroup className="grid grid-cols-6 gap-y-3 px-6" />')
+  clean('<ToggleGroupItem className="h-7" />')
+})
+
+test('R-33: a dialog keeps the primitive radius', () => {
+  has(`${prefix} const ui = <DialogContent className="gap-4 rounded-2xl p-0" />`, 'style/dialog-radius')
+  has(`${prefix} const ui = <AlertDialogContent className={cn('rounded-lg')} />`, 'style/dialog-radius')
+  const clean = source => assert.ok(!rules(`${prefix} const ui = ${source}`).includes('style/dialog-radius'), source)
+  clean('<DialogContent className="gap-4 p-0" />')
+  clean('<DialogContent className="h-dvh w-screen rounded-none" />')
 })
 
 test('utility parser respects bracket expressions and variants', () => {
@@ -291,4 +315,32 @@ test('the issue page may draw its header and comment-card lines (R-61, R-63); ot
     assert.ok(!auditSource(file, '<header className="border-b border-rule" />', policy).some(d => d.rule === 'style/no-horizontal-rule'))
   }
   assert.ok(auditSource('components/workspace/task-detail.tsx', '<div className="border-b border-rule" />', policy).some(d => d.rule === 'style/no-horizontal-rule'))
+})
+
+test('R-31: a search field is the shared SearchInput, never an outlined Input with a magnifier', () => {
+  const icons = `import { Search } from 'lucide-react'; import { Input } from '@/components/ui/input'; import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'; import { SidebarInput } from '@/components/ui/sidebar';`
+  has(`${icons} const ui = <Input type="search" />`, 'style/search-input')
+  has(`${icons} const ui = <Input aria-label={t('searchAria')} />`, 'style/search-input')
+  has(`${icons} const ui = <Input placeholder="搜索项目…" />`, 'style/search-input')
+  has(`${icons} const ui = <div><Search /><SidebarInput /></div>`, 'style/search-input')
+  has(`${icons} const ui = <InputGroup><InputGroupAddon><Search /></InputGroupAddon><InputGroupInput /></InputGroup>`, 'style/search-input')
+  const clean = source => assert.ok(!rules(`${icons} import { SearchInput } from '@/components/ui/search-input'; const ui = ${source}`).includes('style/search-input'), source)
+  clean(`<SearchInput aria-label={t('searchAria')} placeholder={t('searchPlaceholder')} />`)
+  clean(`<Input type="email" aria-label={t('email')} />`)
+  clean(`<InputGroup><InputGroupInput type="email" /><InputGroupAddon><Mail /></InputGroupAddon></InputGroup>`)
+})
+
+test('one container per surface: a frame inside a frame is a double border', () => {
+  const imports = `${prefix} import { Card, CardHeader, CardContent } from '@/components/ui/card'; import { Item } from '@/components/ui/item'; import { FramePanel } from '@/components/reui/frame'; import { SettingsLoading, SettingsSection } from '@/components/settings/primitives'; import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';`
+  has(`${imports} const ui = <div className="rounded-xl border"><div className="rounded-lg border p-3" /></div>`, 'style/nested-frame')
+  has(`${imports} const ui = <SettingsSection title="x"><SettingsLoading label="x" /></SettingsSection>`, 'style/nested-frame')
+  has(`${imports} const ui = <FramePanel><Item variant="outline" /></FramePanel>`, 'style/nested-frame')
+  has(`${imports} const ui = <Card><CardHeader /><CardContent><div className={cn('rounded-md border', active && 'border-primary')} /></CardContent></Card>`, 'style/nested-frame')
+  const clean = source => assert.ok(!rules(`${imports} const ui = ${source}`).includes('style/nested-frame'), source)
+  clean(`<SettingsSection title="x"><SettingsLoading label="x" bare /></SettingsSection>`)
+  clean(`<div className="rounded-xl border"><div className="rounded-lg bg-muted p-3" /></div>`)
+  clean(`<div className="rounded-xl border"><div className="hover:border rounded-lg" /></div>`)
+  clean(`<div className="rounded-lg border"><div className="rounded-full border bg-popover shadow-lg" /></div>`)
+  clean(`<Card><CardHeader /><CardContent><Dialog><DialogContent><DialogTitle>x</DialogTitle><div className="rounded-lg border" /></DialogContent></Dialog></CardContent></Card>`)
+  clean(`<FramePanel><Item /></FramePanel>`)
 })

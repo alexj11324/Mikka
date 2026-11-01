@@ -8,6 +8,7 @@ export const SETTINGS_ACTION_ERROR_CODES = [
   'secretNotFound', 'secretPermissionDenied', 'secretNameReserved', 'secretNameTaken',
   'secretLimitReached', 'secretsUnavailable', 'e2bKeyInvalid', 'e2bKeyUnverifiable',
   'e2bKeyRateLimited', 'botNotFound', 'tokenNotFound', 'tokenLimitReached',
+  'apiKeyInvalid', 'apiKeyUnverifiable', 'apiKeyBaseUrlInvalid', 'apiKeyNotFound',
 ] as const
 export type SettingsActionErrorCode = ActionErrorCode | typeof SETTINGS_ACTION_ERROR_CODES[number]
 export type SettingsActionResult<T> = ActionResult<T, SettingsActionErrorCode>

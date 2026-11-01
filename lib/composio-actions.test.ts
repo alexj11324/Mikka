@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createServer } from 'node:http'
 
 import { createComposioAITools, createGoogleAITools, executeComposioAction, isApprovalAction, parseActionInput } from './composio-actions'
 import type { ComposioActionClient } from './composio-actions'
@@ -109,6 +110,48 @@ test('sends an email as plain text to the first recipient plus the rest', async 
   })
 })
 
+test('a lost response after an external write stays uncertain; preflight failures never dispatch', async () => {
+  let effects = 0
+  // Independent loopback effect service: this is a transport fault fixture,
+  // not evidence that a live Gmail/Calendar account was exercised.
+  const receiver = createServer((request, response) => {
+    assert.equal(request.method, 'POST')
+    effects++
+    response.destroy()
+  })
+  await new Promise<void>(resolve => receiver.listen(0, '127.0.0.1', resolve))
+  const address = receiver.address() as { port: number }
+  try {
+    for (const [action, toolkit, input] of [
+      ['send_email', 'gmail', { to: ['recipient@example.invalid'], subject: 'Fixture', body: 'One effect' }],
+      ['create_calendar_event', 'googlecalendar', { summary: 'Fixture', start: '2027-01-01T10:00:00Z', end: '2027-01-01T11:00:00Z' }],
+      ['update_calendar_event', 'googlecalendar', { event_id: 'fixture-event', summary: 'Fixture' }],
+    ] as const) {
+      const transport = googleClient(toolkit, {})
+      transport.tools.execute = async () => {
+        await fetch(`http://127.0.0.1:${address.port}`, { method: 'POST' })
+        throw Error('receiver must drop its response')
+      }
+      assert.deepEqual(await executeComposioAction('owner', action, input, transport), { error: 'operationUncertain' })
+    }
+    assert.equal(effects, 3, 'each invocation issues exactly one HTTP effect, without a transport retry')
+    const transport = googleClient('gmail', {})
+    transport.tools.getRawComposioToolBySlug = async () => { throw Error('metadata unavailable before dispatch') }
+    assert.deepEqual(await executeComposioAction('owner', 'send_email', { to: ['recipient@example.invalid'], subject: 'Fixture', body: 'No dispatch' }, transport), { error: 'integrationActionFailed' })
+    assert.equal(effects, 3)
+  } finally {
+    receiver.closeAllConnections()
+    await new Promise<void>((resolve, reject) => receiver.close(error => error ? reject(error) : resolve()))
+  }
+})
+
+test('an unsuccessful dispatched write is unknown while an unsuccessful read remains a read error', async () => {
+  const transport = googleClient('gmail', {})
+  transport.tools.execute = async () => ({ successful: false, error: 'provider or gateway error', data: {}, logId: 'fixture-log' })
+  assert.deepEqual(await executeComposioAction('owner', 'send_email', { to: ['recipient@example.invalid'], subject: 'Fixture', body: 'Fixture' }, transport), { error: 'operationUncertain', logId: 'fixture-log' })
+  assert.deepEqual(await executeComposioAction('owner', 'read_gmail_message', { message_id: 'fixture-id' }, transport), { error: 'provider or gateway error', logId: 'fixture-log' })
+})
+
 test('creates an event on the primary calendar without a Meet link, emailing guests unless told not to', async () => {
   const calls: Record<string, unknown> = {}
   await executeComposioAction('user-1', 'create_calendar_event', {
@@ -127,7 +170,7 @@ test('an event change must change something and cannot cancel the event', () => 
   assert.deepEqual(parseActionInput('update_calendar_event', { event_id: 'abc', start: '2026-10-27T11:00:00Z' }), { event_id: 'abc', start: '2026-10-27T11:00:00Z' })
 })
 
-test('only sending mail and writing the calendar need approval', () => {
+test('only sending mail and writing the calendar are account writes', () => {
   assert.equal(isApprovalAction('send_email'), true)
   assert.equal(isApprovalAction('create_calendar_event'), true)
   assert.equal(isApprovalAction('update_calendar_event'), true)
@@ -160,4 +203,18 @@ test('model tools pass explicit account choices separately from provider input',
   await notion.search_notion_pages.execute!({ query: 'roadmap', account_id: 'account-a' }, options)
   await google.send_email.execute!({ to: ['test@example.invalid'], subject: 's', body: 'b', account_id: 'account-b' }, options)
   assert.deepEqual(calls, [['search_notion_pages', { query: 'roadmap' }, 'account-a'], ['send_email', { to: ['test@example.invalid'], subject: 's', body: 'b' }, 'account-b']])
+})
+
+test('the dispatch gate sees the account and tool tags before anything is sent, and can stop it', async () => {
+  const calls: Record<string, unknown> = {}
+  const transport = client([activeNotion], calls)
+  transport.tools.getRawComposioToolBySlug = async () => ({ version: '20261018_00', tags: ['destructiveHint'] }) as never
+  const seen: unknown[] = []
+  const stopped = await executeComposioAction('user-1', 'search_notion_pages', { query: 'x' }, transport, undefined, undefined, async (accountId, tool) => { seen.push([accountId, tool.tags]); return { error: 'integrationApprovalRequired' } })
+  assert.deepEqual(stopped, { error: 'integrationApprovalRequired' })
+  assert.deepEqual(seen, [['notion-account', ['destructiveHint']]])
+  assert.equal(calls.execution, undefined)
+  const passed = await executeComposioAction('user-1', 'search_notion_pages', { query: 'x' }, transport, undefined, undefined, async () => null)
+  assert.ok('data' in passed)
+  assert.ok(calls.execution)
 })

@@ -4,12 +4,13 @@ import type { CoordinatorRuntime, NativeCoordinatorJob } from '@mikka/protocol/c
 import { nativeCoordinatorEnabled, nativeCoordinatorStore } from '@/lib/coordinator/native'
 import { loadConversation } from '@/lib/coordinator/store'
 import { instructionsWithMemory, promptMessages } from '@/lib/coordinator/context'
-import { nativeCoordinatorContext, personalCoordinatorInstructions } from '@/lib/coordinator/native-prompt'
+import { nativeCoordinatorContext, personalCoordinatorInstructions, withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { personalMailboxInstructions } from '@/lib/personal-mailbox-instructions'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
+import { SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
 
 export async function runtime(userId: string): Promise<CoordinatorRuntime> {
   'use step'
@@ -18,10 +19,10 @@ export async function runtime(userId: string): Promise<CoordinatorRuntime> {
 export async function enqueue(userId: string, holder: string, round: number, selected: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: NativeCoordinatorJob['tools'], botId: string | null = null, snapshot?: DefinitionSnapshot) {
   'use step'
   const { summary, memory, messages } = await loadConversation(userId, botId)
-  const base = snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, personalCoordinatorInstructions())
+  const base = snapshot ? withCoordinatorPresentation(executionInstructions(snapshot)) : await botInstructions(userId, botId, personalCoordinatorInstructions())
   const permitted = snapshotMailboxTools(snapshot).filter(name => tools.some(tool => tool.name === name))
   return nativeCoordinatorStore.enqueue(userId,holder,round,selected,{
-    instructions: instructionsWithMemory(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base), memory),
+    instructions: instructionsWithMemory(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + '\n' + SCHEDULE_INSTRUCTIONS,
     context: nativeCoordinatorContext(promptMessages(summary,messages,{ key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) })), tools,
   })
 }

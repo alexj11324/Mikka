@@ -5,7 +5,7 @@ import { before, mock, test } from 'node:test'
 
 class WorkspaceError extends Error { constructor(readonly code: string) { super(code) } }
 const calls: Array<[string, ...unknown[]]> = []
-const audits: unknown[] = []
+const auditContext = { ip: null, geoCity: null, geoCountry: null, geoRegion: null }
 const cookieJar = new Map<string, string>()
 let failure: Error | null = null
 const actor = { userId: 'admin-1', email: 'a@example.invalid', name: 'A', workspaceId: '11111111-1111-4111-8111-111111111111', role: 'admin' as const }
@@ -28,7 +28,7 @@ before(async () => {
   } })
   mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError, requireWorkspace: async () => { throw new Error('unexpected') }, loadWorkspaceContext: async () => ({ workspace: { id: actor.workspaceId } }) } })
   mock.module('@/lib/workspace-admin/current', { namedExports: { currentWorkspaceActor: async (workspaceId?: string) => { calls.push(['currentWorkspaceActor', workspaceId]); return workspaceId ? { ...actor, workspaceId } : actor } } })
-  mock.module('@/lib/audit/record', { namedExports: { recordAuditSafe: async (event: unknown) => { audits.push(event); return null }, auditRequestContext: () => ({ ip: null, geoCity: null, geoCountry: null, geoRegion: null }) } })
+  mock.module('@/lib/audit/record', { namedExports: { auditRequestContext: () => ({ ip: null, geoCity: null, geoCountry: null, geoRegion: null }) } })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => ({ id: actor.userId, email: actor.email, name: actor.name }) } })
   mock.module('@/lib/workspace-admin/general', { namedExports: {
     updateWorkspaceGeneral: respond('updateWorkspaceGeneral', { id: actor.workspaceId, name: 'New', slug: 'new', icon: null }),
@@ -38,7 +38,7 @@ before(async () => {
     transferWorkspaceOwnership: respond('transferWorkspaceOwnership', { owner: { userId: 'm-1', name: 'Mia', email: 'm@example.invalid' }, previousRole: 'member' }),
     deleteWorkspaceData: async (...args: unknown[]) => { calls.push(['deleteWorkspaceData', ...args]); if (failure) throw failure; return { deleted: { bots: 0, threads: 0, tasks: 0, projects: 0, teams: 0, invitations: 0, members: 1 }, nextWorkspaceId: args[2] === 'Last' ? null : '22222222-2222-4222-8222-222222222222' } },
   } })
-  mock.module('@/lib/workspace-admin/members', { namedExports: { removeMember: respond('removeMember', { removed: true, transferred: { bots: 2 }, label: 'Mia' }), transferOnSuspend: respond('transferOnSuspend', { bots: 0 }) } })
+  mock.module('@/lib/workspace-admin/members', { namedExports: { removeMember: respond('removeMember', { removed: true, transferred: { bots: 2 }, label: 'Mia' }), transferOnSuspend: respond('transferOnSuspend', { bots: 0 }), releaseDepartingMember: respond('releaseDepartingMember', undefined), restoreReturningMember: respond('restoreReturningMember', undefined), archivedBots: respond('archivedBots', []), takeOverBot: respond('takeOverBot', { bots: 1 }) } })
   mock.module('@/lib/workspace-admin/teams', { namedExports: {
     teamDeletionImpact: respond('teamDeletionImpact', { teamId: 't', name: 'Platform', tasks: 42, projects: 5 }),
     deleteTeamData: respond('deleteTeamData', { deleted: { tasks: 42, projects: 5 } }),
@@ -59,25 +59,22 @@ before(async () => {
   teamActions = await import('../app/actions/teams')
 })
 
-function reset() { calls.length = 0; audits.length = 0; cookieJar.clear(); failure = null }
+function reset() { calls.length = 0; cookieJar.clear(); failure = null }
 const relevant = () => calls.filter(([name]) => name !== 'currentWorkspaceActor')
 
-test('updateWorkspace acts on the current workspace as the signed-in user and audits a slug change', async () => {
+test('updateWorkspace delegates the real slug change and audit context to one backend transaction', async () => {
   reset()
   const result = await actions.updateWorkspace({ name: 'New', slug: 'new' })
   assert.deepEqual(result, { id: actor.workspaceId, name: 'New', slug: 'new', icon: null })
-  assert.deepEqual(relevant(), [['readWorkspaceGeneral', actor.userId, actor.workspaceId], ['updateWorkspaceGeneral', actor.userId, actor.workspaceId, { name: 'New', slug: 'new' }]])
-  assert.equal(audits.length, 1)
-  assert.deepEqual((audits[0] as { action: string; metadata: unknown }).action, 'workspace.slug_changed')
-  assert.deepEqual((audits[0] as { metadata: unknown }).metadata, { from: 'old', to: 'new' })
+  assert.deepEqual(relevant(), [['updateWorkspaceGeneral', actor.userId, actor.workspaceId, { name: 'New', slug: 'new' }, auditContext]])
+
 })
 
 test('updateWorkspace targets the workspace the settings page shows; a rename alone is not audited', async () => {
   reset()
   const other = '33333333-3333-4333-8333-333333333333'
   await actions.updateWorkspace({ name: 'New' }, other)
-  assert.deepEqual(calls, [['currentWorkspaceActor', other], ['updateWorkspaceGeneral', actor.userId, other, { name: 'New' }]])
-  assert.equal(audits.length, 0)
+  assert.deepEqual(calls, [['currentWorkspaceActor', other], ['updateWorkspaceGeneral', actor.userId, other, { name: 'New' }, auditContext]])
 })
 
 test('general and deletion impact reads go through the same actor', async () => {
@@ -116,7 +113,7 @@ test('removeWorkspaceMember passes the optional new owner', async () => {
   reset()
   assert.deepEqual(await actions.removeWorkspaceMember('member-9', { transferTo: 'heir-3' }), { removed: true, transferred: { bots: 2 } })
   await actions.removeWorkspaceMember('member-9')
-  assert.deepEqual(relevant(), [['removeMember', actor.userId, actor.workspaceId, 'member-9', 'heir-3'], ['removeMember', actor.userId, actor.workspaceId, 'member-9', undefined]])
+  assert.deepEqual(relevant(), [['removeMember', actor.userId, actor.workspaceId, 'member-9', 'heir-3', auditContext], ['removeMember', actor.userId, actor.workspaceId, 'member-9', undefined, auditContext]])
   failure = new WorkspaceError('workspaceCannotRemoveSelf')
   assert.equal((await actions.removeWorkspaceMember(actor.userId)).error, 'workspaceCannotRemoveSelf')
 })
@@ -165,16 +162,12 @@ test('bot defaults and workspace bot list actions', async () => {
   assert.equal((await botActions.updateWorkspaceBotDefaults({ defaultRepository: 'x/y' })).error, 'botDefaultRepositoryUnavailable')
 })
 
-test('transferWorkspace acts on the shown workspace and audits the promotion and the transfer', async () => {
+test('transferWorkspace passes the shown workspace and audit context to its transactional backend', async () => {
   reset()
   const other = '33333333-3333-4333-8333-333333333333'
   assert.deepEqual(await actions.getWorkspaceTransferTargets(other), [{ userId: 'm-1', name: 'Mia', email: 'm@example.invalid' }])
   assert.deepEqual(await actions.transferWorkspace('m-1', other), { owner: { userId: 'm-1', name: 'Mia', email: 'm@example.invalid' } })
-  assert.deepEqual(relevant(), [['workspaceTransferTargets', actor.userId, other], ['transferWorkspaceOwnership', actor.userId, other, 'm-1']])
-  assert.deepEqual(audits.map(event => (event as { action: string }).action), ['member.role_changed', 'workspace.ownership_transferred'])
-  assert.deepEqual((audits[0] as { metadata: unknown }).metadata, { oldRole: 'member', newRole: 'admin' })
-  assert.deepEqual((audits[1] as { workspaceId: string; target: unknown }).target, { type: 'member', id: 'm-1', label: 'Mia' })
-  assert.equal((audits[1] as { workspaceId: string }).workspaceId, other)
+  assert.deepEqual(relevant(), [['workspaceTransferTargets', actor.userId, other], ['transferWorkspaceOwnership', actor.userId, other, 'm-1', auditContext]])
   failure = new WorkspaceError('workspaceTransferTargetInvalid')
   assert.deepEqual(await actions.transferWorkspace('m-1', other), { error: 'workspaceTransferTargetInvalid', params: undefined })
 })

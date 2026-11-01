@@ -29,12 +29,16 @@ export interface ApprovedWriteView {
   approvalExpiresAt: string
   status: 'pending' | 'running' | 'done' | 'declined'
   error: 'operationUncertain' | null
+  outcome?: ApprovedWriteOutcome
 }
+export interface ApprovedWriteOutcome { id: string; url?: string }
+export interface ApprovedWriteDecision { status: 'done' | 'running' | 'declined'; error: string | null; outcome?: ApprovedWriteOutcome }
+const writeOutcome = (receipt: NonNullable<OperationRecord['receipt']>): ApprovedWriteOutcome => ({ id: receipt.providerObjectId, ...(receipt.providerObjectUrl ? { url: receipt.providerObjectUrl } : {}) })
 // #204 acts in a person's own account, not a team workspace. Explicit personal
 // scope avoids inventing a workspace DB relationship or using a browser cookie.
 const scope = (owner: string) => `personal:${owner}`
 const identity = (p: Proposal) => ({ operationId: p.id, ownerId: p.userId, workspaceId: scope(p.userId) })
-const intent = (p: Proposal): OperationIntent => ({ ...identity(p), provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, action: p.action, target: writeTarget(p.action as WriteActionName, p.input), approvalId: p.id, proposalDigest: digest([p.action, p.operationBinding]), payloadDigest: p.operationBinding.payloadDigest, ...(p.operationBinding.run ? { executionRunId: p.operationBinding.run.runId, policyScope: { botId: p.operationBinding.run.botId, workspaceId: p.operationBinding.run.workspaceId, version: p.operationBinding.run.policyVersion } } : {}) })
+const intent = (p: Proposal): OperationIntent => ({ ...identity(p), provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, action: p.action, target: writeTarget(p.action as WriteActionName, p.input), approvalId: p.id, proposalDigest: digest([p.action, p.operationBinding]), payloadDigest: p.operationBinding.payloadDigest, ...(p.operationBinding.run ? { executionRunId: p.operationBinding.run.runId, policyScope: { botId: p.operationBinding.run.botId, workspaceId: p.operationBinding.run.workspaceId, version: p.operationBinding.run.policyVersion, ...(p.operationBinding.run.approvalDefault ? { approvalDefault: p.operationBinding.run.approvalDefault } : {}) } } : {}) })
 
 /** Pure projection only; callers must authenticate/authorize the read separately.
  * Shared by by-ID and discovery so status never depends on which endpoint is used. */
@@ -51,6 +55,7 @@ export function projectApprovedWriteView(p: StoredWriteProposal, execution: (Ope
     account: { provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, version: p.operationBinding.version },
     createdAt: created.data.toISOString(), approvalExpiresAt: new Date(created.data.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     status, error: status === 'running' ? 'operationUncertain' : null,
+    ...(status === 'done' && execution?.receipt ? { outcome: writeOutcome(execution.receipt) } : {}),
   }
 }
 
@@ -61,7 +66,7 @@ async function bounded<T>(call: (signal: AbortSignal) => Promise<T>, requestSign
   finally { clearTimeout(timer) }
 }
 
-export function createApprovedWrites(pool: Pool, provider: WriteProvider, action: WriteActionName, context: WriteRequestContext = {}) {
+export function createApprovedWrites(pool: Pool, provider: WriteProvider, action: WriteActionName, context: WriteRequestContext = {}, notifyDecision?: (proposal: StoredWriteProposal, result: ApprovedWriteDecision) => Promise<void>) {
   function transaction<T>(work: (tx: PoolClient) => Promise<T>, actor: WriteActor | undefined = context.actor) {
     return writeTransaction(pool, work, { signal: context.signal, guard: context.guard, ...(actor ? { authorizeCommit: (tx: PoolClient) => requireOperationSession(tx, actor, actor.userId) } : {}) })
   }
@@ -89,23 +94,20 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
     // UI-compatible projection. Unknown results are never represented as failure
     // or success: existing running stays pending reconciliation; ledger is authoritative.
     if (row.status === 'succeeded') await pool.query(`UPDATE pending_actions SET status='done',result=$2,error=NULL WHERE id=$1 AND status IN ('running','done')`, [row.operationId, { id: row.receipt!.providerObjectId }])
-    return { status: row.status === 'succeeded' ? 'done' as const : 'running' as const, error: row.status === 'succeeded' ? null : 'operationUncertain' }
+    return { status: row.status === 'succeeded' ? 'done' as const : 'running' as const, error: row.status === 'succeeded' ? null : 'operationUncertain', ...(row.status === 'succeeded' ? { outcome: writeOutcome(row.receipt!) } : {}) }
   }
-  async function execute(p: Proposal, actor?: WriteActor) {
+  async function execute(p: Proposal, actor?: WriteActor, readbackOnly = false) {
       const run = p.operationBinding.run
       const guard = actor && run && context.guardForRun ? context.guardForRun({ ownerId: p.userId, botId: run.botId, workspaceId: run.workspaceId, runId: run.runId }) : context.guard
       if (run?.workspaceId && !guard) throw new OperationError('writePolicyUnavailable')
-      const authorize = run ? withWritePolicy(current, async (tx, binding, runId, phase) => { if (!actor) throw new OperationError('writeApprovalRequired'); await current(tx, binding, runId, phase) }, { allowCompleted: Boolean(actor) }) : current
+      const authorize = run ? withWritePolicy(current, async (tx, binding, runId, phase) => { if (!actor) throw new OperationError('writeApprovalRequired'); await current(tx, binding, runId, phase) }, { allowCompleted: Boolean(actor), readbackOnly }) : current
       if (!actor && !run) throw new OperationError('operationAuthorizationRequired')
       const ledger = createOperationLedger(pool, actor ? withOperationSession(actor, authorize) : authorize, { ...context, guard })
-      const row = await ledger.reserve(intent(p))
+      const row = readbackOnly ? await ledger.read(identity(p)) : await ledger.reserve(intent(p))
+      if (readbackOnly && row.status === 'reserved') throw new OperationError('operationReadbackOnly')
       if (row.status !== 'reserved') {
         if (row.status === 'succeeded') return project(row)
-        // A concurrent approval is not proof the first caller crashed. Negative
-        // lookup must not invalidate its claim before invocation starts.
-        const evidence = await bounded(() => provider.lookup({ ownerId: p.userId, accountId: p.operationBinding.accountId, idempotencyKey: row.idempotencyKey }), context.signal)
-        if (!evidence) return project(row)
-        return project(await ledger.reconcile(identity(p), async () => evidence))
+        return project(await ledger.reconcile(identity(p), record => bounded(signal => provider.lookup({ ownerId: p.userId, accountId: p.operationBinding.accountId, version: p.operationBinding.version, payload: p.input, idempotencyKey: record.idempotencyKey, signal }), context.signal)))
       }
       let claimed: OperationRecord
       try { claimed = await ledger.claim(identity(p), run?.runId ?? randomUUID()) }
@@ -192,21 +194,24 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
       let proposal = await locked(prior)
       if (!proposal) {
         // Check authorization before provider metadata and recheck under the insert lock.
+        // Explicit settings win first. Only when none names the action does the
+        // Decisions API judge whether this exact call is destructive (R-77).
         const first = await transaction(tx => lockWritePolicy(tx, { ...run, action }))
         if (first.decision === 'deny') throw new OperationError('writeDenied')
         const selected = await bounded(() => provider.prepare(run.ownerId, input), context.signal)
+        const approvalDefault = first.defaulted && context.judgeWrite && selected.tool ? await context.judgeWrite({ action, tool: selected.tool, annotations: selected.annotations, input }) : 'ask'
         proposal = await locked(async tx => {
           const existing = await prior(tx)
           if (existing) return existing
-          const policy = await lockWritePolicy(tx, { ...run, action })
-          if (policy.version !== first.version || policy.decision !== first.decision) throw new OperationError('writePolicyChanged')
+          const policy = await lockWritePolicy(tx, { ...run, action }, { fallback: approvalDefault })
+          if (policy.version !== first.version) throw new OperationError('writePolicyChanged')
           if (policy.decision === 'deny') throw new OperationError('writeDenied')
           if (policy.decision === 'ask') {
             await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['approved-write-pending-owner', run.ownerId])])
             const count = await tx.query(`SELECT count(*) FROM pending_actions WHERE "userId"=$1 AND status='pending' AND "createdAt">clock_timestamp()-interval '7 days'`, [run.ownerId])
             if (Number(count.rows[0].count) >= 20) throw new OperationError('tooManyPendingActions')
           }
-          const binding = bindingSchema.parse({ ...prepareWriteBinding(provider.name, selected, input), run: { runId:run.runId, botId:run.botId, workspaceId:run.workspaceId, policyVersion:policy.version, decision:policy.decision } })
+          const binding = bindingSchema.parse({ ...prepareWriteBinding(provider.name, selected, input), run: { runId:run.runId, botId:run.botId, workspaceId:run.workspaceId, policyVersion:policy.version, decision:policy.decision, approvalDefault } })
           const id = randomUUID(), status = policy.decision === 'allow' ? 'running' : 'pending'
           const inserted = await tx.query<Proposal>('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding",context,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [id, run.ownerId, action, input, key, binding, selected.context ?? null, status])
           return inserted.rows[0]
@@ -221,7 +226,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
       z.uuid().parse(id)
       // All paths use ledger -> session -> proposal. Revocation waits for an
       // in-flight invoke and never reports cancellation of an already sent effect.
-      const p = await transaction(async tx => {
+      const decision = await transaction(async tx => {
         await lockOperation(tx, { operationId: id, ownerId: actor.userId, workspaceId: scope(actor.userId) })
         const execution = await tx.query('SELECT status,"invokedAt" FROM operation_ledger WHERE "operationId"=$1 AND "ownerId"=$2 FOR UPDATE', [id, actor.userId])
         await requireOperationSession(tx, actor, actor.userId)
@@ -229,15 +234,18 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
           if (execution.rows[0]?.invokedAt) throw new OperationError('operationUncertain')
           // Closing an uninvoked owned proposal does not authorize an effect.
           // Allow old bindings without contextDigest to be safely declined.
-          const closed = await tx.query("UPDATE pending_actions SET status='declined',\"decidedAt\"=clock_timestamp() WHERE id=$1 AND \"userId\"=$2 AND action=$3 AND status IN ('pending','running') RETURNING id", [id, actor.userId, action])
+          const closed = await tx.query<Proposal>("UPDATE pending_actions SET status='declined',\"decidedAt\"=clock_timestamp() WHERE id=$1 AND \"userId\"=$2 AND action=$3 AND status IN ('pending','running') RETURNING *", [id, actor.userId, action])
           if (!closed.rows.length) throw new OperationError('pendingActionUnavailable')
           await requireOperationSession(tx, actor, actor.userId)
-          return null
+          return { proposal: closed.rows[0], readbackOnly: false, declined: true }
         }
         const row = await owned(tx, actor.userId, id)
+        // An effect that was already sent may be read back after its worker
+        // failed. This never grants another reservation, claim or invocation.
+        const readbackOnly = Boolean(execution.rows[0]?.invokedAt)
         if (row.operationBinding.run) {
           const r = row.operationBinding.run
-          const policy = await lockWritePolicy(tx, { ownerId:actor.userId, botId:r.botId, workspaceId:r.workspaceId, runId:r.runId, action }, { allowCompleted:true })
+          const policy = await lockWritePolicy(tx, { ownerId:actor.userId, botId:r.botId, workspaceId:r.workspaceId, runId:r.runId, action }, { allowCompleted:true, readbackOnly, fallback:r.approvalDefault ?? 'ask' })
           if (policy.decision === 'deny') throw new OperationError('writeDenied')
           if (policy.version !== r.policyVersion || policy.decision !== r.decision) throw new OperationError('writePolicyChanged')
         }
@@ -246,10 +254,11 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         if (!valid.rows.length) throw new OperationError('pendingActionUnavailable')
         if (!['pending', 'running', 'done'].includes(row.status)) throw new OperationError('pendingActionUnavailable')
         if (row.status === 'pending') await tx.query("UPDATE pending_actions SET status='running',\"decidedAt\"=clock_timestamp() WHERE id=$1", [id])
-        return row
+        return { proposal: row, readbackOnly, declined: false }
       }, actor)
-      if (!p) return { status: 'declined' as const, error: null }
-      return execute(p, actor)
+      const result = decision.declined ? { status: 'declined' as const, error: null } : await execute(decision.proposal, actor, decision.readbackOnly)
+      await notifyDecision?.(decision.proposal, result)
+      return result
     },
   }
 }

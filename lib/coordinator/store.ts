@@ -21,12 +21,15 @@ import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
-import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
+import { coordinatorChatState } from './chat-state'
+import { coordinatorLeaseActive } from './lease'
 import { readPreferences } from '@/lib/preferences'
 import { pushReasons, type PushReason } from '@/lib/push-reasons'
 import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
 import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
+import type { ScheduledRead } from '@/lib/schedules/contract'
+import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -92,6 +95,8 @@ export interface InboxTake {
   /** A handed-over verification code: the push says only that one came, the code stays in the app chat. */
   pushHidesText: boolean
   taskEventId?: string
+  sourceEventId?: string
+  scheduledRead?: ScheduledRead
   approvedRepositoryKey?: string
 }
 
@@ -108,7 +113,17 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     if (!taken) return { held: false, ...NO_TAKE }
     const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
-    const due = isolateTaskRequest(candidates)
+    // A schedule is a separate read-only turn. Hydrate its authority through
+    // the stored event link, never from notification/model payload fields.
+    const scheduledCandidate = candidates[0]?.payload.source === 'schedule_due' ? candidates[0] : undefined
+    const scheduledRow=scheduledCandidate?(await tx.execute(sql`SELECT o.* FROM schedule_occurrences o JOIN user_schedules s ON s.id=o.schedule_id WHERE o.event_id=${scheduledCandidate.id} AND s.owner_id=${userId} AND s.bot_id IS NOT DISTINCT FROM ${botId}::uuid LIMIT 1`)).rows[0] as Occurrence|undefined:undefined
+    const scheduled=scheduledInbox(scheduledRow,now)
+    if(scheduled && !scheduled.scope){
+      await tx.update(coordinatorEvents).set({deliveredAt:now,tier:'background'}).where(eq(coordinatorEvents.id,scheduled.eventId))
+      return {held:true,...NO_TAKE}
+    }
+    const scheduledRead=scheduled?.scope??undefined
+    const due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id))
     if (!due.length) return { held: true, ...NO_TAKE }
     let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
     let approvedRepositoryKey: string | undefined
@@ -126,7 +141,8 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
         }
       }
     }
-    const isolatedTask = Boolean(taskEventId) || Boolean(approval)
+    const sourceEventId = scheduled ? undefined : due.findLast(event => event.kind === 'user_message')?.id
+    const isolatedTask = Boolean(taskEventId) || Boolean(approval) || Boolean(scheduled)
     const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), eq(coordinatorEvents.tier, 'background')))
@@ -137,7 +153,7 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     const first = await nextPosition(tx, userId, botId)
     if (chatEvents.length) await tx.insert(coordinatorMessages).values(chatEvents.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
-      message: sourcedEventMessage({ ...event, deliveredAt: now }, eventPrompt(event)),
+      message: sourcedEventMessage({ ...event, deliveredAt: now }, scheduledRead ? `[Scheduled read-only task] The person requested this stored task for now: ${scheduledRead.prompt}\nUse only the available allowed read tools. Do not create or change anything, request approval, schedule more work, or claim an external write. Return the result for this original chat.` : eventPrompt(event)),
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
     for (const event of events) {
@@ -153,6 +169,8 @@ export async function takeInbox(userId: string, holder: string, botId: string | 
     return {
       held: true, added: events.length,
       ...(taskEventId ? { taskEventId } : {}),
+      ...(sourceEventId ? { sourceEventId } : {}),
+      ...(scheduledRead ? { scheduledRead } : {}),
       ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
@@ -236,19 +254,42 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
  * Appends the turn's new messages and renews the lease. `warning` says why the
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null): Promise<void> {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null, streamId?: string): Promise<number> {
   await assertCredentialSafeChat(userId, messages)
-  await db.transaction(async tx => {
+  return db.transaction(async tx => {
     await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId" IS NOT DISTINCT FROM ${botId}::uuid FOR UPDATE`)
+    const first = await nextPosition(tx, userId, botId)
     if (messages.length) {
-      const first = await nextPosition(tx, userId, botId)
-      await tx.insert(coordinatorMessages).values(messages.map((message, index) => ({
-        id: crypto.randomUUID(), userId, botId, position: first + index, message: message as unknown as Record<string, unknown>,
-      })))
+      await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
+        const { mikkaStreamId: _untrusted, ...plain } = message as unknown as Record<string, unknown>
+        return { id: crypto.randomUUID(), userId, botId, position: first + index,
+          message: { ...plain, ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}) } }
+      }))
     }
     const now = new Date()
     await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning, lastErrorAt: warning ? now : null, updatedAt: now })
       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
+    return first + messages.length - 1
+  })
+}
+
+/**
+ * 重试 on a failed reply: runs the same turn again over the conversation as it
+ * stands, so the person's message is not sent twice. The event never becomes a
+ * chat message, and one failure can be retried once; a new failure can be
+ * retried again. False when nothing failed or a turn is already running.
+ */
+export async function retryFailedTurn(userId: string, botId: string | null = null): Promise<boolean> {
+  return db.transaction(async tx => {
+    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId" IS NOT DISTINCT FROM ${botId}::uuid FOR UPDATE`)
+    const [session] = await tx.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+    if (!session?.lastError || !session.lastErrorAt || coordinatorLeaseActive(session)) return false
+    const inserted = await tx.insert(coordinatorEvents).values({
+      id: crypto.randomUUID(), userId, botId, kind: 'user_message', issueId: null, runId: null,
+      dedupeKey: `turn_retry:${userId}:${botId ?? 'coordinator'}:${session.lastErrorAt.toISOString()}`,
+      payload: { text: '', postedToChat: true, retry: true },
+    }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
+    return inserted.length === 1
   })
 }
 
@@ -268,7 +309,10 @@ export async function loadConversation(userId: string, botId: string | null = nu
     .orderBy(asc(coordinatorMessages.position))
   // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
   const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
-  return { summary: session?.summary ?? null, memory, messages: rows.map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })) }
+  return { summary: session?.summary ?? null, memory, messages: rows.map(row => {
+    const { mikkaStreamId: _streamId, ...message } = row.message
+    return { position: row.position, message: message as unknown as ModelMessage }
+  }) }
 }
 
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */
@@ -292,7 +336,13 @@ export async function editMemory<T>(userId: string, edit: (memory: string) => { 
 
 export interface ChatView {
   items: ChatItem[]
-  /** A turn holds the lease or messages wait in the inbox: a reply is coming. */
+  /** Active Workflow lease for this exact owner and bot. */
+  streamRunId?: string
+  /** Last stored message position, excluding pending inbox items. */
+  cursor?: number
+  /** Server-owned IDs already represented in these stored assistant messages. */
+  persistedStreamIds?: string[]
+  /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
   /** Why the last turn failed, when no turn has answered since. */
   error: string | null
@@ -340,6 +390,12 @@ export async function citationSources(userId: string, texts: readonly string[], 
   return sources
 }
 
+/** A waiting message as the chat shows it: its words, and a stand-in per photo so the chat can count them. */
+function withImages(text: string, images: unknown): ModelMessage['content'] {
+  if (!Array.isArray(images) || !images.length) return text
+  return [{ type: 'text', text }, ...images.map(() => ({ type: 'file' as const, data: '', mediaType: 'image/jpeg' }))]
+}
+
 /** The latest of the conversation for the chat, oldest first. */
 export async function chatView(userId: string, limit = 200, botId: string | null = null): Promise<ChatView> {
   const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
@@ -352,15 +408,15 @@ export async function chatView(userId: string, limit = 200, botId: string | null
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? 0
   const pending = waiting.filter(event => event.kind === 'user_message' && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
-    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: eventPrompt(event) } as ModelMessage, pending: true as const,
+    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
   }))
-  const leased = coordinatorLeaseActive(session)
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   return {
     items,
-    // A handoff waiting in the inbox is not shown as a reply coming: the Coordinator may decide to stay quiet.
-    working: leased || waiting.some(event => event.tier !== 'background' && !isHandoff(event.kind)),
-    error: session?.lastError ?? null,
+    cursor: last,
+    persistedStreamIds: [...new Set(rows.flatMap(({message}) => message.role === 'assistant' && typeof message.mikkaStreamId === 'string' ? [message.mikkaStreamId] : []))],
+    ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
+    ...coordinatorChatState(session, waiting),
     sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
     artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
   }
@@ -370,7 +426,7 @@ export interface BotChatSummary {
   /** The latest reply or message, as written; null before the first. */
   line: string | null
   at: string | null
-  /** A turn holds the lease or the person's messages wait: a reply is coming. */
+  /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
 }
 
@@ -380,16 +436,20 @@ export async function botChats(userId: string): Promise<Record<string, BotChatSu
     .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), isNotNull(coordinatorMessages.botId), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
   const sessions = await db.select().from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNotNull(coordinatorSessions.botId)))
-  const waiting = await wakingChats(userId)
+  const waiting = await db.select({ botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError })
+    .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), isNotNull(coordinatorEvents.botId), isNull(coordinatorEvents.deliveredAt)))
   const result: Record<string, BotChatSummary> = {}
+  for (const event of waiting) {
+    if (event.botId && !result[event.botId]) result[event.botId] = { line: null, at: null, working: coordinatorChatState(undefined, waiting.filter(row => row.botId === event.botId)).working }
+  }
   for (const session of sessions) {
     if (!session.botId) continue
-    result[session.botId] = { line: null, at: null, working: coordinatorLeaseActive(session) || waiting.includes(session.botId) }
+    result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId)).working }
   }
   for (const row of latest) {
     if (!row.botId) continue
     const [item] = chatItems([{ position: 0, message: row.message as unknown as ModelMessage, createdAt: row.createdAt }])
-    result[row.botId] = { ...(result[row.botId] ?? { working: waiting.includes(row.botId) }), line: item?.text || null, at: row.createdAt.toISOString() }
+    result[row.botId] = { ...(result[row.botId] ?? { working: false }), line: item?.text || null, at: row.createdAt.toISOString() }
   }
   return result
 }

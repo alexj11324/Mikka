@@ -25,7 +25,7 @@ const MAX_LENGTH = 8000
 
 type Machine = { value: string; label: string; cloud?: boolean; online?: boolean }
 
-/** A machine's icon with its state dot. E2B stays green asleep, since picking it wakes it; red only when it failed (the workspace has one, so any bot's computer reports it). */
+/** A machine's icon with its state dot. Mikka Cloud stays green asleep, since picking it wakes it; red only when it failed (the workspace has one, so any bot's computer reports it). */
 function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
   const t = useTranslations('Shell.newTaskDialog')
   const tStatus = useTranslations('Computer.status')
@@ -70,7 +70,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
   const { data: bots = [] } = useSWR(open ? 'bots' : null, listBots)
   const cloudBotId = bots[0]?.id
-  // E2B first and by default: there the Coordinator picks the bot, so no bot is named.
+  // Mikka Cloud first and by default: there the Coordinator picks the bot, so no bot is named.
   // Direct daemon devices are 本机, including Linux. OS is not evidence that
   // a computer is an SSH target reached through another machine (R-23).
   const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true }
@@ -130,16 +130,16 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
               {own.length > 0 && <SelectGroup><SelectLabel>{tDevices('thisMachine')}</SelectLabel>{own.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudBotId={cloudBotId} /></SelectItem>)}</SelectGroup>}
             </SelectContent>
           </Select>
-          : <span className="flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}
+          : <span className="flex h-7 items-center gap-1.5 rounded-full bg-control px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}
         <ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
         <DialogTitle className="text-sm font-medium">{t('title')}</DialogTitle>
-        {project && <span className="flex h-6 max-w-40 items-center rounded-full border px-2 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}
+        {project && <span className="flex h-7 max-w-40 items-center rounded-full bg-control px-2.5 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}
       </div>
       <DialogDescription className="sr-only">{t('description')}</DialogDescription>
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="new-issue-title" className="sr-only">{t('label')}</FieldLabel>
-          <Textarea id="new-issue-title" autoFocus value={draft} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-32 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 dark:bg-transparent" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
+          <Textarea id="new-issue-title" autoFocus value={draft} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-32 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 bg-transparent" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() }
           }} />
         </Field>

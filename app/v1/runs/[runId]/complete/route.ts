@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { runCompleteRequest } from '@mikka/protocol/run'
@@ -18,7 +19,7 @@ import { maskDeep } from '@/lib/secrets/mask'
 export const dynamic = 'force-dynamic'
 
 /** The first completion is immutable; retries also recover a failed enqueue. */
-export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { runId } = await params
@@ -50,3 +51,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
   }
   return new NextResponse(null, { status: 204 })
 }
+
+export const POST = withDeviceRoute(handlePOST)

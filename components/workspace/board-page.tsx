@@ -16,7 +16,6 @@ import { CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { AGENT_STATES, CARD_PROPERTIES, DEFAULT_CARD_PROPERTIES, DEFAULT_HIDDEN_COLUMNS, agentStateOf, type AgentState, type CardProperty } from '@/components/blocks/kanban-board-1/components/data'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { ButtonGroup, ButtonGroupText } from '@/components/ui/button-group'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -125,6 +124,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const linearSynced = !!linear && !linear.error && linear.synced
   const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000, revalidateOnFocus: false })
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
+  const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run.status); return state ? [[run.issueId, state] as const] : [] })), [runs])
   const subtasks = useMemo(() => {
     const result = new Map<string, { done: number; total: number }>()
@@ -183,8 +183,8 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <h1 id={titleId} className="sr-only">{t('title')}</h1>
       <div role="toolbar" aria-label={t('toolbar')} className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 px-5 py-3">
-        <ToggleGroup aria-label={t('scopeLabel')} size="sm" spacing={0} className="rounded-lg bg-muted p-0.5" value={[scope]} onValueChange={values => { const next = values[0] as Scope | undefined; if (next) update({ scope: next }) }}>
-          {(['all', 'workspace', 'personal'] as const).map(value => <ToggleGroupItem key={value} value={value} className="h-7 rounded-md px-3 font-normal text-muted-foreground aria-pressed:bg-background aria-pressed:font-medium aria-pressed:text-foreground aria-pressed:shadow-xs">{t(`scope.${value}`)}</ToggleGroupItem>)}
+        <ToggleGroup aria-label={t('scopeLabel')} variant="segment" size="sm" spacing={0.5} value={[scope]} onValueChange={values => { const next = values[0] as Scope | undefined; if (next) update({ scope: next }) }}>
+          {(['all', 'workspace', 'personal'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`scope.${value}`)}</ToggleGroupItem>)}
         </ToggleGroup>
         <Separator orientation="vertical" className="mx-1 h-5" />
         <DropdownMenu>
@@ -198,14 +198,15 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
             </DropdownMenuSub>)}
           </DropdownMenuGroup></DropdownMenuContent>
         </DropdownMenu>
-        {activeFilters.map(([field, values]) => <ButtonGroup key={field} aria-label={t(`filterField.${field}`)}>
-          <ButtonGroupText className="h-6 px-2 text-xs text-muted-foreground">{t(`filterField.${field}`)}</ButtonGroupText>
-          <ButtonGroupText className="h-6 max-w-48 truncate px-2 text-xs">{values.map(value => options[field].find(option => option.value === value)?.label ?? value).join(', ')}</ButtonGroupText>
-          <Button variant="outline" size="icon-xs" aria-label={t('removeFilter', { field: t(`filterField.${field}`) })} onClick={() => update({ filters: { ...filters, [field]: [] } })}><X data-icon="inline-start" /></Button>
-        </ButtonGroup>)}
+        {/* One chip per filter (Linear): field, value and remove in a single control-grey container. */}
+        {activeFilters.map(([field, values]) => <div key={field} role="group" aria-label={t(`filterField.${field}`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-md bg-control pr-0.5 pl-2.5 text-xs">
+          <span className="text-muted-foreground">{t(`filterField.${field}`)}</span>
+          <span className="max-w-48 truncate font-medium">{values.map(value => options[field].find(option => option.value === value)?.label ?? value).join(', ')}</span>
+          <Button variant="ghost" size="icon-xs" className="rounded-sm text-muted-foreground hover:bg-control-hover" aria-label={t('removeFilter', { field: t(`filterField.${field}`) })} onClick={() => update({ filters: { ...filters, [field]: [] } })}><X data-icon="inline-start" /></Button>
+        </div>)}
         <div className="ml-auto flex items-center gap-1">
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
-          <ToggleGroup aria-label={t('viewLabel')} size="sm" spacing={0} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') update({ view: next }) }}>
+          <ToggleGroup aria-label={t('viewLabel')} variant="segment" size="sm" spacing={0.5} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') update({ view: next }) }}>
             <ToggleGroupItem value="board" aria-label={t('viewBoard')}><Columns3 /></ToggleGroupItem>
             <ToggleGroupItem value="list" aria-label={t('viewList')}><List /></ToggleGroupItem>
           </ToggleGroup>
@@ -240,7 +241,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
         </div>
       </div>
       {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} narrow={sidebar ? ['done'] : undefined} context={{ properties: new Set(display.properties), agentStates, subtasks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} narrow={sidebar ? ['done'] : undefined} context={{ properties: new Set(display.properties), agentStates, subtasks, owners }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
         : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l lg:flex">

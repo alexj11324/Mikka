@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { z } from 'zod'
 import { INLINE_UPLOAD_MAX_BYTES, receiveUpload, resumeUpload } from '@/lib/captures/store'
 import { captureFailure, captureJson, deviceRun } from '@/lib/captures/device'
@@ -5,7 +6,7 @@ import { captureFailure, captureJson, deviceRun } from '@/lib/captures/device'
 export const dynamic = 'force-dynamic'
 
 /** Reissue a target for an existing unexpired reservation, including after run completion. */
-export async function POST(request: Request, { params }: { params: Promise<{ runId: string; captureId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string; captureId: string }> }) {
   const { runId, captureId } = await params
   const found = await deviceRun(request, runId, true)
   if (found instanceof Response) return found
@@ -15,7 +16,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
 }
 
 /** `PUT /v1/runs/:runId/captures/:captureId`: the file itself, only where no bucket is configured. */
-export async function PUT(request: Request, { params }: { params: Promise<{ runId: string; captureId: string }> }) {
+async function handlePUT(request: Request, { params }: { params: Promise<{ runId: string; captureId: string }> }) {
   const { runId, captureId } = await params
   const found = await deviceRun(request, runId, true)
   if (found instanceof Response) return found
@@ -27,3 +28,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ runI
   const result = await receiveUpload(found.owner, captureId, bytes)
   return 'error' in result ? captureFailure(result) : new Response(null, { status: 204 })
 }
+
+export const POST = withDeviceRoute(handlePOST)
+export const PUT = withDeviceRoute(handlePUT)

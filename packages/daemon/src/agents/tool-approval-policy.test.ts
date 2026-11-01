@@ -42,3 +42,34 @@ it('preserves the computer ceiling for every capture transport registration', ()
     expect(toolApprovalDecision(request,{...base,permissions:{...base.permissions,computer_use:undefined}},'/worktree')).toBe('deny')
   }
 })
+
+
+it('permits only registered hand-in transport while context authority stays server-owned', () => {
+  const policy = { ...defaultRunPolicy(), readOnly: true }
+  const request: ToolApprovalRequest = { runId: 'r', requestId: 'context', harness: 'claude_code', method: 'cli/mcp__mikka__request_help', input: { question: 'Existing task context?' } }
+  expect(toolApprovalDecision(request, policy, '/worktree')).toBe('allow')
+  expect(toolApprovalDecision({ ...request, method: 'cli/mcp__other__request_help' }, policy, '/worktree')).toBe('unavailable')
+  expect(toolApprovalDecision({ ...request, method: 'cli/mcp__mikka__arbitrary_tool' }, policy, '/worktree')).toBe('unavailable')
+  expect(toolApprovalDecision(request, undefined, '/worktree')).toBe('unavailable')
+})
+
+it('allows only the app entries this daemon registered; the Mikka server owns each call', () => {
+  const base = defaultRunPolicy()
+  const request: ToolApprovalRequest = { runId: 'r', requestId: 'app', harness: 'claude_code', method: 'cli/mcp__gmail__GMAIL_SEND_EMAIL', input: { to: 'a@example.com' } }
+  expect(toolApprovalDecision(request, base, '/worktree', ['gmail', 'notion'])).toBe('allow')
+  expect(toolApprovalDecision({ ...request, harness: 'codex' }, { ...base, readOnly: true }, '/worktree', ['gmail'])).toBe('allow')
+  expect(toolApprovalDecision(request, base, '/worktree')).toBe('unavailable')
+  expect(toolApprovalDecision(request, base, '/worktree', ['notion'])).toBe('unavailable')
+  expect(toolApprovalDecision({ ...request, method: 'cli/mcp__gmailx__GMAIL_SEND_EMAIL' }, base, '/worktree', ['gmail'])).toBe('unavailable')
+  expect(toolApprovalDecision({ ...request, method: 'cli/mcp__gmail__' }, base, '/worktree', ['gmail'])).toBe('unavailable')
+  expect(toolApprovalDecision({ ...request, method: 'mcp__gmail__GMAIL_SEND_EMAIL' }, base, '/worktree', ['gmail'])).toBe('unavailable')
+})
+
+it('WebFetch and WebSearch follow the run network permission; unknown tools stay unavailable', () => {
+  const base = defaultRunPolicy()
+  for (const tool of ['WebFetch', 'WebSearch']) {
+    const request: ToolApprovalRequest = { runId: 'r', requestId: tool, harness: 'claude_code', method: `cli/${tool}`, input: { url: 'https://example.com' } }
+    for (const network of ['allow', 'ask', 'deny'] as const) expect(toolApprovalDecision(request, { ...base, permissions: { ...base.permissions, network } }, '/worktree')).toBe(network)
+  }
+  expect(toolApprovalDecision({ runId: 'r', requestId: 'x', harness: 'claude_code', method: 'cli/WebBrowse', input: {} }, base, '/worktree')).toBe('unavailable')
+})

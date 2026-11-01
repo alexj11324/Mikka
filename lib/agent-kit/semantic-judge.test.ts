@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict'
-import { beforeEach, after, test } from 'node:test'
+import { beforeEach, after, test, mock } from 'node:test'
 import { createHash } from 'node:crypto'
 import { DEFAULT_AGENT_DEFINITION } from './builtin'
 import { digest } from './definition'
 import { CORE_EVAL_CASES, bindSemanticEvidence, compareReports, runEvalSuite, type SemanticJudgeInput } from './evals'
 import { DECISION_MODEL } from '../coordinator/decision'
 import { judgeLiveTrace } from './semantic-judge'
+mock.module(new URL('../abuse/context.ts',import.meta.url).href,{namedExports:{hostedBillingScope:{getStore:()=>({workspaceId:'fixture-workspace',ownerId:'fixture-owner'})}}})
+mock.module(new URL('../abuse/runtime.ts',import.meta.url).href,{namedExports:{canUseMikkaPaid:async()=>{},hostedUsage:{reserve:async()=>{},settle:async()=>{}}}})
+mock.module(new URL('../abuse/alerts.ts',import.meta.url).href,{namedExports:{checkAbuseAlerts:async()=>{}}})
+mock.module(new URL('../model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertUnmanagedModelTransport:async()=>{}}})
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='
 const prior={fetch:globalThis.fetch,key:process.env.DECISION_GATEWAY_API_KEY,flag:process.env.MIKKA_AGENT_KIT_LIVE_EVAL,error:console.error}
 let payload:unknown

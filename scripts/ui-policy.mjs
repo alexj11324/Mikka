@@ -93,6 +93,13 @@ function checkUtility(token, policy, report, options = {}) {
 // MIK-8: the 「新」 unread divider is the only chat file allowed to draw a horizontal rule.
 // The right column's group headers (「等待回复（2）」 and a rule, Figma 395:27702, Alex 2026-10-28) are the other.
 export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx', 'components/nav/group-header.tsx']
+// Files another open change owns; each fixes its own lines and then drops its entry here.
+// plugins-skills-view: the Plugins/Skills session moves its skill search to SearchInput.
+// secrets-settings: PR #557 rewrites the E2B section, whose loading rows need `bare`.
+export const UI_SWEEP_PENDING = new Map([
+  ['components/plugins/plugins-skills-view.tsx', 'style/search-input'],
+  ['components/settings/secrets-settings.tsx', 'style/nested-frame'],
+])
 const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx']
 
 export function auditSource(file, text, policy) {
@@ -102,6 +109,7 @@ export function auditSource(file, text, policy) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()
   const add = (node, rule, message) => {
+    if (UI_SWEEP_PENDING.get(file) === rule) return
     const start = node.getStart(source)
     const key = `${start}:${rule}:${message}`
     if (seen.has(key)) return
@@ -122,6 +130,8 @@ export function auditSource(file, text, policy) {
       // next/font/local 的字体文件与 CSS 变量在调用处对照 typography.localFonts 校验。
       if (/^(?:@base-ui\/|@radix-ui\/|radix-ui$|react\/jsx-runtime|react\/jsx-dev-runtime)/.test(from)) add(node, 'components/no-primitive-bypass', '业务代码只组合已下载组件，不直接使用底层 primitives 或 JSX runtime。')
       if (/^(?:@tabler\/icons|@heroicons\/|react-icons\/|@phosphor-icons\/)/.test(from) && from !== policy.iconLibrary) add(node, 'icons/library', `仅使用配置的 ${policy.iconLibrary}。`)
+      // R-71 (unslop): no sparkle for "AI"; thinking is Brain, a bot is Bot.
+      if (from === policy.iconLibrary) for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Sparkles?|WandSparkles)(?:Icon)?$/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/no-sparkle', 'AI 不用闪光图标（R-71）：思考用 Brain，Bot 用 Bot。')
     }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const entries = variables.get(node.name.text) ?? []
@@ -198,10 +208,53 @@ export function auditSource(file, text, policy) {
     if (ts.isJsxElement(node.parent)) node.parent.children.forEach(visit)
     return found
   }
+  // Unprefixed utilities on an element's className: its resting look, without hover:/dark: states.
+  const restingTokens = o => {
+    const initializer = attr(o, 'className')?.initializer
+    const expression = initializer && (ts.isJsxExpression(initializer) ? initializer.expression : initializer)
+    return resolve(expression).strings.flatMap(splitUtilities).filter(token => token === utilityBase(token))
+  }
+  const stringAttr = (o, name) => { const value = attr(o, name)?.initializer; return value && ts.isStringLiteral(value) ? value.text : undefined }
+  // A frame is a surface with its own visible edge: a bordered, rounded box, a Card, a settings card,
+  // an outline Item, or SettingsLoading's own card (`bare` renders rows only).
+  const isFrame = o => {
+    const name = canonical(o)
+    if (['Card', 'SettingsSection', 'FramePanel'].includes(name)) return true
+    if (name === 'Item') return stringAttr(o, 'variant') === 'outline'
+    if (name === 'SettingsLoading') return !attr(o, 'bare')
+    const tokens = restingTokens(o)
+    return tokens.some(token => /^border(?:-(?:[1-9]\d*|border|input))?$/.test(token)) && tokens.some(token => /^rounded(?:-(?!none$).+)?$/.test(token))
+  }
+  // Overlay content portals out of the frame, so a card inside a dialog opened from a card is not nested.
+  const portal = /^(?:Dialog|AlertDialog|Sheet|Drawer|Popover|Tooltip|HoverCard|DropdownMenu|ContextMenu|Menubar|Select|Combobox)/
+  const nestedFrames = element => {
+    const found = []
+    const walk = n => {
+      const o = opening(n)
+      if (o && portal.test(canonical(o))) return
+      // A floating bar (shadow) sits above the frame, not inside its edge.
+      if (o && isFrame(o) && !restingTokens(o).some(token => /^shadow-(?!none$)/.test(token))) { found.push(o); return }
+      ts.forEachChild(n, walk)
+    }
+    element.children.forEach(walk)
+    return found
+  }
+  const searchIcon = o => ['Search', 'SearchIcon'].includes(o.tagName.getText(source)) && imports.get(o.tagName.getText(source))?.from === policy.iconLibrary
+  const hasSearchIcon = nodes => {
+    let found = false
+    const walk = n => { const o = opening(n); if (o && searchIcon(o)) found = true; if (!found) ts.forEachChild(n, walk) }
+    nodes.forEach(walk)
+    return found
+  }
   function visit(node) {
     const cssAssertionProperty = /\.spec\.[jt]sx?$/.test(file) && !!node.parent && ts.isCallExpression(node.parent) && ts.isPropertyAccessExpression(node.parent.expression) && node.parent.expression.name.text === 'toHaveCSS' && node.parent.arguments[0] === node
     if (ts.isStringLiteralLike(node) && !cssAssertionProperty) {
       for (const token of splitUtilities(node.text)) if (/^(?:text-|font-|leading-|tracking-|bg-|border-|divide-|ring-|outline-|fill-|stroke-|space-[xy]-|\[(?:font|line-height|letter-spacing))/.test(utilityBase(token))) checkUtility(token, policy, (rule, message) => add(node, rule, message), { allowHorizontalRule })
+      const bases = splitUtilities(node.text).map(utilityBase)
+      // R-37 (unslop, interface-design): name the animated properties; transition-all also animates layout.
+      if (bases.includes('transition-all')) add(node, 'motion/transition-all', '过渡写明属性（transition-colors、transition-[transform,opacity]），不用 transition-all（R-37）。')
+      // R-32 (unslop): labels are sentence case; an uppercase label with wide tracking is the AI-template look.
+      if (bases.includes('uppercase') && bases.some(base => /^tracking-(?:wide|wider|widest|\[)/.test(base))) add(node, 'typography/uppercase-label', '标签用句子大小写，不用全大写加宽字距（R-32）。')
     }
     if (ts.isPropertyAssignment(node) && /^(?:fontSize|fontFamily|fontWeight|lineHeight|letterSpacing|fontVariant|fontStyle)$/.test(node.name.getText(source).replaceAll(/['"]/g, ''))) add(node, 'typography/no-inline-values', '排版只能通过预设档位；不允许 style/配置对象手写字体值。')
     if (ts.isCallExpression(node)) {
@@ -258,8 +311,12 @@ export function auditSource(file, text, policy) {
           const whiteFill = tokens.some(token => /^(?:bg-background|bg-card)(?:\/|$)/.test(token))
           const stroke = tokens.some(token => /^border(?:-(?:[1-9]\d*|border|input)(?:\/.*)?)?$/.test(token))
           const variantAttr = attr(node, 'variant')?.initializer
-          const outline = !!variantAttr && ts.isStringLiteral(variantAttr) && variantAttr.text === 'outline'
+          const outline = !!variantAttr && ts.isStringLiteral(variantAttr) && ['outline', 'secondary'].includes(variantAttr.text)
           if (name === 'Button' && whiteFill && (stroke || outline)) add(classAttr, 'style/secondary-button-fill', '次级按钮用灰色填充、无描边（R-31）；不要给 Button 加白底 + 描边，也不要把 outline 按钮改回白底。')
+          // R-33: dialogs are rounded-xl from the primitive; only a full-screen viewer may drop the radius.
+          if (['DialogContent', 'AlertDialogContent'].includes(name) && bases.some(base => /^rounded(?:-|$)/.test(base) && base !== 'rounded-none')) add(classAttr, 'style/dialog-radius', '对话框圆角由 DialogContent 决定（14px，R-33），调用处不改；全屏查看器可用 rounded-none。')
+          // A segmented control's track is ToggleGroup variant="segment"; a call-site track brought back three looks of one control.
+          if (name === 'ToggleGroup' && bases.some(base => /^(?:h|p|rounded|bg)(?:-|$)/.test(base))) add(classAttr, 'style/segment-track', '分段控件的轨道用 ToggleGroup variant="segment"，不在调用处改高度、圆角、内边距或底色（R-31、R-33）。')
           for (const token of tokens) {
             const base = utilityBase(token)
             // 组件调用处的视觉 class 不做限制。Mikka 的规则集里没有这一条，
@@ -296,6 +353,15 @@ export function auditSource(file, text, policy) {
         if (!vertical && !ruleExempt) add(node, 'style/no-horizontal-rule', '禁止水平 <Separator />；用间距或背景分组，只保留竖线分隔。')
       }
       if (name === 'Button' && (attr(node, 'isLoading') || attr(node, 'isPending'))) add(node, 'composition/button-loading', 'Button 使用 Spinner + disabled，不存在 isLoading/isPending。')
+      // R-31 search fields: one borderless grey SearchInput, never an outlined Input with a magnifier beside it.
+      if (['Input', 'InputGroupInput', 'SidebarInput'].includes(name)) {
+        const searchText = ['type', 'aria-label', 'placeholder', 'id'].some(key => /search|搜索/i.test(attr(node, key)?.initializer?.getText(source) ?? ''))
+        const siblings = ts.isJsxElement(node.parent) ? node.parent.children : []
+        if (searchText || hasSearchIcon(siblings)) add(node, 'style/search-input', '搜索框统一用 SearchInput（components/ui/search-input）：无描边灰底、图标在左。')
+      }
+      if (name === 'InputGroup' && ts.isJsxOpeningElement(node) && hasSearchIcon(node.parent.children)) add(node, 'style/search-input', '搜索框统一用 SearchInput（components/ui/search-input）：无描边灰底、图标在左。')
+      // One container per surface: a frame inside another frame draws two concentric edges.
+      if (ts.isJsxOpeningElement(node) && isFrame(node)) for (const inner of nestedFrames(node.parent)) add(inner, 'style/nested-frame', `${canonical(inner)} 嵌在 ${name} 里形成双层边框；只保留一层容器（内层去掉 border/rounded，SettingsLoading 用 bare）。`)
       if (['Input', 'Textarea'].includes(name) && parents.includes('InputGroup')) add(node, 'forms/input-group', 'InputGroup 内使用 InputGroupInput/InputGroupTextarea。')
       if (name === 'FieldContent' && ts.isJsxElement(node.parent)) {
         const children = node.parent.children.map(opening).filter(Boolean)
@@ -341,7 +407,9 @@ export function auditCss(file, text, policy) {
   try { root = postcss.parse(text, { from: file }) }
   catch (error) { return [{ file, line: error.line ?? 1, column: error.column ?? 1, rule: 'style/css-parse', message: error.reason }] }
   root.walkDecls(node => {
-    if (/^(?:font(?:-.+)?|line-height|letter-spacing|--text-.+|--leading-.+|--tracking-.+|--font-weight-.+)$/.test(node.prop)) add(node, 'typography/no-css-values', '不允许 CSS 自定义排版值或重定义 Tailwind 字体档位。')
+    // R-32's document body size is the one approved theme token, pinned to its value in ui-policy.json.
+    const approvedToken = policy.typography.cssTokens?.[node.prop] === node.value.trim()
+    if (!approvedToken && /^(?:font(?:-.+)?|line-height|letter-spacing|--text-.+|--leading-.+|--tracking-.+|--font-weight-.+)$/.test(node.prop)) add(node, 'typography/no-css-values', '不允许 CSS 自定义排版值或重定义 Tailwind 字体档位。')
     if (node.prop.startsWith('--font-')) {
       const permitted = { '--font-sans': 'var(--font-geist), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif', '--font-heading': 'var(--font-sans)' }
       if (node.prop in permitted && permitted[node.prop] !== node.value) add(node, 'typography/font-token', `${node.prop} 不在批准的字体 token 映射中。`)

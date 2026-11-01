@@ -47,9 +47,24 @@ test('OAuth resume URLs omit app-only parameters while preserving the signed req
   assert.equal(path, '/api/auth/oauth2/authorize?client_id=client&response_type=code')
 })
 
-test('returns to the plugins page and a known app page, nothing else', () => {
+test('returns to the plugins page and any store app page, nothing else', () => {
   assert.equal(safeAuthReturn('/?section=plugins'), '/?section=plugins')
   assert.equal(safeAuthReturn('/?section=plugins&app=gmail'), '/?section=plugins&app=gmail')
-  assert.equal(safeAuthReturn('/?section=plugins&app=github'), '/')
+  assert.equal(safeAuthReturn('/?section=plugins&app=github'), '/?section=plugins&app=github')
+  // Any store app (a toolkit slug), not only the first seven.
+  assert.equal(safeAuthReturn('/?section=plugins&app=hubspot'), '/?section=plugins&app=hubspot')
+  assert.equal(safeAuthReturn('/?section=plugins&app=google_maps'), '/?section=plugins&app=google_maps')
+  // Only the slug's shape: never a URL, a path, another case or an overlong value.
+  for (const app of ['HubSpot', 'hub-spot', '1password', '_x', 'https://evil.test', '//evil.test', '../settings', 'a%2Fb', 'gmail&next=/', '', 'x'.repeat(65)]) {
+    assert.equal(safeAuthReturn(`/?section=plugins&app=${encodeURIComponent(app)}`), '/', app)
+  }
   assert.equal(safeAuthReturn('/?section=plugins&app=gmail&next=//evil.test'), '/')
+  assert.equal(safeAuthReturn('/?section=plugins&app=gmail&app=hubspot'), '/')
+})
+
+test('returns to an app page under 设置 › 连接, and only there', () => {
+  assert.equal(safeAuthReturn('/settings?section=connections&app=github'), '/settings?section=connections&app=github')
+  assert.equal(safeAuthReturn('/settings?section=connections&app=hubspot'), '/settings?section=connections&app=hubspot')
+  assert.equal(safeAuthReturn('/settings?section=connections&app=Not%20A%20Slug'), '/')
+  assert.equal(safeAuthReturn('/settings?section=account&app=github'), '/')
 })

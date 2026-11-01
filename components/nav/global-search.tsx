@@ -19,6 +19,7 @@ import { useSiteSearch, type ListedSource } from '@/hooks/use-site-search'
 import type { ChatTarget } from './bot-list'
 import { LetterAvatar } from './letter-avatar'
 import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
+import { FieldError } from '@/components/ui/field'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Project = Awaited<ReturnType<typeof listProjects>>[number]
@@ -49,9 +50,10 @@ export function SearchPill({ onSearch }: { onSearch: () => void }) {
  * stay authorized by the server; opening one goes through the destination's own
  * access check.
  */
-export function GlobalSearch({ open, onOpenChange, bots, sessions, coordinatorLine, issues, projects, workspaceId, onChat, onNewBot, onIssue, onProject, onCreateIssue }: {
+export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, sessions, coordinatorLine, issues, projects, workspaceId, onChat, onNewBot, onIssue, onProject, onCreateIssue }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onOpenChangeComplete?: (open: boolean) => void
   bots: BotView[]
   sessions: SavedAgentSession[]
   coordinatorLine?: string
@@ -111,7 +113,7 @@ export function GlobalSearch({ open, onOpenChange, bots, sessions, coordinatorLi
     return <>{loading ? <Spinner role="presentation" aria-hidden="true" /> : <Plus />}{loading ? t('search.loadingMore') : t('search.more')}</>
   }
 
-  return <CommandDialog open={open} onOpenChange={onOpenChange} title={t('searchLabel')} description={t('searchDescription')} className="top-1/2 -translate-y-1/2 sm:max-w-xl">
+  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-1/2 -translate-y-1/2 sm:max-w-xl">
     {/* Filtering is ours: server hits must not be dropped by cmdk's client-side match. */}
     <Command shouldFilter={false} className="**:data-[selected=true]:bg-muted">
       <CommandInput aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={setQuery} maxLength={400} />
@@ -172,7 +174,7 @@ export function GlobalSearch({ open, onOpenChange, bots, sessions, coordinatorLi
         {search.searching && <div aria-hidden="true" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><Spinner role="presentation" aria-hidden="true" className="size-3.5" />{t('search.searching')}</div>}
         {!search.searching && resultCount === 0 && <p aria-hidden="true" className="py-6 text-center text-sm">{search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')}</p>}
         {failed.length > 0 && (authLost
-          ? <p role="alert" className="px-3 py-2 text-xs text-destructive">{t('search.authRequired')}</p>
+          ? <FieldError className="px-3 py-2 text-xs">{t('search.authRequired')}</FieldError>
           : <CommandGroup>
             <CommandItem value="retry search" onSelect={() => { for (const source of failed) search.retry(source) }} className="text-muted-foreground">
               <RotateCw />{t('search.failed', { sources: failed.map(source => t(`search.source.${source}`)).join(t('search.sourceSeparator')) })}

@@ -35,3 +35,20 @@ export const lift = {
   shadowOffset: { width: 0, height: 2 },
   elevation: 3,
 } as const
+
+/**
+ * Stack options: on iOS the system navigation bar, transparent over the
+ * content (each screen fills it with `NavBar`), the back button as a bare
+ * chevron and the system push and swipe back; the web draws its own bar.
+ */
+export const screenOptions = (background: string) => ({
+  headerShown: Platform.OS === 'ios',
+  headerTransparent: true,
+  headerShadowVisible: false,
+  headerBackButtonDisplayMode: 'minimal' as const,
+  headerTintColor: colors.ink,
+  // iOS 26 blurs content scrolling under the bar (and above the home indicator) with the system's soft edge.
+  scrollEdgeEffects: { top: 'soft' as const, bottom: 'soft' as const },
+  contentStyle: { backgroundColor: background },
+  ...(Platform.OS === 'ios' ? {} : { animation: 'slide_from_right' as const }),
+})

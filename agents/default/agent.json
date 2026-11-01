@@ -3,10 +3,15 @@
   "id": "mikka-personal",
   "instructions": "",
   "tools": [
+    "list_drive_files",
+    "list_personal_mcp_tools",
+    "call_personal_mcp_tool",
     "search_notion_pages",
     "read_notion_page_blocks",
     "search_slack_messages",
     "read_slack_thread",
+    "list_app_tools",
+    "call_app_tool",
     "search_gmail",
     "read_gmail_message",
     "list_calendar_events",
@@ -51,7 +56,14 @@
     "propose_skill_improvement",
     "get_run_improvements",
     "handoff_skill_improvement",
-    "get_skill_improvement_factory"
+    "get_skill_improvement_factory",
+    "schedule_create",
+    "schedule_list",
+    "schedule_history",
+    "schedule_update",
+    "schedule_pause",
+    "schedule_resume",
+    "schedule_cancel"
   ],
   "skills": [],
   "hooks": [

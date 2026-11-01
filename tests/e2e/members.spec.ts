@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { test, expect, register, watchRuntime, browserClientHeaders, app, BASE_PATH } from "./fixtures";
+import { test, expect, register, registerInTeam, rail, watchRuntime, browserClientHeaders, app, BASE_PATH } from "./fixtures";
 
 test("旧设置预览地址跳转到真实成员设置并保留参数", async ({ page, request }) => {
   const workspace = randomUUID();
@@ -10,7 +10,7 @@ test("旧设置预览地址跳转到真实成员设置并保留参数", async ({
   expect(destination.searchParams.get('workspace')).toBe(workspace);
   expect(destination.searchParams.get('invite')).toBe('1');
 
-  await register(page, '/settings/members');
+  await registerInTeam(page, '/settings/members');
   await page.goto(app('/preview/settings?invite=1'));
   await expect(page).toHaveURL(url => url.pathname === app('/settings/members') && url.searchParams.get('invite') === '1');
   await expect(page.getByRole('dialog', { name: '邀请成员', exact: true })).toBeVisible();
@@ -22,18 +22,20 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve });
   let initialRequests = 0;
+  // Members are a team workspace's: sign up into one, then hold the first workspace read of a fresh load.
+  await registerInTeam(page);
   await page.route('**/api/workspace', async route => {
     initialRequests++;
     await gate;
     await route.continue();
   });
-  await register(page);
-  const workspaceSidebar = page.locator('[data-slot="sidebar-container"]');
+  await page.goto(app('/'));
+  const workspaceSidebar = page.locator('[data-slot="settings-list"]');
   await expect(workspaceSidebar.getByRole("link", { name: "成员", exact: true })).toHaveCount(0);
   await expect(workspaceSidebar.getByRole("link", { name: "团队", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "工作区菜单", exact: true }).click();
   await page.getByRole("menuitem", { name: "设置", exact: true }).click();
-  const settingsSidebar = page.locator('[data-slot="sidebar-container"]');
+  const settingsSidebar = page.locator('[data-slot="settings-list"]');
   await expect(settingsSidebar.getByRole("link", { name: "成员", exact: true })).toBeVisible();
   await expect(settingsSidebar.getByRole("link", { name: "团队", exact: true })).toBeVisible();
   await settingsSidebar.getByRole("link", { name: "成员", exact: true }).click();
@@ -93,14 +95,14 @@ test("成员导航、邀请取消、角色选择、创建和撤销邀请、管�
   await expect(confirmation.getByRole("alert")).toContainText("管理员");
   await confirmation.getByRole("button", { name: "取消", exact: true }).click();
   await expect(confirmation).not.toBeVisible();
-  await page.getByRole("link", { name: "返回工作台", exact: true }).click();
+  await rail(page, "主页").click();
   await expect(
     page.getByRole("button", { name: /^Coordinator/ }),
   ).toHaveAttribute("aria-current", "page");
 });
 
 test("CSV 拖拽去重、导入错误保护、批量邀请和导出", async ({ page }) => {
-  await register(page, "/settings/members");
+  await registerInTeam(page, "/settings/members");
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "邀请成员", exact: true });
   const first = `csv-${randomUUID()}@example.com`;
@@ -174,7 +176,7 @@ test("受邀邮箱加入后，管理员可停用并恢复成员", async ({
   browser,
   baseURL,
 }) => {
-  await register(page, "/settings/members");
+  await registerInTeam(page, "/settings/members");
   await page.getByRole("button", { name: "邀请成员", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "邀请成员", exact: true });
   const email = `member-${randomUUID()}@example.com`;

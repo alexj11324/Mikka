@@ -254,12 +254,15 @@ export class CursorAdapter implements AgentAdapter {
     // 2026.09 stopped using CURSOR_DATA_DIR and wrote to `/tmp/.cursor`.
     const configDir = prepareCursorHome(join(paths.runDir, "cursor-home"))
     const ctx = new RunContext({
+      github: options.github,
+      childPath: options.env.PATH,
       harness: "cursor",
       kind: options.kind,
       worktree: options.cwd,
       gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,
       policy: options.policy,
+      policyHash: options.policyHash,
       skills: options.skills,
       skillReceipt: options.skillReceipt,
       runDir,
@@ -315,6 +318,7 @@ export class CursorAdapter implements AgentAdapter {
         },
         async sessionUpdate(params) {
           if (replaying) return
+          if (params.sessionId === sessionId && params.update.sessionUpdate === 'tool_call_update' && params.update.status === 'in_progress') queue.progress()
           for (const chunk of chunker.update(params.update)) queue.chunk(chunk)
         },
       }),

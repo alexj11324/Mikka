@@ -3,6 +3,10 @@
 export const IPC = {
   appOpenExternal: "mikka:app:open-external",
   appPrepareAuth: "mikka:app:prepare-auth",
+  appClaudeCallback: "mikka:app:claude-callback",
+  /** The downloaded update's version, or null; also main -> renderer once it downloads. */
+  appUpdateReady: "mikka:app:update-ready",
+  appInstallUpdate: "mikka:app:install-update",
   settingsGetAll: "mikka:settings:get-all",
   settingsSet: "mikka:settings:set",
   quotaGet: "mikka:quota:get",

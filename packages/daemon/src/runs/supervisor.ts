@@ -28,10 +28,12 @@
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. An explicitly approved, pushed submission can finish unverified;
 // its report keeps `not_run`, and the server may open only a draft PR.
+import { runApps } from '../agents/run-apps'
 import { fixedCheckSnapshot } from "./check"
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
 import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 import { runPaths } from "../agents/run-context"
+import { removeRunCredentials } from "../run-scratch"
 import { createRunMasker, type RunMasker } from "../secret-mask"
 import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
 import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
@@ -57,6 +59,8 @@ import {
 
 import {
   applyCheckpoint,
+  assertCheckpointFresh,
+  CheckpointRecoveryError,
   hasCommit,
   headCommit,
   takeCheckpoint,
@@ -103,6 +107,8 @@ export interface SupervisorDeps {
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
+  /** Authenticated policy validation before repository/setup effects, including resume. */
+  verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
   bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
   /** Resolve only daemon-owned cache paths (or a trusted hosted workspace). */
@@ -823,6 +829,12 @@ export class RunSupervisor {
     const run = this.active.get(runId)
     if (run) void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))
     this.leases.delete(runId)
+    // A finished turn keeps no credential on the machine (decision 2026-10-31-2225);
+    // a resumed session writes its own again.
+    if (this.deps.adapterStateDir) {
+      try { removeRunCredentials(this.deps.adapterStateDir, runId) }
+      catch (err) { this.deps.log.warn({ run_id: runId, err }, "run credential cleanup failed") }
+    }
     this.deps.outbox.compact(runId).catch((err: unknown) => {
       this.deps.log.error({ run_id: runId, err }, "outbox compaction failed")
     })
@@ -996,7 +1008,11 @@ export class RunSupervisor {
     }
     // Taking over a run from another machine: start where it started.
     const resume = assignment.resumeFrom?.baseCommit
-    if (resume && (await hasCommit(repo.path, resume))) return resume
+    if (resume) {
+      assertCheckpointFresh(assignment.resumeFrom!)
+      if (await hasCommit(repo.path, resume)) return resume
+      throw new CheckpointRecoveryError('Checkpoint base commit is unavailable. Restore the original worktree before retrying.')
+    }
     const branch = assignment.pushBranch
     const base = await this.deps.baseRef(assignment)
     if (!branch || !pushDecision(runPolicy(assignment.policy), repo.push?.approved === true).push) return base
@@ -1072,7 +1088,7 @@ export class RunSupervisor {
         this.deps.log.error({ run_id: runId, err: error }, "run failed")
         if (this.stopping) return
         try {
-          this.finish(runId, run.cancelRequested ? run.forcedStop ?? "cancelled" : "error", run.cancelRequested ? undefined : message)
+          this.finish(runId, run.cancelRequested ? run.forcedStop ?? "cancelled" : error instanceof CheckpointRecoveryError ? 'blocked' : "error", run.cancelRequested ? undefined : message)
         } catch (finishError) {
           this.deps.log.error(
             { run_id: runId, err: finishError },
@@ -1092,9 +1108,16 @@ export class RunSupervisor {
     const log = this.deps.log.child({ run_id: runId })
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
+    if ((assignment.policySnapshotRequired || assignment.policySnapshot) && !this.deps.verifyRunPolicy) throw new Error('Run policy verification unavailable')
+    await this.deps.verifyRunPolicy?.(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal]))
     verifySkillAssignment(assignment)
     if (assignment.skillReceipt && (this.leases.get(runId)??0)<=Date.now())
       throw new Error('Receipted Skill assignment requires a current server lease')
+    if(assignment.skillReceipt?.artifact.registryId==='mikka-team') {
+      if(!this.deps.revalidateSkillAssignment)throw new Error('Current team Skill authorization unavailable')
+      const current=await this.deps.revalidateSkillAssignment(assignment)
+      this.leases.set(runId,Date.parse(verifySkillResume(assignment,current)))
+    }
     const adapter = this.adapterFor(runId)
     if (
       assignment.requireSessionResume &&
@@ -1148,6 +1171,8 @@ export class RunSupervisor {
       throw new Error(
         "Original question worktree is unavailable; a fresh task cannot replace it",
       )
+    if (assignment.requireWorktreeContinuation && !entry.worktree && !continued)
+      throw new CheckpointRecoveryError('Original worktree is unavailable and there is no usable recovery snapshot.')
     const worktree =
       entry.worktree ??
       continued ??
@@ -1172,6 +1197,7 @@ export class RunSupervisor {
           worktree,
           checkpoint: assignment.resumeFrom,
         })
+        if (!applied) throw new CheckpointRecoveryError('Checkpoint patch could not be restored. Restore the original worktree before retrying.')
         log.info(
           { files: assignment.resumeFrom.files, applied },
           "checkpoint from the earlier attempt",
@@ -1218,6 +1244,9 @@ export class RunSupervisor {
       try { checkMailbox() } catch (error) { toolApproval.revoke(); throw error }
     }
     const options = {
+      github: assignment.github && assignment.mcp && (assignment.kind === 'implement' || assignment.kind === 'fix') && !runPolicy(assignment.policy).readOnly
+        ? { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId } : undefined,
+      apps: runApps(assignment.mcp),
       toolApproval,
       runId,
       requireSessionResume: assignment.requireSessionResume,
@@ -1231,6 +1260,7 @@ export class RunSupervisor {
       networkAllow: repo.networkAllow,
       gitWritePaths: await worktreeGitWritePaths(repo.path, worktree, runId),
       policy: assignment.policy,
+      policyHash: assignment.policySnapshot?.payload.policyHash,
       skills: assignment.skills,
       skillReceipt: assignment.skillReceipt,
       onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {
@@ -1396,6 +1426,7 @@ export class RunSupervisor {
                   error: "Session ended without an exit event",
                 }
               : next.value
+        if (event.type === 'progress') { run.lastProgressAt = Date.now(); continue }
         if (event.type === "chunk") {
           // Streamed text is not progress; tool calls, steps and files are.
           if (!event.chunk.type.endsWith("-delta"))

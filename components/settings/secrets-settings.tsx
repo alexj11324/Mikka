@@ -4,11 +4,13 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { Cloud } from 'lucide-react'
-import { createSecret, deleteE2BKey, deleteSecret, getE2BKey, listSecrets, replaceSecret, saveE2BKey } from '@/app/actions/workspace-secrets'
+import { createSecret, deleteSecret, replaceSecret, type listSecrets } from '@/app/actions/workspace-secrets'
+import { E2BKeyDialog, useE2BKeyStatus } from '@/components/settings/e2b-key-dialog'
+import { settingsRead } from '@/lib/settings-read'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -16,6 +18,7 @@ import { SettingRow, SettingsLoading, SettingsSection, settingsSectionAction } f
 import type { WorkspaceSecretView } from '@/lib/secrets/store'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
+import { usePresence, type PresenceProps } from '@/lib/use-presence'
 
 /** Rows grouped as N5 shows them: 工作区 first, then one group per repository. */
 function groupByScope(secrets: WorkspaceSecretView[]) {
@@ -31,15 +34,16 @@ function groupByScope(secrets: WorkspaceSecretView[]) {
 export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.secrets')
   const actionError = useActionError()
-  const list = useSWR(['settings:secrets', workspaceId], () => listSecrets(workspaceId))
+  const list = useSWR(['settings:secrets', workspaceId], () => settingsRead<Awaited<ReturnType<typeof listSecrets>>>('secrets', { workspace: workspaceId }))
   const [editing, setEditing] = useState<WorkspaceSecretView | 'new' | null>(null)
+  const secretDialog = usePresence(editing)
   const [warning, setWarning] = useState<string | null>(null)
   const secrets = list.data && !list.data.error ? list.data.secrets : null
 
   return <>
     <SettingsSection id="secrets-heading" title={t('heading')} action={<Button {...settingsSectionAction} onClick={() => { setWarning(null); setEditing('new') }}>{t('add')}</Button>}>
-      {!list.data && !list.error && <SettingsLoading label={t('loading')} rows={2} />}
-      {(list.error || list.data?.error) && <p role="alert" className="px-5 py-4 text-sm text-destructive">{actionError(list.data?.error)}</p>}
+      {!list.data && !list.error && <SettingsLoading label={t('loading')} rows={2} bare />}
+      {(list.error || list.data?.error) && <FieldError className="px-5 py-4">{actionError(list.data?.error)}</FieldError>}
       {secrets?.length === 0 && <p className="px-5 py-4 text-sm text-muted-foreground">{t('empty')}</p>}
       {secrets && groupByScope(secrets).map(([repository, rows]) => <div key={repository || 'workspace'} role="group" aria-label={repository ? t('repositoryGroup', { repository }) : t('workspaceGroup')}>
         <p className="px-5 pt-3 text-xs font-medium text-muted-foreground">{repository ? t('repositoryGroup', { repository }) : t('workspaceGroup')}</p>
@@ -49,7 +53,7 @@ export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
       </div>)}
     </SettingsSection>
     {warning && <p role="status" className="px-1 text-sm text-muted-foreground">{warning}</p>}
-    {editing && <SecretDialog workspaceId={workspaceId} secret={editing === 'new' ? null : editing} onClose={saved => {
+    {secretDialog.value && <SecretDialog open={secretDialog.open} onOpenChangeComplete={secretDialog.onOpenChangeComplete} workspaceId={workspaceId} secret={secretDialog.value === 'new' ? null : secretDialog.value} onClose={saved => {
       setEditing(null)
       if (saved?.warning === 'shortValueNotMasked') setWarning(t('shortValueNotMasked', { name: saved.name }))
       if (saved) void list.mutate()
@@ -62,67 +66,25 @@ export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
 function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.secrets.e2b')
   const actionError = useActionError()
-  const status = useSWR(['settings:e2b-key', workspaceId], () => getE2BKey())
+  const status = useE2BKeyStatus(workspaceId)
   const [open, setOpen] = useState(false)
+  const keyDialog = usePresence(open)
   const data = status.data && !status.data.error ? status.data : null
   const state = !data ? null : !data.configured ? 'missing' : data.lastErrorCode ? `errors.${data.lastErrorCode}` : 'configured'
 
   return <>
     <SettingsSection id="e2b-heading" title={t('heading')}>
       {!status.data && !status.error && <SettingsLoading label={t('loading')} rows={1} />}
-      {(status.error || status.data?.error) && <p role="alert" className="px-5 py-4 text-sm text-destructive">{actionError(status.data?.error)}</p>}
+      {(status.error || status.data?.error) && <FieldError className="px-5 py-4">{actionError(status.data?.error)}</FieldError>}
       {data && state && <SettingRow title="E2B API Key" icon={<Cloud aria-hidden="true" className="size-4 text-muted-foreground" />}>
         <div className="flex items-center gap-3">
           <span role="status" className={cn(data.lastErrorCode ? 'text-destructive' : 'text-muted-foreground')}>{t(state as 'missing')}</span>
-          <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>{data.configured ? t('replace') : t('set')}</Button>
+          {data.canEdit && <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>{data.configured ? t('replace') : t('set')}</Button>}
         </div>
       </SettingRow>}
     </SettingsSection>
-    {open && data && <E2BKeyDialog configured={data.configured} onClose={changed => { setOpen(false); if (changed) void status.mutate() }} />}
+    {keyDialog.value && data && <E2BKeyDialog workspaceId={workspaceId} open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={data.configured} onClose={changed => { setOpen(false); if (changed) void status.mutate() }} />}
   </>
-}
-
-function E2BKeyDialog({ configured, onClose }: { configured: boolean; onClose: (changed: boolean) => void }) {
-  const t = useTranslations('Settings.secrets.e2b')
-  const commonT = useTranslations('Common')
-  const actionError = useActionError()
-  const [apiKey, setApiKey] = useState('')
-  const [pending, setPending] = useState<'save' | 'delete' | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  async function run(kind: 'save' | 'delete') {
-    setPending(kind)
-    setError(null)
-    try {
-      const result = kind === 'save' ? await saveE2BKey({ apiKey: apiKey.trim() }) : await deleteE2BKey()
-      if (result.error) { setError(actionError(result.error)); return }
-      onClose(true)
-    } catch {
-      setError(actionError())
-    } finally {
-      setPending(null)
-    }
-  }
-
-  return <Dialog open onOpenChange={next => { if (!next && !pending) onClose(false) }}>
-    <DialogContent>
-      <DialogHeader><DialogTitle>E2B API Key</DialogTitle></DialogHeader>
-      <form onSubmit={event => { event.preventDefault(); if (apiKey.trim() && !pending) void run('save') }}>
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="e2b-api-key">{configured ? t('newKey') : t('key')}</FieldLabel>
-            <Input id="e2b-api-key" type="password" value={apiKey} autoComplete="off" placeholder="e2b_…" onChange={event => setApiKey(event.target.value)} />
-          </Field>
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        </FieldGroup>
-        <DialogFooter className="mt-4">
-          {configured && <Button type="button" variant="destructive" className="sm:mr-auto" disabled={pending !== null} onClick={() => void run('delete')}>{pending === 'delete' ? t('removing') : t('remove')}</Button>}
-          <Button type="button" variant="outline" disabled={pending !== null} onClick={() => onClose(false)}>{commonT('cancel')}</Button>
-          <Button type="submit" disabled={pending !== null || !apiKey.trim()}>{pending === 'save' ? t('verifying') : commonT('save')}</Button>
-        </DialogFooter>
-      </form>
-    </DialogContent>
-  </Dialog>
 }
 
 function SecretRow({ secret, onEdit }: { secret: WorkspaceSecretView; onEdit: () => void }) {
@@ -138,7 +100,7 @@ function SecretRow({ secret, onEdit }: { secret: WorkspaceSecretView; onEdit: ()
 
 type Saved = { name: string; warning: 'shortValueNotMasked' | null } | null
 
-function SecretDialog({ workspaceId, secret, onClose }: { workspaceId: string; secret: WorkspaceSecretView | null; onClose: (saved: Saved) => void }) {
+function SecretDialog({ workspaceId, secret, onClose, open = true, onOpenChangeComplete }: { workspaceId: string; secret: WorkspaceSecretView | null; onClose: (saved: Saved) => void } & PresenceProps) {
   const t = useTranslations('Settings.secrets')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
@@ -185,7 +147,7 @@ function SecretDialog({ workspaceId, secret, onClose }: { workspaceId: string; s
     }
   }
 
-  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose(null) }}>
+  return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={open => { if (!open && !pending) onClose(null) }}>
     <DialogContent>
       <DialogHeader><DialogTitle>{secret ? secret.name : t('addTitle')}</DialogTitle></DialogHeader>
       <div className="flex flex-col gap-3">
@@ -212,7 +174,7 @@ function SecretDialog({ workspaceId, secret, onClose }: { workspaceId: string; s
         {scope === 'repository' && <Label className="flex flex-col items-start gap-1.5">{t('repository')}
           <Input value={repository} placeholder="owner/repo" autoComplete="off" onChange={event => setRepository(event.target.value)} />
         </Label>}
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {error && <FieldError>{error}</FieldError>}
       </div>
       <DialogFooter>
         {secret && <Button type="button" variant="destructive" className="sm:mr-auto" disabled={pending !== null} onClick={() => void remove()}>{pending === 'delete' ? t('deleting') : commonT('delete')}</Button>}

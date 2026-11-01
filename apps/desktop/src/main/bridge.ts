@@ -9,6 +9,7 @@ import type { QuotaSnapshotReport } from '@mikka/protocol/quota'
 
 import type { NotificationCenter } from './notification-center'
 import { SshInstaller } from './ssh-install'
+import type { Updates } from './updates'
 import { isTrustedFrame } from './security'
 
 export interface BridgeOptions {
@@ -16,10 +17,12 @@ export interface BridgeOptions {
   mintEnrollment(): Promise<string>
   openExternal(url: string): Promise<void>
   prepareAuth(state: string): Promise<string>
+  claudeCallback(authorizationUrl: unknown): Promise<string | null>
   localDevice(): Promise<LocalDevice>
   quota(): Promise<QuotaSnapshotReport>
   notifications: NotificationCenter
   consumePendingClick(): string | null
+  updates: Pick<Updates, 'ready' | 'install'>
 }
 
 export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstaller): void {
@@ -56,6 +59,9 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
   })
   handle(IPC.appOpenExternal, url => options.openExternal(typeof url === 'string' ? url : ''))
   handle(IPC.appPrepareAuth, state => options.prepareAuth(typeof state === 'string' ? state : ''))
+  handle(IPC.appClaudeCallback, url => options.claudeCallback(url))
+  handle(IPC.appUpdateReady, () => options.updates.ready)
+  handle(IPC.appInstallUpdate, () => options.updates.install())
   handle(IPC.deviceStatus, () => options.localDevice())
   handle(IPC.quotaGet, () => options.quota())
   handle(IPC.notificationsShow, notification => options.notifications.show(notification))

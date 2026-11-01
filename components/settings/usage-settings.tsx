@@ -5,7 +5,8 @@ import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { Download } from 'lucide-react'
 import { Bar, BarChart, XAxis } from 'recharts'
-import { getUsage } from '@/app/actions/usage'
+import type { getUsage } from '@/app/actions/usage'
+import { settingsRead } from '@/lib/settings-read'
 import { creditBillingKey } from '@/components/billing/balance-section'
 import { getCreditBilling } from '@/lib/billing/verification-client'
 import { BotAvatar } from '@/components/nav/bot-avatar'
@@ -20,6 +21,7 @@ import { currentMonth, recentMonths } from '@/lib/usage/month'
 import type { BotUsageRow, UsageRow } from '@/lib/usage/read'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
+import { FieldError } from '@/components/ui/field'
 
 type View = 'bots' | 'members'
 
@@ -32,7 +34,7 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
   const [view, setView] = useState<View>('bots')
   const downloadRef = useRef<HTMLAnchorElement>(null)
   const [downloadUrl, setDownloadUrl] = useState<string | undefined>()
-  const usage = useSWR(['settings:usage', workspaceId, month], () => getUsage(month, workspaceId), { keepPreviousData: true })
+  const usage = useSWR(['settings:usage', workspaceId, month], () => settingsRead<Awaited<ReturnType<typeof getUsage>>>('usage', { month, workspace: workspaceId }), { keepPreviousData: true })
   const data = usage.data && !usage.data.error ? usage.data : null
   // 余额 in points, the card-verification $1 included (#559, Figma ALW-4 `709:28418`). Admins only, as 计费 is.
   const credits = useSWR(creditBillingKey(workspaceId), () => getCreditBilling(workspaceId))
@@ -65,7 +67,7 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
         <SelectTrigger size="sm" aria-label={t('month')}><SelectValue /></SelectTrigger>
         <SelectContent><SelectGroup>{months.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
-      {admin && <ToggleGroup aria-label={t('groupBy')} variant="outline" size="sm" spacing={0} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'bots' || next === 'members') setView(next) }}>
+      {admin && <ToggleGroup aria-label={t('groupBy')} variant="segment" size="sm" spacing={0.5} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'bots' || next === 'members') setView(next) }}>
         <ToggleGroupItem value="bots">{t('byBot')}</ToggleGroupItem>
         <ToggleGroupItem value="members">{t('byMember')}</ToggleGroupItem>
       </ToggleGroup>}
@@ -74,7 +76,7 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
     </div>
 
     {!usage.data && !usage.error && <SettingsLoading label={t('loading')} rows={3} />}
-    {(usage.error || usage.data?.error) && <p role="alert" className="text-sm text-destructive">{actionError(usage.data?.error)}</p>}
+    {(usage.error || usage.data?.error) && <FieldError>{actionError(usage.data?.error)}</FieldError>}
     {data && <>
       {!admin && <h2 className="pl-1 text-sm font-medium">{t('yours')}</h2>}
       <dl className={cn('grid grid-cols-2 gap-4', balance !== null && 'sm:grid-cols-3')}>

@@ -29,6 +29,13 @@ function defined(values: Record<string, unknown>) {
 }
 
 export const COMPOSIO_ACTIONS = {
+  list_drive_files: {
+    title: 'List Google Drive files',
+    description: 'List files visible to the connected Google Drive account. Use the returned page token for pagination.',
+    toolkit: 'googledrive', slug: 'GOOGLEDRIVE_LIST_FILES',
+    inputSchema: z.object({ query: z.string().max(1000).optional(), page_size: z.number().int().min(1).max(100).optional(), page_token: z.string().max(2048).optional() }).strict(),
+    toArguments: (input: { query?: string; page_size?: number; page_token?: string }) => defined({ q: input.query, pageSize: input.page_size ?? 25, pageToken: input.page_token }),
+  },
   search_notion_pages: {
     title: 'Search Notion pages',
     description: 'Search the connected Notion workspace for pages and databases by title.',
@@ -108,8 +115,9 @@ export const COMPOSIO_ACTIONS = {
     inputSchema: z.object({ event_id: z.string().trim().min(1).max(1024) }),
     toArguments: (input: { event_id: string }) => ({ calendar_id: 'primary', event_id: input.event_id }),
   },
-  // The three below change the person's mail or calendar. Agents only propose
-  // them (lib/pending-actions.ts); they run after the person approves.
+  // The three below change the person's mail or calendar. They run at once
+  // when the connection grants it; only a call the Decisions API judges
+  // destructive becomes an approval card (lib/pending-action-store.ts writeAccountAction).
   send_email: {
     title: 'Send an email',
     description: 'Send a new plain-text email from the person\'s Gmail.',
@@ -158,7 +166,7 @@ export const COMPOSIO_ACTIONS = {
 } as const
 
 export type ComposioActionName = keyof typeof COMPOSIO_ACTIONS
-/** Actions that change the person's mail or calendar; they run only once the person approves. */
+/** Actions that change the person's mail or calendar. Each runs directly unless the call is judged destructive; the card path stays for those. */
 export const APPROVAL_ACTIONS = ['send_email', 'create_calendar_event', 'update_calendar_event'] as const
 export type ApprovalActionName = (typeof APPROVAL_ACTIONS)[number]
 
@@ -189,6 +197,8 @@ export async function resolveComposioAccount(userId: string, toolkit: string, cl
 }
 
 export type ComposioActionClient = Pick<Composio, 'connectedAccounts' | 'tools'>
+/** Runs after the account and tool version are known, before anything is sent. An error stops the action. */
+export type ComposioDispatchGate = (accountId: string, tool: { tags?: readonly string[] }) => Promise<{ error: string } | null>
 
 export async function executeComposioAction(
   userId: string,
@@ -198,6 +208,7 @@ export async function executeComposioAction(
   /** The account the person chose with 设为默认 for a toolkit, if any. */
   chosenDefault: (toolkit: string) => Promise<string | null> = async () => null,
   boundAccountId?: string,
+  gate?: ComposioDispatchGate,
 ): Promise<ComposioActionResult> {
   if (!Object.hasOwn(COMPOSIO_ACTIONS, actionName)) return { error: 'integrationActionNotAllowed' }
   const action = COMPOSIO_ACTIONS[actionName as ComposioActionName]
@@ -205,6 +216,7 @@ export async function executeComposioAction(
   if (!parsed) return { error: 'invalidIntegrationInput' }
   if (!client) return { error: 'composioNotConfigured' }
 
+  let dispatched = false
   try {
     const { accountId, accounts } = await resolveComposioAccount(userId, action.toolkit, client, chosenDefault, boundAccountId)
     if (!accountId) return accounts.length > 0
@@ -213,7 +225,10 @@ export async function executeComposioAction(
 
     const schema = await client.tools.getRawComposioToolBySlug(action.slug)
     if (!schema.version || schema.version === 'latest') return { error: 'integrationActionVersionUnavailable' }
+    const stopped = gate ? await gate(accountId, schema) : null
+    if (stopped) return stopped
 
+    dispatched = true
     const result = await client.tools.execute(action.slug, {
       userId,
       connectedAccountId: accountId,
@@ -222,13 +237,15 @@ export async function executeComposioAction(
     })
     return result.successful
       ? { data: result.data, accountId, ...(result.logId ? { logId: result.logId } : {}) }
-      : { error: result.error ?? 'integrationActionFailed', ...(result.logId ? { logId: result.logId } : {}) }
+      : { error: isApprovalAction(actionName) ? 'operationUncertain' : result.error ?? 'integrationActionFailed', ...(result.logId ? { logId: result.logId } : {}) }
   } catch (error) {
     console.error('Composio action failed', {
       action: action.slug,
       error: error instanceof Error ? error.name : 'unknown',
     })
-    return { error: 'integrationActionFailed' }
+    // A transport/provider error after dispatch cannot prove that an external
+    // write did not happen. Keep its proposal consumed; never invite a resend.
+    return { error: dispatched && isApprovalAction(actionName) ? 'operationUncertain' : 'integrationActionFailed' }
   }
 }
 
@@ -243,6 +260,7 @@ function separateAccount(input: Record<string, unknown>) {
 export function createComposioAITools(execute: (action: ComposioActionName, input: unknown, accountId?: string) => Promise<unknown>) {
   const run = (action: ComposioActionName, input: Record<string, unknown>) => { const selection = separateAccount(input); return execute(action, selection.actionInput, selection.accountId) }
   return {
+    list_drive_files: tool({ ...COMPOSIO_ACTIONS.list_drive_files, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.list_drive_files.inputSchema), execute: input => run('list_drive_files', input) }),
     search_notion_pages: tool({ ...COMPOSIO_ACTIONS.search_notion_pages, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.search_notion_pages.inputSchema), execute: input => run('search_notion_pages', input) }),
     read_notion_page_blocks: tool({ ...COMPOSIO_ACTIONS.read_notion_page_blocks, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.read_notion_page_blocks.inputSchema), execute: input => run('read_notion_page_blocks', input) }),
     search_slack_messages: tool({ ...COMPOSIO_ACTIONS.search_slack_messages, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.search_slack_messages.inputSchema), execute: input => run('search_slack_messages', input) }),
@@ -250,26 +268,26 @@ export function createComposioAITools(execute: (action: ComposioActionName, inpu
   }
 }
 
-const PROPOSAL_NOTE = ' Nothing happens yet: the person sees exactly this in the chat and approves or declines it, and the outcome arrives later as an [Event]. Write the final text, not a draft to revise.'
+const WRITE_NOTE = ' It acts in the person\'s connected account at once, so write the final text, not a draft. If the result is awaiting_approval, the tool needs the person\'s approval: they see a card and the outcome arrives later as an [Event]. After operationUncertain it may already have happened; never send it again.'
 
 /**
  * Gmail and Google Calendar for the person's own Coordinator. Reads run at
- * once; the three that change something only `propose`, and run after the
- * person approves (lib/pending-actions.ts).
+ * once; the three that change something run through `write`, which acts
+ * directly when the connection grants it (decision 2026-10-31).
  */
 export function createGoogleAITools(
   execute: (action: ComposioActionName, input: unknown, accountId?: string) => Promise<unknown>,
-  propose: (action: ApprovalActionName, input: unknown, accountId?: string) => Promise<unknown>,
+  write: (action: ApprovalActionName, input: unknown, accountId?: string) => Promise<unknown>,
 ) {
   const run = (action: ComposioActionName, input: Record<string, unknown>) => { const selection = separateAccount(input); return execute(action, selection.actionInput, selection.accountId) }
-  const submit = (action: ApprovalActionName, input: Record<string, unknown>) => { const selection = separateAccount(input); return propose(action, selection.actionInput, selection.accountId) }
+  const submit = (action: ApprovalActionName, input: Record<string, unknown>) => { const selection = separateAccount(input); return write(action, selection.actionInput, selection.accountId) }
   return {
     search_gmail: tool({ ...COMPOSIO_ACTIONS.fetch_recent_gmail, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.fetch_recent_gmail.inputSchema), title: 'Search Gmail', description: 'Search the person\'s Gmail with a Gmail search query, e.g. "from:ana is:unread newer_than:7d".', execute: input => run('fetch_recent_gmail', input) }),
     read_gmail_message: tool({ ...COMPOSIO_ACTIONS.read_gmail_message, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.read_gmail_message.inputSchema), execute: input => run('read_gmail_message', input) }),
     list_calendar_events: tool({ ...COMPOSIO_ACTIONS.list_calendar_events, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.list_calendar_events.inputSchema), execute: input => run('list_calendar_events', input) }),
     get_calendar_event: tool({ ...COMPOSIO_ACTIONS.get_calendar_event, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.get_calendar_event.inputSchema), execute: input => run('get_calendar_event', input) }),
-    send_email: tool({ ...COMPOSIO_ACTIONS.send_email, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.send_email.inputSchema), description: COMPOSIO_ACTIONS.send_email.description + PROPOSAL_NOTE, execute: input => submit('send_email', input) }),
-    create_calendar_event: tool({ ...COMPOSIO_ACTIONS.create_calendar_event, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.create_calendar_event.inputSchema), description: COMPOSIO_ACTIONS.create_calendar_event.description + PROPOSAL_NOTE, execute: input => submit('create_calendar_event', input) }),
-    update_calendar_event: tool({ ...COMPOSIO_ACTIONS.update_calendar_event, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.update_calendar_event.inputSchema), description: COMPOSIO_ACTIONS.update_calendar_event.description + PROPOSAL_NOTE, execute: input => submit('update_calendar_event', input) }),
+    send_email: tool({ ...COMPOSIO_ACTIONS.send_email, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.send_email.inputSchema), description: COMPOSIO_ACTIONS.send_email.description + WRITE_NOTE, execute: input => submit('send_email', input) }),
+    create_calendar_event: tool({ ...COMPOSIO_ACTIONS.create_calendar_event, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.create_calendar_event.inputSchema), description: COMPOSIO_ACTIONS.create_calendar_event.description + WRITE_NOTE, execute: input => submit('create_calendar_event', input) }),
+    update_calendar_event: tool({ ...COMPOSIO_ACTIONS.update_calendar_event, inputSchema: withAccountSelection(COMPOSIO_ACTIONS.update_calendar_event.inputSchema), description: COMPOSIO_ACTIONS.update_calendar_event.description + WRITE_NOTE, execute: input => submit('update_calendar_event', input) }),
   }
 }

@@ -1,8 +1,8 @@
 import 'server-only'
-import { resolveFrozenHostedModel, type HostedSubscriptionSnapshot } from './subscription-model-snapshot'
+import { resolveFrozenHostedModel, selectionScope, type HostedModelSelection } from './subscription-model-snapshot'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from './subscription-runtime'
-export function resolveSubscriptionWorkflowModel(selection: HostedSubscriptionSnapshot, signal?: AbortSignal) {
-  return resolveFrozenHostedModel({ ownerId: selection.ownerId, botId: selection.coordinator ? null : selection.consumerId, workspaceId: selection.workspaceId },
+export function resolveSubscriptionWorkflowModel(selection: HostedModelSelection, signal?: AbortSignal) {
+  return resolveFrozenHostedModel(selectionScope(selection),
     { harness: 'ai_sdk', model: selection.modelId, modelSelection: selection },
     { service: () => subscriptionRuntime(), workspace: authorizeSubscriptionWorkspace }, signal)
 }

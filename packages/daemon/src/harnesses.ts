@@ -1,52 +1,72 @@
-// Detects which harness CLIs are installed on this device and their
-// versions; reported on device registration and heartbeats.
-import type { Harness, HarnessInfo } from "@mikka/protocol"
+// The device's capability report: what this machine can run, not which
+// agents the person installed. The daemon runs its own pinned Claude Code
+// and Codex (harness-install.ts), so a device needs neither installed; it
+// reports OS/arch, free disk, Docker and each harness's install state.
+import { statfsSync } from "node:fs"
+import { arch, platform } from "node:os"
+
+import type { DeviceRunnerCapability, HarnessInfo } from "@mikka/protocol"
 import { execa } from "execa"
 
-import { buildChildEnv } from "./env"
 import { daemonTestMode } from "@mikka/protocol/repository"
-import { detectHarnessModels } from "./harness-models"
+import { managedHarnessReport, type HarnessStore } from "./harness-install"
 import { DAEMON_VERSION } from "./paths"
 
-/** Candidate binaries per harness, tried in order. */
-export const HARNESS_BINARIES: Record<Exclude<Harness, "mock">, string[]> = {
-  claude_code: ["claude"],
-  codex: ["codex"],
-  cursor: ["cursor-agent", "agent"],
-}
-
-async function versionOf(binary: string): Promise<string | null> {
+/** Whether a Docker engine answers; the CLI alone is not enough. */
+export async function dockerAvailable(): Promise<boolean> {
   try {
-    const { stdout } = await execa(binary, ["--version"], {
-      env: buildChildEnv(),
+    const { exitCode } = await execa("docker", ["info", "--format", "{{.ServerVersion}}"], {
+      env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "" },
       extendEnv: false,
       timeout: 5_000,
       stdin: "ignore",
+      reject: false,
     })
-    const line = stdout.trim().split("\n")[0]?.trim()
-    return line || null
+    return exitCode === 0
+  } catch {
+    return false
+  }
+}
+
+export function freeDiskBytes(dir: string): number | null {
+  try {
+    const stats = statfsSync(dir)
+    return Number(stats.bavail) * Number(stats.bsize)
   } catch {
     return null
   }
 }
 
-export async function detectHarnesses(): Promise<HarnessInfo[]> {
-  const detected = await Promise.all(
-    (Object.keys(HARNESS_BINARIES) as Exclude<Harness, "mock">[]).map(
-      async (harness): Promise<HarnessInfo> => {
-        for (const binary of HARNESS_BINARIES[harness]) {
-          const version = await versionOf(binary)
-          if (version) {
-            const models = await detectHarnessModels(harness,binary)
-            return { harness, installed: true, version, ...(models?.length ? {models} : {}) }
-          }
-        }
-        return { harness, installed: false, version: null }
-      }
-    )
-  )
+export async function deviceCapabilities(
+  store: HarnessStore,
+  dataDir: string,
+  docker: () => Promise<boolean> = dockerAvailable,
+): Promise<DeviceRunnerCapability> {
+  return {
+    os: platform(),
+    arch: arch(),
+    freeDiskBytes: freeDiskBytes(dataDir),
+    docker: await docker(),
+    harnesses: managedHarnessReport(store),
+  }
+}
+
+/**
+ * Harnesses this device can run: every managed one with a build for this
+ * platform, installed yet or not (the first run installs it).
+ */
+export function detectHarnesses(store: HarnessStore): HarnessInfo[] {
   return [
-    ...detected,
+    ...managedHarnessReport(store).map(({ harness, state, version }) => ({
+      harness,
+      installed: state !== "unsupported",
+      version,
+    })),
     ...(daemonTestMode(process.env) ? [{ harness: "mock" as const, installed: true, version: DAEMON_VERSION }] : []),
   ]
+}
+
+/** Changes when an install finishes, so the next heartbeat reports it. */
+export function harnessFingerprint(store: HarnessStore): string {
+  return managedHarnessReport(store).map(({ harness, state, version }) => `${harness}:${version}:${state}`).join("|")
 }

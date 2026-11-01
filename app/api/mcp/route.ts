@@ -176,7 +176,7 @@ const handler = createMcpHandler(server => {
 
   server.registerTool('list_agents', {
     title: 'List local execution tools',
-    description: 'List available local execution tools and their computers. Use the returned internal id as agentId for dispatch_run and provide the repository URL separately. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, never an Agent.',
+    description: 'List available local execution tools and their computers. Use the returned internal id as agentId for dispatch_run and provide the repository URL separately. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, run by its Agent (Claude Code or Codex).',
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true },
   }, async (_input, ctx) => json(await actions.listAgents(mcpUserId(ctx.http?.authInfo))))

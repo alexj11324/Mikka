@@ -1,7 +1,7 @@
 import { test, expect } from './test-account-fixtures'
 import { app } from './fixtures'
 
-test('pooled owner and peer keep ordinary browser sessions and workspace isolation', async ({ page, peerPage, testAccounts }, testInfo) => {
+test('pooled owner and peer keep ordinary browser sessions and workspace isolation', { tag: '@smoke' }, async ({ page, peerPage, testAccounts }, testInfo) => {
   const { scope } = testAccounts
   expect(scope.owner.userId).not.toBe(scope.peer.userId)
   expect(scope.owner.namespace).not.toBe(scope.peer.namespace)
@@ -33,7 +33,7 @@ test('a real browser sign-out revokes the leased session without signing out the
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '退出登录', exact: true }).click()
   await expect(page).toHaveURL(url => url.pathname === app('/sign-in') && url.searchParams.get('login') === '1')
-  await expect(page.getByRole('heading', { name: '欢迎回来', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '登录 Mikka', exact: true })).toBeVisible()
 
   // The runner still has the original issued cookie. Replaying it proves
   // server revocation, rather than merely observing browser cookie removal.

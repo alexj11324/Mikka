@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, uuid, varchar, primaryKey, unique, index } from 'drizzle-orm/pg-core'
+import type { AuditRow } from '@/lib/audit/events'
+import { pgTable, text, timestamp, uuid, varchar, primaryKey, unique, index, jsonb } from 'drizzle-orm/pg-core'
 
 export const workspaces = pgTable('mikka_workspaces', {
   id: uuid('id').primaryKey(),
@@ -7,6 +8,8 @@ export const workspaces = pgTable('mikka_workspaces', {
   slug: varchar('slug', { length: 64 }).unique('mikka_workspaces_slug_unique'),
   /** A small image data URL (≤200 KB decoded); see lib/workspace-admin/icon.ts. */
   icon: text('icon'),
+  /** 'personal': the one workspace each person has, with only them as a member (decision 2026-10-31-2130). */
+  kind: text('kind').$type<'personal' | 'team'>().notNull().default('team'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -38,3 +41,13 @@ export const workspaceSlugRedirects = pgTable('mikka_workspace_slug_redirects', 
   workspaceId: uuid('workspaceId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('mikka_workspace_slug_redirects_workspace_idx').on(table.workspaceId)])
+
+/** Durable delivery receipt for the main audit sink, committed with workspace mutations. */
+export const workspaceAuditOutbox = pgTable('workspace_audit_outbox', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspaceId').notNull(),
+  payload: jsonb('payload').$type<AuditRow>(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull(),
+  lastAttemptAt: timestamp('lastAttemptAt', { withTimezone: true }),
+  deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
+})

@@ -3,7 +3,8 @@ import { createHash, randomBytes } from 'node:crypto'
 import { after } from 'next/server'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { agentRuns, artifactShares, artifactVersions, artifacts, bots, issueMembers, issues, type ArtifactKind } from '@/lib/db/schema'
+import { agentRuns, agents, artifactShares, artifactVersions, artifacts, bots, issueMembers, issues, type ArtifactKind } from '@/lib/db/schema'
+import { runAgentName, runBotName } from '@/lib/run-bot-name'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { artifactSubmittedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
@@ -49,6 +50,7 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
   const hash = sha256(content)
 
   const result = await db.transaction(async tx => {
+    await tx.execute(sql`select mikka_account_assert_writable(${submitter.userId})`)
     let artifactId = input.artifactId
     let version = 1
     if (artifactId) {
@@ -91,7 +93,9 @@ async function detail(where: ReturnType<typeof and>): Promise<ArtifactDetail | n
   if (!row) return null
   const versions = await db.select({ version: artifactVersions.version, authorName: artifactVersions.authorName, createdAt: artifactVersions.createdAt })
     .from(artifactVersions).where(eq(artifactVersions.artifactId, row.id)).orderBy(asc(artifactVersions.version))
-  // Authors are bots: shown with their own bloub, found by name, else by the run that handed the artifact over.
+  // A version the run handed over is the run's Agent's (R-78), also when an older row stored the dispatching Bot's name.
+  const agent = row.runId ? (await runAgents([row.runId])).get(row.runId) : undefined
+  // Other authors are bots: shown with their own bloub, found by name, else by the run that handed the artifact over.
   const names = [...new Set(versions.map(version => version.authorName.toLowerCase()))]
   const named = names.length ? await db.select({ name: bots.name, color: bots.color, shape: bots.shape }).from(bots)
     .where(and(eq(bots.ownerId, row.userId), inArray(sql`lower(${bots.name})`, names))) : []
@@ -100,8 +104,9 @@ async function detail(where: ReturnType<typeof and>): Promise<ArtifactDetail | n
   const look = (name: string) => named.find(bot => bot.name.toLowerCase() === name.toLowerCase()) ?? runBot ?? null
   const { userId: _owner, ...summary } = row
   return { ...summary, versions: versions.map(version => {
+    if (agent?.wrote(version.authorName)) return { ...version, authorName: agent.name, createdAt: version.createdAt.toISOString(), authorColor: null, authorShape: null, authorHarness: agent.harness }
     const bot = look(version.authorName)
-    return { ...version, createdAt: version.createdAt.toISOString(), authorColor: bot?.color ?? null, authorShape: bot?.shape ?? null }
+    return { ...version, createdAt: version.createdAt.toISOString(), authorColor: bot?.color ?? null, authorShape: bot?.shape ?? null, authorHarness: null }
   }) }
 }
 
@@ -136,18 +141,34 @@ async function withIssueKeys(userId: string, rows: (Omit<ArtifactListItem, 'issu
   })
 }
 
+/** Each run's Agent: its name and harness, and whether a stored author name is that run's (the Agent, or the Bot that dispatched it). */
+async function runAgents(runIds: string[]) {
+  const rows = runIds.length ? await db.select({ id: agentRuns.id, harness: agents.harness, name: runAgentName, botName: runBotName })
+    .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(inArray(agentRuns.id, [...new Set(runIds)])) : []
+  return new Map(rows.map(row => [row.id, { name: row.name, harness: row.harness, wrote: (author: string | null) => !!author && [row.name, row.botName].some(name => name?.toLowerCase() === author.toLowerCase()) }]))
+}
+
+/** A run's artifacts in a list name the run's Agent as their latest author. */
+async function withAgentAuthors<T extends { runId: string | null; authorName: string | null }>(rows: T[]): Promise<T[]> {
+  const agents = await runAgents(rows.flatMap(row => row.runId ? [row.runId] : []))
+  return rows.map(row => {
+    const agent = row.runId ? agents.get(row.runId) : undefined
+    return agent?.wrote(row.authorName) ? { ...row, authorName: agent.name } : row
+  })
+}
+
 /** The person's artifacts, last changed first, each with its latest author and the task it was made for. */
 export async function listArtifacts(userId: string): Promise<ArtifactListItem[]> {
   const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion)
     .where(eq(artifacts.userId, userId)).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
-  return withIssueKeys(userId, rows)
+  return withIssueKeys(userId, await withAgentAuthors(rows))
 }
 
 /** What one of the person's runs handed over, last changed first. */
 export async function listRunArtifacts(userId: string, runId: string): Promise<ArtifactListItem[]> {
   const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion)
     .where(and(eq(artifacts.userId, userId), eq(artifacts.runId, runId))).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
-  return withIssueKeys(userId, rows)
+  return withIssueKeys(userId, await withAgentAuthors(rows))
 }
 
 /** The file of one version, or null when the artifact or version is not there. */

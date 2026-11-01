@@ -87,7 +87,11 @@ for (const harness of ["codex", "claude_code"] as const) {
       model: "fixture-model",
       env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }),
       log: createLogger({ level: "silent" }),
+      github: { endpoint: 'https://mikka.example/api/runs/github-token', repository: 'owner/repo', branch: 'mikka/mik-1', runToken: 'synthetic-run-token', issueId: assignment.issueId },
     };
+    const githubDir = join(stateDir, 'runs', runId, 'github');
+    mkdirSync(githubDir, { recursive: true, mode: 0o700 });
+    writeFileSync(join(githubDir, 'config.json.cache'), JSON.stringify({ repository: 'owner/repo', token: 'synthetic-installation-token', createdAt: Date.now(), expiresAt: new Date(Date.now() + 3600_000).toISOString() }), { mode: 0o600 });
     const before = readFileSync(join(options.cwd, ".git", "config"), "utf8");
     const session = await runner.start(assignment, options);
     const events = [];
@@ -104,6 +108,10 @@ for (const harness of ["codex", "claude_code"] as const) {
     expect(
       existsSync(join(stateDir, "runs", runId, "runtime-git", ".git")),
     ).toBe(true);
+    // Closing the session leaves no GitHub token cache or CLI login on the machine.
+    expect(existsSync(githubDir)).toBe(false);
+    expect(existsSync(join(stateDir, "runs", runId, "runtime-home", ".codex", "auth.json"))).toBe(false);
+    expect(existsSync(join(stateDir, "runs", runId, "runtime-home", ".claude", ".credentials.json"))).toBe(false);
     connected = false;
     // Completed sessions revoke their own gate. A restart needs a fresh host
     // gate before the independently revoked subscription context is consulted.

@@ -1,107 +1,143 @@
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native'
+import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react'
+import { Image, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { usePathname, useRouter, type Href } from 'expo-router'
-import { CodeXml, Inbox, ListChecks, PenLine, Search, X } from 'lucide-react-native'
-import { BotAvatar, Spinner } from '@/components/icons'
+import { CircleArrowDown, Inbox, ListChecks, Puzzle, Settings } from 'lucide-react-native'
 import { Text } from '@/components/Text'
-import { Dot, RoundButton } from '@/components/ui'
+import { Symbol } from '@/components/Symbol'
+import { tap } from '@/lib/haptics'
 import { useHome } from '@/lib/home'
-import { colors, font } from '@/lib/theme'
+import { restartToUpdate, useUpdateReady } from '@/lib/updates'
+import { colors } from '@/lib/theme'
 
 type DrawerState = { open: () => void; close: () => void; isOpen: boolean }
 const DrawerContext = createContext<DrawerState>({ open: () => {}, close: () => {}, isOpen: false })
 export const useDrawer = () => useContext(DrawerContext)
 
+// Close to UIKit's default spring: settles fast, no visible bounce.
+const SPRING = { damping: 30, stiffness: 300, mass: 0.9, overshootClamping: true }
+
+/** The tab roots: a chat or thread pushed over them keeps the system's swipe back instead. */
+const drawerRoot = (path: string) => path === '/chats' || path === '/threads' || path === '/search'
+
 /**
- * The side drawer, like the ChatGPT iOS app (mobile.md "Where it lives"): it
- * slides in from the left and pushes the current screen right.
+ * The side drawer, opened from the person's avatar at the top left of 对话 (as
+ * in Grok and the ChatGPT app) or by swiping right on a tab's root: it slides
+ * in from the left and pushes the tabs right, following the finger, and
+ * settles by position and speed on the UI thread. It holds the person, 建议,
+ * 任务, 插件 and 设置; the bots are on 对话 itself.
  */
 export function DrawerHost({ children }: { children: ReactNode }) {
   const { width } = useWindowDimensions()
   const panel = Math.min(width * 0.82, 340)
+  const path = usePathname()
   const [isOpen, setOpen] = useState(false)
-  const progress = useRef(new Animated.Value(0)).current
+  // 0 closed … 1 open.
+  const progress = useSharedValue(0)
+  const start = useSharedValue(0)
 
-  useEffect(() => {
-    Animated.timing(progress, { toValue: isOpen ? 1 : 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
-  }, [isOpen, progress])
+  const settle = useCallback((open: boolean, velocity = 0) => {
+    'worklet'
+    progress.value = withSpring(open ? 1 : 0, { ...SPRING, velocity: velocity / panel })
+  }, [panel, progress])
 
-  const value = useMemo(() => ({ open: () => setOpen(true), close: () => setOpen(false), isOpen }), [isOpen])
-  const shift = progress.interpolate({ inputRange: [0, 1], outputRange: [0, panel] })
-  const panelShift = progress.interpolate({ inputRange: [0, 1], outputRange: [-panel * 0.3, 0] })
+  const changed = useCallback((open: boolean) => {
+    setOpen(was => {
+      if (was !== open) tap()
+      return open
+    })
+  }, [])
+
+  const value = useMemo(() => ({
+    open: () => { settle(true); changed(true) },
+    close: () => { settle(false); changed(false) },
+    isOpen,
+  }), [changed, isOpen, settle])
+
+  const pan = Gesture.Pan()
+    .enabled(isOpen || drawerRoot(path))
+    // Closed: only a rightward swipe takes over, so vertical scrolling stays the list's.
+    .activeOffsetX(isOpen ? [-12, 12] : [-10000, 14])
+    .failOffsetY([-14, 14])
+    .onBegin(() => { start.value = progress.value })
+    .onUpdate(event => {
+      progress.value = Math.min(1, Math.max(0, start.value + event.translationX / panel))
+    })
+    .onEnd(event => {
+      const open = event.velocityX > 500 ? true : event.velocityX < -500 ? false : progress.value > 0.5
+      settle(open, event.velocityX)
+      scheduleOnRN(changed, open)
+    })
+
+  const contentStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: progress.value * panel }],
+    borderTopLeftRadius: interpolate(progress.value, [0, 0.15], [0, 28], 'clamp'),
+    borderBottomLeftRadius: interpolate(progress.value, [0, 0.15], [0, 28], 'clamp'),
+    shadowOpacity: progress.value * 0.12,
+  }))
+  const dimStyle = useAnimatedStyle(() => ({ opacity: progress.value * 0.12 }))
+  const panelStyle = useAnimatedStyle(() => ({ transform: [{ translateX: (progress.value - 1) * panel * 0.3 }] }))
 
   return (
     <DrawerContext.Provider value={value}>
-      <View style={styles.root}>
-        <Animated.View style={[styles.panel, { width: panel, transform: [{ translateX: panelShift }] }]} pointerEvents={isOpen ? 'auto' : 'none'}>
-          <DrawerPanel onNavigate={() => setOpen(false)} />
-        </Animated.View>
-        <Animated.View style={[styles.content, isOpen && styles.contentOpen, { transform: [{ translateX: shift }] }]}>
-          {children}
-          {isOpen ? <Pressable accessibilityLabel="关闭菜单" style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} /> : null}
-        </Animated.View>
-      </View>
+      <GestureDetector gesture={pan}>
+        <View style={styles.root}>
+          <Animated.View style={[styles.panel, { width: panel }, panelStyle]} pointerEvents={isOpen ? 'auto' : 'none'}>
+            <DrawerPanel onNavigate={value.close} />
+          </Animated.View>
+          <Animated.View style={[styles.content, contentStyle]}>
+            {children}
+            <Animated.View pointerEvents="none" style={[styles.dim, dimStyle]} />
+            {isOpen ? <Pressable accessibilityLabel="关闭菜单" style={StyleSheet.absoluteFill} onPress={value.close} /> : null}
+          </Animated.View>
+        </View>
+      </GestureDetector>
     </DrawerContext.Provider>
   )
+}
+
+/** The person's photo, or their initials on a colour. */
+export function Avatar({ size = 32 }: { size?: number }) {
+  const user = useHome().data?.user
+  const round = { width: size, height: size, borderRadius: size / 2 }
+  if (user?.image) return <Image source={{ uri: user.image }} style={round} accessibilityIgnoresInvertColors />
+  const initials = (user?.name || user?.email || '').trim().slice(0, 2).toUpperCase()
+  return <View style={[round, styles.initials]}><Text style={[styles.initialsText, { fontSize: size * 0.4 }]}>{initials}</Text></View>
 }
 
 function DrawerPanel({ onNavigate }: { onNavigate: () => void }) {
   const insets = useSafeAreaInsets()
   const router = useRouter()
-  const path = usePathname()
-  const go = (href: Href) => { onNavigate(); setQuery(null); router.replace(href) }
   const { data } = useHome()
-  // 最近: newest chat first (mobile.md). Pinning is not on the server yet, so there is no 置顶 group.
-  // Search filters the drawer by name, as ChatGPT iOS's drawer search does with its chats.
-  const [query, setQuery] = useState<string | null>(null)
-  const needle = query?.trim().toLowerCase() ?? ''
-  const shows = (label: string) => !needle || label.toLowerCase().includes(needle)
-  const bots = [...data?.bots ?? []].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? '')).filter(bot => shows(bot.name))
-  const initials = (data?.user.name || data?.user.email || '').trim().slice(0, 2).toUpperCase()
-  const nothing = needle && !bots.length && !['Coordinator', '建议', '线程', '任务'].some(shows)
-
+  const updateReady = useUpdateReady()
+  const go = (href: Href) => { onNavigate(); router.push(href) }
   return (
-    <View style={{ flex: 1, paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 12) }}>
-      <View style={styles.top}>
-        {query === null ? <Text style={styles.brand}>Mikka</Text> : (
-          <TextInput autoFocus value={query} onChangeText={setQuery} placeholder="搜索" placeholderTextColor={colors.tertiary} returnKeyType="search"
-            accessibilityLabel="搜索" style={styles.search} />
-        )}
-        {query === null
-          ? <RoundButton label="搜索" onPress={() => setQuery('')}><Search size={20} color={colors.ink} strokeWidth={2} /></RoundButton>
-          : <RoundButton label="取消搜索" onPress={() => setQuery(null)}><X size={20} color={colors.ink} strokeWidth={2} /></RoundButton>}
-      </View>
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 16 }}>
-        {shows('Coordinator') ? <Row active={path === '/'} onPress={() => go('/')} icon={<BotAvatar size={24} />} label="Coordinator" /> : null}
-        {shows('建议') ? <Row active={path === '/suggestions'} onPress={() => go('/suggestions')} icon={<Inbox size={22} color={colors.ink} strokeWidth={1.8} />} label="建议"
-          trailing={data?.suggestions ? <Text style={styles.count}>{data.suggestions}</Text> : null} /> : null}
-        {shows('线程') ? <Row active={path.startsWith('/threads')} onPress={() => go('/threads')} icon={<CodeXml size={22} color={colors.ink} strokeWidth={1.8} />} label="线程"
-          trailing={data?.threads.waiting ? <Dot /> : data?.threads.running ? <Text style={styles.count}>{data.threads.running} 运行中</Text> : null} /> : null}
-        {shows('任务') ? <Row active={path === '/tasks'} onPress={() => go('/tasks')} icon={<ListChecks size={22} color={colors.ink} strokeWidth={1.8} />} label="任务" /> : null}
-        {nothing ? <Text style={styles.none}>没有找到「{query?.trim()}」。</Text> : null}
-        {bots.length && !needle ? <Text style={styles.section}>最近</Text> : null}
-        {bots.map(bot => (
-          <Row key={bot.id} active={path === `/bots/${bot.id}`} onPress={() => go(`/bots/${bot.id}`)} icon={<BotAvatar color={bot.color} shape={bot.shape} size={24} />} label={bot.name}
-            trailing={bot.working ? <Spinner size={14} /> : null} />
-        ))}
+    <View style={{ flex: 1, paddingTop: insets.top + 12, paddingBottom: Math.max(insets.bottom, 8) }}>
+      <Pressable accessibilityRole="button" accessibilityLabel="设置" onPress={() => go('/settings')} style={({ pressed }) => [styles.me, pressed && styles.rowActive]}>
+        <Avatar size={44} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.meName} numberOfLines={1}>{data?.user.name || data?.user.email || ''}</Text>
+          {data ? <Text style={styles.meDetail} numberOfLines={1}>{data.workspace.name}</Text> : null}
+        </View>
+      </Pressable>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 8, paddingTop: 12, paddingBottom: 16 }}>
+        <Row onPress={() => go('/suggestions')} icon={<Symbol name="tray" web={<Inbox size={22} color={colors.ink} strokeWidth={1.8} />} />} label="建议"
+          trailing={data?.suggestions ? <Text style={styles.count}>{data.suggestions}</Text> : null} />
+        <Row onPress={() => go('/tasks')} icon={<Symbol name="checklist" web={<ListChecks size={22} color={colors.ink} strokeWidth={1.8} />} />} label="任务" />
+        <Row onPress={() => go('/plugins')} icon={<Symbol name="puzzlepiece.extension" web={<Puzzle size={22} color={colors.ink} strokeWidth={1.8} />} />} label="插件" />
+        <Row onPress={() => go('/settings')} icon={<Symbol name="gearshape" web={<Settings size={22} color={colors.ink} strokeWidth={1.8} />} />} label="设置" />
+        {updateReady ? <Row onPress={restartToUpdate} icon={<Symbol name="arrow.down.circle" color={colors.accent} web={<CircleArrowDown size={22} color={colors.accent} strokeWidth={1.8} />} />} label="重启以更新" /> : null}
       </ScrollView>
-      <View style={styles.bottom}>
-        <Pressable accessibilityRole="button" onPress={() => go('/')} style={styles.newButton}>
-          <PenLine size={18} color="#fff" strokeWidth={2} />
-          <Text style={styles.newLabel}>新建</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="设置" onPress={() => { onNavigate(); router.push('/settings') }} style={styles.me}>
-          <Text style={styles.meText}>{initials}</Text>
-        </Pressable>
-      </View>
     </View>
   )
 }
 
-function Row({ icon, label, trailing, active, onPress }: { icon: ReactNode; label: string; trailing?: ReactNode; active?: boolean; onPress: () => void }) {
+function Row({ icon, label, trailing, onPress }: { icon: ReactNode; label: string; trailing?: ReactNode; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, (active || pressed) && styles.rowActive]}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.rowActive]}>
       <View style={styles.rowIcon}>{icon}</View>
       <Text style={styles.rowLabel} numberOfLines={1}>{label}</Text>
       {trailing}
@@ -112,21 +148,17 @@ function Row({ icon, label, trailing, active, onPress }: { icon: ReactNode; labe
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.grouped, overflow: 'hidden' },
   panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: colors.grouped },
-  content: { flex: 1, backgroundColor: colors.page, overflow: 'hidden' },
-  contentOpen: { borderTopLeftRadius: 28, borderBottomLeftRadius: 28, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: -2, height: 0 } },
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 12 },
-  brand: { fontSize: 28, fontWeight: '700' },
-  search: { flex: 1, minWidth: 0, width: 0, marginRight: 12, height: 44, borderRadius: 22, backgroundColor: '#E4E4E6', paddingHorizontal: 16, fontSize: 16, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
-  none: { fontSize: 14, color: colors.secondary, marginTop: 12, marginLeft: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', height: 48, paddingHorizontal: 12, borderRadius: 14, gap: 14 },
+  content: { flex: 1, backgroundColor: colors.page, overflow: 'hidden', shadowColor: '#000', shadowRadius: 16, shadowOffset: { width: -2, height: 0 } },
+  row: { flexDirection: 'row', alignItems: 'center', height: 50, paddingHorizontal: 12, borderRadius: 14, gap: 14 },
   rowActive: { backgroundColor: '#E4E4E6' },
   rowIcon: { width: 26, alignItems: 'center' },
-  rowLabel: { flex: 1, fontSize: 16 },
-  count: { fontSize: 14, color: colors.secondary },
-  section: { fontSize: 13, color: colors.secondary, marginTop: 18, marginBottom: 6, marginLeft: 12 },
-  bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8 },
-  newButton: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 48, paddingHorizontal: 20, borderRadius: 24, backgroundColor: colors.accent },
-  newLabel: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  me: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#3D7A5C', alignItems: 'center', justifyContent: 'center' },
-  meText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  rowLabel: { flex: 1, fontSize: 17 },
+  count: { fontSize: 15, color: colors.secondary },
+  me: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14 },
+  meName: { fontSize: 17, fontWeight: '600' },
+  meDetail: { fontSize: 14, color: colors.secondary, marginTop: 2 },
+  initials: { backgroundColor: '#3D7A5C', alignItems: 'center', justifyContent: 'center' },
+  initialsText: { color: '#fff', fontWeight: '600' },
+  // The pushed screen dims as the drawer opens, as iOS dims what a panel covers.
+  dim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000' },
 })

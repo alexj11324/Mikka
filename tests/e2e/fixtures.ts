@@ -13,7 +13,7 @@ export function app(path: string) {
 }
 
 /** Buttons on the left icon rail (主页 / 建议 / 看板 / 插件 / Artifact). Phones have no rail. */
-export function rail(page: Page, name: '主页' | '建议' | '看板' | '插件' | '产物') {
+export function rail(page: Page, name: '主页' | '建议' | '看板' | '插件' | 'Artifact') {
   return page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name, exact: true })
 }
 
@@ -39,6 +39,8 @@ export async function openCreateIssue(page: Page) {
   await dialog.getByRole('option', { name: '新建任务', exact: true }).click()
   const create = page.getByRole('dialog', { name: '新建任务', exact: true })
   await expect(create).toBeVisible()
+  // ⌘K search plays its close animation before unmounting; wait until it has gone.
+  await expect(page.getByRole('dialog')).toHaveCount(1)
   return create
 }
 
@@ -100,6 +102,19 @@ export async function seedHostedVerification(page: Page, remaining: number) {
   await db.query('INSERT INTO hosted_allowances ("workspaceId", remaining) VALUES ($1, $2) ON CONFLICT ("workspaceId") DO UPDATE SET remaining = $2', [member.workspaceId, remaining])
 }
 
+/** A team workspace the signed-in person administers, beside their personal one (decision 2026-10-31-2130). */
+export async function seedTeamWorkspace(page: Page, name = 'E2E 团队') {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedTeamWorkspace 需要已登录的页面。')
+  const db = database()
+  const { rows: [user] } = await db.query<{ id: string; name: string; email: string }>('SELECT u.id,u.name,u.email FROM session s JOIN "user" u ON u.id = s."userId" WHERE s.token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!user) throw new Error('找不到当前登录会话。')
+  const id = randomUUID()
+  await db.query(`INSERT INTO mikka_workspaces (id, "userId", name, kind) VALUES ($1, $2, $3, 'team')`, [id, user.id, name])
+  await db.query(`INSERT INTO mikka_workspace_members ("workspaceId", "userId", name, email, role) VALUES ($1, $2, $3, $4, 'admin')`, [id, user.id, user.name, user.email.toLowerCase()])
+  return id
+}
+
 /** The current conversation's title pill over the chat (desktop). */
 export function conversationPill(page: Page) {
   // Conversations opened earlier stay mounted but hidden; only the current one is visible.
@@ -113,18 +128,49 @@ export async function hydrated(field: Locator) {
   await expect.poll(() => field.evaluate(element => Object.keys(element).some(key => key.startsWith('__reactProps$')))).toBe(true)
 }
 
+/**
+ * Each text appears exactly once among the items, in any order and next to any
+ * other items. Use it instead of an ordered toHaveText([...]) list, which fails
+ * whenever an unrelated item is added or the order changes.
+ */
+export async function expectItems(items: Locator, texts: string[]) {
+  for (const text of texts) {
+    const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const exact = new RegExp('^\\s*' + escaped + '\\s*$')
+    await expect(items.filter({ hasText: exact }), text).toHaveCount(1)
+  }
+}
+
+/**
+ * API-only specs sign up through the browser, then work over HTTP and SQL. Leave
+ * the signed-in page before seeding: an open workspace page can reload and take
+ * row locks on the same issues while a fixture transaction holds them (a
+ * deadlock that surfaced as HTTP 500 on /mikka). page.request keeps the session.
+ */
+export async function leavePage(page: Page) {
+  await page.goto('about:blank')
+}
+
 type ExpectedConsoleError = { path: string; message: string }
 
-export function watchRuntime(context: BrowserContext, expectedConsoleErrors: ExpectedConsoleError[] = []) {
+/**
+ * expectedConsoleErrors: each entry absorbs exactly one matching console error.
+ * allowedConsoleErrors: a per-test allowlist for denials the test provokes on
+ * purpose (for example a 403 on a workspace it may not read). Each entry absorbs
+ * any number of matching errors, so a refetch does not fail the guard; anything
+ * else, every page error and every same-origin 5xx still fails the test.
+ */
+export function watchRuntime(context: BrowserContext, expectedConsoleErrors: ExpectedConsoleError[] = [], allowedConsoleErrors: ExpectedConsoleError[] = []) {
   const failures: string[] = []
   const expected = [...expectedConsoleErrors]
   context.on('page', page => {
     page.on('pageerror', error => failures.push(error.stack ?? error.message))
     page.on('console', message => {
       if (message.type() !== 'error') return
-      const index = expected.findIndex(error => message.text() === error.message && message.location().url === `${new URL(page.url()).origin}${error.path}`)
+      const matches = (error: ExpectedConsoleError) => message.text() === error.message && message.location().url === `${new URL(page.url()).origin}${error.path}`
+      const index = expected.findIndex(matches)
       if (index >= 0) expected.splice(index, 1)
-      else failures.push(`console.error: ${message.text()}`)
+      else if (!allowedConsoleErrors.some(matches)) failures.push(`console.error: ${message.text()}`)
     })
     page.on('response', response => {
       if (response.status() >= 500 && new URL(response.url()).origin === new URL(page.url()).origin) {
@@ -140,13 +186,14 @@ export function browserClientHeaders() {
   return { 'x-forwarded-for': `198.18.${randomInt(256)}.${randomInt(1, 255)}` }
 }
 
-export const test = base.extend<{ runtimeGuard: void; expectedConsoleErrors: ExpectedConsoleError[] }>({
+export const test = base.extend<{ runtimeGuard: void; expectedConsoleErrors: ExpectedConsoleError[]; allowedConsoleErrors: ExpectedConsoleError[] }>({
   expectedConsoleErrors: [[], { option: true }],
+  allowedConsoleErrors: [[], { option: true }],
   extraHTTPHeaders: async ({ extraHTTPHeaders }, use) => {
     await use({ ...extraHTTPHeaders, ...browserClientHeaders() })
   },
-  runtimeGuard: [async ({ context, expectedConsoleErrors }, use, testInfo) => {
-    const failures = watchRuntime(context, expectedConsoleErrors)
+  runtimeGuard: [async ({ context, expectedConsoleErrors, allowedConsoleErrors }, use, testInfo) => {
+    const failures = watchRuntime(context, expectedConsoleErrors, allowedConsoleErrors)
     await use()
     if (failures.length) await testInfo.attach('runtime-errors', { body: failures.join('\n\n'), contentType: 'text/plain' })
     expect(failures, '页面异常、console.error 或服务端 5xx 不得被忽略').toEqual([])
@@ -182,7 +229,33 @@ export async function captureAuthenticationCookies(context: BrowserContext) {
   }))
 }
 
-export async function register(page: Page, next = '/', email = `e2e-${randomUUID()}@example.com`) {
+/**
+ * A new account opens on the first-run guide, which only the workspace root
+ * shows. Tests about other flows mark it done and skip it in place, without a
+ * reload that would refetch the page's data; tests/e2e/onboarding.spec.ts
+ * covers the guide.
+ */
+export async function skipOnboarding(page: Page, email: string) {
+  await database().query('insert into user_onboarding ("userId") select id from "user" where email = $1 on conflict do nothing', [email])
+  if (new URL(page.url()).pathname.replace(/\/$/, '') !== app('/').replace(/\/$/, '')) return
+  const guide = page.getByRole('dialog', { name: '创建你的第一个 Bot', exact: true })
+  await guide.getByRole('button', { name: '跳过引导', exact: true }).click()
+  await expect(guide).toHaveCount(0)
+}
+
+/**
+ * register(), then a team workspace the new person administers, selected as the current one.
+ * A new account's own workspace is personal and has no members, 团队权限 or 审计日志 (decision 2026-10-31-2130).
+ */
+export async function registerInTeam(page: Page, next = '/', email?: string, options: { onboarding?: boolean } = {}) {
+  const account = await register(page, '/', email, options)
+  const workspaceId = await seedTeamWorkspace(page)
+  await page.context().addCookies([{ name: 'mikka-workspace', value: workspaceId, url: new URL(page.url()).origin }])
+  await page.goto(app(next))
+  return { ...account, workspaceId }
+}
+
+export async function register(page: Page, next = '/', email = `e2e-${randomUUID()}@example.com`, { onboarding = false } = {}) {
   const password = randomBytes(32).toString('base64url')
   try {
     await page.goto(app(`/sign-up?next=${encodeURIComponent(next)}`))
@@ -193,6 +266,7 @@ export async function register(page: Page, next = '/', email = `e2e-${randomUUID
     await delay(4000)
     await page.getByRole('button', { name: '创建账号并进入', exact: true }).click()
     await expect(page).toHaveURL(url => `${url.pathname}${url.search}` === app(next))
+    if (!onboarding) await skipOnboarding(page, email)
     return { email, password }
   } finally {
     // Existing real signup tests also feed the private artifact scanner. A

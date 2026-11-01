@@ -5,6 +5,7 @@ import type { WriteActionName, WriteProvider } from './write-contract'
 import { channelSnapshot, calendarSnapshot, snapshotDigest } from './write-target'
 import { createHash } from 'node:crypto'
 import { SLACK_CONVERSATION_READ_CONTRACT, type SlackConversationReader } from './slack-conversation-read'
+import { SLACK_DELIVERY_CONTRACT, type SlackDelivery } from './slack-delivery'
 
 const definitions = {
   append_notion_paragraph: { toolkit: 'notion', write: 'NOTION_APPEND_BLOCK_CHILDREN', read: 'NOTION_RETRIEVE_PAGE' },
@@ -21,7 +22,7 @@ export function writeArguments(action: WriteActionName, p: Record<string, unknow
  * authorized test connection before enabling this adapter in product tooling. */
 export type ConditionalCalendarDelete = (input: { ownerId: string; accountId: string; eventId: string; ifMatch: string; sendUpdates: 'none' | 'all' | 'externalOnly'; signal: AbortSignal; beforeSend: () => Promise<void> }) => Promise<{ status: number }>
 export type SlackReadContract = { version: string; metadataDigest: string }
-export function composioWriteProvider(client: ComposioActionClient | null, action: WriteActionName, conditionalDelete?: ConditionalCalendarDelete, slackReadContract?: SlackReadContract, slackReader?: SlackConversationReader): WriteProvider {
+export function composioWriteProvider(client: ComposioActionClient | null, action: WriteActionName, conditionalDelete?: ConditionalCalendarDelete, slackReadContract?: SlackReadContract, slackReader?: SlackConversationReader, slackDelivery?: SlackDelivery): WriteProvider {
   const d = definitions[action]
   async function account(owner: string) {
     if (!client) throw new OperationError('composioNotConfigured')
@@ -62,8 +63,12 @@ export function composioWriteProvider(client: ComposioActionClient | null, actio
   return {
     name: `composio-${d.toolkit}`,
     async prepare(owner, payload) {
-      const accountId = await account(owner), pinned = await version(d.write)
-      return { accountId, version: pinned, context: await inspect(owner, accountId, payload) }
+      // The write tool's own annotations (MCP hints such as destructiveHint) go
+      // to the destructive judgment, also when Slack sends through its own transport.
+      const accountId = await account(owner), tool = await client!.tools.getRawComposioToolBySlug(d.write)
+      const custom = action === 'send_slack_message' && slackDelivery
+      if (!custom && (!tool.version || tool.version === 'latest')) throw new OperationError('integrationActionVersionUnavailable')
+      return { accountId, version: custom ? SLACK_DELIVERY_CONTRACT : tool.version!, context: await inspect(owner, accountId, payload), tool: d.write, annotations: tool.tags ?? [] }
     },
     async execute(p) {
       p.signal.throwIfAborted()
@@ -76,6 +81,7 @@ export function composioWriteProvider(client: ComposioActionClient | null, actio
         p.signal.throwIfAborted(); await p.beforeSend(); p.signal.throwIfAborted()
       }
       await recheck()
+      if (action === 'send_slack_message' && p.version === SLACK_DELIVERY_CONTRACT && slackDelivery) return slackDelivery.send({ ...p, beforeSend: recheck })
       if (action === 'cancel_calendar_event') {
         // Do not guess an if_match tool argument: only an explicitly supplied
         // transport that atomically honors Google's If-Match can cancel.
@@ -94,6 +100,10 @@ export function composioWriteProvider(client: ComposioActionClient | null, actio
       if (typeof id !== 'string' || !id || id.length > 1024) throw new OperationError('operationUncertain')
       return { providerObjectId: id, evidenceDigest: createHash('sha256').update(JSON.stringify([p.accountId, action, p.payload, id])).digest('hex') }
     },
-    async lookup() { return null },
+    async lookup(input) {
+      if (action !== 'send_slack_message' || !slackDelivery || input.version !== SLACK_DELIVERY_CONTRACT) return null
+      if (await account(input.ownerId) !== input.accountId) throw new OperationError('integrationAccountUnavailable')
+      return slackDelivery.lookup(input)
+    },
   }
 }

@@ -5,6 +5,7 @@ import { DEFAULT_AGENT_DEFINITION, builtinAgentDefinition } from './builtin'
 import { COMPUTER_TOOL_IDS, FACTORY_TOOL_IDS } from './registry'
 import { makeSnapshot, parseDefinition, exportDefinition, importDefinition, digest } from './definition'
 import { AgentKitStore, type AgentExecution } from './store'
+import { skillEvaluationCommandSchema } from '../self-improvement/schema'
 
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 const calls: {name: string; args: unknown[]}[] = []
@@ -12,7 +13,7 @@ const capture = (name: string) => async (...args: unknown[]) => { calls.push({na
 const forbidden = () => { throw Error('No DB, provider or device in catalogue tests') }
 stub('../db/index.ts', {db: {select: forbidden}, pool: {connect: forbidden}})
 stub('../workspace-db.ts', {workspaceDb: {select: forbidden}})
-stub('../../workflows/coordinator/steps.ts', {composioAction: capture('read'), proposeAccountAction: capture('propose'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy')})
+stub('../../workflows/coordinator/steps.ts', {composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy')})
 stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }) })
 let registry: typeof import('../../workflows/coordinator/tools')
 let service: typeof import('./service')
@@ -36,6 +37,38 @@ const scopedRoutingFactoryTools = ['list_factory_requests', 'intake_factory_requ
 const scopedLifecycleFactoryTools = ['dispatch_factory_task', 'recover_factory_check', 'list_factory_questions', 'answer_factory_context', 'escalate_factory_question'] as const
 const knownFactoryTools = new Set<string>([...FACTORY_TOOL_IDS, ...scopedRoutingFactoryTools, ...scopedLifecycleFactoryTools])
 
+test('all exposed tool schemas have object roots and skill evaluation retains strict command validation', async () => {
+  const previous = factoryGateKeys.map(key => process.env[key])
+  try {
+    for (const key of factoryGateKeys) process.env[key] = '1'
+    const run = execution()
+    run.snapshot.runtime = { harness: 'ai_sdk', model: 'openai/gpt-6-luna' }
+    const tools = registry.createCoordinatorRegistry(owner, null, scope, { execution: run, computerEnabled: true, mailboxEnabled: true, writeEnabled: true })
+    assert.ok(tools.skill_evaluation)
+    assert.ok(tools.append_notion_paragraph)
+    for (const [name, tool] of Object.entries(tools)) assert.equal((await asSchema(tool.inputSchema).jsonSchema).type, 'object', name)
+    const schema = asSchema(tools.skill_evaluation.inputSchema)
+    assert.deepEqual(await schema.jsonSchema, { ...await asSchema(skillEvaluationCommandSchema).jsonSchema, type: 'object' })
+    const commands = [
+      { action: 'freeze_benchmark', sourceRunId: bot },
+      { action: 'dispatch_training', instanceId: bot },
+      { action: 'begin_evaluation', instanceId: bot, proposalId: bot, candidateVersionId: bot },
+      { action: 'dispatch_evaluation', evaluationId: bot },
+      { action: 'compare_evaluation', evaluationId: bot },
+    ]
+    for (const command of commands) {
+      assert.deepEqual(await schema.validate!(command), { success: true, value: command })
+      for (const invalid of [{ action: command.action }, { ...command, unauthorized: true }, { ...command, [Object.keys(command)[1]]: 'invalid-uuid' }]) {
+        assert.equal((await schema.validate!(invalid)).success, false)
+      }
+    }
+    assert.equal((await schema.validate!({ action: 'unknown' })).success, false)
+    assert.equal((await schema.validate!(null)).success, false)
+  } finally {
+    factoryGateKeys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i] })
+  }
+})
+
 test('all four existing flag combinations preserve the actual pre-kit catalogue for newly initialized definitions', () => {
   const keys = ['MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_BYOS_ENABLED'] as const
   const saved = keys.map(key => process.env[key])
@@ -56,7 +89,7 @@ test('all four existing flag combinations preserve the actual pre-kit catalogue 
   }
 })
 
-test('Gmail reads retain the real input schema, host owner and native scope; account mutations still propose', async () => {
+test('Gmail reads retain the real input schema, host owner and native scope; account writes go through the host write step', async () => {
   calls.length = 0
   const tools = registry.coordinatorTools(owner, bot, scope, {execution: execution()})
   const checked = await asSchema(tools.read_gmail_message.inputSchema).validate!({message_id: 'message-1', ownerId: 'forged'})
@@ -67,7 +100,7 @@ test('Gmail reads retain the real input schema, host owner and native scope; acc
   await invoke(tools, 'send_email', {to: 'synthetic@example.invalid', subject: 'fixture', body: 'fixture'})
   assert.deepEqual(calls, [
     {name: 'read', args: [owner, 'read_gmail_message', {message_id: 'message-1'}, scope, undefined, bot]},
-    {name: 'propose', args: [owner, 'send_email', {to: 'synthetic@example.invalid', subject: 'fixture', body: 'fixture'}, scope, undefined, bot]},
+    {name: 'write', args: [owner, 'send_email', {to: 'synthetic@example.invalid', subject: 'fixture', body: 'fixture'}, scope, undefined, bot]},
   ])
   assert.equal((await asSchema(tools.read_gmail_message.inputSchema).validate!({message_id: ''})).success, false)
 })
