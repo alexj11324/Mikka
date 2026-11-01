@@ -4,6 +4,9 @@ import { resolve } from 'node:path'
 import { Pool } from 'pg'
 import { readBoundedBody } from './http-body.mjs'
 import { MVP_DECISION_KEY, hasBoundMvpTransport, verifyMvpTransport } from '../../tests/mvp/transport.mjs'
+import { databaseTarget, EnvironmentError } from './database-target.mjs'
+
+export { databaseTarget, EnvironmentError }
 
 const IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/
 const LABEL = /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,159}$/
@@ -11,20 +14,7 @@ const SHA = /^[a-f0-9]{40}$/
 const INSTANCE = /^[a-f0-9-]{36}$/
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]'])
 
-export class EnvironmentError extends Error {
-  constructor(code) { super(code); this.name = 'EnvironmentError'; this.code = code }
-}
 const fail = code => { throw new EnvironmentError(code) }
-
-/** Deliberately never include a URL, driver error, password or response body in errors. */
-export function databaseTarget(connectionString) {
-  let target
-  try { target = new URL(connectionString) } catch { fail('DATABASE_URL_REQUIRED') }
-  if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.search || target.hash || !target.username || !target.password) fail('DATABASE_URL_INVALID')
-  const name = target.pathname.slice(1)
-  if (!IDENTIFIER.test(name) || !IDENTIFIER.test(decodeURIComponent(target.username))) fail('DATABASE_TARGET_INVALID')
-  return { host: target.hostname, port: Number(target.port || 5432), name, schema: 'public', user: decodeURIComponent(target.username) }
-}
 
 export function bindingValue(value) {
   return {
