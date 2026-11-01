@@ -32,7 +32,7 @@ export function GroupChatView({ group, userId, people }: {
 }) {
   const t = useTranslations('GroupChat')
   const { data: agents = [] } = useSWR('agents', listAgents)
-  const { data: members = [] } = useSWR(['group-members', group.id], ([, id]: [string, string]) => fetchGroupMembers(id), { revalidateOnFocus: false })
+  const { data: members = [] } = useSWR(['group-members', group.id], ([, id]: [string, string]) => fetchGroupMembers(id))
   const member = (type: 'user' | 'agent' | 'bot', id: string) => members.find(item => item.memberType === type && item.id === id)
   const { data: pages, error, size, setSize, isValidating, mutate } = useSWRInfinite<GroupMessagePage>(
     (index, previous: GroupMessagePage | null) => index === 0 ? ['group-messages', group.id, null] : previous?.nextBefore ? ['group-messages', group.id, previous.nextBefore] : null,

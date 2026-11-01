@@ -31,8 +31,13 @@ test('paused Linear settings do not poll state or start OAuth', async ({ page })
   expect(stateActions).toEqual([])
   const response = await page.request.get(app('/api/integrations/linear/status'))
   expect(await response.json()).toMatchObject({ enabled: false })
-  // Focus checks availability again; other settings may revalidate on focus.
-  await page.evaluate(() => window.dispatchEvent(new Event('focus')))
-  await expect.poll(() => availabilityReads).toBe(3)
+  // Focus and visibility read nothing (decision 2026-11-01-0400-no-refetch-on-focus).
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('focus'))
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await page.clock.runFor(5_000)
+  expect(availabilityReads).toBe(2)
+  expect(stateActions).toEqual([])
   await expect(page.getByText('同步已暂停', { exact: true })).toBeVisible()
 })

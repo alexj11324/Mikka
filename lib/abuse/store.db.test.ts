@@ -43,6 +43,7 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
   await pool.query(
     readFileSync('drizzle/20261030230001_legacy_hosted_workspaces.sql', 'utf8'),
   )
+  await pool.query(readFileSync('drizzle/20261101130000_hosted_usage_concurrent.sql', 'utf8'))
   const store = new HostedUsageStore(pool)
   const verified = async () => {
     const id = randomUUID()
@@ -126,24 +127,53 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     },
   )
   await t.test(
-    'only one in-flight provider call per workspace; unknown receipt blocks replay without prepayment',
+    'one workspace runs calls concurrently up to the cap; replay refused; unknown receipt keeps its hold',
     async () => {
       const id = await verified()
       const calls = Array.from({ length: 10 }, () => randomUUID())
       const results = await Promise.allSettled(
         calls.map((call) => store.reserve(id, 'fixture', call)),
       )
-      assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1)
-      const call = calls[results.findIndex((r) => r.status === 'fulfilled')]
+      const admitted = calls.filter((_, i) => results[i].status === 'fulfilled')
+      assert.equal(admitted.length, 8)
+      for (const r of results)
+        if (r.status === 'rejected') assert.match(String(r.reason), /usage_concurrency_limit/)
+      assert.equal((await store.status(id)).state, 'usage_concurrency_limit')
+      // Holds gate admission only; they are not charged.
       assert.equal((await store.balance(id)).free, 1_000_000)
-      await store.settle(call, null)
-      assert.equal((await store.balance(id)).free, 1_000_000)
-      await assert.rejects(
-        store.reserve(id, 'fixture', randomUUID()),
-        /usage_in_progress/,
-      )
-      await store.settle(call, 100)
+      await assert.rejects(store.reserve(id, 'fixture', admitted[0]), /usage_in_progress/)
+      await store.settle(admitted[0], null)
+      // An unknown receipt frees its slot but keeps its hold: 7 pending, 800k held.
+      const next = randomUUID()
+      await store.reserve(id, 'fixture', next)
+      await assert.rejects(store.reserve(id, 'fixture', randomUUID()), /usage_concurrency_limit/)
+      await Promise.all([next, ...admitted.slice(1)].map((call) => store.settle(call, 0)))
+      assert.equal((await store.status(id)).state, 'ready')
+      await store.settle(admitted[0], 100)
       assert.equal((await store.balance(id)).free, 999_900)
+      await assert.rejects(store.reserve(id, 'fixture', admitted[0]), /usage_in_progress/)
+    },
+  )
+  await t.test(
+    'concurrent calls must fit the balance together; only the excess is refused',
+    async () => {
+      const id = await verified()
+      await pool.query('UPDATE hosted_allowances SET remaining=250000 WHERE "workspaceId"=$1', [id])
+      const calls = Array.from({ length: 5 }, () => randomUUID())
+      const results = await Promise.allSettled(
+        calls.map((call) => store.reserve(id, 'fixture', call)),
+      )
+      const admitted = calls.filter((_, i) => results[i].status === 'fulfilled')
+      // 250k covers the lone call plus one more 100k hold; the rest do not fit.
+      assert.equal(admitted.length, 2)
+      for (const r of results)
+        if (r.status === 'rejected') assert.match(String(r.reason), /free_allowance_used/)
+      assert.equal((await store.status(id)).state, 'free_allowance_used')
+      // Settlement charges the actual cost and releases the hold.
+      await store.settle(admitted[0], 30_000)
+      assert.equal((await store.balance(id)).free, 220_000)
+      await store.reserve(id, 'fixture', randomUUID())
+      await assert.rejects(store.reserve(id, 'fixture', randomUUID()), /free_allowance_used/)
     },
   )
   await t.test(
@@ -155,8 +185,11 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
       const stuck = randomUUID()
       await store.reserve(id, 'fixture', stuck)
       await store.settle(stuck, null)
-      // Recent: it still blocks, so a live call is never cut.
-      await assert.rejects(store.reserve(id, 'fixture', randomUUID()), /usage_in_progress/)
+      // Recent: it is kept (its cost may still arrive) and does not block others.
+      const alongside = randomUUID()
+      await store.reserve(id, 'fixture', alongside)
+      await store.settle(alongside, 0)
+      assert.equal((await pool.query('SELECT state FROM hosted_usage WHERE id=$1', [stuck])).rows[0].state, 'unknown')
       // Past the margin it can never settle; the next reservation reaps it.
       await pool.query('UPDATE hosted_usage SET "createdAt"=now()-interval \'11 minutes\' WHERE id=$1', [stuck])
       const next = randomUUID()

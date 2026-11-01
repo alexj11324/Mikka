@@ -99,9 +99,7 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
     void loadUsage()
     const read = setInterval(() => { if (document.visibilityState === 'visible') void loadUsage() }, USAGE_EVERY_MS)
     const tick = setInterval(() => setNow(Date.now()), 30_000)
-    const visible = () => { if (document.visibilityState === 'visible') void loadUsage() }
-    document.addEventListener('visibilitychange', visible)
-    return () => { clearInterval(read); clearInterval(tick); document.removeEventListener('visibilitychange', visible); usageAbort.current?.abort() }
+    return () => { clearInterval(read); clearInterval(tick); usageAbort.current?.abort() }
   }, [connectedKey, loadUsage])
   useEffect(() => {
     if (!attempt || attempt.flow !== 'device' || !attempt.interval) return

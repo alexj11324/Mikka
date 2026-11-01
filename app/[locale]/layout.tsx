@@ -6,6 +6,7 @@ import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PostHogAnalytics } from "@/components/posthog-analytics";
+import { SWRDefaults } from "@/components/swr-defaults";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { routing } from "@/i18n/routing";
@@ -54,7 +55,7 @@ export default async function RootLayout({
       </head>
       <body className="antialiased in-data-desktop-translucent:bg-transparent">
         <NextIntlClientProvider messages={messages}>
-          <ThemeProvider>{posthogConfig.token && <PostHogAnalytics />}{children}<Toaster /></ThemeProvider>
+          <ThemeProvider>{posthogConfig.token && <PostHogAnalytics />}<SWRDefaults>{children}</SWRDefaults><Toaster /></ThemeProvider>
         </NextIntlClientProvider>
       </body>
     </html>

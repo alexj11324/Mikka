@@ -409,12 +409,21 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.ok(!('error' in started))
     assert.ok(calls.includes(`record :3 ${started.recordingId} 300`), 'the limit is clamped')
     assert.equal((await screen.startRecording(worker, cloudRun, 'Again') as { error: string }).error, 'conflict')
+    // The timeline (Figma 13): steps are offsets from when ffmpeg was up, in the agent's own words.
+    assert.ok((await pool.query('SELECT "startedAt" FROM run_captures WHERE id=$1', [started.recordingId])).rows[0].startedAt, 'the start is when recording began')
+    assert.equal(await screen.step(worker, cloudRun, '  点击登录按钮 ', 'action'), true)
+    assert.equal(await screen.step(worker, cloudRun, '首屏出现', 'mark'), true)
+    assert.equal(await store.recordStep({ userId: bob, runId: cloudRun }, { label: 'Not mine', source: 'mark' }), false, 'another owner cannot add a step')
     await pool.query(`UPDATE bot_desktops SET control='user',"controlledBy"=$2,"controlUntil"=now()+interval '5 minutes' WHERE "botId"=$1`, [botId, alice])
     assert.ok(await store.currentRecording(cloudRun), 'takeover does not automatically stop an existing recording')
     const stopped = await screen.stopRecording(worker, cloudRun)
     assert.ok(!('error' in stopped))
     await pool.query(`UPDATE bot_desktops SET control='agent',"controlledBy"=null,"controlUntil"=null WHERE "botId"=$1`, [botId])
     assert.deepEqual([stopped.id, stopped.kind, stopped.durationMs], [started.recordingId, 'video', 4200])
+    const steps = await store.recordingSteps(started.recordingId)
+    assert.deepEqual(steps.map(step => [step.label, step.source]), [['点击登录按钮', 'action'], ['首屏出现', 'mark']])
+    assert.ok(steps.every(step => step.atMs >= 0) && steps[0].atMs <= steps[1].atMs)
+    assert.equal(await screen.step(worker, cloudRun, 'After stop', 'action'), false, 'no recording, no step')
     assert.equal((await screen.stopRecording(worker, cloudRun) as { error: string }).error, 'not_found')
 
     failStart = true

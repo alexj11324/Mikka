@@ -59,7 +59,7 @@ function OptionLabel({ t, option }: { t: T; option: Pick<BotModelMenuOption, 'id
  */
 export function BotModelPicker({ botId }: { botId: string | null }) {
   const t = useTranslations('Coordinator.modelPicker')
-  const menu = useSWR<BotModelMenu>(botModelMenuKey(botId), () => getBotModelMenu(botId), { revalidateOnFocus: true })
+  const menu = useSWR<BotModelMenu>(botModelMenuKey(botId), () => getBotModelMenu(botId))
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshFailed, setRefreshFailed] = useState(false)

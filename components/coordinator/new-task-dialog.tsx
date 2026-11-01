@@ -62,7 +62,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const [sending, setSending] = useState(false)
   const [coordinatorUnavailable, setCoordinatorUnavailable] = useState(false)
   const tCoordinator = useTranslations('Coordinator')
-  const { data: available = true } = useSWR(open ? 'issue-creation-available' : null, () => issueCreationAvailable(), { revalidateOnFocus: false })
+  const { data: available = true } = useSWR(open ? 'issue-creation-available' : null, () => issueCreationAvailable())
   const fileRef = useRef<HTMLInputElement>(null)
   const composed = useRef<{ key: string; message: string; taskDestination: TaskDestination } | null>(null)
   const fileId = useId()

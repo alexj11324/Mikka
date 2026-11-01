@@ -115,11 +115,11 @@ function Row({ name, preview, avatar, status, current, unread, onClick, label }:
 export function BotList({ bots, workspaceId, threads, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
-  const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat(), { revalidateOnFocus: false })
+  const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat())
   // Each bot's latest line gives its row the preview and its place in the list.
-  const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: 15000, revalidateOnFocus: false })
+  const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: 15000 })
   // Group chats sit among the bots (R-01), ordered by their latest message.
-  const { data: groups = [] } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: 15000, revalidateOnFocus: false })
+  const { data: groups = [] } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: 15000 })
   const rows = [...bots.map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
     .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
   const lastReply = coordinator?.items.findLast(item => item.from !== 'event')

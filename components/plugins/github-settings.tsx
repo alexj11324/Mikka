@@ -8,7 +8,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
-import { openSettingsInBrowser } from '@/lib/platform/open-settings'
+import { openPathInBrowser } from '@/lib/platform/open-settings'
+import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
 import { FieldError } from '@/components/ui/field'
 
 type GitHubState = { viewerId: string; configured: boolean; connected: boolean; login?: string | null; installed: boolean; repositories: { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }[] }
@@ -16,6 +17,7 @@ type GitHubState = { viewerId: string; configured: boolean; connected: boolean; 
 type GitHubRead = { state: GitHubState; reconnect: false } | { state: null; reconnect: true }
 
 const githubKey = (userId: string) => ['integrations:github', userId] as const
+const CONNECT_PATH = withBasePath('/api/integrations/github/connect')
 
 async function readGitHub([, userId]: ReturnType<typeof githubKey>): Promise<GitHubRead> {
   const response = await fetch(withBasePath('/api/integrations/github'), { cache: 'no-store' })
@@ -39,29 +41,18 @@ export function GitHubSettings() {
 function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefined; isPending: boolean }) {
   const t = useTranslations('Settings.integrations')
   // Cached across visits: a revisit shows the last state at once and re-checks it behind.
-  // Every mount and focus asks GitHub again (no deduping), like the PR badge.
+  // Every mount asks GitHub again (no deduping). Focus never does: what is shown
+  // stays until the person's own action or a finished hand-off reads again.
   const { data, error, isLoading, mutate } = useSWR(userId ? githubKey(userId) : null, readGitHub, { revalidateOnFocus: false, shouldRetryOnError: false, dedupingInterval: 0 })
-  // Back from the browser, the cookie may belong to someone else: hide what was
-  // shown until GitHub answers again.
-  const [rechecking, setRechecking] = useState(false)
-  const hidden = rechecking || Boolean(error)
-  const githubState = hidden ? null : data?.state ?? null
-  const githubReconnect = !hidden && Boolean(data?.reconnect)
-  const githubLoading = isPending || isLoading || rechecking
-  const githubError = error && !rechecking ? t('githubLoadFailed') : githubReconnect ? t('githubReconnectRequired') : ''
+  const githubState = error ? null : data?.state ?? null
+  const githubReconnect = !error && Boolean(data?.reconnect)
+  const githubLoading = isPending || isLoading
+  const githubError = error ? t('githubLoadFailed') : githubReconnect ? t('githubReconnectRequired') : ''
   const [githubLinking, setGithubLinking] = useState(false)
   const [githubLinkError, setGithubLinkError] = useState('')
 
-  useEffect(() => {
-    if (!userId) return
-    let current = true
-    const onFocus = () => {
-      setRechecking(true)
-      void mutate().finally(() => { if (current) setRechecking(false) })
-    }
-    window.addEventListener('focus', onFocus)
-    return () => { current = false; window.removeEventListener('focus', onFocus) }
-  }, [userId, mutate])
+  // The link or installation finishes in another window: read once on the way back.
+  const checkOnReturn = useCheckOnReturn(() => { void mutate() })
 
   useEffect(() => {
     if (!userId) return
@@ -75,11 +66,13 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
   async function linkGitHub() {
     setGithubLinking(true); setGithubLinkError('')
     try {
-      const handoff = await openSettingsInBrowser('integrations')
-      if (handoff === 'desktop') return
+      // The authorization has to finish in a real browser: the desktop hands it
+      // the GitHub start itself, which goes straight on to github.com.
+      const handoff = await openPathInBrowser(CONNECT_PATH)
+      if (handoff === 'desktop') { checkOnReturn(); return }
       if (handoff === 'unsupported') { setGithubLinkError(t('browserUpdateRequired')); return }
       // A plugin connection, not a sign-in link: it never touches the login identity.
-      window.location.assign(withBasePath('/api/integrations/github/connect'))
+      window.location.assign(CONNECT_PATH)
     } catch {
       setGithubLinkError(t('githubLinkFailed'))
     } finally {
@@ -103,7 +96,7 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
   return <SettingsSection id="github-connection-heading">
     <SettingRow title={t('github')} description={isPending || githubLoading ? t('githubLoading') : !userId ? t('githubSignInRequired') : !githubState ? undefined : !githubState.configured ? t('githubNotConfigured') : !githubState.connected ? t('githubAccountRequired') : !githubState.installed ? t('githubNotAuthorized') : t('githubRepositories', { count: githubState.repositories.length })}>
       <div className="flex flex-col items-start gap-2 sm:items-end">
-        {(githubState?.configured || githubReconnect) && (githubState?.connected ? <Button variant="outline" size="sm" nativeButton={false} role="link" render={<a href="https://github.com/apps/mikka-github/installations/new" target="_blank" rel="noopener noreferrer" />}>
+        {(githubState?.configured || githubReconnect) && (githubState?.connected ? <Button variant="outline" size="sm" nativeButton={false} role="link" render={<a href="https://github.com/apps/mikka-github/installations/new" target="_blank" rel="noopener noreferrer" onClick={checkOnReturn} />}>
           {githubState.installed ? t('githubManage') : t('githubAuthorize')}
         </Button> : <Button type="button" variant="outline" size="sm" disabled={githubLinking} onClick={() => void linkGitHub()}>
           {githubLinking ? t('working') : t('githubLink')}

@@ -46,18 +46,21 @@ test('电脑 tab: no E2B key offers 添加 E2B API Key; adding the key shows the
     await pool.query(`INSERT INTO workspace_e2b_keys ("workspaceId", ciphertext, iv, "keyVersion", last4, "verifiedAt", "createdBy", "updatedBy")
       VALUES ($1, 'e2e-not-a-key', 'e2e', 1, 'e2e0', now(), $2, $2)`, [member.workspaceId, member.userId])
     const url = page.url()
-    // A window focus revalidates the shared key state, as returning from 密钥与环境 does
-    // (SWR takes at most one focus revalidation every 5 s).
-    const refocus = (expectation: () => Promise<void>) => expect(async () => {
-      await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    // The key changed outside this page: focus never re-reads it (decision
+    // 2026-11-01-0400-no-refetch-on-focus), the next visit does.
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await expect(add).toBeVisible()
+    const revisit = async (expectation: () => Promise<void>) => {
+      await page.reload()
+      await panel.getByRole('tab', { name: '电脑', exact: true }).click()
       await expectation()
-    }).toPass({ timeout: 30_000, intervals: [1000] })
-    await refocus(() => expect(panel.getByRole('button', { name: '唤醒', exact: true })).toBeVisible({ timeout: 1000 }))
+    }
+    await revisit(() => expect(panel.getByRole('button', { name: '唤醒', exact: true })).toBeVisible())
     await expect(panel.getByText('云端助手 的屏幕', { exact: true })).toBeVisible()
     await expect(add).toHaveCount(0)
 
     await pool.query('DELETE FROM workspace_e2b_keys WHERE "workspaceId" = $1', [member.workspaceId])
-    await refocus(() => expect(add).toBeVisible({ timeout: 1000 }))
+    await revisit(() => expect(add).toBeVisible())
     expect(page.url()).toBe(url)
   } finally { await pool.end() }
 })

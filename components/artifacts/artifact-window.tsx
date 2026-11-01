@@ -33,7 +33,7 @@ export function ArtifactWindow({ artifact, onChange, onClose, onOpenIssue }: { a
   const tThreads = useTranslations('IssueThreads')
   const { runId, issueId } = artifact
   // The same key as the thread panel beside it, so both read one request.
-  const { data: thread } = useSWR(runId && issueId ? ['issue-thread', issueId, runId] : null, () => getIssueThread(issueId!, runId!), { revalidateOnFocus: false })
+  const { data: thread } = useSWR(runId && issueId ? ['issue-thread', issueId, runId] : null, () => getIssueThread(issueId!, runId!))
   if (runId && issueId) return <ArtifactViewer artifactId={artifact.id} onArtifactChange={onChange} onClose={onClose} quotes={[]} canQuote={false}
     bot={{ name: thread ? thread.thread.detail?.name ?? tThreads('title') : '', avatar: thread ? <StatusDot status={dotStatus(thread.thread.status)} /> : <Skeleton className="size-2 rounded-full" /> }}
     chat={() => <IssueThreadPanel issueId={issueId} runId={runId} onClose={onClose} bare />} />

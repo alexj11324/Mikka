@@ -34,7 +34,7 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
   const t = useTranslations('ArtifactsPage')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
-  const { data, error, mutate } = useSWR('artifacts', () => listArtifacts(), { revalidateOnFocus: false })
+  const { data, error, mutate } = useSWR('artifacts', () => listArtifacts())
   const [category, setCategory] = useState<Category>('all')
   const [open, setOpen] = useState<Pick<ArtifactListItem, 'id' | 'runId' | 'issueId'> | null>(null)
   const rows = (data ?? []).filter(item => category === 'all' || item.kind === category)

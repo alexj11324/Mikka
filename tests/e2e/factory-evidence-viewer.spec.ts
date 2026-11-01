@@ -241,7 +241,8 @@ async function webm(browser: Browser) {
 
 test('evidence viewer: a recording plays in the viewer', async ({ page, browser }) => {
   const recording = await webm(browser)
-  const clipManifest = manifest.map(entry => 'captureId' in entry && entry.captureId === clip ? { ...entry, contentType: 'video/webm' } : entry)
+  const steps = [{ atMs: 0, label: '打开首页（4G）' }, { atMs: 600, label: '首屏出现' }, { atMs: 1200, label: '向下滚动' }]
+  const clipManifest = manifest.map(entry => 'captureId' in entry && entry.captureId === clip ? { ...entry, contentType: 'video/webm', steps } : entry)
   const { thread } = await open(page, clipManifest, (route, id) => id === clip ? route.fulfill({ status: 200, contentType: 'video/webm', body: recording }) : route.fulfill({ status: 200, contentType: 'image/png', body: image }), figma)
   await thread.getByRole('button', { name: '录屏 · 向下滚动' }).click()
   const viewer = page.getByRole('dialog').filter({ has: page.getByTestId('evidence-counter') })
@@ -254,6 +255,19 @@ test('evidence viewer: a recording plays in the viewer', async ({ page, browser 
   // The first frame is decoded, so the shot shows the recording rather than a blank player.
   await video.evaluate(async node => { const v = node as HTMLVideoElement; v.muted = true; await v.play(); v.pause() })
   await expect.poll(() => video.evaluate(node => (node as HTMLVideoElement).readyState)).toBe(4)
+  // Figma 13 「操作」: each step is its time and what was done; a step seeks the video.
+  const timeline = viewer.getByRole('region', { name: '操作 3' })
+  await expect(timeline.getByRole('listitem')).toHaveText([/0:00\s*打开首页（4G）/, /0:01\s*首屏出现/, /0:01\s*向下滚动/])
+  await expect(timeline.getByText(/run-|click|mcp__/)).toHaveCount(0)
+  // A browser-made WebM has no seek index (real recordings are ffmpeg MP4 with byte ranges), so record the seek the step asks for.
+  await video.evaluate(node => {
+    const v = node as HTMLVideoElement & { requestedSeek?: number }
+    const native = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'currentTime')!
+    Object.defineProperty(v, 'currentTime', { configurable: true, get: () => native.get!.call(v), set: (value: number) => { v.requestedSeek = value; native.set!.call(v, value) } })
+  })
+  await timeline.getByRole('button', { name: /向下滚动/ }).click()
+  await expect.poll(() => video.evaluate(node => (node as HTMLVideoElement & { requestedSeek?: number }).requestedSeek)).toBe(1.2)
+  await expect(timeline.getByRole('button', { name: /向下滚动/ })).toHaveAttribute('aria-current', 'true')
   await shoot(page, 'video')
 })
 
