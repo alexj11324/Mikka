@@ -165,6 +165,17 @@ export async function pendingCommands(deviceId: string, skip: readonly string[])
   return commands
 }
 
+/** Runs waiting for this device to claim them, except those in `skip`. */
+export async function queuedRuns(deviceId: string, skip: readonly string[]): Promise<string[]> {
+  const rows = await db
+    .select({ id: agentRuns.id })
+    .from(agentRuns)
+    .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
+    .limit(100 + skip.length)
+  const skipped = new Set(skip)
+  return rows.map(row => row.id).filter(id => !skipped.has(id)).slice(0, 100)
+}
+
 /** Marks messages the agent now holds; called by the daemon's ack. */
 export async function ackCommands(deviceId: string, delivered: readonly string[]): Promise<void> {
   if (delivered.length === 0) return

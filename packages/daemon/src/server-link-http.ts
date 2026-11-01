@@ -505,7 +505,8 @@ export class HttpServerLink implements ServerLink {
     {
       signal,
       skipRuns = [],
-    }: { signal?: AbortSignal; skipRuns?: readonly string[] } = {}
+      onQueuedRuns,
+    }: { signal?: AbortSignal; skipRuns?: readonly string[]; onQueuedRuns?: (runIds: string[]) => void } = {}
   ): Promise<RunCommand[]> {
     const response = await this.call(
       "GET",
@@ -520,6 +521,7 @@ export class HttpServerLink implements ServerLink {
         signal,
       }
     )
+    if (response.queuedRuns?.length) onQueuedRuns?.(response.queuedRuns)
     return response.commands
   }
 

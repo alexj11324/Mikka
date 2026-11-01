@@ -140,3 +140,60 @@ it('resets backoff before immediately acknowledging work after failures', async 
   await vi.advanceTimersByTimeAsync(1)
   expect(ackCommands).toHaveBeenCalledTimes(2)
 })
+
+function pollWithClaims(fetchCommands: ServerLink['fetchCommands'], claimAndStart: (runId: string) => Promise<unknown>) {
+  const daemon = new Daemon({ dataDir: '/unused-commands-poll-test', flavor: 'dev',
+    link: { ...new MemoryServer('device-1').link(), fetchCommands, ackCommands: async () => {} },
+    log: createLogger({ level: 'silent' }) })
+  Reflect.set(daemon, 'device', { deviceId: 'device-1', credential: 'fixture' })
+  Reflect.set(daemon, 'registered', true)
+  Reflect.set(daemon, 'journal', { get: () => undefined })
+  Reflect.set(daemon, 'supervisor', { send: async () => {}, stop: async () => {} })
+  Reflect.set(daemon, 'claimAndStart', claimAndStart)
+  Reflect.set(daemon, 'commandsLoop', Reflect.get(daemon, 'pollCommands').call(daemon))
+  daemons.push(daemon)
+  return daemon
+}
+
+it('claims a run the commands poll reports queued at once, without waiting for a heartbeat', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+  const claim = vi.fn(async () => ({}))
+  const fetch = vi.fn<ServerLink['fetchCommands']>()
+    .mockImplementationOnce(async (_device, _wait, options) => { options?.onQueuedRuns?.(['run-new']); return [] })
+    .mockImplementation(async () => new Promise(() => {}))
+  pollWithClaims(fetch, claim)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(claim).toHaveBeenCalledWith('run-new')
+  // The next poll follows immediately instead of pacing out the 25-second wait.
+  expect(fetch).toHaveBeenCalledTimes(2)
+})
+
+it('a failed claim stays out of the poll until the heartbeat retries it, so the poll cannot spin', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+  const claim = vi.fn(async () => { throw new Error('claim refused') })
+  const fetch = vi.fn<ServerLink['fetchCommands']>()
+    .mockImplementationOnce(async (_device, _wait, options) => { options?.onQueuedRuns?.(['run-bad']); return [] })
+    .mockImplementation(async () => new Promise(() => {}))
+  const daemon = pollWithClaims(fetch, claim)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(claim).toHaveBeenCalledTimes(1)
+  // The second poll was already sent while the claim was in flight; the third carries the failure in skip.
+  Reflect.get(daemon, 'wakeCommands')?.()
+  expect(Reflect.get(daemon, 'queuedClaims').get('run-bad')).toBe('failed')
+})
+
+it('a run still being claimed is not claimed twice; the poll waits briefly instead of spinning', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+  const claim = vi.fn(async () => new Promise(() => {}))
+  const report = async (_device: string, _wait: number, options?: Parameters<ServerLink['fetchCommands']>[2]) => { options?.onQueuedRuns?.(['run-slow']); return [] }
+  const fetch = vi.fn<ServerLink['fetchCommands']>().mockImplementationOnce(report).mockImplementationOnce(report)
+    .mockImplementation(async () => new Promise(() => {}))
+  pollWithClaims(fetch, claim)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(fetch).toHaveBeenCalledTimes(2)
+  expect(claim).toHaveBeenCalledTimes(1)
+  await vi.advanceTimersByTimeAsync(499)
+  expect(fetch).toHaveBeenCalledTimes(2)
+  await vi.advanceTimersByTimeAsync(1)
+  expect(fetch).toHaveBeenCalledTimes(3)
+})
