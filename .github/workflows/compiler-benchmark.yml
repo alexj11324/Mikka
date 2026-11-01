@@ -1,0 +1,41 @@
+name: Compiler memory benchmark
+
+# Disposable experiment; never runs on main or deploys an application.
+on:
+  push:
+    branches: [codex/compiler-memory-benchmark]
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+      - name: Install isolated, pinned comparison compilers
+        run: |
+          npm install --prefix "$RUNNER_TEMP/compiler-stable" --no-save --package-lock=false typescript@7.0.2
+          npm install --prefix "$RUNNER_TEMP/compiler-beta" --no-save --package-lock=false typescript@7.1.0-beta
+          npm install --prefix "$RUNNER_TEMP/compiler-tsrs" --no-save --package-lock=false tsrs@0.20.1-ts7.1.0-beta
+      - name: Generate route types once
+        run: pnpm exec next typegen
+      - name: Verify benchmark self-checks
+        run: node scripts/compiler-benchmark.mjs --self-test
+      - name: Compare cold checks and deliberate diagnostic probes
+        run: node scripts/compiler-benchmark.mjs
+      - name: Preserve measurements and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: compiler-benchmark-${{ github.sha }}
+          path: ${{ runner.temp }}/compiler-benchmark-results
+          if-no-files-found: error
+          retention-days: 7
