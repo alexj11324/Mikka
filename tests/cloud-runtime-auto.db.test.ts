@@ -118,14 +118,15 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [granted.runId])
 
     await pool.query('UPDATE github_repository_installations SET "pushGrantedAt"=null WHERE "userId"=$1', [g.id])
-    const ungranted = await dispatch(g.id, g.issueId, g.botId) as unknown as { runId: string; status: string }
+    // Each case on its own task of the same person: dispatching the same task again continues its thread (lib/thread-dispatch.ts).
+    const ungranted = await dispatch(g.id, await anotherTask(g.id, 8), g.botId) as unknown as { runId: string; status: string }
     assert.equal(ungranted.status, 'queued', 'a cloud run without the grant still runs; it just cannot push')
     const plain = (await pool.query('SELECT r."agentDefinition",(SELECT count(*)::int FROM run_publications p WHERE p."runId"=r.id) AS publications FROM agent_runs r WHERE r.id=$1', [ungranted.runId])).rows[0]
     assert.equal(plain.agentDefinition.repositoryAdmission, undefined)
     assert.equal(plain.publications, 0)
     await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [ungranted.runId])
 
-    const readOnly = await steps.dispatchRun(g.id, { issueId: g.issueId, repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, g.botId) as unknown as { runId: string; status: string }
+    const readOnly = await steps.dispatchRun(g.id, { issueId: await anotherTask(g.id, 9), repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, g.botId) as unknown as { runId: string; status: string }
     assert.equal(readOnly.status, 'queued')
     const definition = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [readOnly.runId])).rows[0].agentDefinition
     assert.equal(definition.readOnly, true)
