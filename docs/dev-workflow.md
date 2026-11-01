@@ -31,6 +31,9 @@ Debugging and pipeline runs use source, not builds:
 Use a production build (`pnpm build` then `next start`) only for production
 screenshots of a UI change, or for a spec that requires one.
 
+现状（非决定）：`playwright.config.ts` and `scripts/start-mvp-e2e.mjs` still
+start `next start`, so those specs need a build until they move to `next dev`.
+
 ## 3. Environment
 
 One command sets up a container: `scripts/dev/bootstrap-local.sh`. Put it in
@@ -40,7 +43,8 @@ provides:
 - **Node 24**, the same as CI. Node 22's `mock.module` ignores `{ exports }`
   and gives false test failures.
 - **PostgreSQL 17** at `127.0.0.1:5433`, database `mikka_e2e`; migrations with
-  `pnpm migrate`.
+  `MIGRATE=1 pnpm migrate` (without `MIGRATE=1` the script skips everywhere
+  but Vercel Production).
 - **bubblewrap, socat and ripgrep** for the daemon's sandbox and tools.
 - **Playwright** on the container's Chromium: set
   `executablePath: '/opt/pw-browsers/chromium'`. Never run
@@ -51,6 +55,11 @@ provides:
 Never set `GITHUB_ACTIONS`, `RUNNER_ENVIRONMENT`, `GITHUB_RUN_ID` or any other
 CI variable to get past a test guard. A suite that runs only on a
 GitHub-hosted runner is left to CI.
+
+现状（非决定）：many database and browser suites, and the shared test-account
+pool (`scripts/test-accounts/bootstrap.mjs`), refuse to run unless
+`GITHUB_ACTIONS` and related variables are set, and several hard-code port
+5432. Until those guards learn the local environment, those suites run in CI.
 
 Local test accounts: _to be filled in when the local test-account mode lands
 (session `session_01XDndLRHw24esXi2pKyHX5A`)._ Until then, use the existing
@@ -69,12 +78,18 @@ Pull requests waiting to merge go in batches of five:
 5. The coordinator squash-merges the integration PR into `main`, then closes
    the original PRs with a link to it.
 
+`integration/` replaces the older `integrate/` prefix. 现状（非决定）：CI still
+matches `integrate/` (`browser-tests.yml`, `subagents.yml`,
+`scripts/ci-docs-only.mjs`).
+
 ## 6. Numbers
 
 Rule ids (`R-xx`) and migration timestamps are assigned by the coordinator
 when the work is dispatched, so parallel branches never collide and nothing
 is renamed afterwards. A session that needs one and has none asks the
-coordinator.
+coordinator. 现状（非决定）：`scripts/check-migrations.mjs` still refuses a
+timestamp at or below the newest one on `main`, so an assigned timestamp can
+fail if a later one merges first; the coordinator then assigns a new one.
 
 ## 7. E2B templates
 
