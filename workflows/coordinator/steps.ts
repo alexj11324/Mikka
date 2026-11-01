@@ -345,7 +345,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
       }
       if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
-      const runtime=(await pool.query(`SELECT "botId",harness FROM bot_cloud_runtimes WHERE ($1::uuid IS NULL OR "botId"=$1) AND "ownerId"=$2 AND "workspaceId"=$3 AND ($4='auto' OR harness=$4) ORDER BY harness,"botId" LIMIT 1`,[botId,userId,target.workspaceId,target.harness])).rows[0]
+      const runtime=(await pool.query(`SELECT "botId",harness FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ($4='auto' OR harness=$4) ORDER BY harness,"botId" LIMIT 1`,[botId,userId,target.workspaceId,target.harness])).rows[0]
       const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,reportToCoordinator:botId===null},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
       // The person's own E2B refused (capacity, quota, key): same as no cloud.
       if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud

@@ -50,7 +50,7 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
     return deviceId
   }
-  const dispatch = (userId: string, issueId: string) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` })
+  const dispatch = (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId)
   type NoMachine = { error: string; card: { title: string; options: { value: string; action: string }[] } }
   const actions = (result: NoMachine) => result.card.options.map(option => option.action)
   const runOf = async (runId: string) => (await pool.query('SELECT "deviceId",status FROM agent_runs WHERE id=$1', [runId])).rows[0]
@@ -105,30 +105,37 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
 
   await t.test('(c) own E2B refuses (cap, quota, key): the cloud run is ended, a server takes it, else an error card', async () => {
     const c = await person('cloud')
-    await cloudReady(c)
+    const { botId } = await cloudReady(c)
     await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), c.id, c.workspaceId])
-    const refused = await dispatch(c.id, c.issueId) as unknown as NoMachine
+    // The Coordinator has no cloud runtime of its own and never borrows a bot's.
+    const coordinator = await dispatch(c.id, c.issueId) as unknown as NoMachine
+    assert.equal(coordinator.error, 'machineUnavailable')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [c.id])).rows[0].n, 0, 'no cloud run on the bot computer')
+    const refused = await dispatch(c.id, c.issueId, botId) as unknown as NoMachine
     assert.equal(refused.error, 'machineUnavailable', 'no device: an error the person can act on')
     assert.deepEqual(actions(refused), ['enableThisMac', 'e2bKey', 'connectServer'])
     const cloudRuns = (await pool.query(`SELECT r.status,m.state FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows
     assert.deepEqual(cloudRuns, [{ status: 'stopped', state: 'ended' }], 'the refused cloud run was queued, then ended instead of left stuck')
+    const frozen = (await pool.query(`SELECT r."agentDefinition"->>'harness' AS harness FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows[0]
+    assert.equal(frozen.harness, 'codex', 'every cloud run freezes its definition when it is created')
     // A server comes online: on by default, so it takes the run.
     const deviceId = await onlineMac(c.id, null, 'server')
-    const result = await dispatch(c.id, c.issueId) as unknown as { runId: string; status: string }
+    const result = await dispatch(c.id, c.issueId, botId) as unknown as { runId: string; status: string }
     assert.equal(result.status, 'queued')
     assert.equal((await runOf(result.runId)).deviceId, deviceId)
   })
 
   await t.test('a server goes offline mid-run: the run moves to the own E2B cloud, which ends it with the card when E2B refuses', async () => {
     const c = await person('offline')
-    const { cloudDevice } = await cloudReady(c)
+    const { botId, cloudDevice } = await cloudReady(c)
     const server = await onlineMac(c.id, null, 'server')
     await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '10 minutes' WHERE id=$1`, [server])
     const agentId = (await pool.query('SELECT id FROM agents WHERE "deviceId"=$1', [server])).rows[0].id
     const repoId = (await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5) RETURNING id`, [randomUUID(), server, c.id, normalizeRepository('octo/repo').key, normalizeRepository('octo/repo').remoteUrl])).rows[0].id
     const lost = randomUUID()
-    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"leaseExpiresAt","agentDefinition") VALUES ($1,$2,$3,$4,$5,$6,'running','Lost run',now()-interval '1 minute',$7)`,
-      [lost, c.id, c.issueId, agentId, server, repoId, JSON.stringify({ harness: 'codex' })])
+    // The bot's run: it moves to that bot's own cloud runtime.
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"leaseExpiresAt","agentDefinition","botId") VALUES ($1,$2,$3,$4,$5,$6,'running','Lost run',now()-interval '1 minute',$7,$8)`,
+      [lost, c.id, c.issueId, agentId, server, repoId, JSON.stringify({ harness: 'codex' }), botId])
     await reclaimLostRuns(c.id, new Date())
     assert.equal((await runOf(lost)).status, 'failed')
     const moved = (await pool.query(`SELECT r.id,r.attempt,r.status,r."deviceId",b."botId" FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id WHERE r."retryOf"=$1`, [lost])).rows
