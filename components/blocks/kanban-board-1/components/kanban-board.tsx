@@ -22,7 +22,8 @@ import { LabelDot, IssueMetadataControls, type MetadataRequest, type MetadataSav
 import { IssuePropertyMenu } from '@/components/workspace/issue-property-menu'
 import { IssuePullRequestLink } from '@/components/workspace/issue-pull-request-link'
 import { CardControlBoundary, CardCreatedAt } from '@/components/workspace/issue-card-controls'
-import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier, type IssueStatus } from '@/components/workspace/issue-properties'
+import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
+import { PriorityIcon } from '@/components/workspace/priority-icon'
 import { BOARD_COLUMNS, type AgentState, type BoardColumns, type BoardTask, type CardProperty, type RunOwner } from './data'
 
 function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Viewport> & { viewportRef: Ref<HTMLDivElement> }) {
@@ -33,14 +34,6 @@ function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typ
     <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="flex h-2.5 touch-none flex-col p-px select-none"><ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-foreground/15" /></ScrollAreaPrimitive.Scrollbar>
     <ScrollAreaPrimitive.Corner />
   </ScrollAreaPrimitive.Root>
-}
-
-/** Linear-style priority mark, 14px (Figma 看板/优先级): 紧急 is a filled square with !, the rest three bars. */
-const PRIORITY_BARS: Record<string, number> = { high: 3, normal: 2, low: 1 }
-function PriorityMark({ priority }: { priority: string }) {
-  if (priority === 'urgent') return <svg aria-hidden="true" viewBox="0 0 14 14" className="size-3.5 shrink-0 text-warning"><rect width="14" height="14" rx="3" fill="currentColor" /><path d="M7 3.5v4.25" stroke="var(--card)" strokeWidth="1.75" strokeLinecap="round" /><circle cx="7" cy="10.25" r="1" fill="var(--card)" /></svg>
-  const filled = PRIORITY_BARS[priority] ?? 0
-  return <svg aria-hidden="true" viewBox="0 0 14 14" className="size-3.5 shrink-0">{[[1, 5], [5.5, 8], [10, 11]].map(([x, height], index) => <rect key={x} x={x} y={12.5 - height} width="3" height={height} rx="1" className={index < filled ? 'fill-muted-foreground' : 'fill-foreground/15'} />)}</svg>
 }
 
 /** Each avatar in the card's group (Figma 看板/负责人组): an 18px circle ringed 2px in the card colour. */
@@ -120,7 +113,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   const meta = 'flex items-center gap-1 text-xs text-muted-foreground tabular-nums [&_svg]:size-3.5 [&_svg]:shrink-0'
   // Row 3 shows only what the task has; it wraps when it does not fit.
   const chips = [
-    show('priority') && <CardControlBoundary key="priority"><div className="-mx-[3px] flex"><IssuePropertyMenu label={tIssue('priorityLabel')} value={task.priority} options={priorityOptions} icon={Flag} iconOnly compact disabled={controlsDisabled} renderIcon={value => <PriorityMark priority={value} />} onChange={value => onPriorityChange(task, value)} /></div></CardControlBoundary>,
+    show('priority') && <CardControlBoundary key="priority"><div className="-mx-[3px] flex"><IssuePropertyMenu label={tIssue('priorityLabel')} value={task.priority} options={priorityOptions} icon={Flag} iconOnly compact disabled={controlsDisabled} renderIcon={value => <PriorityIcon priority={value} />} onChange={value => onPriorityChange(task, value)} /></div></CardControlBoundary>,
     labels.length > 0 && <div key="labels" className="flex min-w-0 items-center gap-2">
       {labels.slice(0, 2).map(label => <span key={label.name} className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"><LabelDot color={label.color} small /><span className="max-w-20 truncate">{label.name}</span></span>)}
       {labels.length > 2 && <span className="text-xs text-muted-foreground/70 tabular-nums">+{labels.length - 2}</span>}
@@ -135,7 +128,8 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   // Figma 看板/任务卡片: filled, no stroke (R-31); radius 8, padding 12, rows 8 apart.
   const card = <div className={cn('group/card flex flex-col gap-2 rounded-md bg-card p-3 text-card-foreground shadow-xs transition-colors hover:bg-muted/50', isOverlay && 'pointer-events-none rotate-2 shadow-lg')}>
     <div className="flex h-5 min-w-0 items-center gap-1.5">
-      {show('identifier') && <span className="truncate text-xs text-muted-foreground tabular-nums">{issueIdentifier(task, tIssue('unassignedNumber'))}</span>}
+      {/* No placeholder while the task has no number (Linear sync off): the row starts with what is there (R-25, R-40). */}
+      {show('identifier') && task.identifier && <span className="truncate text-xs text-muted-foreground tabular-nums">{task.identifier}</span>}
       {task.scope === 'personal' && <Tooltip><TooltipTrigger render={<span className="flex shrink-0" />}><Lock aria-label={tCard('personal')} className="size-3.5 text-muted-foreground" /></TooltipTrigger><TooltipContent>{tCard('personalHint')}</TooltipContent></Tooltip>}
       {/* No placeholder circle when nobody owns the task; the control appears on hover and focus. */}
       {show('assignee') && <div className={cn('ml-auto flex shrink-0 items-center', !assigneeGroup && 'opacity-0 group-hover/card:opacity-100 focus-within:opacity-100')}><CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary></div>}

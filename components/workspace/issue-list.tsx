@@ -6,10 +6,17 @@ import { cn } from '@/lib/utils'
 import type { listIssues } from '@/app/actions/issues'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
-import { ISSUE_STATUSES, issueIdentifier } from './issue-properties'
+import type { CardProperty } from '@/components/blocks/kanban-board-1/components/data'
+import { AssigneeAvatar } from './issue-assignee-menu'
+import { ISSUE_STATUSES } from './issue-properties'
+import { PriorityIcon } from './priority-icon'
 
-export function IssueList({ issues, searching, onOpen, onCreate }: {
+const LIST_COLUMNS: ReadonlySet<CardProperty> = new Set(['identifier', 'priority', 'assignee'])
+
+/** The board's list view: one row per task, its columns the same 显示 properties as the cards. */
+export function IssueList({ issues, properties = LIST_COLUMNS, searching, onOpen, onCreate }: {
   issues: Awaited<ReturnType<typeof listIssues>>
+  properties?: ReadonlySet<CardProperty>
   searching: boolean
   onOpen: (id: string) => void
   onCreate: () => void
@@ -19,6 +26,8 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
   const format = useFormatter()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
+  // Without Linear sync no task has a number; the column is left out rather than filled with a placeholder (R-40).
+  const showIdentifier = properties.has('identifier') && issues.some(issue => issue.identifier)
   if (!issues.length) return <Empty className="min-h-80">
     <EmptyHeader>
       <EmptyMedia variant="icon"><ListTodo /></EmptyMedia>
@@ -43,11 +52,12 @@ export function IssueList({ issues, searching, onOpen, onCreate }: {
           {group.map(issue => <li key={issue.id}>
             <Button type="button" variant="ghost" onClick={() => onOpen(issue.id)} className="h-auto min-h-13 w-full justify-start p-0">
               <span className="flex w-full items-center gap-3 px-4 py-3 text-left sm:px-6">
+                {/* Linear's row order: priority, number, status, title. */}
+                {properties.has('priority') && <PriorityIcon priority={issue.priority} label={priorityLabel(issue.priority)} />}
                 <status.icon className={cn('size-3.5 shrink-0', indicatorClassName)} />
-                <span className="hidden w-24 shrink-0 font-mono text-xs text-muted-foreground sm:block">{issueIdentifier(issue, tIssue('unassignedNumber'))}</span>
+                {showIdentifier && <span className="hidden w-20 shrink-0 text-xs text-muted-foreground tabular-nums sm:block">{issue.identifier}</span>}
                 <span className="min-w-0 flex-1 truncate font-medium">{issue.title}</span>
-                <span className="hidden w-24 shrink-0 text-xs text-muted-foreground sm:block">{priorityLabel(issue.priority)}</span>
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">v{issue.revision}</span>
+                {properties.has('assignee') && <span className="flex size-4 shrink-0 items-center justify-center" title={issue.metadata.assignee?.name}>{issue.metadata.assignee && <><AssigneeAvatar assignee={issue.metadata.assignee} compact /><span className="sr-only">{issue.metadata.assignee.name}</span></>}</span>}
                 <time suppressHydrationWarning dateTime={new Date(issue.updatedAt).toISOString()} className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground md:block">{format.dateTime(new Date(issue.updatedAt), { month: 'numeric', day: 'numeric' })}</time>
               </span>
             </Button>
