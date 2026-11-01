@@ -16,8 +16,9 @@ test('device runs on a shared subscription', { skip: !dbUrl }, async t => {
   const { SubscriptionRepository } = await import('../lib/subscription-repository')
   const { authorizedAccessName } = await import('../lib/subscription-access-snapshot')
   const { setSubscriptionShare, sharedNativeBinding } = await import('../lib/personal-policy')
+  const { authorizeSubscriptionWorkspace } = await import('../lib/subscription-runtime')
   const service = new SubscriptionService(new SubscriptionRepository(pool), () => { throw new Error('no worker in this test') },
-    { ready: () => true, oauth: { codex: false, claude: false }, nativeIsolation: 'verified_runtime' })
+    { ready: () => true, oauth: { codex: false, claude: false }, nativeIsolation: 'verified_runtime' }, undefined, undefined, undefined, authorizeSubscriptionWorkspace)
 
   const admin = await seedUser(pool, 'admin'), owner = await seedUser(pool, 'owner'), peer = await seedUser(pool, 'peer'), outsider = await seedUser(pool, 'outsider')
   const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: owner, role: 'member' }, { userId: peer, role: 'member' }])
@@ -42,7 +43,7 @@ test('device runs on a shared subscription', { skip: !dbUrl }, async t => {
   }
   const lease = (runner: string, run: { run: string; device: string }) => service.nativeRun(runner, run.device, run.run)
   const credential = async (binding: string, consumer: string, run: string) => authorizedAccessName(pool,
-    { connectionId: connection, ownerId: owner, workspaceId: team.id, provider: 'claude' } as never, { bindingId: binding, consumerId: consumer, runId: run }, Number(epoch))
+    { connectionId: connection, ownerId: owner, workspaceId: team.id, provider: 'claude' } as never, { bindingId: binding, consumerId: consumer, runId: run }, Number(epoch), authorizeSubscriptionWorkspace)
 
   await t.test('a member\'s run is bound to a teammate\'s subscription only while it is shared for members', async () => {
     const peerAgent = await seedAgent(pool, peer, 'claude_code')

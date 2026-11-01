@@ -63,7 +63,7 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, o
     const resolve = sharedCustodyIdentity ? async (executionOnly: boolean, signal?: AbortSignal, use?: { bindingId: string; consumerId: string; runId?: string }, revision?: unknown) => {
       if (!executionOnly) return { workloadToken: await infisicalWorkloadToken(infisicalOrigin, custodyId!, custodySecret!, signal) }
       if (!use) throw new Error('subscription_access_unavailable')
-      const name = await authorizedAccessName(database, scope, use, revision)
+      const name = await authorizedAccessName(database, scope, use, revision, authorizeSubscriptionWorkspace)
       return { accessSnapshot: await subscriptionAccessSnapshot({ origin: infisicalOrigin, clientId: custodyId!, clientSecret: custodySecret!, project: accessProject ?? project, environment, path: accessPath, name, signal }) }
     } : resolveIdentity
     return new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken: sharedCustodyIdentity ? '' : workloadToken ?? '', accessPath, accessProject, accessToken: custodyOnly || sharedCustodyIdentity ? undefined : accessToken, retainEnrollmentSources: retainEnrollmentSourcesForAcceptance(), enrollmentAttemptPath: process.env.MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH, enrollmentClaimPath: process.env.MIKKA_BYOS_ENROLLMENT_CLAIM_PATH, enrollmentGrantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH, enableRuntime: !custodyOnly, enablePlainModels: !custodyOnly && modelRoutes.has(scope.provider === 'codex' ? 'codex_cpa' : 'claude_cpa'), enableCodexOAuth: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', enableClaudeOAuth: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1', ...(options.exportAccessLease && !custodyOnly ? { exportAccessLease: true } : {}) }, resolve)
@@ -74,5 +74,5 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, o
     // The private device route also requires a server allow-list and the hosted
     // runner capability. This never enables raw nativeAuth credential export.
     nativeIsolation: nativeBroker ? 'verified_runtime' : 'none'
-  }, undefined, authorizeSubscriptionUse)
+  }, undefined, authorizeSubscriptionUse, undefined, authorizeSubscriptionWorkspace)
 }

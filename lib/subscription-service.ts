@@ -24,7 +24,9 @@ export class SubscriptionService {
     readonly admitModel: (scope: { ownerId: string; workspaceId: string; runId?: string }, model: string, route: string, signal?: AbortSignal) => Promise<void> = async (...args) => {
       const { assertSubscriptionModelTransport } = await import('./model-admission/runtime')
       await assertSubscriptionModelTransport(...args)
-    }) {}
+    },
+    /** Active membership in the workspace database; a teammate's shared subscription needs it for both people. */
+    readonly member: (userId: string, workspaceId: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') }) {}
 
   async access(use: SubscriptionUse, signal?: AbortSignal): Promise<SubscriptionAccess> {
     const { modelId: _, ...binding } = await this.repository.binding(use.ownerId, use.bindingId)
@@ -108,6 +110,10 @@ export class SubscriptionService {
     if (!rows[0]) throw new SubscriptionRefusal('account_unavailable')
     const row=rows[0]
     if (!workerSubscriptionMatches(row.agentDefinition,row.harness,row)) throw new SubscriptionRefusal('binding_mismatch')
+    if (String(row.ownerId) !== ownerId) {
+      try { await this.member(ownerId, row.workspaceId); await this.member(String(row.ownerId), row.workspaceId) }
+      catch { throw new SubscriptionRefusal('account_unavailable') }
+    }
     // The use belongs to the credential's owner: the run owner, or the member who shared it (分享给团队成员).
     return {ownerId:String(row.ownerId),workspaceId:row.workspaceId,consumerId:row.consumerId,bindingId:row.id,execution:'native',runId} as const
   }

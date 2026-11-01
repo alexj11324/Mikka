@@ -83,15 +83,15 @@ export const subscriptionsUsableSql = (owner: string, workspace: string) =>
  * SQL for 分享给团队成员 on a run (orchestration.md §2, §6): may the credential
  * owner's subscription serve the run owner's run in this workspace? Yes for the
  * owner themselves; for another member only while the owner shares it there for
- * others too, both are active members and the admin allows member subscriptions.
- * Checked on every lease and credential read, so withdrawing stops the next one.
+ * others too and the admin allows member subscriptions. Membership lives in the
+ * workspace database, so callers check it there (authorizeSubscriptionWorkspace);
+ * leaving also stops the runs (releaseDepartingMember). Checked on every lease
+ * and credential read, so withdrawing stops the next one.
  */
 export const runMayUseCredentialSql = (credentialOwner: string, runOwner: string, workspace: string) =>
   `(${credentialOwner}=${runOwner} OR (
     EXISTS (SELECT 1 FROM workspace_subscription_shares sh WHERE sh."ownerId"=${credentialOwner} AND sh."allowOthers" AND sh."workspaceId"::text=(${workspace})::text)
-    AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies pp WHERE pp."workspaceId"::text=(${workspace})::text AND NOT pp.subscriptions)
-    AND EXISTS (SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId"::text=(${workspace})::text AND m."userId"=${runOwner} AND m.status='active')
-    AND EXISTS (SELECT 1 FROM mikka_workspace_members m WHERE m."workspaceId"::text=(${workspace})::text AND m."userId"=${credentialOwner} AND m.status='active')))`
+    AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies pp WHERE pp."workspaceId"::text=(${workspace})::text AND NOT pp.subscriptions)))`
 
 /**
  * A device run whose owner has no subscription of their own here: bind the
