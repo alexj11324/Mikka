@@ -52,7 +52,7 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
   const locale = useLocale()
   const timeZone = typeof Intl === 'undefined' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone
   const { mutate: mutateAll } = useSWRConfig()
-  const { data, error, isValidating, mutate } = useSWR(withBasePath(`/api/suggestions?tz=${encodeURIComponent(timeZone)}&locale=${encodeURIComponent(locale)}`), fetchJson<SuggestionsView>, { revalidateOnFocus: false })
+  const { data, error, isValidating, mutate } = useSWR(withBasePath(`/api/suggestions?tz=${encodeURIComponent(timeZone)}&locale=${encodeURIComponent(locale)}`), fetchJson<SuggestionsView>)
   const empty = !!data && !data.groups.some(group => group.items.length)
   // 「连接应用」 only for someone with no app connected yet; an unknown answer shows nothing.
   const { data: connections } = useSWR(empty ? withBasePath('/api/integrations/composio') : null, fetchJson<Connections>, { revalidateOnFocus: false, shouldRetryOnError: false })

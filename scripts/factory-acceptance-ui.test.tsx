@@ -12,8 +12,10 @@ type Swr = { data?: unknown; error?: unknown; isLoading: boolean; mutate: () => 
 let list: Swr
 let ledger: unknown
 let evidence: unknown
+let detail: unknown
 mock.module('swr', { defaultExport: (key: string | null) => {
   if (key === null) return { data: undefined }
+  if (key === '/api/factory/tasks/t1') return { data: detail, mutate: async () => detail }
   if (key.includes('view=ledger')) return { data: ledger, mutate: async () => ledger }
   if (key.includes('/approval')) return { data: evidence }
   return list
@@ -42,7 +44,7 @@ before(async () => {
   ;({ FactoryAcceptancePane, CandidateMachine } = await import('../components/workspace/factory-acceptance-pane'))
 })
 beforeEach(() => {
-  ledger = { binding: {}, approvals: [], publications: [] }; evidence = undefined
+  ledger = { binding: {}, approvals: [], publications: [], merges: [] }; evidence = undefined; detail = undefined
   container = document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container as unknown as Node)
   root = createRoot(container)
@@ -85,34 +87,70 @@ test('the row opens acceptance for its task', async () => {
   assert.deepEqual(opened, [task()])
 })
 
-test('the pane hides 批准并发布 when the candidate has no publishable environment', async () => {
+test('验收并合并 needs the candidate PR, posts only the binding, and a refusal names GitHub\'s reason with 在 GitHub 打开', async () => {
+  const pr = 'https://github.com/alexj11324/Mikka/pull/418'
+  const delivery = (pullRequest: unknown) => ({ checks: [], delivery: { candidateSha: 'a'.repeat(40), pullRequest, repository: 'alexj11324/Mikka', environment: null, previewUrl: null, deploymentEnvironment: null } })
   list = { data: { tasks: [task()] }, isLoading: false, mutate: async () => undefined }
-  evidence = { binding: {}, manifest: { candidate: { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'staging', scope: 'x' }, artifacts: [] } }
+  evidence = { binding: {}, manifest: { candidate: { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'x' }, artifacts: [] } }
+  ledger = { binding: { taskId: 't1', revision: 3 }, approvals: [], publications: [], merges: [] }
+  detail = delivery(null)
   await pane()
-  assert.doesNotMatch(document.body.textContent ?? '', /有效/)
-  assert.equal(Boolean(button('批准并发布')), false, '批准并发布 is hidden')
-  evidence = { ...(evidence as object), manifest: { ...(evidence as { manifest: object }).manifest, candidate: { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'x' } } }
+  assert.equal(Boolean(button('验收并合并')), false, 'no PR, nothing to merge')
+  assert.doesNotMatch(document.body.textContent ?? '', /有效|批准/)
+  detail = delivery({ url: pr, state: 'open' })
   await pane()
-  assert.ok(button('批准并发布'), 'a complete candidate shows 批准')
+  const sent: unknown[] = []
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async (_url: string, init?: { body?: string }) => {
+    sent.push(JSON.parse(init?.body ?? 'null'))
+    return new Response(JSON.stringify({ error: 'githubMergeBlocked', pullRequestUrl: pr }), { status: 409 })
+  }) as typeof fetch
+  try {
+    await act(async () => { button('验收并合并')!.click() })
+  } finally { globalThis.fetch = realFetch }
+  assert.equal(sent.length, 1)
+  const [body] = sent as { operation: string; input: Record<string, unknown> }[]
+  assert.equal(body.operation, 'accept')
+  assert.deepEqual(Object.keys(body.input).sort(), ['binding', 'eventId'])
+  assert.deepEqual(body.input.binding, { taskId: 't1', revision: 3 })
+  assert.match(document.body.textContent ?? '', /无法合并/)
+  assert.match(document.body.textContent ?? '', /检查或审批未通过/)
+  const link = [...document.querySelectorAll('a')].find(a => a.textContent?.includes('在 GitHub 打开'))
+  assert.equal(link?.getAttribute('href'), pr)
+  assert.ok(button('验收并合并'), 'the task keeps waiting: accept again')
 })
 
-test('the pane hides 发布 when the active approval has no publishable environment', async () => {
-  list = { data: { tasks: [task({ stage: 'publish', status: 'running' })] }, isLoading: false, mutate: async () => undefined }
+test('merging and merged read from the merge ledger; merged opens the PR', async () => {
+  const pr = 'https://github.com/alexj11324/Mikka/pull/418'
+  detail = { checks: [], delivery: { candidateSha: 'a'.repeat(40), pullRequest: { url: pr, state: 'open' }, repository: 'alexj11324/Mikka', environment: null, previewUrl: null, deploymentEnvironment: null } }
+  evidence = { binding: {}, manifest: { candidate: { sha: 'a'.repeat(40), repository: 'alexj11324/Mikka', environment: 'preview', scope: 'x' }, artifacts: [] } }
+  ledger = { binding: {}, approvals: [], publications: [], merges: [{ candidateId: 'c1', status: 'merging', code: null, pullRequestUrl: pr, createdAt: new Date().toISOString() }] }
+  await pane()
+  assert.match(document.body.textContent ?? '', /合并中/)
+  assert.equal(Boolean(button('验收并合并')), false)
+  ledger = { binding: {}, approvals: [], publications: [], merges: [{ candidateId: 'c1', status: 'merged', code: null, pullRequestUrl: pr, createdAt: new Date().toISOString() }] }
+  await pane({ stage: 'publish', status: 'passed' })
+  assert.match(document.body.textContent ?? '', /已合并/)
+  assert.equal([...document.querySelectorAll('a')].find(a => a.textContent?.includes('在 GitHub 打开'))?.getAttribute('href'), pr)
+})
+
+test('a skill: the pane hides 发布 when the active approval has no publishable environment', async () => {
+  list = { data: { tasks: [task({ stage: 'publish', status: 'running', isSkillCandidate: true })] }, isLoading: false, mutate: async () => undefined }
   const approval = { id: 'a1', candidateId: 'c1', candidate: { sha: 'a'.repeat(40), repository: 'r', environment: 'staging', scope: 'x' }, action: 'deploy', target: 't', targetEnvironment: 'staging', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null, createdAt: new Date().toISOString() }
   ledger = { binding: {}, approvals: [approval], publications: [] }
-  await pane({ stage: 'publish', status: 'running' })
+  await pane({ stage: 'publish', status: 'running', isSkillCandidate: true })
   assert.ok(button('撤销批准'))
   assert.equal(Boolean(button('发布')), false, '发布 is hidden')
   ledger = { binding: {}, approvals: [{ ...approval, candidate: { ...approval.candidate, environment: 'preview' }, targetEnvironment: 'preview' }], publications: [] }
-  await pane({ stage: 'publish', status: 'running' })
+  await pane({ stage: 'publish', status: 'running', isSkillCandidate: true })
   assert.ok(button('发布'))
 })
 
-test('a failed publication shows 发布失败，批准仍保留 with 撤销批准 and 发布', async () => {
-  list = { data: { tasks: [task({ stage: 'publish', status: 'running' })] }, isLoading: false, mutate: async () => undefined }
+test('a skill: a failed publication shows 发布失败，批准仍保留 with 撤销批准 and 发布', async () => {
+  list = { data: { tasks: [task({ stage: 'publish', status: 'running', isSkillCandidate: true })] }, isLoading: false, mutate: async () => undefined }
   const approval = { id: 'a1', candidateId: 'c1', candidate: { sha: 'a'.repeat(40), repository: 'r', environment: 'preview', scope: 'x' }, action: 'deploy', target: 't', targetEnvironment: 'preview', expiresAt: new Date(Date.now() + 3600000).toISOString(), revokedAt: null, createdAt: new Date().toISOString() }
   ledger = { binding: {}, approvals: [approval], publications: [{ id: 'p1', approvalId: 'a1', status: 'failed', request: {} }] }
-  await pane({ stage: 'publish', status: 'running' })
+  await pane({ stage: 'publish', status: 'running', isSkillCandidate: true })
   assert.match(document.body.textContent ?? '', /发布失败，批准仍保留/)
   assert.ok(button('撤销批准'))
   assert.ok(button('发布'))
@@ -122,7 +160,7 @@ test('a failed publication shows 发布失败，批准仍保留 with 撤销批�
 const delivery = { candidateSha: 'a3f9c2e'.padEnd(40, 'b'), pullRequest: { url: 'https://github.com/alexj11324/Mikka/pull/418', state: 'open', title: 'perf(home): 首屏图片懒加载与字体子集' }, repository: 'alexj11324/Mikka', previewUrl: null, previewDatabaseBranch: 'preview/mik-48', machine: { name: 'Alex 的 MacBook', kind: 'device' } }
 
 test('the candidate card shows the PR title and the preview database branch (#541)', async () => {
-  list = { data: { checks: [], delivery }, isLoading: false, mutate: async () => undefined }
+  detail = { checks: [], delivery }
   evidence = { binding: {}, manifest: { candidate: { sha: delivery.candidateSha, repository: 'alexj11324/Mikka', environment: 'preview', scope: '' }, artifacts: [] } }
   await pane()
   const card = document.querySelector('section[aria-label="候选版本"]')
@@ -132,7 +170,7 @@ test('the candidate card shows the PR title and the preview database branch (#54
 })
 
 test('without the #541 fields the card falls back to the repository and the bare environment', async () => {
-  list = { data: { checks: [], delivery: { ...delivery, pullRequest: { url: delivery.pullRequest.url, state: 'open' }, previewDatabaseBranch: undefined, machine: undefined } }, isLoading: false, mutate: async () => undefined }
+  detail = { checks: [], delivery: { ...delivery, pullRequest: { url: delivery.pullRequest.url, state: 'open' }, previewDatabaseBranch: undefined, machine: undefined } }
   evidence = { binding: {}, manifest: { candidate: { sha: delivery.candidateSha, repository: 'alexj11324/Mikka', environment: 'preview', scope: '' }, artifacts: [] } }
   await pane()
   const card = document.querySelector('section[aria-label="候选版本"]')
@@ -141,10 +179,10 @@ test('without the #541 fields the card falls back to the repository and the bare
 })
 
 test('the header names the machine that produced the candidate, and nothing when unknown', async () => {
-  list = { data: { checks: [], delivery }, isLoading: false, mutate: async () => undefined }
+  detail = { checks: [], delivery }
   await act(async () => root.render(<CandidateMachine taskId="t1" />))
   assert.equal(container.textContent, 'Alex 的 MacBook')
-  list = { data: { checks: [], delivery: { ...delivery, machine: null } }, isLoading: false, mutate: async () => undefined }
+  detail = { checks: [], delivery: { ...delivery, machine: null } }
   await act(async () => root.render(<CandidateMachine taskId="t1" />))
   assert.equal(container.textContent, '')
 })

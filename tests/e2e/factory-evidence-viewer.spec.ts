@@ -94,7 +94,7 @@ async function open(page: Page, artifacts: Record<string, unknown>[], media: Med
   await page.getByRole('button', { name: 'Factory 验收', exact: true }).click()
   const thread = page.getByRole('region', { name: THREAD, exact: true })
   await expect(thread.getByRole('tab', { name: '验收' })).toHaveAttribute('aria-selected', 'true')
-  return { thread, served }
+  return { thread, served, candidateId }
 }
 
 const sha = 'a3f9c2e' + 'b'.repeat(33)
@@ -154,7 +154,7 @@ test('验收 on the thread: criteria with their evidence, independent results, t
   const results = thread.getByRole('region', { name: '独立结果' })
   await expect(results.getByText('建议合并', { exact: true })).toBeVisible()
   await expect(results.getByRole('listitem').filter({ hasText: '验证' }).getByText('3/3', { exact: true })).toBeVisible()
-  await expect(thread.getByRole('button', { name: '批准并发布' })).toBeVisible()
+  await expect(thread.getByRole('button', { name: '验收并合并' })).toBeVisible()
   await expect(thread.getByRole('button', { name: '退回修改' })).toBeVisible()
   await expect(thread.getByText(/有效/)).toHaveCount(0)
   await shoot(page, 'list')
@@ -272,4 +272,48 @@ test('no evidence and no checks is one line', async ({ page }) => {
   const { thread } = await open(page, [], serveImages, () => ({ checks: [], delivery: { candidateSha: sha, pullRequest: null, repository: 'alexj11324/Mikka', environment: null, previewUrl: null, deploymentEnvironment: null } }))
   await expect(thread.getByText('没有证据', { exact: true })).toBeVisible()
   await shoot(page, 'empty')
+})
+
+// #528 merge states on the thread, with the full Figma 06 evidence. GitHub's refusal is a 409 on purpose; the browser logs it once.
+const mergeTask = randomUUID()
+test.describe('merge states', () => {
+  test.use({ expectedConsoleErrors: [{ path: app(`/api/factory/tasks/${mergeTask}/approval`), message: 'Failed to load resource: the server responded with a status of 409 (Conflict)' }] })
+  test('无法合并 names GitHub\'s reason in the bar; 已合并 keeps the evidence and opens the PR', async ({ page }) => {
+    const { thread, candidateId } = await open(page, manifest, serveImages, figma, mergeTask)
+    const pr = 'https://github.com/alexj11324/Mikka/pull/418'
+    // As the server records it: a refused attempt is a failed merge row, a merge marks the PR merged.
+    let merge: Record<string, unknown> | null = null
+    await page.route(`**/api/factory/tasks/${mergeTask}/approval*`, route => {
+      const request = route.request()
+      if (request.method() === 'POST') {
+        merge = { id: randomUUID(), candidateId, status: 'failed', source: 'mikka', code: 'githubMergeBlocked', pullRequestUrl: pr, createdAt: new Date().toISOString() }
+        return route.fulfill({ status: 409, json: { error: 'githubMergeBlocked', pullRequestUrl: pr } })
+      }
+      if (merge && new URL(request.url()).searchParams.get('view') === 'ledger')
+        return route.fulfill({ json: { binding: {}, approvals: [], publications: [], merges: [merge], capabilities: { reject: true } } })
+      return route.fallback()
+    })
+    await page.route(`**/api/factory/tasks/${mergeTask}`, route => {
+      const body = figma(candidateId) as { delivery: Record<string, unknown> }
+      if (merge?.status === 'merged') body.delivery = { ...body.delivery, pullRequest: { url: pr, state: 'merged' } }
+      return route.fulfill({ json: body })
+    })
+    await thread.getByRole('button', { name: '验收并合并' }).click()
+    await expect(thread.getByText('无法合并', { exact: true }).first()).toBeVisible()
+    await expect(thread.getByText('检查或审批未通过')).toBeVisible()
+    await expect(thread.getByRole('link', { name: '在 GitHub 打开' })).toHaveAttribute('href', pr)
+    await expect(thread.getByRole('region', { name: '验收标准' })).toBeVisible()
+    await expect(thread.getByText('无法合并', { exact: true })).toHaveCount(2)
+    await shoot(page, 'merge-refused')
+    merge = { ...merge!, id: randomUUID(), status: 'merged', code: null, createdAt: new Date().toISOString() }
+    // Leave and come back to 验收 past SWR's dedupe window: the pane reads the ledger and the PR again.
+    await page.waitForTimeout(2500)
+    await thread.getByRole('tab', { name: '对话' }).click()
+    await thread.getByRole('tab', { name: '验收' }).click()
+    await expect(thread.getByText('已合并', { exact: true }).first()).toBeVisible()
+    await expect(thread.getByRole('region', { name: '验收标准' })).toBeVisible()
+    await expect(thread.getByRole('button', { name: '验收并合并' })).toHaveCount(0)
+    await expect(thread.getByRole('link', { name: '在 GitHub 打开' })).toHaveAttribute('href', pr)
+    await shoot(page, 'merged')
+  })
 })

@@ -34,6 +34,10 @@ Thank you for helping improve Mikka.
   this loose-check policy; the workflow alone cannot change that setting.
   See "How changes are tested" below for which checks run when.
 - Never commit credentials. Project secrets live in Infisical Cloud.
+- Focus is stale-while-revalidate: only data past its freshness threshold
+  revalidates, silently, never hiding what is shown; third-party status never
+  on focus. See
+  [`docs/design/decisions/2026-11-01-0400-no-refetch-on-focus.md`](docs/design/decisions/2026-11-01-0400-no-refetch-on-focus.md).
 
 ## How changes are tested
 

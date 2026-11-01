@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { acceptanceState, acceptanceStateKey } from './acceptance-state'
+import { acceptanceState, acceptanceStateKey, mergeAcceptance } from './acceptance-state'
 
 const now = Date.parse('2026-10-29T12:00:00Z')
 const approval = (patch: Record<string, unknown> = {}) => ({ id: 'a1', candidateId: 'c1', expiresAt: '2026-10-29T13:00:00Z', revokedAt: null, createdAt: '2026-10-29T10:00:00Z', ...patch })
@@ -77,4 +77,18 @@ test('without a current candidate no approval counts', () => {
   assert.equal(result.active, undefined)
   assert.equal(result.superseded, undefined)
   assert.equal(acceptanceState({ stage: 'approval', candidateId: null, approvals: [approval()], publications: [], now }).state, 'pending')
+})
+
+test('a code candidate is accepted by merging its PR (#528)', () => {
+  const merge = (patch: Record<string, unknown> = {}) => ({ candidateId: 'c1', status: 'merged' as const, code: null, pullRequestUrl: 'https://github.com/o/r/pull/1', createdAt: '2026-10-29T10:00:00Z', ...patch })
+  const merged = (input: Partial<Parameters<typeof mergeAcceptance>[0]>) => mergeAcceptance({ stage: 'approval', status: 'pending', candidateId: 'c1', merges: [], ...input })
+  assert.deepEqual(merged({}), { state: 'pending' })
+  assert.deepEqual(merged({ merges: [merge({ status: 'merging' })] }), { state: 'merging' })
+  assert.deepEqual(merged({ merges: [merge()] }), { state: 'merged' })
+  assert.deepEqual(merged({ stage: 'publish', status: 'passed' }), { state: 'merged' }, 'merged on GitHub, completed by the webhook')
+  assert.deepEqual(merged({ merges: [merge({ status: 'failed', code: 'githubMergeBlocked' })] }), { state: 'pending', refusal: 'githubMergeBlocked' })
+  assert.deepEqual(merged({ merges: [merge({ status: 'failed', code: 'githubMergeBlocked' }), merge({ status: 'merging', createdAt: '2026-10-29T11:00:00Z' })] }), { state: 'merging' }, 'the latest attempt decides')
+  assert.deepEqual(merged({ merges: [merge({ candidateId: 'c0' })] }), { state: 'pending' }, 'a merge of an older candidate does not count')
+  assert.deepEqual(merged({ stage: 'execute' }), { state: 'unavailable' })
+  assert.equal(acceptanceStateKey('merged', false), 'state.merged')
 })

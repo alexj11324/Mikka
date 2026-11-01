@@ -100,7 +100,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   // Read-only never constructs a DocumentSync: no Y.Doc, no provider, no exchange.
   const [sync] = useState(() => seed ? new DocumentSync(initial.id, seed) : null)
   const syncState = useSyncExternalStore(sync?.subscribe ?? noSubscribe, sync?.getSnapshot ?? readOnlySnapshot, sync?.getSnapshot ?? readOnlySnapshot)
-  const { mutate: retrySync } = useSWR(sync ? ['document-sync', saved.id, sync.doc.clientID] : null, () => sync?.exchange(saved.id), { refreshInterval: 1500, revalidateOnFocus: true, shouldRetryOnError: true, errorRetryInterval: 3000 })
+  const { mutate: retrySync } = useSWR(sync ? ['document-sync', saved.id, sync.doc.clientID] : null, () => sync?.exchange(saved.id), { refreshInterval: 1500, shouldRetryOnError: true, errorRetryInterval: 3000 })
   useEffect(() => {
     // Delay disposal so React Strict Mode's immediate effect replay retains this document.
     if (!sync) return
@@ -139,7 +139,7 @@ function TaskForm({ initial, user, onSaved, onDirty, onClose, onDeleted, onRegis
   const [actionRequest, setActionRequest] = useState<IssueActionRequest | null>(null)
   const restoration = useRef<{ resolve: (success: boolean) => void } | null>(null)
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
-  const { data: versions, error: historyError, mutate: refreshVersions } = useSWR(['versions', saved.id], () => listIssueVersions(saved.id), { revalidateOnFocus: false })
+  const { data: versions, error: historyError, mutate: refreshVersions } = useSWR(['versions', saved.id], () => listIssueVersions(saved.id))
   const { data: connections } = useSWR(['issue-connections', saved.id], () => listIssueConnections(saved.id))
   const hasUnsavedChanges = dirty
   useEffect(() => { onDirty(hasUnsavedChanges || pending) }, [hasUnsavedChanges, pending, onDirty])
