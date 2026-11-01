@@ -32,7 +32,16 @@ async function handlePATCH(request: Request, { params }: { params: Promise<{ run
   if (!parsed.success) return NextResponse.json({ error: 'Invalid patch.' }, { status: 400 })
   // 4e2 item 4: the error text is agent/harness output; mask it like run events.
   const patch = parsed.data.error !== undefined ? { ...parsed.data, error: await maskForWorkspace(caller.scopeWorkspaceId, parsed.data.error) } : parsed.data
-  if (!(LIVE_STATES as readonly string[]).includes(patch.state)) return new NextResponse(null, { status: 204 })
+  if (!(LIVE_STATES as readonly string[]).includes(patch.state)) {
+    // The end itself comes through `/complete`, which carries no error. A
+    // failed run's reason arrives here, just before it: keep it (the first one
+    // wins) without letting this patch move the run's state.
+    if (patch.state === 'failed' && patch.error)
+      await db.update(agentRuns)
+        .set({ error: patch.error, updatedAt: new Date() })
+        .where(and(eq(agentRuns.id, runId), isNull(agentRuns.error), inArray(agentRuns.status, [...LIVE_STATES, 'paused', 'failed'])))
+    return new NextResponse(null, { status: 204 })
+  }
   await db.update(agentRuns)
     .set({
       status: sql`CASE WHEN ${agentRuns.status}='paused' THEN 'paused' ELSE ${patch.state} END`,

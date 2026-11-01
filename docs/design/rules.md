@@ -71,7 +71,14 @@ source wins in a conflict is in [`README.md`](README.md).
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
 - **R-15** A task or thread mentioned in chat is an inline chip, not a large
-  card (a task chip carries the board's status icon). A thread the reply
+  card (a task chip carries the board's status icon). Internal object chips
+  are boxed: a faint accent fill (`--object-chip`), small radius, the status or
+  type icon, then the title in the accent with no underline; the chip never
+  breaks across lines and a long title truncates. The task number is in the
+  hover card, not the chip. A thread chip leads with the thread's status icon
+  (the same marks and colours as the thread card and Threads list) and opens
+  the thread's own conversation, as a thread card does (R-66); only a task chip
+  opens the task. Web sources and links keep the unboxed source chip (R-14). A thread the reply
   dispatches is different: it is a thread card under that reply (R-66). An
   Artifact waiting for acceptance is a bordered card under the reply (icon,
   name, state such as 待你确认); clicking it opens the Artifact window (R-56).
@@ -177,6 +184,12 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   line before the properties column or an open thread. Nothing else gets a
   line; sections are separated by space. The content column is centred in
   the main area, up to 680px wide.
+- **R-79** No breadcrumb, title bar or page header shows the workspace's
+  name. There is one workspace on screen, the name cannot be clicked there,
+  and it is shown and switched only from the avatar menu at the bottom left.
+  The task page's breadcrumb starts at 看板. A group heading that names the
+  workspace its settings apply to (设置's workspace group) is not a crumb and
+  stays.
 - **R-62** 线程 lists the threads working on the issue, grouped as R-52:
   status icon (never the bot's avatar, `glossary.md`), thread name, time, and
   the opening of its last reply (R-53). Someone who cannot open the thread
@@ -449,6 +462,19 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `components/app-shell.tsx`; no reUI App Shell blocks. Standing rule: a
   skill audit (unslop, interface-design) never changes the shell layout;
   Alex keeps it as it is (2026-10-31).
+- **R-80** Every vertical line between two columns can be dragged to resize
+  them (Alex: 「只要是这种竖线都可以 resizable」, decision 2026-11-01-1310):
+  the bot list, the right panel, 建议's two halves, Artifact's list, the
+  board's Coordinator sidebar, a task's right panel, the editor's side
+  panel, a project's details, the settings list, the browser. The line is a
+  `ResizablePane` or a `ResizeHandle` (`components/ui/resizable-pane.tsx`,
+  on `hooks/use-resizable-width.ts`): drag it, use the arrow keys on it
+  (Shift for bigger steps, Home and End for the limits), double-click it for
+  the default width; it shows `col-resize` on hover, stays between a minimum
+  and a maximum, and the width is remembered per place on this device. No
+  second way to resize a column. `scripts/split-pane-policy.mjs` fails a
+  fixed-width column with its own side border and no handle; a line that is
+  not between columns says why with `split-pane-exempt: <reason>`.
 - **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`, all 16
   shapes kept); people use letter avatars. A person without an uploaded
   picture gets a generated gradient avatar (`public/avatars/*.webp`): after

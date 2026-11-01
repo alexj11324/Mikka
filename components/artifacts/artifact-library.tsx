@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { ArtifactKindIcon } from './artifact-card'
 import { ArtifactWindow } from './artifact-window'
 import { InlineLoadError } from '@/components/load-error'
+import { ResizablePane } from '@/components/ui/resizable-pane'
 
 /** The categories on the left: everything, then one per kind an artifact can be today. */
 type Category = 'all' | ArtifactKind
@@ -33,6 +34,7 @@ const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-4 md:grid-
  */
 export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => void }) {
   const t = useTranslations('ArtifactsPage')
+  const tCommon = useTranslations('Common')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
   const { data, error, mutate } = useSWR('artifacts', () => listArtifacts())
@@ -43,7 +45,8 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
   const source = (item: ArtifactListItem) => [item.authorName, item.issueKey].filter(Boolean).join(' · ') || '—'
 
   return <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-    <aside aria-labelledby="artifact-library-title" className="flex shrink-0 flex-col gap-1 border-rule px-2 pt-6 pb-3 md:w-68 md:border-r md:pb-6">
+    <ResizablePane render="aside" aria-labelledby="artifact-library-title" storageKey="mikka:artifact-list-width" defaultWidth={272} min={200} max={480} edge="end" from="md" label={tCommon('resize.artifactList')}
+      className="flex shrink-0 flex-col gap-1 border-rule px-2 pt-6 pb-3 md:border-r md:pb-6">
       <h1 id="artifact-library-title" className="px-2 pb-3 text-xl leading-7 font-semibold">{t('title')}</h1>
       <ul className="flex gap-1 overflow-x-auto md:flex-col">
         {CATEGORIES.map(item => <li key={item.id}>
@@ -53,7 +56,7 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
           </Button>
         </li>)}
       </ul>
-    </aside>
+    </ResizablePane>
     {/* The category is already selected on the left, so the table has no second 20px title (R-32). */}
     <section aria-label={t(`category.${current.label}`)} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-6 pb-6 md:px-12">
       {error ? <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />

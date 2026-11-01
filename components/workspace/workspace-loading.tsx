@@ -20,6 +20,7 @@ export function WorkspaceLoading() {
     <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">
       <div aria-hidden="true" className="hidden w-17 shrink-0 flex-col items-center gap-1 pt-1 md:flex">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="size-9 rounded-lg" />)}</div>
       <div className="flex min-w-0 flex-1 overflow-hidden bg-background in-data-desktop-translucent:bg-transparent md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">
+        {/* split-pane-exempt: the loading placeholder of the bot list, gone before anyone could drag it */}
         <aside aria-hidden="true" className="hidden w-64 shrink-0 flex-col gap-3 border-r p-3 md:flex">
           <Skeleton className="h-8 w-24" />
           {Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="h-12 w-full rounded-xl" />)}

@@ -49,6 +49,14 @@ export default function GroupChat() {
   const reactions = reactionState.data?.reactions ?? {}
   const working = Boolean(page.data?.agentStatus)
   useEffect(() => { setFast(working) }, [working])
+  // 停止: the group's reply ends on the server; stop stays away until the group stops answering.
+  const [stopping, setStopping] = useState(false)
+  useEffect(() => { if (!working) setStopping(false) }, [working])
+  const stop = async () => {
+    setStopping(true)
+    try { await api(`/api/conversations/${id}/stop`, { method: 'POST' }) } catch { setStopping(false) }
+    await page.reload()
+  }
 
   // What the person has seen: the newest message, once it is on screen.
   const newest = page.data?.messages[0]?.id
@@ -117,11 +125,12 @@ export default function GroupChat() {
           {working ? <View style={styles.working}><Spinner size={16} /></View> : null}
           {page.data && !messages.length ? <Text style={styles.empty}>@ 一个 Bot，或直接说</Text> : null}
           {page.data?.routingError && !working ? <Text style={styles.error}>没有 Bot 接这条，@ 它的名字</Text> : null}
+          {page.data?.stopped && !working ? <Text style={styles.stopped}>已停止</Text> : null}
           {sendFailed ? <Text style={styles.error}>没发出去</Text> : null}
         </KeyboardChatScrollView>
       </View>
       <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} overlay onHeight={setComposerHeight}
-        quote={quote} onClearQuote={() => setQuote(null)} />
+        quote={quote} onClearQuote={() => setQuote(null)} onStop={working && !stopping ? () => void stop() : undefined} />
     </View>
   )
 }
@@ -134,5 +143,6 @@ const styles = StyleSheet.create({
   authorName: { fontSize: 13, color: colors.secondary },
   working: { alignSelf: 'flex-start', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
   empty: { alignSelf: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
+  stopped: { alignSelf: 'center', color: colors.secondary, fontSize: 12 },
   error: { alignSelf: 'center', color: colors.danger, fontSize: 13, textAlign: 'center', marginHorizontal: 24 },
 })

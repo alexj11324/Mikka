@@ -108,7 +108,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const before = provisioned
     const result = await dispatch(n.id, n.issueId, n.botId) as unknown as { error: string; card: { title: string } }
     assert.equal(result.error, 'machineUnavailable')
-    assert.equal(result.card.title, '这个任务需要一台电脑来跑')
+    assert.equal(result.card.title, '没有可用的电脑')
     assert.equal(provisioned, before, 'no cloud computer is woken without a key')
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [n.botId]), 0)
     // Their own server comes online (允许自动调度 is on by default for servers): it takes the run.
@@ -164,7 +164,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       const before = provisioned
       const result = await dispatch(b.id, b.issueId, b.botId) as unknown as { error: string; card: { title: string } }
       assert.equal(result.error, 'machineUnavailable')
-      assert.equal(result.card.title, '这个任务需要一台电脑来跑')
+      assert.equal(result.card.title, '没有可用的电脑')
       assert.equal(provisioned, before)
       assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [b.botId]), 0)
       assert.equal(await count('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [b.id]), 0)

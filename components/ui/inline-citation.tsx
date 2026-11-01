@@ -6,28 +6,33 @@ import { ArrowUpRight, Globe } from "lucide-react"
 import { cn } from "cn"
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
-import { sourceChipClassName } from "@/components/ui/streaming-text"
+import { objectChipClassName, sourceChipClassName } from "@/components/ui/streaming-text"
 
 /** A source cited inline in text: a small chip that previews the source on hover. */
 function InlineCitation({ ...props }: PreviewCardPrimitive.Root.Props) {
   return <HoverCard data-slot="inline-citation" {...props} />
 }
 
-/** The chip, styled like the streaming-text SourceChip. A button by default; pass `render={<a href=… />}` for a web page. */
+/**
+ * The chip. A source (web page) is styled like the streaming-text SourceChip, with no box; a Mikka object (task,
+ * thread) is a boxed chip. A button by default; pass `render={<a href=… />}` for a web page.
+ */
 function InlineCitationTrigger({
   className,
+  variant = "source",
   delay = 200,
   closeDelay = 100,
   render = <button type="button" />,
   ...props
-}: PreviewCardPrimitive.Trigger.Props) {
+}: PreviewCardPrimitive.Trigger.Props & { variant?: "source" | "object" }) {
   return (
     <HoverCardTrigger
       data-slot="inline-citation-trigger"
+      data-variant={variant}
       render={render}
       delay={delay}
       closeDelay={closeDelay}
-      className={cn(sourceChipClassName, className)}
+      className={cn(variant === "object" ? objectChipClassName : sourceChipClassName, className)}
       {...props}
     />
   )

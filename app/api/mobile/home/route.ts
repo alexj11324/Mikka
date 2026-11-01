@@ -43,7 +43,7 @@ async function handleGET(request: Request) {
     user: { id: user.id, name: user.name, email: user.email, image: user.image ?? null },
     workspace: context.workspace,
     workspaces: context.choices,
-    bots: botRows.map(bot => ({ ...bot, line: homeLine(chats[bot.id]?.line), at: chats[bot.id]?.at ?? null, working: chats[bot.id]?.working ?? false, pinned: preferences[bot.id]?.pinned ?? false })),
+    bots: botRows.map(bot => ({ ...bot, line: homeLine(chats[bot.id]?.line), at: chats[bot.id]?.at ?? null, working: chats[bot.id]?.working ?? false, pinned: preferences[bot.id]?.pinned ?? bot.coordinator })),
     threads: { running: Number(counts?.running ?? 0), waiting: Number(counts?.waiting ?? 0) },
     suggestions: suggestions.length,
   })

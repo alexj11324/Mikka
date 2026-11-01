@@ -104,6 +104,9 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
    const fresh=await store().inbox(owner,botId,[(await history(second.id))[0].event_id]);assert.ok(fresh?.scope)
    await store().completeRead(owner,botId,fresh.scope,'Current read result')
    assert.equal((await history(second.id))[0].status,'succeeded')
+   // The result event gets no fixed background tier: triage (the Decisions API) decides whether it needs the person.
+   const reported=(await pool.query(`SELECT tier,"deliveredAt" FROM coordinator_events WHERE "dedupeKey"=$1`,[`schedule_result:${(await history(second.id))[0].id}`])).rows[0]
+   assert.deepEqual(reported,{tier:null,deliveredAt:null})
   })
   await t.test('actual Coordinator inbox isolates the scheduled read and preserves user source identity',async()=>{
    const app=await import('../db/request-scope')

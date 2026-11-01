@@ -44,7 +44,9 @@ const scopedDecisions = z.record(z.string(), z.enum(['allow','ask','deny']))
  * agent and Claude for Chrome act until the person takes over). The only gate
  * before an action is the Decisions judgment that it serves the person's task;
  * no effect, payment and sending included, waits for a human click. A workspace
- * computer deny, or an explicit deny for this effect, still blocks it. */
+ * computer deny, or an explicit deny for this effect, still blocks it. "ask" is
+ * not a browser option: settings reject it and the 2026-11-01 migration turned
+ * stored ones into allow; one that slipped through reads as allow. */
 export function browserPermission(effect: BrowserEffect, computer: 'allow'|'deny', agent: unknown, workspace: unknown): 'allow'|'deny' {
   const action = `browser_${effect}`
   const layers = [scopedDecisions.parse(agent), scopedDecisions.parse(workspace)]
