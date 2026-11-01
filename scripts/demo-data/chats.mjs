@@ -100,7 +100,7 @@ note = InlineText(["线程 ", RunChip("{{run:r-testflight}}"), " 在等你确认
     user('冷启动回归要覆盖哪几台测试机？'),
     bot(`root = Stack([grid, image, buttons])
 grid = BeCardGrid([BeImageCard("iPhone 13", "iPhone 13", "主力机型，冷启动基线在这台上量。", ["基线"]), BeImageCard("iPhone SE", "iPhone SE 2020", "小屏和老芯片，白屏最明显。", ["小屏", "A13"]), BeImageCard("iPad Air", "iPad Air 2020", "确认分栏布局下首帧也正常。", ["平板"])])
-image = BeImage("Xcode Instruments", "Instruments 时间线", "公共图库示意图")
+image = BeImage("MacBook Pro 2021", "跑模拟器的 MacBook Pro", "公共图库示意图")
 buttons = Stack([BeButton("继续细化", "把三台测试机的首帧时间做成表格", "primary"), BeButton("直接提问", "iPhone SE 上还需要测热启动吗？", "outline")], "row")`),
   ],
 
