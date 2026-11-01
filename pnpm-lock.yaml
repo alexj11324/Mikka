@@ -9,7 +9,7 @@ overrides:
 
 patchedDependencies:
   '@novnc/novnc@1.6.0':
-    hash: c7e55a3b24bc1a04b676972d5ea5308386d9285fad1f2045cfb40b5c815cebc2
+    hash: 4c366142582a7e49bf37b4e30502f6cc47d708fe1d91b0627c029c3872963573
     path: patches/@novnc__novnc@1.6.0.patch
 
 importers:
@@ -87,7 +87,7 @@ importers:
         version: 0.4.1(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.0))(solid-js@2.0.0-rc.0)
       '@novnc/novnc':
         specifier: 1.6.0
-        version: 1.6.0(patch_hash=c7e55a3b24bc1a04b676972d5ea5308386d9285fad1f2045cfb40b5c815cebc2)
+        version: 1.6.0(patch_hash=4c366142582a7e49bf37b4e30502f6cc47d708fe1d91b0627c029c3872963573)
       '@openuidev/lang-core':
         specifier: 1.0.1
         version: 1.0.1(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(zod@4.6.7)
@@ -13538,7 +13538,7 @@ snapshots:
       '@solidjs/web': 2.0.0-rc.0(solid-js@2.0.0-rc.0)
       solid-js: 2.0.0-rc.0
 
-  '@novnc/novnc@1.6.0(patch_hash=c7e55a3b24bc1a04b676972d5ea5308386d9285fad1f2045cfb40b5c815cebc2)': {}
+  '@novnc/novnc@1.6.0(patch_hash=4c366142582a7e49bf37b4e30502f6cc47d708fe1d91b0627c029c3872963573)': {}
 
   '@noxcturnal/noxcturnal-darwin-arm64@0.1.11':
     optional: true
