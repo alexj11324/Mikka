@@ -55,6 +55,7 @@
     "./computer": "./src/computer.ts",
     "./subscription": "./src/subscription.ts",
     "./repository": "./src/repository.ts",
+    "./local-test-mode": "./src/local-test-mode.ts",
     "./subagent": "./src/subagent.ts"
   },
   "scripts": {
