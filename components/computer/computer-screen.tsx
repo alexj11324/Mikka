@@ -23,6 +23,7 @@ function NoVncView({ url, mode, label }: { url?: string; mode: ViewerMode; label
     if (!url) return
     let alive = true
     let client: RFBInstance | undefined
+    let disconnected = false
     let canvas: HTMLCanvasElement | null = null
     function retainFrame() {
       const saved = picture.current
@@ -31,6 +32,7 @@ function NoVncView({ url, mode, label }: { url?: string; mode: ViewerMode; label
       if (saved.height !== canvas.height) saved.height = canvas.height
       saved.getContext('2d')?.drawImage(canvas, 0, 0)
     }
+    function onDisconnect() { disconnected = true; retainFrame() }
     void import('@novnc/novnc/lib/rfb.js').then(({ default: RFB }) => {
       if (!alive || !host.current) return
       client = new RFB(host.current, url, { shared: true }) as RFBInstance
@@ -39,13 +41,13 @@ function NoVncView({ url, mode, label }: { url?: string; mode: ViewerMode; label
       client.background = 'transparent'
       client.viewOnly = mode === 'view'
       canvas = host.current.querySelector('canvas')
-      client.addEventListener('disconnect', retainFrame)
+      client.addEventListener('disconnect', onDisconnect)
     })
     return () => {
       alive = false
       retainFrame()
-      client?.removeEventListener('disconnect', retainFrame)
-      client?.disconnect()
+      client?.removeEventListener('disconnect', onDisconnect)
+      if (!disconnected) client?.disconnect()
     }
   }, [url, mode])
   return <div role="img" aria-label={label} className="absolute inset-0">
