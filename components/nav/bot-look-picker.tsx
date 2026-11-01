@@ -24,15 +24,16 @@ export function BotLookPicker({ color, shape, disabled, onColor, onShape }: { co
         <feMerge><feMergeNode in="line" /><feMergeNode in="SourceGraphic" /></feMerge>
       </filter>
     </svg>
+    {/* Shapes and colours share the picker's left and right edges: each grid puts its first and last column on them (R-33). */}
     <Field>
-      <ToggleGroup aria-label={t('shape')} spacing={2} className="grid grid-cols-4 justify-items-center sm:grid-cols-8" value={[shape]} disabled={disabled} onValueChange={values => { const next = values[0] as BotShape | undefined; if (next) onShape(next) }}>
+      <ToggleGroup aria-label={t('shape')} spacing={2} className="grid w-full grid-cols-[repeat(4,auto)] justify-between gap-x-0 sm:grid-cols-[repeat(8,auto)]" value={[shape]} disabled={disabled} onValueChange={values => { const next = values[0] as BotShape | undefined; if (next) onShape(next) }}>
         {BOT_SHAPES.map(id => <ToggleGroupItem key={id} value={id} aria-label={t(`shapes.${id}`)} className="size-14 min-w-0 rounded-2xl p-0 hover:bg-transparent data-pressed:bg-transparent data-pressed:[&_svg]:[filter:url(#bot-shape-ring)]">
           <BotAvatar color={color} shape={id} size="cell" still />
         </ToggleGroupItem>)}
       </ToggleGroup>
     </Field>
     <Field>
-      <ToggleGroup aria-label={t('color')} spacing={2} className="grid grid-cols-6 justify-items-center gap-y-3 px-6" value={[color]} disabled={disabled} onValueChange={values => { const next = values[0] as BotColor | undefined; if (next) onColor(next) }}>
+      <ToggleGroup aria-label={t('color')} spacing={2} className="grid w-full grid-cols-[repeat(6,auto)] justify-between gap-y-3" value={[color]} disabled={disabled} onValueChange={values => { const next = values[0] as BotColor | undefined; if (next) onColor(next) }}>
         {BOT_COLORS.map(id => <ToggleGroupItem key={id} value={id} aria-label={t(`colors.${id}`)} className="size-10 min-w-0 rounded-full p-0 data-pressed:bg-transparent">
           <span aria-hidden="true" className={cn('size-7.5 rounded-full',
             id === 'encre' && 'bg-bot-encre', id === 'brun' && 'bg-bot-brun', id === 'rouge' && 'bg-bot-rouge', id === 'orange' && 'bg-bot-orange', id === 'ambre' && 'bg-bot-ambre', id === 'vert' && 'bg-bot-vert', id === 'turquoise' && 'bg-bot-turquoise', id === 'bleu' && 'bg-bot-bleu', id === 'violet' && 'bg-bot-violet', id === 'rose' && 'bg-bot-rose', id === 'gris' && 'bg-bot-gris', id === 'creme' && 'bg-bot-creme',

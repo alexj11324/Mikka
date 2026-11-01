@@ -66,9 +66,9 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
   return <main className="flex min-h-svh w-full flex-col bg-background text-foreground">
     <header className="flex items-center px-5 py-5 sm:px-8 sm:py-6 lg:px-10"><AuthLogo /></header>
     <section className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8 sm:py-16" aria-label={t('title')}>
-      <Card className="w-full max-w-[24.5rem] gap-4 p-6 ring-0">
-        <CardHeader className="gap-4 p-0">
-          <CardTitle><h1>{title}</h1></CardTitle>
+      <Card className="w-full max-w-[24.5rem] gap-5 p-6">
+        <CardHeader className="gap-1 p-0">
+          <CardTitle className="text-xl font-semibold"><h1>{title}</h1></CardTitle>
           <p className="break-all text-sm text-muted-foreground">{account}</p>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 p-0">
