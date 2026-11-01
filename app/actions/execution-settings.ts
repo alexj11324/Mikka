@@ -78,7 +78,8 @@ async function chatScope(chatBot: string | null) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ActionFailureError("authRequired");
   if (chatBot !== null && !z.uuid().safeParse(chatBot).success) throw new ActionFailureError("botNotFound");
-  const botId = await chatBotId(session.user.id, chatBot);
+  // No bot named: the Coordinator of the workspace the person has open.
+  const botId = chatBot ?? await chatBotId(session.user.id, null, (await loadWorkspaceContext(undefined, session.user)).workspace.id);
   return { botId, scope: await botModelScope(session.user.id, botId) };
 }
 /** The composer's model menu for a bot, or the Coordinator (`null`). */

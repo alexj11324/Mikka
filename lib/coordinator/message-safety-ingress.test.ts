@@ -87,6 +87,7 @@ stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async (use
 stub('./coordinator-bot.ts', {
   coordinatorBot: async (user: string) => { assert.equal(user, owner); return { botId: bot, workspaceId: 'synthetic-workspace' } },
   chatBotId: async (user: string, chosen: string | null | undefined) => { assert.equal(user, owner); return chosen ?? bot },
+  openChatBotId: async (user: { id: string }, chosen: string | null | undefined) => { assert.equal(user.id, owner); return chosen ?? bot },
 })
 let store: typeof import('./store'), tools: typeof import('../mcp/tools')
 before(async () => { store = await import('./store'); tools = await import('../mcp/tools') })

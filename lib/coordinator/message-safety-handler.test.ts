@@ -80,6 +80,7 @@ const coordinator = '28700000-0000-4000-8000-0000000c0de1'
 stub('./coordinator-bot.ts', {
   coordinatorBot: async (user: string) => { assert.equal(user, owner); return { botId: coordinator, workspaceId: '28700000-0000-4000-8000-0000000000a1' } },
   chatBotId: async (user: string, chosen: string | null | undefined) => { assert.equal(user, owner); return chosen ?? coordinator },
+  openChatBotId: async (user: { id: string }, chosen: string | null | undefined) => { assert.equal(user.id, owner); return chosen ?? coordinator },
 })
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('Unrelated tool outside test') } })
 stub('../issue-access.ts', { issueForUser: () => {} })

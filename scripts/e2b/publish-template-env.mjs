@@ -1,5 +1,6 @@
 // Points production at a freshly built, public E2B template, then redeploys production.
-// Inputs: TEMPLATE_ID and SOURCE_SHA (from build-template.py --public --json), VERCEL_TEAM_TOKEN.
+// Inputs: TEMPLATE_ID and SOURCE_SHA (the worker hash, workerSha from build-template.py --public --json),
+// VERCEL_TEAM_TOKEN. With --current it only prints production's MIKKA_CLOUD_WORKER_SHA (empty when unset).
 // Both variables go in one request, so production never holds a template from one build and a SHA from another.
 const API = 'https://api.vercel.com'
 export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
@@ -26,6 +27,15 @@ export function pairEnv({ templateId, sourceSha }) {
     { key: 'E2B_BYO_COMPUTER_TEMPLATE', value: templateId, type: 'plain', target: ['production'] },
     { key: 'MIKKA_CLOUD_WORKER_SHA', value: sourceSha, type: 'plain', target: ['production'] },
   ]
+}
+
+export async function currentWorkerSha({ token, fetchImpl = fetch }) {
+  if (!token) fail('vercel_token_unavailable')
+  const { envs = [] } = await api(`/v10/projects/${PROJECT}/env`, { token, fetchImpl })
+  const row = envs.find((item) => item.key === 'MIKKA_CLOUD_WORKER_SHA' && item.target?.includes('production') && !item.gitBranch)
+  if (!row) return ''
+  const { value } = await api(`/v1/projects/${PROJECT}/env/${encodeURIComponent(row.id)}`, { token, fetchImpl })
+  return /^[0-9a-f]{40}$/.test(value ?? '') ? value : ''
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -71,7 +81,9 @@ export async function publish({ token, templateId, sourceSha, fetchImpl = fetch,
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--current')) {
+  console.log(await currentWorkerSha({ token: process.env.VERCEL_TEAM_TOKEN }))
+} else if (import.meta.url === `file://${process.argv[1]}`) {
   const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, templateId: process.env.TEMPLATE_ID, sourceSha: process.env.SOURCE_SHA })
   console.log(`production deployment ready: ${result.deploymentId}`)
 }

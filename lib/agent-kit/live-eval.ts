@@ -21,7 +21,7 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
   if (mode === 'live' && process.env.MIKKA_AGENT_KIT_LIVE_EVAL !== '1') throw new AgentKitError('agentLiveEvaluationDisabled',409)
   const model = mode === 'live' ? COORDINATOR_MODEL : null
   const { chatBotId, isCoordinatorBot } = await import('@/lib/coordinator/coordinator-bot')
-  const botId = await chatBotId(scope.ownerId, scope.botId)
+  const botId = await chatBotId(scope.ownerId, scope.botId, scope.workspaceId)
   const coordinator = await isCoordinatorBot((await import('@/lib/db')).pool, scope.ownerId, botId)
   const hostInstructions = mode === 'live' ? await botInstructions(scope.ownerId,botId,COORDINATOR_INSTRUCTIONS) : ''
   const dependencies = { service:() => subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace }

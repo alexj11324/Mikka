@@ -27,7 +27,7 @@ stub('../subscription-runtime.ts',{subscriptionRuntime:unavailable,authorizeSubs
 stub('../coordinator/wake.ts',{coordinatorEnabled:()=>true,wakeCoordinator:unavailable})
 /** The person's Coordinator: an ordinary bot row, resolved by the host. */
 const COORDINATOR_BOT='30000000-0000-4000-8000-0000000c0de1'
-stub('../coordinator/coordinator-bot.ts',{chatBotId:async(_owner:string,botId:string|null|undefined)=>botId??COORDINATOR_BOT})
+stub('../coordinator/coordinator-bot.ts',{chatBotId:async(_owner:string,botId:string|null|undefined)=>botId??COORDINATOR_BOT,openChatBotId:async(_user:unknown,botId:string|null|undefined)=>botId??COORDINATOR_BOT})
 stub('../coordinator/bot-instructions.ts',{botInstructions:async(_owner:string,_bot:string|null,base:string)=>base})
 stub('../coordinator/personal-instructions.ts',{withPersonalInstructions:async(_owner:string,base:string)=>base})
 stub('../issue-visibility.ts',{issueVisibility:unavailable})

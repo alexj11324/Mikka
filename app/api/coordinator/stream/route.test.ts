@@ -50,6 +50,7 @@ before(async () => {
   mock.module('workflow/api', { namedExports: { getRun } })
   mock.module(new URL('../../../../lib/coordinator/coordinator-bot.ts', import.meta.url).href, { namedExports: {
     chatBotId: async (owner: string, chosen: string | null | undefined) => chosen ?? coordinatorOf[owner],
+    openChatBotId: async (user: { id: string }, chosen: string | null | undefined) => chosen ?? coordinatorOf[user.id],
   } })
   GET = (await import('./route')).GET
 })
