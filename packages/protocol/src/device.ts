@@ -526,6 +526,12 @@ export type RunCommand = z.infer<typeof runCommandSchema>
  */
 export const runCommandsResponse = z.object({
   commands: z.array(runCommandSchema).max(500),
+  /**
+   * Runs queued for this device (outside `skip`), so it claims them now
+   * instead of on its next heartbeat. A queued run also ends the long-poll.
+   * Absent from older servers; the heartbeat still claims either way.
+   */
+  queuedRuns: z.array(id).max(100).optional(),
 })
 export type RunCommandsResponse = z.infer<typeof runCommandsResponse>
 

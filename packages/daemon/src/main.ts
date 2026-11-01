@@ -241,6 +241,8 @@ export class Daemon {
   private registered = false
   /** Run ids the server sent that were refused as unsafe (reported once). */
   private refusedRuns = new Set<string>()
+  /** Runs the commands poll reported queued: being claimed, or failed until the next heartbeat retries them. */
+  private queuedClaims = new Map<string, "claiming" | "failed">()
   private quota: QuotaPoller | null = null
   /** Ends the commands long-poll when the daemon stops. */
   private commandsAbort = new AbortController()
@@ -616,18 +618,30 @@ export class Daemon {
         }
         // Runs being stopped or already ended would come back on every
         // answer; leaving them out lets the poll wait for new commands.
-        const skipRuns = [...this.stopping, ...this.ended].slice(
+        // So are queued runs this daemon refused or failed to claim: the
+        // heartbeat retries those, and the poll must not answer them again.
+        const failedClaims = [...this.queuedClaims].flatMap(([id, state]) => state === "failed" ? [id] : [])
+        const skipRuns = [...failedClaims, ...this.refusedRuns, ...this.stopping, ...this.ended].slice(
           0,
           COMMANDS_MAX_SKIP
         )
         const started = performance.now()
+        let queued: string[] = []
         const commands = await link.fetchCommands(deviceId, wait, {
           signal,
           skipRuns,
+          onQueuedRuns: (runIds) => { queued = runIds },
         })
         if (this.stopped || signal.aborted) return
         backoff = 1_000
         const acted = await this.applyCommands(commands)
+        // A new run starts now instead of on the next heartbeat; then poll
+        // again at once. Runs already being claimed only wait for that claim.
+        if (queued.length > 0) {
+          if (this.claimQueued(queued)) continue
+          await this.pauseCommands(500, signal)
+          continue
+        }
         if (this.unacked.size > 0) continue // ack right away
         if (commands.length === 0 && !signal.aborted) {
           const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
@@ -698,6 +712,25 @@ export class Daemon {
         backoff = Math.min(backoff * 2, 30_000)
       }
     }
+  }
+
+  /** Starts claiming the reported queued runs; true when any claim began. */
+  private claimQueued(runIds: string[]): boolean {
+    let started = false
+    for (const runId of runIds) {
+      if (this.draining || this.updating || this.stopped) break
+      if (this.queuedClaims.has(runId) || this.refusedRuns.has(runId) || this.journal.get(runId)) continue
+      this.queuedClaims.set(runId, "claiming")
+      started = true
+      void this.claimAndStart(runId).then(
+        () => { this.queuedClaims.delete(runId) },
+        (error: unknown) => {
+          this.queuedClaims.set(runId, "failed")
+          this.log.warn({ run_id: runId, err: error }, "could not start run")
+        }
+      )
+    }
+    return started
   }
 
   /** Waits `ms`, or less if the daemon stops or the device registers. */
@@ -1167,8 +1200,10 @@ export class Daemon {
         // A receipted run blocked while offline may resume only after its
         // server authorization is available; no second recovery scheduler.
         await this.supervisor.resumeAll(true)
+        // Claims that failed after the commands poll reported them are retried here.
+        for (const [runId, state] of this.queuedClaims) if (state === "failed") this.queuedClaims.delete(runId)
         for (const runId of await link.pendingRuns(deviceId)) {
-          if (this.refusedRuns.has(runId)) continue
+          if (this.refusedRuns.has(runId) || this.queuedClaims.has(runId)) continue
           await this.claimAndStart(runId).catch((error: unknown) =>
             this.log.warn({ run_id: runId, err: error }, "could not start run")
           )

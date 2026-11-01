@@ -129,12 +129,14 @@ export interface ServerLink {
   /**
    * Messages people sent this device's runs and stops they asked for
    * (ADR 0018). Long-polls up to `waitSeconds` when nothing is pending;
-   * `signal` ends the wait early (daemon stopping).
+   * `signal` ends the wait early (daemon stopping). A server that also
+   * reports runs queued for this device passes them to `onQueuedRuns`, so
+   * the daemon claims them without waiting for its next heartbeat.
    */
   fetchCommands(
     deviceId: string,
     waitSeconds: number,
-    options?: { signal?: AbortSignal; skipRuns?: readonly string[] }
+    options?: { signal?: AbortSignal; skipRuns?: readonly string[]; onQueuedRuns?: (runIds: string[]) => void }
   ): Promise<RunCommand[]>
   /** Marks messages as handed to their agents. */
   ackCommands(deviceId: string, delivered: string[]): Promise<void>
