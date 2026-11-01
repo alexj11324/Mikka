@@ -233,7 +233,7 @@ export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAu
     await pool.query(`UPDATE factory_tasks SET stage='monitor',status='passed',"candidateId"=$2 WHERE id=$1`,[r.task.id,candidateId]);
     await pool.query(`UPDATE factory_attempts SET stage='monitor',status='passed',"candidateId"=$2,evidence='[{"fixture":true}]' WHERE id=$1`,[r.task.attemptId,candidateId]);
     const original=await store.read('owner',r.task.id), binding=factoryBinding(original.task),id=randomUUID();
-    await denies(()=>store.apply('owner',{...binding,candidateId:randomUUID()},id,{action:'retry',reason:'next'}),'factoryStale');
+    await denies(()=>store.apply('owner',{...binding,revision:binding.revision+1},id,{action:'retry',reason:'next'}),'factoryStale');
     const next=await store.apply('owner',binding,id,{action:'retry',reason:'next'});
     assert.equal(next.task.candidateId,candidateId);assert.equal(next.task.status,'pending');
     assert.deepEqual(next.attempts[0].evidence,[{fixture:true}]);assert.deepEqual(next.attempts[1].evidence,[]);

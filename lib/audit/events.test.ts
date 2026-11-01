@@ -13,7 +13,7 @@ test('every action maps to a known category and security is reachable', () => {
   assert.equal(auditCategory('token.created'), 'security')
   assert.equal(auditCategory('secret.replaced'), 'secret')
   assert.equal(auditCategory('member.role_changed'), 'member')
-  assert.deepEqual(Object.keys(AUDIT_ACTIONS).filter(action => auditCategory(action as keyof typeof AUDIT_ACTIONS) === 'permission').sort(), ['bot.permissions_changed', 'integration.permission_changed', 'team.access_changed'])
+  assert.deepEqual(Object.keys(AUDIT_ACTIONS).filter(action => auditCategory(action as keyof typeof AUDIT_ACTIONS) === 'permission').sort(), ['agent.policy_changed', 'bot.permissions_changed', 'integration.permission_changed', 'model.policy_changed', 'skill.registered', 'skill.reviewed', 'skill.withdrawn', 'team.access_changed'])
   assert.deepEqual(new Set(Object.values(AUDIT_ACTIONS)), new Set(AUDIT_CATEGORIES))
 })
 
@@ -100,6 +100,7 @@ test('metadata is a per-action allowlist', () => {
     ['member.role_changed', { oldRole: 'member', newRole: 'admin' }],
     ['integration.permission_changed', { integration: 'Slack', capability: 'write', from: 'allow', to: 'deny' }],
     ['auth.signed_in', { newDevice: true, method: 'password' }],
+    ['auth.signed_in', { method: 'oauth' }],
     ['token.created', { tokenName: 'CI deploy' }],
   ]
   for (const [action, metadata] of ok) assert.deepEqual(toAuditRow({ ...base, action, metadata }).metadata, metadata, action)
@@ -123,4 +124,25 @@ test('Basic credentials are matched case-insensitively', () => {
 
 test('a credential-shaped label value is still rejected (tokenName)', () => {
   assert.throws(() => toAuditRow({ ...base, action: 'token.created', metadata: { tokenName: 'gh~p_abcdefghijklmnopqrstuvwxyz0123456789'.replace('~', '') } }), /secret-bearing value at metadata.tokenName/)
+})
+
+
+test('CLI policy changes expose a bound revision, never policy instructions or routes', () => {
+  const event = { ...base,action: 'agent.policy_changed' as const, metadata: {scope:'project' as const,revision:'a'.repeat(64)} }
+  assert.deepEqual(toAuditRow(event).metadata,event.metadata)
+  assert.throws(() => toAuditRow({...event,metadata:{...event.metadata,policy:{networkAllow:['private.example']}}} as unknown as AuditEvent))
+})
+
+
+test('credential and Agent approval metadata excludes credential content and tool input', () => {
+  for (const action of ['credential.created', 'credential.replaced', 'credential.revoked'] as const) {
+    assert.deepEqual(toAuditRow({ ...base, action }).metadata, {})
+    for (const key of ['origin', 'username', 'password']) assert.throws(() => toAuditRow({ ...base, action, metadata: { [key]: 'private-input' } }), /allowlist/)
+  }
+  const metadata = { runId: ws, decision: 'approved' as const, revision: 'a'.repeat(64) }
+  assert.deepEqual(toAuditRow({ ...base, action: 'agent.approval_decided', metadata }).metadata, metadata)
+  assert.throws(() => toAuditRow({ ...base, action: 'agent.approval_decided', metadata: { ...metadata, input: { command: 'private-input' } } }), /allowlist/)
+  assert.throws(() => toAuditRow({ ...base, action: 'agent.approval_decided', metadata: { ...metadata, revision: 'unknown' } }), /allowlist/)
+  assert.deepEqual(toAuditRow({ ...base, action: 'agent.approval_consumed', metadata: { runId: ws, revision: metadata.revision } }).metadata, { runId: ws, revision: metadata.revision })
+  assert.throws(() => toAuditRow({ ...base, action: 'agent.approval_consumed', metadata }), /allowlist/)
 })

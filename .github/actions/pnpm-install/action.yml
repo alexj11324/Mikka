@@ -1,0 +1,33 @@
+name: Install dependencies with pnpm
+description: >-
+  pnpm, Node 24 and a frozen-lockfile install. The pnpm store cache is
+  read-only everywhere except pushes to main: pull requests and branches
+  restore main's entry and never save their own, so cache entries stop
+  multiplying per branch.
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      with:
+        version: 10.34.3
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: 24
+    - id: store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+    - id: restore
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-
+    - shell: bash
+      run: pnpm install --frozen-lockfile
+    - name: Save the pnpm store (main only)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}

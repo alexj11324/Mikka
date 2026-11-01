@@ -135,6 +135,8 @@ export function useUnreadIndicators({ conversationId, items, rootRef, source = c
     const element = viewport()
     const line = element?.querySelector<HTMLElement>(`[${UNREAD_DIVIDER_ATTR}]`)
     if (!element || !line) return
+    // The scroller follows the end until the person scrolls; tell it this is a reading place, as a wheel would.
+    element.dispatchEvent(new WheelEvent('wheel', { bubbles: true }))
     const offset = line.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop
     element.scrollTo({ top: Math.max(0, offset - element.clientHeight / 3) })
   }

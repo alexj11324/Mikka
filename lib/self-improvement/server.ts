@@ -6,11 +6,11 @@ import { runPolicyDigestInput, type RunPolicy } from '@mikka/protocol/agent-poli
 import { invokeDecision } from '../coordinator/decide'
 import { getArtifactObject } from '../artifacts/storage'
 import { createSkillComparisonCollector } from './comparison-collector'
-import { createRegisteredSkillEvaluator } from './registered-evaluation'
+import { createConfiguredSkillEvaluator } from './registered-evaluation'
 import { pool } from '@/lib/db'
 import { issueForUser } from '@/lib/issue-access'
 import { queueFactoryRun } from '@/lib/agent-runs'
-import { lockCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
+import { lockCliRunPolicy, lockCliTaskScope } from '@/lib/agent-tool-approval/policy-store'
 import { createImprovementStore } from './store'
 import { createSkillAssignments } from './assignments'
 import { factoryStore, dispatchFactoryRun } from '../factory/server'
@@ -19,6 +19,7 @@ import { createImprovementFactoryBridge } from './factory-bridge'
 import { createSkillEvaluations } from './evaluations'
 import { digest, ImprovementError } from './contract'
 import { REPORT_BENCHMARK } from './report-benchmark'
+import { TeamSkillStore } from './team-skills'
 
 const authorize: Parameters<typeof createSkillAssignments>[1] = async (userId, issueId, tx) =>
   Boolean(await issueForUser(userId, issueId, false, drizzle(tx)))
@@ -28,10 +29,18 @@ export const benchmarkPolicy:RunPolicy = {
 }
 export const loadSkillComparison=createSkillComparisonCollector(pool,
   async(userId,issueId)=>Boolean(await issueForUser(userId,issueId,false,drizzle(pool))),getArtifactObject)
-export const skillEffectEvaluator=createRegisteredSkillEvaluator({loadComparison:loadSkillComparison,invokeDecision,
-  // Real benchmark/model evaluation is explicitly OFF for this delivery.
-  modelEvaluationEnabled:false})
+const evaluateSkillEffect=createConfiguredSkillEvaluator({loadComparison:loadSkillComparison,invokeDecision})
+export const skillEffectEvaluator: typeof evaluateSkillEffect = async (userId, proposal) => {
+  const tx = await pool.connect()
+  let taskScope: Awaited<ReturnType<typeof lockCliTaskScope>>
+  try { taskScope = await lockCliTaskScope(tx, userId, proposal.issueId) }
+  finally { tx.release() }
+  const [{ hostedBillingScope }, { executionWorkspace }] = await Promise.all([import('../abuse/context'), import('../execution-settings')])
+  const workspaceId = taskScope.workspaceId ?? await executionWorkspace(userId, null)
+  return hostedBillingScope.run({ workspaceId, ownerId: userId }, () => evaluateSkillEffect(userId, proposal))
+}
 export const skillRegistry = createSkillRegistry(pool, authorize)
+export const teamSkillStore = new TeamSkillStore(pool)
 export const skillAssignments:ReturnType<typeof createSkillAssignments> = createSkillAssignments(pool, authorize,
   (...args)=>skillEvaluations.authorizeEvaluation(...args))
 export const skillEvaluations:ReturnType<typeof createSkillEvaluations> = createSkillEvaluations(pool, {

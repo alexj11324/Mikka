@@ -86,7 +86,7 @@ it.each(['allow', 'ask', 'deny', 'readOnly'] as const)('scopes native computer e
   expect(ask).not.toHaveBeenCalled()
 })
 
-it('permits one fixed Mikka hand-in elicitation without a computer spec or action ask', async () => {
+it.each([['MIKKA_ELICITATION_TEST', 'submit'], ['MIKKA_CONTEXT_ELICITATION_TEST', 'request_help']] as const)('permits the fixed Mikka %s hand-in without a computer spec or action ask', async (prompt, tool) => {
   const cwd = await makeRepo(), stateDir = tempDir()
   const policy = defaultRunPolicy()
   policy.permissions.computer_use = 'deny'
@@ -96,15 +96,29 @@ it('permits one fixed Mikka hand-in elicitation without a computer spec or actio
   const adapter = new CodexAdapter({ sandbox: new NoSandbox(), stateDir, userHome: tempDir(), binary: resolve(import.meta.dirname, 'fakes/fake-codex.mjs') })
   // The fake emits native approval frames only; it never calls the hand-in MCP
   // server, contacts a provider, or writes a handoff file in this case.
-  const session = await adapter.start({ runId: 'run-1', cwd, prompt: 'MIKKA_ELICITATION_TEST', policy, env: { PATH: process.env.PATH ?? '' }, log: createLogger(), toolApproval: gate })
+  const session = await adapter.start({ runId: 'run-1', cwd, prompt, policy, env: { PATH: process.env.PATH ?? '' }, log: createLogger(), toolApproval: gate })
   let output = ''
   for await (const event of session.events()) if (event.type === 'chunk' && event.chunk.type === 'text-delta') output += event.chunk.delta
   const result = JSON.parse(output)
   expect(result.first).toEqual({ action: 'accept', content: {} })
-  expect(result.replay).toEqual({ action: 'decline' })
-  expect(result.afterCompletion).toEqual({ action: 'decline' })
+  for (const name of ['foreignThread', 'foreignTurn', 'unknownServer', 'replay', 'afterCompletion']) expect(result[name]).toEqual({ action: 'decline' })
   expect(checkPermission).toHaveBeenCalledOnce()
-  expect(checkPermission).toHaveBeenCalledWith(expect.objectContaining({ method: 'cli/mcp__mikka__submit', input: {} }))
+  expect(checkPermission).toHaveBeenCalledWith(expect.objectContaining({ method: `cli/mcp__mikka__${tool}`, input: {} }))
   expect(ask).not.toHaveBeenCalled()
   expect(existsSync(join(stateDir, 'runs', 'run-1', 'handoff.json'))).toBe(false)
+})
+
+
+it('refuses an unregistered Mikka tool before consulting transport policy', async () => {
+  const cwd = await makeRepo(), policy = defaultRunPolicy()
+  const permission = vi.fn((request: Readonly<ToolApprovalRequest>) => toolApprovalDecision(request, policy, cwd))
+  const ask = vi.fn(async () => 'deny' as const)
+  const gate = new ToolApprovalGate('run-1', { permission, ask, isLive: () => true })
+  const adapter = new CodexAdapter({ sandbox: new NoSandbox(), stateDir: tempDir(), userHome: tempDir(), binary: resolve(import.meta.dirname, 'fakes/fake-codex.mjs') })
+  const session = await adapter.start({ runId: 'run-1', cwd, prompt: 'MIKKA_UNKNOWN_ELICITATION_TEST', policy, env: { PATH: process.env.PATH ?? '' }, log: createLogger(), toolApproval: gate })
+  let output = ''
+  for await (const event of session.events()) if (event.type === 'chunk' && event.chunk.type === 'text-delta') output += event.chunk.delta
+  for (const value of Object.values(JSON.parse(output))) expect(value).toEqual({ action: 'decline' })
+  expect(permission).not.toHaveBeenCalled()
+  expect(ask).not.toHaveBeenCalled()
 })

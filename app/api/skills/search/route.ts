@@ -1,7 +1,7 @@
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { getVercelOidcToken } from '@vercel/oidc'
 
-import { skillsSearchResponseSchema } from '@/lib/skills-search'
+import { SKILLS_MAX_PAGE, SKILLS_PAGE_SIZE, SKILLS_SEARCH_MAX, skillsPage, skillsSearchResponseSchema, skillsUpstreamUrl } from '@/lib/skills-search'
 import { auth } from '@/lib/api-auth'
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' }
@@ -13,8 +13,12 @@ async function handleGET(request: Request) {
     return Response.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE })
   }
 
-  const query = new URL(request.url).searchParams.get('q')?.trim() ?? ''
-  if (query.length === 1 || query.length > 100) {
+  const params = new URL(request.url).searchParams
+  const query = params.get('q')?.trim() ?? ''
+  const pageParam = params.get('page') ?? '0'
+  const page = /^\d{1,4}$/.test(pageParam) ? Number(pageParam) : -1
+  const lastPage = query ? SKILLS_SEARCH_MAX / SKILLS_PAGE_SIZE - 1 : SKILLS_MAX_PAGE
+  if (query.length === 1 || query.length > 100 || page < 0 || page > lastPage) {
     return Response.json({ error: 'invalid_query' }, { status: 400, headers: NO_STORE })
   }
 
@@ -25,14 +29,7 @@ async function handleGET(request: Request) {
     return Response.json({ error: 'skills_oidc_unavailable' }, { status: 503, headers: NO_STORE })
   }
 
-  const url = new URL(query ? '/api/v1/skills/search' : '/api/v1/skills', 'https://skills.sh')
-  if (query) {
-    url.searchParams.set('q', query)
-    url.searchParams.set('limit', '12')
-  } else {
-    url.searchParams.set('view', 'trending')
-    url.searchParams.set('per_page', '12')
-  }
+  const url = skillsUpstreamUrl(query, page)
 
   try {
     const response = await fetch(url, {
@@ -52,7 +49,7 @@ async function handleGET(request: Request) {
       return Response.json({ error: 'invalid_skills_response' }, { status: 502, headers: NO_STORE })
     }
 
-    return Response.json({ data: result.data.data }, { headers: NO_STORE })
+    return Response.json(skillsPage(result.data, query, page), { headers: NO_STORE })
   } catch {
     return Response.json({ error: 'skills_search_unavailable' }, { status: 503, headers: NO_STORE })
   }

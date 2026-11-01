@@ -1,8 +1,9 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { useRevealLoaded } from '@/lib/hooks/use-reveal-loaded'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
@@ -10,23 +11,23 @@ import { ArrowLeft, ArrowRight, PanelLeft } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Spinner } from '@/components/ui/spinner'
 
-export function AppShell({ children, variant = 'workspace', fixed = false, topBar = false }: { children: ReactNode; variant?: 'workspace' | 'settings'; fixed?: boolean; topBar?: boolean }) {
-  return <TooltipProvider><SidebarProvider className={cn(fixed && 'h-svh overflow-hidden', topBar && 'md:pt-10', variant === 'settings' && 'h-svh overflow-hidden bg-sidebar [--background:var(--settings-background)] [--foreground:var(--settings-foreground)] [--card:var(--settings-card)] [--card-foreground:var(--settings-foreground)] [--sidebar:var(--settings-sidebar)] [--sidebar-foreground:var(--settings-sidebar-foreground)] [--sidebar-accent:var(--settings-sidebar-accent)] [--sidebar-accent-foreground:var(--settings-foreground)] [--sidebar-border:var(--settings-border)] [--border:var(--settings-border)] [--input:var(--settings-input)] [--muted-foreground:var(--settings-muted-foreground)]')}>{children}</SidebarProvider></TooltipProvider>
-}
+/** Settings' own palette, mapped onto the shared tokens for everything inside the frame. */
+const SETTINGS_COLORS = '[--background:var(--settings-background)] [--foreground:var(--settings-foreground)] [--card:var(--settings-card)] [--card-foreground:var(--settings-foreground)] [--sidebar:var(--settings-sidebar)] [--sidebar-foreground:var(--settings-sidebar-foreground)] [--sidebar-accent:var(--settings-sidebar-accent)] [--sidebar-accent-foreground:var(--settings-foreground)] [--sidebar-border:var(--settings-border)] [--border:var(--settings-border)] [--input:var(--settings-input)] [--muted-foreground:var(--settings-muted-foreground)]'
 
 /**
  * The app window, built like Comma's shell: one gray frame that never scrolls,
  * the window bar across the top, the rail on the left, and every page inside a
  * single rounded card. Columns inside the card scroll on their own.
  */
-export function AppFrame({ bar, rail, children }: { bar: ReactNode; rail: ReactNode; children: ReactNode }) {
+export function AppFrame({ bar, rail, children, settings = false }: { bar: ReactNode; rail: ReactNode; children: ReactNode; settings?: boolean }) {
   const t = useTranslations('Shell')
-  return <TooltipProvider><SidebarProvider className="h-svh min-h-0 flex-col overflow-hidden bg-shell-chrome">
+  return <TooltipProvider><SidebarProvider className={cn('h-svh min-h-0 flex-col overflow-hidden bg-shell-chrome in-data-desktop-translucent:bg-transparent', settings && SETTINGS_COLORS)}>
     {bar}
     <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">
       {rail}
-      <section data-slot="app-frame-content" aria-label={t('window')} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">{children}</section>
+      <section data-slot="app-frame-content" aria-label={t('window')} className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background in-data-desktop-translucent:bg-transparent md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">{children}</section>
     </div>
   </SidebarProvider></TooltipProvider>
 }
@@ -71,7 +72,7 @@ export function SignOutBoundary({ pending, children }: { pending: boolean; child
       <DialogContent showCloseButton={false} aria-label={t('signingOut')} onKeyDown={event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'b') event.stopPropagation() }} className="inset-0 flex h-dvh max-w-none translate-x-0 translate-y-0 items-center justify-center rounded-none bg-background p-0 text-foreground ring-0 sm:max-w-none data-open:animate-none">
         <DialogTitle className="sr-only">{t('signingOut')}</DialogTitle>
         <div role="status" aria-label={t('signingOut')} className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span aria-hidden="true" className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none" />
+          <Spinner aria-hidden="true" role="presentation" className="motion-reduce:animate-none" />
           {t('signingOut')}
         </div>
       </DialogContent>
@@ -82,7 +83,10 @@ export function SignOutBoundary({ pending, children }: { pending: boolean; child
 export function AppShellContent({ parent, title, actions, children, variant = 'workspace', hideHeader = false, listToggle = true }: { parent: string; title: string; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean; listToggle?: boolean }) {
   const i18nText = useTranslations();
   const { isMobile, openMobile, open, toggleSidebar } = useSidebar()
-  return <SidebarInset className={cn('min-h-0 min-w-0', variant === 'workspace' && 'overflow-y-auto overscroll-contain', variant === 'settings' && 'overflow-y-auto overscroll-contain md:my-2 md:mr-2 md:rounded-xl md:shadow-sm')}>
+  // A section's loading placeholder gives way to its content with a short fade.
+  const contentRef = useRef<HTMLElement>(null)
+  useRevealLoaded(contentRef)
+  return <SidebarInset ref={contentRef} className={cn('min-h-0 min-w-0', 'overflow-y-auto overscroll-contain')}>
     {/* Desktop has no title bar (MIK-40): the top bar searches and the pill names the conversation. Phones keep it, having no rail. */}
     {!hideHeader && <header className={cn('flex h-12 shrink-0 items-center justify-between gap-3 px-4 md:hidden')}>
       <div className="flex min-w-0 items-center gap-2">

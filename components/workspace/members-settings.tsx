@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Download,
   MoreHorizontal,
-  Search,
   Shield,
   Users,
 } from "lucide-react";
@@ -34,11 +33,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -69,29 +63,16 @@ import {
   Empty,
   EmptyHeader,
   EmptyTitle,
-  EmptyDescription,
+  
   EmptyMedia,
 } from "@/components/ui/empty";
-import { withBasePath } from "@/lib/base-path";
+import { SearchInput } from "@/components/ui/search-input";
+import { fetchSettingsData, memberSettingsKey } from "@/lib/settings-data";
 import { useActionError } from "@/lib/use-action-error";
 import { SettingsDataState } from "@/components/settings/settings-data-state";
 import { cn } from "@/lib/utils";
+import { FieldError } from '@/components/ui/field'
 
-async function fetchSettings(url: string): Promise<WorkspaceSettings> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    const payload: unknown = await response.json().catch(() => null);
-    const message =
-      typeof payload === "object" &&
-      payload !== null &&
-      "error" in payload &&
-      typeof payload.error === "string"
-        ? payload.error
-        : "Failed to load members.";
-    throw new Error(message);
-  }
-  return response.json();
-}
 type Change = {
   userId: string;
   name: string;
@@ -117,14 +98,12 @@ export function MembersSettings({
   const locale = useLocale();
   const router = useRouter();
   const requestedWorkspaceId = initial?.workspace.id ?? workspaceId;
-  const settingsUrl = requestedWorkspaceId
-    ? `/api/workspace?workspace=${encodeURIComponent(requestedWorkspaceId)}`
-    : "/api/workspace";
+  // The same key the settings preloader fills, so members open from its cache.
   const {
     data: fetchedData,
     error: fetchError,
     mutate,
-  } = useSWR<WorkspaceSettings>(withBasePath(settingsUrl), fetchSettings, {
+  } = useSWR<WorkspaceSettings>(memberSettingsKey(requestedWorkspaceId), fetchSettingsData<WorkspaceSettings>, {
     fallbackData: initial,
     revalidateOnMount: true,
   });
@@ -357,17 +336,12 @@ export function MembersSettings({
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="min-w-0 flex-1 sm:w-72">
-                  <InputGroup>
-                    <InputGroupAddon>
-                      <Search />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      aria-label={t("searchLabel")}
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder={t("searchPlaceholder")}
-                    />
-                  </InputGroup>
+                  <SearchInput
+                    aria-label={t("searchLabel")}
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={t("searchPlaceholder")}
+                  />
                 </div>
                 <Select
                   value={filter}
@@ -653,11 +627,6 @@ export function MembersSettings({
                   <EmptyTitle>
                     {query ? t("empty.noResults") : t("empty.noMembers")}
                   </EmptyTitle>
-                  <EmptyDescription>
-                    {query
-                      ? t("empty.noResultsHint")
-                      : t("empty.noMembersHint")}
-                  </EmptyDescription>
                 </EmptyHeader>
               </Empty>
             )}
@@ -703,9 +672,9 @@ export function MembersSettings({
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error && (
-            <p role="alert" className="text-sm text-destructive">
+            <FieldError>
               {error}
-            </p>
+            </FieldError>
           )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>

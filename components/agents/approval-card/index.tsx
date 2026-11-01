@@ -11,12 +11,18 @@ import {
   MessageSquareText,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentDisclosure } from "@/components/agents/agent-disclosure";
+import { statusTones } from "@/lib/status-appearance";
 import { ActionSwapRollText } from "@/components/motion/action-swap-roll";
 import { Button } from "@/components/motion/button";
 import { Checkbox } from "@/components/motion/checkbox";
+import { DateRangePickerDropdown } from "@/components/motion/date-range-picker";
+import { RangeSlider } from "@/components/motion/range-slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/motion/select";
+import { Switch } from "@/components/motion/switch";
 import { Input } from "@/components/motion/input";
 import { RadioGroup, RadioGroupItem } from "@/components/motion/radio";
 import { EASE_OUT, SPRING_SWAP } from "@/lib/ease";
@@ -52,26 +58,26 @@ function useStatusLabel(status: ApprovalCardStatus) {
 
 function getStatusClass(status: ApprovalCardStatus) {
   if (status === "approved" || status === "answered") {
-    return "text-emerald-600 dark:text-emerald-400";
+    return "text-success-foreground";
   }
-  if (status === "rejected") return "text-rose-600 dark:text-rose-400";
+  if (status === "rejected") return "text-destructive";
   if (status === "changes-requested") {
-    return "text-amber-600 dark:text-amber-400";
+    return "text-warning-foreground";
   }
   return "text-muted-foreground";
 }
 
 function getStatusBadgeClass(status: ApprovalCardStatus) {
   if (status === "pending" || status === "changes-requested") {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400";
+    return statusTones.warning;
   }
   if (status === "submitting") {
-    return "border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400";
+    return statusTones.info;
   }
   if (status === "approved" || status === "answered") {
-    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    return statusTones.success;
   }
-  return "border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400";
+  return statusTones.destructive;
 }
 
 function isAnswered(answer: ApprovalCardAnswer) {
@@ -84,20 +90,24 @@ function QuestionOptions({
   disabled,
   onChange,
   onSingleSelect,
+  dateRangePicker,
 }: {
   question: ApprovalCardQuestion;
   answer: ApprovalCardAnswer;
   disabled: boolean;
   onChange: (answer: ApprovalCardAnswer) => void;
   onSingleSelect?: () => void;
+  dateRangePicker?: ApprovalCardProps["dateRangePicker"];
 }) {
   const agentCopy = useAgentCopy()
 
   const custom = answer.custom ?? "";
 
   return (
-    <div className="mt-3">
-      {question.options?.length ? (
+    <div className="mt-2">
+      {question.input ? (
+        <QuestionInput question={question} answer={answer} disabled={disabled} onChange={onChange} dateRangePicker={dateRangePicker} />
+      ) : question.options?.length ? (
         question.multiple ? (
           <div className="grid gap-0.5">
             {question.options.map((option) => (
@@ -115,7 +125,7 @@ function QuestionOptions({
                       : answer.selected.filter((value) => value !== option.value),
                   })
                 }
-                className="min-h-9 rounded-lg px-1.5 py-1"
+                className="min-h-8 rounded-lg px-1.5 py-1"
               />
             ))}
           </div>
@@ -135,7 +145,7 @@ function QuestionOptions({
                 label={option.label}
                 description={option.description}
                 disabled={disabled || option.disabled}
-                className="min-h-9 rounded-lg px-1.5 py-1"
+                className="min-h-8 rounded-lg px-1.5 py-1"
               />
             ))}
           </RadioGroup>
@@ -157,13 +167,100 @@ function QuestionOptions({
           className={cn("p-0.5", question.options?.length && "mt-1.5")}
           classNames={{
             field:
-              "h-10 rounded-xl border-0 bg-background/70 focus-within:bg-background",
-            input: "px-3 text-sm",
+              // R-31: a filled field, no stroke. --control darkens the grey card instead of a pale near-white patch.
+              "h-10 rounded-lg border-0 bg-control hover:bg-control-hover data-[state=focused]:bg-control data-[state=focused]:ring-1 data-[state=focused]:ring-ring",
+            input: "px-3 text-sm placeholder:text-muted-foreground",
           }}
         />
       ) : null}
     </div>
   );
+}
+
+const SELECT_ROOM = ["pb-14", "pb-24", "pb-34", "pb-44", "pb-54", "pb-64"];
+const DATE_RANGE = /^(\d{4}-\d{2}-\d{2})(?: – (\d{4}-\d{2}-\d{2}))?$/;
+
+/** Mikka: Select, Switch, RangeSlider and DateRangePicker answers, kept as the answer's custom text. */
+function QuestionInput({
+  question,
+  answer,
+  disabled,
+  onChange,
+  dateRangePicker,
+}: {
+  question: ApprovalCardQuestion;
+  answer: ApprovalCardAnswer;
+  disabled: boolean;
+  onChange: (answer: ApprovalCardAnswer) => void;
+  dateRangePicker?: ApprovalCardProps["dateRangePicker"];
+}) {
+  const agentCopy = useAgentCopy();
+  const [selectOpen, setSelectOpen] = useState(false);
+  const custom = answer.custom ?? "";
+  const label = typeof question.title === "string" ? question.title : undefined;
+  if (question.input === "select") {
+    // The card clips its overflow, so make room under the field for the open panel.
+    return (
+      <div className={cn("transition-[padding] duration-200 motion-reduce:transition-none", selectOpen && SELECT_ROOM[Math.min(question.options?.length ?? 1, SELECT_ROOM.length) - 1])}>
+      <Select value={answer.selected[0] ?? ""} onValueChange={(value) => onChange({ selected: [value], custom: "" })} onOpenChange={setSelectOpen} disabled={disabled} className="w-full">
+        <SelectTrigger><SelectValue placeholder={agentCopy.chooseOption} /></SelectTrigger>
+        <SelectContent>
+          {question.options?.map((option) => (
+            <SelectItem key={option.value} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      </div>
+    );
+  }
+  if (question.input === "switch") {
+    return (
+      <Switch
+        checked={custom === agentCopy.answerYes}
+        onCheckedChange={(checked) => onChange({ selected: [], custom: checked ? agentCopy.answerYes : agentCopy.answerNo })}
+        disabled={disabled}
+        label={custom === agentCopy.answerYes ? agentCopy.answerYes : agentCopy.answerNo}
+        ariaLabel={label}
+      />
+    );
+  }
+  if (question.input === "slider" && question.range) {
+    const { min, max, step = 1, unit = "" } = question.range;
+    const parsed = Number.parseFloat(custom);
+    const value = Number.isFinite(parsed) ? parsed : min;
+    return (
+      <div className="flex items-center gap-3">
+        <RangeSlider
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          disabled={disabled}
+          aria-label={label}
+          formatValueText={(next) => `${next}${unit}`}
+          onValueChange={(next) => onChange({ selected: [], custom: `${next}${unit}` })}
+          showTicks={(max - min) / step <= 20}
+          className="min-w-0 flex-1"
+        />
+        <span className="w-16 shrink-0 text-right text-sm tabular-nums">{value}{unit}</span>
+      </div>
+    );
+  }
+  if (question.input === "dateRange") {
+    const match = DATE_RANGE.exec(custom);
+    return (
+      <DateRangePickerDropdown
+        {...dateRangePicker}
+        value={match ? { from: match[1], to: match[2] ?? match[1] } : null}
+        onValueChange={(range) => onChange({ selected: [], custom: range ? `${range.from} – ${range.to ?? range.from}` : "" })}
+        disabled={disabled}
+        label={label}
+        placeholder={agentCopy.chooseDateRange}
+        closeOnSelect
+      />
+    );
+  }
+  return null;
 }
 
 function ProgressDots({ current, ids }: { current: number; ids: string[] }) {
@@ -213,6 +310,7 @@ export function ApprovalCard({
   approveLabel: approveLabelProp,
   submitLabel: submitLabelProp,
   result,
+  dateRangePicker,
   className,
 }: ApprovalCardProps) {
   const agentCopy = useAgentCopy()
@@ -301,7 +399,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
       data-state={status}
       aria-busy={busy}
       className={cn(
-        "w-full overflow-hidden rounded-2xl bg-muted p-4 text-sm",
+        "w-full overflow-hidden rounded-2xl bg-muted p-3 text-sm",
         className,
       )}
     >
@@ -344,7 +442,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
             ) : (
               <span
                 className={cn(
-                  "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+                  "shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors",
                   getStatusBadgeClass(status),
                 )}
               >
@@ -384,6 +482,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                     disabled={busy}
                     onChange={updateCurrentAnswer}
                     onSingleSelect={queueAutoAdvance}
+                    dateRangePicker={dateRangePicker}
                   />
                 </motion.div>
               </AnimatePresence>
@@ -399,9 +498,14 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
             )}
 
             {questionMode ? (
-              <div className="mt-4 flex items-center gap-3">
+              // Back, progress and next sit together on the right, within one thumb's reach (Codex, Linear).
+              <div className="mt-3 flex items-center justify-end gap-2">
                 {multipleQuestions ? (
                   <>
+                    <ProgressDots
+                      current={currentStep}
+                      ids={questions.map((item) => item.id)}
+                    />
                     <Button
                       variant="ghost"
                       size="icon"
@@ -412,10 +516,6 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                     >
                       <ArrowLeft className="size-4" />
                     </Button>
-                    <ProgressDots
-                      current={currentStep}
-                      ids={questions.map((item) => item.id)}
-                    />
                   </>
                 ) : null}
                 <Button
@@ -427,7 +527,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                   }
                   disabled={busy || !isAnswered(currentAnswer) || (currentStep === questions.length - 1 && questions.some(item => !isAnswered(currentAnswers[item.id] ?? EMPTY_ANSWER)))}
                   onClick={continueQuestion}
-                  className="ml-auto rounded-full"
+                  className="rounded-full disabled:bg-control disabled:text-muted-foreground disabled:opacity-100"
                 >
                   {busy ? (
                     <LoaderCircle className={cn("size-4", !reduce && "animate-spin")} />
@@ -467,7 +567,7 @@ const submitLabel = submitLabelProp ?? agentCopy.answer
                     size="sm"
                     disabled={busy}
                     onClick={onReject}
-                    className="rounded-full text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400"
+                    className="rounded-full text-muted-foreground hover:text-destructive"
                   >
                     {agentCopy.reject}</Button>
                 ) : null}

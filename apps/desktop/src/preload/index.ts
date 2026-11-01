@@ -18,7 +18,12 @@ function onNotificationClick(listener: (href: string) => void): () => void {
 if (appOrigin && window.location.origin === appOrigin) {
   // Lets the page reserve room for the macOS traffic lights and draw its own drag region.
   // The preload runs before <html> exists, so wait for the document.
-  const markPlatform = () => { document.documentElement.dataset.desktopPlatform = process.platform }
+  // A translucent window (macOS vibrancy) also marks the page, so only its rail and list go see-through.
+  const translucent = process.argv.includes('--mikka-translucent')
+  const markPlatform = () => {
+    document.documentElement.dataset.desktopPlatform = process.platform
+    if (translucent) document.documentElement.dataset.desktopTranslucent = ''
+  }
   if (document.documentElement) markPlatform()
   else window.addEventListener('DOMContentLoaded', markPlatform, { once: true })
 
@@ -30,7 +35,15 @@ if (appOrigin && window.location.origin === appOrigin) {
       serverUrl: __MIKKA_APP_URL__,
       zeroUrl: '',
       openExternal: (url: unknown) => ipcRenderer.invoke(IPC.appOpenExternal, url),
-    prepareAuth: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareAuth, state),
+      prepareAuth: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareAuth, state),
+      claudeCallback: (authorizationUrl: unknown) => ipcRenderer.invoke(IPC.appClaudeCallback, authorizationUrl),
+      updateReady: () => ipcRenderer.invoke(IPC.appUpdateReady),
+      onUpdateReady: (listener: (version: string) => void) => {
+        const handler = (_event: IpcRendererEvent, version: string) => listener(version)
+        ipcRenderer.on(IPC.appUpdateReady, handler)
+        return () => { ipcRenderer.removeListener(IPC.appUpdateReady, handler) }
+      },
+      installUpdate: () => ipcRenderer.invoke(IPC.appInstallUpdate),
     },
     notifications: {
       show: (notification: unknown) => ipcRenderer.invoke(IPC.notificationsShow, notification),

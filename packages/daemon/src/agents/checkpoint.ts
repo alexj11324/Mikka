@@ -14,9 +14,21 @@ import { gunzipSync, gzipSync } from "node:zlib"
 
 import { execa } from "execa"
 
-import { RUN_CHECKPOINT_MAX_BYTES, type RunCheckpoint } from "@mikka/protocol"
+import { RUN_CHECKPOINT_MAX_BYTES, RUN_CHECKPOINT_RECOVERY_MAX_AGE_MS, type RunCheckpoint } from "@mikka/protocol"
 
 import { pinnedGit, snapshotTree } from "./publish"
+
+export class CheckpointRecoveryError extends Error {
+  constructor(message: string) { super(message); this.name = 'CheckpointRecoveryError' }
+}
+
+export function assertCheckpointFresh(checkpoint: RunCheckpoint, now = Date.now()) {
+  if (checkpoint.unavailableReason)
+    throw new CheckpointRecoveryError('Checkpoint exceeds the recovery size limit. Restore the original worktree before retrying.')
+  const time = Date.parse(checkpoint.takenAt)
+  if (!Number.isFinite(time) || now - time > RUN_CHECKPOINT_RECOVERY_MAX_AGE_MS)
+    throw new CheckpointRecoveryError('Checkpoint is older than the thirty-minute recovery window.')
+}
 
 /** The worktree's commit right now; a run records it as its base once. */
 export async function headCommit(
@@ -30,8 +42,8 @@ export async function headCommit(
 export interface TakenCheckpoint {
   /** The worktree's content as a tree; equal trees mean nothing changed. */
   tree: string
-  /** Null when the worktree matches its base or the patch is too large. */
-  checkpoint: RunCheckpoint | null
+  /** Clean trees and unavailable trees both supersede the previous snapshot. */
+  checkpoint: RunCheckpoint
 }
 
 /**
@@ -52,7 +64,6 @@ export async function takeCheckpoint(options: {
   )
     .split("\n")
     .filter(Boolean)
-  if (!names.length) return { tree, checkpoint: null }
   // Bytes, not text: binary patches must survive unchanged.
   const diff = (
     await git(
@@ -62,22 +73,23 @@ export async function takeCheckpoint(options: {
     )
   ).stdout as unknown as Uint8Array
   const gzipped = gzipSync(diff)
-  if (gzipped.length > RUN_CHECKPOINT_MAX_BYTES) return { tree, checkpoint: null }
+  const unavailable = gzipped.length > RUN_CHECKPOINT_MAX_BYTES
   return {
     tree,
     checkpoint: {
       baseCommit: options.baseCommit,
-      patch: gzipped.toString("base64"),
+      patch: (unavailable ? gzipSync(Buffer.alloc(0)) : gzipped).toString("base64"),
       files: names.length,
       takenAt: new Date().toISOString(),
+      ...(unavailable ? { unavailableReason: 'too_large' as const } : {}),
     },
   }
 }
 
 /**
  * Applies a checkpoint to a fresh worktree as uncommitted changes. False
- * when it does not apply (the base moved and the patch conflicts); the run
- * then goes on from the base, and its brief says to check what is there.
+ * when it does not apply. The caller must block recovery instead of starting
+ * the agent without the work it was asked to continue.
  */
 export async function applyCheckpoint(options: {
   repoPath: string
@@ -88,10 +100,9 @@ export async function applyCheckpoint(options: {
   const dir = mkdtempSync(join(tmpdir(), "mikka-checkpoint-"))
   const file = join(dir, "checkpoint.patch")
   try {
-    writeFileSync(
-      file,
-      gunzipSync(Buffer.from(options.checkpoint.patch, "base64"))
-    )
+    const patch = gunzipSync(Buffer.from(options.checkpoint.patch, "base64"))
+    if (!patch.length && options.checkpoint.files === 0) return true
+    writeFileSync(file, patch)
     for (const args of [
       ["apply", "--binary", "--whitespace=nowarn", file],
       ["apply", "--binary", "--3way", "--whitespace=nowarn", file],

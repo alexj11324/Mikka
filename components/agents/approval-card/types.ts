@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { DateRangePickerProps } from "@/components/motion/date-range-picker";
 
 export type ApprovalCardStatus =
   | "pending"
@@ -25,6 +26,10 @@ export interface ApprovalCardQuestion {
   autoAdvance?: boolean;
   allowCustom?: boolean;
   customPlaceholder?: string;
+  /** Answer with a beUI control instead of radio/checkbox rows; the value is kept as the custom answer text. */
+  input?: "select" | "switch" | "slider" | "dateRange";
+  /** Bounds for `input: "slider"`. */
+  range?: { min: number; max: number; step?: number; unit?: string };
 }
 
 export interface ApprovalCardAnswer {
@@ -54,5 +59,7 @@ export interface ApprovalCardProps {
   approveLabel?: ReactNode;
   submitLabel?: ReactNode;
   result?: ReactNode;
+  /** Mikka: locale and text for `dateRange` questions. */
+  dateRangePicker?: Pick<DateRangePickerProps, "locale" | "labels">;
   className?: string;
 }

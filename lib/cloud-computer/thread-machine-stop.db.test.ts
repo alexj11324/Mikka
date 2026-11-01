@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
+import { dropTestDatabase } from "../../tests/support/drop-test-database";
 
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
@@ -104,6 +105,22 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       assert.equal(s.tokens, 0, "no worker token was issued");
     });
 
+    await t.test("a paused thread whose sandbox is gone gets a new sandbox for the same thread", async () => {
+      const runId = await queuedRun();
+      const oldOperation = randomUUID();
+      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'sandbox-gone','snapshot-fixture',$5,'paused')`, [runId, workspaceId, owner, botId, oldOperation]);
+      const { calls, provider } = fake();
+      const { SandboxNotFoundError } = await import("e2b");
+      provider.connect = async (id) => { calls.push(`connect:${id}`); throw new SandboxNotFoundError("gone"); };
+      await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), (e: Error) => !(e instanceof SandboxNotFoundError), "it goes on past the lost sandbox");
+      assert.deepEqual(calls.slice(0, 2), ["connect:sandbox-gone", "create"], "no snapshot: the thread keeps its workspace snapshot");
+      const machine = (await pool.query('SELECT "sandboxId","operationId","snapshotId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
+      assert.notEqual(machine.operationId, oldOperation, "a new operation, so E2B creates a new sandbox");
+      assert.equal(machine.sandboxId, `sandbox-${machine.operationId}`);
+      assert.equal(machine.snapshotId, "snapshot-fixture");
+      assert.equal((await state(runId)).run.status, "queued");
+    });
+
     await t.test("control: without a stop, provisioning passes both checks (and fails later on the fake sandbox)", async () => {
       const runId = await queuedRun();
       const { calls, provider } = fake();
@@ -113,13 +130,10 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       assert.equal((await state(runId)).run.status, "queued");
     });
   } finally {
-    await pool.end();
     await appPool?.end();
     if (saved.m === undefined) delete process.env.MIKKA_DATABASE_URL; else process.env.MIKKA_DATABASE_URL = saved.m;
     if (saved.d === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = saved.d;
-    for (let i = 0; i < 100 && (await admin.query("SELECT 1 FROM pg_stat_activity WHERE datname=$1", [database])).rowCount; i++)
-      await new Promise((r) => setTimeout(r, 50));
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
+    await dropTestDatabase(admin, database, pool);
     await admin.end();
   }
 });

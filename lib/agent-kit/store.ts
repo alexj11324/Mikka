@@ -111,7 +111,7 @@ export class AgentKitStore {
       return target
     })
   }
-  async beginExecution(scope: AgentScope, executionKey: string, hostInstructions: string, runtime: DefinitionSnapshot['runtime'] | ((definition: AgentDefinition) => Promise<DefinitionSnapshot['runtime']>), defaults: AgentDefinition): Promise<AgentExecution> {
+  async beginExecution(scope: AgentScope, executionKey: string, hostInstructions: string, runtime: DefinitionSnapshot['runtime'] | ((definition: AgentDefinition) => Promise<DefinitionSnapshot['runtime']>), defaults: AgentDefinition, plugins?: (client: PoolClient) => Promise<import('@/lib/plugins/contracts').PersonalPluginSnapshot>): Promise<AgentExecution> {
     z.string().min(1).max(240).parse(executionKey)
     return this.transaction(async client => {
       const current = await this.head(client,scope,defaults)
@@ -119,6 +119,13 @@ export class AgentKitStore {
       if (existing.rows[0]) return existing.rows[0]
       const resolvedRuntime = typeof runtime === 'function' ? await runtime(current.definition) : runtime
       const id = randomUUID(); const snapshot = makeSnapshot(current.id,current.version,current.definition,hostInstructions,resolvedRuntime)
+      if (plugins) {
+        snapshot.personalPlugins = await plugins(client)
+        // Personal installations are an independent, explicit owner grant; never
+        // rewrite the saved Bot definition or an existing execution on replay.
+        if (snapshot.personalPlugins.servers.length) snapshot.effectiveTools = [...new Set([...snapshot.effectiveTools, 'list_personal_mcp_tools', 'call_personal_mcp_tool'])]
+        if (snapshot.personalPlugins.toolkits?.includes('googledrive')) snapshot.effectiveTools = [...new Set([...snapshot.effectiveTools, 'list_drive_files'])]
+      }
       await client.query('insert into agent_kit_executions(id,owner_id,bot_key,execution_key,version_id,snapshot) values($1,$2,$3,$4,$5,$6)',[id,...params(scope),executionKey,current.id,JSON.stringify(snapshot)])
       return { id,snapshot,status:'running' }
     })

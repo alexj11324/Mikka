@@ -28,8 +28,9 @@ export default defineConfig({
     command: 'pnpm exec next start --port 3100',
     url: 'http://localhost:3100/mikka/sign-in',
     reuseExistingServer: false,
-    // Opt-in harness for the credential login card (mocked API, no vault).
-    env: { MIKKA_CREDENTIAL_HARNESS: '1' },
+    // Opt-in harness for the credential login card (mocked API, no vault), and
+    // loopback custom model providers for 「API 与订阅」 (lib/model-api-keys.ts).
+    env: { MIKKA_CREDENTIAL_HARNESS: '1', MIKKA_MODEL_KEY_LOOPBACK: '1' },
     timeout: 60000,
   },
 })

@@ -5,6 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { gunzipSync, gzipSync } from 'node:zlib'
 import test from 'node:test'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dropTestDatabase } from './support/drop-test-database'
 
 test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, flag: process.env.MIKKA_BYO_E2B_KEY }
@@ -46,7 +47,8 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   const token = 'dt_' + randomBytes(24).toString('hex')
   await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values (gen_random_uuid(),$1,$2,$3,$4,now()+interval '1 hour')`, [admin, hashDeviceToken(token), device, ws.id])
   const agent = (await pool.query(`insert into agents (id,"userId",harness,name) values (gen_random_uuid(),$1,'codex','a') returning id`, [admin])).rows[0].id as string
-  const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId",status) values (gen_random_uuid(),$1,$2,$3,'running') returning id`, [agent, admin, device])).rows[0].id as string
+  // Output writes belong to a claimed live run, including its active lease.
+  const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,'running',now()+interval '10 minutes') returning id`, [agent, admin, device])).rows[0].id as string
   const call = (method: string, path: string, body: unknown) => new Request(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) })
   /** The row is committed before Next's `after()` (the wake-up) runs; outside a request it throws. */
   const afterOnly = (error: unknown) => { if (!String((error as Error)?.message).includes('outside a request scope')) throw error }
@@ -185,12 +187,10 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   })
 
   await t.test('mailbox: a run\'s peer message is masked in run_messages and coordinator_events', async () => {
-    // The mailbox schema is still review-only (docs/backend/personal-mailbox-schema.review.sql), so the
-    // write goes to a throwaway local _e2e database with that SQL applied, never to the shared test DB.
+    // The write goes to a throwaway local _e2e database built from the tracked migrations, never to the shared test DB.
     const { maskWorkerMailboxInput } = await import('../lib/personal-mailbox-runtime')
     const { SessionMailbox } = await import('../lib/session-mailbox')
     const { execFileSync } = await import('node:child_process')
-    const { readFileSync } = await import('node:fs')
     const base = new URL(dbUrl!)
     const name = `mailbox_mask_${randomBytes(8).toString('hex')}_e2e`
     const throwaway = new URL(base); throwaway.pathname = `/${name}`
@@ -198,7 +198,6 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     const mailboxPool = new Pool({ connectionString: throwaway.toString(), max: 3 })
     try {
       execFileSync(process.execPath, ['scripts/setup-e2e-db.mjs'], { env: { ...process.env, E2E_DATABASE_URL: throwaway.toString() }, stdio: 'ignore' })
-      await mailboxPool.query(readFileSync('docs/backend/personal-mailbox-schema.review.sql', 'utf8'))
       const runId = await newRun()
       const input = await maskWorkerMailboxInput(runId, { to: '', key: randomUUID(), text: `use ${SECRET} for the deploy` }) as { to: string; key: string; text: string }
       // Same ids in the throwaway DB, so the run is live there too.
@@ -217,8 +216,7 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
       const { rows: events } = await mailboxPool.query(`select payload from coordinator_events where "runId"=$1`, [runId])
       noPlain('coordinator_events', JSON.stringify(events))
     } finally {
-      await mailboxPool.end()
-      await pool.query(`drop database if exists ${name} with (force)`)
+      await dropTestDatabase(pool, name, mailboxPool)
     }
   })
 

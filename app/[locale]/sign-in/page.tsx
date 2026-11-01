@@ -12,7 +12,7 @@ import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { COMPOSIO_AUTH_CALLBACK_PATH, oauthResumePath, safeAuthReturn } from '@/lib/auth-return'
 import { oauthAccountNotLinkedProvider } from '@/lib/auth-error'
 import { authCallbackURL } from '@/lib/auth-callback'
-import { desktopAuthReturnPath, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
+import { desktopAuthCallbackPath, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale()
@@ -34,8 +34,10 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const session = await auth.api.getSession({ headers: await headers() })
   if (session?.user && !addAccount && oauthResume) redirect(withBasePath(oauthResume))
   if (session?.user && !addAccount && composioResume) redirect(composioResume)
-  if (session?.user && !addAccount && desktopFlow) redirect(desktopAuthReturnPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback))
-  if (session?.user && !addAccount) {
+  // The return route sends a refused handoff here with oauth=failed: show that, never redirect back to it.
+  const desktopRefused = Boolean(desktopFlow && query.oauth)
+  if (session?.user && !addAccount && desktopFlow && !desktopRefused) redirect(desktopAuthCallbackPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback))
+  if (session?.user && !addAccount && !desktopRefused) {
     const locale = await getLocale()
     if (next.startsWith('/?')) redirect(`${getPathname({ locale, href: '/' })}${next.slice(1)}`)
     localeRedirect({ href: next, locale })

@@ -29,15 +29,22 @@ await build({
   external: Object.keys(dependencies).flatMap(name => [name, `${name}/*`]),
   logLevel: 'warning',
 })
-for (const path of ['agents/native-container.mjs', 'agents/native-egress.mjs', 'computer/proxy.mjs', 'computer/driver.mjs']) {
+for (const path of ['agents/native-container.mjs', 'agents/native-egress.mjs', 'agents/run-container-entry.mjs', 'computer/proxy.mjs', 'computer/driver.mjs']) {
   await mkdir(dirname(resolve(out, path)), { recursive: true })
   await copyFile(resolve(root, 'src', path), resolve(out, path))
 }
 // run-context is bundled into each root entry; its stdio helper is standalone.
 await copyFile(resolve(root, 'src/agents/mikka-mcp.mjs'), resolve(out, 'mikka-mcp.mjs'))
+await copyFile(resolve(root, 'src/agents/github-credentials.mjs'), resolve(out, 'github-credentials.mjs'))
 await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })
+// The runner image's sources (run-container.ts builds it on a device with Docker).
+for (const path of ['harness/Dockerfile', 'harness/pins.json', 'harness/install.mjs', 'harness/cli.mjs']) {
+  await mkdir(dirname(resolve(out, path)), { recursive: true })
+  await copyFile(resolve(root, path), resolve(out, path))
+}
 await copyFile(resolve(root, '../../LICENSE'), resolve(out, 'LICENSE'))
 await copyFile(resolve(root, 'README.md'), resolve(out, 'README.md'))
+await copyFile(resolve(root, 'THIRD_PARTY_NOTICES.md'), resolve(out, 'THIRD_PARTY_NOTICES.md'))
 const exports = Object.fromEntries(Object.entries(source.exports).map(([key]) => [key, `./${key === '.' ? 'main' : key.slice(2)}.js`]))
 await writeFile(resolve(out, 'package.json'), `${JSON.stringify({
   name: packageName, version: source.version, description: source.description,

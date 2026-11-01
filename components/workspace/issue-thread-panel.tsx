@@ -23,13 +23,16 @@ import { ArtifactKindIcon } from '@/components/artifacts/artifact-card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AcceptanceStateBadge, useThreadAcceptance } from './factory-acceptance'
-import { FactoryAcceptancePane } from './factory-acceptance-pane'
+import { CandidateMachine, FactoryAcceptancePane } from './factory-acceptance-pane'
 
 // Loaded on demand: the window itself shows this panel, bare, on its right.
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
 import { ThreadFeedback } from './self-improvement'
+import { InlineLoadError } from '@/components/load-error'
+import { FieldError } from '@/components/ui/field'
 
-const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm whitespace-pre-wrap break-words'
+// R-32 chat: 14/22, also for the agent's Markdown inside a bubble.
+const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.5 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.5'
 
 /**
  * An open thread: a conversation between people and the agent running it (R-62, R-10).
@@ -122,6 +125,8 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
       <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{detail?.name ?? t('title')}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
+      {/* Frame 06 draws the machine in the wide centre-column header; the side panel has no room for it. */}
+      {acceptance && back && <CandidateMachine taskId={acceptance.id} />}
       {acceptance && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
         <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
       </Tabs>}
@@ -129,7 +134,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
     </header>}
     {accepting && acceptance ? <div className={cn('flex min-h-0 flex-1 flex-col', back && 'mx-auto w-full max-w-3xl')}><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
     <div className={cn('flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4', back && 'mx-auto w-full max-w-3xl')}>
-      {error ? <div role="alert" className="flex items-center gap-2 text-xs"><span className="text-destructive">{t('loadFailed')}</span><Button variant="ghost" size="xs" onClick={() => { void mutate() }}>{t('retry')}</Button></div>
+      {error ? <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -141,7 +146,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
             {items.map(item => <li key={item.id} className="flex flex-col gap-1">
               {item.kind === 'agent' && <div className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>}
               {item.kind === 'steps' && <span className="flex items-center gap-1 text-xs text-muted-foreground"><ChevronRight className="size-3.5" aria-hidden="true" />{t('steps', { harness: harnessLabel(detail?.harness ?? ''), count: item.count })}</span>}
-              {item.kind === 'error' && <p role="alert" className="text-xs text-destructive">{item.text}</p>}
+              {item.kind === 'error' && <FieldError className="text-xs">{item.text}</FieldError>}
               {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : (view?.status ?? data.thread.status) === 'succeeded' ? 'done' : 'failed'} />}
               {item.kind === 'person' && (item.mine
                 // R-14: your own words are the blue bubble on the right.
@@ -158,9 +163,9 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
     </div>
     {(active || question) && detail && <div className={cn('flex shrink-0 flex-col gap-1 p-3', back && 'mx-auto w-full max-w-3xl px-4 pb-4')}>
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
-      <ChatComposer ref={inputRef} label={t('composer', { agent: detail.agentName })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
+      <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
         sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={active || question === 'resuming'} onStop={active && data.thread.ownedByCurrentUser && !sending && !stopPending ? () => { void stop() } : undefined} />
-      {sendFailed && <p role="alert" className="px-3 text-xs text-destructive">{t('sendFailed')}</p>}
+      {sendFailed && <FieldError className="px-3 text-xs">{t('sendFailed')}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
     </>}

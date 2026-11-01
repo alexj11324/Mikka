@@ -1,4 +1,4 @@
-import { test, expect, register, rail, watchRuntime, browserClientHeaders, app, openCreateIssue } from './fixtures'
+import { test, expect, registerInTeam, rail, watchRuntime, browserClientHeaders, app, openCreateIssue } from './fixtures'
 import { controlsSelector, clickWithEffect, inspectControl } from './control-audit'
 import type { Page } from '@playwright/test'
 
@@ -9,10 +9,12 @@ const surfaces: { name: string; scope?: 'dialog' | 'menu'; prepare: (page: Page)
     await expect(page.getByRole('heading', { name: '看板', exact: true })).toBeVisible()
   } },
   { name: '成员管理', prepare: async page => {
+    // Settings sit in the window frame; one history entry keeps its 后退 enabled on every fresh page alike.
+    await page.goto(app('/'))
     await page.goto(app('/settings/members'))
     await expect(page.getByRole('button', { name: '邀请成员', exact: true })).toBeEnabled()
     // Admin-only sections join the sidebar once the role is known (S-P); freeze the list after that.
-    await expect(page.locator('[data-slot="sidebar-container"]').getByRole('link', { name: '团队权限', exact: true })).toBeVisible()
+    await expect(page.locator('[data-slot="settings-list"]').getByRole('link', { name: '团队权限', exact: true })).toBeVisible()
   } },
   { name: '邀请弹窗', scope: 'dialog', prepare: async page => {
     await page.goto(app('/settings/members'))
@@ -41,7 +43,7 @@ const surfaces: { name: string; scope?: 'dialog' | 'menu'; prepare: (page: Page)
 for (const surface of surfaces) {
   test(`自动发现可见控件并验证点击效果：${surface.name}`, async ({ page, browser, baseURL }, testInfo) => {
     test.setTimeout(180000)
-    await register(page)
+    await registerInTeam(page)
     const storageState = await page.context().storageState()
     await surface.prepare(page)
     const root = surface.scope ? page.getByRole(surface.scope) : page
@@ -49,9 +51,16 @@ for (const surface of surfaces) {
     expect(controls.length, '扫描不能空跑').toBeGreaterThan(0)
     // 打开独立页面可能让原菜单失焦关闭，必须在此前冻结完整清单，而非保留动态 nth 定位器。
     const candidates = await Promise.all(controls.map(control => inspectControl(control, page)))
+    const occurrences = new Map<string, number>()
+    const discovered = candidates.map(candidate => {
+      const key = JSON.stringify(candidate.identity)
+      const ordinal = occurrences.get(key) ?? 0
+      occurrences.set(key, ordinal + 1)
+      return { ...candidate, ordinal }
+    })
     const coverage: { label: string; status: string }[] = []
     const failures: string[] = []
-    for (const [index, { label, skip }] of candidates.entries()) {
+    for (const [index, { label, skip, identity, ordinal }] of discovered.entries()) {
       if (skip) { coverage.push({ label, status: skip }); continue }
       await test.step(`点击 ${label}`, async () => {
         // 每个候选控件使用独立页面与同一服务端会话，避免上一次的菜单/导航污染下一次。
@@ -61,8 +70,21 @@ for (const surface of surfaces) {
           const isolated = await context.newPage()
           await surface.prepare(isolated)
           const isolatedRoot = surface.scope ? isolated.getByRole(surface.scope) : isolated
-          const candidate = isolatedRoot.locator(controlsSelector).nth(index)
-          expect((await inspectControl(candidate, isolated)).label, '页面恢复后控件身份必须一致').toBe(label)
+          if (!identity) throw new Error(`控件必须具有可访问身份：${label}`)
+          // 恢复时异步加入的导航项可能改变全局顺序；只在同一身份的重名控件中保留序号。
+          let matching = isolatedRoot.getByRole(identity.role, { name: identity.name, exact: true }).and(isolatedRoot.locator(controlsSelector))
+          if (identity.href !== null) matching = matching.and(isolatedRoot.locator(`[href=${JSON.stringify(identity.href)}]`))
+          const candidate = matching.nth(ordinal)
+          const found = await matching.count() > ordinal
+          const restored = found ? await inspectControl(candidate, isolated) : null
+          if (!restored || restored.label !== label) {
+            // Diagnostics only: the restored page's own control list shows what moved or went missing.
+            const list = await Promise.all((await isolatedRoot.locator(controlsSelector).all()).map(async control => (await inspectControl(control, isolated)).label))
+            await testInfo.attach(`恢复后控件清单-${index}`, { body: JSON.stringify({ expected: label, identity, ordinal, restored: list }, null, 2), contentType: 'application/json' })
+          }
+          if (!restored) throw new Error(`页面恢复后找不到同一身份的控件：${label}`)
+          expect(restored.label, '页面恢复后控件身份必须一致').toBe(label)
+          expect(restored.identity, '页面恢复后可访问身份与链接目标必须一致').toEqual(identity)
           await clickWithEffect(isolated, candidate)
           expect(runtimeErrors, '点击不得伴随运行异常').toEqual([])
           coverage.push({ label, status: '已点击且有可观察变化' })

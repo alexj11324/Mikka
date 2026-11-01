@@ -1,9 +1,12 @@
-/** Component names a reply may open with as its whole program, the library's catalog plus its root (lib/agent-ui-catalog.ts). */
+/** Component names a reply may open with as its whole program: the library's catalog, its root and the OpenUI built-ins the Coordinator prompt lists. */
 const TOP_LEVEL_COMPONENTS = [
   'Stack', 'TextContent', 'BeCodeBlock', 'BeCard', 'BeCardGrid', 'BeImageCard', 'BeImage', 'BeButton',
-  'BeFollowUps', 'BeBadge', 'BeStat', 'BeResponse', 'BeApproval', 'BeQuestions', 'BeTodoList', 'AgentIcon',
-  'InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'ComputerCard', 'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert',
-  'ShadcnProgress', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame',
+  'BeFollowUps', 'BeStat', 'BeResponse', 'BeApproval', 'BeQuestions', 'BeTodoList', 'AgentIcon',
+  'InlineText', 'TaskChip', 'RunChip', 'SourceChip', 'ComputerCard',
+  'BeAlert', 'BeTable', 'BeTabs', 'BeCollapsible', 'BarChart', 'LineChart', 'AreaChart', 'DonutChart', 'RadialChart', 'BeFileTree', 'BeCitations', 'BeFileDiff',
+  'Tag', 'Steps', 'Form',
+  // Retired names that saved replies may still open with (legacyAgentComponentCatalog).
+  'ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnProgress', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame', 'BeBadge', 'BeTimeline',
 ]
 
 /**
@@ -25,6 +28,16 @@ function withoutFences(source: string): string {
  * is left as Markdown.
  */
 const TOP_LEVEL_CALL = new RegExp(`^\\s*(?:${TOP_LEVEL_COMPONENTS.join('|')})\\s*\\(\\s*[^\\s)]`)
+
+/** Hold ambiguous program prefixes until they become a card or ordinary prose. */
+export function isAgentUISourcePrefix(source: string): boolean {
+  const text = source.trimStart()
+  if (!text || 'root'.startsWith(text)) return true
+  if (/^root\s*$/.test(text)) return true
+  const assignment = /^root\s*=\s*/.exec(text)
+  const component = assignment ? text.slice(assignment[0].length) : text
+  return TOP_LEVEL_COMPONENTS.some(name => name.startsWith(component) || new RegExp(`^${name}\\s*(?:\\(\\s*)?$`).test(component))
+}
 
 /**
  * Whether a reply is OpenUI and the source to render. The prompt asks for

@@ -4,6 +4,7 @@ import {
   APPROVAL_MODES,
   defaultRunPolicy,
   runPolicyDigestInput,
+  runPolicySchema,
   CONFIGURABLE_ACTIONS,
   DEFAULT_NETWORK_ALLOW,
   FIXED_PERMISSIONS,
@@ -22,6 +23,15 @@ import {
   storedPermissionsSchema,
 } from "./agent-policy"
 import { runAssignmentSchema } from "./device"
+
+describe("run policy compatibility", () => {
+  it("rejects unsupported policy fields and actions instead of dropping restrictions", () => {
+    const policy = defaultRunPolicy()
+    expect(runPolicySchema.safeParse(policy).success).toBe(true)
+    expect(runPolicySchema.safeParse({ ...policy, schemaVersion: 999 }).success).toBe(false)
+    expect(runPolicySchema.safeParse({ ...policy, permissions: { ...policy.permissions, new_restricted_action: "deny" } }).success).toBe(false)
+  })
+})
 
 describe("agent policy table (ADR 0009)", () => {
   it("splits every action into fixed or configurable", () => {

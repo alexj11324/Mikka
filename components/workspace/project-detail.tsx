@@ -22,10 +22,12 @@ import { ProjectTextEditor } from './project-text-editor'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useShortcutLabel } from '@/components/shortcut-keys'
+import { usePresence } from '@/lib/use-presence'
 
 export function ProjectDetail({ project, projects, issues, userName, onBack, onOpenIssue, onCreateIssue, onUpdated }: { project: Project; projects: Project[]; issues: Awaited<ReturnType<typeof listIssues>>; userName: string; onBack: () => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void }) {
   const i18nText = useTranslations();
   const [editing, setEditing] = useState(false)
+  const editDialog = usePresence(editing)
   const [linking, setLinking] = useState(false)
   const [showDetails, setShowDetails] = useState(true)
   const detailsShortcut = useShortcutLabel(['mod', 'I'])
@@ -73,12 +75,12 @@ export function ProjectDetail({ project, projects, issues, userName, onBack, onO
         {showDetails && <aside aria-label={i18nText("Projects.detail.detailsLabel")} className="flex w-full shrink-0 flex-col gap-7 px-5 py-6 lg:w-64 lg:border-l xl:w-72">
           <section className="flex flex-col gap-4"><div className="flex items-center justify-between"><h2 className="text-sm font-medium">{i18nText("Projects.detail.properties")}</h2><Button variant="ghost" size="icon-sm" aria-label={i18nText("Projects.detail.editProperties")} onClick={() => { void afterSave(() => setEditing(true)) }}><Pencil data-icon="inline-start" /></Button></div><dl className="flex flex-col gap-2 text-sm">{([{ field: 'status', label: i18nText("Projects.fields.status") }, { field: 'health', label: i18nText("Projects.fields.health") }, { field: 'priority', label: i18nText("Projects.fields.priority") }, { field: 'lead', label: i18nText("Projects.fields.lead") }, { field: 'members', label: i18nText("Invite.roles.member") }, { field: 'startDate', label: i18nText("Projects.fields.startDate") }, { field: 'targetDate', label: i18nText("Projects.fields.targetDate") }, { field: 'labels', label: i18nText("Projects.fields.labels") }, { field: 'dependencyIds', label: i18nText("Projects.fields.dependencyIds") }] as const).map(({ field, label }) => <div key={field} className="grid grid-cols-[4rem_minmax(0,1fr)] items-center gap-2"><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0"><ProjectPropertyControl field={field} value={project} userName={userName} projects={projects} projectId={project.id} disabled={pending} plain onChange={changes => void update(project, changes)} /></dd></div>)}</dl>{saveError && <Alert variant="destructive"><AlertDescription>{saveError}</AlertDescription></Alert>}</section>
           <ProjectTeamControl project={project} disabled={pending} onUpdated={onUpdated} />
-          <section className="flex flex-col gap-4"><h2 className="text-sm font-medium">{i18nText("Projects.detail.progress")}</h2><div className="flex justify-between text-sm"><span className="text-muted-foreground">{i18nText("Projects.status.completed")} {complete} / {linked.length}</span><span>{progress}%</span></div><Progress value={progress} aria-label={i18nText("Projects.detail.progressAria")} /><p className="text-xs text-muted-foreground">{i18nText("Projects.detail.progressNote")}</p></section>
+          <section className="flex flex-col gap-4"><h2 className="text-sm font-medium">{i18nText("Projects.detail.progress")}</h2><div className="flex justify-between text-sm"><span className="text-muted-foreground">{i18nText("Projects.status.completed")} {complete} / {linked.length}</span><span>{progress}%</span></div><Progress value={progress} aria-label={i18nText("Projects.detail.progressAria")} /></section>
           <section className="flex flex-col gap-3"><h2 className="text-sm font-medium">{i18nText("Projects.detail.activity")}</h2><p className="text-xs text-muted-foreground">{i18nText("Issue.createdAt")} {new Date(project.createdAt).toLocaleDateString('zh-CN')}</p><Button variant="ghost" size="sm" onClick={() => { void afterSave(() => setTab('activity')) }}>{i18nText("Projects.detail.viewAllActivity")}</Button></section>
         </aside>}
       </div>
     </Tabs>
-    {editing && <ProjectForm project={project} projects={projects} userName={userName} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onUpdated() }} />}
+    {editDialog.value && <ProjectForm open={editDialog.open} onOpenChangeComplete={editDialog.onOpenChangeComplete} project={project} projects={projects} userName={userName} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onUpdated() }} />}
     {linking && <ProjectIssuePicker project={project} projects={projects} issues={issues} onClose={() => setLinking(false)} onSaved={() => { setLinking(false); onUpdated() }} />}
   </div>
 }

@@ -107,21 +107,25 @@ export const bots = pgTable('bots', {
   repository: text('repository'),
   /** Monthly credit cap for this bot; null uses workspace_settings.botMonthlyCreditLimit. */
   monthlyCreditLimit: integer('monthlyCreditLimit'),
+  /** Set when the owner left or was suspended; the bot stays paused until an admin takes it over (§8.3). */
+  archivedAt: timestamp('archivedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
 
 /** Personal execution preferences in the same workspace scope as Bots. The
- * fixed default rule is virtual and is never stored in this editable table. */
+ * default uses a null label and is stored alongside label rules. */
 export const executionRules = pgTable('execution_rules', {
   id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull().references(()=>users.id,{onDelete:'cascade'}),
-  workspaceId: uuid('workspaceId').notNull(), label: text('label').notNull(),
-  place: text('place').notNull().default('auto'), harness: text('harness').notNull().default('auto'),
-  model: text('model').notNull().default('auto'), position: integer('position').notNull(),
-}, table=>[index('execution_rules_scope_idx').on(table.ownerId,table.workspaceId)])
+  workspaceId: uuid('workspaceId').notNull(), label: text('label'),
+  place: text('place').notNull(), harness: text('harness').notNull(),
+  model: text('model').notNull(), position: integer('position').notNull(),
+}, table=>[index('execution_rules_scope_idx').on(table.ownerId,table.workspaceId), uniqueIndex('execution_rules_default_idx').on(table.ownerId,table.workspaceId).where(sql`${table.label} IS NULL`)])
 export const botModelChoices = pgTable('bot_model_choices', {
   ownerId:text('ownerId').notNull().references(()=>users.id,{onDelete:'cascade'}),workspaceId:uuid('workspaceId').notNull(),
-  botKey:text('botKey').notNull(),bindingId:uuid('bindingId').notNull(),
+  botKey:text('botKey').notNull(),bindingId:uuid('bindingId'),
+  /** Or a model an API key / custom provider serves (C22); exactly one of the two. */
+  apiKeyId:uuid('apiKeyId'),apiKeyModel:text('apiKeyModel'),
 }, table=>[primaryKey({columns:[table.ownerId,table.workspaceId,table.botKey]})])
 
 export const agentSessions = pgTable('agent_sessions', {
@@ -196,6 +200,8 @@ export const linearIssueDetachments = pgTable('linear_issue_detachments', {
   issueId: uuid('issueId').notNull(), ownerId: text('ownerId').notNull(),
   teamSyncId: uuid('teamSyncId'), linearIdentifier: text('linearIdentifier'),
   sourceLinkId: uuid('sourceLinkId').unique(), publicationId: uuid('publicationId'),
+  externalTargetVerified: boolean('externalTargetVerified').notNull().default(false),
+  archivedAt: timestamp('archivedAt', { withTimezone: true }),
   detachedAt: timestamp('detachedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('linear_issue_detachments_issue_idx').on(table.issueId)])
 export const linearCommentLinks = pgTable('linear_comment_links', {
@@ -205,6 +211,7 @@ export const linearCommentLinks = pgTable('linear_comment_links', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('linear_comment_links_local_key').on(table.issueLinkId, table.threadId, table.messageId)])
 export const linearSyncOutbox = pgTable('linear_sync_outbox', {
+  operation: text('operation').$type<'sync' | 'archive'>().notNull().default('sync'), archiveTarget: jsonb('archiveTarget'),
   scopeVersion: integer('scopeVersion').notNull().default(1), claimToken: uuid('claimToken'),
   id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   status: text('status').notNull().default('queued'), attempts: integer('attempts').notNull().default(0),
@@ -241,6 +248,8 @@ export const devices = pgTable('devices', {
   computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
   enabled: boolean('enabled').notNull().default(true),
+  /** 「允许自动调度」: null is the type default (servers on, personal computers off); see lib/device-auto-schedule.ts. */
+  autoSchedule: boolean('autoSchedule'),
   /** The person renamed it; a daemon re-register keeps this name. */
   nameLocked: boolean('nameLocked').notNull().default(false),
   /** Removed from settings: a tombstone that keeps run history (lib/device-removal.ts). */
@@ -271,6 +280,7 @@ export const deviceTokens = pgTable('device_tokens', {
   expiresAt: timestamp('expiresAt', { withTimezone: true }),
   lastUsedAt: timestamp('lastUsedAt', { withTimezone: true }),
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
+  revokedBy: text('revokedBy'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('device_tokens_hash_key').on(table.tokenHash), index('device_tokens_user_idx').on(table.userId)])
 
@@ -324,6 +334,8 @@ export const agentRuns = pgTable('agent_runs', {
   botId: uuid('botId').references(() => bots.id, { onDelete: 'set null' }),
   deviceId: uuid('deviceId').references(() => devices.id, { onDelete: 'set null' }),
   deviceRepoId: uuid('deviceRepoId').references(() => deviceRepos.id, { onDelete: 'set null' }),
+  /** Authenticated daemon token that claimed this run; unknown for old runs. */
+  deviceTokenId: uuid('deviceTokenId'),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
   pauseReason: text('pauseReason').$type<'human_control' | null>(),
   resumeStatus: text('resumeStatus').$type<RunStatus | null>(),
@@ -358,6 +370,15 @@ export const agentRuns = pgTable('agent_runs', {
 }, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`)])
 
 /** A verified owner/repository binding. Installation tokens are never stored. */
+/** Plugins → GitHub connection, separate from the login identity; one GitHub account may serve many users. Tokens are sealed like Better Auth's. */
+export const githubConnections = pgTable('github_connections', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  githubAccountId: text('githubAccountId').notNull(), githubLogin: text('githubLogin').notNull(),
+  accessToken: text('accessToken').notNull(), refreshToken: text('refreshToken'),
+  accessTokenExpiresAt: timestamp('accessTokenExpiresAt', { withTimezone: true }), refreshTokenExpiresAt: timestamp('refreshTokenExpiresAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const githubRepositoryInstallations = pgTable('github_repository_installations', {
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
   remoteKey: text('remoteKey').notNull(),
@@ -403,6 +424,7 @@ export const runCheckpoints = pgTable('run_checkpoints', {
   runId: uuid('runId').primaryKey().references(() => agentRuns.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(), baseCommit: text('baseCommit').notNull(),
   patch: bytea('patch').notNull(), files: integer('files').notNull(),
+  unavailableReason: text('unavailableReason').$type<'too_large' | null>(),
   takenAt: timestamp('takenAt', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -461,9 +483,18 @@ export const coordinatorEvents = pgTable('coordinator_events', {
   lastTriageAttemptAt: timestamp('lastTriageAttemptAt', { withTimezone: true }),
   /** Model response envelope bound to the event and winning attempt, not approval. */
   triageDecision: jsonb('triageDecision').$type<Record<string, unknown>>(),
+  /** Bounded, durable wake delivery; the event itself remains the outbox. */
+  wakeAttempts: integer('wakeAttempts').notNull().default(0),
+  nextWakeAt: timestamp('nextWakeAt', { withTimezone: true }).notNull().defaultNow(),
+  wakeLeaseUntil: timestamp('wakeLeaseUntil', { withTimezone: true }),
+  wakeLastError: text('wakeLastError'),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt)])
+}, table => [
+  index('coordinator_events_pending_idx').on(table.userId, table.deliveredAt, table.createdAt),
+  index('coordinator_events_wake_due_idx').on(table.nextWakeAt, table.userId, table.botId)
+    .where(sql`${table.deliveredAt} is null and ${table.wakeAttempts} < 8`),
+])
 
 /**
  * One person's Coordinator, or one of their bots (`botId`), which runs on the
@@ -708,9 +739,13 @@ export const coordinatorMessages = pgTable('coordinator_messages', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_messages_position_key').on(table.userId, table.botId, table.position).nullsNotDistinct()])
 
-/** A message a person sent a running agent, delivered on its next poll. */
+/**
+ * A message a person sent a running agent, delivered on its next poll.
+ * runId is null for personal mailbox messages, which address a mailbox
+ * (20261101020100_personal_mailbox_schema.sql); those columns are not listed.
+ */
 export const runMessages = pgTable('run_messages', {
-  id: uuid('id').primaryKey(), runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  id: uuid('id').primaryKey(), runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(), text: text('text').notNull(),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
@@ -757,20 +792,32 @@ export const conversations = pgTable('conversations', {
   createdBy: text('createdBy').notNull(), lastPosition: bigint('lastPosition', { mode: 'bigint' }).notNull().default(sql`0`),
   // Optional owner-designated current group agent; never inferred or backfilled.
   leadAgentId: uuid('leadAgentId'),
+  leadBotId: uuid('leadBotId'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 export const conversationMembers = pgTable('conversation_members', {
   conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
-  memberType: text('memberType').$type<'user' | 'agent'>().notNull(), memberId: text('memberId').notNull(),
+  memberType: text('memberType').$type<'user' | 'agent' | 'bot'>().notNull(), memberId: text('memberId').notNull(),
   role: text('role').$type<'owner' | 'member'>().notNull(),
   joinedAt: timestamp('joinedAt', { withTimezone: true }).notNull().defaultNow(), leftAt: timestamp('leftAt', { withTimezone: true }),
 }, t => [primaryKey({ columns: [t.conversationId, t.memberType, t.memberId] }), index('conversation_members_identity_idx').on(t.memberType, t.memberId)])
 export const conversationMessages = pgTable('conversation_messages', {
   id: uuid('id').primaryKey(), conversationId: uuid('conversationId').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
-  position: bigint('position', { mode: 'bigint' }).notNull(), authorType: text('authorType').$type<'user' | 'agent'>().notNull(),
+  position: bigint('position', { mode: 'bigint' }).notNull(), authorType: text('authorType').$type<'user' | 'agent' | 'bot'>().notNull(),
   authorId: text('authorId').notNull(), body: text('body').notNull(), mentions: jsonb('mentions').notNull().default([]),
   replyToId: uuid('replyToId'), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('conversation_messages_position_key').on(t.conversationId, t.position), index('conversation_messages_timeline_idx').on(t.conversationId, t.position.desc())])
+/** A person's 置顶 and 通知 for one chat: a bot's id or 'coordinator' (drizzle/20261101020600). */
+export const chatPreferences = pgTable('chat_preferences', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }), chatKey: text('chatKey').notNull(),
+  pinned: boolean('pinned').notNull().default(false), muted: boolean('muted').notNull().default(false),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.chatKey] })])
+/** A person's reaction to a bot-chat or group-chat message: one emoji each (drizzle/20261101020500). No FK: the message is in either table. */
+export const messageReactions = pgTable('message_reactions', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }), messageId: uuid('messageId').notNull(),
+  emoji: text('emoji').notNull(), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.messageId] }), index('message_reactions_message_idx').on(t.messageId)])
 // Same names/types as unmerged MIK-8 (#69); deliberately no FK: 'coordinator' is also a valid id.
 export const conversationReads = pgTable('conversation_reads', {
   userId: text('userId').notNull(), conversationId: text('conversationId').notNull(),
@@ -791,6 +838,7 @@ export const groupTurns = pgTable('group_turns', {
   userId: text('userId').notNull(),
   status: text('status').$type<'queued' | 'running' | 'complete' | 'failed'>().notNull().default('queued'),
   agentId: uuid('agentId'), activeRunId: uuid('activeRunId'), route: jsonb('route'), error: text('error'),
+  botId: uuid('botId'), modelSelections: jsonb('modelSelections').notNull().default({}),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [index('group_turns_queue_idx').on(t.conversationId, t.status, t.createdAt)])
@@ -891,9 +939,12 @@ export const runCaptureShares = pgTable('run_capture_shares', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('run_capture_shares_token_key').on(table.tokenHash), index('run_capture_shares_capture_idx').on(table.captureId)])
 /**
- * Something an agent wants to do in the person's own accounts (send an email,
- * create or change a calendar event). It stays `pending` until the person
- * approves or declines it; approving runs exactly `input` (lib/pending-actions.ts).
+ * Something an agent does in the person's own accounts (send an email,
+ * create or change a calendar event, or an agent-run write). A write the
+ * connection and policy allow is inserted `running` with no `decidedAt` and
+ * stays as the record. One that needs approval stays `pending` until the
+ * person approves or declines it; approving runs exactly `input`
+ * (lib/pending-actions.ts).
  * `context` is what the card shows besides the input, such as the event being changed.
  */
 export const PENDING_ACTION_STATUSES = ['pending', 'running', 'done', 'failed', 'declined'] as const
@@ -992,7 +1043,7 @@ export const userPreferences = pgTable('user_preferences', {
   userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   pushDecide: boolean('pushDecide').notNull().default(true),
   pushReview: boolean('pushReview').notNull().default(true),
-  pushFinished: boolean('pushFinished').notNull().default(false),
+  pushFinished: boolean('pushFinished').notNull().default(true),
   pushBriefing: boolean('pushBriefing').notNull().default(true),
   pushWhen: text('pushWhen').$type<PushWhen>().notNull().default('always'),
   memoryEnabled: boolean('memoryEnabled').notNull().default(true),

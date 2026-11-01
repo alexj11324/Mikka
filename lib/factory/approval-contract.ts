@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { bindingSchema, candidateSchema } from "./contract";
+import { revisionBindingSchema, candidateSchema } from "./contract";
 export {
   bindingSchema,
   candidateSchema,
@@ -18,13 +18,14 @@ export const publicationAction = z.enum([
 ]);
 export const approvalRequest = z
   .object({
-    binding: bindingSchema,
+    binding: revisionBindingSchema,
     eventId: z.uuid(),
     candidate: candidateSchema,
     action: publicationAction,
     target: z.string().trim().min(1).max(2000),
     targetEnvironment: z.string().trim().min(1).max(4000),
-    expiresAt: z.iso.datetime(),
+    // Accepted for old clients; approval now starts publication immediately.
+    expiresAt: z.iso.datetime().optional(),
     // Compatibility with older clients only; human approval does not require a read receipt.
     evidenceDigest: z
       .string()
@@ -35,7 +36,7 @@ export const approvalRequest = z
   .strict();
 export const approvalControl = z
   .object({
-    binding: bindingSchema,
+    binding: revisionBindingSchema,
     eventId: z.uuid(),
     approvalId: z.uuid(),
   })
@@ -43,7 +44,7 @@ export const approvalControl = z
 /** Human "request changes": sends the exact candidate back to execute. */
 export const rejectRequest = z
   .object({
-    binding: bindingSchema,
+    binding: revisionBindingSchema,
     eventId: z.uuid(),
     candidateId: z.uuid(),
     note: z.string().trim().max(2000).optional(),

@@ -29,7 +29,7 @@ async function fixture(browser: Browser, use: (value: {
   allowedCookieSeen: () => boolean; failures: string[]
   initialPopupHits: () => number
   detachProtection: () => Promise<void>
-}) => Promise<void>, options: { failProtocolAbort?: boolean; expectFailure?: boolean; failClose?: 'page' | 'context'; localImage?: boolean } = {}) {
+}) => Promise<void>, options: { failProtocolAbort?: boolean; expectFailure?: boolean; failClose?: 'page' | 'context'; localImage?: boolean; slowLease?: boolean; pausedLease?: { entered: () => void; released: Promise<void>; canceled: () => void; continued?: () => void } } = {}) {
   let foreignRequests = 0, websocketRequests = 0, allowedCookie = false, initialPopupRequests = 0
   const foreign = createServer((_request, response) => {
     foreignRequests++
@@ -48,6 +48,11 @@ async function fixture(browser: Browser, use: (value: {
     if (path === '/foreign-via') return redirect('/foreign-middle')
     if (path === '/foreign-middle') return redirect(`${foreignOrigin}/blocked`, 307)
     if (path === '/fixture-image') return redirect(`${foreignOrigin}/fixture.png`)
+    if (path === '/busy') {
+      response.setHeader('content-type', 'text/html')
+      response.end("<p>controlled allowed response</p><script>setInterval(() => { fetch('/poll?' + Math.random()).catch(() => {}) }, 5)</script>")
+      return
+    }
     if (path === '/popup') { response.setHeader('content-type', 'text/html'); response.end('<a id="foreign" target="_blank" href="/foreign-via">foreign chain</a><a id="same" target="_blank" href="/same-start">same chain</a>'); return }
     if (path === '/worker.js') {
       response.setHeader('content-type', 'text/javascript')
@@ -98,10 +103,32 @@ async function fixture(browser: Browser, use: (value: {
       } })
     }
     const protectionSessions: CDPSession[] = []
+    const pausedLease = options.pausedLease
+    let holdLease = false
     const createSession = context.newCDPSession.bind(context)
     Object.defineProperty(context, 'newCDPSession', { value: async (page: Parameters<typeof createSession>[0]) => {
       const session = await createSession(page)
       protectionSessions.push(session)
+      if (pausedLease) {
+        let pendingNetworkId: string | undefined
+        let pendingRequestId: string | undefined
+        session.on('Fetch.requestPaused', event => {
+          if (new URL(event.request.url).pathname === '/pending-cancel') {
+            pendingNetworkId = event.networkId
+            pendingRequestId = event.requestId
+            holdLease = true
+          }
+        })
+        session.on('Network.loadingFailed', event => {
+          if (pendingNetworkId && event.requestId === pendingNetworkId && event.canceled === true) pausedLease.canceled()
+        })
+        await session.send('Network.enable')
+        const send = session.send.bind(session)
+        Object.defineProperty(session, 'send', { value: async (method: string, params?: { requestId?: string }) => {
+          try { return await Reflect.apply(send, session, [method, params]) }
+          finally { if (method === 'Fetch.continueRequest' && params?.requestId === pendingRequestId) pausedLease.continued?.() }
+        } })
+      }
       if (options.failClose === 'page') {
         Object.defineProperty(page, 'close', { configurable: true, value: async () => { throw new Error('SYNTHETIC_CLOSE_FAILURE') } })
       }
@@ -114,7 +141,11 @@ async function fixture(browser: Browser, use: (value: {
       }
       return session
     } })
-    await installAccountOriginFence(context, { assertActive: async () => {} }, origin,
+    await installAccountOriginFence(context, { assertActive: async () => {
+      // The pooled lease check is a database round trip, not a microtask.
+      if (options.slowLease) await new Promise(resolve => setTimeout(resolve, 2))
+      if (holdLease && pausedLease) { holdLease = false; pausedLease.entered(); await pausedLease.released }
+    } }, origin,
       () => { blocked++ }, () => { failures.push('ORIGIN_FENCE_FAILED') },
       options.localImage ? [{ url: `${foreignOrigin}/fixture.png`, body: SYNTHETIC_PNG }] : [])
     await use({ context, origin, foreignOrigin, blocked: () => blocked,
@@ -190,6 +221,78 @@ test('origin fence preserves same-origin redirect cookies and streaming browser 
     await nextPage.goto(`${f.origin}/final`)
     await expect(nextPage.locator('p')).toHaveText('controlled allowed response')
   })
+})
+
+test('origin fence survives an exact canceled request during its lease check and still fences after reload', async ({ browser }) => {
+  let releaseLease!: () => void
+  const released = new Promise<void>(resolve => { releaseLease = resolve })
+  let entered = false, canceled = false
+  try {
+    await fixture(browser, async f => {
+      const page = await f.context.newPage()
+      await page.goto(`${f.origin}/final`)
+      const controller = await page.evaluateHandle(() => new AbortController())
+      await page.evaluate(abort => { void fetch('/pending-cancel', { signal: abort.signal }).catch(() => {}) }, controller)
+      await expect.poll(() => entered).toBe(true)
+      await controller.evaluate(abort => abort.abort())
+      await expect.poll(() => canceled).toBe(true)
+      releaseLease()
+      await controller.dispose()
+      await page.reload()
+      await expect(page.locator('p')).toHaveText('controlled allowed response')
+      expect(f.context.isClosed()).toBe(false)
+      expect(f.failures).toEqual([])
+      expect(await page.evaluate(async () => {
+        try { await fetch('/foreign-via'); return false } catch { return true }
+      })).toBe(true)
+      await expect.poll(f.blocked).toBe(1)
+      expect(f.foreignHits()).toBe(0)
+    }, { pausedLease: { entered: () => { entered = true }, released, canceled: () => { canceled = true } } })
+  } finally { releaseLease() }
+})
+
+test('origin fence survives reload replacing a paused subrequest document without a loadingFailed event', async ({ browser }) => {
+  let releaseLease!: () => void, continued!: () => void
+  const released = new Promise<void>(resolve => { releaseLease = resolve })
+  const resumed = new Promise<void>(resolve => { continued = resolve })
+  let entered = false
+  try {
+    await fixture(browser, async f => {
+      const page = await f.context.newPage()
+      await page.goto(`${f.origin}/final`)
+      await page.evaluate(() => { void fetch('/pending-cancel').catch(() => {}) })
+      await expect.poll(() => entered).toBe(true)
+      // Chromium retires this paused interception when committing the new
+      // document, but need not emit loadingFailed on the fence's CDP session.
+      await page.reload()
+      releaseLease()
+      await resumed
+      await expect(page.locator('p')).toHaveText('controlled allowed response')
+      expect(f.context.isClosed()).toBe(false)
+      expect(await page.evaluate(async () => {
+        try { await fetch('/foreign-via'); return false } catch { return true }
+      })).toBe(true)
+      await expect.poll(f.blocked).toBe(1)
+      expect(f.foreignHits()).toBe(0)
+      expect(f.failures).toEqual([])
+    }, { pausedLease: { entered: () => { entered = true }, released, canceled: () => {}, continued } })
+  } finally { releaseLease() }
+})
+
+test('origin fence survives reloads that discard many paused same-origin requests', async ({ browser }) => {
+  await fixture(browser, async f => {
+    const page = await f.context.newPage()
+    await page.goto(`${f.origin}/busy`)
+    for (let reload = 0; reload < 10; reload++) await page.reload()
+    await expect(page.locator('p')).toHaveText('controlled allowed response')
+    expect(f.context.isClosed()).toBe(false)
+    expect(await page.evaluate(async () => {
+      try { await fetch('/foreign-via'); return false } catch { return true }
+    })).toBe(true)
+    await expect.poll(f.blocked).toBe(1)
+    expect(f.foreignHits()).toBe(0)
+    expect(f.failures).toEqual([])
+  }, { slowLease: true })
 })
 
 test('origin fence blocks direct and same-origin-then-cross-port redirect hops before the sink receives a request', async ({ browser }) => {

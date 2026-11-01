@@ -18,6 +18,7 @@
 import { z } from "zod"
 
 import { modelNameSchema, runPolicySchema } from "./agent-policy"
+import { signedPolicySnapshotSchema } from "./policy-snapshot"
 import { harnessInfoSchema, harnessSchema } from "./harness"
 import { quotaSnapshotSchema } from "./quota"
 import { runStopReason, runBenchmarkContext } from "./run"
@@ -106,6 +107,23 @@ export const devicePaths = {
 
 /** `POST /v1/devices/register` */
 export const deviceComputerCapability = z.object({ installed: z.boolean(), version: z.string().max(100).nullable() }).strict()
+/**
+ * What this machine can run (2026-10-31, devices are runners): the daemon
+ * installs its own pinned harnesses, so this reports their install state,
+ * never which agents the person installed.
+ */
+export const deviceRunnerCapability = z.object({
+  os: z.string().max(50),
+  arch: z.string().max(50),
+  freeDiskBytes: z.number().int().nonnegative().nullable(),
+  docker: z.boolean(),
+  harnesses: z.array(z.object({
+    harness: harnessSchema,
+    state: z.enum(["installed", "not_installed", "unsupported"]),
+    version: z.string().max(100),
+  })).max(20),
+})
+export type DeviceRunnerCapability = z.infer<typeof deviceRunnerCapability>
 export const deviceRegistration = z.object({
   deviceType: z.enum(["laptop", "server"]).optional(),
   name: z.string().trim().min(1).max(200),
@@ -116,6 +134,7 @@ export const deviceRegistration = z.object({
   protocolVersion: z.number().int(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
+  runner: deviceRunnerCapability.optional(),
   /**
    * This machine's one device id, the same in every workspace (ADR ORV-284).
    * Registering with it in another workspace joins the same device there.
@@ -151,6 +170,7 @@ export const deviceHeartbeatSchema = z.object({
   failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
+  runner: deviceRunnerCapability.optional(),
   deviceType: z.enum(["laptop", "server"]).optional(),
   runs: z.array(heartbeatRunSchema).max(500),
   worktreeDiskBytes: z.number().int().nonnegative(),
@@ -181,6 +201,10 @@ export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
 
 /** Largest gzipped checkpoint patch the server keeps. */
 export const RUN_CHECKPOINT_MAX_BYTES = 8 * 1024 * 1024
+/** This daemon enforces requireWorktreeContinuation before starting an agent. */
+export const RECOVERY_WORKTREE_HEADER = 'x-mikka-recovery-worktree'
+/** Longest an automatic cross-machine recovery uses an uploaded snapshot. */
+export const RUN_CHECKPOINT_RECOVERY_MAX_AGE_MS = 30 * 60_000
 
 /**
  * A run's work in progress, saved by the daemon (never the agent) after
@@ -199,6 +223,8 @@ export const runCheckpointSchema = z.object({
   /** Files the patch touches. */
   files: z.number().int().nonnegative(),
   takenAt: isoTime,
+  /** The latest tree could not be checkpointed; it supersedes older patches. */
+  unavailableReason: z.literal('too_large').optional(),
 })
 export type RunCheckpoint = z.infer<typeof runCheckpointSchema>
 
@@ -322,7 +348,16 @@ export const runAssignmentSchema = z.object({
    * it stops working when the run ends. Absent: the server could not issue
    * one, and the run goes ahead without it.
    */
-  mcp: z.object({ url: z.url(), token: z.string().min(1).max(200), mailbox: z.literal(true).optional() }).optional(),
+  mcp: z.object({
+    url: z.url(), token: z.string().min(1).max(200), mailbox: z.literal(true).optional(),
+    /** Apps (Composio toolkits) this run may use through the Mikka server, one MCP entry each. */
+    apps: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional(),
+  }).optional(),
+  /** Agent-owned GitHub delivery; the same run token exchanges short-lived credentials. */
+  github: z.object({
+    endpoint: z.url(), repository: z.string().regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
+    branch: z.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/),
+  }).strict().optional(),
   /** Question continuation must not silently open a different session. */
   /**
    * What the orchestrator dispatched this run for (ADR 0023). `plan` writes a
@@ -335,11 +370,14 @@ export const runAssignmentSchema = z.object({
    * branch, so nothing the earlier run left uncommitted is lost.
    */
   continuesRunId: id.optional(),
+  /** A same-device retry with no usable snapshot must reuse its real worktree. */
+  requireWorktreeContinuation: z.literal(true).optional(),
   /**
    * The latest checkpoint of the attempt this run takes over after its
    * machine went offline. Used only for a new worktree (another machine, or
    * the earlier worktree is gone): it starts at `baseCommit` (the base
-   * branch when that commit is not here) with the patch applied.
+   * commit with the patch applied. Missing or unusable recovery data blocks
+   * the attempt rather than silently starting again from the base branch.
    */
   resumeFrom: runCheckpointSchema.optional(),
   /**
@@ -363,6 +401,9 @@ export const runAssignmentSchema = z.object({
   policy: runPolicySchema.optional(),
   /** Trusted server revision for the exact run policy; older servers omit it. */
   policyRevision: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  /** Only a trusted server context can make a snapshot required. */
+  policySnapshotRequired: z.boolean().optional(),
+  policySnapshot: signedPolicySnapshotSchema.optional(),
   /**
    * The skills mounted on this run's agent and still enabled, resolved at
    * claim time the way `policy` is. The daemon inlines them into the agent's

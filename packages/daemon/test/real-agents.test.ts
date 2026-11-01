@@ -13,6 +13,7 @@ import { join } from "node:path"
 import { execa } from "execa"
 import { afterAll, describe, expect, it } from "vitest"
 
+import { ToolApprovalGate } from "../src/agents/tool-approval"
 import { Daemon } from "../src/main"
 import { MemoryServer } from "../src/server-link"
 import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
@@ -51,10 +52,13 @@ async function setup() {
 }
 
 async function boot(server: MemoryServer, dataDir: string) {
+  // The HTTP link supplies this gate in production; this run allows every tool.
+  const link = server.link()
+  link.prepareRunToolApproval = async assignment => new ToolApprovalGate(assignment.runId, { permission: () => 'allow', ask: async () => 'deny', isLive: () => true })
   const daemon = await new Daemon({
     dataDir,
     flavor: "dev",
-    link: server.link(),
+    link,
     credential: "cred-real",
     heartbeatMs: 1000,
   }).start()
@@ -173,7 +177,7 @@ describe.skipIf(HARNESSES.length === 0)("real agent CLIs", () => {
     it(
       `${harness}: edits in a sandboxed worktree, hands in, gets committed and pushed`,
       async () => {
-        const { origin, server, daemon } = await setup()
+        const { repo, server, daemon } = await setup()
         expect(daemon.status().harnesses.map((h) => h.harness)).toContain(
           harness
         )
@@ -217,9 +221,10 @@ describe.skipIf(HARNESSES.length === 0)("real agent CLIs", () => {
           pushed: true,
         })
         // The branch really is on the remote, with the agent's file.
+        // The cached clone's remote is the source repository.
         const { stdout } = await execa("git", [
           "--git-dir",
-          origin,
+          join(repo, ".git"),
           "show",
           `mikka/run-${runId}:src/greet.mjs`,
         ])

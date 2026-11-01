@@ -1,12 +1,14 @@
 import { test, expect, app, register, seedCoordinatorError, seedHostedVerification } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
-// 免费额度, 余额 and the Mikka 默认 notices (Figma BIL-*, ALW-*) on the #531 backend.
-// #558 (Checkout card verification) and #559 (points purchase) are not on main,
-// so the card row reads 暂不可用 and 充值 is unavailable; verification and the
-// allowance are seeded in the database as Stripe's webhook would leave them.
+// No Stripe keys: real actions report unavailable and cannot contact Stripe.
+// Verification and its allowance are seeded as the webhook would leave them.
 
-test('计费：未验证时显示免费额度和余额；Checkout 未上线时显示暂不可用', async ({ page }, testInfo) => {
+test.beforeAll(() => {
+  expect(process.env.STRIPE_SECRET_KEY, 'This spec requires Stripe to be unconfigured').toBeFalsy()
+})
+
+test('计费：未验证时显示免费额度和余额；Stripe 未配置时显示暂不可用', async ({ page }, testInfo) => {
   await register(page, '/settings?section=billing')
   const allowance = page.getByRole('region', { name: '免费额度' })
   await expect(allowance.getByText('银行卡验证', { exact: true })).toBeVisible()
@@ -19,16 +21,18 @@ test('计费：未验证时显示免费额度和余额；Checkout 未上线时�
   await expect(page.getByText('充值暂不可用')).toBeVisible()
 })
 
-test('计费：从 Checkout 返回且已验证时，免费额度消失，$1 计入余额', async ({ page }, testInfo) => {
+test('计费：Stripe 未配置时返回仍显示暂不可用，已赠送的 $1 保留在余额', async ({ page }, testInfo) => {
   await register(page, '/settings?section=billing')
   await expect(page.getByRole('region', { name: '免费额度' })).toBeVisible()
   await seedHostedVerification(page, 1_000_000)
   await page.goto(app('/settings?section=billing&verify=success&session_id=cs_test_fixture'))
-  await expect(page.getByText('银行卡已验证')).toBeVisible()
-  await expect(page.getByRole('region', { name: '免费额度' })).toHaveCount(0)
+  const allowance = page.getByRole('region', { name: '免费额度' })
+  await expect(allowance.getByRole('status')).toHaveText('正在确认…')
+  await expect(allowance.getByRole('status')).toHaveText('暂不可用', { timeout: 25_000 })
+  await expect(page.getByText('银行卡已验证', { exact: true })).toHaveCount(0)
   await expect(page.locator('[data-slot="balance"]')).toHaveText('100 点')
   await expect(page).not.toHaveURL(/verify=|session_id=/)
-  await attachLightDark(page, testInfo, 'billing-verified')
+  await attachLightDark(page, testInfo, 'billing-return-unavailable')
 })
 
 test('用量：显示余额', async ({ page }, testInfo) => {

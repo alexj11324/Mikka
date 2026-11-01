@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { generateKeyPairSync } from 'node:crypto'
 import test from 'node:test'
-import { githubRepository, openRunPullRequest, PublicationError, verifyGitHubRepositoryAccess } from './run-pull-request'
+import { githubRepository, issueRunGitHubInstallationToken, openRunPullRequest, PublicationError, revokeRunGitHubInstallationToken, verifyGitHubRepositoryAccess } from './run-pull-request'
 
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs1', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } })
 const env = { GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey }
@@ -24,7 +24,7 @@ function stub(options: { title?: string; permission?: string; userId?: number; p
     const authorization = new Headers(init?.headers).get('authorization') ?? ''
     calls.push({ path, method, body, authorization })
     if (path.endsWith('/installation')) return options.installed === false ? Response.json({}, { status: 404 }) : Response.json({ id: 99, suspended_at: null, permissions: { pull_requests: options.prPermission ?? 'write', contents: 'read' } })
-    if (path.endsWith('/access_tokens')) return Response.json({ token: body?.permissions?.pull_requests === 'write' ? 'synthetic-write-token' : 'synthetic-read-token' })
+    if (path.endsWith('/access_tokens')) return Response.json({ token: body?.permissions?.pull_requests === 'write' ? 'synthetic-write-token' : 'synthetic-read-token', expires_at: '2099-01-01T00:00:00Z' })
     if (path === '/user/456') return options.forbiddenUser ? Response.json({}, { status: 404 }) : Response.json({ id: options.userId ?? 456, login: 'new-login' })
     if (path.endsWith('/collaborators/new-login/permission')) return Response.json({ permission: options.permission ?? 'write', user: { id: options.userId ?? 456, login: 'new-login' } })
     if (path === '/repos/owner/repo') return Response.json({ id: 789, full_name: 'owner/repo', default_branch: 'trunk' })
@@ -46,6 +46,32 @@ function stub(options: { title?: string; permission?: string; userId?: number; p
   }) as typeof fetch
   return { calls, fetcher }
 }
+
+test('worker token is limited to the verified repository and can push, create PRs and read CI', async () => {
+  const { calls, fetcher } = stub()
+  assert.deepEqual(await issueRunGitHubInstallationToken({ ...input, fetcher }), { token: 'synthetic-write-token', expiresAt: '2099-01-01T00:00:00Z' })
+  const tokens = calls.filter(call => call.path.endsWith('/access_tokens'))
+  assert.deepEqual(tokens[1].body, { repository_ids: [789], permissions: {
+    contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read',
+  } })
+  assert.ok(calls.findIndex(call => call.path.includes('/permission')) < calls.indexOf(tokens[1]))
+})
+
+test('a connected user without repository write access never receives a worker token', async () => {
+  const { calls, fetcher } = stub({ permission: 'read' })
+  await assert.rejects(issueRunGitHubInstallationToken({ ...input, fetcher }), PublicationError)
+  assert.equal(calls.filter(call => call.body?.permissions && (call.body.permissions as Record<string, unknown>).contents === 'write').length, 0)
+})
+
+test('revocation uses the minted token itself and never follows redirects', async () => {
+  await revokeRunGitHubInstallationToken('synthetic-expired-grant', (async (url, init) => {
+    assert.equal(url, 'https://api.github.com/installation/token')
+    assert.equal(init?.method, 'DELETE')
+    assert.equal(init?.redirect, 'error')
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer synthetic-expired-grant')
+    return new Response(null, { status: 204 })
+  }) as typeof fetch)
+})
 
 test('requires canonical github.com identity; user-controlled URLs cannot receive credentials', () => {
   assert.deepEqual(githubRepository('v2/github.com/a/b'), { owner: 'a', repo: 'b', path: '/repos/a/b' })

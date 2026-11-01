@@ -2,7 +2,6 @@
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { defaultAgentCopy as agentCopy } from '@/lib/agent-copy'
-import { Info } from 'lucide-react'
 import { AgentApproval, AgentQuestions, useAgentDecision } from './agent-decision'
 import { AgentCodeContent, AgentContent, AgentStatusIcon, AgentTasks, AgentTextContent } from './agent-content'
 import { AgentImage } from './agent-image'
@@ -11,22 +10,19 @@ import { AgentImageCard } from './agent-image-card'
 import { CitationChip, WebCitation } from './agent-citations'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { Button as BeButton } from '@/components/motion/button/base'
-import { AnimatedBadge } from '@/components/motion/animated-badge'
 import { AnimatedNumber } from '@/components/motion/animated-number'
 import { Card as BeCard, CardContent as BeCardContent, CardDescription as BeCardDescription, CardHeader as BeCardHeader, CardTitle as BeCardTitle } from '@/components/motion/card'
-import { createAgentLibrary, type AgentComponentRenderers } from '@/lib/agent-ui-catalog'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { createAgentLibrary, type AgentComponentRenderers, type LegacyAgentComponentRenderers } from '@/lib/agent-ui-catalog'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress, ProgressLabel, ProgressValue } from '@/components/ui/progress'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert as ReuiAlert, AlertDescription as ReuiAlertDescription, AlertTitle as ReuiAlertTitle } from '@/components/reui/alert'
-import { Badge as ReuiBadge } from '@/components/reui/badge'
+import type { StatusTone } from '@/lib/status-appearance'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AgentTextBubble, InsideBlock } from './agent-text-bubble'
-import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from '@/components/reui/frame'
+import { Alert as BeAlert, AlertContent as BeAlertContent, AlertDescription as BeAlertDescription, AlertIcon as BeAlertIcon, AlertTitle as BeAlertTitle } from '@/components/motion/alert'
+import { Collapsible as BeCollapsible, CollapsibleContent as BeCollapsibleContent, CollapsibleIndicator as BeCollapsibleIndicator, CollapsibleTrigger as BeCollapsibleTrigger } from '@/components/motion/collapsible'
+import { Tabs as BeTabs, TabsContent as BeTabsContent, TabsList as BeTabsList, TabsTrigger as BeTabsTrigger } from '@/components/motion/tabs'
+import { AgentAreaChart, AgentBarChart, AgentDonutChart, AgentLineChart, AgentRadialChart } from './agent-chart'
+import { AgentCitations, AgentFileDiff, AgentFileTree, AgentTable } from './agent-report'
+import { AgentEditableTable } from './agent-editable-table'
 
 const renderers = {
   TextContent: AgentTextContent,
@@ -47,7 +43,6 @@ const renderers = {
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
     </div>
   },
-  BeBadge: ({ props }) => <AnimatedBadge status={props.status} size="sm" pulse={false}>{props.text}</AnimatedBadge>,
   BeStat: ({ props }) => {
     const formatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: props.precision ?? 0, maximumFractionDigits: props.precision ?? 0 })
     return <BeCard size="compact" className="min-w-0">
@@ -69,44 +64,57 @@ const renderers = {
   RunChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="run" />,
   SourceChip: ({ props }) => <WebCitation url={props.url} label={props.label ?? null} />,
   ComputerCard: ({ props }) => <ComputerCard {...props} />,
-  ShadcnCard: ({ props, renderNode }) => <Card size="sm" className="min-w-0">
-    <CardHeader><CardTitle>{props.title}</CardTitle>{props.description && <CardDescription>{props.description}</CardDescription>}</CardHeader>
-    <CardContent className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</CardContent>
-  </Card>,
-  ShadcnBadge: ({ props }) => <Badge variant={props.variant}>{props.text}</Badge>,
-  ShadcnAlert: ({ props }) => <Alert variant={props.variant} role="note"><Info aria-hidden="true" /><AlertTitle>{props.title}</AlertTitle><AlertDescription>{props.description}</AlertDescription></Alert>,
-  ShadcnProgress: ({ props }) => <Progress value={props.value}><ProgressLabel>{props.label}</ProgressLabel><ProgressValue /></Progress>,
-  ShadcnAccordion: ({ props }) => <Accordion multiple={props.multiple}>
-    {(props.items ?? []).map((item, index) => <AccordionItem key={index} value={String(index)}><AccordionTrigger>{item.title}</AccordionTrigger><AccordionContent>{item.content}</AccordionContent></AccordionItem>)}
-  </Accordion>,
-  ShadcnTabs: ({ props, renderNode }) => <Tabs defaultValue="0" className="min-w-0">
-    <TabsList className="max-w-full overflow-x-auto">{(props.items ?? []).map((item, index) => <TabsTrigger key={index} value={String(index)}>{item.title}</TabsTrigger>)}</TabsList>
-    {(props.items ?? []).map((item, index) => <TabsContent key={index} value={String(index)} className="flex min-w-0 flex-col gap-3">{renderNode(item.children)}</TabsContent>)}
-  </Tabs>,
-  ShadcnTable: ({ props }) => <Table>
-    <TableHeader><TableRow>{(props.columns ?? []).map((column, index) => <TableHead key={index}>{column}</TableHead>)}</TableRow></TableHeader>
-    <TableBody>{(props.rows ?? []).map((row, index) => <TableRow key={index}>{(row ?? []).map((cell, cellIndex) => <TableCell key={cellIndex}>{cell}</TableCell>)}</TableRow>)}</TableBody>
-  </Table>,
-  ShadcnButton: function PromptButton({ props }) {
-  const agentCopy = useAgentCopy()
-
-    const { send, sent, error, status } = useAgentDecision()
-    return <div className="flex min-w-0 flex-col gap-2">
-      <Button type="button" variant={props.variant} disabled={status !== 'pending'} onClick={() => { void send(props.prompt) }}>{sent ? agentCopy.asked : props.label === agentCopy.fillQuestion ? agentCopy.askNow : props.label}</Button>
-      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-    </div>
-  },
-  ReuiBadge: ({ props }) => <ReuiBadge variant={props.variant ?? 'outline'}>{props.text}</ReuiBadge>,
-  ReuiAlert: ({ props }) => <ReuiAlert variant={props.variant} role="note"><Info aria-hidden="true" /><ReuiAlertTitle>{props.title}</ReuiAlertTitle><ReuiAlertDescription>{props.description}</ReuiAlertDescription></ReuiAlert>,
-  ReuiFrame: ({ props, renderNode }) => <Frame spacing="sm" className="min-w-0">
-    <FrameHeader><FrameTitle>{props.title}</FrameTitle>{props.description && <FrameDescription>{props.description}</FrameDescription>}</FrameHeader>
-    <FramePanel className="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</FramePanel>
-  </Frame>,
+  BeAlert: ({ props }) => <BeAlert variant={props.variant} role="status"><BeAlertIcon /><BeAlertContent><BeAlertTitle>{props.title}</BeAlertTitle><BeAlertDescription>{props.description}</BeAlertDescription></BeAlertContent></BeAlert>,
+  BeTable: ({ props }) => <AgentTable columns={props.columns} rows={props.rows} />,
+  EditableTable: ({ props }) => <AgentEditableTable name={props.name} columns={props.columns} data={props.data} />,
+  BeTabs: ({ props, renderNode }) => <BeTabs defaultValue="0" variant="underline" className="min-w-0">
+    <BeTabsList>{(props.items ?? []).map((item, index) => <BeTabsTrigger key={index} value={String(index)}>{item.title}</BeTabsTrigger>)}</BeTabsList>
+    {(props.items ?? []).map((item, index) => <BeTabsContent key={index} value={String(index)} className="flex min-w-0 flex-col gap-3 pt-3">{renderNode(item.children)}</BeTabsContent>)}
+  </BeTabs>,
+  BeCollapsible: ({ props, renderNode }) => <BeCollapsible defaultOpen={props.defaultOpen} className="min-w-0">
+    <BeCollapsibleTrigger>{props.title}<BeCollapsibleIndicator /></BeCollapsibleTrigger>
+    <BeCollapsibleContent contentClassName="flex min-w-0 flex-col gap-3">{renderNode(props.children)}</BeCollapsibleContent>
+  </BeCollapsible>,
+  BarChart: ({ props }) => <AgentBarChart labels={props.labels} series={props.series} horizontal={props.horizontal} unit={props.unit} />,
+  LineChart: ({ props }) => <AgentLineChart labels={props.labels} series={props.series} unit={props.unit} />,
+  AreaChart: ({ props }) => <AgentAreaChart labels={props.labels} series={props.series} unit={props.unit} />,
+  DonutChart: ({ props }) => <AgentDonutChart slices={props.slices} unit={props.unit} total={props.total} />,
+  RadialChart: ({ props }) => <AgentRadialChart label={props.label} used={props.used} limit={props.limit} unit={props.unit} />,
+  // UI policy draws no horizontal rules: a section break is space, still announced as a separator.
+  Separator: () => <div role="separator" className="h-2" />,
+  BeFileTree: ({ props }) => <AgentFileTree paths={props.paths} />,
+  BeCitations: ({ props }) => <AgentCitations sources={props.sources} />,
+  BeFileDiff: ({ props }) => <AgentFileDiff file={props.file} diff={props.diff} language={props.language} />,
 } satisfies AgentComponentRenderers
 
-// Replies flow through these; every other component is a block, and text inside it gets no bubble.
-const FLOW = new Set<string>(['TextContent', 'InlineText', 'BeResponse', 'TaskChip', 'RunChip', 'SourceChip'])
-const blocks = Object.fromEntries(Object.entries(renderers).map(([name, Render]) => [name, FLOW.has(name) ? Render
-  : (input: object) => { const Block = Render as (props: object) => React.ReactNode; return <InsideBlock value><Block {...input} /></InsideBlock> }])) as typeof renderers
+// Saved replies' retired components, drawn as the component that replaced each (lib/agent-ui-catalog.ts).
+const TONES: Record<string, StatusTone> = { destructive: 'destructive', 'destructive-light': 'destructive', danger: 'destructive', 'success-light': 'success', success: 'success', 'warning-light': 'warning', warning: 'warning', 'info-light': 'info', info: 'info', 'primary-light': 'info' }
+const LegacyBadge = ({ text, tone }: { text: string; tone?: string }) => <Badge tone={TONES[tone ?? ''] ?? 'neutral'}>{text}</Badge>
+const legacyRenderers = {
+  ShadcnCard: input => <renderers.BeCard {...input} />,
+  ReuiFrame: input => <renderers.BeCard {...input} />,
+  ShadcnBadge: ({ props }) => <LegacyBadge text={props.text} tone={props.variant} />,
+  ReuiBadge: ({ props }) => <LegacyBadge text={props.text} tone={props.variant} />,
+  BeBadge: ({ props }) => <LegacyBadge text={props.text} tone={props.status} />,
+  ShadcnAlert: input => <renderers.BeAlert {...input} />,
+  ReuiAlert: input => <renderers.BeAlert {...input} />,
+  ShadcnProgress: ({ props }) => <AgentRadialChart label={props.label} used={props.value} limit={100} unit="%" />,
+  ShadcnAccordion: ({ props }) => <div className="flex min-w-0 flex-col gap-1">
+    {(props.items ?? []).map((item, index) => <BeCollapsible key={index} className="min-w-0">
+      <BeCollapsibleTrigger>{item.title}<BeCollapsibleIndicator /></BeCollapsibleTrigger>
+      <BeCollapsibleContent><p className="text-sm leading-6">{item.content}</p></BeCollapsibleContent>
+    </BeCollapsible>)}
+  </div>,
+  ShadcnTabs: input => <renderers.BeTabs {...input} />,
+  ShadcnTable: ({ props }) => <AgentTable columns={props.columns} rows={props.rows} />,
+  ShadcnButton: ({ props, ...input }) => <renderers.BeButton {...input} props={{ label: props.label, action: props.prompt, variant: props.variant === 'default' ? 'primary' : props.variant }} />,
+  BeTimeline: ({ props, ...input }) => <renderers.TextContent {...input} props={{ text: (props.events ?? []).map(event => `- **${event.date} · ${event.title}**${event.description ? `：${event.description}` : ''}`).join('\n') }} />,
+} satisfies LegacyAgentComponentRenderers
 
-export const agentUILibrary = createAgentLibrary(blocks)
+// Replies flow through these; every other component, ours or OpenUI's, is a block, and text inside it gets no bubble.
+const FLOW = new Set<string>(['Stack', 'TextContent', 'InlineText', 'BeResponse', 'TaskChip', 'RunChip', 'SourceChip'])
+const block = <Render,>(name: string, render: Render): Render => FLOW.has(name) ? render
+  : ((input: object) => { const Block = render as (props: object) => React.ReactNode; return <InsideBlock value><Block {...input} /></InsideBlock> }) as Render
+const blocks = Object.fromEntries(Object.entries({ ...renderers, ...legacyRenderers }).map(([name, render]) => [name, block(name, render)])) as typeof renderers & typeof legacyRenderers
+
+export const agentUILibrary = createAgentLibrary(blocks, block)

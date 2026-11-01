@@ -1,3 +1,4 @@
+import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { and, eq, sql } from 'drizzle-orm'
 import { runEventBatchSchema } from '@mikka/protocol/device'
@@ -25,7 +26,7 @@ async function ownedRun(runId: string, userId: string): Promise<boolean> {
  * `POST /v1/runs/:runId/events`: a batch of the run's UI message chunks.
  * `fromSeq` makes a re-sent batch land once, so a lost response costs nothing.
  */
-export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { runId } = await params
@@ -52,3 +53,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     .where(eq(runChunks.runId, runId))
   return NextResponse.json({ offset: String(tail?.seq ?? 0) })
 }
+
+export const POST = withDeviceRoute(handlePOST)

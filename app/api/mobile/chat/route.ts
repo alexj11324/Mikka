@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { chatView } from '@/lib/coordinator/store'
+import { reactionsFor } from '@/lib/reactions'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { z } from 'zod'
@@ -12,6 +13,7 @@ import { getCoordinatorChat, sendCoordinatorMessage } from '@/app/actions/coordi
 import { ActionFailureError } from '@/lib/action-error'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { MESSAGE_MAX } from '@/lib/message-limits'
+import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +25,9 @@ async function tokenBotAllowed(user: { id: string; [tokenWorkspace]?: string }, 
   const [bot] = await db.select({ id: bots.id }).from(bots).where(and(eq(bots.id, botId), eq(bots.ownerId, user.id), eq(bots.workspaceId, user[tokenWorkspace]!))).limit(1)
   return Boolean(bot)
 }
+
+/** Reactions on the chat's stored messages (a message still waiting has no id yet). */
+const reactionsOf = (userId: string, items: readonly { id?: string }[]) => reactionsFor(userId, items.flatMap(item => item.id ? [item.id] : []))
 
 /** `GET /api/mobile/chat?bot=<id>`: the chat with the Coordinator (no `bot`) or one of the person's bots. */
 async function handleGET(request: Request) {
@@ -36,27 +41,30 @@ async function handleGET(request: Request) {
       if (!await tokenBotAllowed(user, bot.data)) return json({ error: 'botNotFound' }, 404)
       const enabled = coordinatorEnabled()
       const chat = await chatView(user.id, 200, bot.data)
-      return json({ ...chat, enabled, working: enabled && chat.working })
+      return json({ ...chat, enabled, working: enabled && chat.working, reactions: await reactionsOf(user.id, chat.items) })
     }
-    return json(await getCoordinatorChat(bot.data))
+    const chat = await getCoordinatorChat(bot.data)
+    return json({ ...chat, reactions: await reactionsOf(user.id, chat.items) })
   } catch (error) {
     if (error instanceof ActionFailureError) return json({ error: error.code }, 404)
     throw error
   }
 }
 
-/** `POST /api/mobile/chat` with `{ text, botId? }`: a message; the reply shows up in the chat. */
+/** `POST /api/mobile/chat` with `{ text, botId?, images? }`: a message, with up to two photos as data URLs; the reply shows up in the chat. */
 async function handlePOST(request: Request) {
   const user = await mobileUser(request)
   noteLogUser(user?.id)
   if (!user) return unauthorized()
   if (!writeAllowed(request)) return forbiddenOrigin()
-  const parsed = z.object({ text: z.string().trim().min(1).max(MESSAGE_MAX), botId: z.uuid().nullable().optional() }).safeParse(await request.json().catch(() => null))
+  const parsed = z.object({ text: z.string().trim().max(MESSAGE_MAX), botId: z.uuid().nullable().optional(), images: userImageInputsSchema.optional() })
+    .refine(value => Boolean(value.text || value.images?.length)).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return json({ error: 'messageRequired' }, 400)
+  const images = parsed.data.images?.length ? parsed.data.images : undefined
   if (typeof user[tokenWorkspace] === 'string') {
     const botId = parsed.data.botId ?? null
     if (!await tokenBotAllowed(user, botId)) return json({ error: 'botNotFound' }, 404)
-    try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId }) }
+    try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId, images }) }
     catch (error) {
       if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)
       throw error
@@ -64,7 +72,7 @@ async function handlePOST(request: Request) {
     after(() => wakeCoordinator(user.id))
     return json({ queued: true }, 202)
   }
-  const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null)
+  const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, undefined, undefined, null, images)
   return result.error ? json(result, 400) : json(result, 202)
 }
 

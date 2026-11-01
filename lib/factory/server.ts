@@ -19,6 +19,8 @@ import { eq } from "drizzle-orm";
 import type { FactoryAuthorize } from "./store";
 import { configuredMonitorProbes } from "./monitor-probe";
 import { monitorWorkspacePartition } from "./monitor-fingerprint";
+import { createFactoryMonitorIssueLinks } from "./monitor-issue-links";
+import { readAuthorizedIssue } from "../github/user-access";
 
 // Preserve existing personal/workspace/team/deletion access rules on every operation.
 const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
@@ -84,6 +86,7 @@ export const factoryMonitor = createFactoryMonitor(
   appendMonitorEvidence,
   configuredMonitorProbes(process.env),
 );
+export const factoryMonitorIssueLinks = createFactoryMonitorIssueLinks(pool, authorize, readAuthorizedIssue);
 
 import { queueFactoryRun } from "@/lib/agent-runs";
 import { createFactoryDispatch, defaultFactoryDispatchAdapters } from "./dispatch";
@@ -103,7 +106,13 @@ export const questionSkillAssignments: QuestionSkillGuards = {
     // question, task and origin before a continuation can be created.
     const {rows:[question]}=await tx.query('SELECT "originRunId" FROM factory_questions WHERE id=$1 AND "userId"=$2',[questionId,userId]);
     if (!question) throw new FactoryError("factoryNotFound");
-    await lockCliRunPolicy(tx,question.originRunId,userId);
+    try {
+      await lockCliRunPolicy(tx,question.originRunId,userId);
+    } catch (error) {
+      if (error instanceof Error && error.message === "agentPolicyUnavailable")
+        throw new FactoryError("factoryNotFound");
+      throw error;
+    }
   },
   lockOrigin: async (...args) => {
     try {

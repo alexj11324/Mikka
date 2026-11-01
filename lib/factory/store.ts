@@ -7,7 +7,7 @@ import { captureIdOf } from "./evidence";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import {
-  bindingSchema,
+  revisionBindingSchema,
   candidateSchema,
   nextStage,
   changeSchema,
@@ -15,6 +15,7 @@ import {
   routeSchema,
   routeStage,
   type FactoryBinding,
+  type FactoryBindingInput,
   type FactoryChange,
   type FactoryStage,
   type FactoryStatus,
@@ -211,7 +212,12 @@ export function createFactoryStore(
     const {
       rows: [event],
     } = await tx.query<{ result: FactorySnapshot; same: boolean }>(
-      'SELECT result, request=$3::jsonb AS same FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',
+      `SELECT result, CASE WHEN request ? 'binding' AND $3::jsonb ? 'binding'
+        THEN (request-'binding')=($3::jsonb-'binding')
+          AND request->'binding'->>'taskId'=$3::jsonb->'binding'->>'taskId'
+          AND request->'binding'->>'revision'=$3::jsonb->'binding'->>'revision'
+        ELSE request=$3::jsonb END AS same
+        FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2`,
       [taskId, eventId, JSON.stringify(request)],
     );
     if (event && !event.same) fail("factoryReplayMismatch");
@@ -371,17 +377,16 @@ export function createFactoryStore(
       eventId: string,
       tx: PoolClient,
     ) {
-      const parsed = bindingSchema.safeParse(rawBinding);
+      const parsed = revisionBindingSchema.safeParse(rawBinding);
       if (!parsed.success) fail("factoryInvalid");
       uuid(eventId);
       const binding = parsed.data;
       const task = await owned(tx, userId, binding.taskId);
-      if (task.issueId !== binding.issueId) fail("factoryNotFound");
       if (terminal(task)) fail("factoryStopped");
       const {
         rows: [prior],
       } = await tx.query(
-        "SELECT result, request->'change' AS change, request->'binding'=$3::jsonb AS same FROM factory_events WHERE \"taskId\"=$1 AND \"eventId\"=$2",
+        "SELECT result, request->'change' AS change, (request->'binding'->>'taskId'=$3::jsonb->>'taskId' AND request->'binding'->>'revision'=$3::jsonb->>'revision') AS same FROM factory_events WHERE \"taskId\"=$1 AND \"eventId\"=$2",
         [task.id, eventId, JSON.stringify(binding)],
       );
       if (prior) {
@@ -392,9 +397,7 @@ export function createFactoryStore(
         return previous;
       }
       if (
-        task.revision !== binding.revision ||
-        task.attemptId !== binding.attemptId ||
-        task.candidateId !== binding.candidateId
+        task.revision !== binding.revision
       )
         fail("factoryStale");
       if (
@@ -407,12 +410,12 @@ export function createFactoryStore(
     /** Trusted backend lifecycle actions require installed consumer gates. */
     async apply(
       userId: string,
-      rawBinding: FactoryBinding,
+      rawBinding: FactoryBindingInput,
       eventId: string,
       rawChange: FactoryChange,
       existingTransaction?: PoolClient,
     ) {
-      const bp = bindingSchema.safeParse(rawBinding),
+      const bp = revisionBindingSchema.safeParse(rawBinding),
         cp = changeSchema.safeParse(rawChange);
       if (!bp.success || !cp.success) fail("factoryInvalid");
       uuid(eventId);
@@ -421,15 +424,12 @@ export function createFactoryStore(
       if (JSON.stringify(change).length > 100_000) fail("factoryInvalid");
       return transaction(async (tx) => {
         const task = await owned(tx, userId, binding.taskId);
-        if (task.issueId !== binding.issueId) fail("factoryNotFound");
         if (terminal(task)) fail("factoryStopped");
         const request = { binding, change };
         const previous = await replay(tx, task.id, eventId, request);
         if (previous) return previous;
         if (
-          task.revision !== binding.revision ||
-          task.attemptId !== binding.attemptId ||
-          task.candidateId !== binding.candidateId
+          task.revision !== binding.revision
         )
           fail("factoryStale");
         const {
@@ -724,6 +724,14 @@ export function createFactoryStore(
             fail("factoryTransition");
           task.reason = change.reason;
           await freshAttempt(tx, task, change.stage, change.reason);
+        } else if (change.action === "retry_publication") {
+          if (task.stage !== 'publish' || task.status !== 'pending' || !task.candidateId)
+            fail('factoryTransition');
+          const { rowCount } = await tx.query(`SELECT id FROM factory_publications WHERE id=$1 AND "taskId"=$2 AND "candidateId"=$3 AND status='failed' AND request->'binding'->>'revision'=$4 FOR UPDATE`, [change.publicationId, task.id, task.candidateId, String(task.revision)]);
+          if (rowCount !== 1) fail('factoryPublicationReceiptRequired');
+          await tx.query(`UPDATE factory_attempts SET status='failed',reason=$2,"finishedAt"=clock_timestamp() WHERE id=$1`, [attempt.id, change.reason]);
+          task.reason = change.reason;
+          await freshAttempt(tx, task, 'approval', change.reason);
         } else if (change.action === "retry" || change.action === "repair") {
           if (task.stage === "clarify") fail("factoryTransition");
           const pendingQuestion = await tx.query(

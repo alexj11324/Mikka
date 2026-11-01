@@ -47,7 +47,7 @@ test('a named Bot cannot redirect its cloud tool to another Bot',async()=>{
 test('native subscription requests retain the run snapshot after Agent harness/device edits',async()=>{
  const binding={id:randomUUID(),modelId:'frozen-model',route:'codex_cli'}
  const snapshot=freezeWorkerDefinition({harness:'codex',instructions:'Review',prompt:'task',parent:null,executionId:null,subscription:binding})
- let row={...binding,workspaceId:randomUUID(),consumerId:randomUUID(),harness:'claude_code',agentDefinition:snapshot}
+ let row={...binding,ownerId:owner,workspaceId:randomUUID(),consumerId:randomUUID(),harness:'claude_code',agentDefinition:snapshot}
  const requests:unknown[][]=[]
  const repository={pool:{query:async(_sql:string,args:unknown[])=>{requests.push(args);return {rows:[row]}}}} as unknown as SubscriptionRepository
  const service=new SubscriptionService(repository,()=>{throw Error('No worker/provider request is allowed in this unit test')},{ready:()=>false,nativeIsolation:'none'})

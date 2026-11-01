@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -65,6 +67,11 @@ func NewInfisical(config InfisicalConfig) (*Infisical, error) {
 	}
 	return &Infisical{config, &client}, nil
 }
+
+// One fixed-shape stderr line the parent may log: never a body, name or path.
+func noteStoreFailure(method, reason string) {
+	fmt.Fprintf(os.Stderr, "secret_store_failure %s %s\n", method, reason)
+}
 func validSecretName(name string) bool {
 	return strings.HasPrefix(name, "mikka-byos-") && uuidPattern.MatchString(strings.TrimPrefix(name, "mikka-byos-"))
 }
@@ -86,6 +93,7 @@ func (i *Infisical) request(ctx context.Context, method, name string, raw []byte
 	}
 	token, err := i.config.Token(ctx)
 	if err != nil || token == "" || strings.ContainsAny(token, "\r\n") {
+		noteStoreFailure(method, "no_token")
 		return nil, ErrStore
 	}
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, body)
@@ -96,6 +104,7 @@ func (i *Infisical) request(ctx context.Context, method, name string, raw []byte
 	req.Header.Set("Content-Type", "application/json")
 	response, err := i.client.Do(req)
 	if err != nil {
+		noteStoreFailure(method, "network")
 		if method == http.MethodPost {
 			return nil, ErrCreateUncertain
 		}
@@ -109,6 +118,7 @@ func (i *Infisical) request(ctx context.Context, method, name string, raw []byte
 		return nil, ErrMissing
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		noteStoreFailure(method, fmt.Sprintf("http_%d", response.StatusCode))
 		if method == http.MethodPost && response.StatusCode >= 500 {
 			_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 			return nil, ErrCreateUncertain

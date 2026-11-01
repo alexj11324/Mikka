@@ -28,11 +28,10 @@ Layout:
 
 ## Push
 
-Registering a phone for pushes needs the EAS project id. `app.config.ts`
-reads it from `EAS_PROJECT_ID` into `extra.eas.projectId`; set it as an EAS
-environment variable (`eas env:create --name EAS_PROJECT_ID ...`) or in the
-shell for a local build. `eas init` prints the id. Without it the app runs but
-cannot register, and Settings shows 「推送无法送达」. The server sends through
+Registering a phone for pushes needs the EAS project id, committed in
+`app.json` (`extra.eas.projectId`); `EAS_PROJECT_ID` overrides it for a fork's
+own EAS project (`app.config.ts`). Without it the app runs but cannot
+register, and Settings shows 「推送无法送达」. The server sends through
 Expo's push service (`lib/mobile-push.ts`, optional `EXPO_ACCESS_TOKEN`).
 
 The app asks iOS for permission after the Coordinator's first message of its
@@ -40,3 +39,19 @@ own, or when the person turns a push on in 通知; never at launch. A tapped
 push opens what it is about (`lib/push-route.ts`): a proposal's card
 (`pendingActionId`), a finished thread (`runId`), or the chat it came from
 (`botId`).
+
+## Releases
+
+iOS builds run on EAS and go to TestFlight:
+
+```sh
+eas build -p ios --profile production --non-interactive
+eas submit -p ios --latest --non-interactive
+```
+
+JavaScript changes then ship as EAS Updates (`.github/workflows/mobile-update.yml`):
+main publishes to the `production` channel, a pull request to branch
+`pr-<n>`. The app downloads an update in the background and offers
+「重启以更新」 in the drawer. The runtime version is the native fingerprint:
+adding or upgrading a native module needs a new build, and updates published
+before it do not reach it.

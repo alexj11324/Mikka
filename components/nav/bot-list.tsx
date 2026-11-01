@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
+import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
-import { PanelLeft, Plus } from 'lucide-react'
+import { PanelLeft, Plus, Users } from 'lucide-react'
 import { botChatSummaries, getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
 import type { Thread } from '@/app/actions/task-runs'
@@ -13,7 +14,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
 import { cn } from '@/lib/utils'
-import { markdownLine, sessionPreview } from '@/lib/agent-history'
+import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
+import { SPRING_SIDEBAR } from '@/lib/ease'
+import { chatPreview } from '@/lib/agent-history'
+import { fetchGroups } from '@/lib/group-messages'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
 
@@ -25,6 +29,8 @@ export type ChatTarget = { kind: 'coordinator' } | { kind: 'bot'; botId: string 
 
 type ListProps = {
   bots: BotView[]
+  /** The workspace whose group chats are listed with the bots (R-01). */
+  workspaceId: string | null
   threads: Thread[]
   active: ChatTarget | null
   onOpen: (target: ChatTarget) => void
@@ -37,6 +43,11 @@ type ListProps = {
   signingOut: boolean
   onBeforeChange?: (action: () => Promise<void>) => void
 }
+
+// Linear's sidebar range; the width is remembered on this device.
+const LIST_WIDTH = { storageKey: 'mikka:bot-list-width', min: 208, max: 400, initial: 256, edge: 'end' } as const
+// A click on the edge folds the list after this long, unless it turns out to be a double-click.
+const DOUBLE_CLICK_MS = 250
 
 const SEEN_KEY = 'mikka:conversations-seen'
 type Seen = { since: string; at: Record<string, string> }
@@ -77,10 +88,6 @@ function botMood(threads: Thread[], botId: string, chatting: boolean): BotMood {
   return own[0]?.status === 'failed' ? 'exclaim' : 'idle'
 }
 
-/** A Coordinator reply as one plain line: citations become their labels. */
-function coordinatorLine(text: string) {
-  return sessionPreview(markdownLine(text), null)
-}
 
 /** Green while the bot is working, orange while it waits on you; otherwise no dot. */
 type RowStatus = 'working' | 'waiting'
@@ -101,23 +108,46 @@ function Row({ name, preview, avatar, status, current, unread, onClick, label }:
 
 /**
  * The bot list beside the icon rail (Figma 188:3115): the Coordinator pinned
- * on top, then one row per bot with its blob, its name and the latest line
- * of its chat, most recent first. Threads (the work a bot does) live in the
+ * on top, then one row per bot or group chat (R-01) with its avatar, its name
+ * and the latest line of its chat, most recent first. Threads (the work a bot does) live in the
  * right column, never here. It collapses off canvas; the rail stays.
  */
-export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
+export function BotList({ bots, workspaceId, threads, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
   const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat(), { revalidateOnFocus: false })
   // Each bot's latest line gives its row the preview and its place in the list.
   const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: 15000, revalidateOnFocus: false })
-  const ordered = [...bots].sort((a, b) => (chats[b.id]?.at ?? '').localeCompare(chats[a.id]?.at ?? '') || a.name.localeCompare(b.name))
+  // Group chats sit among the bots (R-01), ordered by their latest message.
+  const { data: groups = [] } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: 15000, revalidateOnFocus: false })
+  const rows = [...bots.map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
+    .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
   const lastReply = coordinator?.items.findLast(item => item.from !== 'event')
   const latest: Record<string, string> = {}
   for (const [botId, chat] of Object.entries(chats)) if (chat.at) latest[botId] = chat.at
+  for (const group of groups) if (group.lastMessage) latest[group.id] = group.lastMessage.createdAt
   if (lastReply?.from === 'coordinator') latest.coordinator = lastReply.createdAt
-  const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : null
+  const activeId = active?.kind === 'coordinator' ? 'coordinator' : active?.kind === 'bot' ? active.botId : active?.kind === 'group' ? active.id : null
+  /** One plain line of a message; a card that shows no words reads as the card placeholder. */
+  const previewOf = (text: string | null | undefined) => {
+    if (!text) return null
+    const line = chatPreview(text) ?? i18nText('Nav.cardPreview')
+    return line ? <span className="truncate">{line}</span> : null
+  }
   const unread = useUnread(activeId, latest)
+  const { width, dragging, instant, endedDrag, reset, handleProps } = useResizableWidth(LIST_WIDTH)
+  const foldTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(foldTimer.current), [])
+  // Enter or a click folds the list; a double-click resets its width instead.
+  function onEdgeClick(event: ReactMouseEvent) {
+    window.clearTimeout(foldTimer.current)
+    if (endedDrag() || event.detail > 1) return
+    if (event.detail === 0) toggleSidebar()
+    else foldTimer.current = window.setTimeout(toggleSidebar, DOUBLE_CLICK_MS)
+  }
+  const listRef = useRef<HTMLDivElement>(null)
+  // The inner list keeps its full width while the column folds, so rows never squeeze.
+  useLayoutEffect(() => { listRef.current?.style.setProperty('--bot-list-width', `${width}px`) }, [width])
   function choose(target: ChatTarget) { onOpen(target); setOpenMobile(false) }
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-1">
@@ -135,14 +165,22 @@ export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail,
         <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}
           status={coordinator?.working ? 'working' : undefined}
-          preview={lastReply ? <span className="truncate">{coordinatorLine(lastReply.text)}</span> : null} />
-        {ordered.map(bot => {
+          preview={previewOf(lastReply?.text)} />
+        {rows.map(row => {
+          if (row.kind === 'group') {
+            const { group } = row
+            const title = group.title || i18nText('Nav.untitledConversation')
+            return <Row key={group.id} name={title} label={title} current={active?.kind === 'group' && active.id === group.id} unread={unread(group.id)} onClick={() => choose({ kind: 'group', id: group.id, title: group.title, workspaceId: group.workspaceId })}
+              avatar={<span aria-hidden="true" className="flex size-8.5 items-center justify-center rounded-full bg-muted text-muted-foreground"><Users className="size-4" /></span>}
+              preview={previewOf(group.lastMessage?.body)} />
+          }
+          const { bot } = row
           const chat = chats[bot.id]
           const mood = botMood(threads, bot.id, chat?.working ?? false)
           const status: RowStatus | undefined = mood === 'notify' ? 'waiting' : mood === 'thinking' ? 'working' : undefined
           return <Row key={bot.id} name={bot.name} label={bot.name} current={active?.kind === 'bot' && active.botId === bot.id} unread={unread(bot.id)} onClick={() => choose({ kind: 'bot', botId: bot.id })}
             avatar={<BotAvatar color={bot.color} shape={bot.shape} mood={mood} />} status={status}
-            preview={chat?.line ? <span className="truncate">{coordinatorLine(chat.line)}</span> : null} />
+            preview={previewOf(chat?.line)} />
         })}
       </SidebarMenu></SidebarGroup>
     </SidebarContent>
@@ -154,9 +192,11 @@ export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail,
   </>
   if (isMobile) return <Sidebar collapsible="offcanvas" mobileTitle={i18nText('Nav.sidebarTitle')} mobileDescription={i18nText('Nav.sidebarDescription')} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>
   // On desktop the list is the first column inside the card; it folds to nothing and the rail stays.
-  return <div data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} className={cn('relative hidden shrink-0 overflow-hidden border-r transition-[width] duration-150 ease-out motion-reduce:transition-none md:block', open ? 'w-64' : 'w-0 border-r-0')}>
-    <Sidebar collapsible="none" className="w-64 bg-transparent">{body}</Sidebar>
-    {/* Comma's edge toggle: an invisible strip along the edge that shows a hairline on hover. */}
-    <SidebarRail label={i18nText('Nav.sidebarRail')} title={i18nText('Nav.collapseList')} className="right-0 left-auto w-2 cursor-col-resize ltr:translate-x-0 rtl:translate-x-0 after:inset-y-3 after:start-auto after:right-0 after:w-px after:bg-border after:opacity-0 after:transition-opacity hover:after:opacity-100" />
-  </div>
+  // R-37: the width moves on a spring; MotionConfig at the root turns it off for reduced motion.
+  // While dragging the edge the width follows the pointer with no spring.
+  return <motion.div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} initial={false} animate={{ width: open ? width : 0 }} transition={instant ? { duration: 0 } : SPRING_SIDEBAR} className={cn('relative hidden shrink-0 overflow-hidden md:block', open ? 'border-r' : 'border-r-0', dragging && 'select-none')}>
+    <Sidebar collapsible="none" className="w-[var(--bot-list-width,16rem)] bg-transparent">{body}</Sidebar>
+    {/* Comma's edge strip with a hairline on hover: drag it or use the arrow keys to resize the list, double-click it to reset, click it to fold the list. */}
+    <SidebarRail {...handleProps} aria-expanded={undefined} label={i18nText('Nav.resizeList')} title={i18nText('Nav.collapseList')} onClick={onEdgeClick} onDoubleClick={reset} className={cn(RESIZE_EDGE, 'right-0 left-auto after:start-auto after:right-0')} />
+  </motion.div>
 }

@@ -15,6 +15,7 @@ import { ProfileName } from '@/components/settings/profile-name'
 import { withBasePath } from '@/lib/base-path'
 import { avatarImageSrc } from '@/lib/default-avatar'
 import { useActionError } from '@/lib/use-action-error'
+import { FieldError } from '@/components/ui/field'
 
 /** Shrinks to 256px before upload; the server refuses anything over 200 KB. */
 async function shrinkAvatar(file: File): Promise<Blob> {
@@ -85,7 +86,7 @@ export function AccountSettings({ user, onSignOut, signingOut }: {
 
   return <>
     <SettingsSection id="account-heading" title={t('heading')}>
-      <SettingRow title={t('avatar')} description={t('avatarDescription')}>
+      <SettingRow title={t('avatar')}>
         <div className="flex items-center gap-3">
           <Avatar className="size-10">
             {shownImage && <AvatarImage src={shownImage} alt="" />}
@@ -97,16 +98,16 @@ export function AccountSettings({ user, onSignOut, signingOut }: {
           </Button>
         </div>
       </SettingRow>
-      {avatarError && <p role="alert" className="px-5 pb-3 text-sm text-destructive">{avatarError}</p>}
+      {avatarError && <FieldError className="px-5 pb-3">{avatarError}</FieldError>}
       <SettingRow title={t('name')}><ProfileName name={user.name || ''} /></SettingRow>
       <SettingRow title={t('email')}><span className="break-all">{user.email}</span></SettingRow>
     </SettingsSection>
 
     <SettingsSection id="session-heading" title={t('sessionHeading')}>
-      <SettingRow title={t('signOut')} description={t('signOutDescription')}>
+      <SettingRow title={t('signOut')}>
         <Button type="button" variant="secondary" size="sm" disabled={signingOut} onClick={onSignOut}>{signingOut ? t('signingOut') : t('signOut')}</Button>
       </SettingRow>
-      <SettingRow title={t('deleteAccount')} description={t('deleteAccountDescription')}>
+      <SettingRow title={t('deleteAccount')}>
         <Button type="button" variant="destructive" size="sm" onClick={() => { setTyped(''); setDeleteError(null); setConfirming(true) }}>{t('deleteAccount')}</Button>
       </SettingRow>
     </SettingsSection>
@@ -121,7 +122,7 @@ export function AccountSettings({ user, onSignOut, signingOut }: {
           {t('deleteConfirmLabel', { email: user.email })}
           <Input value={typed} onChange={event => setTyped(event.target.value)} placeholder={user.email} autoComplete="off" />
         </Label>
-        {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+        {deleteError && <FieldError>{deleteError}</FieldError>}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setConfirming(false)} disabled={deleting}>{t('cancel')}</Button>
           <Button type="button" variant="destructive" disabled={deleting || typed.trim() !== user.email} onClick={() => { void remove() }}>{deleting ? t('deleting') : t('confirmDelete')}</Button>

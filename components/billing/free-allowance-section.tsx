@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
-import { cardVerificationStatus, pollUntil, startCardVerification, type CardVerificationStatus } from '@/lib/billing/verification-client'
+import { cardVerificationStatus, pollUntil, readCardVerification, startCardVerification, type CardVerificationStatus } from '@/lib/billing/verification-client'
 import { useActionError } from '@/lib/use-action-error'
 
 export function cardVerificationKey(workspaceId: string) {
@@ -35,7 +35,7 @@ function takeReturn(name: string): string | null {
 export function FreeAllowanceSection({ workspaceId, onVerified }: { workspaceId: string; onVerified?: () => void }) {
   const t = useTranslations('Billing.allowance')
   const actionError = useActionError()
-  const status = useSWR(cardVerificationKey(workspaceId), () => cardVerificationStatus(workspaceId))
+  const status = useSWR(cardVerificationKey(workspaceId), () => readCardVerification(workspaceId))
   const { mutate } = status
   const [confirming, setConfirming] = useState(false)
   const [redirecting, setRedirecting] = useState(false)

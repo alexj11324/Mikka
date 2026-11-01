@@ -18,11 +18,13 @@ import {
   spawnCli,
   untilReady,
 } from "../agents/child"
+import type { RunContainer, RunContainerOptions } from "../run-container"
 import {
   carryHistory,
-  guardCodexAuth,
   prepareCodexHome,
+  wipeRunCredentials,
 } from "../agents/harness-home"
+import { codexCredential, credentialDomain } from "../agents/run-credential"
 import { jsonlConnection } from "../agents/jsonl-rpc"
 import {
   MCP_SERVER_NAME,
@@ -37,7 +39,9 @@ import type { AgentSandbox } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
 import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
 import { runNetworkApproval } from "../agents/run-network"
+import { runAppsHost, type RunApps } from "../agents/run-apps"
 import { rawCliShellAvailable, runPolicy } from "../permissions"
+import { codexHasAuditedDynamicTools, codexSupportsRunApproval } from "./codex-version"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
@@ -68,6 +72,10 @@ export interface CodexAdapterOptions {
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
   binary?: string
+  /** The daemon's pinned Codex, installed on first need. */
+  ensureBinary?: () => Promise<string>
+  /** Docker mode (run-container.ts): set by the daemon when this device runs harnesses in containers. */
+  openContainer?: (run: Omit<RunContainerOptions, "image" | "owner">) => Promise<RunContainer>
   /** Trusted hosted transport, retaining the existing app-server adapter. */
   spawnCli?: typeof spawnCli
   /** Persist an owner-bound session before any prompt can execute. */
@@ -75,7 +83,7 @@ export interface CodexAdapterOptions {
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
   computerProvider?: ComputerSpecProvider
-  /** The user's own `CODEX_HOME` (for the auth link); `~/.codex` by default. */
+  /** @deprecated Ignored: the person's own `CODEX_HOME` is never read. */
   userHome?: string
   /** Trusted, owner-bound broker only; never a task/model-supplied credential. */
   subscriptionAuth?: {
@@ -116,6 +124,14 @@ function subscriptionTokens(
 
 /** What a follow-up run copies from the earlier run's `CODEX_HOME`. */
 const CODEX_HISTORY = ["sessions", "archived_sessions", "session_index.jsonl"]
+
+/** One streamable-HTTP MCP entry per connected app, each pointing at the Mikka server. */
+export function codexAppArgs(apps?: RunApps): string[] {
+  return (apps?.apps ?? []).flatMap(app => [
+    "-c", `mcp_servers.${app.name}.url=${toml(app.url)}`,
+    "-c", `mcp_servers.${app.name}.http_headers={ Authorization = ${toml(`Bearer ${apps!.token}`)} }`,
+  ])
+}
 
 /** TOML value for a `-c key=value` override (JSON strings are TOML strings). */
 function toml(value: string | string[]): string {
@@ -310,13 +326,21 @@ export class CodexAdapter implements AgentAdapter {
       }
     }
     // Inside the run dir: one run's home is never another run's.
-    const codexHome = prepareCodexHome(
-      join(runDir, "codex-home"),
-      log,
-      this.options.userHome,
-      !externalAuth
-    )
+    const codexHome = prepareCodexHome(join(runDir, "codex-home"), log)
+    const assignedComputer = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
+    // Docker mode: the CLI runs in a disposable container of the runner image.
+    const inContainer = !this.options.spawnCli && this.options.sandbox.kind !== 'none' && !assignedComputer && Boolean(this.options.openContainer)
+    const binary = this.options.binary ?? (inContainer ? "codex" : await this.options.ensureBinary?.()) ?? "codex"
+    if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_AUTH_ERROR)
+    const credential = codexCredential(options.credential)
+    const providerDomain = credentialDomain(options.credential)
     const ctx = new RunContext({
+      ...(inContainer ? { nodeBinary: "node" } : {}),
+      harnessDomains: providerDomain ? [providerDomain] : undefined,
+      github: options.github,
+      apps: options.apps,
+      githubRuntime: options.githubRuntime,
+      childPath: options.env.PATH,
       mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
       kind: options.kind,
@@ -324,20 +348,20 @@ export class CodexAdapter implements AgentAdapter {
       gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,
       policy: options.policy,
+      policyHash: options.policyHash,
       skills: options.skills,
       skillReceipt: options.skillReceipt,
       runDir,
       privateDir: paths.privateDir,
-      extraWrite: codexHome.authFile ? [codexHome.authFile] : [],
     })
     // A hand-in the last daemon never got to act on ends the session now.
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
-    const computerMcp = sandboxComputerSpec(this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy), this.options.sandbox.kind)
+    const computerMcp = sandboxComputerSpec(assignedComputer, this.options.sandbox.kind)
     const mcp = ctx.mcpServer()
     const argv = [
-      this.options.binary ?? "codex",
+      binary,
       "app-server",
       "-c", `features.shell_tool=${rawCliShellAvailable(runPolicy(options.policy))}`,
       "-c",
@@ -356,16 +380,17 @@ export class CodexAdapter implements AgentAdapter {
         ] : []),
         ...Object.entries(computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
       ] : []),
+      ...codexAppArgs(options.apps),
+      ...credential.args,
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
         "-c",
         `shell_environment_policy.set.${key}=${toml(value)}`,
       ]),
     ]
-    const checkAuth = guardCodexAuth(codexHome.authFile, log)
     const spawnOptions = {
       cwd: ctx.worktree,
-      env: { ...options.env, ...ctx.tempEnv(), CODEX_HOME: codexHome.home },
+      env: { ...options.env, ...ctx.tempEnv(), ...credential.env, CODEX_HOME: codexHome.home },
       policy: computerSandboxPolicy(ctx.policy(), computerMcp),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
@@ -375,17 +400,21 @@ export class CodexAdapter implements AgentAdapter {
       : spawnOptions.policy.allowDomains.includes('*') ? [...requestedCeiling]
       : requestedCeiling.includes('*') ? spawnOptions.policy.allowDomains
       : requestedCeiling.filter(domain => spawnOptions.policy.allowDomains.includes(domain))
-    let launcher: ReturnType<typeof spawnRunSandbox> | undefined
-    const child = this.options.spawnCli || this.options.sandbox.kind === 'none'
+    let launcher: { revoke(): Promise<void> } | undefined
+    const onNetwork = runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps))
+    const container = inContainer ? await this.options.openContainer!({ runId: options.runId, cwd: ctx.worktree, policy: spawnOptions.policy, onNetwork }) : undefined
+    const child = container
+      ? (launcher = container.spawn(argv[0], argv.slice(1), spawnOptions.env))
+      : this.options.spawnCli || this.options.sandbox.kind === 'none'
       ? await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
-      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp)) }))
+      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps)) }))
     if (launcher) {
       const ownedLauncher = launcher
       const off = options.toolApproval!.onRevoke(() => { void ownedLauncher.revoke().catch(() => undefined) })
       void child.exited.finally(off)
     }
     // After the whole group is gone (`exited` kills it first).
-    void child.exited.then(checkAuth)
+    void child.exited.then(async () => { await container?.close(); wipeRunCredentials(runDir) })
     const rpc: MessageConnection = jsonlConnection(
       child.process.stdout,
       child.process.stdin,
@@ -401,8 +430,9 @@ export class CodexAdapter implements AgentAdapter {
     let usage = { inputTokens: 0, outputTokens: 0 }
     const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
     const registeredMcpTool = (server: string, tool: string) =>
-      (server === MCP_SERVER_NAME && ['submit','ask_human','report_blocked'].includes(tool)) ||
-      (Boolean(computerMcp) && server === COMPUTER_MCP_SERVER_NAME && ['get_desktop_state','click','type_text','press_key','scroll'].includes(tool))
+      (server === MCP_SERVER_NAME && ['submit','request_help','ask_human','report_blocked'].includes(tool)) ||
+      (Boolean(computerMcp) && server === COMPUTER_MCP_SERVER_NAME && ['get_desktop_state','click','type_text','press_key','scroll'].includes(tool)) ||
+      Boolean(options.apps?.apps.some(app => app.name === server))
 
     /** The CLI and everything it started are gone before the exit is told. */
     let ended: Promise<void> | undefined
@@ -500,6 +530,11 @@ export class CodexAdapter implements AgentAdapter {
       // host-bound run. Turn authority comes from our turn/start response.
       if (options.mailbox && (method.startsWith('item/') || method.startsWith('turn/') || method === 'thread/tokenUsage/updated') && (params as { threadId?: unknown } | null)?.threadId !== sessionId) return
       switch (method) {
+        case 'item/commandExecution/outputDelta': {
+          const progress = params as { threadId?: string; turnId?: string; delta?: string }
+          if (progress.threadId === sessionId && progress.turnId === activeTurn && typeof progress.delta === 'string' && progress.delta.length > 0) queue.progress()
+          return
+        }
         case "item/agentMessage/delta": {
           const { itemId, delta } = params as DeltaNotification
           if (!streamed.has(itemId)) {
@@ -667,7 +702,8 @@ export class CodexAdapter implements AgentAdapter {
       )
       // Public schemas omit the experimental dynamicTools field. Support only
       // the exact pinned CLI whose Rust protocol and response were audited.
-      if ((options.mailbox || !rawCliShellAvailable(runPolicy(options.policy))) && !/(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(initialized.userAgent ?? '')) throw new Error('Run permissions require the audited Codex0.163.0 tool interface')
+      if (options.mailbox && !codexHasAuditedDynamicTools(initialized.userAgent)) throw new Error('Run permissions require the audited Codex0.163.0 tool interface')
+      if (!codexSupportsRunApproval(initialized.userAgent)) throw new Error('This Codex version is too old for Mikka; update Codex')
       await rpc.sendNotification("initialized")
       if (externalAuth) {
         try {

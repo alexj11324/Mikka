@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { before, mock, test } from 'node:test'
 import { MockLanguageModelV4 } from 'ai/test'
-import { compactWithFrozenModel } from './compaction-model'
+let compactWithFrozenModel: typeof import('./compaction-model').compactWithFrozenModel
 import type { SubscriptionService } from '../subscription-service'
 
 const id=(n:number)=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`
 const scope={ownerId:'synthetic-owner',botId:id(1),workspaceId:id(2)}
 const selection={type:'subscription' as const,bindingId:id(3),ownerId:scope.ownerId,consumerId:scope.botId,workspaceId:scope.workspaceId,connectionId:id(4),connectionRevision:1,modelId:'synthetic-stream-model',route:'claude_cpa' as const}
+
+mock.module(new URL('../model-admission/runtime.ts', import.meta.url).href, { namedExports: {
+ assertSubscriptionModelTransport: async (actualScope: {workspaceId:string;ownerId:string}, modelId: string, route: string) => {
+  assert.deepEqual(actualScope, {workspaceId:scope.workspaceId,ownerId:scope.ownerId})
+  assert.equal(modelId, selection.modelId)
+  assert.equal(route, selection.route)
+ },
+} })
+before(async () => { compactWithFrozenModel = (await import('./compaction-model')).compactWithFrozenModel })
 
 test('actual SDK partial-error or unterminated streams cannot become successful compaction text',async()=>{
  const originalFetch=globalThis.fetch,originalError=console.error

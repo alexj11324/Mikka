@@ -4,8 +4,9 @@ import { after, before, mock, test } from 'node:test'
 import type { Pool } from 'pg'
 
 // Settings backend: saved logins, activity and device removal, run through the
-// real server actions and daemon routes against Postgres. Only the session
-// (auth + next/headers) is mocked. CI runs it on the Actions loopback
+// real server actions and daemon routes against Postgres. Session/request
+// (auth + next/headers) and request locale are fixture ports; workspace context
+// resolves actual active membership through the production loader. CI runs it on the Actions loopback
 // mikka_e2e; locally it needs MIKKA_LOCAL_DB_TESTS=1 and a loopback mikka_*e2e database.
 let databaseUrl: string | undefined
 try {
@@ -24,6 +25,7 @@ const B = `test-settings-b-${randomUUID()}`
 const workspaceId = randomUUID()
 const botA = randomUUID(), botB = randomUUID(), subagentA = randomUUID()
 const agentA = randomUUID(), runA = randomUUID()
+let workspacePool: Pool
 let pool: Pool
 let actions: typeof import('../app/actions/settings-activity')
 let deviceActions: typeof import('../app/actions/agents')
@@ -32,19 +34,29 @@ let link: typeof import('../lib/device-link')
 before(async () => {
   if (!databaseUrl) return
   mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false }) } })
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser } } : null } } } })
+  const intl = await import('next-intl/server')
+  mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en' } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser, name: sessionUser, email: `${sessionUser}@example.invalid` } } : null } } } })
   ;({ pool } = await import('../lib/db'))
+  ;({ workspacePool } = await import('../lib/workspace-db'))
   actions = await import('../app/actions/settings-activity')
   deviceActions = await import('../app/actions/agents')
   link = await import('../lib/device-link')
   for (const id of [A, B]) await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [id, `${id}@example.invalid`])
+  await workspacePool.query(`INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,$2,'Fixture workspace',$3)`, [workspaceId, A, `settings-${workspaceId}`])
+  await workspacePool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,'admin','active')`, [workspaceId, A, `${A}@example.invalid`])
   await pool.query(`INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$4,'Scout'),($3,$5,$4,'Other')`, [botA, A, botB, workspaceId, B])
   await pool.query(`INSERT INTO bot_subagents (id,"workspaceId","ownerId","botId",task,status) VALUES ($1,$2,$3,$4,'sign in','running')`, [subagentA, workspaceId, A, botA])
 })
 
 after(async () => {
   if (!databaseUrl) return
+  await pool.query(`DELETE FROM workspace_audit_events WHERE "workspaceId"=$1 AND "actorType"='user' AND "actorId"=$2 AND action='credential.revoked'`, [workspaceId, A])
+  await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, A])
+  await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=$1 AND "userId"=$2', [workspaceId, A])
+  await workspacePool.end()
   await pool.query('DELETE FROM credential_fill_leases WHERE user_id = ANY($1)', [[A, B]])
+  await pool.query('DELETE FROM device_credential_revocations WHERE "ownerId" = ANY($1)', [[A, B]])
   await pool.query('DELETE FROM device_tokens WHERE "userId" = ANY($1)', [[A, B]])
   await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [[A, B]])
   await pool.query('DELETE FROM device_repos WHERE "userId" = ANY($1)', [[A, B]])
@@ -113,6 +125,9 @@ dbTest('saved logins: account and last Bot only, usage per login, owner-scoped d
   const open = await store.lease(caller, 'https://linear.app', browser)
   assert.equal(open.status, 'ready')
   assert.deepEqual(await actions.deleteSavedLogin(linear), { id: linear })
+  const audit = (await pool.query(`SELECT "workspaceId","actorType","actorId",action,"targetType","targetId",metadata FROM workspace_audit_events WHERE "workspaceId"=$1 AND "actorId"=$2 AND action='credential.revoked'`, [workspaceId, A])).rows
+  assert.deepEqual(audit, [{ workspaceId, actorType: 'user', actorId: A, action: 'credential.revoked', targetType: 'credential', targetId: linear, metadata: {} }])
+
   assert.deepEqual(await store.lease(caller, 'https://linear.app', browser), { status: 'needs_login', origin: 'https://linear.app' })
   if (open.status === 'ready') await assert.rejects(fillCredential(pool, open.lease, { kms, guard: { begin: async () => { throw new Error('no browser') }, end: async () => {} } }))
   assert.deepEqual(await actions.deleteSavedLogin(linear), { error: 'savedLoginNotFound', params: undefined })

@@ -2,8 +2,10 @@ import 'server-only'
 import { eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { bots, mobilePushTokens } from '@/lib/db/schema'
-import { readPreferences, type Preferences } from '@/lib/preferences'
+import { readPreferences } from '@/lib/preferences'
+import { pushAllowed } from '@/lib/push-allowed'
 import type { PushReason } from '@/lib/push-reasons'
+import { chatMuted } from '@/lib/chat-preferences'
 import { openUIText, parseOpenUI } from '@/lib/openui-lang'
 import type { ActionLocale } from '@/lib/suggestions/action-title'
 import { personLocale } from '@/lib/suggestions/action-title-server'
@@ -15,8 +17,6 @@ const MESSAGES = {
   en: () => import('@/messages/en.json'),
 } as const
 
-const FLAG: Record<PushReason, keyof Preferences> = { decide: 'pushDecide', review: 'pushReview', finished: 'pushFinished', briefing: 'pushBriefing' }
-
 /**
  * The push for a verification code, in the person's language: it only says
  * one came; the code stays in the app chat. Read straight from the messages:
@@ -27,10 +27,7 @@ export async function codePushBody(locale: ActionLocale): Promise<string> {
   return (await MESSAGES[locale]()).default.MobilePush.verificationCode
 }
 
-/** Whether the person's 通知 settings let a reply with these reasons reach the phone. */
-export function pushAllowed(preferences: Preferences, reasons: readonly PushReason[]): boolean {
-  return preferences.proactive && reasons.some(reason => preferences[FLAG[reason]] === true)
-}
+export { pushAllowed }
 
 /**
  * The push text: the reply's first lines, without citation tokens or Markdown
@@ -51,7 +48,7 @@ export function pushBody(text: string): string {
 
 /**
  * Sends a Coordinator (or bot) reply to every phone the person signed in on,
- * when their settings allow it. Tapping the push opens that chat. `text` null
+ * when their settings allow it and the chat's 通知 is on. Tapping the push opens that chat. `text` null
  * is a reply about a verification code: the push only says one came, the code
  * stays in the app chat. Tokens Expo reports as gone are removed. Never throws.
  */
@@ -59,6 +56,8 @@ export async function pushReply(userId: string, botId: string | null, text: stri
   try {
     if (!reasons.length || text?.trim() === '') return
     if (!pushAllowed(await readPreferences(userId), reasons)) return
+    // 通知 off for this chat, on its page.
+    if (await chatMuted(userId, botId)) return
     const tokens = await db.select({ token: mobilePushTokens.token }).from(mobilePushTokens).where(eq(mobilePushTokens.userId, userId))
     if (!tokens.length) return
     const [bot] = botId ? await db.select({ name: bots.name }).from(bots).where(eq(bots.id, botId)).limit(1) : []

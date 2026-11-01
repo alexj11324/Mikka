@@ -54,7 +54,7 @@ export async function clickWithEffect(page: Page, control: Locator) {
 // An unlabeled control falls back to its markup, without the ids React's useId
 // generates (`_r_2a_`): they depend on render order and change after a reload.
 export async function inspectControl(control: Locator, page: Page) {
-  return control.evaluate((element, currentURL) => {
+  const inspected = await control.evaluate((element, currentURL) => {
     const labelledBy = element.getAttribute('aria-labelledby')?.split(/\s+/).map(id => document.getElementById(id)?.textContent?.trim() ?? '').filter(Boolean).join(' ')
     const associatedLabel = element.id ? Array.from(document.querySelectorAll<HTMLLabelElement>('label[for]')).find(label => label.htmlFor === element.id)?.textContent?.trim() : ''
     const label = element.getAttribute('aria-label') || element.getAttribute('title') || labelledBy || associatedLabel || element.closest('label')?.textContent?.trim().replace(/\s+/g, ' ') || element.textContent?.trim().replace(/\s+/g, ' ') || element.outerHTML.replace(/\s[\w-]+="[^"]*_r_[\w]+_[^"]*"/g, '').slice(0, 160)
@@ -72,6 +72,17 @@ export async function inspectControl(control: Locator, page: Page) {
       if (target.origin !== new URL(currentURL).origin) skip = '外部文档链接，不在通用业务点击测试中访问第三方'
       else if (target.href === currentURL) skip = '当前页面链接，允许幂等'
     }
-    return { label, skip }
+    return { label, skip, href }
   }, page.url())
+  const heading = (await control.ariaSnapshot()).split('\n')[0]
+  const match = /^- ([a-z]+)(?: ("(?:[^"\\]|\\.)*"))?/.exec(heading)
+  if (!match) {
+    if (inspected.skip) return { ...inspected, identity: null }
+    throw new Error(`控件必须具有可访问身份：${inspected.label}`)
+  }
+  return { ...inspected, identity: {
+    role: match[1] as Parameters<Locator['getByRole']>[0],
+    name: match[2] ? JSON.parse(match[2]) as string : '',
+    href: inspected.href,
+  } }
 }

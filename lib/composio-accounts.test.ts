@@ -11,6 +11,9 @@ test('shows only real accounts on our apps, without credentials', () => {
     id: 'ca_1', toolkit: 'gmail', status: 'ACTIVE', enabled: true, alias: 'Work', createdAt: '2026-10-28T10:00:00.000Z', email: null, isDefault: false,
   })
   assert.equal(toConnectedAccountView({ ...account, toolkit: { slug: 'github' } }), null)
+  assert.equal(toConnectedAccountView({ ...account, toolkit: { slug: 'Not A Slug' } }), null)
+  // Any store toolkit is a real account, not only the first apps.
+  assert.equal(toConnectedAccountView({ ...account, toolkit: { slug: 'hubspot' } })?.toolkit, 'hubspot')
   for (const status of ['INITIALIZING', 'INITIATED', 'REVOKED']) assert.equal(toConnectedAccountView({ ...account, status }), null)
   assert.equal(toConnectedAccountView({ ...account, status: 'EXPIRED' })?.status, 'EXPIRED')
 })

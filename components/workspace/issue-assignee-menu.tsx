@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import type { MetadataRequest } from './issue-metadata-controls'
 import useSWR from 'swr'
@@ -29,8 +29,8 @@ export function AssigneeAvatar({ assignee, compact = false }: { assignee: IssueM
   return <Avatar size={compact ? 'xs' : 'sm'}><AvatarImage src={avatarImageSrc(assignee.image)} alt="" draggable={false} /><AvatarFallback>{assignee.name.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
 }
 
-export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, onInvite, request }: {
-  id: string; assignee: IssueMetadata['assignee']; disabled?: boolean; compact?: boolean
+export function IssueAssigneeMenu({ id, assignee, avatar, disabled, compact, onChange, onInvite, request }: {
+  id: string; assignee: IssueMetadata['assignee']; avatar?: ReactNode; disabled?: boolean; compact?: boolean
   onChange: (value: { kind: 'member'; id: string } | null) => Promise<boolean>
   onInvite: () => void; request?: MetadataRequest | null
 }) {
@@ -43,8 +43,8 @@ export function IssueAssigneeMenu({ id, assignee, disabled, compact, onChange, o
     if (await onChange(value)) { setOpen(false); setQuery('') }
   }
   return <Popover open={open} onOpenChange={value => { setOpen(value); setQuery('') }}>
-    <PopoverTrigger render={<Button data-assignee-trigger type="button" variant="ghost" size={compact ? 'icon-compact' : 'sm'} className={cn(!compact && ROW_VALUE)} disabled={disabled} aria-label={t('aria', { name: assignee?.name ?? t('unassigned') })} title={t('ariaShortcut', { name: assignee?.name ?? t('unassigned') })} />}>
-      <AssigneeAvatar assignee={assignee} compact={compact} />{!compact && <span className={cn('truncate', !assignee && 'text-muted-foreground')}>{assignee?.name ?? t('unassignedLabel')}</span>}
+    <PopoverTrigger render={<Button data-assignee-trigger type="button" variant="ghost" size={compact ? 'icon-compact' : 'sm'} className={cn(!compact && ROW_VALUE, avatar && 'w-auto px-0.5')} disabled={disabled} aria-label={t('aria', { name: assignee?.name ?? t('unassigned') })} title={t('ariaShortcut', { name: assignee?.name ?? t('unassigned') })} />}>
+      {avatar ?? <AssigneeAvatar assignee={assignee} compact={compact} />}{!compact && <span className={cn('truncate', !assignee && 'text-muted-foreground')}>{assignee?.name ?? t('unassignedLabel')}</span>}
     </PopoverTrigger>
     <PopoverContent align="end" className="w-72 p-0">
       <Command onKeyDownCapture={event => {

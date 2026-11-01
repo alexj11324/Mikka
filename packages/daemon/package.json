@@ -24,14 +24,16 @@
     "daemon": "tsx bin/mikka.ts daemon",
     "dev": "tsx watch bin/mikka.ts daemon --dev --server memory",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "vitest run && pnpm test:mailbox-cli && pnpm test:repository-identity",
+    "test": "vitest run && pnpm test:mailbox-cli && pnpm test:repository-identity && pnpm test:github-credentials",
     "test:mailbox-cli": "node --import tsx --test --test-timeout=60000 test/run-mailbox.node-test.ts",
     "codex:types": "codex app-server generate-ts --out \"${TMPDIR:-/tmp}/mikka-codex-types\" && echo \"Generated; compare v2/ with src/adapters/codex-protocol.ts\"",
     "test:real": "MIKKA_REAL_AGENTS=${MIKKA_REAL_AGENTS:-claude_code,codex,cursor} vitest run test/real-agents.test.ts",
     "test:changed": "vitest run --changed origin/main --passWithNoTests",
     "build": "node scripts/build.mjs",
     "test:package": "node --test test/package.test.mjs",
-    "test:repository-identity": "node --experimental-strip-types --test test/repository-identity-pure.node-test.ts"
+    "test:repository-identity": "node --experimental-strip-types --test test/repository-identity-pure.node-test.ts",
+    "test:github-credentials": "node --test test/github-credentials.node-test.mjs",
+    "test:run-container": "node --import tsx --test --test-timeout=900000 test/run-container.docker-test.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.9.0",

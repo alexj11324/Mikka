@@ -1,6 +1,9 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { gateway, type LanguageModel } from 'ai'
+import { modelAdmission } from '@/lib/model-admission/runtime'
+import { GATEWAY_MODEL_ENDPOINT, managedGatewayOptions, ModelAdmissionError, type GatewayAdmission } from '@/lib/model-admission/contract'
+import { hostedBillingScope } from './context'
 import { checkAbuseAlerts } from './alerts'
 import { canUseMikkaPaid, hostedUsage } from './runtime'
 import {
@@ -10,64 +13,52 @@ import {
   PaidResourceError,
 } from './policy'
 type Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
+const trustedGatewayModels = new WeakSet<Model>()
+/** Server-owned transport. Neither redirects nor a caller proxy can move data. */
+export async function createTrustedGatewayModel(modelId: string, apiKey?: string): Promise<Model> {
+  const { createGateway } = await import('ai')
+  const client = createGateway({ baseURL: GATEWAY_MODEL_ENDPOINT, ...(apiKey ? { apiKey } : {}),
+    fetch: (input, init) => fetch(input, { ...init, redirect: 'error' }) })
+  const model = client(modelId)
+  trustedGatewayModels.add(model)
+  return model
+}
 /** Every SDK tool step reaches this model boundary, including compaction. */
 export async function hostedModel(
   workspaceId: string,
   modelId: string,
   provider?: Model,
+  ownerId?: string,
 ): Promise<Model> {
   await canUseMikkaPaid(workspaceId)
   const model = provider ?? gateway(modelId)
+  const billing = hostedBillingScope.getStore()
+  const scope = { workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) }
+  let managed: Model | undefined
+  const executionModel = async (admission: GatewayAdmission | null) => {
+    if (!admission) return model
+    if (provider && !trustedGatewayModels.has(provider)) throw new ModelAdmissionError('modelRouteDenied')
+    return provider ?? (managed ??= await createTrustedGatewayModel(modelId))
+  }
   const reserve = async (
     id: string,
     args: Parameters<Model['doGenerate']>[0],
   ) => {
-    // Upper-bound text input tokens by UTF-8 bytes, output by an enforced token
-    // limit. Include an image/file token cushion without changing subscription calls.
+    const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal, auditAllowed: false })
+    await executionModel(admission)
+    // An input-size boundary, not a prepaid or estimated-cost balance check.
     const promptBytes = Buffer.byteLength(
       JSON.stringify({ prompt: args.prompt, tools: args.tools }),
     )
     if (promptBytes > 16 * 1024 * 1024)
       throw new PaidResourceError('usage_cost_unavailable')
-    const files = args.prompt.reduce(
-      (count, message) =>
-        count +
-        (typeof message.content === 'string'
-          ? 0
-          : message.content.filter(
-              (part) => part.type === 'file' || part.type === 'reasoning-file',
-            ).length),
-      0,
-    )
-    const entry = (await gateway.getAvailableModels()).models.find(
-      (row) => row.id === modelId,
-    )
-    if (!entry?.pricing) throw new PaidResourceError('usage_cost_unavailable')
-    const prices = entry.pricing
-    const input = Math.max(
-      ...[
-        prices.input,
-        prices.cachedInputTokens ?? '0',
-        prices.cacheCreationInputTokens ?? '0',
-      ].map(Number),
-    )
-    const output = Number(prices.output)
-    if (![input, output].every((n) => Number.isFinite(n) && n >= 0))
-      throw new PaidResourceError('usage_cost_unavailable')
-    const maximum = Math.max(
-      1,
-      Math.ceil(
-        ((promptBytes + files * 128_000) * input + 4096 * output) * 1e6 * 1.1,
-      ),
-    )
-    await hostedUsage.reserve(workspaceId, modelId, id, process.env, maximum)
-    await checkAbuseAlerts()
+    await hostedUsage.reserve(workspaceId, modelId, id, process.env)
   }
-  const options = (value: Parameters<Model['doGenerate']>[0]) => ({
+  const options = (value: Parameters<Model['doGenerate']>[0], admission: GatewayAdmission | null) => ({
     ...value,
     providerOptions: {
       ...value.providerOptions,
-      gateway: { ...value.providerOptions?.gateway, user: workspaceId },
+      gateway: admission ? { ...managedGatewayOptions(admission), user: workspaceId } : { ...value.providerOptions?.gateway, user: workspaceId },
     },
     maxOutputTokens: Math.min(value.maxOutputTokens ?? 4096, 4096),
     abortSignal: AbortSignal.any([
@@ -81,8 +72,15 @@ export async function hostedModel(
         return async (args: Parameters<Model['doGenerate']>[0]) => {
           const id = randomUUID()
           await reserve(id, args)
+          let requestStarted = false
           try {
-            const result = await target.doGenerate(options(args))
+            await checkAbuseAlerts()
+            const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal })
+            const selected = await executionModel(admission)
+            const prepared = options(args, admission)
+            if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
+            requestStarted = true
+            const result = await selected.doGenerate(prepared)
             const cost = gatewayCost(result.providerMetadata)
             await hostedUsage.settle(
               id,
@@ -96,7 +94,7 @@ export async function hostedModel(
               throw new PaidResourceError('usage_cost_unavailable')
             return result
           } catch (error) {
-            await hostedUsage.settle(id, null)
+            await hostedUsage.settle(id, requestStarted ? null : 0)
             throw error
           }
         }
@@ -104,38 +102,78 @@ export async function hostedModel(
         return async (args: Parameters<Model['doStream']>[0]) => {
           const id = randomUUID()
           await reserve(id, args)
+          let requestStarted = false
           try {
-            const result = await target.doStream(options(args))
+            await checkAbuseAlerts()
+            const admission = await modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal: args.abortSignal })
+            const selected = await executionModel(admission)
+            const prepared = options(args, admission)
+            if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
+            requestStarted = true
+            const result = await selected.doStream(prepared)
             let finished = false
+            let consumerCancelled = false
+            let generationId: string | undefined
+            const reader = result.stream.getReader()
+            const interrupt = async (reason: unknown) => {
+              // Stop provider work immediately, even when accounting is waiting
+              // for a database connection or row lock. Still await both outcomes.
+              const [upstream, settlement] = await Promise.allSettled([
+                reader.cancel(reason),
+                finished ? Promise.resolve() : hostedUsage.settle(id, null, 0, 0, generationId),
+              ])
+              if (settlement.status === 'rejected') throw settlement.reason
+              if (upstream.status === 'rejected') throw upstream.reason
+            }
             return {
               ...result,
-              stream: result.stream.pipeThrough(
-                new TransformStream({
-                  async transform(chunk, controller) {
+              stream: new ReadableStream({
+                async pull(controller) {
+                  try {
+                    const { value: chunk, done } = await reader.read()
+                    if (done) {
+                      if (!finished && !consumerCancelled) await hostedUsage.settle(id, null, 0, 0, generationId)
+                      if (!consumerCancelled) controller.close()
+                      return
+                    }
+                    // Gateway exposes its lookup ID on the first content chunk,
+                    // before a finish receipt can be lost to interruption.
+                    if (chunk.type !== 'finish' && 'providerMetadata' in chunk) {
+                      const observed = gatewayGenerationId(chunk.providerMetadata)
+                      if (observed && observed !== generationId) {
+                        await hostedUsage.recordGeneration(id, observed)
+                        generationId = observed
+                      }
+                    }
                     if (chunk.type === 'finish') {
-                      finished = true
                       const cost = gatewayCost(chunk.providerMetadata)
                       await hostedUsage.settle(
                         id,
                         cost,
                         chunk.usage.inputTokens.total ?? 0,
                         chunk.usage.outputTokens.total ?? 0,
-                        gatewayGenerationId(chunk.providerMetadata),
+                        gatewayGenerationId(chunk.providerMetadata) ?? generationId,
                       )
+                      finished = true
                       await checkAbuseAlerts()
                       if (cost === null)
                         throw new PaidResourceError('usage_cost_unavailable')
                     }
-                    controller.enqueue(chunk)
-                  },
-                  async flush() {
-                    if (!finished) await hostedUsage.settle(id, null)
-                  },
-                }),
-              ),
+                    if (!consumerCancelled) controller.enqueue(chunk)
+                  } catch (error) {
+                    let failure = error
+                    try { await interrupt(error) } catch (cleanupError) { failure = cleanupError }
+                    if (!consumerCancelled) controller.error(failure)
+                  }
+                },
+                async cancel(reason) {
+                  consumerCancelled = true
+                  await interrupt(reason)
+                },
+              }),
             }
           } catch (error) {
-            await hostedUsage.settle(id, null)
+            await hostedUsage.settle(id, requestStarted ? null : 0)
             throw error
           }
         }

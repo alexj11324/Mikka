@@ -10,6 +10,7 @@ type Hold = { operation: string; phase: 'before' | 'after'; fail: boolean; arriv
  * this actual HTTP loopback server before any external network can be opened. */
 export async function linearLoopback(team: { id: string; key: string; name: string }) {
   const issues = new Map<string, LinearIssueSnapshot>()
+  const archived = new Map<string, string>()
   const comments = new Map<string, { id: string; body: string; issue: { id: string }; parent: null; createdAt: string; user: { name: string } }>()
   const requests: RequestRecord[] = []
   const holds: Hold[] = []
@@ -30,7 +31,14 @@ export async function linearLoopback(team: { id: string; key: string; name: stri
       if (failIndex >= 0) { outgoing.writeHead(503, { 'content-type': 'application/json' }); outgoing.end(JSON.stringify({ errors: [{ message: 'Synthetic transport failure' }] })); return }
       const variables = body.variables
       let data: unknown
-      if (operation === 'MikkaLinearTeams') data = { teams: { nodes: [{ ...team, states: { nodes: [] } }], pageInfo: { hasNextPage: false, endCursor: null } } }
+      if (operation === 'MikkaLinearArchiveState') {
+        const issue = issues.get(variables.id!)
+        data = { issue: issue ? { id: issue.id, team: issue.team, archivedAt: archived.get(issue.id) ?? null } : null }
+      } else if (operation === 'MikkaLinearArchiveIssue') {
+        if (!issues.has(variables.id!)) throw new Error('Unknown synthetic issue')
+        archived.set(variables.id!, new Date().toISOString())
+        data = { issueArchive: { success: true } }
+      } else if (operation === 'MikkaLinearTeams') data = { teams: { nodes: [{ ...team, states: { nodes: [] } }], pageInfo: { hasNextPage: false, endCursor: null } } }
       else if (operation === 'MikkaLinearIssue') {
         const issue = issues.get(variables.id!)
         data = { issue: issue ? { ...issue, labels: { nodes: issue.labels } } : null }

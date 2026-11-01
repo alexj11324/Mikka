@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { AuditActor } from '../audit/events'
 
 export class CredentialError extends Error {
   constructor(public code = 'credential_unavailable', public status = 503) { super(code) }
@@ -9,7 +10,7 @@ export const submitSchema = z.object({
   origin: z.string().max(2048), username: secretText, password: secretText,
 }).strict()
 export const otpSchema = z.object({ nonce: z.string().regex(/^[A-Za-z0-9_-]{43}$/), origin: z.string().max(2048), username: secretText.optional(), code: z.string().regex(/^[A-Za-z0-9 -]{3,32}$/) }).strict()
-export type Actor = { userId: string; workspaceId: string }
+export type Actor = { userId: string; workspaceId: string; auditActor?: AuditActor }
 export type BrowserCaller = Actor & { botId: string; subagentId?: string; runId?: string }
 export type EncryptionContext = { userId: string; credentialId: string; origin: string }
 export type Envelope = { v: 1; wrappedDek: string; nonce: string; ciphertext: string }

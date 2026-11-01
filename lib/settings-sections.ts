@@ -5,11 +5,12 @@
  */
 export type SettingsSectionId =
   | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'models'
-  | 'logins' | 'privacy' | 'activity' | 'computers' | 'developer'
+  | 'logins' | 'privacy' | 'computers' | 'developer'
   | 'general' | 'members' | 'teams' | 'bots' | 'permissions' | 'secrets' | 'audit' | 'usage' | 'billing'
 
 export interface SettingsSectionDef {
   id: SettingsSectionId
+  /** 'personal' is the 账号 group (account-level); 'workspace' is the current workspace's group. */
   group: 'personal' | 'workspace'
   /** English name; the sidebar search matches it in any locale. */
   title: string
@@ -31,17 +32,16 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
-  { id: 'models', group: 'personal', title: 'Models' },
+  { id: 'models', group: 'personal', title: 'API and subscriptions' },
   { id: 'logins', group: 'personal', title: 'Logins and keys' },
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
-  { id: 'activity', group: 'personal', title: 'Activity' },
   { id: 'computers', group: 'personal', title: 'Devices' },
   // Hidden until an API accepts the tokens (Alex); the UI and token store are built. Delete `unbuilt` to ship it.
   { id: 'developer', group: 'personal', title: 'Personal access tokens', unbuilt: true },
   { id: 'general', group: 'workspace', title: 'General' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
-  { id: 'bots', group: 'workspace', title: 'Bots', unbuilt: true },
+  { id: 'bots', group: 'workspace', title: 'Bots and agents' },
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },
   { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true },
   { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
@@ -85,6 +85,9 @@ export function settingsHref(id: SettingsSectionId, workspaceId?: string): strin
   return `/settings?${search}`
 }
 
-export function visibleSettingsSections({ admin }: { admin: boolean }): SettingsSectionDef[] {
-  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly))
+/** A personal workspace has only its owner, so it has no members, team permissions or audit log (decision 2026-10-31-2130). */
+export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'permissions', 'audit'])
+
+export function visibleSettingsSections({ admin, personal = false }: { admin: boolean; personal?: boolean }): SettingsSectionDef[] {
+  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)))
 }

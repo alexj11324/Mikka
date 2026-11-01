@@ -42,8 +42,11 @@ source wins in a conflict is in [`README.md`](README.md).
   and a bot's computer screen send instructions through the centre composer.
   An open thread is a conversation with the agent running it, so its detail
   ends in that composer and what is typed there goes to that agent.
-- **R-11** The composer has no model picker. The model is our default;
-  BYOK users will choose it in Settings later.
+- **R-11** A bot's composer, the Coordinator's included, has one model chip
+  (`BotModelPicker`) beside 「+」, saved per bot; it picks a model only, never
+  an Agent. Settings has no per-bot model rows
+  ([decision](decisions/2026-10-31-2330-bot-model-picker.md)). A thread's
+  composer has none.
 - **R-12** No starter or suggestion cards in any chat ("试试从这些事情开始").
   Suggestions live only on the 建议 page (R-55). A new bot greets with one
   bubble and an A–D choice card.
@@ -68,8 +71,9 @@ source wins in a conflict is in [`README.md`](README.md).
   Artifact waiting for acceptance is a bordered card under the reply (icon,
   name, state such as 待你确认); clicking it opens the Artifact window (R-56).
 - **R-16** The computer card in chat shows a title, a status, one sentence
-  about the task and a big screen. Approval is part of that card. It never
-  shows an operation log, a step checklist, or OS and spec lines.
+  about the task and a big screen. It has no approval step: the bot operates
+  until the person takes control (decisions 2026-10-30). It never shows an
+  operation log, a step checklist, or OS and spec lines.
 - **R-17** The 概览 header does not show 「<Bot 名> 的屏幕」. The 电脑 tab
   holds the bot's screen, the existing `AgentComputer` view (R-50).
 
@@ -121,20 +125,31 @@ source wins in a conflict is in [`README.md`](README.md).
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
   shows a machine picker.
-- **R-23** Machine picker order: **E2B** first and selected by
+- **R-23** Machine picker order: **Mikka Cloud** first and selected by
   default; then the group **本机** (this Mac, a local Linux machine); then the
   group **Remote control** (VPS and SSH hosts reached through the user's
   machine). Settings › 设备 uses the same two groups.
 - **R-24** A device's online state is a StatusDot on the top-right of its
   icon (green online, grey offline, red error), never a text badge.
-- **R-25** Board cards show the id, the assignee's avatar (never a name),
-  the status icon, the title, then one row with priority, labels, linked PRs
-  and the latest run's state. Only the run state is a tinted pill; priority,
-  labels and PRs are bare icon + text with no border, wrapping onto a second
-  row when needed. The board is the reUI Kanban with no column `+` (R-22) and
-  no page-title pill (the rail says where you are). With the Coordinator
-  sidebar open, 已完成 collapses to a 40px strip (icon, vertical name, count)
-  so the other columns are never cut off. Figma: section `77:2`.
+- **R-25** Board cards follow Figma 「看板卡片 v1」 (`714:5283`): a filled card
+  with no stroke (R-31), radius 8px, padding 12px, rows 8px apart, icons
+  14px. Row 1 is the id, a lock when the task is personal, and the assignee
+  avatar group on the right (never a name; nothing when unassigned). When a
+  Bot owns the task its avatar is on top. Row 2 is the status icon and the
+  title, at most two lines, then an ellipsis. Row 3 shows only what the task
+  has, in this order, wrapping when needed: priority, labels (bare dot and
+  text, at most two, then 「+N」), the newest PR (then 「+N」), subtasks, the
+  latest run's state and the due date. Only the run state is a tinted pill
+  (运行中, 等你处理, 运行失败). Colour carries meaning only: a failed run and an
+  overdue date are red; run state, urgent priority and PR state are green or
+  orange; a done card's title is the secondary grey. The board is the reUI
+  Kanban with no column `+` (R-22) and no page-title pill (the rail says
+  where you are). Columns are a fixed 300px, as in Linear: when they do not
+  fit, the board scrolls horizontally, and spare width stays empty. With the
+  Coordinator sidebar open, only 已完成 collapses, to a 40px strip (icon, the
+  name one glyph per line, count) that expands when clicked; every other
+  column keeps its 300px. Figma: page 「看板卡片 v1 · 定稿 2026-10-31」
+  (`714:5283`).
 - **R-26** Workspace tasks sync with Linear (`MIK-xx`); personal tasks stay in
   Mikka. A task can move both ways: a workspace task can be turned back into
   a personal one (its Linear issue is archived; issue #184). Teammates see agent runs on workspace issues only, never left-column
@@ -160,9 +175,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the agent talk there. A thread's content is its owner's alone: teammates
   (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
   as GitHub Copilot and Cursor keep agent sessions private; what the thread
-  produces (a PR, a comment its owner posts) is how the team sees the work. The bot runs the thread (R-05); a coding agent it hands work
-  to (Codex, Claude Code) shows as a step 「交给 Codex · …」, never as the
-  runner in the list or the header.
+  produces (a PR, a comment its owner posts) is how the team sees the work. The bot dispatches the thread; the Agent it hands the work
+  to (Codex, Claude Code) runs it, and where a thread carries an icon
+  other than its status, that icon is the Agent's mark (R-78).
 - **R-63** Activity: events (created, handed to, dispatched a thread,
   status changes) are plain one-line rows; one person's events in the same
   minute join into one row (「创建了任务，交给 Mikka Backend，自己负责」). A comment is a card with a 1px
@@ -202,13 +217,16 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot's avatar and name (R-02), then the tabs 详情, 线程, PR, 电脑. 线程
   lists only the threads this bot dispatched (for the Coordinator, the
   threads it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
-  全部线程 lists every bot's threads; each row carries a 16px bot avatar in
-  that bot's colour, the only thread list that shows one, and a relative
-  time on the right (2 分钟前, 昨天).
+  全部线程 lists every bot's threads; each row carries the 16px mark of the
+  Agent running it (R-78), the only thread list that shows one, and a
+  relative time on the right (2 分钟前, 昨天).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
   header's search, widen and close, and a list group's collapse chevron), the only
-  control is 「展开」 to expand a list. 详情 holds two lists, 例行 (routines)
+  controls are 「展开」 to expand a list and, in a bot's 概览 header, its own name
+  and avatar: clicking the name renames it in place (Enter or leaving saves, Esc
+  cancels) and clicking the avatar opens the 新建 Bot shape and colour picker
+  (2026-10-31). The Coordinator's header stays read-only. 详情 holds two lists, 例行 (routines)
   and 资料库 (library). The bot creates routines when asked in chat; files are
   uploaded with the composer's 「+」.
 - **R-52** Every thread list groups its rows in this order: 等待回复（N）,
@@ -219,7 +237,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-53** A thread row has two lines: the thread's title, then the opening of
   its last reply quoted verbatim, cut to one line. No generated description,
   no status word and no bot-name prefix (generating them costs compute).
-- **R-54** The PR tab lists this bot's PRs in groups 等待审查, 进行中, 已合并,
+- **R-54** The PR tab lists the PRs of the threads this bot dispatched, in groups 等待审查, 进行中, 已合并,
   with R-52's header style. Each row is the PR title and its number.
 - **R-55** 建议 is the second rail item. Its page is split 50/50 with a 1px
   divider: on the left the title 「建议」 (24px SemiBold) with a refresh icon,
@@ -265,6 +283,34 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   page names the product for each. Rail icons: 主页 House, 建议 Lightbulb,
   看板 Columns3, 插件 Blocks. Artifact is the one exception: it uses
   Mikka's own stacked-cards icon (R-56), never lucide Copy or Library.
+  No sparkle for AI (unslop): thinking is Brain, a bot is Bot (ui-policy
+  `icons/no-sparkle`).
+- **R-76** Every workspace feature is on by default. Only a workspace admin
+  turns one off (Settings › 工作区 or 团队权限), and members see the current
+  value read-only. A stored off is an admin's choice, never a leftover
+  default: a migration that turns a default on also rewrites rows that hold
+  the old default. A feature stays off only for real per-use cost, an
+  incident kill switch or a recorded Alex decision (`decisions.md`). Safety
+  and money defaults (approval requirements, auto-recharge) are not features;
+  they change only with Alex's decision. Source: Alex, 2026-10-31.
+- **R-77** An app write has the permission its connection grants, and only
+  a destructive call asks. If the Gmail, Calendar, Notion or Slack
+  connection allows the write, the agent writes without a card. Explicit
+  person or admin allow/ask/deny win first. Otherwise the Decisions API
+  answers one predicate, `destructive`: does this exact call delete,
+  overwrite or remove existing data? The tool's MCP annotations
+  (`destructiveHint`, `readOnlyHint`) are input; a `readOnlyHint` tool is not
+  asked about. Creating, sending, appending and adding never ask. An
+  unavailable or refused judgment shows a card, never a silent write.
+  Source: Alex, 2026-10-31.
+- **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…),
+  so wherever a thread or run is drawn with an icon, the icon is that
+  Agent's mark (`HarnessMark`, R-74); a thread whose Agent is unknown takes
+  the neutral thread mark. A bot never does coding work: it appears only
+  where it dispatched or owns the work (「<Bot> 派出线程」, the 概览 header),
+  never as a thread's or run's icon, and neither does the Coordinator's
+  avatar. Status icons stay where a list shows status (R-62, R-66).
+  Source: Alex, 2026-11-01 (decision `2026-11-01-0110-agent-mark-on-threads`).
 - **R-74** A named thing always carries its icon. Wherever the UI shows a
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
@@ -273,7 +319,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   agents use their own brand mark (Claude Code, Codex, Cursor…); models use
   their provider's mark (Claude, OpenAI…); apps use the R-70 brand tile.
   Brand marks are the colored logo on its own, never set in a white disc or
-  a bordered circle. 自动 uses one neutral icon so lists line up. Name-only
+  a bordered circle. There is no 自动 choice (decision 2026-10-30). Name-only
   text for these things fails review. Build them with the shared label
   components, not by hand.
 - **R-72** Two kinds of work. A real task, such as coding, is a thread: a full
@@ -306,13 +352,28 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   profile and the background research sit behind deployment flags (off by
   default when self-hosted), a per-person entitlement, the person's own
   toggles and a daily budget.
+- **R-75** Workspaces are switched in one place: the account menu behind the
+  avatar at the bottom of the rail (the bot list's footer on phones).
+  Settings shows the current workspace's settings and has no switcher; its
+  column starts with the 设置 title and search. The account menu is one flat
+  `DropdownMenu`, no submenu, as Linear's and Notion's: each signed-in
+  account's email (small, muted) with its workspaces under it (avatar, name,
+  a check on the current one; about five show, more scroll), 创建工作区;
+  then 设置 with its shortcut as one quiet text hint (⌘, not keycaps); then
+  添加账户 and 退出登录. Every action row leads with a muted lucide icon in
+  the same 20px box as the workspace avatars (创建工作区 `Plus`, 设置
+  `Settings`, 添加账户 `UserPlus`, 退出登录 `LogOut`), so all rows share
+  one text column. Menu text and item height are the defaults; the
+  menu is 240px wide and opens above the rail avatar, never over it.
 
 ## Look
 
 - **R-30** Greys are pure neutral: `rgba(0,0,0,a)` and `#737373 / #A3A3A3 /
   #171717` in light mode, the same idea in dark. Never slate, zinc or teal
   tinted. Main content is near-black (`text-foreground`); grey is for
-  metadata, borders and hover only.
+  metadata, borders and hover only. One accent, `accent/default`
+  (`--sidebar-primary`): no second brand hue on buttons or selections (the
+  violet workspace and project accents now map to it; unslop, 2026-10-31).
 - **R-31** No white hairlines. Inputs have a grey fill and no stroke. The
   sources to watch: shadcn `border-input` (dark `--input` is
   `oklch(1 0 0 / 15%)`), `ring-foreground/10` on dialogs and popovers,
@@ -322,7 +383,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   dark grey in dark mode, never white at low opacity.
   Secondary buttons follow the same rule: a grey fill and no stroke, like
   the 「Add folder…」 button in Claude desktop's settings (a light grey pill
-  on a white panel, no outline). `Button variant="outline"` (and the
+  on a white panel, no outline). `Button variant="outline"` and `variant="secondary"` (and the
   `outline` Toggle, the motion `secondary`/`outline` buttons) use the
   `--control` / `--control-hover` tokens, a translucent black (light) or
   white (dark) overlay, so the button still reads on grey cards and
@@ -333,6 +394,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   to white; ui-policy fails both as `style/secondary-button-fill`. Status
   tones (`statusTones`, used by status and priority pickers and status
   badges) are a tinted fill with no stroke; neutral uses `--control`.
+  Search fields use `SearchInput` (`components/ui/search-input.tsx`): the
+  `--control` fill, no stroke, the magnifier on the left and a light focus ring.
+  ui-policy fails an outlined `Input`, `InputGroup` or `SidebarInput` used for
+  search as `style/search-input`.
 - **R-32** Font Geist, self-hosted from `app/fonts/Geist-Variable.woff2` through
   `next/font/local` (no runtime font CDN). A local font is only allowed after
   its file and CSS variable are registered in `ui-policy.json` →
@@ -340,24 +405,53 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
   (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium
   (group title), 11/14 Medium (badge), and 24/32 SemiBold for the 建议 page
-  title only (R-55).
+  title only (R-55). Documents people read (a task's title and description,
+  the Artifact reader, comments) use four steps, as Linear and Notion do:
+  24/32 SemiBold title (`text-2xl`), 18/28 SemiBold section heading
+  (`text-lg`), 15/24 Regular body (`text-md`, the one theme token, pinned in
+  `ui-policy.json`), 12/16 meta (`text-xs`); a smaller heading is the body
+  size in SemiBold. Chat, the thread pane included, stays 14/22 (Alex,
+  2026-11-01, decision `2026-11-01-0140-document-type-scale`). Nothing is smaller than 11px. Labels are sentence case:
+  no uppercase label with wide tracking (unslop; ui-policy
+  `typography/uppercase-label`). Weights stop at SemiBold, never Bold.
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
-  14 approval and list card, 16 dialog, 999 pill. Spacing is a multiple of 4.
-  Exception: 建议 cards use 16 (R-55).
+  14 approval and list card, 14 dialog (`rounded-xl`, the `DialogContent` /
+  `AlertDialogContent` default; a call site does not change it), 999 pill. Spacing is a multiple of 4.
+  Exception: 建议 cards use 16 (R-55). An `icon-sm` button (28px) extends
+  its hit area to 40px on a coarse pointer with an invisible ring
+  (interface-design, Alex 2026-10-31).
 - **R-34** Status colours come only from the StatusBadge set (Figma
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,
   forward, centred search pill that opens ⌘K, the 浏览器 globe toggle at the
   right, R-57), 72px icon rail with a text label under each icon, in this
   order: 主页, 建议, 看板, 插件, Artifact; and one rounded content card. Build on
-  `components/app-shell.tsx`; no reUI App Shell blocks.
+  `components/app-shell.tsx`; no reUI App Shell blocks. Standing rule: a
+  skill audit (unslop, interface-design) never changes the shell layout;
+  Alex keeps it as it is (2026-10-31).
 - **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`, all 16
-  shapes kept); people use letter avatars.
+  shapes kept); people use letter avatars. A person without an uploaded
+  picture gets a generated gradient avatar (`public/avatars/*.webp`): after
+  adopting the unslop skill Alex still requires it (2026-10-31), so it is
+  intentional and not a violation. A bot's avatars move through the idle
+  montage on one shared clock, so every copy of one bot shows the same pose.
 - **R-37** Animate only when the user's action changes a size or position.
   Position and size move with springs; opacity and colour use a duration.
+  Springs settle without visible overshoot (no bouncy springs). No hover
+  scale or lift: hover is a colour or surface change, a press may scale to
+  0.97. Transitions name their properties, never `transition-all` (ui-policy
+  `motion/transition-all`); animate transform and opacity rather than
+  width, height, top or left (unslop, interface-design).
 - **R-38** Light-theme hover and column backgrounds use `rgba(0,0,0,a)`
   overlays, not a tinted overlay (an `rgba(16,24,40,…)` overlay read as mint
   green).
+
+- **R-39** One container per surface. A bordered or rounded card never wraps
+  another bordered card, outline item or loading card (a loading card inside a
+  settings section is `SettingsLoading bare`); a dialog is the only surface for
+  what it holds. A list row's hover and selected fill cover the whole row edge
+  to edge; buttons and switches inside it stay separately clickable.
+  `pnpm lint:ui` fails a frame inside a frame as `style/nested-frame`.
 
 ## Copy
 
@@ -380,15 +474,28 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   - Test: delete the string. If the screen still says the same thing, keep it
     deleted. This applies to copy written in specs and agent briefs too: do not
     hand a designer or subagent an explanatory sentence to draw.
+  - Data is not filler. An item in the 插件 store shows Composio's one-line
+    description when Composio has one, as Codex's store does (decision
+    2026-10-31); Mikka writes none of its own, so an item without one, and
+    GitHub, Linear and Telegram, show icon and name only. Rows in 设置 › 连接
+    have none.
 - **R-41** An empty state is one colloquial line plus one button (often
   "send to a bot"). Never "这里是空的" or "Check back later".
 - **R-42** Every visible string lives in `messages/zh-CN.json` and
   `messages/en.json`; `pnpm i18n:check` must pass. Write Chinese first.
-- **R-43** Use the glossary's words: Bot, 对话, 线程, 资料库, 浏览器, 电脑.
+- **R-43** Use the glossary's words: Bot, 对话, 线程, Agent, 资料库, 浏览器, 电脑.
   Never 会话 for a left row or a run, and never 任务 for the panel's thread
-  tab. 「Artifact」 is never translated. Built-in role names stay English
+  tab. The right-side worker that does a thread's work (Claude Code, Codex) is
+  an **Agent**, never harness or 执行器 in the UI; it runs on a 电脑 (your
+  computer, an SSH server or Mikka Cloud). `scripts/check-copy.mjs` rejects harness and
+  执行器 in `messages/`. 「Artifact」 is never translated. Built-in role names stay English
   (Coordinator).
-- **R-44** The home greeting stays 「早上好，Alex」 (time of day + name).
+- **R-44** The 建议 panel header greets by time of day and name
+  (「早上好，Alex。」, `Shell.suggestions.morning` / `afternoon` / `evening`);
+  it is a briefing, not a page headline. Every other title names the place or
+  the period and never greets (unslop): the sign-in title is 「登录 Mikka」,
+  not 「欢迎回来」. `check-copy` rejects greeting titles and exclamation
+  marks.
 
 - **R-45** A 建议 item, briefing item or follow-up item makes clear what to
   do and who or what it is about; never a bare report such as 「CI 挂了」 or
@@ -424,6 +531,7 @@ place, not a licence to pick either.
 | `border/rule` | `#e5e5e5` / dark `#383838` | `--rule` | `oklch(0.922 0 0)` / dark `oklch(0.269 0 0)` | |
 | `accent/default` | `#2f6bff` | `--sidebar-primary` | shadcn blue | yes |
 | `status/*` | StatusBadge set | `--success`, `--warning`, `--destructive` | Tailwind palette | check |
+| `brand/claude` (R-74 mark) | none yet | `--color-brand-claude` | `#D97757`, both themes | Figma to add |
 
 The drift rows are open in `decisions.md`. Until they are settled, the code
 value is what ships and Figma is updated to match.

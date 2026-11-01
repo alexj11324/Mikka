@@ -1,5 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "build": {
+    "env": {
+      "NEXT_ENABLE_ADAPTER": "0"
+    }
+  },
+  "functions": {
+    "app/api/coordinator/stream/route.ts": {
+      "supportsCancellation": true
+    }
+  },
   "git": {
     "deploymentEnabled": {
       "main": true,

@@ -1,7 +1,10 @@
 import { z } from 'zod'
 import { SubscriptionRefusal, subscriptionRouteSchema } from '@mikka/protocol/subscription'
 import type { SubscriptionService } from './subscription-service'
+import { WorkerRefusal } from '../packages/daemon/src/subscription-worker-client'
+import { noteLogUser } from './request-log'
 import { accountLabel, failedUsage, usageCache } from './subscription-usage'
+import { stopRunsUsingSubscriptions } from './personal-policy'
 
 const id = z.uuid()
 const input = z.discriminatedUnion('action', [
@@ -18,13 +21,32 @@ export interface SubscriptionHTTPDependencies {
   session(request: Request): Promise<{ userId: string; sessionId: string; tokenWorkspaceId?: string } | null>
   workspace(userId: string, workspaceId: string): Promise<void>
   service(custodyOnly?: boolean): SubscriptionService
+  /** Receives one JSON line per refused request: action, provider, code and error class only. */
+  log?: (line: string) => void
+}
+/** The refusal code a client may see. Worker codes are a fixed snake_case set
+ * (packages/subscription-worker/errors.go); anything else stays generic. */
+export function refusalCode(error: unknown) {
+  if (error instanceof SubscriptionRefusal) return error.code
+  if (error instanceof WorkerRefusal && /^[a-z_]{1,64}$/.test(error.code)) return error.code
+  return 'subscription_unavailable'
+}
+/** A sign-in that never started leaves no row: each failed 连接 would otherwise add one. Best effort, so the refusal itself still reaches the page. */
+async function discardUnstarted(service: SubscriptionService, userId: string, connectionId: string, worker: { call(method: string, params: unknown): Promise<unknown> }) {
+  try {
+    const row = await service.repository.connection(userId, connectionId)
+    await worker.call('disconnect', { revision: Number(row.epoch) })
+    await service.repository.remove(userId, connectionId)
+  } catch { /* still listed; 移除 clears it */ }
 }
 export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
   return async (request: Request): Promise<Response> => {
+    const refused: { action?: string; provider?: string } = {}
     try {
       if (request.method !== 'POST' || request.headers.get('sec-fetch-site') === 'cross-site' || (request.headers.has('origin') && request.headers.get('origin') !== new URL(request.url).origin)) return Response.json({ error: 'request_refused' }, { status: 403, headers })
       const session = await deps.session(request)
       if (!session) return Response.json({ error: 'auth_required' }, { status: 401, headers })
+      noteLogUser(session.userId)
       if (!request.headers.get('content-type')?.startsWith('application/json')) return Response.json({ error: 'invalid_request' }, { status: 415, headers })
       const reader = request.body?.getReader()
       if (!reader) throw new Error('invalid_request')
@@ -34,6 +56,8 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
       const parsed = input.safeParse(JSON.parse(new TextDecoder().decode(bytes)))
       if (!parsed.success) throw new Error('invalid_request')
       const body = parsed.data
+      refused.action = body.action
+      if (body.action === 'connect') refused.provider = body.provider
       const service = deps.service(['status', 'disconnect', 'recover', 'remove'].includes(body.action))
       if (body.action === 'connect') {
         if (session.tokenWorkspaceId && session.tokenWorkspaceId !== body.workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
@@ -41,10 +65,13 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         if (!service.capabilities.oauth?.[body.provider]) throw new SubscriptionRefusal('backend_unavailable')
         const connectionId = await service.repository.create(session.userId, body.workspaceId, body.provider)
         const row = await service.repository.connection(session.userId, connectionId)
-        const result = await service.worker(service.repository.scope(row)).call<{ authorizationUrl: string; revision: number }>('oauthStart', { revision: Number(row.epoch), sessionId: session.sessionId }, request.signal)
+        const worker = service.worker(service.repository.scope(row))
+        const result = await worker.call<{ authorizationUrl: string; revision: number }>('oauthStart', { revision: Number(row.epoch), sessionId: session.sessionId }, request.signal)
+          .catch(async (failure: unknown) => { await discardUnstarted(service, session.userId, connectionId, worker); throw failure })
         return Response.json({ connectionId, ...result }, { headers })
       }
       const row = await service.repository.connection(session.userId, body.connectionId)
+      refused.provider = row.provider
       if (session.tokenWorkspaceId && session.tokenWorkspaceId !== row.workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
       await deps.workspace(session.userId, row.workspaceId)
       const worker = service.worker(service.repository.scope(row))
@@ -62,9 +89,13 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         result = { id: row.id, removed: true }
       }
       else { await worker.call(body.action, { revision: body.revision }, request.signal); result = await service.status(session.userId, row.id, request.signal) }
+      // 断开连接 / 移除: runs using this connection stop now, wherever they run.
+      if (body.action === 'disconnect' || body.action === 'remove') await stopRunsUsingSubscriptions(service.repository.pool, { ownerId: session.userId, connectionId: row.id })
       return Response.json(result, { headers })
     } catch (error) {
-      const code = error instanceof SubscriptionRefusal ? error.code : 'subscription_unavailable'
+      const code = refusalCode(error)
+      // Never the message, URL, state or body: those can carry provider or secret data.
+      try { (deps.log ?? console.warn)(JSON.stringify({ level: 'warn', msg: 'subscription_refused', action: refused.action ?? null, provider: refused.provider ?? null, code, error: error instanceof Error ? error.name : 'unknown' })) } catch { /* logging never breaks a request */ }
       return Response.json({ error: code }, { status: 409, headers })
     }
   }
@@ -78,10 +109,18 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
     if (session.tokenWorkspaceId && session.tokenWorkspaceId !== workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
     await deps.workspace(session.userId, workspaceId)
-    const { rows } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel" from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and "removedAt" is null order by "createdAt" desc limit 50', [session.userId, workspaceId])
+    // A subscription belongs to the account (decision 2026-10-31-2130): every workspace lists the same
+    // connections. The same provider account connected in two workspaces shows once; nothing is deleted.
+    const { rows: all } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel","providerSubject" from byos_connections where "ownerId"=$1 and "removedAt" is null and "credentialVersion">0 and state<>\'disconnected\' order by "createdAt" desc limit 50', [session.userId])
+    const subjects = new Set<string>()
+    const rows = all.filter(row => !row.providerSubject || (subjects.has(`${row.provider}:${row.providerSubject}`) ? false : (subjects.add(`${row.provider}:${row.providerSubject}`), true)))
     // Which Bots use each connection is a nicety: the list still loads without it.
-    const bots = await service.repository.connectionBots(session.userId, workspaceId).catch(() => [])
-    return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(service.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: accountLabel(row.accountLabel), bots: bots.filter(bot => bot.connectionId === row.id).map(({ id, name, color, shape }) => ({ id, name, color, shape })) })) }, { headers })
+    const bots = await service.repository.connectionBots(session.userId).catch(() => [])
+    // Listing needs custody only; sign-in needs the full runtime (connect). Offer
+    // 连接 only when that runtime exists, or every click fails the same way.
+    let signIn: SubscriptionService | null = null
+    try { signIn = deps.service(false) } catch { /* custody-only deployment: list and remove still work */ }
+    return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(signIn?.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: accountLabel(row.accountLabel), bots: bots.filter(bot => bot.connectionId === row.id).map(({ id, name, color, shape }) => ({ id, name, color, shape })) })) }, { headers })
   } catch (error) {
     if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable') return Response.json({ enabled: false, providers: [], connections: [] }, { headers })
     return Response.json({ error: 'subscription_unavailable' }, { status: 409, headers })
@@ -101,7 +140,7 @@ export async function subscriptionUsage(request: Request, deps: SubscriptionHTTP
     const workspaceId = z.uuid().parse(new URL(request.url).searchParams.get('workspace'))
     if (session.tokenWorkspaceId && session.tokenWorkspaceId !== workspaceId) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
     await deps.workspace(session.userId, workspaceId)
-    const { rows } = await service.repository.pool.query('select id,epoch from byos_connections where "ownerId"=$1 and "workspaceId"=$2 and state=\'connected\' order by "createdAt" desc limit 20', [session.userId, workspaceId])
+    const { rows } = await service.repository.pool.query('select id,epoch from byos_connections where "ownerId"=$1 and state=\'connected\' order by "createdAt" desc limit 20', [session.userId])
     const force = new URL(request.url).searchParams.get('refresh') === '1'
     const connections = await Promise.all(rows.map(row => cachedUsage(`${session.userId}:${row.id}:${row.epoch}`, () =>
       service.usage(session.userId, row.id, AbortSignal.timeout(15_000)).catch(() => failedUsage(row.id, 'unavailable')), force)))

@@ -14,7 +14,7 @@ const words = (quote: ArtifactQuote) => quote.kind === 'element' ? quote.label ?
 /** The quote waiting in the composer, above what the person types. */
 export function ArtifactQuoteChip({ quote, onRemove }: { quote: ArtifactQuote; onRemove: () => void }) {
   const t = useTranslations('Artifact')
-  return <div data-slot="artifact-quote-chip" className="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md bg-muted pr-0.5 pl-2 text-xs text-muted-foreground">
+  return <div data-slot="artifact-quote-chip" className="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md bg-control pr-0.5 pl-2 text-xs text-muted-foreground">
     <Icon quote={quote} />
     <span className="min-w-0 flex-1 truncate" title={words(quote)}>{words(quote)}</span>
     <Button type="button" variant="ghost" size="icon-xs" aria-label={t('removeQuote')} onClick={onRemove}><X data-icon="inline-start" /></Button>

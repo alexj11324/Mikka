@@ -1,4 +1,4 @@
-import {tool} from 'ai'
+import {tool,zodSchema,jsonSchema} from 'ai'
 import {z} from 'zod'
 import { bindingSchema,routeSchema } from '@/lib/factory/contract'
 import {factoryDispatchSchema} from '@/lib/factory/dispatch-schema'
@@ -7,6 +7,7 @@ import {commandSchema,skillEvaluationCommandSchema} from '@/lib/self-improvement
 import type {NativeToolScope} from './tool-scope'
 import * as steps from './steps'
 const coordinatorQuestionReferenceSchema = questionReferenceSchema.pick({ questionId: true, questionRevision: true })
+const skillEvaluationInput = zodSchema(skillEvaluationCommandSchema)
 export function factoryCoordinatorTools(userId:string,scope?:NativeToolScope){const id=z.uuid();return {
 list_factory_requests: tool({
       description: 'Read recent authenticated requests to identify the source event for task routing.',
@@ -89,7 +90,7 @@ register_skill_candidate: tool({
     }),
 skill_evaluation: tool({
       description:'Freeze the server-owned report benchmark from an actual baseline run; dispatch one pending training run, bind evaluation to a registered candidate, dispatch one pending heldout run, or compare real persisted results. Settings and cases stay server-owned; comparison cannot activate a Skill or grant approval.',
-      inputSchema:skillEvaluationCommandSchema, execute:input=>steps.skillEvaluation(userId,input,scope),
+      inputSchema:jsonSchema({ ...skillEvaluationInput.jsonSchema, type: 'object' }, { validate: skillEvaluationInput.validate }), execute:input=>steps.skillEvaluation(userId,input,scope),
     }),
 dispatch_baseline_rehearsal: tool({
       description:'For an explicitly requested controlled Skill rehearsal, atomically dispatch an existing authorized pending Factory execute task with the built-in baseline selected before any worker can claim it. Does not activate a candidate or grant permissions.',

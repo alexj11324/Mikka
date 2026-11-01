@@ -24,7 +24,10 @@ export type IssueView = 'all' | 'mine' | 'shared' | 'favorites' | 'following' | 
 export const WORKSPACE_NAME = 'Mikka'
 export const WORKSPACE_SLUG = 'mikka'
 
-/** Shows the id the server resolved with `taskIdentifier` (lib/task-identifier.ts): `MIK-12` or `ALEX-12`. */
-export function issueIdentifier(task: { identifier: string | null } | null | undefined, pendingLabel = 'Unassigned') {
+/**
+ * Shows the id the server resolved with `taskIdentifier` (lib/task-identifier.ts): `MIK-12` or `ALEX-12`.
+ * A task without one (a workspace task with no Linear id) shows `pendingLabel`, by default nothing.
+ */
+export function issueIdentifier(task: { identifier: string | null } | null | undefined, pendingLabel = '') {
   return task?.identifier ?? pendingLabel
 }

@@ -27,6 +27,26 @@ test('evidence sits under the criterion that names it; the rest stays in a last 
   assert.equal(groups[2].items[0].command, null, 'text from another run does not')
 })
 
+test('each criterion shows the command that checked it; the run command is the fallback', () => {
+  const second: EvidenceEntry = { ...log, artifact: 'run-chunk:7d1c2a40-0000-4000-8000-000000000002' }
+  const verify = check({
+    criteria: [
+      { criterionId: 'k1', text: '首页 2 秒内可交互（4G）', passed: true, evidence: log.artifact, command: 'pnpm perf:home --4g', exitCode: 0 },
+      { criterionId: 'k2', text: 'Lighthouse 性能分 ≥ 90', passed: false, evidence: second.artifact, command: 'pnpm lighthouse:mobile', exitCode: 1 },
+      { criterionId: 'k3', text: '首屏图片懒加载后无布局跳动', passed: true, evidence: `${log.artifact} ${second.artifact}` },
+    ],
+    verify: { status: 'failed', command: 'pnpm verify', exitCode: 1 },
+  })
+  const groups = criterionGroups([log, second], [verify], 'c1')
+  assert.deepEqual(groups.map(group => group.items.map(item => item.command)), [
+    [{ text: 'pnpm perf:home --4g', exitCode: 0 }],
+    [{ text: 'pnpm lighthouse:mobile', exitCode: 1 }],
+    [{ text: 'pnpm verify', exitCode: 1 }, { text: 'pnpm verify', exitCode: 1 }],
+  ])
+  const unknownExit = check({ criteria: [{ criterionId: 'k1', text: 'a', passed: true, evidence: log.artifact, command: 'pnpm a' }] })
+  assert.deepEqual(criterionGroups([log], [unknownExit], 'c1')[0].items[0].command, { text: 'pnpm a', exitCode: null })
+})
+
 test('only the current candidate counts, and the latest check of a stage wins', () => {
   const old = check({ candidateId: 'c0', criteria: [{ criterionId: null, text: 'old', passed: true, evidence: null }] })
   const first = check({ criteria: [{ criterionId: null, text: 'first', passed: false, evidence: null }] })

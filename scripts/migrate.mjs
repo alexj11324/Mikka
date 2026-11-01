@@ -13,6 +13,7 @@ import { Pool } from 'pg'
 import { alreadyApplied, orderMigrations } from './migration-order.mjs'
 import { applyMigration, planMigration } from './migration-steps.mjs'
 import { migrationTargets } from './migration-targets.mjs'
+import { migrationGuard } from './migration-guard.mjs'
 import { scopeMigrationBeforeCommit, validateScopeMigrationHistory, validateScopeMigrationSources } from './scope-migration-history.mjs'
 
 const shouldRun = process.env.MIGRATE !== '0' && (process.env.MIGRATE === '1' || process.env.VERCEL_ENV === 'production')
@@ -22,6 +23,8 @@ if (!shouldRun) {
 }
 
 const targets = migrationTargets(process.env)
+const { warning } = migrationGuard(process.env, targets, process.argv.slice(2))
+if (warning) console.warn(warning)
 
 const dir = new URL('../drizzle/', import.meta.url)
 // 旧迁移是 NNNN_*.sql，新迁移是 YYYYMMDDHHMMSS_*.sql（UTC）。按文件名排序时时间戳文件排在所有旧文件之后。

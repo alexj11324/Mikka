@@ -273,7 +273,7 @@ describe("claimed runs without an adapter", () => {
     }
   })
 
-  it("does not advertise real harnesses when sandbox startup fails", async () => {
+  it("keeps a detected CLI unschedulable and says why when sandbox startup fails", async () => {
     const supported = vi.spyOn(SandboxRuntime, "supported").mockReturnValue(true)
     const probe = vi.spyOn(SandboxRuntime.prototype, "probe").mockRejectedValue(new Error("bwrap: uid map failed"))
     const reset = vi.spyOn(SandboxRuntime.prototype, "reset").mockResolvedValue()
@@ -285,8 +285,10 @@ describe("claimed runs without an adapter", () => {
           { harness: "codex", installed: true, version: "1.0.0" },
         ],
       })
-      expect(daemon.status().harnesses.map((h) => h.harness)).toEqual(["mock"])
-      expect(server.devices.get(DEVICE)?.info.harnesses.map((h) => h.harness)).toEqual(["mock"])
+      expect(daemon.status().harnesses.filter((h) => h.installed).map((h) => h.harness)).toEqual(["mock"])
+      const reported = server.devices.get(DEVICE)?.info.harnesses
+      expect(reported?.filter((h) => h.installed).map((h) => h.harness)).toEqual(["mock"])
+      expect(reported?.find((h) => h.harness === "codex")).toEqual({ harness: "codex", installed: false, version: "1.0.0", sandboxBlocked: { missing: [] } })
       expect(reset).toHaveBeenCalledOnce()
     } finally {
       supported.mockRestore()

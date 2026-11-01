@@ -1,15 +1,122 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { browserArguments } from './ci-browser-tests.mjs'
-import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, scriptSteps, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
+import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, scriptSteps, shardScripts, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
 
 const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
 const env = { CI: 'true', GITHUB_ACTIONS: 'true', E2E_DATABASE_URL: target, MIKKA_DATABASE_URL: target, DATABASE_URL: target }
 const sample = REQUIRED_SUITES[0]
 const files = { [sample.marker]: '', [sample.file]: "import { Pool } from 'pg'" }
 const scripts = { [sample.script]: `node --test ${sample.file}` }
+
+function runnerFixture(t) {
+  const root = mkdtempSync(join(tmpdir(), 'mikka-db-runner-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  mkdirSync(join(root, 'tests'))
+  const commands = Object.fromEntries(['a', 'b', 'c'].map(name => {
+    const file = `tests/${name}.db.test.mjs`
+    writeFileSync(join(root, file), '')
+    return [`test:${name}-db`, `node --test ${file}`]
+  }))
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: commands }))
+  return { root, scripts: Object.keys(commands) }
+}
+
+test('DB shards are deterministic, disjoint and exhaustive, with unsharded execution as default', () => {
+  const scripts = ['test:g', 'test:c', 'test:f', 'test:a', 'test:d', 'test:b', 'test:e']
+  assert.deepEqual(shardScripts(scripts), scripts)
+  assert.deepEqual(shardScripts(scripts, '1/4'), ['test:a', 'test:e'])
+  for (let count = 1; count <= scripts.length; count++) {
+    const shards = Array.from({ length: count }, (_, index) => shardScripts(scripts, `${index + 1}/${count}`))
+    const combined = shards.flat()
+    assert.equal(new Set(combined).size, scripts.length, `no overlap for ${count} shards`)
+    assert.deepEqual(combined.sort(), [...scripts].sort(), `complete inventory for ${count} shards`)
+    assert.ok(shards.every(shard => shard.length > 0))
+  }
+  assert.deepEqual(scripts, ['test:g', 'test:c', 'test:f', 'test:a', 'test:d', 'test:b', 'test:e'])
+})
+
+test('DB shard configuration rejects malformed, unsafe, out-of-range and empty selections', () => {
+  for (const shard of ['', ' ', '1', '0/4', '1/0', '5/4', '1/-1', '1.5/4', '01/4', '1/04', '1/4\n', '1/4/2', '1/9007199254740992', null]) {
+    assert.throws(() => shardScripts(['test:a'], shard), /DB_TEST_SHARD/, String(shard))
+  }
+  assert.throws(() => shardScripts(['test:a'], '2/2'), /selects no database suites/)
+})
+
+test('runner invokes only the selected scripts and retains full inventory and required environment', t => {
+  const fixture = runnerFixture(t)
+  const logs = []
+  t.mock.method(console, 'log', message => logs.push(message))
+  const calls = []
+  const run = (command, args, options) => {
+    calls.push({ command, args, options })
+    return { status: 0, stdout: '# tests 1\n# pass 1\n', stderr: '' }
+  }
+  const fullEnv = { ...env, DB_TEST_EXPECTED: fixture.scripts.join(',') }
+  assert.equal(main({ root: fixture.root, env: { ...fullEnv, DB_TEST_SHARD: '1/2' }, run }), 0)
+  assert.deepEqual(calls.map(call => call.args), [['-s', 'test:a-db'], ['-s', 'test:c-db']])
+  assert.ok(logs.some(line => line.startsWith('Required DB inventory: ') && line.includes('test:b-db')))
+  assert.ok(logs.includes('Required DB selection: {"shard":"1/2","total":3,"scripts":["test:a-db","test:c-db"]}'))
+  for (const call of calls) {
+    assert.equal(call.command, 'pnpm')
+    assert.equal(call.options.cwd, fixture.root)
+    assert.equal(call.options.env.REQUIRE_DB, '1')
+    assert.equal(call.options.env.CONVERSATION_READS_REQUIRE_DB, '1')
+    assert.equal(call.options.env.MIKKA_TEST_DB_PORT, '5432')
+    assert.equal(call.options.env.DATABASE_URL, target)
+  }
+  calls.length = 0
+  assert.equal(main({ root: fixture.root, env: fullEnv, run }), 0)
+  assert.deepEqual(calls.map(call => call.args[1]), fixture.scripts)
+})
+
+test('runner validates all expected and discovered suites before sharding and before subprocesses', t => {
+  const fixture = runnerFixture(t)
+  const errors = []
+  t.mock.method(console, 'log', () => {})
+  t.mock.method(console, 'error', message => errors.push(message))
+  let called = false
+  const run = () => { called = true }
+  const shardEnv = { ...env, DB_TEST_SHARD: '1/2', DB_TEST_EXPECTED: fixture.scripts.join(',') }
+  rmSync(join(fixture.root, 'tests/b.db.test.mjs'))
+  assert.equal(main({ root: fixture.root, env: shardEnv, run }), 1)
+  assert.ok(errors.some(error => /Expected DB script not enrolled: test:b-db/.test(error)))
+  writeFileSync(join(fixture.root, 'tests/b.db.test.mjs'), '')
+  writeFileSync(join(fixture.root, 'tests/unregistered.db.test.mjs'), '')
+  assert.equal(main({ root: fixture.root, env: shardEnv, run }), 1)
+  assert.ok(errors.some(error => /unregistered.db.test.mjs needs one explicit/.test(error)))
+  assert.equal(called, false)
+})
+
+test('runner rejects invalid shards before execution and preserves per-shard summary failures', t => {
+  const fixture = runnerFixture(t)
+  const errors = []
+  t.mock.method(console, 'log', () => {})
+  t.mock.method(console, 'error', message => errors.push(message))
+  for (const shard of ['', '0/2', '3/2', '4/4']) {
+    let called = false
+    assert.equal(main({ root: fixture.root, env: { ...env, DB_TEST_SHARD: shard }, run() { called = true } }), 1)
+    assert.equal(called, false)
+  }
+  for (const result of [
+    { status: 1, stdout: '# tests 1\n# pass 1\n' },
+    { status: 0, stdout: '' },
+    { status: 0, stdout: '# tests 0\n# pass 0\n' },
+    { status: 0, stdout: '# tests 1\n# pass 0\n# skipped 1\n' },
+  ]) {
+    const calls = []
+    assert.equal(main({ root: fixture.root, env: { ...env, DB_TEST_SHARD: '2/2' }, run(command, args) { calls.push(args[1]); return { ...result, stderr: '' } } }), 1)
+    assert.deepEqual(calls, ['test:b-db'])
+  }
+  assert.ok(errors.some(error => /test:b-db exited with 1/.test(error)))
+  assert.ok(errors.some(error => /test:b-db: no node:test summary/.test(error)))
+  assert.ok(errors.some(error => /test:b-db: ran no tests/.test(error)))
+  assert.ok(errors.some(error => /test:b-db: 1 skipped/.test(error)))
+})
 
 test('parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or failed executions', () => {
   assert.deepEqual(parseSummary('# tests 4\n# pass 4\n# fail 0\n# skipped 0\n'), { tests: 4, pass: 4, fail: 0, skipped: 0 })
@@ -75,10 +182,10 @@ test('self-managed suites are excluded only with a reason and a live dedicated r
 })
 test('dedicated browser inventory requires its spec, config and script, without exempting adjacent DB tests', () => {
   const suite = BROWSER_SUITES[0]
-  const tree = { ...files, [suite.file]: "import { Pool } from 'pg'", [suite.config]: 'export default {}' }
+  const tree = { ...files, ...Object.fromEntries(BROWSER_SUITES.flatMap(suite => [[suite.file, "import { Pool } from 'pg'"], [suite.config, 'export default {}']])) }
   const commands = { ...scripts, [suite.script]: `playwright test --config=${suite.config}` }
   const plan = inventory(tree, commands)
-  assert.deepEqual(plan.browser, [suite.file])
+  assert.deepEqual(plan.browser, BROWSER_SUITES.map(suite => suite.file).sort())
   assert.deepEqual(plan.scripts, [sample.script], 'Playwright is not sent to the node:test summary checker')
   assert.throws(() => inventory(tree, scripts), /Browser script .* missing/)
   assert.throws(() => inventory(tree, { ...commands, [suite.script]: 'playwright test' }), /no longer runs/)
@@ -149,7 +256,13 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   const custodyWorkflow = readFileSync('.github/workflows/e2b-byos.yml', 'utf8')
   const browser = readFileSync('.github/workflows/browser-tests.yml', 'utf8')
   assert.match(browser, /run: pnpm test:factory-http/ , 'Factory HTTP probes remain mandatory against the built app')
-  assert.ok(browser.indexOf('run: pnpm build') < browser.indexOf('run: pnpm test:factory-http'))
+  assert.ok(browser.includes('pnpm exec next build'))
+  for (const job of ['\n  browser-pr:\n', '\n  browser-runtime:\n']) {
+    const section = browser.split(job)[1].split(/\n  [a-z][a-z0-9-]*:\n/)[0]
+    assert.ok(section.includes('run: pnpm test:factory-http'), `${job.trim()} runs Factory HTTP against the built app`)
+  }
+  const pullRequest = browser.split('\n  browser-pr:\n')[1].split(/\n  [a-z][a-z0-9-]*:\n/)[0]
+  assert.ok(pullRequest.indexOf('pnpm exec next build') < pullRequest.indexOf('run: pnpm test:factory-http'))
   for (const { runner } of SELF_MANAGED) {
     const dedicatedScript = Object.entries(pkg).find(([, command]) => command === `node ${runner}`)?.[0]
     assert.ok(workflow.includes(`run: node ${runner}`) || browser.includes(`run: node ${runner}`) || (dedicatedScript && custodyWorkflow.includes(`run: pnpm ${dedicatedScript}`)), `${runner} runs in CI`)
@@ -174,12 +287,15 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.match(workflow, /MIGRATION_BOOTSTRAP_CI: '1'/)
   assert.match(workflow, /REQUIRE_DB: '1'/)
   assert.match(browser, /pnpm test:performance --output=performance-results/)
-  assert.ok(browser.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/4 > "$log_file"'), 'each isolated shard runs the selected layer')
+  assert.ok(browser.includes('node scripts/ci-browser-tests.mjs --shard=${{ matrix.shard }}/$BROWSER_SHARDS > "$log_file"'), 'each isolated shard runs the selected layer')
   assert.deepEqual(browserArguments('full', '[]'), ['exec', 'playwright', 'test', '--grep-invert', '@performance'], 'integration retains every non-performance browser spec through the selected-layer runner')
-  assert.match(browser, /^\s*pnpm test:e2e:mvp > "\$log_file" 2>&1 \|\| test_status=\$\?/m, 'the dedicated MVP browser gate remains required')
+  const runtime = browser.split('\n  browser-runtime:\n')[1].split(/\n  [a-z][a-z0-9-]*:\n/)[0]
+  assert.match(runtime, /^\s*pnpm test:e2e:mvp > "\$log_file" 2>&1 \|\| test_status=\$\?/m, 'main and full tiers run both MVP cases')
+  assert.doesNotMatch(runtime, /mvp_args|BROWSER_TIER:/)
+  assert.match(pullRequest, /^\s*pnpm test:e2e:mvp --grep @smoke > /m, 'PR runtime runs the one smoke MVP case')
   assert.match(browser, /log_file=\.cache\/e2e\/playwright-mvp\.log[\s\S]*?audit-evidence --evidence "\$log_file"[\s\S]*?exit "\$test_status"/, 'MVP output is audited before display and the test result is preserved')
   assert.equal(pkg['test:e2e:mvp'], 'playwright test --config=playwright.mvp.config.ts')
-  assert.deepEqual(plan.browser, ['tests/mvp/core-loop.spec.ts'])
+  assert.deepEqual(plan.browser, ['tests/mvp/coordinator-streaming.spec.ts', 'tests/mvp/core-loop.spec.ts'])
   const mvpConfig = readFileSync('playwright.mvp.config.ts', 'utf8')
   assert.match(mvpConfig, /testDir:\s*['"]\.\/tests\/mvp['"]/)
   assert.match(mvpConfig, /testMatch:\s*['"]\*\*\/\*\.spec\.ts['"]/)

@@ -3,7 +3,7 @@
 import { useCallback, useReducer, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { CircleCheck, CircleDashed, CircleX, ExternalLink, GitCommitHorizontal, Server } from 'lucide-react'
+import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, GitCommitHorizontal, Laptop, Server } from 'lucide-react'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -19,6 +19,7 @@ import { ApprovalBar } from './factory-approval-bar'
 import { RejectNote } from './factory-reject-note'
 import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha, shortSha } from './short-sha'
+import { FieldError } from '@/components/ui/field'
 
 type Candidate = { sha: string; repository: string; environment: string; scope: string }
 export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean }
@@ -83,7 +84,7 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
     {pr && <div className="flex min-w-0 items-center gap-2 text-sm">
       <span className="flex size-4 shrink-0 [&_svg]:size-4"><PullRequestIcon state={pr.state} /></span>
       <a href={pr.url} target="_blank" rel="noopener noreferrer" className="shrink-0 font-medium hover:underline">{number ? `#${number}` : t('pullRequest')}</a>
-      {repository && <span className="min-w-0 truncate text-muted-foreground">{repository}</span>}
+      {pr.title ? <span className="min-w-0 truncate">{pr.title}</span> : repository && <span className="min-w-0 truncate text-muted-foreground">{repository}</span>}
     </div>}
     {sha && <div className="flex min-w-0 items-center gap-2">
       <Label>{t('commitLabel')}</Label>
@@ -97,16 +98,27 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
         <span className="truncate">{bareUrl(delivery.previewUrl)}</span><ExternalLink aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
       </a>
     </div>}
-    {(isSkill || environment) && <div className="flex min-w-0 items-center gap-2">
+    <div className="flex min-w-0 items-center gap-2">
       <Label>{t('environmentLabel')}</Label>
       <Server aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-      <span className="truncate text-sm">{isSkill ? t('internalSkill') : environment}</span>
-    </div>}
+      <span className="truncate text-sm">{isSkill ? t('internalSkill') : environment ?? t('state.unavailable')}{!isSkill && delivery?.previewDatabaseBranch && ` · Neon ${delivery.previewDatabaseBranch}`}</span>
+    </div>
     {isSkill && <div className="flex min-w-0 items-center gap-2">
       <Label>{t('target')}</Label>
       <code className="truncate text-xs">mikka-builtin:run-report</code>
     </div>}
   </section>
+}
+
+/** Frame 06 header: the machine that produced the candidate. Reads the same task detail as the pane. */
+export function CandidateMachine({ taskId }: { taskId: string }) {
+  const { data } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${taskId}`, request)
+  const machine = data?.delivery?.machine
+  if (!machine?.name) return null
+  const Icon = machine.kind === 'cloud' ? Cloud : Laptop
+  return <span className="flex min-w-0 shrink items-center gap-1.5 text-xs text-muted-foreground max-sm:hidden">
+    <Icon aria-hidden="true" className="size-3.5 shrink-0" /><span className="truncate">{machine.name}</span>
+  </span>
 }
 
 function Verdict({ passed }: { passed: boolean | null }) {
@@ -261,7 +273,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const envChip = task.isSkillCandidate ? t('internalSkill') : environment ? t(`envChip.${environment}`) : null
   const open = viewing ? groups[viewing.group] : undefined
 
-  if (ledgerError || evidenceError) return <p role="alert" className="px-6 py-6 text-xs text-destructive">{t('loadError')}</p>
+  if (ledgerError || evidenceError) return <FieldError className="px-6 py-6 text-xs">{t('loadError')}</FieldError>
   if (!ledger || ((task.stage === 'approval' || superseded) && !evidence)) return <div className="flex flex-1 items-center justify-center py-10"><Spinner /></div>
   return <div className="flex min-h-0 flex-1 flex-col">
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-3 pb-4 sm:px-6">
@@ -280,7 +292,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
         <ul className="flex flex-col gap-1">{results.map(row => <ResultLine key={row.stage} row={row} onOpenThread={onOpenThread} />)}</ul>
       </section>}
       {state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
-      {error && <p role="alert" className="text-xs text-destructive">{t(ERROR_KEYS[error] ?? 'error')}</p>}
+      {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
     </div>
     {state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(pullRequestUrl)}

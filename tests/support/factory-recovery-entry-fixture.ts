@@ -99,7 +99,9 @@ export async function exerciseFactoryRecoveryEntry(
     stub("../../lib/device-link.ts", { DEVICE_ONLINE_WINDOW_MS: 60000 });
     stub("../../lib/search/index.ts", { webSearch: unused });
     stub("../../lib/composio.ts", { runComposioAction: unused });
-    stub("../../lib/pending-action-store.ts", { proposeAction: unused, proposeRepositoryPush: unused });
+    // Recovery exercises its real entry/runtime, never unrelated GitHub issue reads.
+    stub("../../lib/github/user-access.ts", { readAuthorizedIssue: unused });
+    stub("../../lib/pending-action-store.ts", { proposeAction: unused, writeAccountAction: unused, proposeRepositoryPush: unused });
     stub("../../lib/telegram/client.ts", { postTelegramText: unused });
     stub("../../lib/attention/store.ts", {
       recordDecision: unused,

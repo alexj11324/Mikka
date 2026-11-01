@@ -3,22 +3,22 @@
 import { useTranslations } from 'next-intl'
 import { useRouter } from '@/i18n/navigation'
 import { SettingsView } from '@/components/settings/settings-view'
-import { AppShell } from '@/components/app-shell'
+import { SettingsFrame } from '@/components/settings/settings-shell'
 
 export function SettingsPreview() {
   const t = useTranslations('Settings')
   const router = useRouter()
   return (
-    <AppShell variant="settings">
+    <SettingsFrame user={{ name: t('preview.userName'), email: 'preview@example.com' }} onRail={() => router.push('/sign-in')} onSettings={() => {}} onSignOut={() => router.push('/sign-in')} signingOut={false}>
         <SettingsView
           user={{ name: t('preview.userName'), email: 'preview@example.com' }}
           googleEnabled={false}
-          onBack={() => router.push('/sign-in')}
+          onRail={() => router.push('/sign-in')}
           onSignOut={() => router.push('/sign-in')}
           signingOut={false}
           accountError=""
           preview
         />
-    </AppShell>
+    </SettingsFrame>
   )
 }

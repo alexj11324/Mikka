@@ -134,3 +134,132 @@ test('登出会清除本标签页里未发送的草稿', async ({ page }) => {
   await expect(page).toHaveURL(/sign-in/)
   expect(await stored()).toEqual([])
 })
+
+async function newBot(page: import('@playwright/test').Page, name: string) {
+  await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click()
+  const dialog = page.getByRole('dialog', { name: '新建 Bot' })
+  await dialog.getByLabel('名字', { exact: true }).fill(name)
+  await dialog.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  await expect(conversationPill(page)).toHaveText(name)
+}
+
+// The right panel's name edits in place: Enter or leaving the field saves, Esc
+// cancels, and a name that does not save says why and leaves the old one.
+test('右栏点击 Bot 名字直接改名，左侧列表和标题一起更新', async ({ page }) => {
+  await register(page)
+  await newBot(page, '另一个 Bot')
+  await newBot(page, '改名前')
+  const panel = page.getByRole('complementary', { name: '右栏', exact: true })
+  const bots = page.getByRole('list', { name: 'Bot', exact: true })
+  const nameButton = panel.getByRole('button', { name: '改名前', exact: true })
+  const field = panel.getByLabel('名字', { exact: true })
+
+  // Click opens the field with the whole name selected, so typing replaces it.
+  await nameButton.click()
+  await expect(field).toBeFocused()
+  expect(await field.evaluate((input: HTMLInputElement) => [input.selectionStart, input.selectionEnd])).toEqual([0, 3])
+  await field.pressSequentially('周报助手')
+  await field.press('Enter')
+  await expect(field).toBeHidden()
+  await expect(panel.getByRole('heading', { name: '周报助手', exact: true })).toBeVisible()
+  await expect(conversationPill(page)).toHaveText('周报助手')
+  await expect(bots.getByRole('button', { name: '周报助手', exact: true })).toBeVisible()
+  await expect(bots.getByRole('button', { name: '改名前', exact: true })).toHaveCount(0)
+
+  // Esc cancels; the keyboard can open it again with Enter.
+  const renamed = panel.getByRole('button', { name: '周报助手', exact: true })
+  await expect(renamed).toBeFocused()
+  await renamed.press('Enter')
+  await field.fill('不保存')
+  await field.press('Escape')
+  await expect(field).toBeHidden()
+  await expect(panel.getByRole('heading', { name: '周报助手', exact: true })).toBeVisible()
+
+  // Empty and over-long names stay in the field with the reason.
+  await renamed.click()
+  await field.fill('   ')
+  await field.press('Enter')
+  await expect(panel.getByRole('alert')).toHaveText('名字不能为空')
+  await field.fill('长'.repeat(61))
+  await field.press('Enter')
+  await expect(panel.getByRole('alert')).toHaveText('名字最多 60 个字')
+  await expect(field).toHaveAttribute('aria-invalid', 'true')
+
+  // Another bot's name does not save: the old name comes back everywhere.
+  await field.fill('另一个 Bot')
+  await field.press('Enter')
+  await expect(panel.getByRole('alert')).toHaveText('已有同名 Bot，请换一个名字。')
+  await expect(field).toHaveValue('另一个 Bot')
+  await expect(conversationPill(page)).toHaveText('周报助手')
+  await expect(bots.getByRole('button', { name: '周报助手', exact: true })).toBeVisible()
+
+  // Leaving the field saves.
+  await field.fill('日报助手')
+  await page.getByLabel('给 周报助手 发消息', { exact: true }).click()
+  await expect(conversationPill(page)).toHaveText('日报助手')
+
+  await page.reload()
+  await expect(conversationPill(page)).toHaveText('日报助手')
+  await expect(panel.getByRole('heading', { name: '日报助手', exact: true })).toBeVisible()
+  await expect(bots.getByRole('button', { name: '日报助手', exact: true })).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('bot-renamed.png'), fullPage: false })
+})
+
+// The big avatar opens the 新建 Bot picker; each pick saves and the left row follows.
+test('右栏点击 Bot 头像更换形状和颜色', async ({ page }) => {
+  await register(page)
+  await newBot(page, '换头像')
+  const panel = page.getByRole('complementary', { name: '右栏', exact: true })
+  const row = page.getByRole('list', { name: 'Bot', exact: true }).getByRole('button', { name: '换头像', exact: true })
+  const avatar = panel.getByRole('button', { name: '更换 换头像 的头像', exact: true })
+  await avatar.click()
+  const picker = page.getByRole('dialog', { name: '更换 换头像 的头像', exact: true })
+  await picker.getByRole('button', { name: '六边形', exact: true }).click()
+  await picker.getByRole('button', { name: '红色', exact: true }).click()
+  await expect(avatar.locator('[data-slot="bot-avatar"]')).toHaveAttribute('data-shape', 'hexagone')
+  await expect(avatar.locator('[data-slot="bot-avatar"]')).toHaveAttribute('data-color', 'rouge')
+  await expect(row.locator('[data-slot="bot-avatar"]')).toHaveAttribute('data-shape', 'hexagone')
+  await page.screenshot({ path: test.info().outputPath('bot-avatar-picker.png'), fullPage: false })
+  await page.keyboard.press('Escape')
+  await expect(picker).toBeHidden()
+
+  await page.reload()
+  await expect(row.locator('[data-slot="bot-avatar"]')).toHaveAttribute('data-shape', 'hexagone')
+  await expect(row.locator('[data-slot="bot-avatar"]')).toHaveAttribute('data-color', 'rouge')
+})
+
+// With reduced motion the preview is a still blob. It used to keep drawing the
+// shape picked before (the hexagon showed the triangle): a still bloub is
+// sampled at time 0 while its morph starts at the current clock.
+test('新建 Bot 预览跟随所选形状和颜色（减少动态效果时也是）', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await register(page)
+  await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click()
+  const dialog = page.getByRole('dialog', { name: '新建 Bot' })
+  const preview = dialog.locator('[data-slot="bot-avatar"]').first()
+  // Shape outlines are drawn in bloub's own coordinates, so a still tile and the still preview of one shape share the path.
+  const outline = (avatar: import('@playwright/test').Locator) => avatar.locator('path').first().getAttribute('d')
+  for (const shape of ['三角', '六边形', '爱心']) {
+    const tile = dialog.getByRole('button', { name: shape, exact: true })
+    await tile.click()
+    await expect.poll(() => outline(preview)).toBe(await outline(tile.locator('[data-slot="bot-avatar"]')))
+  }
+  await dialog.getByRole('button', { name: '红色', exact: true }).click()
+  await expect(preview).toHaveAttribute('data-color', 'rouge')
+  await expect.poll(() => preview.locator('path').first().getAttribute('fill')).toBe(await dialog.getByRole('button', { name: '爱心', exact: true }).locator('path').first().getAttribute('fill'))
+})
+
+// One bot, one pose: its avatars in the list, the chat and the panel move through
+// the idle montage together, so the Coordinator is never a circle in one place and
+// a triangle in another.
+test('Coordinator 的几个头像同步变化，并且会轮流变形', async ({ page }) => {
+  await register(page)
+  const avatars = page.locator('[data-slot="bot-avatar"][data-shape="cercle"]')
+  await expect.poll(async () => avatars.count()).toBeGreaterThanOrEqual(2)
+  const poses = () => avatars.evaluateAll(nodes => nodes.filter(node => node.getBoundingClientRect().width > 0).map(node => (node as HTMLElement).dataset.pose ?? ''))
+  // A boundary frame can split them for a moment, so wait for a sample where they agree.
+  await expect.poll(async () => new Set(await poses()).size, { timeout: 10000 }).toBe(1)
+  const seen = new Set<string>()
+  await expect.poll(async () => { const [pose] = await poses(); if (pose) seen.add(pose); return seen.size }, { timeout: 20000 }).toBeGreaterThan(1)
+})

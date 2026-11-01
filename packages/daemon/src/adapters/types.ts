@@ -5,6 +5,8 @@
 // onto start -> events -> send / cancel, plus `resume(sessionId)`. A
 // follow-up run starts by continuing the earlier run's conversation
 // (`StartOptions.continueSession`), so a run never ends the chat.
+import type { RunCredential } from "../agents/run-credential"
+import type { RunApps } from '../agents/run-apps'
 import type {
   HandoffReport,
   Harness,
@@ -44,7 +46,7 @@ export type AgentReport = Partial<
 >
 
 /** Adapter output: UI message chunks, then exactly one `exit`. */
-export type AgentEvent = { type: "chunk"; chunk: RunChunk } | ExitEvent
+export type AgentEvent = { type: "chunk"; chunk: RunChunk } | { type: 'progress' } | ExitEvent
 
 export interface AgentCapabilities {
   /** `send` can deliver a user message while a turn is running. */
@@ -57,6 +59,14 @@ export interface AgentCapabilities {
 }
 
 export interface SessionOptions {
+  /** API key or custom provider for this run (agents/run-credential.ts), never written to disk. */
+  credential?: RunCredential
+  /** Trusted server-issued delivery binding, never model-selected. */
+  github?: { endpoint: string; repository: string; branch: string; runToken: string; issueId: string }
+  /** Trusted server-issued app entries (one MCP server each), never model-selected. */
+  apps?: RunApps
+  /** Fixed container paths supplied by the hosted runner, never by the assignment. */
+  githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Trusted, run-bound host gate. Never populated from model input. */
   toolApproval?: ToolApprovalGate
   /** Host-created run-bound control callbacks; no serialized token/URL/model input. */
@@ -83,6 +93,8 @@ export interface SessionOptions {
    * the CLI's own permission rules where it has them, the agent's rules.
    */
   policy?: RunPolicy
+  /** Final policy digest from the independently verified server snapshot. */
+  policyHash?: string
   /**
    * The skills the run was given (the assignment's `skills`). They are
    * written under the run dir and read into the agent's instructions.

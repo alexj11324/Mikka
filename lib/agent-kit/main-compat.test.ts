@@ -28,6 +28,9 @@ const publicationAssignment={pushBranch:'mikka/mik-42',policy:publicationPolicy}
 const prepared=mock.fn(async(..._args:Parameters<typeof import('../run-publications').prepareRunPublication>)=>structuredClone(publicationAssignment))
 const completed=mock.fn(async()=>{throw Error('Claim unexpectedly completed a run')})
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
+// This suite substitutes device authentication and DB IO to test only claim
+// snapshot composition. Real credential admission is covered by revocation DB tests.
+stub('../device-route.ts',{withDeviceRoute:<T>(handler:T)=>handler})
 let selectIndex=0
 let mismatch: string|undefined
 let currentRun: {id:string;userId:string;agentId:string;deviceId:string;deviceRepoId:string;issueId:string;baseBranch:null;kind:string;prompt:string;agentDefinition:ReturnType<typeof frozen>|null;status:string;stopRequestedAt:Date|null;leaseExpiresAt:Date|null}
@@ -44,8 +47,13 @@ stub('../db/index.ts',{db,pool:{}})
 const cliPolicy: ReturnType<typeof defaultRunPolicy>={...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,network:'deny',install_dependency:'deny',git_push:'deny'},networkAllow:['cli-policy.invalid']}
 let cliReadOnly=false
 stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
-stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64)})})
+const modelAdmissionCheck=mock.fn(async(_scope:{workspaceId:string;ownerId:string},_model:string,_signal?:AbortSignal)=>undefined)
+stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck})
+stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64),workspaceIds:[workspace]})})
 stub('../mcp/worker.ts',{issueRunToken:async()=>{if(stopDuringToken)currentRun.stopRequestedAt=new Date();return {token:'synthetic-only'}}})
+// Task visibility is a separate boundary; do not initialize auth/MCP services
+// in the claim snapshot fixture. Revoked access has source and PG regressions.
+stub('../issue-access.ts',{issueForUser:async(userId:string,id:string)=>userId===owner&&id===issueId?{id:issueId,userId:owner,scope:'personal',content:{type:'doc'}}:null})
 stub('../issue-team-access.ts',{issueTeamAccess:async()=>{throw Error('owner claim must not query team membership')}})
 stub('../mcp/resource.ts',{mcpResourceURL:null})
 stub('../device-repositories.ts',{readRepositorySettings:async()=>null})
@@ -69,12 +77,14 @@ stub('../subscription-runtime.ts',{subscriptionRuntime:()=>({repository:{binding
 let claim: typeof import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route').POST
 let queue: typeof import('../computer/queue-run').queueCloudRun
 before(async()=>{claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
-beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;cliReadOnly=false;cliPolicy.permissions.git_push='deny';publicationPolicy.permissions.git_push='allow';computerPermission='ask';mismatch=undefined;protocolVersion=3;selectIndex=0;stopDuringToken=false;lockOrder.length=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [bindingById,latestBinding,scopedBinding,claimed,cloudClaimed,prepared,completed])fn.mock.resetCalls()})
+beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;cliReadOnly=false;cliPolicy.permissions.git_push='deny';publicationPolicy.permissions.git_push='allow';computerPermission='ask';mismatch=undefined;protocolVersion=3;selectIndex=0;stopDuringToken=false;lockOrder.length=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [modelAdmissionCheck,bindingById,latestBinding,scopedBinding,claimed,cloudClaimed,prepared,completed])fn.mock.resetCalls()})
 const request=()=>claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+randomUUID()+'/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1'}}),{params:Promise.resolve({deviceId,runId:randomUUID()})})
 const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.equal(body.policy.permissions.git_push,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}
 test('local claim uses frozen harness and exact subscription despite Agent edits',async()=>{
  definition={...frozen(),model:'frozen-model',cliModelSelection:'explicit'}
  const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.equal(body.remoteUrl,'https://github.com/example/repo.git');assert.equal(body.baseBranch,undefined);assert.deepEqual(bindingById.mock.calls[0].arguments,[owner,binding.id]);assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1);assert.equal(typeof (claimed.mock.calls[0].arguments as unknown[])[5],'function','Factory lineage guard remains attached')
+ assert.deepEqual(modelAdmissionCheck.mock.calls[0].arguments.slice(0,2),[{workspaceId:workspace,ownerId:owner},'frozen-model'])
+ assert.equal(modelAdmissionCheck.mock.calls[0].arguments[2],binding.route)
  assert.equal(prepared.mock.callCount(),1)
  const [run,remoteUrl]=prepared.mock.calls[0].arguments
  assert.equal(run.userId,owner);assert.equal(run.issueId,issueId);assert.equal(run.baseBranch,null);assert.equal(remoteUrl,'https://github.com/example/repo.git')
@@ -135,12 +145,14 @@ test('cloud queue captures exact worker and parent snapshot in the same transact
 })
 
 
-test('feature-off cloud queue keeps the existing main SQL path without snapshot or binding lookup',async()=>{
+test('with versioned definitions off, a cloud run still freezes its Agent and credential source',async()=>{
+ // Every cloud run freezes its definition when it is queued (orchestration.md § 5), with or without a model in the request.
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
- const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});return {rows:sql.startsWith('SELECT m.')?[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]:[]}}}
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:''})
- assert.ok(!calls.some(c=>c.sql.includes('agentDefinition')||c.sql.startsWith('select id from byos_bindings')));assert.equal(calls.at(-1)!.sql,'COMMIT')
+ const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string)
+ assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
 })
 test('an automatic rule model stays automatic with versioned definitions disabled',async()=>{
  process.env.MIKKA_AGENT_KIT='0'

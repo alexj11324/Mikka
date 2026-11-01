@@ -195,7 +195,7 @@ before(async () => {
     },
   } })
   mock.module('@/lib/request-log', { namedExports: { noteLogUser: () => undefined, withRequestLog: (_path: string, handler: unknown) => handler } })
-  mock.module('@/lib/coordinator/store', { namedExports: { chatView: async () => ({}), botChats: async () => ({}) } })
+  mock.module('@/lib/coordinator/store', { namedExports: { chatView: async () => ({}), botChats: async () => ({}), retryFailedTurn: async () => false } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => enabled, wakeCoordinator: () => { throw new Error('test must not execute wake') } } })
   mock.module('next/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
   mock.module('next/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: () => undefined }) } })
@@ -216,6 +216,18 @@ test('HTTP handler and action share personal submission identity and expose payl
   userId = 'foreign'
   assert.equal((await POST(request({ text: 'hello', submissionId }))).status, 202)
   assert.equal(current.rows.size, 2)
+})
+
+test('the app\'s photos reach the stored message through the signed-in action', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+  assert.deepEqual(await sendCoordinatorMessage('', null, null, undefined, undefined, null, [{ dataUrl }]), { queued: true })
+  const [stored] = [...current.rows.values()] as unknown as { payload: { text: string; images: { dataUrl: string; mediaType: string }[] } }[]
+  assert.equal(stored.payload.text, '')
+  assert.equal(stored.payload.images[0].dataUrl, dataUrl)
+  assert.equal(stored.payload.images[0].mediaType, 'image/png')
+  assert.deepEqual(await sendCoordinatorMessage('', null, null, undefined, undefined, null, [{ dataUrl: 'data:image/png;base64,AAAA' }]), { error: 'messageRequired', params: undefined })
+  assert.equal(current.rows.size, 1)
 })
 
 test('HTTP handler rejects anonymous and unsupported question submissions without writing or waking', async () => {
@@ -390,12 +402,20 @@ test('with the Coordinator off a new task is refused, not queued silently; a cha
   delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
 })
 
-test('new-task submission fails closed when issue tools are disabled', async () => {
+test('new-task submission fails closed when the issue-tools kill switch is set', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'issueToolsDisabled', params: undefined })
   assert.equal(current.rows.size, 0)
   assert.equal(callbacks.length, 0)
+  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+})
+
+test('new-task submission is on by default with no issue-tools setting', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { queued: true })
+  assert.equal(current.rows.size, 1)
 })
 
 // Regression for current-main integration: neither source can erase the other.

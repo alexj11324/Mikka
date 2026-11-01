@@ -28,13 +28,15 @@ const appHref = z
 
 /**
  * The kinds that become a desktop system notification (interaction spec 8.3):
- * the ones where an agent is waiting on the person. Everything else stays in
- * the inbox.
+ * the ones where an agent is waiting on the person, and a finished thread
+ * (线程完成, on by default; Alex, 2026-10-31). Everything else stays in the
+ * inbox.
  */
 export const DESKTOP_NOTIFICATION_KINDS = [
   "review",
   "awaiting",
   "failed",
+  "finished",
 ] as const
 export type DesktopNotificationKind =
   (typeof DESKTOP_NOTIFICATION_KINDS)[number]
@@ -224,6 +226,17 @@ export interface MikkaBridge {
     openExternal(url: string): Promise<void>
     /** Start a one-shot loopback listener and return its callback URL. */
     prepareAuth(state: string): Promise<string>
+    /** Absent on older desktop builds. Opens the sign-in page and returns its callback URL. */
+    claudeCallback?(authorizationUrl: string): Promise<string | null>
+    /**
+     * The version of an update already downloaded in the background, or null.
+     * Only a downloaded update is surfaced. Absent on older desktop builds.
+     */
+    updateReady?(): Promise<string | null>
+    /** Called once an update finishes downloading; returns an unsubscribe. */
+    onUpdateReady?(listener: (version: string) => void): () => void
+    /** Quits and installs the downloaded update. */
+    installUpdate?(): Promise<void>
   }
   /**
    * Login. The long-lived session token stays in the main process (macOS

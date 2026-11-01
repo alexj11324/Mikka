@@ -6,7 +6,7 @@ import { groupRuntime } from '@/lib/coordinator/group-runtime'
 import { and, eq, inArray } from 'drizzle-orm'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { db, pool } from '@/lib/db'
-import { agents } from '@/lib/db/schema'
+import { agents, bots } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { handleGroup, type GroupRequest } from '@/lib/group-conversations-store'
@@ -24,6 +24,10 @@ const directory = groupDirectory({
   },
   async ownedAgents(userId, ids) {
     const rows = await db.select({ id: agents.id }).from(agents).where(and(eq(agents.userId, userId), inArray(agents.id, ids)))
+    return rows.map(row => row.id)
+  },
+  async ownedBots(workspaceId, userId, ids) {
+    const rows = await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), eq(bots.workspaceId, workspaceId), inArray(bots.id, ids)))
     return rows.map(row => row.id)
   },
 })

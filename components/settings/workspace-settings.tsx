@@ -3,7 +3,8 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { deleteWorkspace, getWorkspaceDeletionImpact, getWorkspaceGeneral, getWorkspaceTransferTargets, transferWorkspace, updateWorkspace } from '@/app/actions/workspace-settings'
+import { deleteWorkspace, transferWorkspace, updateWorkspace, type getWorkspaceDeletionImpact, type getWorkspaceGeneral, type getWorkspaceTransferTargets } from '@/app/actions/workspace-settings'
+import { settingsRead } from '@/lib/settings-read'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -14,7 +15,10 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { withBasePath } from '@/lib/base-path'
+import { resetOnboarding } from '@/app/actions/onboarding'
 import { useActionError } from '@/lib/use-action-error'
+import { usePresence, type PresenceProps } from '@/lib/use-presence'
+import { FieldError } from '@/components/ui/field'
 
 const ICON_MAX_BYTES = 200 * 1024
 const ICON_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
@@ -40,7 +44,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const general = useSWR(['workspace:general', workspaceId ?? ''], () => getWorkspaceGeneral(workspaceId))
+  const general = useSWR(['workspace:general', workspaceId ?? ''], () => settingsRead<Awaited<ReturnType<typeof getWorkspaceGeneral>>>('workspace-general', { workspace: workspaceId }))
   const data = general.data && !general.data.error ? general.data : null
   const [name, setName] = useState<string | null>(null)
   const [slug, setSlug] = useState<string | null>(null)
@@ -48,10 +52,14 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const [failed, setFailed] = useState<FailedSave | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [transferring, setTransferring] = useState(false)
+  const transferDialog = usePresence(transferring)
+  const deleteDialog = usePresence(deleting)
   const [transferredTo, setTransferredTo] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   // One save at a time: Enter followed by the blur from disabling the field must not send it twice.
   const inFlight = useRef(false)
+  // A save asked for while another runs goes next; dropping it would leave a draft that looks saved.
+  const queued = useRef<{ field: Field; value: string | null } | null>(null)
   const host = typeof window === 'undefined' ? '' : `${window.location.host}${withBasePath('/w/')}`
 
   if (!general.data && !general.error) return <SettingsLoading label={t('loading')} rows={3} />
@@ -67,7 +75,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   }
 
   async function save(field: Field, value: string | null) {
-    if (inFlight.current) return
+    if (inFlight.current) { queued.current = { field, value }; return }
     inFlight.current = true
     setSaving(field)
     setFailed(null)
@@ -82,6 +90,9 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
       clearDraft(field)
       setSaving(null)
       inFlight.current = false
+      const next = queued.current
+      queued.current = null
+      if (next) void save(next.field, next.value)
     }
   }
 
@@ -106,11 +117,11 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   const icon = <Avatar className="size-8"><AvatarImage src={current.icon ?? undefined} alt="" /><AvatarFallback>{initial}</AvatarFallback></Avatar>
 
   // S-P: members read the same rows as plain values, with no controls.
-  if (!current.canEdit) return <SettingsSection id="workspace-general">
+  if (!current.canEdit) return <><SettingsSection id="workspace-general">
     <SettingRow title={t('icon')}>{icon}</SettingRow>
     <SettingRow title={t('name')}><span>{current.name}</span></SettingRow>
     {current.slug && <SettingRow title={t('address')}><span className="break-all">{host}{current.slug}</span></SettingRow>}
-  </SettingsSection>
+  </SettingsSection><ReplayOnboarding /></>
 
   return <>
     <SettingsSection id="workspace-general">
@@ -137,6 +148,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
       </SettingRow>
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => { if (failed.field === 'icon' && failed.value === null) { fileRef.current?.click(); return } void save(failed.field, failed.value) }} />}
+    <ReplayOnboarding />
 
     <SettingsSection id="workspace-danger" title={t('danger')}>
       {current.canTransfer && <SettingRow title={t('transferWorkspace')}>
@@ -147,18 +159,51 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
       </SettingRow>
     </SettingsSection>
     {transferredTo && <p role="status" className="text-sm text-muted-foreground">{t('transferred', { name: transferredTo })}</p>}
-    {transferring && <TransferWorkspaceDialog workspaceId={current.id} name={current.name} onClose={() => setTransferring(false)}
+    {transferDialog.value && <TransferWorkspaceDialog open={transferDialog.open} onOpenChangeComplete={transferDialog.onOpenChangeComplete} workspaceId={current.id} name={current.name} onClose={() => setTransferring(false)}
       onDone={owner => { setTransferring(false); setTransferredTo(owner); void general.mutate() }} />}
-    {deleting && <DeleteWorkspaceDialog workspaceId={current.id} name={current.name} onClose={() => setDeleting(false)} />}
+    {deleteDialog.value && <DeleteWorkspaceDialog open={deleteDialog.open} onOpenChangeComplete={deleteDialog.onOpenChangeComplete} workspaceId={current.id} name={current.name} onClose={() => setDeleting(false)} />}
+  </>
+}
+
+/**
+ * 重新播放引导 (docs/design/onboarding.md §3): clears this person's completion (`resetOnboarding`)
+ * and reloads the app, which shows the first-run guide again. Personal, so members see it too.
+ */
+function ReplayOnboarding() {
+  const t = useTranslations('Settings.workspaceForm')
+  const commonT = useTranslations('Common')
+  const actionError = useActionError()
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function replay() {
+    setPending(true)
+    setError(null)
+    try {
+      await resetOnboarding()
+      window.location.assign(withBasePath('/'))
+    } catch {
+      setError(actionError())
+      setPending(false)
+    }
+  }
+
+  return <>
+    <SettingsSection id="workspace-onboarding">
+      <SettingRow title={t('replayOnboarding')}>
+        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => void replay()}>{pending ? t('replaying') : t('replay')}</Button>
+      </SettingRow>
+    </SettingsSection>
+    {error && <SettingsSaveError message={error} retryLabel={commonT('retry')} onRetry={() => void replay()} />}
   </>
 }
 
 /** 转让工作区: pick another active member; they become the owner (and an admin). */
-function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone }: { workspaceId: string; name: string; onClose: () => void; onDone: (owner: string) => void }) {
+function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = true, onOpenChangeComplete }: { workspaceId: string; name: string; onClose: () => void; onDone: (owner: string) => void } & PresenceProps) {
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const targets = useSWR(['workspace:transfer-targets', workspaceId], () => getWorkspaceTransferTargets(workspaceId))
+  const targets = useSWR(['workspace:transfer-targets', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getWorkspaceTransferTargets>>>('transfer-targets', { workspace: workspaceId }))
   const people = targets.data && !targets.data.error ? targets.data : null
   const [to, setTo] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -179,7 +224,7 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone }: { works
     }
   }
 
-  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}>
+  return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={open => { if (!open && !pending) onClose() }}>
     <DialogContent>
       <DialogHeader><DialogTitle>{t('transferTitle', { name })}</DialogTitle></DialogHeader>
       <div className="flex flex-col gap-3 text-sm">
@@ -192,8 +237,8 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone }: { works
               </Select>
             </Label>
             : <p className="text-muted-foreground">{t('transferNoMembers')}</p>
-          : targets.data?.error ? <p role="alert" className="text-destructive">{actionError(targets.data.error)}</p> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
-        {error && <p role="alert" className="text-destructive">{error}</p>}
+          : targets.data?.error ? <FieldError>{actionError(targets.data.error)}</FieldError> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
+        {error && <FieldError>{error}</FieldError>}
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" disabled={pending} onClick={onClose}>{commonT('cancel')}</Button>
@@ -204,12 +249,12 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone }: { works
 }
 
 /** S-I: lists what goes, then the name must be typed exactly. */
-function DeleteWorkspaceDialog({ workspaceId, name, onClose }: { workspaceId: string; name: string; onClose: () => void }) {
+function DeleteWorkspaceDialog({ workspaceId, name, onClose, open = true, onOpenChangeComplete }: { workspaceId: string; name: string; onClose: () => void } & PresenceProps) {
   const t = useTranslations('Settings.workspaceForm')
   const computerBilling = useGatedFeature('computerBilling')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
-  const impact = useSWR(['workspace:deletion-impact', workspaceId], () => getWorkspaceDeletionImpact(workspaceId))
+  const impact = useSWR(['workspace:deletion-impact', workspaceId], () => settingsRead<Awaited<ReturnType<typeof getWorkspaceDeletionImpact>>>('deletion-impact', { workspace: workspaceId }))
   const counts = impact.data && !impact.data.error ? impact.data : null
   const [typed, setTyped] = useState('')
   const [pending, setPending] = useState(false)
@@ -228,7 +273,7 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose }: { workspaceId: st
     }
   }
 
-  return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}>
+  return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={open => { if (!open && !pending) onClose() }}>
     <DialogContent>
       <DialogHeader><DialogTitle>{t('deleteTitle', { name })}</DialogTitle></DialogHeader>
       <div className="flex flex-col gap-3 text-sm">
@@ -239,12 +284,12 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose }: { workspaceId: st
             <li>{t('deleteTasks', { tasks: counts.tasks, teams: counts.teams })}</li>
             {computerBilling && counts.purchasedPoints > 0 && <li>{t('deletePoints', { points: counts.purchasedPoints })}</li>}
           </ul>
-          : impact.data?.error ? <p role="alert" className="text-destructive">{actionError(impact.data.error)}</p> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
+          : impact.data?.error ? <FieldError>{actionError(impact.data.error)}</FieldError> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
         <p className="text-muted-foreground">{t('deleteKept')}</p>
         <Label className="flex flex-col items-start gap-1.5 font-normal text-muted-foreground">{t('deleteConfirmLabel', { name })}
           <Input value={typed} placeholder={name} autoComplete="off" onChange={event => setTyped(event.target.value)} />
         </Label>
-        {error && <p role="alert" className="text-destructive">{error}</p>}
+        {error && <FieldError>{error}</FieldError>}
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" disabled={pending} onClick={onClose}>{commonT('cancel')}</Button>

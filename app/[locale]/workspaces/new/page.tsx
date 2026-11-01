@@ -26,7 +26,7 @@ export default async function NewWorkspacePage() {
       <span className="max-w-[60%] truncate text-xs text-muted-foreground" title={session.user.email}>{session.user.email}</span>
     </header>
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-6 pt-12 pb-16 sm:pt-24">
-      <div className="mb-10 flex flex-col gap-3"><h1 className="text-3xl font-semibold tracking-tight">{i18nText("FeatureCopy.c_0155bce8")}</h1><p className="text-sm leading-relaxed text-muted-foreground">{i18nText("FeatureCopy.c_c2044c1b")}</p></div>
+      <div className="mb-10 flex flex-col gap-3"><h1 className="text-3xl font-semibold tracking-tight">{i18nText("FeatureCopy.c_0155bce8")}</h1></div>
       <CreateWorkspaceForm />
     </main>
   </div>

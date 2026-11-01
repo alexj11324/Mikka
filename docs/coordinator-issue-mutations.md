@@ -24,11 +24,13 @@ back task changes, history and the tool receipt together.
 
 ## Independent deployment gate
 
-`MIKKA_ISSUE_TOOLS_ENABLED` defaults off; only the exact value `1` enables the
-new Coordinator tools and durable mutation receipts. With the flag absent, the
-tools are not exposed to the model, frozen grants can only narrow, and the
-existing external MCP create/update path retains its pre-rollout behavior
-without querying `issue_tool_calls`. Enabling a flag never adds tools absent
+`MIKKA_ISSUE_TOOLS_ENABLED` defaults on (Alex, 2026-10-31: every workspace
+feature is on by default; `docs/design/decisions.md`). Unset or `1` enables the
+Coordinator tools and durable mutation receipts; any other value is the
+incident kill switch. With the kill switch set, the tools are not exposed to
+the model, frozen grants can only narrow, 新建任务 is refused with
+`issueToolsDisabled`, and the existing external MCP create/update path keeps
+its pre-rollout behavior without querying `issue_tool_calls`. Enabling never adds tools absent
 from an execution's recorded `effectiveTools`.
 
 The legacy MCP schema retains agent assignment and does not offer the new
@@ -36,13 +38,9 @@ human-assignee field. Unknown MCP fields are rejected instead of silently
 discarded; direct no-tool-ID human-assignee calls fail before any write. The
 human-assignee path is available only through the guarded durable tool.
 
-The operator must first verify the actual application database binding, apply
-the reviewed `drizzle/20261028015330_issue_tool_calls.sql` to an authorized
-target and verify its schema/primary key, then separately authorize enablement.
-The code does not create the table or change any deployment setting. This PR
-can therefore ship with the feature disabled without a production migration.
-CI enables it only in the guarded disposable database suite after migrations;
-the later MVP browser fixture must explicitly enable it for its isolated app.
+Deploys apply `drizzle/20261028015330_issue_tool_calls.sql` themselves
+(`pnpm build` runs `scripts/migrate.mjs`, decisions 2026-10-30), so no separate
+enablement step remains.
 
 The tools intentionally do not expose project moves. Project membership
 lives in the workspace database; these durable issue mutations use one
@@ -89,6 +87,5 @@ matching schema, fixed Preview and UI acceptance before release.
 - Full chat-to-daemon browser acceptance belongs to #357 item 6. A source test
   or skipped DB test is not evidence that deployed acceptance passed.
 
-No configuration is required to merge the disabled code. Enabling the new
-capability requires the schema and `MIKKA_ISSUE_TOOLS_ENABLED=1`; neither is
-installed or enabled automatically by this change.
+No configuration is required: the capability is on once the deploy has
+migrated. Set `MIKKA_ISSUE_TOOLS_ENABLED=0` only to stop it during an incident.

@@ -18,11 +18,11 @@ const accountsDatabase = new Pool({ connectionString: process.env.E2E_DATABASE_U
 try {
   // This registered, isolated database is shared by the ordered CI stages:
   // five DB safety cases and two HTTP safety cases quarantine their pairs;
-  // both MVP cases retain theirs, and ordinary browser flows reuse two pairs.
+  // three MVP cases retain theirs, and ordinary browser flows reuse two pairs.
   // Pooled selection/settings cases keep business data unchanged; performance
   // uses its own register() fixture. prepare() creates metadata slots only, never
   // users, and neither replenishes a failed lease nor reclaims quarantined data.
-  await new TestAccountPool(accountsDatabase, environment).prepare({ pairs: 5 + 2 + 2 + 2 })
+  await new TestAccountPool(accountsDatabase, environment).prepare({ pairs: 5 + 2 + 3 + 2 })
 } finally { await accountsDatabase.end() }
 const database = new URL(process.env.E2E_DATABASE_URL)
 await indexMvpResource('database-target', `${database.hostname}:${database.port || '5432'}${database.pathname}`)

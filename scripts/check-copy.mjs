@@ -14,6 +14,11 @@
  *   beside such a button; remove it when the button goes away.
  * - C-02 colloquial words in zh-CN (「没能」「打不开了」, sentence-final 吧/呢/哦/啊).
  * - C-03 apologies and interjections (「抱歉」「请稍等」, "sorry", "oops").
+ * - R-44 greeting headlines: a title or heading names the place or period,
+ *   never 「欢迎回来」 / 「早上好，…」 / "Welcome back".
+ * - R-40 exclamation marks: interface text states, it does not exclaim.
+ * - R-43 the worker that runs a thread is an Agent: no "harness" or 「执行器」 in
+ *   copy. Keys and ICU placeholders such as `{harness}` are identifiers and stay.
  *
  * It does not check English contractions (Microsoft recommends them), 「请」 in
  * full sentences, or whether a status line offers a next step. Reviewers judge
@@ -28,6 +33,11 @@ const enRetry = /\b(try again|retry)\b/i
 const zhColloquial = /没能|没发出去|打不开了|[吧呢哦啊](?=[。！？!?，]|$)/
 const zhApology = /抱歉|对不起|不好意思|哎呀|哎哟|请稍等|请稍候/
 const enApology = /\b(sorry|oops|whoops|uh-oh|apologi[sz]e)\b/i
+const greetingKey = /(Title|Heading)\d*$|^(title|heading|welcome)\d*$/
+const greeting = /^(欢迎回来|欢迎|早上好|下午好|晚上好|你好)|^(welcome( back)?|good (morning|afternoon|evening)|hi|hey|hello)\b/i
+const exclamation = /[!！]/
+const workerTerm = /harness|执行器/i
+const withoutPlaceholders = value => value.replace(/\{\s*\w+/g, '{')
 
 /** Keys whose component renders a retry or matching action button beside the text. */
 const retryButtonKeys = new Set([
@@ -49,8 +59,7 @@ const retryButtonKeys = new Set([
   'Members.keptPrevious',
   'Members.addFailed',
   'Members.removeFailed',
-  'Plugins.loadFailedDescription',
-  'Projects.loadErrorDescription',
+  'Projects.loadErrorTitle',
   'DeviceAuthorization.failed',
   'Shell.newTaskDialog.failed',
   'FeatureCopy.c_85f5c4d3',
@@ -74,6 +83,9 @@ for (const [file, lang] of [['messages/zh-CN.json', 'zh'], ['messages/en.json', 
   for (const key of retryButtonKeys) if (!strings.has(key)) report(file, key, 'retryButtonKeys 中的 key 不存在', '')
   for (const [key, value] of strings) {
     const leaf = key.split('.').at(-1)
+    if (greetingKey.test(leaf) && greeting.test(value)) report(file, key, 'R-44 标题不写问候，写这里是什么', value)
+    if (exclamation.test(value)) report(file, key, 'R-40 界面文字不用感叹号', value)
+    if (workerTerm.test(withoutPlaceholders(value))) report(file, key, 'R-43 the worker is an Agent, not harness/执行器', value)
     if (lang === 'zh') {
       if (labelKey.test(leaf) && imperativeQing.test(value)) report(file, key, 'C-04 标签/按钮/占位符/标题里不写「请」', value)
       if (retryButtonKeys.has(key) && zhRetry.test(value)) report(file, key, 'C-04 旁边已有重试按钮，文字不写「请重试」', value)
@@ -91,4 +103,4 @@ if (problems.length) {
   for (const problem of problems) console.error(`- ${problem}`)
   process.exit(1)
 }
-console.log('Copy check passed: labels without 「请」, no retry text beside retry buttons, no colloquial or apologetic copy.')
+console.log('Copy check passed: labels without 「请」, no retry text beside retry buttons, no colloquial or apologetic copy, Agent for the worker, no greeting titles or exclamation marks.')

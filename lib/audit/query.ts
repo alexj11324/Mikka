@@ -57,14 +57,9 @@ export async function listWorkspaceAudit(actorId: string, workspaceId: string, i
   }
 }
 
-/** Every event in the window, for 导出 CSV. Bounded by the window and a hard cap. */
+/** Every event in a stable window. An oversized export is refused, never silently truncated. */
 export async function exportWorkspaceAudit(actorId: string, workspaceId: string, filter: unknown, now = new Date(), cap = 50_000): Promise<AuditEventView[]> {
-  const events: AuditEventView[] = []
-  let cursor: string | null = null
-  do {
-    const page: AuditPage = await listWorkspaceAudit(actorId, workspaceId, { filter, cursor, limit: 100 }, now)
-    events.push(...page.events)
-    cursor = page.nextCursor
-  } while (cursor && events.length < cap)
-  return events
+  const parsed = auditPageInput.parse({ filter })
+  const { createAuditExport } = await import('./export')
+  return (await createAuditExport(actorId, workspaceId, parsed.filter, now, cap)).events
 }

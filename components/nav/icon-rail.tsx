@@ -1,11 +1,13 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import type { ComponentType } from 'react'
-import { Columns3, House, Lightbulb } from 'lucide-react'
+import { useEffect, useState, type ComponentType } from 'react'
+import { CircleArrowDown, Columns3, House, Lightbulb } from 'lucide-react'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactFilled, Columns3Filled, HouseFilled, LightbulbFilled, PlugCircle, PlugCircleFilled } from '@/components/icons/rail-filled-icons'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { bridgeFromWindow } from '@/lib/platform/detect'
 import { cn } from '@/lib/utils'
 import { Sidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
@@ -15,7 +17,7 @@ export type RailDestination = 'chats' | 'suggestions' | 'board' | 'plugins' | 'a
 /** A lucide icon or one of ours drawn the same way (components/icons). */
 type RailIcon = ComponentType<{ className?: string; 'data-icon'?: string }>
 
-// 主页 (the bot chats), 建议, the board, plugins, 产物. `selectedIcon` is the solid twin shown on the current item.
+// 主页 (the bot chats), 建议, the board, plugins, Artifact. `selectedIcon` is the solid twin shown on the current item.
 export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'Nav.home' | 'Nav.suggestions' | 'Nav.board' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
   { id: 'chats', icon: House, selectedIcon: HouseFilled, label: 'Nav.home' },
   { id: 'suggestions', icon: Lightbulb, selectedIcon: LightbulbFilled, label: 'Nav.suggestions' },
@@ -23,6 +25,9 @@ export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: Ra
   { id: 'plugins', icon: PlugCircle, selectedIcon: PlugCircleFilled, label: 'Nav.plugins' },
   { id: 'artifacts', icon: ArtifactIcon, selectedIcon: ArtifactFilled, label: 'Nav.artifacts' },
 ]
+
+const ITEM = 'group/rail-item size-9 rounded-sm text-muted-foreground/80 shadow-none hover:bg-transparent hover:text-muted-foreground/80 aria-[current=page]:text-foreground dark:hover:bg-transparent'
+const ITEM_ICON = 'flex rounded-sm p-2 group-hover/rail-item:bg-sidebar-item in-data-desktop-translucent:group-hover/rail-item:bg-control'
 
 type RailProps = {
   active: RailDestination | null
@@ -36,23 +41,51 @@ type RailProps = {
 
 /**
  * The 68px icon column on the window's frame, left of the card (Figma 56:500,
- * Icon rail v4). Each item is icon over name; hover and the current item fill
- * only the icon slot, in Comma's light gray, and the current item swaps to the
+ * Icon rail v4). Each item is an icon whose name shows as a tooltip on hover; hover and the current item fill
+ * the icon, in Comma's light gray, and the current item swaps to the
  * solid icon. It never collapses; the conversation list inside the card does.
  */
 export function IconRail({ active, onNavigate, ...menu }: RailProps) {
   const i18nText = useTranslations()
   // A non-collapsing Sidebar, as in shadcn's nested icon-rail pattern; phones get these items in the list footer.
-  return <Sidebar collapsible="none" role="navigation" aria-label={i18nText('Nav.rail')} className="hidden h-full w-17 shrink-0 items-center gap-0.5 bg-transparent pt-1 pb-1 md:flex">
-    {/* The name makes a tooltip unnecessary. */}
+  return <Sidebar collapsible="none" role="navigation" aria-label={i18nText('Nav.rail')} className="hidden h-full w-17 shrink-0 items-center gap-1 bg-transparent pt-1 pb-1 md:flex">
     {RAIL_ITEMS.map(item => {
       const selected = active === item.id
       const Icon = selected ? item.selectedIcon : item.icon
-      return <Button key={item.id} variant="ghost" className="group/rail-item h-auto w-15 flex-col gap-0.5 rounded-sm px-0 py-1 text-xs font-medium whitespace-nowrap text-muted-foreground/80 shadow-none hover:bg-transparent hover:text-muted-foreground/80 aria-[current=page]:text-foreground dark:hover:bg-transparent" aria-current={selected ? 'page' : undefined} onClick={() => onNavigate(item.id)}>
-        <span className={cn('flex rounded-sm px-2 py-1 group-hover/rail-item:bg-sidebar-item', selected && 'bg-sidebar-item text-foreground')}><Icon data-icon="inline-start" className="size-5" /></span>
-        <span>{i18nText(item.label)}</span>
-      </Button>
+      const label = i18nText(item.label)
+      return <Tooltip key={item.id}>
+        <TooltipTrigger render={<Button variant="ghost" size="icon" className={ITEM} aria-label={label} aria-current={selected ? 'page' : undefined} onClick={() => onNavigate(item.id)} />}>
+          <span className={cn(ITEM_ICON, selected && 'bg-sidebar-item in-data-desktop-translucent:bg-control-hover')}><Icon className="size-5" /></span>
+        </TooltipTrigger>
+        <TooltipContent side="right">{label}</TooltipContent>
+      </Tooltip>
     })}
-    <div className="mt-auto flex w-15 justify-center"><WorkspaceMenu compact {...menu} /></div>
+    <div className="mt-auto flex w-15 flex-col items-center gap-1">
+      <UpdateButton />
+      <WorkspaceMenu compact {...menu} />
+    </div>
   </Sidebar>
+}
+
+/**
+ * The desktop app's restart button above the avatar (Alex, 2026-10-31): shown
+ * only once an update has downloaded in the background; a click restarts into it.
+ */
+function UpdateButton() {
+  const i18nText = useTranslations()
+  const [version, setVersion] = useState<string | null>(null)
+  useEffect(() => {
+    const app = bridgeFromWindow(window)?.app
+    if (!app?.updateReady || !app.onUpdateReady) return
+    void app.updateReady().then(ready => { if (ready) setVersion(ready) }).catch(() => {})
+    return app.onUpdateReady(setVersion)
+  }, [])
+  if (!version) return null
+  const label = i18nText('Nav.restartToUpdate', { version })
+  return <Tooltip>
+    <TooltipTrigger render={<Button variant="ghost" size="icon" className={cn(ITEM, 'animate-in fade-in-0 duration-200 motion-reduce:animate-none')} aria-label={label} onClick={() => { void bridgeFromWindow(window)?.app.installUpdate?.() }} />}>
+      <span className={ITEM_ICON}><CircleArrowDown className="size-5" /></span>
+    </TooltipTrigger>
+    <TooltipContent side="right">{label}</TooltipContent>
+  </Tooltip>
 }

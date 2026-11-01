@@ -29,6 +29,14 @@ export const SPRING_PANEL = {
   mass: 0.5,
 } as const;
 
+/** Side panels opening, closing or resizing (bot list, thread panel). Critically damped so a panel never overshoots zero width. */
+export const SPRING_SIDEBAR = {
+  type: "spring",
+  stiffness: 380,
+  damping: 35,
+  mass: 0.75,
+} as const;
+
 /** Shared-layout glides — pills, indicators and panels morphing between positions. */
 export const SPRING_LAYOUT = {
   type: "spring",

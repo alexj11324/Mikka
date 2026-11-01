@@ -46,6 +46,7 @@ import { CursorAdapter } from "./adapters/cursor"
 import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
+import { agentPublishedReceipt, githubReceiptEnvironment } from './agents/github-runtime'
 import { runPaths } from "./agents/run-context"
 import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
@@ -60,14 +61,20 @@ import {
   ServerUnreachableError,
 } from "./errors"
 import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
+import { checkLatestVersion, type AutoUpdateRuntime } from "./auto-update"
 import { restartService, uninstallService } from "./service"
 import { detectDeviceType } from "./device-type"
-import { detectHarnesses } from "./harnesses"
+import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
+import { ensureHarness, type HarnessStore } from "./harness-install"
+import { sweepRunCredentials } from "./agents/harness-home"
+import { containerOwner, ensureRunnerImage, openRunContainer, selectIsolation, sweepRunContainers, type RunContainerOptions } from "./run-container"
+import { createLocalSubscriptionRunner } from "./subscription-local-runner"
+import { codexSupportsRunApproval } from "./adapters/codex-version"
+import { ensureSandboxTools, missingSandboxTools } from "./sandbox-tools"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
 import { Outbox } from "./outbox"
-import { LocalCredentialsSource } from "./quota/local-credentials"
 import { QuotaPoller, type QuotaSource } from "./quota/poller"
 import { DAEMON_VERSION, daemonPaths, type DaemonPaths } from "./paths"
 import { decide, pushDecision, runPolicy } from "./permissions"
@@ -96,6 +103,8 @@ export { DAEMON_VERSION, daemonPaths, defaultDataDir } from "./paths"
 
 export interface DaemonOptions {
   dataDir: string
+  /** Supplied only by the managed public npm CLI. */
+  autoUpdate?: AutoUpdateRuntime
   flavor: Flavor
   link: ServerLink
   /** Set with `--server memory`: enables `dev.mockRun` (dev flavor only). */
@@ -115,8 +124,7 @@ export interface DaemonOptions {
   /** Skip CLI detection (tests). */
   harnesses?: HarnessInfo[]
   /**
-   * Subscription-quota reader. Omit for the local-credential source.
-   * `null` disables polling (tests).
+   * Subscription-quota reader. Omitted or `null`: no polling.
    */
   quotaSource?: QuotaSource | null
   /** Ignored when it is below the poller's minimum interval. */
@@ -185,6 +193,14 @@ export function loadDeviceFile(raw: unknown): DeviceFile {
   return file
 }
 
+const HARNESS_RESCAN_MS = 5 * 60_000
+const SANDBOX_REPAIR_RETRY_MS = 60 * 60_000
+
+/** A person may install a missing tool themselves; that alone is worth a new attempt. */
+function missingToolsUnchanged(issue: { missing: string[] } | null) {
+  return !issue?.missing.length || missingSandboxTools().length === issue.missing.length
+}
+
 export class Daemon {
   readonly paths: DaemonPaths
   readonly log: Logger
@@ -201,6 +217,11 @@ export class Daemon {
   private server: DaemonStatus["server"] = "unregistered"
   private timer: NodeJS.Timeout | null = null
   private tick: Promise<void> = Promise.resolve()
+  private updating = false
+  private claimsInFlight = 0
+  private updateCheck: Promise<void> | null = null
+  private maintenance: Promise<void> | null = null
+  private updateVersion: string | undefined
   private draining = false
   private stopped = false
   private stopPromise: Promise<void> | null = null
@@ -349,6 +370,12 @@ export class Daemon {
         },
       })
     }
+    // Docker decides the run isolation (run-container.ts), so probe it before the adapters exist.
+    // Tests drive fake CLIs on the host.
+    if (!this.options.hostedSubscriptions && !this.options.harnesses && !this.options.harnessBinaries && !daemonTestMode(process.env)) {
+      this.docker = await dockerAvailable()
+      if (this.docker) await sweepRunContainers(containerOwner(paths.dataDir)).catch(() => undefined)
+    }
     const hosted = this.options.hostedSubscriptions
       ? await createHostedBotRunner({
           stateDir: paths.adapterState,
@@ -398,9 +425,16 @@ export class Daemon {
       outbox: this.outbox,
       worktrees: this.worktrees,
       adapters,
-      startSubscription: hosted?.start,
+      startSubscription: hosted?.start ?? this.localSubscriptions()?.start,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
+      verifyRunPolicy: this.options.link.verifyRunPolicy ? async (assignment,signal) => {
+        // resumeAll runs before the first sync; establish the existing device
+        // session before fetching the independent signing context.
+        if (!this.device.credential) throw new Error('Current policy device credential unavailable')
+        if (!this.registered || !this.device.deviceId) await this.register(this.device.credential)
+        return this.options.link.verifyRunPolicy!(assignment,signal)
+      } : undefined,
       bootstrap: hosted
         ? async (worktree, repo) => {
             if (
@@ -457,7 +491,13 @@ export class Daemon {
       publisher: {
         snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
         publish: async ({ runId, worktree, repo, assignment, report, tree }) =>
-          publishRun({
+          assignment.github && assignment.mcp ? agentPublishedReceipt({
+            runId, repoPath: repo.path, worktree, tree,
+            github: { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId },
+            privateDir: join(paths.adapterState, 'pids'),
+            ...(hosted ? { hosted: true } : {}),
+            env: githubReceiptEnvironment(),
+          }) : publishRun({
             runId,
             repoPath: repo.path,
             worktree,
@@ -500,27 +540,30 @@ export class Daemon {
     // without an adapter yet is left out; the schema has no "unsupported".)
     const detected = hosted
       ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
-      : (this.options.harnesses ?? (await detectHarnesses()))
+      : (this.options.harnesses ?? detectHarnesses(this.harnessStore()))
     if (this.stopped) throw new Error("daemon stopped during startup")
     // A callback alone is insufficient: the host must own the enforcement
     // boundary and bind its lifetime to the run's authenticated gate.
-    const runApprovalTransport = typeof this.options.link.prepareRunToolApproval === 'function'
-    const localIsolation = this.ownedSandbox !== null && this.sandbox === this.ownedSandbox
-    this.harnesses = detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
+    if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
+    this.harnesses = [...detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
       ...info,
       // Local enforcement requires the successful owned SRT probe. Hosted
       // enforcement uses its existing network-none/read-only Docker boundary
       // and gate-bound broker/container teardown; general egress stays outside
       // that ceiling. Codex also verifies its pinned interface at initialize.
-      toolApproval: runApprovalTransport && (hosted || (localIsolation && (info.harness === 'claude_code' || (info.harness === 'codex' && /(?:^|[ /])0\.163\.0(?:$|[ ();])/.test(info.version ?? ''))))) ? true as const : undefined,
+      toolApproval: this.supportsToolApproval(info),
       coordinator: hosted ? false : coordinatorCapable(info),
-    }))
+      ...(!hosted && this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}),
+    })), ...this.sandboxBlockedHarnesses(detected)]
+    // A crash or kill skipped the run-end wipe; resumed runs get fresh credentials.
+    sweepRunCredentials(paths.adapterState)
     // Runs survive restarts: pick up what the journal says was active.
     await this.supervisor.resumeAll()
-    if (!hosted && this.options.quotaSource !== null) {
+    // The person's own logins are never read (devices are runners), so only
+    // an injected source polls.
+    if (!hosted && this.options.quotaSource) {
       this.quota = new QuotaPoller(
-        this.options.quotaSource ??
-          new LocalCredentialsSource({ log: this.log }),
+        this.options.quotaSource,
         { log: this.log, intervalMs: this.options.quotaPollMs }
       )
       this.quota.start()
@@ -551,6 +594,7 @@ export class Daemon {
     let backoff = 1_000
     while (!this.stopped) {
       const deviceId = this.device.deviceId
+      const credential = this.device.credential
       try {
         if (!this.registered || !deviceId) {
           await this.pauseCommands(1_000, signal)
@@ -567,18 +611,25 @@ export class Daemon {
           0,
           COMMANDS_MAX_SKIP
         )
+        const started = performance.now()
         const commands = await link.fetchCommands(deviceId, wait, {
           signal,
           skipRuns,
         })
+        if (this.stopped || signal.aborted) return
+        backoff = 1_000
         const acted = await this.applyCommands(commands)
         if (this.unacked.size > 0) continue // ack right away
-        backoff = 1_000
+        if (commands.length === 0 && !signal.aborted) {
+          const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
+          if (remaining > 0) await this.pauseCommands(remaining, signal)
+        }
         // A message for a run with no session yet (still preparing): retry
         // shortly instead of spinning on the same answer.
         if (commands.length > 0 && !acted) await this.pauseCommands(500, signal)
       } catch (error) {
         if (this.stopped || signal.aborted) return
+        if (error instanceof SessionRejectedError) this.rejectDeviceSession(credential)
         if (!(error instanceof ServerUnreachableError))
           this.log.warn({ err: error }, "fetching run commands failed")
         await this.pauseCommands(backoff, signal)
@@ -596,20 +647,29 @@ export class Daemon {
     const { link } = this.options
     if (!link.fetchFsRequests || !link.answerFsRequest) return
     const signal = this.commandsAbort.signal
+    const wait = this.options.commandsWaitSeconds ?? FS_REQUESTS_MAX_WAIT_SECONDS
     let backoff = 1_000
     while (!this.stopped) {
       const deviceId = this.device.deviceId
+      const credential = this.device.credential
       try {
         if (!this.registered || !deviceId) {
           await this.pauseCommands(1_000, signal)
           continue
         }
+        const started = performance.now()
         const requests = await link.fetchFsRequests(
           deviceId,
-          this.options.commandsWaitSeconds ?? FS_REQUESTS_MAX_WAIT_SECONDS,
+          wait,
           { signal }
         )
+        if (this.stopped || signal.aborted) return
         backoff = 1_000
+        // Some servers return an empty queue without honoring the long-poll wait.
+        if (requests.length === 0 && !signal.aborted) {
+          const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
+          if (remaining > 0) await this.pauseCommands(remaining, signal)
+        }
         await Promise.all(
           requests.map(async ({ id, ...request }) => {
             const result = await browseFolder(request).catch((): FsResult => ({
@@ -622,6 +682,7 @@ export class Daemon {
         )
       } catch (error) {
         if (this.stopped || signal.aborted) return
+        if (error instanceof SessionRejectedError) this.rejectDeviceSession(credential)
         if (!(error instanceof ServerUnreachableError))
           this.log.warn({ err: error }, "answering folder requests failed")
         await this.pauseCommands(backoff, signal)
@@ -632,6 +693,7 @@ export class Daemon {
 
   /** Waits `ms`, or less if the daemon stops or the device registers. */
   private pauseCommands(ms: number, signal: AbortSignal): Promise<void> {
+    if (signal.aborted) return Promise.resolve()
     return new Promise((resolve) => {
       const done = () => {
         clearTimeout(timer)
@@ -699,6 +761,80 @@ export class Daemon {
     return acted
   }
 
+  private supportsToolApproval(info: HarnessInfo): true | undefined {
+    // A callback alone is insufficient: the host must own the enforcement
+    // boundary and bind its lifetime to the run's authenticated gate.
+    if (typeof this.options.link.prepareRunToolApproval !== 'function') return undefined
+    if (this.options.hostedSubscriptions) return true
+    if (this.ownedSandbox === null || this.sandbox !== this.ownedSandbox) return undefined
+    return info.harness === 'claude_code' || (info.harness === 'codex' && codexSupportsRunApproval(info.version)) ? true : undefined
+  }
+
+  /** A subscription run here takes a per-run access lease (subscription-local-runner.ts). */
+  private localSubscriptionCapable(info: HarnessInfo) {
+    return (info.harness === "claude_code" || info.harness === "codex") && info.installed &&
+      this.supportsToolApproval(info) === true && Boolean(this.options.link.nativeLease)
+  }
+
+  /** Report a CLI the daemon cannot run as present but not installed, so no run is pinned here. */
+  private sandboxBlockedHarnesses(detected: HarnessInfo[]): HarnessInfo[] {
+    const issue = this.sandboxIssue
+    if (!issue) return []
+    return detected.filter(info => info.installed && !this.adapters.has(info.harness)).map(info => ({
+      harness: info.harness, installed: false, version: info.version, sandboxBlocked: { missing: issue.missing },
+    }))
+  }
+
+  private async redetectHarnesses() {
+    const repairing = this.sandboxIssue?.missing.length
+    if (this.sandboxIssue && repairing) {
+      this.lastSandboxRepair = Date.now()
+      this.sandboxIssue = { missing: await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log }) }
+    }
+    const detected = detectHarnesses(this.harnessStore())
+    this.harnessPrint = harnessFingerprint(this.harnessStore())
+    this.docker = await dockerAvailable()
+    this.harnesses = [...detected.filter(info => this.adapters.has(info.harness)).map(info => {
+      return { ...info, toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info),
+        ...(this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}) }
+    }), ...this.sandboxBlockedHarnesses(detected)]
+    // Adapters and verification are wired at startup, so a repaired sandbox needs a fresh start.
+    if (repairing && this.sandboxIssue?.missing.length === 0) {
+      this.startMaintenance(() => restartService(false, () => {}, undefined, () => !this.stopped))
+    }
+  }
+
+  /** Notice an agent installed after startup, or retry a failed tool download, without spawning anything per tick. */
+  private rescanHarnesses() {
+    const now = Date.now()
+    if (this.options.hostedSubscriptions || this.options.harnesses || this.rescanning || now - this.lastHarnessScan < HARNESS_RESCAN_MS) return
+    this.lastHarnessScan = now
+    const retryRepair = Boolean(this.sandboxIssue?.missing.length) && now - this.lastSandboxRepair >= SANDBOX_REPAIR_RETRY_MS
+    if (harnessFingerprint(this.harnessStore()) === this.harnessPrint && !retryRepair && missingToolsUnchanged(this.sandboxIssue)) return
+    this.rescanning = true
+    void this.redetectHarnesses()
+      .then(() => this.syncWithServer())
+      .catch((err: unknown) => { this.log.warn({ err }, "harness rescan failed") })
+      .finally(() => { this.rescanning = false })
+  }
+
+  private harnessPrint = ""
+  private docker = false
+
+  /** The daemon's own pinned harnesses (harness-install.ts). */
+  private harnessStore(): HarnessStore {
+    return { root: this.paths.harness }
+  }
+
+  /** What this machine can run; Docker is probed at startup and on redetect. */
+  private async runnerReport() {
+    if (this.options.hostedSubscriptions) return undefined
+    return deviceCapabilities(this.harnessStore(), this.paths.dataDir, async () => this.docker)
+  }
+  private lastHarnessScan = Date.now()
+  private lastSandboxRepair = Date.now()
+  private rescanning = false
+  private sandboxIssue: { missing: string[] } | null = null
   private sandbox: AgentSandbox | null = null
   private ownedSandbox: SandboxRuntime | null = null
 
@@ -709,8 +845,14 @@ export class Daemon {
 
   private async createAgentSandbox(): Promise<AgentSandbox | null> {
     if (this.options.agentSandbox !== undefined) return this.options.agentSandbox
+    // Tests use the host's tools as they are; fetching them with apt would
+    // make every test daemon's start depend on the network.
+    const missing = daemonTestMode(process.env)
+      ? missingSandboxTools()
+      : await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log })
     if (!SandboxRuntime.supported()) {
-      this.log.warn("agent sandbox unavailable: platform or dependencies unsupported")
+      this.log.warn({ missing }, "agent sandbox unavailable: platform or dependencies unsupported")
+      this.sandboxIssue = { missing }
       return null
     }
     const sandbox = new SandboxRuntime(async ({ host }) => {
@@ -727,6 +869,7 @@ export class Daemon {
       return sandbox
     } catch (err) {
       this.log.warn({ err }, "agent sandbox unavailable")
+      this.sandboxIssue = { missing: [] }
       if (!this.options.retainResources) await sandbox.reset().catch((resetError: unknown) => {
         this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
       })
@@ -768,10 +911,25 @@ export class Daemon {
    * sandbox. Cursor retains the existing daemon AgentSandbox boundary.
    */
   private realAdapters(): [Harness, AgentAdapter][] {
+    const options = this.adapterOptions()
+    if (!options) return []
+    return [
+      ["claude_code", new ClaudeAdapter(options.claude)],
+      ["codex", new CodexAdapter(options.codex)],
+      ["cursor", new CursorAdapter(options.cursor)],
+    ]
+  }
+
+  /** What every real adapter of this daemon is built with, subscription runs included. */
+  private adapterOptions() {
     const sandbox = this.agentSandbox()
-    if (!sandbox) return []
+    if (!sandbox) return undefined
     const stateDir = this.paths.adapterState
     const bin = this.options.harnessBinaries ?? {}
+    const openContainer = selectIsolation(process.platform, this.docker)
+      === "container" ? async (run: Omit<RunContainerOptions, "image" | "owner">) =>
+        openRunContainer({ ...run, image: await ensureRunnerImage(), owner: containerOwner(this.paths.dataDir) })
+      : undefined
     const computerProvider = (runId: string) => {
       const assignment = this.journal.get(runId)?.assignment
       if (!assignment?.localComputer || assignment.computer || !assignment.policy?.permissions.computer_use) return undefined
@@ -779,11 +937,27 @@ export class Daemon {
         permission: decide('computer_use', { policy: assignment.policy }), readOnly: assignment.policy.readOnly,
         proxyPath: fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url)), nodeBinary: process.execPath })
     }
-    return [
-      ["claude_code", new ClaudeAdapter({ sandbox, stateDir, binary: bin.claude_code, computerProvider })],
-      ["codex", new CodexAdapter({ sandbox, stateDir, binary: bin.codex, computerProvider })],
-      ["cursor", new CursorAdapter({ sandbox, stateDir, binary: bin.cursor, computerProvider })],
-    ]
+    return {
+      claude: { sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), openContainer, computerProvider },
+      codex: { sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), openContainer, computerProvider },
+      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider },
+    }
+  }
+
+  /**
+   * Subscription runs on this device: the server hands each run its
+   * short-lived access token, never the refresh grant (subscription-local-runner.ts).
+   */
+  private localSubscriptions() {
+    const link = this.options.link
+    const options = this.adapterOptions()
+    if (!options || !link.nativeLease) return undefined
+    return createLocalSubscriptionRunner({
+      stateDir: this.paths.adapterState,
+      link: { nativeLease: link.nativeLease.bind(link) },
+      claude: options.claude,
+      codex: options.codex,
+    })
   }
 
   private revokeLocalComputerGrants() {
@@ -825,6 +999,7 @@ export class Daemon {
   }
 
   private async register(credential: string) {
+    const { workspaceId, deviceId: knownDeviceId } = this.device
     const { deviceId } = await this.options.link.registerDevice(
       credential,
       {
@@ -837,12 +1012,15 @@ export class Daemon {
         deviceType: process.env.MIKKA_DEVICE_TYPE === "server" ? "server" : process.env.MIKKA_DEVICE_TYPE === "laptop" ? "laptop" : await detectDeviceType(),
         harnesses: this.harnesses,
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
-        ...(this.device.workspaceId
-          ? { workspaceId: this.device.workspaceId }
+        runner: await this.runnerReport(),
+        ...(workspaceId
+          ? { workspaceId }
           : {}),
       },
-      this.device.deviceId
+      knownDeviceId
     )
+    // A late registration must not restore the session replaced over RPC.
+    if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) throw new Error('Device session changed during registration')
     if (deviceId !== this.device.deviceId) {
       this.saveDevice({ deviceId })
       this.log.info({ device_id: deviceId }, "device registered")
@@ -871,8 +1049,10 @@ export class Daemon {
   }
 
   private async syncPass() {
+    if (this.stopped) return
+    this.checkAutoUpdate()
     const { link } = this.options
-    const credential = this.device.credential
+    const { credential, workspaceId } = this.device
     if (!credential) {
       this.server = "unregistered"
       return
@@ -891,6 +1071,7 @@ export class Daemon {
         failedDeviceCommands: this.device.failedDeviceCommands,
         harnesses: this.harnesses,
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
+        runner: await this.runnerReport(),
         runs: this.supervisor.heartbeatRuns(),
         worktreeDiskBytes: await this.worktrees.diskUsage(),
         ...(quotas ? { quotas } : {}),
@@ -905,6 +1086,7 @@ export class Daemon {
         this.revokeLocalComputerGrants()
         this.registered = false
       }
+      this.rescanHarnesses()
       const command = deviceCommands?.[0]
       if (command?.kind === 'uninstall') {
         this.draining = true
@@ -925,21 +1107,21 @@ export class Daemon {
         return
       }
       if (command && !this.device.completedDeviceCommands?.includes(command.id) && !this.device.failedDeviceCommands?.some(failure => failure.id === command.id)) {
-        if (command.kind === 'redetect' || this.supervisor.heartbeatRuns().length === 0) {
+        if (command.kind === 'redetect' || this.maintenanceIdle()) {
           try {
             if (command.kind === 'redetect') {
-              const detected = await detectHarnesses()
-              this.harnesses = detected.filter(info => this.adapters.has(info.harness)).map(info => {
-                const previous = this.harnesses.find(old => old.harness === info.harness && old.version === info.version)
-                return { ...info, toolApproval: previous?.toolApproval, coordinator: coordinatorCapable(info) }
-              })
+              await this.redetectHarnesses()
               this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
               // Queue an immediate heartbeat after this sync pass, without re-entering it.
               void this.syncWithServer().catch(() => undefined)
             } else {
-              await restartService(command.kind === 'update', () => {
-                // Persist only after an update succeeds and before scheduling restart.
-                this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+              this.startMaintenance(async () => {
+                await restartService(command.kind === 'update', () => {
+                  if (this.stopped) throw new Error('Daemon stopped during update')
+                  this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+                }, undefined, () => !this.stopped)
+              }, () => {
+                this.saveDevice({ completedDeviceCommands: [], failedDeviceCommands: [{ id: command.id, error: 'Device command failed; check daemon service logs.' }] })
               })
             }
           } catch {
@@ -958,7 +1140,7 @@ export class Daemon {
       // Resume only reservations already made while a run was live. Do not
       // hold the heartbeat or recreate uploads after a run has ended.
       for (const entry of this.journal.all()) if (isTerminalRunState(entry.state)) void this.captureUploader.flush(entry.assignment.runId, true)
-      if (!this.draining) {
+      if (!this.draining && !this.updating && !this.stopped) {
         // A receipted run blocked while offline may resume only after its
         // server authorization is available; no second recovery scheduler.
         await this.supervisor.resumeAll(true)
@@ -973,25 +1155,43 @@ export class Daemon {
       await this.pruneWorktrees()
       await this.sweepEmptyRuns()
     } catch (error) {
+      if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) return
       this.server = "offline"
       if (error instanceof SessionRejectedError) {
-        // Signed out on the server: drop the dead credential and wait for
-        // `mikka daemon login` (or the app, which signs in again when it
-        // sees no credential, ADR 0026).
-        this.server = "unregistered"
-        this.revokeLocalComputerGrants()
-        this.registered = false
-        this.reviewAbort?.abort()
-        this.reviewAbort = null
-        this.saveDevice({ credential: undefined })
-        this.log.warn("server refused the device session; sign in again")
+        this.rejectDeviceSession(credential)
       } else if (!(error instanceof ServerUnreachableError)) {
         this.log.error({ err: error }, "server sync failed")
       }
     }
   }
 
+  /** A refused credential stops its local work as well as future polling.
+   * The supervisor cancels immediately and applies its bounded CLI kill grace. */
+  private rejectDeviceSession(credential: string | undefined) {
+    // An old in-flight request cannot sign out a newly connected credential.
+    if (!credential || this.device.credential !== credential) return
+    this.server = "unregistered"
+    this.revokeLocalComputerGrants()
+    this.registered = false
+    this.reviewAbort?.abort()
+    this.reviewAbort = null
+    this.saveDevice({ credential: undefined })
+    for (const runId of this.supervisor?.activeRunIds() ?? []) {
+      void this.supervisor.cancel(runId).catch(() => this.log.warn({ run_id: runId }, 'could not stop revoked session'))
+    }
+    this.log.warn("server refused the device session; sign in again")
+  }
+
   private async claimAndStart(runId: string) {
+    if (this.draining || this.updating || this.stopped) {
+      throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
+    }
+    this.claimsInFlight++
+    try { return await this.claimAndStartInternal(runId) }
+    finally { this.claimsInFlight-- }
+  }
+
+  private async claimAndStartInternal(runId: string) {
     if (this.draining) {
       throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
     }
@@ -1029,7 +1229,7 @@ export class Daemon {
       }
     }
     if (assignment.computer && (!this.cloudComputerBroker || !assignment.subscriptionBinding || assignment.computer.ownerId !== assignment.subscriptionBinding.ownerId)) throw new Error('Cloud computer runtime unavailable')
-    return this.supervisor.start(assignment)
+    return await this.supervisor.start(assignment)
   }
 
   /**
@@ -1256,7 +1456,7 @@ export class Daemon {
   private startCoordinatorPass(deviceId: string) {
     const link = this.options.link
     const sandbox = this.agentSandbox()
-    if (this.nativeCoordinator || !link.claimCoordinator || !sandbox || this.stopped || !this.harnesses.some(info => info.coordinator)) return
+    if (this.updating || this.draining || this.nativeCoordinator || !link.claimCoordinator || !sandbox || this.stopped || !this.harnesses.some(info => info.coordinator)) return
     const controller = new AbortController()
     this.nativeAbort = controller
     this.nativeCoordinator = (async () => {
@@ -1271,6 +1471,39 @@ export class Daemon {
     }).finally(() => { this.nativeCoordinator = null; this.nativeAbort = null })
   }
 
+  private maintenanceIdle() {
+    return !this.stopped && !this.draining && !this.updating && !this.nativeCoordinator && this.claimsInFlight === 0 && this.supervisor.heartbeatRuns().length === 0
+  }
+
+  private startMaintenance(work: () => Promise<void>, failed: () => void = () => {}) {
+    if (!this.maintenanceIdle()) return
+    this.updating = true
+    this.maintenance = work().catch(() => {
+      this.updating = false
+      failed()
+      this.log.warn('Daemon update or restart failed; check service installation and npm configuration')
+    }).finally(() => { this.maintenance = null })
+  }
+
+  private checkAutoUpdate() {
+    const runtime = this.options.autoUpdate
+    if (!runtime || this.draining || this.updating) return
+    if (this.updateVersion && this.maintenanceIdle()) {
+      const version = this.updateVersion
+      this.updateVersion = undefined
+      this.startMaintenance(async () => {
+        await runtime.install(version)
+        if (this.stopped) return
+        await restartService(false, () => {}, undefined, () => !this.stopped)
+      })
+    } else if (!this.updateCheck && !this.updateVersion) {
+      this.updateCheck = checkLatestVersion(join(this.paths.dataDir, 'auto-update.json'), DAEMON_VERSION, runtime)
+        .then(version => { this.updateVersion = version })
+        .catch(() => { this.log.warn('Daemon automatic update check failed') })
+        .finally(() => { this.updateCheck = null })
+    }
+  }
+
   stop(): Promise<void> {
     return (this.stopPromise ??= this.stopInternal())
   }
@@ -1279,6 +1512,8 @@ export class Daemon {
     this.stopped = true
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
+    await this.updateCheck
+    await this.maintenance
     this.nativeAbort?.abort()
     await this.nativeCoordinator
     if (this.timer) clearTimeout(this.timer)

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { createParser, generateSystemPrompt } from '@openuidev/lang-core'
-import { agentComponentCatalog, agentComponentGroups, createAgentLibrary } from '../lib/agent-ui-catalog.ts'
+import { agentComponentCatalog, agentComponentGroups, agentPromptSpec, createAgentLibrary, legacyAgentComponentCatalog } from '../lib/agent-ui-catalog.ts'
 import { agentImageQuery, findAgentImage, parseAgentImage } from '../lib/agent-images.ts'
 import { getAgentUIIssue } from '../lib/agent-ui-status.ts'
 import { AGENT_DEMO_CODE, AGENT_DEMO_SECTIONS } from '../lib/agent-demo.ts'
@@ -272,7 +272,7 @@ test('真实缺少段落与组件格式错误分别说明原因', () => {
   const missing = getAgentUIIssue(parser.parse('root = Stack([TextContent("已有正文"), missing])'))
   assert.match(missing.message, /没有返回这些段落/)
   assert.match(missing.message, /已收到的内容会保留/)
-  const invalid = getAgentUIIssue(parser.parse('root = ShadcnTable("错误类型", [])'))
+  const invalid = getAgentUIIssue(parser.parse('root = BeTable("错误类型", [])'))
   assert.match(invalid.message, /表格数据格式不正确/)
   assert.match(getAgentUIIssue(null).message, /内容格式有误/)
   assert.equal(getAgentUIIssue(parser.parse('root = TextContent("正文")'), [{ source: 'parser', code: 'no-root', severity: 'warning', message: 'recoverable' }]), null)
@@ -298,38 +298,59 @@ test('紧凑推荐卡片可解析且模型规范优先小卡片', async () => {
 })
 
 const beuiResponse = `root = Stack([badge, statistic, button])
-badge = BeBadge("用户提供的状态", "info")
+badge = Tag("用户提供的状态", null, "sm", "info")
 statistic = BeStat("本周完成任务", 12, "项", 0)
 button = BeButton("继续细化", "请根据本周完成12项任务的数据给出改进建议", "outline")`
 
 test('beUI 组件包含在运行时和可序列化规范中', async () => {
   const spec = JSON.parse(await readFile(new URL('../lib/agent-ui.spec.json', import.meta.url), 'utf8'))
-  assert.deepEqual(spec.library, JSON.parse(JSON.stringify(library.toSpec())))
+  assert.deepEqual(spec.library, JSON.parse(JSON.stringify(agentPromptSpec(library.toSpec()))))
   assert.deepEqual(spec.localComponents, Object.keys(agentComponentCatalog))
   const prompt = generateSystemPrompt(spec)
   const compiled = JSON.parse(await readFile(new URL('../lib/agent-system-prompt.json', import.meta.url), 'utf8'))
   assert.equal(compiled, prompt)
+  // Replaced and host-only components still render, but are never offered as model calls.
+  const hidden = new Set([
+    ...Object.keys(legacyAgentComponentCatalog),
+    'Card', 'CardHeader', 'MarkDownRenderer', 'Callout', 'TextCallout', 'Image', 'ImageBlock', 'ImageGallery',
+    'CodeBlock', 'Table', 'Col', 'Tabs', 'TabItem', 'Accordion', 'AccordionItem',
+    'RadarChart', 'HorizontalBarChart', 'Series', 'PieChart', 'SingleStackedBarChart', 'Slice', 'ScatterChart', 'ScatterSeries', 'Point',
+    'ComputerCard',
+  ])
+  assert.deepEqual(Object.keys(spec.library.components).sort(), Object.keys(library.components).filter(name => !hidden.has(name)).sort())
+  for (const name of hidden) {
+    assert.ok(library.components[name], name)
+    assert.equal(name in spec.library.components, false, name)
+    assert.equal(name in spec.library.schema.properties, false, name)
+    assert.equal(spec.library.componentGroups.some(group => group.components.includes(name)), false, name)
+    assert.doesNotMatch(prompt, new RegExp(`\\b${name}\\(`), name)
+  }
   const route = await readFile(new URL('../app/api/agent/route.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(route, /from '@openuidev\//)
   for (const name of Object.keys(agentComponentCatalog)) {
     assert.ok(library.components[name])
     assert.ok(spec.library.schema.$defs[name])
-    assert.match(prompt, new RegExp(`${name}\\(`))
+    if (!hidden.has(name)) assert.match(prompt, new RegExp(`${name}\\(`))
   }
+  assert.match(prompt, /ComputerCard 的画面、真实状态和审批由宿主控制/)
   assert.match(prompt, /数字只能来自用户输入/)
   assert.match(prompt, /宿主保存历史到数据库/)
   assert.match(prompt, /每次模型请求不会自动包含历史/)
 })
 
-test('beUI OpenUI Lang 输出可解析且保留旧组件兼容', () => {
+test('beUI 与 OpenUI 内置组件的输出可解析', () => {
   const parser = createParser(library.toJSONSchema(), library.root)
   const result = parser.parse(beuiResponse)
   assert.ok(result.root)
   assert.equal(result.meta.incomplete, false)
   assert.deepEqual(result.meta.unresolved, [])
   assert.deepEqual(result.meta.errors, [])
-  for (const name of ['ShadcnCard', 'ShadcnButton', 'ReuiFrame', 'Tabs', 'Form', 'Table']) {
+  for (const name of ['Tag', 'Steps', 'Form', 'EditableTable', 'Tabs', 'Table']) {
     assert.ok(library.components[name])
+  }
+  // Duplicates of OpenUI or beUI components left the catalog; legacyAgentComponentCatalog keeps saved replies parsing.
+  for (const name of ['ShadcnCard', 'ShadcnBadge', 'ShadcnAlert', 'ShadcnAccordion', 'ShadcnTabs', 'ShadcnTable', 'ShadcnButton', 'ShadcnProgress', 'ReuiBadge', 'ReuiAlert', 'ReuiFrame', 'BeBadge', 'BeTimeline']) {
+    assert.equal(name in agentComponentCatalog, false, name)
   }
 })
 
@@ -410,10 +431,9 @@ test('会话宿主直接组合 beUI，不回退到 AI Elements 或同名 shadcn 
 })
 
 test('beUI 限制按钮语义、状态、数字和小数位', () => {
-  const { BeButton, BeBadge, BeStat } = agentComponentCatalog
+  const { BeButton, BeStat } = agentComponentCatalog
   assert.equal(BeButton.props.safeParse({ label: '继续细化', action: '请根据用户数据给出建议' }).success, true)
   assert.equal(BeButton.props.safeParse({ label: '已保存', action: 'save' }).success, false)
-  assert.equal(BeBadge.props.safeParse({ text: '建议', status: 'arbitrary' }).success, false)
   for (const value of [Infinity, NaN, 1e13]) {
     assert.equal(BeStat.props.safeParse({ label: '用户输入', value }).success, false)
   }
@@ -452,9 +472,9 @@ test('单选 BeQuestions 可带真实任务 id，用于 Factory 派发前澄清�
   assert.equal(BeQuestions.props.safeParse({ context: '官网首页提速', questions: [question], task: '0b7d5a3e-1c2f-4e5a-9b8c-7d6e5f4a3b2c' }).success, true)
   assert.equal(BeQuestions.props.safeParse({ context: '官网首页提速', questions: [question], task: 'MIK-48' }).success, false)
   const parser = createParser(library.toJSONSchema(), library.root)
-  const result = parser.parse('root = Stack([q])\nq = BeQuestions("派发失败", [{id:"route", title:"派不出去：Alex 的 MacBook 不在线。等它上线，还是用你的 E2B 在云端运行？", options:[{value:"wait", label:"等它上线"}, {value:"cloud", label:"用你的 E2B 运行", action:"cloudKeySettings"}]}], "0b7d5a3e-1c2f-4e5a-9b8c-7d6e5f4a3b2c")')
+  const result = parser.parse('root = Stack([q])\nq = BeQuestions("派发失败", [{id:"route", title:"派不出去：Alex 的 MacBook 不在线。等它上线，还是在 Mikka Cloud 上运行？", options:[{value:"wait", label:"等它上线"}, {value:"cloud", label:"在 Mikka Cloud 上运行", action:"cloudKeySettings"}]}], "0b7d5a3e-1c2f-4e5a-9b8c-7d6e5f4a3b2c")')
   assert.deepEqual(result.meta.errors, [])
-  const noKey = { ...question, options: [{ value: 'wait', label: '等它上线' }, { value: 'cloud', label: '用你的 E2B 运行', action: 'cloudKeySettings' }] }
+  const noKey = { ...question, options: [{ value: 'wait', label: '等它上线' }, { value: 'cloud', label: '在 Mikka Cloud 上运行', action: 'cloudKeySettings' }] }
   assert.equal(BeQuestions.props.safeParse({ context: '派发失败', questions: [noKey] }).success, true)
-  assert.equal(BeQuestions.props.safeParse({ context: '派发失败', questions: [{ ...noKey, options: [{ value: 'cloud', label: '用你的 E2B 运行', action: 'https://evil.example' }] }] }).success, false)
+  assert.equal(BeQuestions.props.safeParse({ context: '派发失败', questions: [{ ...noKey, options: [{ value: 'cloud', label: '在 Mikka Cloud 上运行', action: 'https://evil.example' }] }] }).success, false)
 })

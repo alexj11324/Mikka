@@ -15,15 +15,19 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // retrying cannot fix.
 import { z } from "zod"
 import { ToolApprovalGate } from "./agents/tool-approval"
+import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
+import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { toolApprovalDecision } from "./agents/tool-approval-policy"
-import { SKILL_ARTIFACT_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
-import { nativeBrokerContextSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { runApps } from "./agents/run-apps"
+import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
+import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCaptureResponse, type CaptureUploadRequest, type CaptureUploadResponse, type ScreenCaptureRequest } from '@mikka/protocol/capture'
 
 import {
   CLIENT_VERSION_HEADER,
   REPO_ORIGIN_HEADER,
+  RECOVERY_WORKTREE_HEADER,
   DAEMON_RPC_ERRORS,
   devicePaths,
   fsPaths,
@@ -104,21 +108,57 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
+  /** Run entry and resume both call this before repository/setup execution. */
+  async verifyRunPolicy(assignment: RunAssignment, signal: AbortSignal) {
+    if (signal.aborted) throw Error('Run policy cancelled')
+    const path = `/v1/runs/${seg(assignment.runId)}/policy-snapshot`
+    const response = await this.send('GET',`${path}?deviceId=${seg(assignment.deviceId)}`,undefined,this.credential,{signal,timeoutMs:5000})
+    // Compatibility for an older, unmanaged server only. A signed/required
+    // cached assignment cannot invent its own trust key or silently downgrade.
+    if (response.status === 404 && !assignment.policySnapshot && !assignment.policySnapshotRequired) return null
+    if (!response.ok) throw Error('Run policy distribution unavailable')
+    const context = policyDistributionContextSchema.parse(await response.json())
+    if (context.issuer !== policyIssuer(this.baseUrl) || context.deviceId !== assignment.deviceId || context.runId !== assignment.runId || context.revision !== assignment.policyRevision) throw Error('Run policy context changed')
+    if (!assignment.policySnapshot) {
+      if (context.required || assignment.policySnapshotRequired) throw Error('Signed run policy required')
+      return context
+    }
+    if (!assignment.policy || !assignment.policyRevision) throw Error('Run policy unavailable')
+    const expected = {runId:assignment.runId,deviceId:assignment.deviceId,revision:assignment.policyRevision,policy:assignment.policy}
+    let snapshot = verifyPolicySnapshot(assignment.policySnapshot,context,expected,{allowExpired:true})
+    if (snapshot.payload.expiresAt - Date.now() <= POLICY_SNAPSHOT_REFRESH_MS) {
+      const renewed = await this.call('POST',path,{body:{deviceId:assignment.deviceId,snapshot},schema:signedPolicySnapshotSchema,signal,timeoutMs:5000})
+      snapshot = verifyPolicySnapshot(renewed,context,expected)
+    } else snapshot = verifyPolicySnapshot(snapshot,context,expected)
+    assignment.policySnapshot = snapshot
+    assignment.policy = snapshot.payload.policy
+    Object.freeze(assignment.policy.permissions); Object.freeze(assignment.policy.networkAllow)
+    if (assignment.policy.networkCeiling) Object.freeze(assignment.policy.networkCeiling)
+    Object.freeze(assignment.policy)
+    return context
+  }
   async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string) {
     if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
+    let context = signal.aborted ? null : await this.verifyRunPolicy(assignment,signal)
     const policyRevision = assignment.policyRevision
     const path = `/v1/runs/${seg(assignment.runId)}/tool-approval`
     const proposal = z.object({ id: z.uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/), status: z.string() })
     const response = z.object({ decision: z.enum(['pending', 'allow', 'deny']) })
     const liveness = new AbortController()
     const gate = new ToolApprovalGate(assignment.runId, {
-      permission: request => toolApprovalDecision(request, assignment.policy, worktree),
+      permission: request => toolApprovalDecision(request, assignment.policy, worktree, runApps(assignment.mcp)?.apps.map(app => app.name)),
       // Keep the callback pending at the tool boundary. The adapter's current
       // session and checkpoint remain intact; handback resolves this same call.
       isLive: async () => {
         try {
           for (;;) {
             check()
+            if (assignment.policySnapshot) {
+              if (!context) return false
+              if (assignment.policySnapshot.payload.expiresAt - Date.now() <= POLICY_SNAPSHOT_REFRESH_MS) context = await this.verifyRunPolicy(assignment,liveness.signal)
+              if (!context) return false
+              verifyPolicySnapshot(assignment.policySnapshot,context,{runId:assignment.runId,deviceId:assignment.deviceId,revision:policyRevision,policy:assignment.policy})
+            }
             const current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean(), paused: z.boolean().optional() }), signal:liveness.signal, timeoutMs:5000 })
             check()
             if (!current.live || !current.paused) return current.live
@@ -224,8 +264,11 @@ export class HttpServerLink implements ServerLink {
         headers: {
           "content-type": "application/json",
           [CLIENT_VERSION_HEADER]: this.clientVersion,
+          [POLICY_SNAPSHOT_HEADER]: POLICY_SNAPSHOT_VERSION,
           [SKILL_ARTIFACT_HEADER]: '1',
+          [TEAM_SKILL_HEADER]: '1',
           [REPO_ORIGIN_HEADER]: '1',
+          [RECOVERY_WORKTREE_HEADER]: '1',
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
         },
@@ -356,6 +399,9 @@ export class HttpServerLink implements ServerLink {
   }
   async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
     return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
+  }
+  async nativeLease(deviceId:string,runId:string,signal?:AbortSignal) {
+    return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription-lease`, {schema:nativeLeaseSchema,signal})
   }
   async nativeRequest(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal) {
     const response=await this.send('POST',`${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`,{action:'request',payload},this.credential,{signal,timeoutMs:275_000})

@@ -68,7 +68,7 @@ export async function handleFactoryApproval(
       const result = await merges.accept(req.actor, input, (await req.githubToken?.()) ?? null);
       return { status: result.status === "merging" ? 202 : 200, body: result };
     }
-    return { status: 200, body: await service[operation](req.actor, input) };
+    return { status: 200, body: await (operation === 'approve' ? service.approveAndPublish(req.actor, input) : service[operation](req.actor, input)) };
   } catch (error) {
     // GitHub refused the person's merge (or could not be asked): the task keeps waiting.
     if (error instanceof FactoryMergeRefused)

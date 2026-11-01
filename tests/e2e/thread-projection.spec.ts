@@ -43,6 +43,9 @@ test('the real events API projects the latest reply into owner-scoped thread lis
     await panel.getByRole('tab', { name: '全部线程', exact: true }).click()
     const running = panel.getByRole('region', { name: '进行中（3）', exact: true })
     await expect(running.getByRole('listitem')).toHaveCount(3)
+    // R-78: each row carries the mark of the Agent running it, never a bot's avatar.
+    await expect(running.getByRole('img', { name: 'Codex', exact: true })).toHaveCount(3)
+    await expect(running.locator('[data-slot="bot-avatar"]')).toHaveCount(0)
     // Ignore the MCP row's newer timestamp: the two app rows must still keep
     // their actual activity order, rather than the first row's older reply time.
     const names = await running.getByRole('listitem').allTextContents()

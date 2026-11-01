@@ -9,12 +9,12 @@ import { HIGHLIGHT_COLORS } from "./rich-text-highlight"
 /** Document typography from host tokens, scoped to .tiptap so getHTML() stays
  * class free and floating menus mounted beside the text stay unstyled. */
 export const RICH_TEXT_PROSE = cn(
-  "text-foreground flex min-h-full flex-col text-base/7",
+  "text-foreground flex min-h-full flex-col text-md",
   "[&_.tiptap]:flex-1 [&_.tiptap]:break-words [&_.tiptap]:outline-none",
   "[&_.tiptap>*+*]:mt-3",
-  "[&_.tiptap_h1]:text-2xl/9 [&_.tiptap_h1]:font-semibold [&_.tiptap_h1]:tracking-tight",
-  "[&_.tiptap_h2]:text-xl/8 [&_.tiptap_h2]:font-semibold [&_.tiptap_h2]:tracking-tight [&_.tiptap>h2:not(:first-child)]:mt-8",
-  "[&_.tiptap_h3]:text-lg/7 [&_.tiptap_h3]:font-semibold [&_.tiptap>h3:not(:first-child)]:mt-6",
+  "[&_.tiptap_h1]:text-lg [&_.tiptap_h1]:font-semibold [&_.tiptap>h1:not(:first-child)]:mt-8",
+  "[&_.tiptap_h2]:text-lg [&_.tiptap_h2]:font-semibold [&_.tiptap>h2:not(:first-child)]:mt-8",
+  "[&_.tiptap_h3]:text-md [&_.tiptap_h3]:font-semibold [&_.tiptap>h3:not(:first-child)]:mt-6",
   "[&_.tiptap_ul]:list-disc [&_.tiptap_ul]:ps-6 [&_.tiptap_ol]:list-decimal [&_.tiptap_ol]:ps-6 [&_.tiptap_li+li]:mt-1 [&_.tiptap_li::marker]:text-muted-foreground",
   "[&_.tiptap_ul[data-type=taskList]]:list-none [&_.tiptap_ul[data-type=taskList]]:ps-0.5",
   "[&_.tiptap_li[data-checked=true]>div>[data-node-view-content]]:text-muted-foreground [&_.tiptap_li[data-checked=true]>div>[data-node-view-content]]:line-through",

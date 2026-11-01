@@ -25,8 +25,14 @@ Thank you for helping improve Mikka.
   pnpm check
   ```
 
-- A pull request merges once the required checks pass. See "How changes are
-  tested" below for which checks run when.
+- A pull request merges once the required checks pass. CI evaluates GitHub's
+  synthetic PR merge commit (the PR combined with its target branch) rather
+  than just the standalone PR head. An unrelated merge to `main` does not
+  require rebasing a still-mergeable PR; a real conflict must be resolved and
+  the updated candidate reverified. The GitHub branch protection setting
+  "Require branches to be up to date before merging" must be disabled for
+  this loose-check policy; the workflow alone cannot change that setting.
+  See "How changes are tested" below for which checks run when.
 - Never commit credentials. Project secrets live in Infisical Cloud.
 
 ## How changes are tested
@@ -37,60 +43,97 @@ cannot.
 1. **While writing** (seconds, on your machine or the agent's container):
    `pnpm typecheck`, `pnpm lint` and the unit tests for what you changed. Run a
    browser test only for the flow you changed, and only if you can.
-2. **Every push and pull request** (minutes, CI): production build, every unit
-   test, database migrations and integration tests such as thread privacy.
-   This is the gate review waits on.
-3. **Ready pull requests** (CI job "Browser tests (before merge)"): critical
-   browser flows plus the affected browser scenarios, against the PR merged with
-   main. Draft PRs defer this layer. The trusted classifier on `main` chooses:
+2. **Every pull request and push to main** (minutes, CI): unit tests, lint, type
+   checks, database migrations and integration tests such as thread privacy.
+   PR checks run against GitHub's synthetic merge candidate. Same-repository
+   branch pushes without a PR do not run a duplicate blocking suite.
+   Each ordinary ready-PR browser lane builds its exact checkout; main and full
+   tiers share one browser build. Merge-group events retain a build in source CI.
+   Source checks, two source-test groups and daemon acceptance run independently. Database
+   suites are partitioned across four isolated PostgreSQL jobs; every shard
+   validates the complete inventory before running its share sequentially, and
+   the protected gate requires every shard to succeed.
+> Browser tests (items 3–5) are manual only since 2026-11-01
+> (`docs/design/decisions/2026-11-01-0230-browser-tests-manual-only.md`). The
+> check "Browser tests (before merge)" passes at once; CI runs no production
+> build; Vercel builds `main`.
+
+3. **Ready pull requests** (CI job "Browser tests (before merge)"): the browser
+   smoke set plus the specs of the areas the change touches, against the PR
+   merged with main. Two "Browser tests (pull request)" lanes start directly,
+   each building the same checkout with its own PostgreSQL database and test
+   identities: the browser lane runs smoke/targeted tests and Turnstile; the
+   runtime lane runs HTTP/account checks, the first MVP real-daemon test and any
+   required performance checks. Draft PRs defer this layer.
+   The trusted classifier on `main`
+   chooses:
 
    | Change | Browser acceptance before merge |
    | --- | --- |
    | Documentation only | No browser runtime; the required gate confirms classification |
-   | Source-only tests, CI workflows, CI policy and test-runner changes | Critical flows; selection-policy changes also validate both browser subsets |
-   | Search, settings, Slack webhook paths | Critical flows plus complete relevant specs |
-   | Schema-only migrations (`drizzle/*.sql`, with documentation) | Migration bootstrap and database checks, then critical flows |
-   | Authentication, permissions, shared UI/runtime, dependencies, mixed schema and application changes, shared browser fixtures or unknown paths | Full functionality |
+   | Any other change | The smoke set: the tests tagged `@smoke` (about ten) and the first MVP real-daemon test, plus the Factory HTTP, real HTTP authentication and test-account gates |
+   | Mapped paths (search, settings, Slack, Factory, threads, suggestions, devices, auth, relations, active agents) | Smoke plus the complete specs of each touched area |
+   | An edited spec under `tests/e2e/` | Smoke plus that complete spec |
+   | Paths the performance budgets measure (navigation shell, settings, saved history) or a performance spec | Also the desktop/mobile performance suite |
+   | Browser mapping data (`scripts/ci-browser-map.json`) | Smoke plus affected specs; mapping additions/removals add their old/new specs without reducing trusted-main coverage |
+   | Executable selection-policy changes (classifier, runner, this workflow) | Also "Browser selection validation": every scoped spec partitioned across four isolated subsets, each retaining the smoke tag |
+   | Unsafe file modes, unavailable comparisons, `integrate/` branches | The full tier (below) before merge |
 
-   The browser layer runs as parallel jobs: one build, one runtime-gate job
-   (Factory HTTP, real HTTP authentication, MVP daemon and performance), two
-   selection-validation jobs (critical and scoped subsets) and four regression
-   shards. Every job has its own PostgreSQL service, test-account directory and
+   The smoke set covers anonymous redirects, sign-up (with Cloudflare's public
+   Turnstile test keys once the form sends a token), task creation, account
+   isolation, a settings save, Factory acceptance and approval, device
+   authorization, share revocation, an approval card and the real daemon loop.
+   The tags live in the specs; the area map, the main list and the nightly-only
+   list live in `scripts/ci-browser-map.json`, and every spec file is in exactly one
+   of the main or nightly-only lists. Update that JSON when adding an area or
+   assigning a new spec to a tier. During policy updates the workflow uses a
+   fixed CI-only allowlist plus the trusted main classifier's documentation/mode
+   checks; it cannot classify its own change as documentation-only, and any
+   other file escalates to the full tier. Mapping data is parsed as JSON, never
+   executed; only trusted-main code can choose a narrower tier. Main/full runtime,
+   full browser shards and policy-validation jobs reuse their exact candidate build.
+   Failed classification or any skipped/failed required lane fails the gate.
+4. **After merge** (CI, every code-bearing push to main): the functional spec
+   files (the main list) on four shards, plus the runtime gates and both MVP
+   tests. A red run opens one issue (or comments on the open one) that names the
+   merged pull request's author, who fixes forward or reverts within one working
+   day; the issue closes on the next green main run.
+5. **Nightly** (19:17 UTC) and manual Actions → Browser tests → Run workflow:
+   every spec, including visual/layout, the click crawler, slower edge cases
+   and specs waiting to move to component or HTTP tests, plus the
+   desktop/mobile performance suite, on four shards. Thresholds, assertions,
+   worker count and retry policy are unchanged; moving a spec to a later tier
+   never skips it.
+
+   Each sharded job has its own PostgreSQL service, test-account directory and
    artifact name, so no database, lease or fixture is shared concurrently. The
-   build runs once and its `.next` artifact is reused; parallelism changes
-   wall-clock time, not which assertions run.
-
-   Critical flows cover anonymous redirects, registration/login, task creation,
-   search/navigation, account isolation, and sign-out with server revocation.
-   The scoped paths and complete spec lists live in `scripts/ci-docs-only.mjs`.
-   Known browser spec changes include that spec; new specs and shared fixtures
-   fall back to full functionality. Mixed changes take the union of scenarios
-   or escalate to full. Unsafe file modes and unavailable comparisons also
-   escalate. Pure CI policy changes run dedicated classifier/runner/gate tests,
-   real HTTP authentication, critical browser flows and both actual browser
-   subsets; they do not require full functionality or performance. The critical
-   subset is not rerun after selection validation has already exercised it.
-   During policy updates the workflow uses a fixed CI-only allowlist plus the
-   trusted main classifier's documentation/mode checks; it cannot classify its
-   own change as documentation-only. Any application or unknown file in that
-   update escalates to full functionality. Failed classification or a
-   skipped/failed selected test job fails the required gate.
-4. **Integration** (CI): every code-bearing push to main, nightly on main, and manual
-   Actions → Browser tests → Run workflow run full functionality **and** the
-   desktop/mobile performance suite. Consolidation PRs on `integrate/` branches
-   run both complete layers before merge as well. A PR changing a performance
-   spec also runs performance before merge. Other PRs defer performance to integration;
-   thresholds, assertions, worker count and retry policy remain unchanged.
+   evidence scanner audits every log and report before any upload, in every
+   tier. Build jobs restore only Next's incremental `.next/cache`; successful
+   main builds seed that cache for later PRs. Runtime artifacts exclude the
+   build cache and retain the application built for the exact tested revision.
 
 A pull request that only changes documentation — non-executable Markdown in
-`docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`, or
-the pull request template — skips the heavy unit, build and browser jobs. The
+`docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`,
+the pull request template, or the README diagrams (`docs/assets/*.svg` and their generator scripts) — skips the heavy unit, build and browser jobs. The
 required status checks report success from small gate jobs (also on a docs-only main push). Other changes
-retain every source, production build, migration and database integration gate;
-only browser scenario selection and performance timing are tiered. Test selection
+retain every source, migration and database integration gate and a production
+build (in browser CI for pull requests and main, and source CI for merge-group
+events); only browser
+scenario selection and performance timing are tiered. Test selection
 is printed in the Changed files job and its summary. The browser environment
 remains an isolated PostgreSQL service and the built application on the GitHub
 Linux runner's localhost; this workflow does not test a Vercel Preview.
+
+### Test logins: never ask for a password
+
+Sessions never ask Alex for an account, password or login step. To test
+signed in, create the login yourself: hash a random password with
+`better-auth/crypto`'s `hashPassword`, insert a `credential` row into `account`,
+store the email and password in Infisical (the database's environment), and
+check it through `POST <base>/api/auth/sign-in/email`. Only a click on a
+third-party site under Alex's identity (a GitHub App install, an OAuth consent)
+or a session permission prompt may be asked of him. Details and the current
+test accounts: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
 
 ## License
 

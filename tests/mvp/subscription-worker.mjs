@@ -24,7 +24,11 @@ for await(const line of lines) {
       assert.equal(request.payload.model,MVP_SUBSCRIPTION_MODEL)
       const response=await fetch(`${MVP_SERVICES}/subscription/model`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(request.payload),redirect:'error'})
       assert.equal(response.status,200)
-      send({chunk:await response.text()});send({result:{done:true}})
+      const decoder=new TextDecoder()
+      for await(const bytes of response.body) send({chunk:decoder.decode(bytes,{stream:true})})
+      const remaining=decoder.decode()
+      if(remaining)send({chunk:remaining})
+      send({result:{done:true}})
     } else throw Error('Unsupported fixture operation')
   } catch {send({error:'subscription_fixture_refused'})}
   break

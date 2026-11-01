@@ -3,6 +3,7 @@ import { Pool, type PoolClient } from 'pg'
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
 import { mikkaDatabaseURL } from './config'
+import { deviceScopedPool } from './device-scope'
 
 const defaultConnectionString = mikkaDatabaseURL(process.env)
 
@@ -26,15 +27,25 @@ const transactionDatabase = new AsyncLocalStorage<Transaction | NodePgDatabase<t
 export const pool = new Proxy(defaultPool, {
   get(target, property) {
     if (property === 'query' && heldClient.getStore()) return heldClient.getStore()!.query.bind(heldClient.getStore()!)
-    const current = requestDatabase.getStore()?.pool ?? target
+    const current = deviceScopedPool(requestDatabase.getStore()?.pool ?? target)
     const value = Reflect.get(current, property, current)
     return typeof value === 'function' ? value.bind(current) : value
   },
 })
 
+const scopedDatabases = new WeakMap<Pool, typeof defaultDatabase>()
+
 export const db = new Proxy(defaultDatabase, {
   get(target, property) {
-    const current = transactionDatabase.getStore() ?? requestDatabase.getStore()?.db ?? target
+    const base = requestDatabase.getStore()?.pool ?? defaultPool
+    const guarded = deviceScopedPool(base)
+    let current = transactionDatabase.getStore() ?? requestDatabase.getStore()?.db ?? target
+    // Ambient transactions already use the checked-out guarded connection.
+    if (!transactionDatabase.getStore() && guarded !== base) {
+      let scoped = scopedDatabases.get(guarded)
+      if (!scoped) { scoped = createDatabase(guarded); scopedDatabases.set(guarded, scoped) }
+      current = scoped
+    }
     const value = Reflect.get(current, property, current)
     return typeof value === 'function' ? value.bind(current) : value
   },

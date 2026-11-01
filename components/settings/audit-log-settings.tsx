@@ -4,7 +4,8 @@ import { useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import { useLocale, useTranslations } from 'next-intl'
 import { Download } from 'lucide-react'
-import { listAuditLog } from '@/app/actions/audit-log'
+import type { listAuditLog } from '@/app/actions/audit-log'
+import { settingsRead } from '@/lib/settings-read'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -14,6 +15,7 @@ import type { AuditEventView } from '@/lib/audit/query'
 import { withBasePath } from '@/lib/base-path'
 import { dayLabel } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
+import { FieldError } from '@/components/ui/field'
 
 /** Scalar metadata only: the ICU templates take named string params. Roles and access levels are words, not codes. */
 function params(event: AuditEventView, word: (key: string) => string | null) {
@@ -36,7 +38,7 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
       if (previous && (previous.error || !previous.nextCursor)) return null
       return ['settings:audit', workspaceId, filter, index === 0 ? null : previous && !previous.error ? previous.nextCursor : null] as const
     },
-    ([, id, segment, cursor]) => listAuditLog({ filter: segment, cursor }, id),
+    ([, id, segment, cursor]) => settingsRead<Awaited<ReturnType<typeof listAuditLog>>>('audit', { workspace: id, filter: segment, cursor }),
     { revalidateFirstPage: false },
   )
   const failure = pages.data?.find(page => page.error)
@@ -61,7 +63,7 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
   return <>
     <SettingsSection id="audit-controls">
       <SettingRow title={t('filter')}>
-        <ToggleGroup aria-label={t('filter')} variant="outline" spacing={0} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'security') setFilter(next) }}>
+        <ToggleGroup aria-label={t('filter')} variant="segment" spacing={0.5} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'security') setFilter(next) }}>
           <ToggleGroupItem value="all">{t('filters.all')}</ToggleGroupItem>
           <ToggleGroupItem value="security">{t('filters.security')}</ToggleGroupItem>
         </ToggleGroup>
@@ -71,7 +73,7 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
       </SettingRow>
     </SettingsSection>
     {pages.isLoading && <SettingsLoading label={t('loading')} rows={3} />}
-    {(pages.error || failure) && <p role="alert" className="px-1 text-sm text-destructive">{actionError(failure?.error)}</p>}
+    {(pages.error || failure) && <FieldError className="px-1">{actionError(failure?.error)}</FieldError>}
     {!pages.isLoading && !failure && !pages.error && events.length === 0 && <p className="px-1 text-sm text-muted-foreground">{t('empty')}</p>}
     {days.map(([label, rows]) => <SettingsSection key={label} id={`audit-${label}`} title={label}>
       {rows.map(event => <div key={event.id} className="flex items-center gap-3 px-5 py-3">
