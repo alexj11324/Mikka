@@ -11,16 +11,18 @@ export { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotC
  * its own animations), 工作中 thinking (its own body, blinking), 等你处理 notify, 完成 wink, 出错
  * exclaim, 离线 sleep.
  * The rest are one-off moves (wide eyes, play, the hexagon pose, and the
- * burst, orbit and comet effects) for moments like the first-run guide; they
- * play at bloub's own length and the caller sets the mood back to idle afterwards.
+ * burst and comet effects) for moments like the first-run guide; they play at
+ * bloub's own length and the caller sets the mood back to idle afterwards.
+ * bloub's orbit move (coloured ribbons circling the body) is never used: Alex
+ * asked for it to go.
  */
 export type BotMood = 'idle' | 'thinking' | 'notify' | 'wink' | 'exclaim' | 'sleep' | BotMove
 
-export type BotMove = 'wide' | 'play' | 'hexagon' | 'burst' | 'orbit' | 'comet'
+export type BotMove = 'wide' | 'play' | 'hexagon' | 'burst' | 'comet'
 
 /** How long each mood lasts at bloub's own pace, in seconds. */
-export const BOT_MOOD_SECONDS: Record<BotMood, number> = { idle: 2.4, thinking: 2.6, notify: 2.2, wink: 1.6, exclaim: 2, sleep: 2.4, wide: 1.8, play: 2, hexagon: 1.6, burst: 2.6, orbit: 3.4, comet: 2.4 }
-const BOT_MOVES = new Set<BotMood>(['wide', 'play', 'hexagon', 'burst', 'orbit', 'comet'])
+export const BOT_MOOD_SECONDS: Record<BotMood, number> = { idle: 2.4, thinking: 2.6, notify: 2.2, wink: 1.6, exclaim: 2, sleep: 2.4, wide: 1.8, play: 2, hexagon: 1.6, burst: 2.6, comet: 2.4 }
+const BOT_MOVES = new Set<BotMood>(['wide', 'play', 'hexagon', 'burst', 'comet'])
 
 /** A steady colour for something that has a name but no colour of its own, such as an agent assignee. */
 export function colorFor(name: string): BotColor {
@@ -69,7 +71,7 @@ if (typeof window !== 'undefined') void loadRuntime()
  */
 const IDLE_MONTAGE = [
   ['idle', 3], ['egg', 1.8], ['idle', 2.5], ['wink', 1.6], ['idle', 2.5], ['hexagon', 1.6],
-  ['idle', 2.5], ['wide', 1.8], ['idle', 2.5], ['play', 2], ['idle', 2.5], ['orbit', 3.4],
+  ['idle', 2.5], ['wide', 1.8], ['idle', 2.5], ['play', 2],
 ] as const
 
 /**

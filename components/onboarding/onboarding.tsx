@@ -166,7 +166,6 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
     setStage('chat')
     return run(async () => {
       await wait(PACE.travel)
-      act('orbit')
       await say(t('hello'))
       setCard('name')
     })
@@ -265,7 +264,7 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
     await wait(PACE.lastBeat)
     setStage('welcome')
     await wait(PACE.travel)
-    act('orbit'); hop(14)
+    hop(14)
     await wait(PACE.rise)
     if (current) setBot(current)
     setCard('welcome')
