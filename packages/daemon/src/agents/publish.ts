@@ -118,13 +118,11 @@ export async function worktreeGitWritePaths(repoPath: string, worktree: string, 
   const gitDir = await worktreeGitDir(repoPath, worktree)
   const common = resolve(gitDir, '..', '..')
   const branch = `mikka/run-${assertSafeId('run id', runId)}`
-  const ref = join(common, 'refs', 'heads', branch)
-  const logsRef = join(common, 'logs', 'refs', 'heads', branch)
-  // Git creates `<branch>.lock` beside the ref (and appends the reflog) when it
-  // updates the branch, so the ref's directory must be writable in the sandbox,
-  // not just the ref file — binding only the leaf leaves the containing
-  // `refs/heads/mikka/` read-only and `git commit` fails with EROFS.
-  return [gitDir, join(common, 'objects'), dirname(ref), ref, `${ref}.lock`, dirname(logsRef), logsRef]
+  // Directories only. The sandbox bind-mounts every listed path; git updates a
+  // ref by writing `<branch>.lock` and renaming it over the ref, and a rename
+  // onto a mount point fails with EBUSY ("couldn't set refs/heads/..."). The
+  // run's ref and reflog live in these two directories.
+  return [gitDir, join(common, 'objects'), dirname(join(common, 'refs', 'heads', branch)), dirname(join(common, 'logs', 'refs', 'heads', branch))]
 }
 
 function safeRealpath(path: string) {

@@ -147,11 +147,12 @@ describe('daemon-owned clone cache', () => {
     const context = new RunContext({ harness: 'codex', worktree, gitWritePaths, privateDir: root, runDir: join(root, 'run') })
     expect(context.policy().allowWrite).toContain(join(path, '.git', 'objects'))
     expect(context.policy().allowWrite).toContain(context.gitDir)
-    // The branch ref's directory (not just the ref file) must be writable so git
-    // can create <branch>.lock when committing; binding only the leaf leaves the
-    // dir read-only and `git commit` fails with EROFS.
+    // The run's ref is updated by renaming `<branch>.lock` over it: its directory
+    // is writable, and no file in it is listed (each listed path is its own
+    // mount point, and a rename onto one fails with EBUSY).
     expect(context.policy().allowWrite).toContain(join(path, '.git', 'refs', 'heads', 'mikka'))
     expect(context.policy().allowWrite).toContain(join(path, '.git', 'logs', 'refs', 'heads', 'mikka'))
+    expect(context.policy().allowWrite.filter(p => p.includes('run-git-test'))).toEqual([])
     expect(context.policy().denyWrite).toContain(join(context.gitDir, 'commondir'))
     expect(context.policy().allowWrite).not.toContain(source)
     const readonly = new RunContext({ harness: 'codex', worktree, gitWritePaths, privateDir: root, runDir: join(root, 'readonly'), policy: { ...runPolicy(undefined), readOnly: true } })

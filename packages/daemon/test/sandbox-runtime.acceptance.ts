@@ -138,3 +138,38 @@ it("probes real Linux isolation, advertises only usable harnesses, and cleans up
     cleanupTempDirs()
   }
 }, 60_000)
+
+it("lets the agent commit on its run branch inside real isolation with the run's own policy", async () => {
+  const { RepositoryCache } = await import("../src/repositories")
+  const { WorktreeManager } = await import("../src/worktrees")
+  const { worktreeGitWritePaths } = await import("../src/agents/publish")
+  const { RunContext } = await import("../src/agents/run-context")
+  const { makeRepo } = await import("./helpers")
+  const { join } = await import("node:path")
+  const { pathToFileURL } = await import("node:url")
+  const { writeFileSync } = await import("node:fs")
+  const { execa } = await import("execa")
+  const source = await makeRepo()
+  const root = tempDir()
+  const cache = new RepositoryCache(join(root, "repos"))
+  const path = await cache.prepare(pathToFileURL(source).href)
+  const worktree = await new WorktreeManager(join(root, "worktrees")).create("commit-test", path, await cache.baseRef(pathToFileURL(source).href))
+  const context = new RunContext({ harness: "claude_code", worktree, privateDir: root, runDir: join(root, "run"),
+    gitWritePaths: await worktreeGitWritePaths(path, worktree, "commit-test") })
+  writeFileSync(join(worktree, "agent.txt"), "agent change\n")
+  const sandbox = new SandboxRuntime()
+  try {
+    const wrapped = await sandbox.wrap(["/bin/sh", "-c",
+      "git add agent.txt && git -c commit.gpgSign=false -c user.name=Agent -c user.email=agent@mikka.invalid commit -qm agent && git rev-parse HEAD"],
+      { ...context.policy(), allowDomains: [] })
+    const result = await execa("/bin/sh", ["-c", wrapped.command], { cwd: worktree, reject: false, env: { ...process.env, ...context.tempEnv() } })
+    wrapped.release()
+    expect(wrapped.annotate(result.stderr)).toBe("")
+    expect(result.exitCode).toBe(0)
+    const head = result.stdout.trim()
+    expect(execFileSync("git", ["rev-parse", "refs/heads/mikka/run-commit-test"], { cwd: path, encoding: "utf8" }).trim()).toBe(head)
+  } finally {
+    await sandbox.reset()
+    cleanupTempDirs()
+  }
+})
