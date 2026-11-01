@@ -1,15 +1,15 @@
 import { type ComponentType, useMemo, useState } from 'react'
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, CircleCheck, Hand, List, LoaderCircle, Plus, SlidersHorizontal } from 'lucide-react-native'
-import { useDrawer } from '@/components/Drawer'
-import { MachineIcon, MenuIcon, Spinner, StatusIcon } from '@/components/icons'
+import { MachineIcon, Spinner, StatusIcon } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Dot } from '@/components/ui'
 import type { Thread, Threads } from '@/lib/types'
-import { useApi } from '@/lib/useApi'
+import { openChat } from '@/lib/navigate'
+import { useApi, useRefresh } from '@/lib/useApi'
 import { colors, lift } from '@/lib/theme'
 
 // 待审阅 and 已归档 (Figma 03b) wait for the server to track reviews and archiving.
@@ -27,36 +27,52 @@ const matches = (thread: Thread, filter: Filter) => {
   return thread.status === filter
 }
 
+const STATES: { title: string; match: (status: Thread['status']) => boolean }[] = [
+  { title: '等你回复', match: status => status === 'waiting' },
+  { title: '进行中', match: status => status === 'running' },
+  { title: '失败', match: status => status === 'failed' },
+  { title: '已完成', match: status => status === 'done' || status === 'stopped' },
+]
+
 /** Threads waiting on the person sort first (mobile.md). */
 const rank = (thread: Thread) => (thread.status === 'waiting' ? 0 : thread.status === 'running' ? 1 : 2)
 
 /** 线程, like the Claude app's Code screen: 设备 chips, filter menu, 新线程 pill (mobile.md). */
-export default function ThreadsScreen() {
-  const drawer = useDrawer()
+export function ThreadsScreen({ bot }: { bot?: string }) {
   const router = useRouter()
+  // `bot`: one bot's threads, pushed over its chat; otherwise the 线程 tab.
+  const pushed = bot !== undefined
   const insets = useSafeAreaInsets()
-  const { data, loading, error } = useApi<Threads>('/api/mobile/threads', 10_000)
+  const { data, loading, error, reload } = useApi<Threads>('/api/mobile/threads', 10_000)
+  const refresh = useRefresh(reload)
   const [machine, setMachine] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [menu, setMenu] = useState(false)
 
   const list = useMemo(() => (data?.threads ?? [])
-    .filter(t => matches(t, filter) && (!machine || t.device?.id === machine))
-    .sort((a, b) => rank(a) - rank(b)), [data, filter, machine])
+    .filter(t => matches(t, filter) && (!machine || t.device?.id === machine) && (!bot || t.by === bot))
+    .sort((a, b) => rank(a) - rank(b)), [data, filter, machine, bot])
+  // 全部: grouped by state, waiting on the person first (mobile.md 线程).
+  const rows: (Thread | { title: string })[] = filter !== 'all' ? list : STATES.flatMap(state => {
+    const items = list.filter(thread => state.match(thread.status))
+    return items.length ? [{ title: state.title }, ...items] : []
+  })
 
   return (
     <View style={styles.screen}>
       <NavBar
-        left={{ icon: 'line.3.horizontal', label: '菜单', onPress: drawer.open, web: <MenuIcon /> }}
-        title="线程"
-        right={{ icon: 'line.3.horizontal.decrease', label: '筛选', web: <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />, onOpen: () => setMenu(true),
-          items: filters.map(f => ({ label: f.label, icon: f.symbol, on: filter === f.id, onPress: () => setFilter(f.id) })) }}
+        back={pushed ? () => router.back() : undefined}
+        title={bot ? `${bot} 的线程` : '线程'}
+        large={!pushed}
+        right={[{ icon: 'square.and.pencil', label: '新线程', web: <Plus size={20} color={colors.ink} strokeWidth={2} />, onPress: () => openChat({ pathname: '/bots/[id]', params: { id: 'coordinator', compose: '1' } }) }, { icon: 'line.3.horizontal.decrease', label: '筛选', web: <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />, onOpen: () => setMenu(true),
+          items: filters.map(f => ({ label: f.label, icon: f.symbol, on: filter === f.id, onPress: () => setFilter(f.id) })) }]}
       />
       <FlatList
-        data={list}
-        keyExtractor={t => t.id}
+        data={rows}
+        keyExtractor={row => 'title' in row ? `h:${row.title}` : row.id}
         {...underBar}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
+        refreshControl={<RefreshControl {...refresh} />}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         ListHeaderComponent={
           <View>
             {data?.devices.length ? <Text style={styles.section}>设备</Text> : null}
@@ -72,19 +88,12 @@ export default function ThreadsScreen() {
                 )
               })}
             </ScrollView>
-            <Text style={styles.section}>{filter === 'all' ? '线程' : filters.find(f => f.id === filter)?.label}</Text>
+            {filter === 'all' ? null : <Text style={styles.section}>{filters.find(f => f.id === filter)?.label}</Text>}
           </View>
         }
         ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : <Text style={styles.empty}>{error ? '线程加载失败。' : '没有线程'}</Text>}
-        renderItem={({ item }) => <ThreadRow thread={item} onPress={() => router.push(`/threads/${item.id}`)} />}
+        renderItem={({ item }) => 'title' in item ? <Text style={styles.section}>{item.title}</Text> : <ThreadRow thread={item} onPress={() => router.push(`/thread/${item.id}`)} />}
       />
-      <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 12) }]} pointerEvents="box-none">
-        <View />
-        <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={styles.newThread}>
-          <Plus size={18} color="#fff" strokeWidth={2.4} />
-          <Text style={styles.newThreadText}>新线程</Text>
-        </Pressable>
-      </View>
       <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenu(false)}>
           <View style={[styles.menu, { top: insets.top + 64 }]}>
@@ -133,9 +142,6 @@ const styles = StyleSheet.create({
   rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   rowMetaText: { fontSize: 12, color: colors.secondary },
   empty: { textAlign: 'center', color: colors.secondary, marginTop: 40 },
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 },
-  newThread: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 48, paddingHorizontal: 20, borderRadius: 24, backgroundColor: colors.ink },
-  newThreadText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   menu: { position: 'absolute', right: 16, width: 220, backgroundColor: '#fff', borderRadius: 18, paddingVertical: 6, ...lift, shadowOpacity: 0.16, shadowRadius: 24 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 44 },
 })

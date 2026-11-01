@@ -11,6 +11,7 @@ import { e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { threadMachineLimits, threadMachineViolation, type ThreadMachineLimits } from './thread-machine-limits'
 import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
+import { credentialProbeCommand, credentialScrubCommand } from '../../packages/daemon/src/credential-globs'
 async function options(workspaceId: string) {
   return { apiKey: await e2bApiKey(workspaceId, 'Cloud runtime unavailable'), proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
 }
@@ -23,14 +24,24 @@ export async function recordCancelledSandbox(pool: Pick<Pool, 'query'>, runId: s
   return Boolean((await pool.query('UPDATE thread_machines SET "sandboxId"=$2,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND state=\'ended\' AND "operationId"=$3 AND "sandboxId" IS NULL RETURNING "runId"', [runId, sandboxId, operationId])).rowCount)
 }
 /** Capture filesystem only. A cloned memory image would duplicate live daemon
- * credentials/connections. Cache is always bound to one owner and workspace. */
-async function workspaceSnapshot(pool: Pool, actor: Actor, source: Sandbox, repoPath: string) {
+ * credentials/connections. Cache is always bound to one owner and workspace.
+ * Never captures a credential (decision 2026-10-31-2225): while one is on the
+ * bot machine (a coding-CLI login, a run's GitHub token, a live broker), the
+ * last clean snapshot is reused, or the thread waits with a refusal. */
+export async function workspaceSnapshot(pool: Pick<Pool, 'query'>, actor: Actor, source: Pick<Sandbox, 'commands' | 'createSnapshot'>, repoPath: string) {
   const revision = (await source.commands.run(`git -C ${quote(repoPath)} rev-parse HEAD`, { user: 'mikka-runner', timeoutMs: 10_000 })).stdout.trim()
   if (!/^[a-f0-9]{40}$/.test(revision)) throw new ComputerError(409, 'Workspace source unavailable')
   const lock = (await source.commands.run(`cd ${quote(repoPath)} && for f in pnpm-lock.yaml package-lock.json yarn.lock; do if test -f "$f"; then sha256sum "$f"; fi; done`, { user: 'mikka-runner', timeoutMs: 10_000 })).stdout
   const lockDigest = createHash('sha256').update(lock).digest('hex')
   const old = (await pool.query('SELECT * FROM workspace_snapshots WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
   if (old && old.sourceRevision === revision && old.lockDigest === lockDigest && Date.now() - new Date(old.createdAt).getTime() < 24 * 60 * 60_000) return old.snapshotId as string
+  const found = (await source.commands.run(credentialProbeCommand(), { user: 'root', timeoutMs: 10_000 })).stdout.split('\n').filter(Boolean)
+  if (found.length) {
+    // Paths only, never contents; the count is enough to find it in logs.
+    console.warn('Workspace snapshot skipped: credentials present', { count: found.length })
+    if (old) return old.snapshotId as string
+    throw new ComputerError(409, 'Workspace snapshot unavailable')
+  }
   const snapshot = await source.createSnapshot({ mode: 'filesystem' })
   await pool.query(`INSERT INTO workspace_snapshots ("workspaceId","ownerId","sourceRevision","lockDigest","snapshotId") VALUES ($1,$2,$3,$4,$5)
     ON CONFLICT ("workspaceId","ownerId") DO UPDATE SET "sourceRevision"=$3,"lockDigest"=$4,"snapshotId"=$5,"createdAt"=now()`, [actor.workspaceId, actor.userId, revision, lockDigest, snapshot.snapshotId])
@@ -170,7 +181,8 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (!machine.sandboxId) {
       // Filesystem snapshots start no old worker process. Remove copied device
       // identity/capabilities before a new worker can make any network call.
-      await sandbox.commands.run('rm -rf /home/mikka-runner/.mikka/worker /home/mikka-runner/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; install -d -m 700 /run/mikka-viewer', { user: 'root', timeoutMs: 10_000 })
+      // A snapshot never holds a credential; scrub the same list again in case an older snapshot did.
+      await sandbox.commands.run(`rm -rf /home/mikka-runner/.mikka/worker /home/mikka-runner/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; ${credentialScrubCommand()}; install -d -m 700 /run/mikka-viewer`, { user: 'root', timeoutMs: 10_000 })
     }
     await installComputerRuntime(sandbox)
     await ensureHostedRunnerImage(sandbox)

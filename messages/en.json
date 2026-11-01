@@ -751,6 +751,8 @@
     "thisMachine": "This machine",
     "allowScheduling": "Allow scheduling",
     "allowSchedulingTo": "Allow scheduling to {name}",
+    "autoSchedule": "Auto-schedule",
+    "autoScheduleTo": "Let Mikka pick {name} automatically",
     "recheck": "Check again",
     "agent": "Available tools",
     "toggleSidebar": "Expand or collapse the sidebar",
@@ -3061,7 +3063,13 @@
     "sendingChoice": "Sending",
     "cloudKeySetup": "Set up your E2B key",
     "dispatchWait": "Wait for it",
-    "dispatchCloud": "Run on Mikka Cloud"
+    "dispatchCloud": "Run on Mikka Cloud",
+    "needsMachineTitle": "This task needs a computer to run on",
+    "needsMachineAuto": "Let this computer be picked automatically",
+    "needsMachineServerOnline": "Bring the server back online",
+    "needsMachineMac": "Enable on this computer",
+    "needsMachineServer": "Connect my server",
+    "needsMachineE2B": "Add E2B key"
   },
   "IssueThreads": {
     "title": "Threads",

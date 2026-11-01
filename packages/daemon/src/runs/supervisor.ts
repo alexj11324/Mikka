@@ -33,6 +33,7 @@ import { fixedCheckSnapshot } from "./check"
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
 import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 import { runPaths } from "../agents/run-context"
+import { removeRunCredentials } from "../run-scratch"
 import { createRunMasker, type RunMasker } from "../secret-mask"
 import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
 import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
@@ -828,6 +829,12 @@ export class RunSupervisor {
     const run = this.active.get(runId)
     if (run) void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))
     this.leases.delete(runId)
+    // A finished turn keeps no credential on the machine (decision 2026-10-31-2225);
+    // a resumed session writes its own again.
+    if (this.deps.adapterStateDir) {
+      try { removeRunCredentials(this.deps.adapterStateDir, runId) }
+      catch (err) { this.deps.log.warn({ run_id: runId, err }, "run credential cleanup failed") }
+    }
     this.deps.outbox.compact(runId).catch((err: unknown) => {
       this.deps.log.error({ run_id: runId, err }, "outbox compaction failed")
     })
