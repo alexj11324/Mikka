@@ -153,7 +153,7 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
   userId: string, botId: string | null, harness: string, model: string | undefined, subscription: S | null) {
   const botWorkspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId ?? null : null
   const choiceWorkspaceId = botWorkspaceId ?? (async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, null).catch(() => null))
-  return (await import('@/lib/run-credential-source')).runCredentialSource(query, { ownerId: userId, botId, harness, model, botWorkspaceId, choiceWorkspaceId, subscription })
+  return (await import('@/lib/run-credential-source')).runCredentialSource(query, { ownerId: userId, botId, harness, model, botWorkspaceId, choiceWorkspaceId, subscription, localLogin: true })
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,

@@ -96,13 +96,14 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     return { connection, binding }
   }
 
-  await t.test('own device: an API-key-only person\'s run is frozen on the key by id; the claim opens it for that run', async () => {
+  await t.test('own device: a bot saved on a key model is frozen on the key by id; the claim opens it for that run', async () => {
     const p = await person('key-device')
     const secret = `sk-ant-${randomBytes(16).toString('hex')}`
     const key = await addKey(p.id, 'anthropic', secret, ['key-model-a', 'key-model-b'])
+    await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, key.id, 'key-model-a')
     const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote }, p.botId)
     const frozen = await definition(runId)
-    assert.deepEqual(frozen.apiKey, { keyId: key.id, model: 'key-model-a' }, 'the key\'s first listed model')
+    assert.deepEqual(frozen.apiKey, { keyId: key.id, model: 'key-model-a' }, 'the bot\'s saved key model')
     assert.equal(frozen.subscription, undefined)
     assert.equal(frozen.modelSource, 'api_key')
     assert.equal(frozen.model, 'key-model-a')
@@ -131,19 +132,38 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const p = await person('key-codex')
     const secret = `sk-${randomBytes(16).toString('hex')}`
     const key = await addKey(p.id, 'openai', secret, ['key-model-c'])
+    await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, key.id, 'key-model-c')
     const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.codex, repo: p.remote }, p.botId)
     assert.deepEqual((await definition(runId)).apiKey, { keyId: key.id, model: 'key-model-c' })
     const response = await claim(p.deviceId, runId, p.token)
     assert.equal(response.status, 200, await response.clone().text())
     assert.deepEqual((await response.json()).modelCredential, { kind: 'provider', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', key: secret })
-    // A Claude Code run has no key for it: nothing is frozen.
+    // A Claude Code run: the saved key is Codex's, so the device's own login runs it.
     const other = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote }, p.botId)
     assert.equal((await definition(other.runId)).apiKey, undefined)
+  })
+
+  await t.test('own device signed in, a key stored, no key model saved: the key is not injected', async () => {
+    const p = await person('key-local-login')
+    const secret = `sk-ant-${randomBytes(16).toString('hex')}`
+    await addKey(p.id, 'anthropic', secret, ['key-model-a'])
+    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote }, p.botId)
+    const frozen = await definition(runId)
+    assert.equal(frozen.apiKey, undefined, 'frozen on the device\'s own login')
+    assert.notEqual(frozen.modelSource, 'api_key')
+    const response = await claim(p.deviceId, runId, p.token)
+    const text = await response.text()
+    assert.equal(response.status, 200, text)
+    const assignment = JSON.parse(text)
+    assert.equal(assignment.modelCredential, undefined, 'no key handed to the device')
+    assert.ok(!text.includes(secret))
+    assert.equal(await recorded(runId), null, 'the key was never opened')
   })
 
   await t.test('a withdrawn key: the claim is refused, the run ends and nothing is handed out', async () => {
     const p = await person('key-withdrawn')
     const key = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-model-a'])
+    await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, key.id, 'key-model-a')
     const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote }, p.botId)
     assert.equal((await definition(runId)).apiKey.keyId, key.id)
     await keys.removeApiKey(pool, p.id, key.id)
@@ -158,7 +178,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     assert.equal(await recorded(runId), null)
   })
 
-  await t.test('subscription and key: the subscription goes first; a used-up quota or the bot\'s saved key model picks the key', async () => {
+  await t.test('subscription and key on a device: the subscription goes first, also when used up; the bot\'s saved key model picks the key', async () => {
     const p = await person('key-and-subscription')
     const key = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-model-a', 'subscription-model'])
     const { connection, binding } = await subscribe(p)
@@ -170,10 +190,8 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const resetsAt = new Date(Date.now() + 3_600_000).toISOString()
     await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [connection, JSON.stringify({ vendor: 'claude_code', source: 'official', status: 'ok', plan: null, windows: [{ kind: 'five_hour', used: 1, resetsAt }], observedAt: new Date().toISOString() })])
     const exhausted = await queue()
-    assert.equal(exhausted.subscription, undefined)
-    assert.deepEqual(exhausted.apiKey, { keyId: key.id, model: 'key-model-a' }, '订阅额度用完后，自动改用 API Key (on by default)')
-    await keys.setApiKeyAfterQuota(pool, p.id, false)
-    assert.equal((await queue()).subscription?.bindingId, binding, 'switched off: the subscription stays')
+    assert.equal(exhausted.subscription?.bindingId, binding, 'on a device the CLI login stays: a stored key is not turned into per-token billing')
+    assert.equal(exhausted.apiKey, undefined)
     await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [connection])
 
     await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, key.id, 'subscription-model')

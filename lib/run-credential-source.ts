@@ -47,7 +47,9 @@ async function subscriptionState(query: Query, binding: Binding): Promise<'usabl
  * for the run's Agent; else the person's usable API key for that Agent.
  * A subscription whose stored quota is used up gives way to a key when
  * 「订阅额度用完后，自动改用 API Key」 is on. With no key the subscription is
- * kept as found, so nothing changes for a person without one. The key is
+ * kept as found, so nothing changes for a person without one. On a device
+ * the CLI's own login counts as a subscription: only the bot's saved key
+ * choice runs on a key there. The key is
  * not opened here: only `apiKeyForRun` does, at claim.
  */
 export async function runCredentialSource<S extends Binding>(query: Query, input: {
@@ -55,6 +57,8 @@ export async function runCredentialSource<S extends Binding>(query: Query, input
   /** The bot's workspace (null with no bot), and where the bot's saved model choice lives. */
   botWorkspaceId: string | null; choiceWorkspaceId: string | null | (() => Promise<string | null>)
   subscription: S | null
+  /** A device run: the device's own CLI login is a subscription too, so only the bot's saved key choice uses a key. */
+  localLogin?: boolean
 }): Promise<{ subscription: S | null; apiKey?: RunApiKey }> {
   const kept = { subscription: input.subscription }
   if (input.harness !== 'codex' && input.harness !== 'claude_code') return kept
@@ -63,6 +67,8 @@ export async function runCredentialSource<S extends Binding>(query: Query, input
   const choiceWorkspaceId = typeof input.choiceWorkspaceId === 'function' ? await input.choiceWorkspaceId() : input.choiceWorkspaceId
   const saved = choiceWorkspaceId ? await botApiKeyChoice(query, { ownerId: input.ownerId, workspaceId: choiceWorkspaceId }, input.botId) : undefined
   if (saved && saved.harness === input.harness && keys.some(key => key.id === saved.keyId)) return { subscription: null, apiKey: { keyId: saved.keyId, model: saved.model } }
+  // The server cannot see whether the device's CLI is signed in, so a free local login is never turned into per-token billing.
+  if (input.localLogin) return kept
   const state = input.subscription ? await subscriptionState(query, input.subscription) : 'unusable'
   if (state === 'usable') return kept
   if (state === 'exhausted' && !(await apiKeyAfterQuota(query, input.ownerId))) return kept
