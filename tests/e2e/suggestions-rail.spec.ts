@@ -12,7 +12,7 @@ async function seedSentCard(email: string, message: string) {
   const pool = new Pool({ connectionString, max: 1 })
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
-    await pool.query('INSERT INTO coordinator_messages (id, "userId", position, message) VALUES ($1, $2, 1, $3)', [randomUUID(), user.id, JSON.stringify({ role: 'user', content: message })])
+    await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), 1, $3)', [randomUUID(), user.id, JSON.stringify({ role: 'user', content: message })])
   } finally { await pool.end() }
 }
 

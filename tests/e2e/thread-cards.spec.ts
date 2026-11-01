@@ -36,7 +36,7 @@ async function seedDispatch(email: string, title: string) {
       { role: 'assistant', content: [{ type: 'text', text: 'Mikka Frontend is on it.' }] },
     ]
     for (const [index, message] of messages.entries()) {
-      await pool.query('INSERT INTO coordinator_messages (id, "userId", position, message) VALUES ($1, $2, $3, $4)', [randomUUID(), user.id, index + 1, JSON.stringify(message)])
+      await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), $3, $4)', [randomUUID(), user.id, index + 1, JSON.stringify(message)])
     }
   } finally { await pool.end() }
 }
@@ -67,7 +67,7 @@ async function seedResultCards(email: string, fixtures: ResultCardFixture[]) {
       { role: 'assistant', content: [{ type: 'text', text: 'PR 状态视觉样例。' }] },
     ]
     for (const [index, message] of messages.entries()) {
-      await pool.query('INSERT INTO coordinator_messages (id, "userId", position, message) VALUES ($1, $2, $3, $4)', [randomUUID(), user.id, Number(last.position) + index + 1, JSON.stringify(message)])
+      await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), $3, $4)', [randomUUID(), user.id, Number(last.position) + index + 1, JSON.stringify(message)])
     }
   } finally { await pool.end() }
 }
