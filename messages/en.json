@@ -2892,7 +2892,8 @@
         "succeeded": "Succeeded",
         "stopped": "Stopped",
         "failed": "Failed",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "paused": "Paused"
       },
       "sources": "{count, plural, one {# source} other {# sources}}"
     },
