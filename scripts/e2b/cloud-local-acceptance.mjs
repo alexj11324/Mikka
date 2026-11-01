@@ -148,7 +148,8 @@ async function main() {
       // disposable fixture, never a device token. It stays under the daemon's
       // existing SRT denyRead path; the repository config and agent env omit it.
       const gitConfig = '/home/mikka-runner/.mikka/worker/adapters/pids/fixture-git.config'
-      await sandbox.commands.run('install -d -o mikka-runner -g mikka-runner -m 700 /home/mikka-runner/.mikka/worker/adapters/pids', { user: 'root' })
+      // install sets ownership only on named directories, not implicit parents.
+      await sandbox.commands.run('install -d -o mikka-runner -g mikka-runner -m 700 /home/mikka-runner/.mikka/worker /home/mikka-runner/.mikka/worker/adapters /home/mikka-runner/.mikka/worker/adapters/pids', { user: 'root' })
       await sandbox.files.write(gitConfig, `[http "${repository}"]\n\textraHeader =\n\textraHeader = Authorization: Bearer ${repoToken}\n`, { user: 'root' })
       await sandbox.files.write('/usr/local/bin/git', `#!/bin/sh\nif test -r ${gitConfig}; then exec /usr/bin/git -c include.path=${gitConfig} "$@"; fi\nexec /usr/bin/git "$@"\n`, { user: 'root' })
       await sandbox.commands.run(`chown mikka-runner:mikka-runner ${gitConfig}; chmod 600 ${gitConfig}; chown root:root /usr/local/bin/git; chmod 755 /usr/local/bin/git`, { user: 'root' })
