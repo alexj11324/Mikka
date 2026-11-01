@@ -1,9 +1,14 @@
 import { digest } from './contract'
 
+// Version 2: the proposal trigger is the Decision API's `propose` answer
+// (lib/self-improvement/proposal-judgment.ts), no longer 25 distinct failures
+// or a 7-day-old failure. The one code rule left is the runaway cap. A new
+// version is a new immutable improvement_scorers row and a new bucket digest.
 export const SCORER = Object.freeze({
-  id: 'run-feedback', version: 1,
+  id: 'run-feedback', version: 2,
   rule: 'negative-feedback-or-report-verify-failed; positive-only-is-unknown; missing-is-unknown',
-  distinctFailures: 25, oldestFailureDays: 7,
+  trigger: 'decision-api-propose-predicate',
+  proposalCapHours: 24,
 })
 export const SCORER_DIGEST = digest(SCORER)
 
