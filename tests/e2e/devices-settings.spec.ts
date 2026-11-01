@@ -60,6 +60,9 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
   await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许调度到 gpu-box' })).not.toBeChecked()
+  // 自动调度 needs 允许调度: a server defaults to auto, but with scheduling off it reads off and is locked.
+  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许 gpu-box 自动调度' })).not.toBeChecked()
+  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许 gpu-box 自动调度' })).toBeDisabled()
   // 允许自动调度: servers on and personal computers off by default; turning it on is saved.
   await expect(row(page, 'build-01').getByRole('switch', { name: '允许 build-01 自动调度' })).toBeChecked()
   const auto = row(page, 'E2E MacBook').getByRole('switch', { name: '允许 E2E MacBook 自动调度' })
@@ -74,7 +77,7 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await expect.poll(async () => (await db().query('SELECT kind FROM device_management_commands WHERE "deviceId" = $1', [ids.server])).rows.map(item => item.kind)).toEqual(['redetect'])
 
   await row(page, 'gpu-box').getByRole('button', { name: 'gpu-box 的更多操作' }).click()
-  await page.getByRole('menuitem', { name: '重启 daemon' }).click()
+  await page.getByRole('menuitem', { name: '重启连接' }).click()
   await expect(page.getByText('gpu-box 离线，上线后执行')).toBeVisible()
 
   await row(page, 'build-01').getByRole('button', { name: 'build-01 的更多操作' }).click()

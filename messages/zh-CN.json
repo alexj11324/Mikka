@@ -832,15 +832,15 @@
     "commands": {
       "sent": {
         "redetect": "已让 {name} 重新检测 Agent",
-        "restart": "已让 {name} 重启 daemon",
-        "update": "已让 {name} 更新 daemon"
+        "restart": "已让 {name} 重启连接",
+        "update": "已让 {name} 更新客户端"
       },
       "queued": "{name} 离线，上线后执行"
     },
     "actions": {
       "rename": "重命名",
-      "restart": "重启 daemon",
-      "update": "更新 daemon",
+      "restart": "重启连接",
+      "update": "更新客户端",
       "redetect": "重新检测 Agent",
       "remove": "移除设备"
     },
@@ -887,7 +887,8 @@
       "retry": "重试",
       "done": "完成",
       "cancelled": "已取消"
-    }
+    },
+    "autoScheduleNeedsAllow": "需先开启「允许调度」"
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",

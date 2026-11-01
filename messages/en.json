@@ -832,15 +832,15 @@
     "commands": {
       "sent": {
         "redetect": "Asked {name} to re-detect agents",
-        "restart": "Asked {name} to restart the daemon",
-        "update": "Asked {name} to update the daemon"
+        "restart": "Asked {name} to restart its connection",
+        "update": "Asked {name} to update its client"
       },
       "queued": "{name} is offline; it runs when it reconnects"
     },
     "actions": {
       "rename": "Rename",
-      "restart": "Restart daemon",
-      "update": "Update daemon",
+      "restart": "Restart connection",
+      "update": "Update client",
       "redetect": "Re-detect agents",
       "remove": "Remove device"
     },
@@ -887,7 +887,8 @@
       "retry": "Retry",
       "done": "Done",
       "cancelled": "Cancelled"
-    }
+    },
+    "autoScheduleNeedsAllow": "Turn on Allow scheduling first"
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",

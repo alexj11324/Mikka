@@ -17,6 +17,7 @@ import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
@@ -118,14 +119,18 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
       </span>
     </span>
     {!device.online && <Button variant="secondary" size="sm" onClick={onReconnect}>{t('reconnect')}</Button>}
-    <span className="flex items-center gap-2 text-xs text-muted-foreground">
+    <span className="flex items-center gap-2 text-sm text-muted-foreground">
       <span aria-hidden="true" className="max-sm:hidden">{t('allowScheduling')}</span>
       <Switch checked={device.enabled} aria-label={t('allowSchedulingTo', { name: device.name })} onCheckedChange={enabled => { void run(() => setDeviceEnabled({ deviceId: device.id, enabled })) }} />
     </span>
-    <span className="flex items-center gap-2 text-xs text-muted-foreground">
-      <span aria-hidden="true" className="max-sm:hidden">{t('autoSchedule')}</span>
-      <Switch checked={device.autoSchedule} disabled={!device.enabled} aria-label={t('autoScheduleTo', { name: device.name })} onCheckedChange={autoSchedule => { void run(() => setDeviceAutoSchedule({ deviceId: device.id, autoSchedule })) }} />
-    </span>
+    {/* 自动调度 depends on 允许调度: while that is off this one reads off too, and its tooltip says why it is locked. */}
+    <Tooltip>
+      <TooltipTrigger render={<span className="flex items-center gap-2 text-sm text-muted-foreground" />}>
+        <span aria-hidden="true" className="max-sm:hidden">{t('autoSchedule')}</span>
+        <Switch checked={device.enabled && device.autoSchedule} disabled={!device.enabled} aria-label={t('autoScheduleTo', { name: device.name })} onCheckedChange={autoSchedule => { void run(() => setDeviceAutoSchedule({ deviceId: device.id, autoSchedule })) }} />
+      </TooltipTrigger>
+      {!device.enabled && <TooltipContent>{t('autoScheduleNeedsAllow')}</TooltipContent>}
+    </Tooltip>
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('menu', { name: device.name })} />}><MoreHorizontal data-icon="inline-start" /></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
