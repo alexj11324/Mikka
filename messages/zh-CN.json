@@ -2825,6 +2825,17 @@
       "retry": "订阅暂时不可用",
       "open": "模型与额度"
     },
+    "quota": {
+      "used": "{name} 额度已用完",
+      "usedGeneric": "订阅额度已用完",
+      "resets": "{time} 重置",
+      "next": "下一条改用 {key} API Key（按 token 计费）",
+      "switched": "{name} 额度用完，已改用 {key} API Key 继续（按 token 计费）",
+      "revert": "改回",
+      "addKey": "添加 API Key 继续",
+      "useKey": "用 API Key 继续",
+      "retryAfterReset": "重置后重试"
+    },
     "wakeErrors": {
       "wake_failed": "回复等待重试",
       "wake_start_unconfirmed": "回复启动未确认",

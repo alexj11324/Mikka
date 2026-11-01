@@ -129,11 +129,9 @@ test(
       );
       assert.deepEqual(await settings.fallbacks("alice"), {
         whenDeviceOffline: "wait",
-        whenQuotaExhausted: "stop",
       });
       await settings.setFallbacks("alice", {
         whenDeviceOffline: "cloud",
-        whenQuotaExhausted: "switchAccount",
       });
       assert.equal(
         (await settings.fallbacks("alice")).whenDeviceOffline,

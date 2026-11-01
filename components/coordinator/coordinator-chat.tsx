@@ -43,6 +43,7 @@ import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
 import { subscriptionRefusal } from '@/lib/subscription-refusal'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
+import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { RetryReplyButton } from './retry-reply-button'
 import { FieldError } from '@/components/ui/field'
 
@@ -253,7 +254,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               {unread.divider === item.position && <UnreadDivider />}
               <MessageScrollerItem messageId={String(item.position)} className={cn('[content-visibility:visible]', entering(item) && ENTER)} {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
               {item.from === 'event'
-                ? <p className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">{item.text.replace(/^\[Event\]\s*/, '')}</p>
+                ? item.notice
+                  ? <QuotaSwitchLine notice={item.notice} botId={botId} />
+                  : <p className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
                     {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
@@ -293,7 +296,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
       {refusal && <HostedRefusalNotice code={refusal} retry={retry} />}
-      {declined && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
+      {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
+      {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}
+      {!refusal && (declined === 'quotaUsed' || !data?.error) && <QuotaNotice botId={botId} stopped={declined === 'quotaUsed'}
+        retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
       {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription><AlertAction>{retry}</AlertAction></>}</Alert>}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {sendError && <FieldError className="text-xs">{sendError}</FieldError>}

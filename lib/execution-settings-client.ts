@@ -1,7 +1,7 @@
 /*
  * The settings screen's only door to the execution settings on the server
  * (app/actions/execution-settings.ts): task `defaults` (the label-less rule plus
- * whenDeviceOffline), label rules, and whenQuotaExhausted. Each bot's model is picked in its chat
+ * whenDeviceOffline) and label rules. Each bot's model is picked in its chat
  * (components/coordinator/bot-model-picker.tsx).
  */
 import {
@@ -13,16 +13,14 @@ import type { ExecutionRule } from '@/lib/execution-rules'
 import { initialExecution, retarget, type BotModelRow, type ExecutionChoice, type ExecutionPlace, type RuleHarness } from '@/lib/execution-settings-view'
 
 export type WhenDeviceOffline = 'wait' | 'cloud'
-export type WhenQuotaExhausted = 'stop' | 'switchAccount'
 export interface TaskDefaults extends ExecutionChoice { whenDeviceOffline: WhenDeviceOffline }
 export interface LabelRule extends ExecutionChoice { id: string; label: string; position: number }
-export interface ExecutionSettingsData { defaults: TaskDefaults; rules: LabelRule[]; whenQuotaExhausted: WhenQuotaExhausted }
+export interface ExecutionSettingsData { defaults: TaskDefaults; rules: LabelRule[] }
 
 /** What the server holds. A field it leaves `null` has no saved value yet. */
 export interface StoredExecutionSettings {
   defaults: Partial<ExecutionChoice> & { whenDeviceOffline: WhenDeviceOffline }
   rules: ExecutionRule[]
-  whenQuotaExhausted: WhenQuotaExhausted
 }
 
 /** The server's id for the label-less default rule. */
@@ -39,7 +37,6 @@ export async function readExecutionSettings(): Promise<StoredExecutionSettings> 
   return {
     defaults: { place: concrete(fallback?.place ?? 'auto'), harness: concrete(fallback?.harness ?? 'auto') as RuleHarness | undefined, model: concrete(fallback?.model ?? 'auto'), whenDeviceOffline: fallbacks.whenDeviceOffline },
     rules: rows.filter(rule => rule.label !== null),
-    whenQuotaExhausted: fallbacks.whenQuotaExhausted,
   }
 }
 
@@ -58,7 +55,6 @@ export function executionSettingsView(stored: StoredExecutionSettings, places: r
   return {
     defaults,
     rules: stored.rules.map(rule => ({ ...rule, label: rule.label ?? '', ...fill(rule) })),
-    whenQuotaExhausted: stored.whenQuotaExhausted,
   }
 }
 
@@ -69,8 +65,8 @@ export async function saveDefaultRule(value: ExecutionChoice): Promise<void> {
   await updateExecutionRule(DEFAULT_ID, { label: null, place: value.place, harness: value.harness as RuleHarness, model: value.model })
 }
 
-/** Both fallbacks in one write, from what the screen shows, so one change is one request. */
-export async function saveFallbacks(value: { whenDeviceOffline: WhenDeviceOffline; whenQuotaExhausted: WhenQuotaExhausted }): Promise<void> {
+/** The fallback the screen shows, in one write. */
+export async function saveFallbacks(value: { whenDeviceOffline: WhenDeviceOffline }): Promise<void> {
   await updateExecutionFallbacks(value)
 }
 

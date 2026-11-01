@@ -3,8 +3,6 @@ import assert from "node:assert/strict";
 import { SubscriptionRefusal } from "@mikka/protocol/subscription";
 const id = (n: number) =>
   `10000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-let policy = "stop",
-  candidates: Record<string, string>[] = [];
 const calls: string[] = [];
 mock.module(new URL("./db/index.ts", import.meta.url).href, {
   namedExports: { pool: {} },
@@ -16,22 +14,6 @@ mock.module(new URL("./abuse/resolve.ts", import.meta.url).href, {
     },
   },
 });
-mock.module(new URL("./execution-settings.ts", import.meta.url).href, {
-  namedExports: {
-    ExecutionSettings: class {
-      async fallbacks() {
-        return { whenQuotaExhausted: policy };
-      }
-      async botModels() {
-        return candidates;
-      }
-      async bindingForBot(_scope: unknown, _bot: unknown, binding: string) {
-        return binding;
-      }
-    },
-  },
-});
-
 mock.module(new URL("./model-admission/runtime.ts", import.meta.url).href, {
   namedExports: {
     assertSubscriptionModelTransport: async (scope: { ownerId: string; workspaceId: string }, model: string, route: string) => {
@@ -79,7 +61,7 @@ function fixture(reason = "quota_exhausted") {
   };
   return { service: () => service as never, workspace: async () => {} };
 }
-test("quota stop refuses; explicit switch selects only another account with the same model and route", async () => {
+test("a frozen subscription that runs out stops the turn; it never switches account or model mid-turn", async () => {
   const {freezeHostedModelSelection,resolveFrozenHostedModel}=await import("./subscription-model-snapshot");
   const deps = fixture();
   const runtime = await freezeHostedModelSelection(
@@ -88,41 +70,11 @@ test("quota stop refuses; explicit switch selects only another account with the 
     { type: "subscription", bindingId: id(3) },
     deps,
   );
-  policy = "stop";
   calls.length = 0;
   await assert.rejects(resolveFrozenHostedModel(scope, runtime, deps), {
     code: "quota_exhausted",
   });
   assert.deepEqual(calls, [id(3)]);
-  policy = "switchAccount";
-  candidates = [
-    {
-      bindingId: id(7),
-      connectionId: id(8),
-      modelId: "different-model",
-      route: "claude_cpa",
-    },
-    {
-      bindingId: id(5),
-      connectionId: id(6),
-      modelId: "chosen-model",
-      route: "claude_cpa",
-    },
-  ];
-  calls.length = 0;
-  assert.equal(
-    (
-      (await resolveFrozenHostedModel(scope, runtime, deps)) as {
-        modelId: string;
-      }
-    ).modelId,
-    "chosen-model",
-  );
-  assert.deepEqual(calls, [id(3), id(5)]);
-  candidates = [];
-  await assert.rejects(resolveFrozenHostedModel(scope, runtime, deps), {
-    code: "quota_exhausted",
-  });
   const unavailable = fixture("account_unavailable");
   calls.length = 0;
   await assert.rejects(resolveFrozenHostedModel(scope, runtime, unavailable), {

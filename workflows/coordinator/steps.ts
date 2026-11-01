@@ -114,6 +114,19 @@ export async function appendMessages(userId: string, holder: string, messages: M
   return store.appendMessages(userId, holder, messages, warning, botId, streamId)
 }
 
+/**
+ * 订阅额度用完后，自动改用 API Key: when this turn was frozen on the person's
+ * key because the subscription ran out, the chat says so before the reply.
+ */
+export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string | null = null) {
+  'use step'
+  const { hostedApiKeySnapshotSchema } = await import('@/lib/subscription-model-snapshot')
+  const selection = hostedApiKeySnapshotSchema.safeParse(runtime.modelSelection)
+  if (!selection.success || !selection.data.afterQuota) return
+  const { quotaSwitchMessage } = await import('@/lib/coordinator/message-safety')
+  await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
+}
+
 export async function writeStreamPart(writable: WritableStream<CoordinatorWorkflowStreamPart>, part: CoordinatorWorkflowStreamPart) {
   'use step'
   const writer = writable.getWriter()
