@@ -3224,6 +3224,10 @@
       "noLibrary": "No files yet",
       "noPullRequests": "No PRs yet",
       "noMatches": "No matches",
+      "members": "Members ({count})",
+      "membersLoading": "Members",
+      "membersError": "Members failed to load",
+      "retry": "Retry",
       "prGroup": {
         "review": "Waiting for review ({count})",
         "running": "In progress ({count})",

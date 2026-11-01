@@ -3224,6 +3224,10 @@
       "noLibrary": "还没有资料",
       "noPullRequests": "还没有 PR",
       "noMatches": "无匹配结果",
+      "members": "成员（{count}）",
+      "membersLoading": "成员",
+      "membersError": "成员加载失败",
+      "retry": "重试",
       "prGroup": {
         "review": "等待审查（{count}）",
         "running": "进行中（{count}）",
