@@ -174,3 +174,20 @@ test('scripted Decisions answers an ended run\'s outcome only from the run outco
     assert.equal(evidence.errors.length, 3)
   } finally { await services.close() }
 })
+
+test('scripted Decisions answers a Coordinator reply\'s phone push only from the push contract', async () => {
+  const services = await startMvpServices(0)
+  try {
+    const PUSH_QUESTIONS = [{ type: 'choice', name: 'push', choices: ['decide', 'review', 'finished', 'briefing', 'none'].map(value => ({ value })) }]
+    const evidence = (answers) => `answeredEvents: user_message (attention)\nanswersAMessageFromThePerson: ${answers}\nreply: 已在你选择的电脑上启动线程。`
+    const request = (input, questions = PUSH_QUESTIONS) => ({ model: 'openai/gpt-6-luna-decisions', input, questions })
+    const post = async body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
+    assert.deepEqual((await (await post(request(evidence('yes')))).json()).answers, [{ type: 'choice', name: 'push', choice: 'none' }])
+    for (const invalid of [request('reply: hi'), request([{ role: 'user', content: [{ type: 'input_text', text: evidence('yes') }] }]), request(evidence('yes'), [{ ...PUSH_QUESTIONS[0], choices: PUSH_QUESTIONS[0].choices.slice(1) }])]) {
+      assert.equal((await post(invalid)).status, 500)
+    }
+    const observed = await (await fetch(`${services.origin}/observations`)).json()
+    assert.deepEqual(observed.observations.filter(item => item.kind === 'push-request').map(item => item.answersPerson), ['yes'])
+    assert.equal(observed.errors.length, 3)
+  } finally { await services.close() }
+})
