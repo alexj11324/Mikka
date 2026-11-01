@@ -17,14 +17,16 @@
    decisions. The question names what each product does and recommends one
    option.
 4. Rules already written in `docs/design/decisions/` still apply; research
-   does not override a decision Alex made.
+   does not override a decision Alex made. Check them first. Example: cloud
+   runs use only the person's own E2B API key; without one, runs go to their
+   own computer or server. That is Alex's decision, whatever other products
+   do by default.
 
 ## Applied on 2026-11-01
 
 | Question | Products | Choice |
 | --- | --- | --- |
 | Per-tool approval for plugin write actions | Claude connectors, ChatGPT apps | Write tools get allow / ask / deny; read tools run |
-| Cloud runs without the user's own computer | Devin, Codex cloud, Cursor background agents, Factory | On by default |
 | Concurrent hosted model calls in one workspace | every hosted model product | Allowed, with per-call budget holds and a concurrency cap |
 | Data freshness when a window regains focus | Linear, Slack, GitHub, Vercel | Push first; stale-while-revalidate; never hide content; no third-party checks on focus |
 | Internal terms such as "daemon" in UI copy | Cursor, Linear | Not shown; use the user-facing name |
