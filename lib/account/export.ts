@@ -75,7 +75,7 @@ export async function buildAccountExport(userId: string, now = new Date()) {
     rows('select "providerId" as provider, "createdAt" from account where "userId" = $1 order by "createdAt"', u),
     rows('select "pushDecide", "pushReview", "pushFinished", "pushBriefing", "pushWhen", "memoryEnabled", "updatedAt" from user_preferences where "userId" = $1', u),
     rows('select "timeZone", "updatedAt" from user_time_zones where "userId" = $1', u),
-    rows('select id, "workspaceId", name, color, shape, "createdAt" from bots where "ownerId" = $1 and kind = \'bot\' order by "createdAt"', u),
+    rows('select id, "workspaceId", name, color, shape, "createdAt" from bots where "ownerId" = $1 order by "createdAt"', u),
     rows('select id, name, harness, description, instructions, "createdAt" from agents where "userId" = $1 order by "createdAt"', u),
     rows('select id, "botId", "issueId", kind, status, prompt, "lastReply", "createdAt", "finishedAt" from agent_runs where "userId" = $1 order by "createdAt"', u),
     rows('select "runId", text, "createdAt" from run_messages where "userId" = $1 order by "createdAt"', u),

@@ -16,6 +16,6 @@ export async function groupParticipants(client: PoolClient, conversationId: stri
   const found: GroupParticipant[] = []
   if (agents.length) found.push(...(await client.query<GroupParticipant>(`SELECT id,name,harness,NULL AS "avatarUrl" FROM agents WHERE "userId"=$1 AND id=ANY($2::uuid[])`, [ownerId, agents])).rows)
   if (bots.length) found.push(...(await client.query<GroupParticipant>(`SELECT id,name,'ai_sdk' AS harness,NULL AS "avatarUrl",'bot' AS "memberType",color,shape
-    FROM bots WHERE "ownerId"=$1 AND "workspaceId"=$2 AND kind='bot' AND id=ANY($3::uuid[])`, [ownerId, workspaceId, bots])).rows)
+    FROM bots WHERE "ownerId"=$1 AND "workspaceId"=$2 AND id=ANY($3::uuid[])`, [ownerId, workspaceId, bots])).rows)
   return members.flatMap(member => { const row = found.find(p => p.id === member.memberId && (p.memberType ?? 'agent') === member.memberType); return row ? [row] : [] })
 }

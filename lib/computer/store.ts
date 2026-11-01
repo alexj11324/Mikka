@@ -23,7 +23,7 @@ export class ComputerStore {
     return rows[0]
   }
   async listBots(actor: Actor) {
-    return (await this.pool.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 AND kind=\'bot\' ORDER BY "createdAt"', [actor.workspaceId, actor.userId])).rows
+    return (await this.pool.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 ORDER BY "createdAt"', [actor.workspaceId, actor.userId])).rows
   }
   async policy(workspaceId: string): Promise<ComputerPermission> {
     const row = (await this.pool.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])).rows[0]

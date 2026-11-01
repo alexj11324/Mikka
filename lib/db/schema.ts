@@ -109,11 +109,9 @@ export const bots = pgTable('bots', {
   monthlyCreditLimit: integer('monthlyCreditLimit'),
   /** Set when the owner left or was suspended; the bot stays paused until an admin takes it over (§8.3). */
   archivedAt: timestamp('archivedAt', { withTimezone: true }),
-  /** 'coordinator' is the owner's hidden Coordinator row in this workspace: it owns the Coordinator's cloud runtime and is never listed. */
-  kind: text('kind').$type<'bot' | 'coordinator'>().notNull().default('bot'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`).where(sql`kind = 'bot'`), uniqueIndex('bots_coordinator_key').on(table.ownerId, table.workspaceId).where(sql`kind = 'coordinator'`)])
+}, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
 
 /** Personal execution preferences in the same workspace scope as Bots. The
  * default uses a null label and is stored alongside label rules. */

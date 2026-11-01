@@ -41,7 +41,7 @@ async function requireTransferTarget(tx: WorkspaceTransaction, workspaceId: stri
  */
 export async function transferBots(tx: MainTransaction, workspaceId: string, fromUserId: string, toUserId: string, only?: string[]): Promise<AssetTransfer> {
   const owned = await tx.select({ id: bots.id, name: bots.name }).from(bots)
-    .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, fromUserId), eq(bots.kind, 'bot'), ...(only ? [inArray(bots.id, only)] : []))).for('update')
+    .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, fromUserId), sql`not exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})`, ...(only ? [inArray(bots.id, only)] : []))).for('update')
   if (!owned.length) return { bots: 0 }
   const ids = owned.map(bot => bot.id)
   const [busyRun] = await tx.select({ id: agentRuns.id }).from(agentRuns)
@@ -49,7 +49,7 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
   const busyTask = await tx.execute<{ id: string }>(sql`select id from bot_subagents where "botId" in ${ids} and status in ('queued', 'running', 'needs_you') limit 1`)
   if (busyRun || busyTask.rows.length) throw new WorkspaceError('botTransferBusy')
   const names = owned.map(bot => bot.name.toLowerCase())
-  const clash = await tx.execute<{ id: string }>(sql`select id from bots where "workspaceId" = ${workspaceId} and "ownerId" = ${toUserId} and kind = 'bot' and lower(name) in ${names} limit 1`)
+  const clash = await tx.execute<{ id: string }>(sql`select id from bots where "workspaceId" = ${workspaceId} and "ownerId" = ${toUserId} and lower(name) in ${names} limit 1`)
   if (clash.rows.length) throw new WorkspaceError('botTransferNameConflict')
   await tx.execute(sql`delete from bot_desktops where "botId" in ${ids}`)
   await tx.execute(sql`delete from bot_cloud_runtimes where "botId" in ${ids}`)
@@ -105,7 +105,7 @@ export async function takeOverBot(actorId: string, workspaceId: string, botId: s
 export async function archivedBots(actorId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
   return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, archivedAt: bots.archivedAt })
-    .from(bots).where(and(eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt), eq(bots.kind, 'bot'))).orderBy(bots.name)
+    .from(bots).where(and(eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).orderBy(bots.name)
 }
 
 /** An active admin other than `userId` remains. */

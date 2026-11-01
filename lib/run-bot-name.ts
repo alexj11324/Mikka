@@ -15,12 +15,15 @@ export const runBotName = sql<string>`coalesce(
   ${executionBotName}
 )`
 
-/** The Bot a run belongs to, found the way `runBotName` finds its name; null for the Coordinator's own work, also on its hidden bot's cloud runtime. */
+/** Until the Coordinator's chat moves to its bot row, its threads stay the Coordinator's (null), also on its cloud runtime. */
+const notCoordinator = sql`not exists (select 1 from coordinator_bots cb where cb."botId"=b.id)`
+
+/** The Bot a run belongs to, found the way `runBotName` finds its name; null for the Coordinator's own work. */
 export const runBotId = sql<string | null>`coalesce(
-  (select b.id from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" and b.kind='bot' where crb."runId"=${agentRuns.id}),
-  (select b.id from bots b where b.id=${agentRuns.botId} and b."ownerId"=${agentRuns.userId} and b.kind='bot'),
-  (select b.id from bot_cloud_runtimes bcr join bots b on b.id=bcr."botId" and b."ownerId"=bcr."ownerId" and b.kind='bot'
-    where bcr."agentId"=${agents.id} and bcr."ownerId"=${agents.userId} limit 1)
+  (select b.id from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" where ${notCoordinator} and crb."runId"=${agentRuns.id}),
+  (select b.id from bots b where b.id=${agentRuns.botId} and b."ownerId"=${agentRuns.userId} and ${notCoordinator}),
+  (select b.id from bot_cloud_runtimes bcr join bots b on b.id=bcr."botId" and b."ownerId"=bcr."ownerId"
+    where bcr."agentId"=${agents.id} and bcr."ownerId"=${agents.userId} and ${notCoordinator} limit 1)
 )`
 
 /**

@@ -89,7 +89,7 @@ export interface WorkspaceBotView {
 export async function workspaceBots(workspaceId: string): Promise<WorkspaceBotView[]> {
   const [rows, names] = await Promise.all([
     db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, model: bots.model, repository: bots.repository })
-      .from(bots).where(and(eq(bots.workspaceId, workspaceId), eq(bots.kind, 'bot'))).orderBy(asc(bots.createdAt)),
+      .from(bots).where(eq(bots.workspaceId, workspaceId)).orderBy(asc(bots.createdAt)),
     workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId)),
   ])
   if (!rows.length) return []

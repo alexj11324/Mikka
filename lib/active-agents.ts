@@ -74,7 +74,7 @@ export async function listActiveAgents(database: Database, userId: string, now =
     database.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, startedAt: groupTurns.updatedAt })
       .from(groupTurns)
       .innerJoin(conversations, and(eq(conversations.id, groupTurns.conversationId), eq(conversations.createdBy, userId)))
-      .innerJoin(bots, and(eq(bots.id, groupTurns.botId), eq(bots.ownerId, userId), eq(bots.workspaceId, conversations.workspaceId), eq(bots.kind, 'bot')))
+      .innerJoin(bots, and(eq(bots.id, groupTurns.botId), eq(bots.ownerId, userId), eq(bots.workspaceId, conversations.workspaceId)))
       .where(and(eq(groupTurns.status, 'running'), gt(groupTurns.updatedAt, new Date(now.getTime() - 60_000)), workspaceId ? eq(bots.workspaceId, workspaceId) : undefined)),
   ])
   const list = mergeAgentRuns(rows)

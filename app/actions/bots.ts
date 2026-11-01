@@ -1,7 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
@@ -35,7 +35,7 @@ async function getOwner() {
 export async function listBots(): Promise<BotView[]> {
   const { ownerId, workspaceId } = await getOwner()
   return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots)
-    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId), eq(bots.kind, 'bot'))).orderBy(asc(bots.createdAt))
+    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId), sql`not exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})`)).orderBy(asc(bots.createdAt))
 }
 
 /**

@@ -32,7 +32,7 @@ export async function workspaceUsage(actorId: string, workspaceId: string, month
   const { membership } = await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId))
   const admin = membership.role === 'admin'
   const botRows = await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId }).from(bots)
-    .where(and(eq(bots.workspaceId, workspaceId), eq(bots.kind, 'bot'), admin ? undefined : eq(bots.ownerId, actorId)))
+    .where(and(eq(bots.workspaceId, workspaceId), admin ? undefined : eq(bots.ownerId, actorId)))
   const ids = botRows.map(bot => bot.id)
   // Run time is the part of each run that falls inside the month; a run still going counts up to now.
   const seconds = sql<number>`coalesce(sum(case when ${agentRuns.startedAt} is null then 0 else greatest(0, extract(epoch from (least(coalesce(${agentRuns.finishedAt}, now()), ${end}::timestamptz) - greatest(${agentRuns.startedAt}, ${start}::timestamptz)))) end), 0)::float8`
