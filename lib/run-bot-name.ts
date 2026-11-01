@@ -22,3 +22,9 @@ export const runBotId = sql<string | null>`coalesce(
   (select b.id from bot_cloud_runtimes bcr join bots b on b.id=bcr."botId" and b."ownerId"=bcr."ownerId"
     where bcr."agentId"=${agents.id} and bcr."ownerId"=${agents.userId} limit 1)
 )`
+
+/**
+ * The Agent that executes a run, by product name (Claude Code, Codex, Cursor):
+ * who did the work, as opposed to the Bot that dispatched it (R-78).
+ */
+export const runAgentName = sql<string>`case ${agents.harness} when 'claude_code' then 'Claude Code' when 'codex' then 'Codex' when 'cursor' then 'Cursor' else ${agents.harness} end`

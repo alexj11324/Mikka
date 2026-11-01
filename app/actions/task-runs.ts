@@ -7,7 +7,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { agents, agentRuns, bots, devices, issues, type RunStatus } from '@/lib/db/schema'
 import { reclaimLostRuns } from '@/lib/run-leases'
-import { runBotId, runBotName } from '@/lib/run-bot-name'
+import { runAgentName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
 import { runWaitingDeviceId } from '@/lib/run-waiting-for'
 
@@ -16,6 +16,7 @@ export interface TaskRun {
   issueId: string
   issueTitle: string
   agentId: string
+  /** The Agent running the newest thread (Claude Code, Codex): the desktop notification's line (R-78). */
   agentName: string
   status: RunStatus
   error: string | null
@@ -33,7 +34,7 @@ export async function listTaskRuns(): Promise<TaskRun[]> {
   // (or lands in 等你) even when none of the person's devices is online.
   await reclaimLostRuns(session.user.id).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error))
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
-    issueId: agentRuns.issueId, issueTitle: issues.title, agentId: agentRuns.agentId, agentName: runBotName,
+    issueId: agentRuns.issueId, issueTitle: issues.title, agentId: agentRuns.agentId, agentName: runAgentName,
     status: agentRuns.status, error: agentRuns.error, finishedAt: agentRuns.finishedAt,
     botId: runBotId,
     harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`,
@@ -52,7 +53,7 @@ export interface Thread {
   botId: string | null
   /** 'mcp' when an MCP client dispatched it: not the Coordinator's, though it has no bot either. */
   source: 'mcp' | null
-  /** Who runs it. */
+  /** The Bot that dispatched it; the Agent running it is `harness` (R-78). */
   agentName: string
   issueId: string | null
   prompt: string

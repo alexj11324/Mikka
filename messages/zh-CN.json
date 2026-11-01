@@ -3898,7 +3898,7 @@
     "confirm": "确定",
     "nameReply": "就叫{name}",
     "named": "好的，以后我叫{name}。",
-    "computerAsk": "我可以用一台云电脑来浏览网页、运行代码。现在开通吗？",
+    "computerAsk": "开通云电脑后，我可以浏览网页，线程也能在云端运行。现在开通吗？",
     "computerYes": "开通",
     "computerNo": "暂不开通",
     "computerLater": "好的。之后可以在设置中填写 E2B API Key 开通。",

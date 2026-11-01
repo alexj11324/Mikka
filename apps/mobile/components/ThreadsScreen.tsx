@@ -11,6 +11,7 @@ import type { Thread, Threads } from '@/lib/types'
 import { openChat } from '@/lib/navigate'
 import { useApi, useRefresh } from '@/lib/useApi'
 import { colors, lift } from '@/lib/theme'
+import { HARNESS } from '@/lib/harness'
 
 // 待审阅 and 已归档 (Figma 03b) wait for the server to track reviews and archiving.
 type Filter = 'all' | 'waiting' | 'running' | 'done'
@@ -111,7 +112,7 @@ export function ThreadsScreen({ bot }: { bot?: string }) {
   )
 }
 
-/** Status icon, name, one grey line: bot and machine icon. Only 等你回复 adds a word (mobile.md). */
+/** Status icon, name, one grey line: the Agent running it (R-78) and the machine icon. Only 等你回复 adds a word (mobile.md). */
 function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
@@ -119,7 +120,7 @@ function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => void })
       <View style={{ flex: 1 }}>
         <Text style={styles.rowTitle} numberOfLines={1}>{thread.name}</Text>
         <View style={styles.rowMeta}>
-          <Text style={styles.rowMetaText}>{thread.status === 'waiting' ? '等你回复 · ' : ''}{thread.by}</Text>
+          <Text style={styles.rowMetaText}>{thread.status === 'waiting' ? '等你回复 · ' : ''}{HARNESS[thread.harness] ?? thread.harness}</Text>
           {thread.device ? <MachineIcon machine={thread.device.kind} size={13} /> : null}
         </View>
       </View>

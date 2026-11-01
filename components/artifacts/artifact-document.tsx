@@ -68,7 +68,7 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
   markdown: string
   /** The newer version's text: when given, its changes are marked into this one. */
   compareWith?: string | null
-  author: Pick<ArtifactVersionInfo, 'authorName' | 'authorColor' | 'authorShape'>
+  author: Pick<ArtifactVersionInfo, 'authorName' | 'authorColor' | 'authorShape' | 'authorHarness'>
   /** 「Mikka Frontend · 10月24日 17:20 更新」 */
   meta: string
   /** Texts already quoted from this version, underlined. */

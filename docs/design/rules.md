@@ -237,7 +237,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-53** A thread row has two lines: the thread's title, then the opening of
   its last reply quoted verbatim, cut to one line. No generated description,
   no status word and no bot-name prefix (generating them costs compute).
-- **R-54** The PR tab lists this bot's PRs in groups 等待审查, 进行中, 已合并,
+- **R-54** The PR tab lists the PRs of the threads this bot dispatched, in groups 等待审查, 进行中, 已合并,
   with R-52's header style. Each row is the PR title and its number.
 - **R-55** 建议 is the second rail item. Its page is split 50/50 with a 1px
   divider: on the left the title 「建议」 (24px SemiBold) with a refresh icon,
