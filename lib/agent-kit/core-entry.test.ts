@@ -34,6 +34,7 @@ stub('../../workflows/coordinator/steps.ts',{
   releaseLease:async()=>false,
   preparePrompt:async(...args:unknown[])=>{record('prompt')(...args);return {prompt:'synthetic request'}},
   appendMessages:async(...args:unknown[])=>{record('append')(...args);return 3},
+  noteQuotaSwitch:async(...args:unknown[])=>{record('quotaSwitch')(...args)},
   writeStreamPart:async(...args:unknown[])=>{record('stream')(...args)},
   settleAttention:async()=>{throw new Error('unexpected attention action')},
   telegramReplyThreads:async()=>{throw new Error('unexpected external message')},

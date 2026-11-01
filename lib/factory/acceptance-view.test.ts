@@ -82,3 +82,9 @@ test('the step playing is the last one already reached', async () => {
   assert.equal(activeStep(steps, 600), 1)
   assert.equal(activeStep(steps, 5000), 2)
 })
+
+test('steps that share a second show tenths; the others show whole seconds', async () => {
+  const { stepTime } = await import('./evidence-view')
+  const steps = [{ atMs: 0 }, { atMs: 1200 }, { atMs: 1700 }, { atMs: 65_000 }]
+  assert.deepEqual(steps.map((_, position) => stepTime(steps, position)), ['0:00', '0:01.2', '0:01.7', '1:05'])
+})

@@ -47,3 +47,5 @@ export function openSecret(sealed: Sealed, aad: string, env?: Record<string, str
 export const secretAad = (row: { workspaceId: string; kind: string; scopeType: string; scopeRef: string; name: string }) =>
   ['workspace_secret', row.workspaceId.toLowerCase(), row.kind, row.scopeType, row.scopeRef, row.name].join('\u0000')
 export const e2bKeyAad = (workspaceId: string) => ['workspace_e2b_key', workspaceId.toLowerCase()].join('\u0000')
+/** A person's own E2B key: bound to their user id, so it cannot be moved to anyone else's row. */
+export const userE2bKeyAad = (userId: string) => ['user_e2b_key', userId].join('\u0000')

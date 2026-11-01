@@ -1,6 +1,6 @@
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { runPatchSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
@@ -42,7 +42,8 @@ async function handlePATCH(request: Request, { params }: { params: Promise<{ run
       ...(patch.error !== undefined ? { error: patch.error } : {}),
       updatedAt: new Date(),
     })
-    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATES, 'paused'])))
+    // A run paused on its quota has ended on the daemon; a late patch does not move it.
+    .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...LIVE_STATES, 'paused']), or(isNull(agentRuns.pauseReason), ne(agentRuns.pauseReason, 'quota_exhausted'))))
   return new NextResponse(null, { status: 204 })
 }
 

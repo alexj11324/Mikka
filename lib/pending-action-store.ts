@@ -10,6 +10,7 @@ import { taskDestinationSchema } from './task-destination'
 import { repositoryPushApproved } from '@/lib/run-publication-policy'
 import { actionOutcome, calendarEventSummary, PENDING_ACTION_TTL_MS, type PendingActionView } from '@/lib/pending-action-view'
 import { prepareRepositoryApproval, validateRepositoryApproval } from '@/lib/repository-approval-proposal'
+import { PULL_REQUEST_APPROVAL, pullRequestApprovalInput } from '@/lib/github/pull-request-approval'
 
 /** Most proposals one person can have waiting at once. */
 const MAX_PENDING = 20
@@ -137,6 +138,7 @@ export async function listPendingActions(userId: string): Promise<PendingActionV
       return [{ id: row.id, action: row.action, input: { summary: row.input.summary, origin: row.input.origin, operation: row.input.operation, description: row.action === 'credential_operation' ? 'The page stays hidden until entered login fields are absent. This does not confirm authentication.' : undefined }, context: null, status: row.status, createdAt: row.createdAt.toISOString() }]
     }
     if (row.action === APP_TOOL_ACTION) return appToolCallSchema.safeParse(row.input).success ? [{ id: row.id, action: APP_TOOL_ACTION, input: row.input, context: null, status: row.status, createdAt: row.createdAt.toISOString() }] : []
+    if (row.action === PULL_REQUEST_APPROVAL) return pullRequestApprovalInput.safeParse(row.input).success ? [{ id: row.id, action: PULL_REQUEST_APPROVAL, input: row.input, context: null, status: row.status, createdAt: row.createdAt.toISOString() }] : []
     if (!isApprovalAction(row.action) && !(row.action === 'approve_repository_push' && validateRepositoryApproval(row.input))) return []
     return [{ id: row.id, action: row.action as PendingActionView['action'], input: row.input, context: row.context as PendingActionView['context'], status: row.status, createdAt: row.createdAt.toISOString() }]
   })

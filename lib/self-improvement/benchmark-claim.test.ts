@@ -28,6 +28,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     // the actual route/fence and token revocation have real PostgreSQL tests.
     '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,scope:'personal',content:{type:'doc'}}}},
     '@/lib/device-route':{withDeviceRoute:<T>(handler:T)=>handler},
+    '@/lib/cloud-computer-flag':{cloudComputerTasksEnabled:()=>true},
     'next/server':{after:()=>{calls.push('wakeScheduled')},NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
     '@mikka/protocol/device':deviceProtocol,

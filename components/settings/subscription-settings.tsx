@@ -16,7 +16,7 @@ import { BotAvatar } from '@/components/nav/bot-avatar'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
-import { InvalidAuthorization, parseSubscriptionStart, subscriptionListSchema, subscriptionUsageSchema, type SubscriptionUsageView } from '@/lib/subscription-ui'
+import { InvalidAuthorization, parseSubscriptionStart, planName, subscriptionListSchema, subscriptionUsageSchema, type SubscriptionUsageView } from '@/lib/subscription-ui'
 import { cn } from '@/lib/utils'
 
 type Provider = 'codex' | 'claude'
@@ -230,14 +230,14 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
                 const paused = connection.paused === true
                 const healthy = live && !reauth && !refused && !paused
                 const account = read?.account ?? connection.account ?? null
-                const plan = read?.plan ? t('codexPlan', { plan: read.plan }) : null
-                const product = provider === 'codex' ? plan ?? t('codexProduct') : read?.plan ? t('claudePlan', { plan: read.plan }) : t('claudeProduct')
+                const plan = read?.plan ? planName(read.plan) : null
+                const product = plan ? t(provider === 'codex' ? 'codexPlan' : 'claudePlan', { plan }) : t(provider === 'codex' ? 'codexProduct' : 'claudeProduct')
                 const bots = connection.bots ?? []
                 const signingIn = starting?.id === connection.id || attempt?.connectionId === connection.id
                 const canReconnect = available && !pending && !attempt
                 return <div key={connection.id} className="flex flex-col gap-3 px-5 py-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-3">
+                    <div className={cn('flex min-w-0 items-center gap-3 transition-opacity duration-150', paused && 'opacity-50')}>
                       <Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />
                       <div className="flex min-w-0 flex-col">
                         <span className="truncate text-sm font-medium">{account ?? product}</span>
@@ -245,10 +245,11 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:justify-end">
-                      <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
-                        <span aria-hidden="true" className={cn('size-1.5 rounded-full', healthy ? 'bg-success' : reauth || (refused && !paused) ? 'bg-warning' : 'bg-muted-foreground')} />
-                        {reauth ? t('reauth') : paused ? t('paused') : refused ? t('notInUse') : live ? t('connected') : t('notConnected')}
-                      </span>
+                      {/* A healthy row's switch already says it is on; the label speaks only for other states. */}
+                      {!healthy && <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
+                        {(reauth || (refused && !paused)) && <span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />}
+                        {reauth ? t('reauth') : paused ? t('paused') : refused ? t('notInUse') : t('notConnected')}
+                      </span>}
                       {mine?.connectionId === connection.id && catching && <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>{t('cancel')}</Button>}
                       {(reauth || !live || signingIn) && <SignInButton busy={signingIn} disabled={!canReconnect} label={t('reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection) }} />}
                       {live && !reauth && !signingIn && <Switch checked={!paused} disabled={pending || !!attempt} aria-label={t('useSubscription', { label: account ?? product })} onCheckedChange={checked => { void setPaused(connection, !checked) }} />}
@@ -264,7 +265,7 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
                       </DropdownMenu>
                     </div>
                   </div>
-                  {(live || reauth) && <div className="flex flex-col gap-2 sm:pl-8">
+                  {(live || reauth) && <div className={cn('flex flex-col gap-2 transition-opacity duration-150 sm:pl-8', paused && 'opacity-50')}>
                     {refused && <p className="text-xs text-foreground">{read?.status === 'unverified' ? t('extraUsageUnverified') : provider === 'claude' ? `${t('extraUsageOn')} · ${t('extraUsageClaudeFix')}` : t('extraUsageOn')}</p>}
                     {failed
                       ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={() => { void loadUsage(true) }}>{t('retry')}</Button></span>

@@ -1,4 +1,4 @@
-import { modelMessage, summaryMessage, type SourcedMessage, type SummaryTrust } from './message-safety'
+import { modelMessage, summaryMessage, type QuotaSwitchNotice, type SourcedMessage, type SummaryTrust } from './message-safety'
 import { pruneMessages, type ModelMessage } from 'ai'
 import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from '@/lib/attention/handoff'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
@@ -132,6 +132,24 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         `[Event] Run ${event.runId} lost its machine (the device went offline or its cloud sandbox is gone), so it was ${movedToText(payload)} as run ${payload.retryRunId}, attempt ${payload.attempt} of ${payload.maxAttempts}.`,
         event.issueId ? `Issue: ${event.issueId}.` : null,
         'Nothing to do; follow the new run.',
+        note,
+      ].filter(Boolean).join('\n')
+    case 'run_credential_switched': {
+      const to = payload.to as { provider?: string; last4?: string; model?: string } | undefined
+      return [
+        `[Event] Run ${event.runId} used up its ${(payload.from as { provider?: string } | undefined)?.provider ?? ''} subscription's quota, so it goes on as run ${payload.retryRunId} on the person's ${to?.provider ?? ''} API key ending ${to?.last4 ?? ''} (model ${to?.model ?? ''}), which is billed per use.`,
+        payload.resetsAt ? `The subscription's quota resets at ${payload.resetsAt}.` : null,
+        event.issueId ? `Issue: ${event.issueId}.` : null,
+        'The person sees this as a card. Follow the new run.',
+        note,
+      ].filter(Boolean).join('\n')
+    }
+    case 'run_quota_paused':
+      return [
+        `[Event] Run ${event.runId} is paused: its ${payload.provider} subscription's quota ran out${payload.why === 'noApiKey' ? ' and the person has no API key for it' : ' and the person turned off switching to an API key'}.`,
+        payload.resetsAt ? `The quota resets at ${payload.resetsAt}.` : 'The CLI did not say when the quota resets.',
+        event.issueId ? `Issue: ${event.issueId}.` : null,
+        'The person sees this as a card with what they can do (add an API key, or retry after the reset). Do not dispatch it again yourself.',
         note,
       ].filter(Boolean).join('\n')
     case 'run_dispatch_failed':
@@ -281,6 +299,8 @@ export interface ChatItem {
   images?: number
   /** Artifacts shown as cards under this entry, in order. */
   artifacts: string[]
+  /** An event line the chat draws in the person's language: the turn moved to their API key after the subscription ran out. */
+  notice?: QuotaSwitchNotice
 }
 
 /** The run id a successful local or Bot-computer dispatch carries. */
@@ -350,7 +370,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       flush()
       const base = { ...(id ? { id } : {}), position, tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], ...(pending ? { pending } : {}) }
       // The triage line is for the Coordinator, not the person.
-      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n') })
+      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n'), ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : {}) })
       else {
         const { quote, text: unquoted } = splitQuote(raw)
         const { notes, text: rest } = splitBrowserNotes(unquoted)

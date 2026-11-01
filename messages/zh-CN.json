@@ -768,7 +768,7 @@
     "connect": {
       "trigger": "连接设备",
       "title": "添加设备",
-      "description": "一台你能 ssh 进去的机器。Mikka 会在上面安装并启动 daemon，然后把它检测到的 Agent 带回来。",
+      "description": "一台你能 ssh 进去的机器。Mikka 会在上面安装并启动 Mikka 客户端，然后把它检测到的 Agent 带回来。",
       "host": "主机",
       "hostPlaceholder": "ssh 主机、主机名或 IP[:端口]",
       "actAs": "以谁的身份",
@@ -778,7 +778,7 @@
       "manualToken": "改用手动 token",
       "connect": "连接",
       "connectingHost": "正在连接 {host}",
-      "progressDescription": "在这台机器上安装并启动 daemon，然后把它的心跳接回来。",
+      "progressDescription": "在这台机器上安装并启动 Mikka 客户端，然后等它连上。",
       "interrupted": "连接中断。",
       "tokenFailed": "生成 token 失败，请重试。",
       "done": "完成",
@@ -800,18 +800,18 @@
       },
       "manual": {
         "loginComment": "# 1. 在这台机器上登录（token 只显示这一次）",
-        "startComment": "# 2. 启动 daemon：它会上报本机装好的 Agent"
+        "startComment": "# 2. 启动 Mikka 客户端：它会上报本机装好的 Agent"
       },
       "sshExitCode": "ssh 退出码 {code}",
       "noNode": "这台机器上没有 node",
       "noPnpm": "这台机器上没有 pnpm",
-      "copyDaemon": "复制 daemon 到 ~/.mikka",
+      "copyDaemon": "复制 Mikka 客户端到 ~/.mikka",
       "rsyncExitCode": "rsync 退出码 {code}",
       "installExitCode": "pnpm install 退出码 {code}",
       "depsInstalled": "依赖已安装",
       "startExitCode": "启动失败，退出码 {code}",
-      "daemonRunning": "daemon 已在后台运行",
-      "heartbeatTimeout": "等待心跳超时，请查看 ~/.mikka/daemon.log",
+      "daemonRunning": "Mikka 客户端已在后台运行",
+      "heartbeatTimeout": "Mikka 客户端没有连上，日志在 ~/.mikka/daemon.log",
       "connectionError": "连接过程出错",
       "commands": {
         "install": "1 安装",
@@ -833,15 +833,15 @@
     "commands": {
       "sent": {
         "redetect": "已让 {name} 重新检测 Agent",
-        "restart": "已让 {name} 重启 daemon",
-        "update": "已让 {name} 更新 daemon"
+        "restart": "已让 {name} 重启 Mikka 客户端",
+        "update": "已让 {name} 更新 Mikka 客户端"
       },
       "queued": "{name} 离线，上线后执行"
     },
     "actions": {
       "rename": "重命名",
-      "restart": "重启 daemon",
-      "update": "更新 daemon",
+      "restart": "重启 Mikka 客户端",
+      "update": "更新 Mikka 客户端",
       "redetect": "重新检测 Agent",
       "remove": "移除设备"
     },
@@ -855,9 +855,9 @@
       "title": "移除「{name}」？",
       "cancel": "取消",
       "confirm": "移除",
-      "uninstall": "也会卸载 {name} 上的 daemon，它的凭证立即失效。",
-      "offline": "{name} 离线，没法卸载上面的 daemon；它的凭证立即失效，不再接任务。",
-      "uninstalling": "正在卸载 {name} 上的 daemon"
+      "uninstall": "也会卸载 {name} 上的 Mikka 客户端，它的凭证立即失效。",
+      "offline": "{name} 离线，没法卸载上面的 Mikka 客户端；它的凭证立即失效，不再接任务。",
+      "uninstalling": "正在卸载 {name} 上的 Mikka 客户端"
     },
     "ssh": {
       "title": "添加设备",
@@ -874,7 +874,7 @@
       "progress": "安装进度",
       "steps": {
         "connect": "连接",
-        "install": "安装 daemon",
+        "install": "安装 Mikka 客户端",
         "start": "启动",
         "online": "已上线"
       },
@@ -1904,11 +1904,36 @@
       "githubRepositoryList": "你已授权的 GitHub 仓库",
       "githubLink": "关联 GitHub",
       "githubAuthorize": "授权仓库",
-      "githubManage": "管理授权",
+      "githubManage": "在 GitHub 上管理",
       "githubLoadFailed": "无法读取 GitHub 授权，请刷新重试。",
       "githubReconnectRequired": "GitHub 授权已失效，请重新关联。",
-      "githubLinkFailed": "无法关联 GitHub",
+      "githubLinkFailed": "GitHub 授权没有完成，账号未关联。",
+      "githubLinkCancelled": "GitHub 授权已取消，账号未关联。",
+      "githubLinkAccountChanged": "授权期间切换了 Mikka 账号，GitHub 未关联。",
       "githubDisconnectFailed": "无法断开 GitHub",
+      "githubDescription": "Agent 在你授权的仓库里读代码、推送分支、开 Pull Request，并读取 Issue 和 CI 检查。",
+      "githubConnectionHeading": "连接",
+      "githubDisconnect": "断开",
+      "githubRepositoryAccess": "仓库访问",
+      "githubRepositoriesDialog": "已授权的仓库",
+      "githubRepositorySearch": "搜索仓库",
+      "githubAbilitiesHeading": "能力",
+      "githubAbilitiesSummary": "包含 {count} 个能力（{write} 个写入，{read} 个读取）",
+      "githubPermission": {
+        "allow": "允许",
+        "ask": "询问",
+        "deny": "拒绝"
+      },
+      "githubPermissionFailed": "无法保存",
+      "githubPrivate": "私有",
+      "githubTool": {
+        "push": "推送分支",
+        "pullRequest": "创建 Pull Request",
+        "readCode": "读取代码",
+        "readPullRequest": "读取 Pull Request",
+        "readIssue": "读取 Issue",
+        "readChecks": "读取 CI 检查"
+      },
       "githubLogin": "@{login}",
       "gmail": "Gmail",
       "googlecalendar": "Google 日历",
@@ -2768,6 +2793,10 @@
       "pushToOrigin": "向此仓库的 origin 推送",
       "approvePush": "允许推送",
       "pushApproved": "已允许推送仓库",
+      "approve_pull_request": "创建 Pull Request",
+      "branch": "分支",
+      "approvePullRequest": "创建",
+      "pullRequestApproved": "已允许创建 Pull Request",
       "send_email": "发送邮件",
       "create_calendar_event": "新建日程",
       "update_calendar_event": "修改日程",
@@ -2825,6 +2854,18 @@
       "retry": "订阅暂时不可用",
       "open": "模型与额度"
     },
+    "quota": {
+      "used": "{name} 额度已用完",
+      "usedGeneric": "订阅额度已用完",
+      "resets": "{time} 重置",
+      "next": "下一条改用 {key} API Key（按 token 计费）",
+      "switched": "{name} 额度用完，已改用 {key} API Key 继续（按 token 计费）",
+      "revert": "改回",
+      "addKey": "添加 API Key 继续",
+      "useKey": "用 API Key 继续",
+      "retryAfterReset": "重置后重试",
+      "continueFailed": "未能继续"
+    },
     "wakeErrors": {
       "wake_failed": "回复等待重试",
       "wake_start_unconfirmed": "回复启动未确认",
@@ -2851,7 +2892,8 @@
         "succeeded": "已完成",
         "stopped": "已停止",
         "failed": "失败",
-        "cancelled": "已取消"
+        "cancelled": "已取消",
+        "paused": "已暂停"
       },
       "sources": "{count} 个来源"
     },
@@ -3630,7 +3672,7 @@
     "approving": "正在批准…",
     "approved": "已批准",
     "denied": "已拒绝",
-    "returnToTerminal": "回到终端启动 daemon",
+    "returnToTerminal": "回到终端启动 Mikka 客户端",
     "done": "完成",
     "invalid": "验证码无效或已过期",
     "failed": "连接失败",
@@ -3998,7 +4040,6 @@
     "computerYes": "开通",
     "computerNo": "暂不开通",
     "computerLater": "好的。之后可以在设置中填写 E2B API Key 开通。",
-    "computerMember": "工作区管理员在设置中填写 E2B API Key 后，我就能用云电脑了。",
     "keyLabel": "E2B API Key",
     "keyLink": "去 E2B 拿 Key",
     "keyConnect": "连接",

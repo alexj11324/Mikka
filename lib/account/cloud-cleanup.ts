@@ -7,24 +7,25 @@ export interface AccountCloudProvider {
   deleteSnapshot(workspaceId: string, snapshotId: string): Promise<void>
   endRuns(userId: string, runIds: string[]): Promise<void>
 }
-const provider: AccountCloudProvider = {
-  async kill(workspaceId, sandboxId) {
+/** Everything cleaned up here is the owner's, on the owner's own E2B key (orchestration § 2). */
+const ownerProvider = (ownerId: string): AccountCloudProvider => ({
+  async kill(_workspaceId, sandboxId) {
     const { Sandbox } = await import('e2b')
     const { e2bApiKey } = await import('@/lib/secrets/e2b-runtime')
-    await Sandbox.kill(sandboxId, { apiKey: await e2bApiKey(workspaceId, 'Cloud cleanup unavailable'), requestTimeoutMs: 20_000 })
+    await Sandbox.kill(sandboxId, { apiKey: await e2bApiKey(ownerId, 'Cloud cleanup unavailable'), requestTimeoutMs: 20_000 })
   },
-  async snapshots(workspaceId, sandboxId) {
+  async snapshots(_workspaceId, sandboxId) {
     const { Sandbox } = await import('e2b')
     const { e2bApiKey } = await import('@/lib/secrets/e2b-runtime')
-    const options = { apiKey: await e2bApiKey(workspaceId, 'Cloud cleanup unavailable'), requestTimeoutMs: 20_000 }
+    const options = { apiKey: await e2bApiKey(ownerId, 'Cloud cleanup unavailable'), requestTimeoutMs: 20_000 }
     const pages = Sandbox.listSnapshots({ ...options, sandboxId }), ids: string[] = []
     while (pages.hasNext) ids.push(...(await pages.nextItems(options)).map(row => row.snapshotId))
     return ids
   },
-  async deleteSnapshot(workspaceId, snapshotId) {
+  async deleteSnapshot(_workspaceId, snapshotId) {
     const { Sandbox } = await import('e2b')
     const { e2bApiKey } = await import('@/lib/secrets/e2b-runtime')
-    await Sandbox.deleteSnapshot(snapshotId, { apiKey: await e2bApiKey(workspaceId, 'Cloud cleanup unavailable'), requestTimeoutMs: 20_000 })
+    await Sandbox.deleteSnapshot(snapshotId, { apiKey: await e2bApiKey(ownerId, 'Cloud cleanup unavailable'), requestTimeoutMs: 20_000 })
   },
   async endRuns(userId, runIds) {
     if (!runIds.length) return
@@ -33,10 +34,10 @@ const provider: AccountCloudProvider = {
     const { screenCaptures } = await import('@/lib/captures/screen')
     await screenCaptures.stopRunRecordings(runIds)
   },
-}
+})
 
 /** Main Bot computers are keyed by workspace AND owner (20261029080001), never workspace alone. */
-export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool, runtime = provider): Promise<string[]> {
+export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool, runtime = ownerProvider(ownerId)): Promise<string[]> {
   const reasons = new Set<string>()
   const machines = (await database.query<{ workspaceId: string }>('SELECT "workspaceId" FROM cloud_machines WHERE "ownerId"=$1 ORDER BY "workspaceId"', [ownerId])).rows
   for (const machine of machines) {

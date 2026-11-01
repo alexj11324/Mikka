@@ -107,8 +107,12 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     const c = await person('cloud')
     const { botId } = await cloudReady(c)
     await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), c.id, c.workspaceId])
-    // The Coordinator has no cloud runtime of its own and never borrows a bot's.
-    const coordinator = await dispatch(c.id, c.issueId) as unknown as NoMachine
+    // The Coordinator uses its own hidden bot's runtime and never borrows a bot's. Here E2B
+    // refuses to wake that hidden bot's desktop, so it gets the card.
+    const { botRuntimeProvisioner } = await import('../lib/computer/auto-runtime')
+    const provision = botRuntimeProvisioner.provision
+    botRuntimeProvisioner.provision = async () => { throw new Error('E2B refused') }
+    const coordinator = await dispatch(c.id, c.issueId).finally(() => { botRuntimeProvisioner.provision = provision }) as unknown as NoMachine
     assert.equal(coordinator.error, 'machineUnavailable')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [c.id])).rows[0].n, 0, 'no cloud run on the bot computer')
     const refused = await dispatch(c.id, c.issueId, botId) as unknown as NoMachine

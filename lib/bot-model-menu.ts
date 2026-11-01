@@ -1,10 +1,12 @@
 import "server-only";
 import type { Pool } from "pg";
-import { quotaWindowSchema } from "@mikka/protocol";
 import { z } from "zod";
 import { ActionFailureError } from "./action-error";
 import type { ExecutionSettings, ExecutionSettingsScope } from "./execution-settings";
 import { apiKeyChatBaseUrl } from "./model-api-key-providers";
+import { quotaExhausted, quotaResetsAt } from "./subscription-quota";
+
+export { quotaExhausted } from "./subscription-quota";
 import {
   apiKeyOptionId,
   HOSTED_CHOICE,
@@ -27,18 +29,6 @@ export async function botModelScope(ownerId: string, botId: string | null, onlyW
 }
 
 const HOSTED = { id: HOSTED_CHOICE, modelId: "", provider: "mikka" } as const;
-
-/** A subscription is out of quota while an account-wide window is fully used and has not reset. */
-export function quotaExhausted(quota: unknown, now = Date.now()) {
-  const parsed = z.object({ windows: z.array(quotaWindowSchema) }).safeParse(quota);
-  if (!parsed.success) return false;
-  return parsed.data.windows.some(
-    (window) =>
-      !window.model &&
-      window.used >= 1 &&
-      (!window.resetsAt || !(Date.parse(window.resetsAt) <= now)),
-  );
-}
 
 /**
  * The composer's model menu for one bot, or the Coordinator (`botId` null),
@@ -117,13 +107,15 @@ export async function botModelMenu(
     const option = rows.find(
       (item) => item.connectionId === row.connectionId && item.modelId === row.modelId,
     );
+    const exhausted = quotaExhausted(quota, now);
     return {
       id: option?.bindingId ?? row.bindingId,
       modelId: row.modelId,
       provider: row.provider,
       kind: "subscription",
       chosen,
-      available: !quotaExhausted(quota, now),
+      available: !exhausted,
+      ...(exhausted ? { quota: { subscription: row.provider, plan: (row as { plan?: string | null }).plan ?? null, resetsAt: quotaResetsAt(quota, now), fallback: null } } : {}),
     };
   };
 
@@ -169,6 +161,16 @@ export async function botModelMenu(
     current = first
       ? fromRow(first, false, quotas.get(String(first.connectionId)))
       : { ...HOSTED, kind: "hosted", chosen: false, available: true };
+  }
+  // Out of quota: the key the next turn moves to, when 订阅额度用完后，自动改用 API Key allows it (freezeBotModel decides the same way).
+  if (current.quota) {
+    const { quotaFallbackKey } = await import("./quota-fallback");
+    const fallback = await quotaFallbackKey(pool, scope.ownerId, scope.workspaceId, current.modelId);
+    if (fallback) {
+      current.quota.fallback = { keyProvider: fallback.key.provider, keyName: fallback.key.name, model: fallback.model };
+      // The chip names what the next turn runs on: the key's model, as freezeBotModel freezes it.
+      current = { ...current, id: apiKeyOptionId(fallback.key.id, fallback.model), modelId: fallback.model, provider: fallback.key.provider, kind: "apiKey", available: true };
+    }
   }
   return { groups, current };
 }

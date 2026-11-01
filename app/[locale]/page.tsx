@@ -13,12 +13,12 @@ import { onboardingDone } from '@/lib/onboarding'
 import { byoE2BKeyEnabled, getE2BKeyStatus } from '@/lib/secrets/e2b'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 
-/** Whether the guide asks about the cloud computer: only when the workspace runs on its own E2B key and has none yet. */
+/** Whether the guide asks about the cloud computer: only while the person has no E2B key of their own (keys are personal). */
 async function onboardingComputer(): Promise<OnboardingComputer> {
   if (!byoE2BKeyEnabled()) return 'none'
   const actor = await currentWorkspaceActor()
   if ((await getE2BKeyStatus(actor.userId, actor.workspaceId)).configured) return 'none'
-  return actor.role === 'admin' ? 'ask' : 'member'
+  return 'ask'
 }
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ acceptance?: string; issue?: string; section?: string; app?: string; settings?: string; google?: string }> }) {

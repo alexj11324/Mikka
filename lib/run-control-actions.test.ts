@@ -126,6 +126,8 @@ before(async () => {
   mock.module('@/lib/ssh', { namedExports: { listSshHosts: () => { throw new Error('SSH outside test') } } })
   mock.module('@/lib/device-link', { namedExports: { DEVICE_ONLINE_WINDOW_MS: 0, hashDeviceToken: () => { throw new Error('device credentials outside test') }, newDeviceToken: () => { throw new Error('device credentials outside test') }, issueDeviceToken: () => { throw new Error('device credentials outside test') } } })
   mock.module('@/lib/coordinator/store', { namedExports: { citationSources: () => { throw new Error('citations outside test') } } })
+  // The thread's quota view (lib/run-quota-view.ts) is covered against real Postgres in tests/run-quota.db.test.ts.
+  mock.module('@/lib/run-quota-view', { namedExports: { threadQuotaView: async () => ({ switched: [], paused: null }) } })
   actions = await import('../app/actions/agents')
 })
 const rejected = (code: string) => (error: unknown) => error instanceof ActionFailureError && error.code === code
