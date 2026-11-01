@@ -198,7 +198,6 @@
     "signIn": "Sign in",
     "createAccount": "Create account",
     "addAccountTitle": "Add an account",
-    "addAccountDescription": "Sign in or create another Mikka account while keeping your current account available to switch back to.",
     "returnToCurrentAccount": "Cancel and return to current account",
     "addAccountLabel": "Add an account",
     "signUpLabel": "Create account",
@@ -207,15 +206,9 @@
     "home": "Mikka home",
     "createTitle": "Create your work account",
     "welcome": "Sign in to Mikka",
-    "createDescription": "Start with your first task and turn ideas into traceable progress.",
-    "welcomeDescription": "Sign in to Mikka and continue with your tasks and documents.",
     "continueGoogle": "Continue with Google",
     "googleLinkHint": "If this email already has a Mikka account, sign in with your password and link Google under Settings → Account.",
-    "googleNotConfigured": "Google sign-in is not configured yet. Continue with email.",
-    "viewGoogleCallback": "View the Google OAuth callback URL",
     "continueGithub": "Continue with GitHub",
-    "githubNotConfigured": "GitHub sign-in is not configured yet. Continue with email.",
-    "viewCallback": "View the GitHub App callback URL",
     "orEmail": "or",
     "name": "Name",
     "namePlaceholder": "What should we call you?",
@@ -274,7 +267,12 @@
       "turnstileFailed": "Human verification failed",
       "turnstileUnavailable": "Human verification is unavailable. Please try again later.",
       "emailRegistered": "This email is already registered. Please sign in."
-    }
+    },
+    "nameRequired": "Name is required",
+    "emailRequired": "Email is required",
+    "emailInvalid": "Enter a valid email address",
+    "passwordRequired": "Password is required",
+    "passwordTooShort": "Password must be at least 8 characters"
   },
   "Metadata": {
     "title": "Mikka · Tasks and documents workspace",

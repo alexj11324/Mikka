@@ -6,7 +6,9 @@ import { Link } from '@/i18n/navigation'
 import { buttonVariants } from '@/components/ui/button'
 import { AuthLogo } from './auth-logo'
 
-export function Auth({ registering = false, addAccount = false, children, next = '/', label }: { registering?: boolean; addAccount?: boolean; children: ReactNode; next?: string; label?: string }) {
+// switchInCard: the sign-in / sign-up card carries its own switch link at the
+// bottom, so the header leaves it out instead of repeating it (R-32).
+export function Auth({ registering = false, addAccount = false, switchInCard = false, children, next = '/', label }: { registering?: boolean; addAccount?: boolean; switchInCard?: boolean; children: ReactNode; next?: string; label?: string }) {
   const t = useTranslations('Auth')
   function authHref(path: string) {
     const params = new URLSearchParams()
@@ -20,7 +22,7 @@ export function Auth({ registering = false, addAccount = false, children, next =
       <header className="flex items-center justify-between gap-4 px-5 py-5 sm:px-8 sm:py-6 lg:px-10">
         <AuthLogo />
         <div className="flex items-center gap-2 text-base">
-          {addAccount ? <Link href={next} className={buttonVariants({ variant: 'link', className: 'text-base' })}>{t('returnToCurrentAccount')}</Link> : <>
+          {addAccount ? <Link href={next} className={buttonVariants({ variant: 'link', className: 'text-base' })}>{t('returnToCurrentAccount')}</Link> : !switchInCard && <>
             <span className="text-muted-foreground hidden sm:inline">{registering ? t('haveAccount') : t('noAccount')}</span>
             <Link href={authHref(registering ? '/sign-in' : '/sign-up')} className={buttonVariants({ variant: 'link', className: 'text-base' })}>
               {registering ? t('signIn') : t('createAccount')}

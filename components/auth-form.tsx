@@ -45,7 +45,7 @@ function rememberDesktopState(state: string, verifier: string): void {
   }
 }
 
-export function AuthForm({ mode, addAccount = false, googleEnabled = false, githubEnabled = false, oauthFailed = false, oauthAccountNotLinked, continueGoogle = false, continueGitHub = false, continueComposio = false, googleCallbackURL, githubCallbackURL, testWorkspaceEnabled = false, emailEnabled = true, next, continueURL, desktopFlow = null }: { mode: 'sign-in' | 'sign-up'; addAccount?: boolean; googleEnabled?: boolean; githubEnabled?: boolean; oauthFailed?: boolean; oauthAccountNotLinked?: 'google' | 'github' | null; continueGoogle?: boolean; continueGitHub?: boolean; continueComposio?: boolean; googleCallbackURL?: string; githubCallbackURL?: string; testWorkspaceEnabled?: boolean; emailEnabled?: boolean; next?: string; continueURL?: string; desktopFlow?: DesktopFlow | null }) {
+export function AuthForm({ mode, addAccount = false, googleEnabled = false, githubEnabled = false, oauthFailed = false, oauthAccountNotLinked, continueGoogle = false, continueGitHub = false, continueComposio = false, testWorkspaceEnabled = false, emailEnabled = true, next, continueURL, desktopFlow = null }: { mode: 'sign-in' | 'sign-up'; addAccount?: boolean; googleEnabled?: boolean; githubEnabled?: boolean; oauthFailed?: boolean; oauthAccountNotLinked?: 'google' | 'github' | null; continueGoogle?: boolean; continueGitHub?: boolean; continueComposio?: boolean; testWorkspaceEnabled?: boolean; emailEnabled?: boolean; next?: string; continueURL?: string; desktopFlow?: DesktopFlow | null }) {
   const t = useTranslations('Auth')
   const locale = useLocale()
   const returnPath = safeAuthReturn(next)
@@ -234,8 +234,8 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
       endSubmit()
     }
   }
-  return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
-    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} notice={notice} googleCallbackURL={googleCallbackURL} githubCallbackURL={githubCallbackURL} next={returnPath} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} />
+  return <Auth registering={registering} addAccount={addAccount} switchInCard next={returnPath}>
+    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} notice={notice} next={returnPath} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
       <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>
