@@ -203,8 +203,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   every member who can access that bot, live and as a transcript, and
   teammates only watch, never send messages. A person's private chat with
   the Coordinator is theirs alone until they share it (team by default,
-  chosen people, or anyone with the link); people it is shared with only
-  view, and fork a copy to continue. The bot dispatches the thread; the Agent it hands the work
+  chosen people, or anyone with the link); people it is shared with view it,
+  can ask for edit access, which the owner approves, and otherwise fork a
+  copy to continue. The bot dispatches the thread; the Agent it hands the work
   to (Codex, Claude Code) runs it, and where a thread carries an icon
   other than its status, that icon is the Agent's mark (R-78).
 - **R-63** Activity: events (created, handed to, dispatched a thread,
