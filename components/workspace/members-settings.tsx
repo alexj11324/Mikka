@@ -332,7 +332,7 @@ export function MembersSettings({
             <span>{t("title")}</span>
           </header>}
           <div className={cn("flex w-full flex-col gap-6 px-5 py-5 md:px-10 lg:px-14 lg:py-8", embedded && "px-0 py-0 md:px-0 lg:px-0 lg:py-0")}>
-            <h1 className="text-2xl font-medium tracking-tight">{t("title")}</h1>
+            <h1 className="text-xl font-semibold">{t("title")}</h1>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="min-w-0 flex-1 sm:w-72">

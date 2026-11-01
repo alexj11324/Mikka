@@ -223,7 +223,7 @@ export function DevicesSettings() {
   const reconnect = () => setAdding(true)
   return <div className="flex flex-col gap-6">
     <div className="flex items-center justify-between gap-3">
-      <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
+      <h1 className="text-xl font-semibold">{t('title')}</h1>
       <Button size="sm" variant="secondary" aria-keyshortcuts="Meta+N Control+N" onClick={() => setAdding(true)}><Plus data-icon="inline-start" />{t('add.trigger')}</Button>
     </div>
     {error && <FieldError className="text-xs">{t('listError')}</FieldError>}
