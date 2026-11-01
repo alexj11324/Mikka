@@ -12,6 +12,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { assertDevLocal } from './dev-local/guard.mjs'
 import { startLocalCron } from './dev-local/cron.mjs'
+import { localSecretsKey } from './dev-local/secrets-key.mjs'
 import { grantLocalCredits, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY } from './dev-local/services.mjs'
 import { startMvpServices } from '../tests/mvp/services.mjs'
 import { MVP_SERVICES, REPOSITORY } from '../tests/mvp/isolated-env.mjs'
@@ -48,6 +49,8 @@ children.push(spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev',
     AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY || MVP_DECISION_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY || LOCAL_RESEND_KEY,
     CRON_SECRET: cronSecret,
+    // Saving a workspace's own model key needs it (lib/secrets/crypto.ts).
+    WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY || localSecretsKey(join(root, '.cache/dev-local')),
     GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString() },
 }))
 

@@ -119,7 +119,7 @@ What is fake and what is real:
 | GitHub App, installation, push grant, pull requests | Fake (`tests/mvp/services.mjs`); a fresh App key is generated at start |
 | Repository | A local bare `file://` origin seeded with `README.md` |
 | GitHub identity | Synthetic: every local account is linked to GitHub account `4242`, which the fake lets write |
-| Model, a workspace's own key (Settings › API 与订阅) | Real |
+| Model, a workspace's own key (Settings › API 与订阅) | Real. Saving it needs `WORKSPACE_SECRETS_KEY`; without one, dev:local creates a random local key in `.cache/dev-local/workspace-secrets-key` (git-ignored, mode 0600) and reuses it, so saved keys still open after a restart |
 | Mikka 默认 and the Coordinator through the [AI Gateway](https://vercel.com/docs/ai-gateway) | Real with a real `AI_GATEWAY_API_KEY`; otherwise a scripted model: it echoes (`Local model: <text>`), a message `/tool <name> <json>` calls that registered tool for real, and a tool result comes back as JSON |
 | Decisions (AI Gateway Decision API: triage, run outcome, push) | Real with a real `AI_GATEWAY_API_KEY`; otherwise the first choice of each question, `0.5` for a predicate |
 | Card verification and credit for Mikka 默认 (Stripe) | Every local workspace gets a verification and a $1000 local allowance, checked every 5 seconds |
