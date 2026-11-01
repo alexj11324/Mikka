@@ -68,20 +68,24 @@ export async function botModelMenu(
     ...rows.filter((row) => row.provider !== "claude"),
   ];
   const subscriptions = new Map<string, BotModelMenuGroup>();
+  const apiKeys = new Map<string, BotModelMenuGroup>();
   for (const row of ordered) {
     const key = String(row.connectionId);
-    const group: BotModelMenuGroup = subscriptions.get(key) ?? {
-      kind: "subscription",
+    // A workspace-added API-key model is its own group kind; subscriptions group by account.
+    const collection = row.provider === "apiKey" ? apiKeys : subscriptions;
+    const group: BotModelMenuGroup = collection.get(key) ?? {
+      kind: row.provider === "apiKey" ? "apiKey" : "subscription",
       provider: row.provider,
       plan: row.plan ?? null,
       options: [],
     };
-    subscriptions.set(key, group);
+    collection.set(key, group);
     group.options.push({ id: row.bindingId, modelId: row.modelId, provider: row.provider });
   }
   const groups: BotModelMenuGroup[] = [
     { kind: "hosted", options: [{ ...HOSTED }] },
     ...subscriptions.values(),
+    ...apiKeys.values(),
   ];
 
   const row = (
@@ -106,7 +110,7 @@ export async function botModelMenu(
       id: option?.bindingId ?? row.bindingId,
       modelId: row.modelId,
       provider: row.provider,
-      kind: "subscription",
+      kind: row.provider === "apiKey" ? "apiKey" : "subscription",
       chosen,
       available: !quotaExhausted(quota, now),
     };

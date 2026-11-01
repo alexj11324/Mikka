@@ -5,6 +5,7 @@ import { auditRequestContext } from '@/lib/audit/events'
 import { secretAuditHook } from '@/lib/secrets/audit'
 import type { SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 import { getE2BKeyCapabilityForUser, getE2BKeyStatus, removeE2BKey, setE2BKey, type E2BKeyStatus } from '@/lib/secrets/e2b'
+import { listWorkspaceApiKeyModels, removeWorkspaceApiKeyModel, setWorkspaceApiKeyModel, type ApiKeyModelView } from '@/lib/secrets/model-api-key'
 import { createWorkspaceSecret, deleteWorkspaceSecret, listWorkspaceSecrets, replaceWorkspaceSecret, type SavedSecretView, type SecretAuditHook, type WorkspaceSecretView } from '@/lib/secrets/store'
 import { settingsWorkspaceAction } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
@@ -37,6 +38,16 @@ export async function saveE2BKey(input: { apiKey: string }, workspaceId?: string
 }
 export async function deleteE2BKey(workspaceId?: string): Promise<SettingsActionResult<{ removed: boolean }>> {
   return withActor((u, w, audit) => removeE2BKey(u, w, audit), workspaceId)
+}
+
+export async function listApiKeyModels(workspaceId?: string): Promise<SettingsActionResult<{ models: ApiKeyModelView[] }>> {
+  return withActor(async (u, w) => ({ models: await listWorkspaceApiKeyModels(u, w) }), workspaceId)
+}
+export async function addApiKeyModel(input: { baseURL: string; apiKey: string; models: string[] }, workspaceId?: string): Promise<SettingsActionResult<ApiKeyModelView>> {
+  return withActor((u, w) => setWorkspaceApiKeyModel(u, w, input), workspaceId)
+}
+export async function removeApiKeyModel(input: { connectionId: string }, workspaceId?: string): Promise<SettingsActionResult<{ removed: boolean }>> {
+  return withActor((u, w) => removeWorkspaceApiKeyModel(u, w, input.connectionId), workspaceId)
 }
 
 /** Shared by settings and the first-run guide. */

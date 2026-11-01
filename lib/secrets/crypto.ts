@@ -47,3 +47,6 @@ export function openSecret(sealed: Sealed, aad: string, env?: Record<string, str
 export const secretAad = (row: { workspaceId: string; kind: string; scopeType: string; scopeRef: string; name: string }) =>
   ['workspace_secret', row.workspaceId.toLowerCase(), row.kind, row.scopeType, row.scopeRef, row.name].join('\u0000')
 export const e2bKeyAad = (workspaceId: string) => ['workspace_e2b_key', workspaceId.toLowerCase()].join('\u0000')
+/** Binds an API-key model credential to its connection and workspace. */
+export const apiKeyModelAad = (connectionId: string, workspaceId: string) =>
+  ['workspace_api_key_model', workspaceId.toLowerCase(), connectionId.toLowerCase()].join('\u0000')

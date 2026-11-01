@@ -4,6 +4,7 @@ import { ExecutionSettings, executionWorkspace } from "./execution-settings";
 import { COORDINATOR_MODEL } from "./coordinator/model";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
 import {
+  apiKeyModelSnapshotSchema,
   freezeHostedModelSelection,
   type HostedModelDependencies,
   type HostedModelScope,
@@ -32,6 +33,28 @@ export async function freezeBotModel(
   // No subscription bound: every bot, the Coordinator included, runs on the hosted default
   // through the same admission (verified card, allowance) and workspace billing.
   if (!binding) return { harness: "ai_sdk", model: COORDINATOR_MODEL };
+  // A workspace-added API-key model runs any bot (the Coordinator included) on its own key.
+  if (binding.provider === "apiKey") {
+    const bindingId = await settings.bindingForBot(
+      settingsScope,
+      scope.botId,
+      binding.bindingId,
+    );
+    const bound = await settings.botBinding(settingsScope, bindingId);
+    if (!bound || bound.provider !== "apiKey")
+      return { harness: "ai_sdk", model: COORDINATOR_MODEL };
+    const apiKeySelection = apiKeyModelSnapshotSchema.parse({
+      type: "apiKey",
+      ...(scope.botId === null ? { coordinator: true } : {}),
+      ownerId: scope.ownerId,
+      consumerId: bound.consumerId,
+      workspaceId,
+      connectionId: bound.connectionId,
+      bindingId,
+      modelId: bound.modelId,
+    });
+    return { harness: "ai_sdk", model: bound.modelId, apiKeySelection };
+  }
   return freezeHostedModelSelection(
     { ...scope, workspaceId },
     { harness: "ai_sdk", model: null },

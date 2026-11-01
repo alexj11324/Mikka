@@ -154,6 +154,29 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     // A provider that refuses (signed out, backend down) is skipped the same way.
     const refusing = { ...discovering, refreshBotModels: async () => { throw new Error("provider down"); } };
     assert.ok((await refreshBotModelMenu(pool, refusing, alice, botA)).groups.length > 1);
+
+    // 7. A workspace-added API-key model: its own menu group, and it freezes the Coordinator
+    // (and a bot) onto its own key — never a subscription selection.
+    const apiConn = await connection("alice", workspace, "apiKey", "connected");
+    const apiBinding = await binding("alice", workspace, apiConn, "deepseek-chat", "api_key");
+    const apiGroup = (await botModelMenu(pool, settings, alice, null)).groups.find((group) => group.kind === "apiKey");
+    assert.ok(apiGroup, "the API-key model is its own group");
+    assert.deepEqual(apiGroup.options.map((option) => option.modelId), ["deepseek-chat"]);
+    await settings.setBotModel(alice, null, apiBinding);
+    const coordinatorApi = await botModelMenu(pool, settings, alice, null);
+    assert.deepEqual([coordinatorApi.current.kind, coordinatorApi.current.modelId], ["apiKey", "deepseek-chat"]);
+    const frozenCoordinator = await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies);
+    assert.equal(frozenCoordinator.model, "deepseek-chat");
+    assert.equal(frozenCoordinator.modelSelection, undefined);
+    assert.deepEqual(
+      [frozenCoordinator.apiKeySelection?.type, frozenCoordinator.apiKeySelection?.coordinator, frozenCoordinator.apiKeySelection?.connectionId, frozenCoordinator.apiKeySelection?.modelId],
+      ["apiKey", true, apiConn, "deepseek-chat"],
+    );
+    await settings.setBotModel(alice, botB, apiBinding);
+    const frozenBot = await freezeBotModel({ ownerId: "alice", botId: botB, workspaceId: workspace }, dependencies);
+    assert.equal(frozenBot.apiKeySelection?.connectionId, apiConn);
+    assert.equal(frozenBot.apiKeySelection?.coordinator, undefined);
+    assert.equal(frozenBot.apiKeySelection?.consumerId, botB);
   } finally {
     await pool.end();
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);

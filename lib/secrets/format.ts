@@ -40,3 +40,10 @@ export const scopeColumns = (scope: SecretScope) => scope.type === 'workspace'
   : { scopeType: 'repository' as const, scopeRef: scope.repository }
 
 export const e2bKeyInput = z.object({ apiKey: z.string().trim().min(8).max(200).regex(/^\S+$/) }).strict()
+
+/** A workspace-added API-key model: an OpenAI-compatible endpoint, its key, and one or more model ids. */
+export const apiKeyModelInput = z.object({
+  baseURL: z.string().trim().url().max(512).refine(url => url.startsWith('https://'), 'https required'),
+  apiKey: z.string().trim().min(8).max(400).regex(/^\S+$/),
+  models: z.array(z.string().trim().min(1).max(128)).min(1).max(20),
+}).strict()

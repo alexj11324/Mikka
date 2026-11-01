@@ -16,6 +16,7 @@ import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings
 import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
+import { ApiKeyModelSettings } from '@/components/settings/api-key-model-settings'
 import { GoogleSignInSettings } from '@/components/settings/google-sign-in-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
 import { SecuritySettings } from '@/components/settings/security-settings'
@@ -108,7 +109,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
-    case 'models': return workspaceId && !preview ? <SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'models': return workspaceId && !preview ? <div className="flex flex-col gap-8"><SubscriptionSettings key={workspaceId} workspaceId={workspaceId} /><ApiKeyModelSettings key={`api-key-${workspaceId}`} workspaceId={workspaceId} /></div> : waiting
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting

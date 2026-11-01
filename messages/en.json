@@ -1177,6 +1177,8 @@
     "secretLimitReached": "This workspace has reached the limit of 500 secrets and variables.",
     "secretsUnavailable": "Secret storage isn't available right now. Please try again later.",
     "e2bKeyInvalid": "This E2B key is invalid or has been revoked.",
+    "apiKeyModelInvalid": "This API key was rejected by the endpoint.",
+    "apiKeyModelUnreachable": "The endpoint could not be reached. Check the base URL and try again.",
     "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
     "e2bKeyRateLimited": "E2B is rate limiting this key right now. Wait a few minutes and try again.",
     "tokenNotFound": "This token does not exist or was already revoked.",
@@ -2130,6 +2132,15 @@
         "remove": "Remove",
         "removing": "Removing…",
         "verifying": "Verifying…"
+      },
+      "apiKeyModels": {
+        "heading": "API key models",
+        "baseURL": "Base URL",
+        "key": "API key",
+        "models": "Model IDs",
+        "add": "Add model",
+        "adding": "Adding…",
+        "remove": "Remove"
       }
     },
     "audit": {

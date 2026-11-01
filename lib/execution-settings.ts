@@ -446,7 +446,7 @@ export class ExecutionSettings {
         `SELECT b.id AS "bindingId",b."consumerId",b."modelId",b.route,c.id AS "connectionId",c.provider,c."accountLabel",c.quota->>'plan' AS plan
        FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
        AND c."workspaceId"=b."workspaceId" AND c.epoch=b."connectionRevision" AND c.state='connected'
-       WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
+       WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc','api_key')
        AND ($3::uuid IS NULL OR b.id=$3)
        AND ($3::uuid IS NOT NULL OR c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId") ORDER BY b."createdAt" DESC,b.id`,
         [scope.ownerId, scope.workspaceId, bindingId ?? null],

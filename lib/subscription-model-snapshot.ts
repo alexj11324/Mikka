@@ -14,10 +14,24 @@ export const hostedSubscriptionSnapshotSchema = z.strictObject({
   route: z.enum(['codex_cpa', 'claude_cpa', 'openai_siwc']),
 })
 export type HostedSubscriptionSnapshot = z.infer<typeof hostedSubscriptionSnapshotSchema>
+/** A workspace-added API-key model (OpenAI-compatible). Non-secret references only;
+ * the key is read from workspace_api_key_credentials in the Node model step. */
+export const apiKeyModelSnapshotSchema = z.strictObject({
+  type: z.literal('apiKey'),
+  coordinator: z.literal(true).optional(),
+  ownerId: z.string().min(1),
+  consumerId: z.string().min(1),
+  workspaceId: z.uuid(),
+  connectionId: z.uuid(),
+  bindingId: z.uuid(),
+  modelId: z.string().min(1).max(128),
+})
+export type ApiKeyModelSnapshot = z.infer<typeof apiKeyModelSnapshotSchema>
 export interface HostedRuntimeSnapshot {
   harness: string
   model: string | null
   modelSelection?: HostedSubscriptionSnapshot
+  apiKeySelection?: ApiKeyModelSnapshot
 }
 export interface HostedModelScope { ownerId: string; botId: string | null; workspaceId: string | null }
 export interface HostedModelDependencies {

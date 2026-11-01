@@ -1177,6 +1177,8 @@
     "secretLimitReached": "此工作区的密钥和环境变量已达 500 个上限。",
     "secretsUnavailable": "密钥存储暂时不可用，请稍后重试。",
     "e2bKeyInvalid": "Key 无效或已被撤销。",
+    "apiKeyModelInvalid": "端点拒绝了这个 API key。",
+    "apiKeyModelUnreachable": "无法连接该端点，请检查 base URL 后重试。",
     "e2bKeyUnverifiable": "暂时无法验证，请稍后重试。",
     "e2bKeyRateLimited": "E2B 当前对该密钥限流，请几分钟后再试。",
     "tokenNotFound": "令牌不存在或已被撤销。",
@@ -2130,6 +2132,15 @@
         "remove": "移除",
         "removing": "正在移除…",
         "verifying": "正在验证…"
+      },
+      "apiKeyModels": {
+        "heading": "API key 模型",
+        "baseURL": "Base URL",
+        "key": "API key",
+        "models": "模型 ID",
+        "add": "添加模型",
+        "adding": "添加中…",
+        "remove": "移除"
       }
     },
     "audit": {
