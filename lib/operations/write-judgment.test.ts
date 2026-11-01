@@ -29,8 +29,9 @@ test('the one predicate sees the action, tool, MCP annotations and concrete argu
   assert.match(seen!.input, /a@example\.invalid/)
 })
 
-test('a read-only tool is never asked about', async () => {
-  let called = false
-  assert.equal(await judgeWrite(async () => { called = true; return null }, { ...call, annotations: ['readOnlyHint'] }), 'allow')
-  assert.equal(called, false)
+test('a read-only hint is evidence for the Decisions API, never a rule that skips it', async () => {
+  let input = ''
+  assert.equal(await judgeWrite(async (_purpose, text) => { input = text; return new Map([['destructive', { type: 'predicate', name: 'destructive', probability: 0.1 }]]) }, { ...call, annotations: ['readOnlyHint'] }), 'allow')
+  assert.match(input, /annotations: readOnlyHint\n/)
+  assert.equal(await judgeWrite(async () => new Map([['destructive', { type: 'predicate', name: 'destructive', probability: 0.9 }]]), { ...call, annotations: ['readOnlyHint'] }), 'ask')
 })
