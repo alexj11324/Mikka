@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, existsSync, symlinkSync, unlinkSync, realpathSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, realpathSync } from 'node:fs'
 import { tmpdir as systemTmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
@@ -10,7 +10,6 @@ import { hasUnsafeModes, isDocsOnly } from './ci-docs-only.mjs'
 const tmpdir = () => realpathSync(systemTmpdir())
 function copyTrustedClassifier(entry) {
   writeFileSync(entry, readFileSync(new URL('./ci-docs-only.mjs', import.meta.url)))
-  writeFileSync(join(dirname(entry), 'ci-browser-map.json'), readFileSync(new URL('./ci-browser-map.json', import.meta.url)))
 }
 
 test('approved documentation paths are documentation-only', () => {
@@ -147,11 +146,11 @@ test('real git diffs retain all fixtures while testing rename, deletion and even
   const changedCodeTree = root([oldDocs], false)
   const codeHead = git(['commit-tree', changedCodeTree, '-p', base, '-m', 'remove-code'])
   const unrelatedHead = git(['commit-tree', root([oldDocs]), '-m', 'unrelated-history'])
-  for (const [name, before, after, expectedDocs, tier, performance] of [
-    ['main-docs', base, docsHead, true, 'docs', 'false'],
-    ['main-code', base, codeHead, false, 'main', 'false'],
-    ['main-unknown', '0'.repeat(40), docsHead, false, 'full', 'true'],
-    ['main-nonancestor', unrelatedHead, docsHead, false, 'full', 'true'],
+  for (const [name, before, after, expectedDocs] of [
+    ['main-docs', base, docsHead, true],
+    ['main-code', base, codeHead, false],
+    ['main-unknown', '0'.repeat(40), docsHead, false],
+    ['main-nonancestor', unrelatedHead, docsHead, false],
   ]) {
     const eventFile = join(dir, `${name}-event.json`)
     record(`${name}-event.json`, { before, after })
@@ -163,8 +162,6 @@ test('real git diffs retain all fixtures while testing rename, deletion and even
     })
     record(`${name}-result.json`, { output })
     assert.match(output, new RegExp(`docs_only=${expectedDocs}`), name)
-    assert.match(output, new RegExp(`browser_tier=${tier}`), name)
-    assert.match(output, new RegExp(`performance=${performance}`), name)
   }
   for (const [name, baseSha, expected] of [['fork', base, true], ['empty-base', '0'.repeat(40), false]]) {
     const eventFile = join(dir, `${name}-event.json`)
@@ -247,7 +244,6 @@ test('each actual workflow temp-file command produces a classifier Node can load
     copyTrustedClassifier(trusted)
     const output = execFileSync(process.execPath, [trusted], { cwd: dir, env: { ...env, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' }, encoding: 'utf8' })
     assert.match(output, /docs_only=false \(no comparable range\)/)
-    assert.match(output, /browser_tier=full; performance=true; specs=\[\]/)
     console.log(`Retained workflow module-loader evidence: ${trusted}`)
   }
 })
@@ -261,7 +257,7 @@ test('the exact trusted-classifier workflow step executes ESM from a retained te
   writeFileSync(git, `#!/bin/sh
 case "$1" in
   fetch|diff|cat-file) exit 0 ;;
-  show) case "$2" in *ci-browser-map.json) cat "$FIXTURE_MAP" ;; *) cat "$FIXTURE_CLASSIFIER" ;; esac ;;
+  show) cat "$FIXTURE_CLASSIFIER" ;;
   *) exit 1 ;;
 esac
 `, { flag: 'wx' })
@@ -273,7 +269,7 @@ esac
     const script = block[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
     const outputFile = join(dir, `${name}.output`)
     const output = execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { cwd: dir, encoding: 'utf8', env: {
-      PATH: `${bin}:${process.env.PATH}`, FIXTURE_CLASSIFIER: resolve('scripts/ci-docs-only.mjs'), FIXTURE_MAP: resolve('scripts/ci-browser-map.json'),
+      PATH: `${bin}:${process.env.PATH}`, FIXTURE_CLASSIFIER: resolve('scripts/ci-docs-only.mjs'),
       TMPDIR: dir,
       GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_OUTPUT: outputFile,
     } })
@@ -327,9 +323,9 @@ test('a trusted stdin wrapper can import the paired classifier without running i
   const dir = mkdtempSync(join(tmpdir(), 'trusted-docs-stdin-')), entry = join(dir, 'ci-docs-only.mjs')
   copyTrustedClassifier(entry)
   const output = execFileSync(process.execPath, ['--input-type=module', '-', entry], {
-    encoding: 'utf8', input: "import { pathToFileURL } from 'node:url'; const policy = await import(pathToFileURL(process.argv[2]).href); console.log(policy.BROWSER_SMOKE_TAG)",
+    encoding: 'utf8', input: "import { pathToFileURL } from 'node:url'; const policy = await import(pathToFileURL(process.argv[2]).href); console.log(typeof policy.isDocsOnly)",
   })
-  assert.equal(output.trim(), '@smoke')
+  assert.equal(output.trim(), 'function')
 })
 
 test('the actual workflow bootstrap executes its trusted temporary ESM module', () => {
@@ -428,139 +424,6 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   const gate = job('ui-policy')
   assert(gate.includes('needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks]'))
   for (const name of ['ui-policy-full', 'ui-policy-integrations', 'source-checks', 'daemon-checks']) assert(gate.includes(`needs.${name}.result`))
-})
-
-const fixtureBrowserMap = () => ({
-  smoke: ['routes.spec.ts'],
-  main: ['routes.spec.ts', 'settings.spec.ts'],
-  nightly: ['unread.spec.ts'],
-  areas: [{ area: 'fixture', paths: ['^lib/fixture/'], specs: ['settings.spec.ts'] }],
-})
-
-function mappingFixture(map = fixtureBrowserMap()) {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'browser-map-retained-')))
-  const repo = join(dir, 'repo'), trusted = join(dir, 'trusted')
-  for (const path of [repo, trusted, join(repo, 'scripts'), join(repo, 'tests'), join(repo, 'tests/e2e')]) mkdirSync(path)
-  const env = { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.invalid', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.invalid' }
-  const git = args => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', ...args], { cwd: repo, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-  git(['init', '--initial-branch=main', '--template='])
-  const entry = join(trusted, 'ci-docs-only.mjs'), candidate = join(repo, 'scripts/ci-browser-map.json')
-  writeFileSync(entry, readFileSync(new URL('./ci-docs-only.mjs', import.meta.url)))
-  writeFileSync(join(trusted, 'ci-browser-map.json'), JSON.stringify(map))
-  writeFileSync(candidate, JSON.stringify(map))
-  for (const name of [...map.main, ...map.nightly]) writeFileSync(join(repo, 'tests/e2e', name), '// existing fixture\n')
-  git(['add', '.']); git(['commit', '-m', 'base'])
-  const base = git(['rev-parse', 'HEAD'])
-  return { dir, repo, trusted, entry, candidate, git, map, run(extraEnv = {}) {
-    git(['add', '.']); git(['commit', '--allow-empty', '-m', 'candidate'])
-    const event = join(dir, 'event.json'), output = join(dir, 'output')
-    writeFileSync(event, JSON.stringify({ pull_request: { base: { sha: base }, head: { sha: git(['rev-parse', 'HEAD']) } } }))
-    execFileSync(process.execPath, [entry], { cwd: repo, env: { ...env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event, GITHUB_OUTPUT: output, ...extraEnv }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-    return Object.fromEntries(readFileSync(output, 'utf8').trim().split('\n').map(line => { const at = line.indexOf('='); return [line.slice(0, at), line.slice(at + 1)] }))
-  } }
-}
-
-test('mapping JSON plus business code and a new spec stays targeted without selection validation', () => {
-  const fixture = mappingFixture()
-  fixture.map.areas.push({ area: 'new area', paths: ['^business/'], specs: ['new-area.spec.ts'] })
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  writeFileSync(join(fixture.repo, 'business.ts'), 'export const changed = true\n')
-  writeFileSync(join(fixture.repo, 'tests/e2e/new-area.spec.ts'), '// new spec\n')
-  const result = fixture.run()
-  assert.equal(result.browser_tier, 'targeted')
-  assert.deepEqual(JSON.parse(result.browser_specs), ['new-area.spec.ts'])
-  assert.equal(result.verify_selection, 'false')
-})
-
-test('a new mapping selects an existing unmodified spec without executing PR path expressions', () => {
-  const fixture = mappingFixture(), marker = join(fixture.repo, 'executed')
-  fixture.map.areas.push({ area: 'new area', paths: [`(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'bad'))()`], specs: ['unread.spec.ts'] })
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  const result = fixture.run()
-  assert.equal(result.browser_tier, 'targeted')
-  assert.deepEqual(JSON.parse(result.browser_specs), ['unread.spec.ts'])
-  assert.equal(result.verify_selection, 'false')
-  assert.equal(existsSync(marker), false)
-})
-
-test('removing a PR mapping cannot shrink trusted coverage', () => {
-  const fixture = mappingFixture()
-  fixture.map.areas = []
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  mkdirSync(join(fixture.repo, 'lib')); mkdirSync(join(fixture.repo, 'lib/fixture'))
-  writeFileSync(join(fixture.repo, 'lib/fixture/change.ts'), '// changed\n')
-  const result = fixture.run()
-  assert.equal(result.browser_tier, 'targeted')
-  assert.deepEqual(JSON.parse(result.browser_specs), ['settings.spec.ts'])
-})
-
-test('changed tier lists include added and removed existing specs without narrowing trusted coverage', () => {
-  const fixture = mappingFixture()
-  fixture.map.main = ['routes.spec.ts', 'unread.spec.ts']
-  fixture.map.nightly = ['settings.spec.ts']
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  const result = fixture.run()
-  assert.deepEqual(JSON.parse(result.browser_specs), ['settings.spec.ts', 'unread.spec.ts'])
-})
-
-test('a JSON-only mapping of an existing performance spec requires performance acceptance', () => {
-  const map = fixtureBrowserMap()
-  map.nightly.push('agent-performance.spec.ts')
-  const fixture = mappingFixture(map)
-  fixture.map.areas.push({ area: 'performance fixture', paths: ['^performance/'], specs: ['agent-performance.spec.ts'] })
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  const result = fixture.run()
-  assert.equal(result.browser_tier, 'targeted')
-  assert.equal(result.browser_performance, 'true')
-})
-
-test('invalid PR mapping JSON fails classification instead of silently skipping coverage', () => {
-  const fixture = mappingFixture()
-  writeFileSync(fixture.candidate, '{ invalid JSON')
-  assert.throws(() => fixture.run())
-})
-
-test('unsafe mapping modes retain the full fail-closed tier', () => {
-  const fixture = mappingFixture()
-  chmodSync(fixture.candidate, 0o755)
-  const result = fixture.run()
-  assert.equal(result.browser_tier, 'full')
-  assert.equal(result.docs_only, 'false')
-})
-
-test('mapping JSON must be a regular file even when the Git diff describes a regular file', () => {
-  const fixture = mappingFixture()
-  fixture.map.areas.push({ area: 'new area', paths: ['^business/'], specs: ['unread.spec.ts'] })
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  fixture.git(['add', '.']); fixture.git(['commit', '-m', 'mapping change'])
-  const outside = join(fixture.dir, 'outside.json')
-  writeFileSync(outside, JSON.stringify(fixture.map))
-  unlinkSync(fixture.candidate); symlinkSync(outside, fixture.candidate)
-  // Keep the committed mapping range while replacing only its checkout entry.
-  const event = join(fixture.dir, 'symlink-event.json')
-  writeFileSync(event, JSON.stringify({ pull_request: { base: { sha: fixture.git(['rev-parse', 'HEAD^']) }, head: { sha: fixture.git(['rev-parse', 'HEAD']) } } }))
-  assert.throws(() => execFileSync(process.execPath, [fixture.entry], { cwd: fixture.repo, encoding: 'utf8', stdio: 'pipe', env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event } }))
-})
-
-test('trusted mapping schema rejects invalid fields, duplicate entries and malformed regexes', () => {
-  for (const change of [
-    map => { map.extra = true },
-    map => { map.smoke = 'routes.spec.ts' },
-    map => { map.main.push('routes.spec.ts') },
-    map => { map.nightly = ['../escape.spec.ts'] },
-    map => { map.areas.push({ ...map.areas[0] }) },
-    map => { map.areas[0].extra = true },
-    map => { map.areas[0].paths = [42] },
-    map => { map.areas[0].paths = ['['] },
-    map => { map.areas[0].paths.push(map.areas[0].paths[0]) },
-    map => { map.areas[0].specs.push(map.areas[0].specs[0]) },
-  ]) {
-    const fixture = mappingFixture(), map = fixtureBrowserMap()
-    change(map)
-    writeFileSync(join(fixture.trusted, 'ci-browser-map.json'), JSON.stringify(map))
-    assert.throws(() => fixture.run())
-  }
 })
 
 test('integration branches take the full tier under both the integration/ and the older integrate/ prefix', () => {
