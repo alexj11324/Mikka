@@ -30,6 +30,8 @@ after(() => { globalThis.fetch = originalFetch; net.Socket.prototype.connect = o
 const transport = {
   async execute(query: SQL) {
     const { sql, params } = dialect.sqlToQuery(query)
+    // The event's credential check reads through the executor it was given.
+    if (/to_regclass\('credential_secrets'\)/.test(sql)) return { rows: [{ present: false }] }
     assert.ok(params.includes(tokenHash), 'actual OAuth verifier must hash the header bearer')
     for (const fragment of ['t.revoked is null', '"expiresAt" > now()', 'c.disabled', '"sessionId"']) assert.ok(sql.includes(fragment))
     return { rows: valid ? [{ userId: owner, clientId: 'offline-agent', scopes: ['mikka'], expiresAt }] : [] }
