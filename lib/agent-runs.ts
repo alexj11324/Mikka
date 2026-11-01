@@ -129,6 +129,10 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const [device] = await executor.select().from(devices).where(and(eq(devices.id, agent.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).limit(1)
   if (!device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw new ActionFailureError('agentHarnessMissing')
   const repo = internal?.repo ?? await ensureDeviceRepository(userId, agent.deviceId, parsed.data.repo)
+  // Push authority is the person's GitHub App grant: ask GitHub now, before the
+  // admission transaction, which reads the recorded outcome. A host dispatch
+  // already inside its transaction (Factory) relies on the recorded check.
+  const pushCheck = !internal && !parsed.data.readOnly ? await (await import('@/lib/github/push-grant')).verifyPushGrant(userId, requestedRepositoryKey) : null
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = true
@@ -147,7 +151,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
     ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
     : null
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(pushCheck && !pushCheck.granted ? (pushCheck.reason === 'githubUnavailable' || pushCheck.reason === 'githubNotConfigured' ? { pushUnchecked: pushCheck.reason } : { pushRefusal: pushCheck.reason }) : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
 }
 
 /** A device run's credential source; the bot's workspace decides whose API keys it may use. */

@@ -8,6 +8,7 @@
   approval card is shown before a push. "`git_push: allow` must mean 'no
   approval card', never 'skip the repository authorization'."
 - Rule: —
+- Superseded by: [2026-11-01-1215-push-by-github-app](2026-11-01-1215-push-by-github-app.md)
 - Replaces: — (narrows the 2026-10-28 rows on per-repository push approval in
   `../decisions.md`; those rows stand)
 

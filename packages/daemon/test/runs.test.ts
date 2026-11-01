@@ -127,8 +127,9 @@ describe("mock runs", () => {
     const origin = join(tempDir(), "origin.git")
     git(source, "clone", "--bare", source, origin)
     const cases = [
+      // Only the server's allow (an admitted GitHub App grant) fetches and pushes the issue branch; a local approval no longer stands in.
       { decision: "allow", approved: false, expected: true },
-      { decision: "ask", approved: true, expected: true },
+      { decision: "ask", approved: true, expected: false },
       { decision: "ask", approved: false, expected: false },
       { decision: "deny", approved: true, expected: false },
     ] as const
@@ -141,7 +142,8 @@ describe("mock runs", () => {
         issueId: `issue-${decision}-${approved}`, repoId: "repo-1",
         remoteUrl: pathToFileURL(origin).href, harness: "mock", prompt: "inspect",
         pushBranch: "mikka/issue-1", fixture: "turn-ended",
-        policy: { ...defaults, permissions: { ...defaults.permissions, git_push: decision } },
+        // ask is what an older server could still send over the wire; it carries no push authority.
+        policy: { ...defaults, permissions: { ...defaults.permissions, git_push: decision as "allow" | "deny" } },
       })
       const run = await runToEnd(daemon, server, runId)
       // An isolated child process observes the same checkout a CLI receives.

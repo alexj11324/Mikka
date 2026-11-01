@@ -1937,6 +1937,7 @@
         "deny": "拒绝"
       },
       "githubPermissionFailed": "无法保存",
+      "githubPushByApp": "由 GitHub App 授权决定",
       "githubPrivate": "私有",
       "githubTool": {
         "push": "推送分支",
@@ -2803,16 +2804,6 @@
     "usedTools": "用了 {count} 个工具",
     "pendingActions": {
       "label": "等你确认",
-      "approve_repository_push": "允许推送仓库",
-      "repository": "仓库",
-      "permission": "权限",
-      "pushToOrigin": "向此仓库的 origin 推送",
-      "approvePush": "允许推送",
-      "pushApproved": "已允许推送仓库",
-      "approve_pull_request": "创建 Pull Request",
-      "branch": "分支",
-      "approvePullRequest": "创建",
-      "pullRequestApproved": "已允许创建 Pull Request",
       "send_email": "发送邮件",
       "create_calendar_event": "新建日程",
       "update_calendar_event": "修改日程",

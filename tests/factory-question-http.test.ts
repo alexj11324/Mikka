@@ -7,6 +7,7 @@ import { Pool, type PoolClient } from "pg";
 import { remoteKey } from "@mikka/protocol/repository";
 import { createFactoryStore } from "../lib/factory/store";
 import { factoryBinding } from "../lib/factory/dispatch";
+import { recordPushGrant } from './support/github-app-stub';
 import {
   createFactoryQuestions,
   questionReference,
@@ -117,7 +118,8 @@ test(
         [agentId, userId, deviceId],
       );
       await pool.query('INSERT INTO issue_prefixes ("userId",prefix) VALUES ($1,\'FQHT\')', [userId]);
-      await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [userId,remoteKey(remoteUrl),JSON.stringify({ approved:true,remote:'origin',approvedByUserId:userId,approvedAt:new Date().toISOString() })]);
+      // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+      await recordPushGrant(pool, userId, remoteKey(remoteUrl));
       let number = 0;
       const fixture = async (
         kind: "context" | "decision" | "permission" | "external" = "context",

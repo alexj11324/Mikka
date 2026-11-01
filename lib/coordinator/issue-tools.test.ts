@@ -11,10 +11,9 @@ const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
 const created = mock.fn(async () => ({ id: 'created' }))
 const updated = mock.fn(async () => ({ id: 'updated' }))
 const dispatched = mock.fn(async () => ({ runId: 'queued' }))
-const proposed = mock.fn(async () => ({ status: 'awaiting_approval' }))
 const readIssue = mock.fn(async (..._args: unknown[]) => ({ id: 'read-issue' }))
 const scheduled = mock.fn(async (..._args: unknown[]) => ({ id: 'schedule' }))
-mock.module('@/workflows/coordinator/steps', { namedExports: { createIssue: created, updateIssue: updated, dispatchRun: dispatched, proposeRepositoryPushApproval: proposed, getIssue: readIssue, scheduleCommand: scheduled } })
+mock.module('@/workflows/coordinator/steps', { namedExports: { createIssue: created, updateIssue: updated, dispatchRun: dispatched, getIssue: readIssue, scheduleCommand: scheduled } })
 mock.module('@/workflows/coordinator/agent-kit-steps', { namedExports: {} })
 mock.module('@/lib/composio-actions', { namedExports: { createComposioAITools: () => ({}), createGoogleAITools: () => ({}) } })
 let registry: typeof import('@/workflows/coordinator/tools')
@@ -123,11 +122,7 @@ test('dispatch uses the same host event as task creation and exposes no event ar
   const input = { issueId: 'b4000000-0000-4000-8000-000000000005', agentId: 'b4000000-0000-4000-8000-000000000006', repo: 'example/repository' }
   await tools.dispatch_run!.execute!(input, { toolCallId: 'dispatch', messages: [], context: {} })
   assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId])
-  const request = tools.request_repository_push_approval!
-  const schema = request.inputSchema as { safeParse(input: unknown): { success: boolean } }
-  assert.equal(schema.safeParse({ repo: input.repo, taskEventId: 'forged' }).success, false)
-  await request.execute!({ repo: input.repo }, { toolCallId: 'approval', messages: [], context: {} })
-  assert.deepEqual(proposed.mock.calls.at(-1)!.arguments, ['owner', { repo: input.repo }, undefined, { eventId, botId: COORDINATOR_BOT }])
+  assert.equal(tools.request_repository_push_approval, undefined, 'push is what the GitHub App grants; Mikka asks for no approval of its own')
   const resumed = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true,  taskEventId: eventId, approvedRepositoryKey: 'v2:github.com/example/repository' })
   await resumed.dispatch_run!.execute!(input, { toolCallId: 'resumed-dispatch', messages: [], context: {} })
   assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:resumed-dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId, 'v2:github.com/example/repository'])

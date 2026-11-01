@@ -32,7 +32,8 @@ describe("permission policy (ADR 0009)", () => {
     ["run_project_script", "allow"],
     ["install_dependency", "allow"],
     ["write_outside_repo", "ask"],
-    ["git_push", "ask"],
+    // Push is what the GitHub App grants: only the server's explicit allow pushes.
+    ["git_push", "deny"],
     ["network", "allow"],
     ["computer_use", "ask"],
   ] as const)("%s -> %s", (action, expected) => {
@@ -138,17 +139,15 @@ describe("applying the workspace's policy (ADR 0028)", () => {
   })
 
   it("pushes by the workspace's choice and the repo's approval", () => {
-    expect(pushDecision(policy({}), false)).toEqual({
+    // Only the server's allow (an admitted GitHub App grant) pushes; nothing local stands in for it.
+    expect(pushDecision(policy({}))).toEqual({
       push: false,
-      note: "Push needs approval for this repo",
+      note: "Push is turned off for this run",
     })
-    expect(pushDecision(policy({}), true)).toEqual({ push: true })
-    expect(pushDecision(policy({ git_push: "allow" }), false)).toEqual({
-      push: true,
-    })
-    expect(pushDecision(policy({ git_push: "deny" }), true)).toEqual({
+    expect(pushDecision(policy({ git_push: "allow" }))).toEqual({ push: true })
+    expect(pushDecision(policy({ git_push: "deny" }))).toEqual({
       push: false,
-      note: "Push is turned off for this workspace",
+      note: "Push is turned off for this run",
     })
   })
 
@@ -165,7 +164,7 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     // Reading is the whole point of the check.
     expect(decide("read_in_worktree", { policy: p })).toBe("allow")
     // A read-only check never pushes, even on an approved repo.
-    expect(pushDecision(p, true)).toEqual({
+    expect(pushDecision(p)).toEqual({
       push: false,
       note: "A read-only check does not push",
     })
@@ -315,7 +314,7 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(asked).toContain("pre-authorized")
   })
   it('keeps project shell execution independent of daemon publication permission', () => {
-    for (const install of ['allow','ask','deny'] as const) for (const push of ['allow','ask','deny'] as const) {
+    for (const install of ['allow','ask','deny'] as const) for (const push of ['allow','deny'] as const) {
       const value=policy({install_dependency:install,git_push:push})
       expect(rawCliShellAvailable(value)).toBe(install==='allow')
       expect(rawCliShellAvailable({...value,readOnly:true})).toBe(false)

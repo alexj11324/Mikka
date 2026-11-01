@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { githubAppStub } from './support/github-app-stub'
 
 const mac = [{ harness: 'codex', installed: true, models: ['gpt-5'], defaultModelSlot: 'default' }]
 
@@ -20,7 +21,12 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const users: string[] = []
+  // Push is what the person granted on GitHub: the synthetic App is installed on octo/repo with contents: write.
+  const github = githubAppStub()
+  github.install('octo/repo', { contents: 'write', pull_requests: 'write' })
+  let githubAccount = 9_200_000
   t.after(async () => {
+    github.restore()
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM thread_machines WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM cloud_machines WHERE "ownerId" = ANY($1)', [users])
@@ -31,13 +37,17 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agents WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM repository_settings WHERE "userId" = ANY($1)', [users])
+    await pool.query('DELETE FROM github_repository_installations WHERE "userId" = ANY($1)', [users])
+    await pool.query('DELETE FROM account WHERE "userId" = ANY($1)', [users])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
   const person = async (label: string) => {
     const id = await seedUser(pool, label)
     users.push(id)
-    // A synthetic persisted push grant; the ordinary admission transaction still runs.
-    await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
+    // Their own GitHub account, which may write to octo/repo; the ordinary admission transaction still runs.
+    const githubAccountId = String(++githubAccount)
+    await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubAccountId, id])
+    github.allowWriter('octo/repo', githubAccountId)
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
     const issueId = await seedIssue(pool, id)
     // A numbered task, so its thread gets a publication branch.
@@ -84,26 +94,52 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
 
   await t.test('a read-only task runs without a repository push approval; a committing one says why it cannot', async () => {
     const r = await person('readonly')
-    await pool.query('DELETE FROM repository_settings WHERE "userId"=$1', [r.id])
     const deviceId = await onlineMac(r.id)
     const botId = await chatBotId(r.id, null, await ownWorkspace(r.id))
-    const refused = await steps.dispatchRun(r.id, { issueId: r.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { error: string; reason: string; detail: string }
+    // The App is not installed on octo/elsewhere.
+    const refused = await steps.dispatchRun(r.id, { issueId: r.issueId, repo: 'octo/elsewhere', requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { error: string; reason: string; detail: string }
     assert.equal(refused.error, 'runInvalid')
-    assert.equal(refused.reason, 'repositoryPushApprovalRequired', 'the Coordinator is told the real cause, not left to guess one')
-    assert.match(refused.detail, /readOnly: true/)
+    assert.equal(refused.reason, 'githubAppNotInstalled', 'the Coordinator is told the real cause, not left to guess one')
+    assert.match(refused.detail, /readOnly run can go ahead/)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [r.id])).rows[0].n, 0)
-    const queued = await steps.dispatchRun(r.id, { issueId: r.issueId, repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { runId: string; status: string }
+    const queued = await steps.dispatchRun(r.id, { issueId: r.issueId, repo: 'octo/elsewhere', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { runId: string; status: string }
     assert.equal(queued.status, 'queued')
     const run = (await pool.query('SELECT "deviceId","agentDefinition" FROM agent_runs WHERE id=$1', [queued.runId])).rows[0]
     assert.equal(run.deviceId, deviceId)
     assert.equal(run.agentDefinition.readOnly, true)
     assert.equal(run.agentDefinition.repositoryAdmission, undefined, 'a read-only run carries no push authority')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_publications WHERE "runId"=$1', [queued.runId])).rows[0].n, 0, 'no push branch is reserved')
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM repository_settings WHERE "userId"=$1', [r.id])).rows[0].n, 0, 'nothing granted a push approval')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [r.id])).rows[0].n, 0, 'nothing asked the person for an approval')
     const { persistRunCompletion } = await import('../lib/run-publications')
     await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`, [queued.runId])
     await persistRunCompletion(r.id, queued.runId, { stopReason: 'submitted', report: { summary: 'Findings reported.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } })
     assert.equal((await runOf(queued.runId)).status, 'succeeded', 'a read-only report has nothing to publish, so it is not blocked on a push')
+  })
+
+  await t.test('push follows the GitHub App grant: allowed without a card when granted, a clear reason when not', async () => {
+    const g = await person('github-grant')
+    await onlineMac(g.id)
+    const botId = await chatBotId(g.id, null, await ownWorkspace(g.id))
+    const dispatchTo = (repo: string) => steps.dispatchRun(g.id, { issueId: g.issueId, repo, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as Promise<{ error?: string; reason?: string; detail?: string; runId?: string; status?: string }>
+    const runs = async () => (await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [g.id])).rows[0].n
+    github.install('octo/read-only-app', { contents: 'read', pull_requests: 'write' })
+    const narrow = await dispatchTo('octo/read-only-app')
+    assert.equal(narrow.reason, 'githubAppPermissionRequired')
+    assert.match(narrow.detail!, /contents: write/)
+    assert.match(narrow.detail!, /https:\/\/github\.com\/apps\/mikka-github\/installations\/new/, 'the person is sent to GitHub, not to an approval in Mikka')
+    github.install('octo/suspended', { contents: 'write', suspended: true })
+    assert.equal((await dispatchTo('octo/suspended')).reason, 'githubAppSuspended')
+    github.install('octo/not-mine', { contents: 'write', pull_requests: 'write' })
+    assert.equal((await dispatchTo('octo/not-mine')).reason, 'githubAccessDenied', 'the App grant never lends one person\'s push to another')
+    assert.equal(await runs(), 0)
+    const queued = await dispatchTo('octo/repo')
+    assert.equal(queued.status, 'queued')
+    const run = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [queued.runId])).rows[0]
+    assert.equal(run.agentDefinition.repositoryAdmission.authority, 'github_app')
+    assert.equal((await pool.query('SELECT "pushApproved" FROM run_publications WHERE "runId"=$1', [queued.runId])).rows[0].pushApproved, true)
+    assert.ok((await pool.query('SELECT "pushGrantedAt" FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2', [g.id, normalizeRepository('octo/repo').key])).rows[0].pushGrantedAt)
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [g.id])).rows[0].n, 0, 'no approval card')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM repository_settings WHERE "userId"=$1 AND push IS NOT NULL', [g.id])).rows[0].n, 0, 'no Mikka-side push approval is involved')
   })
 
   await t.test('(b) no E2B and an online Mac with 允许自动调度 on: a cloud rule runs on the Mac', async () => {

@@ -30,7 +30,8 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const { factoryStore, dispatchFactoryRun, factoryQuestions } = await import('../lib/factory/server')
   const { factoryBinding } = await import('../lib/factory/dispatch')
   const { questionReference } = await import('../lib/factory/questions/store')
-  const { writeRepositoryPushApproval } = await import('../lib/repository-approval-write')
+  const { recordPushGrant } = await import('./support/github-app-stub')
+  const clearPushGrant = (userId: string, key: string) => pool.query('UPDATE github_repository_installations SET "pushGrantedAt"=null WHERE "userId"=$1 AND "remoteKey"=$2', [userId, key])
   const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')
   const { previewPersonalScope, changeIssueScopeLocally } = await import('../lib/issue-scope-store')
   const fixtures: Fixture[] = []
@@ -54,8 +55,8 @@ test('real Factory admission preserves host scope, policy and transaction owners
     return id
   }
   // Factory's repositories are authorized: by default the fixture records the
-  // owner's repository push approval, as the human decision would. A push
-  // needs it and git_push together (`approved: false` leaves it unrecorded).
+  // GitHub App grant a live check would have found (contents: write, the
+  // owner's own write access). `approved: false` leaves it unrecorded.
   async function fixture(options: { permission?: 'allow' | 'ask' | 'deny'; destination?: unknown | 'selected'; delivered?: boolean; approved?: boolean } = {}): Promise<Fixture> {
     const id = randomUUID(), userId = `factory-admission-${id}`
     const remoteUrl = `https://github.com/mikka-ci/admission-${id}.git`
@@ -71,7 +72,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
     const f = { ...identity, eventId, task: routed.task }
     fixtures.push(f)
     await policy(f, options.permission ?? 'allow')
-    if (options.approved !== false) await writeRepositoryPushApproval(userId, identity.remoteKey, true)
+    if (options.approved !== false) await recordPushGrant(pool, userId, identity.remoteKey)
     return f
   }
   const dispatch = (f: Fixture, tx?: PoolClient) => dispatchFactoryRun(f.userId, { binding: factoryBinding(f.task), agentId: f.agentId, deviceRepoId: f.repoId }, tx)
@@ -108,14 +109,14 @@ test('real Factory admission preserves host scope, policy and transaction owners
   try {
     assert.equal(String((await pool.query('SHOW server_version_num')).rows[0].server_version_num).slice(0, 2), '17')
 
-    await t.test('configured allow with the repository approval queues a NULL-issue Factory source through the real public admission store', async () => {
+    await t.test('configured allow with the GitHub App grant queues a NULL-issue Factory source through the real public admission store', async () => {
       const f = await fixture()
       assert.equal((await pool.query('SELECT "issueId" FROM coordinator_events WHERE id=$1', [f.eventId])).rows[0].issueId, null)
       const admitted = await dispatch(f)
       const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [admitted.runId])).rows[0]
       const publication = (await pool.query('SELECT * FROM run_publications WHERE "runId"=$1', [admitted.runId])).rows[0]
-      assert.equal(run.agentDefinition.repositoryAdmission.authority, 'repository_approval')
-      assert.equal(run.agentDefinition.repositoryAdmission.approvedAt, (await pool.query('SELECT push FROM repository_settings WHERE "userId"=$1 AND "remoteKey"=$2', [f.userId, f.remoteKey])).rows[0].push.approvedAt)
+      assert.equal(run.agentDefinition.repositoryAdmission.authority, 'github_app')
+      assert.equal(run.agentDefinition.repositoryAdmission.approvedAt, (await pool.query('SELECT "pushGrantedAt" FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2', [f.userId, f.remoteKey])).rows[0].pushGrantedAt.toISOString())
       assert.equal(run.agentDefinition.repositoryAdmission.remoteKey, f.remoteKey)
       assert.equal(run.dispatchKey, `factory:${f.task.attemptId}`)
       assert.equal(publication.scopeVersion, 1)
@@ -125,16 +126,17 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await dispatch(f)).runId, admitted.runId)
       assert.deepEqual(await rowsFor(f), before)
       await assert.rejects(queueRun(f.userId, publicInput(f, `another:${randomUUID()}`)), /runAlreadyActive/, 'an internal Factory run still participates in the ordinary active-task gate')
-      assert.equal((await pool.query('SELECT count(*)::int AS n FROM repository_settings WHERE "userId"=$1', [f.userId])).rows[0].n, 1, 'the admission rests on the one recorded repository approval')
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM github_repository_installations WHERE "userId"=$1 AND "pushGrantedAt" IS NOT NULL', [f.userId])).rows[0].n, 1, 'the admission rests on the one recorded GitHub App grant')
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [f.userId])).rows[0].n, 0, 'no approval card')
     })
 
-    await t.test('configured allow without a repository approval admits nothing', async () => {
+    await t.test('configured allow without a GitHub App grant admits nothing', async () => {
       const f = await fixture({ approved: false })
       const before = await rowsFor(f)
       await assert.rejects(dispatch(f), /runInvalid/)
       await assert.rejects(queueRun(f.userId, publicInput(f, `allow:${randomUUID()}`)), /runInvalid/)
       assert.deepEqual(await rowsFor(f), before)
-      assert.equal((await pool.query('SELECT count(*)::int AS n FROM repository_settings WHERE "userId"=$1', [f.userId])).rows[0].n, 0, 'nothing granted a repository approval on the owner\'s behalf')
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM github_repository_installations WHERE "userId"=$1', [f.userId])).rows[0].n, 0, 'nothing recorded a grant on the owner\'s behalf')
     })
 
     await t.test('caller-owned rollback removes queue, publication, binding and dispatch receipt together', async () => {
@@ -176,21 +178,19 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await rowsFor(f)).runs, 0)
     })
 
-    await t.test('persistent deny wins over an older repository grant and ask still requires a valid grant', async () => {
+    await t.test('a persistent deny wins over the GitHub App grant; ask needs only the grant, never a card', async () => {
       const denied = await fixture({ permission: 'deny' })
-      await writeRepositoryPushApproval(denied.userId, denied.remoteKey, true)
       await assert.rejects(dispatch(denied), /runInvalid/)
       assert.equal((await rowsFor(denied)).runs, 0)
       const ask = await fixture({ permission: 'ask', approved: false })
       await assert.rejects(dispatch(ask), /runInvalid/)
-      await writeRepositoryPushApproval(ask.userId, ask.remoteKey, true)
+      await recordPushGrant(pool, ask.userId, ask.remoteKey)
       const allowed = await dispatch(ask)
-      assert.equal((await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [allowed.runId])).rows[0].agentDefinition.repositoryAdmission.authority, 'repository_approval')
+      assert.equal((await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [allowed.runId])).rows[0].agentDefinition.repositoryAdmission.authority, 'github_app')
     })
 
     await t.test('policy contention precedes Factory task and worker locks, and the committed deny governs admission', async () => {
       const f = await fixture()
-      await writeRepositoryPushApproval(f.userId, f.remoteKey, true)
       const locker = await pool.connect()
       let pending: Promise<{ accepted: boolean; error?: unknown }> | undefined
       try {
@@ -228,12 +228,12 @@ test('real Factory admission preserves host scope, policy and transaction owners
           await locker.query('BEGIN')
           const pid = (await locker.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
           if (held === 'policy') await lockCliAgentPolicy(locker, f.userId, f.agentId, null)
-          else await locker.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['repository-approval', f.userId, f.remoteKey])])
+          else await locker.query('SELECT 1 FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2 FOR UPDATE', [f.userId, f.remoteKey])
           pending = factoryQuestions.answer({ source: 'orchestrator', userId: f.userId }, input)
           settled = pending.then(() => ({ accepted: true }), error => ({ accepted: false, error }))
           await waitBlockedBy(pid)
           if (held === 'policy') await locker.query('SELECT id FROM factory_tasks WHERE id=$1 FOR UPDATE NOWAIT', [f.task.id])
-          else assert.equal((await locker.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS available', [JSON.stringify(['dispatch-issue', f.userId, f.issueId])])).rows[0].available, true, 'question continuation must wait for repository approval before holding dispatch-issue')
+          else assert.equal((await locker.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS available', [JSON.stringify(['dispatch-issue', f.userId, f.issueId])])).rows[0].available, true, 'question continuation must wait for the GitHub App grant before holding dispatch-issue')
           await locker.query('SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE NOWAIT', [origin.runId])
           await locker.query('COMMIT')
           const outcome = await settled
@@ -259,7 +259,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const secondEvent = await addEvent(f, { bound: true, destination })
       await assert.rejects(queueRun(f.userId, input, null, undefined, secondEvent), /runDispatchKeyConflict/)
       await policy(f, 'deny')
-      await writeRepositoryPushApproval(f.userId, f.remoteKey, false)
+      await clearPushGrant(f.userId, f.remoteKey)
       assert.deepEqual(await queueRun(f.userId, input, null, undefined, firstEvent), { runId: first.runId, status: 'queued', replayed: true })
       assert.deepEqual((await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [first.runId])).rows[0].agentDefinition, before)
       await assert.rejects(queueRun(f.userId, { ...input, requestKey: `fresh:${randomUUID()}` }, null, undefined, secondEvent), /runInvalid/)

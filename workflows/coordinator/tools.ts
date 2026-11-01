@@ -93,13 +93,6 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: (input, options) => steps.updateIssue(userId, input, options.toolCallId, scope, botId),
     }),
     } : {}),
-    request_repository_push_approval: tool({
-      description: 'Request the person’s explicit approval to push to this repository. This only creates a confirmation; never claim approval until the person decides.',
-      inputSchema: z.object({ repo: z.string().trim().min(1).max(4000) }).strict(),
-      execute: input => options.taskEventId
-        ? steps.proposeRepositoryPushApproval(userId, input, scope, { eventId: options.taskEventId, botId })
-        : steps.proposeRepositoryPushApproval(userId, input, scope, { botId }),
-    }),
     ...(issueMutationsEnabled() && process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? {
       dispatch_factory_task: tool({description:'Dispatch an authorized pending Factory attempt through its current binding. No permission is granted by dispatch.',inputSchema:factoryDispatchSchema,execute:input=>steps.dispatchFactoryTask(userId,input,scope,botId)}),
       recover_factory_check: tool({description:'Request an evidence-bound recovery judgment from the existing decision model. Supply only the current binding. Missing/refused evidence stays pending; no permission is granted and no run is dispatched.',inputSchema:factoryCheckRecoverySchema,execute:(input,call)=>steps.recoverFactoryCheck(userId,input,call.toolCallId,scope,botId)}),
