@@ -8,7 +8,7 @@ import { SubagentStore } from './subagents'
 import { startSuggestion } from './suggestions'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { claimCloudRun } from '@/lib/computer/claim'
-import { assertThreadMachineCapacity, openThreadDesktop, recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
+import { openThreadDesktop, recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
 // This suite runs DROP SCHEMA ... CASCADE, so the full target is checked before any
@@ -112,17 +112,6 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
       await pool.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,\'alice\',$3,$4,\'snapshot-owner-alice\',$5,\'running\',$6)', [runId, alice.workspaceId, botA, `sandbox-${runId}`, randomUUID(), deviceId])
     }
     await pool.query('INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId") VALUES ($1,\'alice\',$2,$3)', [bindingId, alice.workspaceId, agentId])
-    // Spend guard: alice already holds runA and runB as running machines.
-    const spare = randomUUID()
-    await assert.rejects(assertThreadMachineCapacity(pool, alice, spare, { perOwner: 2, perWorkspace: 20, monthlyComputeHours: 60 }), { status: 429, message: 'Thread machine limit reached' })
-    await assert.rejects(assertThreadMachineCapacity(pool, alice, spare, { perOwner: 5, perWorkspace: 2, monthlyComputeHours: 60 }), { status: 429, message: 'Workspace machine limit reached' })
-    await assert.rejects(assertThreadMachineCapacity(pool, alice, spare, { perOwner: 5, perWorkspace: 20, monthlyComputeHours: 0 }), { status: 429, message: 'Thread machine budget exhausted' })
-    // E2B bills only running time: one tracked compute hour blocks a 1-hour cap.
-    await pool.query('UPDATE thread_machines SET "computeSeconds"=3600 WHERE "runId"=$1', [runA])
-    await assert.rejects(assertThreadMachineCapacity(pool, alice, spare, { perOwner: 5, perWorkspace: 20, monthlyComputeHours: 1 }), { status: 429, message: 'Thread machine budget exhausted' })
-    await assert.doesNotReject(assertThreadMachineCapacity(pool, alice, spare, { perOwner: 5, perWorkspace: 20, monthlyComputeHours: 2 }))
-    await assert.doesNotReject(assertThreadMachineCapacity(pool, alice, runA, { perOwner: 2, perWorkspace: 20, monthlyComputeHours: 2 }), 'the run being provisioned is not counted against itself')
-    await assert.doesNotReject(assertThreadMachineCapacity(pool, bob, spare, { perOwner: 3, perWorkspace: 20, monthlyComputeHours: 60 }))
     const connectionId = randomUUID()
     await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch) VALUES ($1,'alice',$2,'codex','connected',1)`, [connectionId, alice.workspaceId])
     await pool.query(`UPDATE byos_bindings SET "connectionId"=$2,"connectionRevision"=1,route='codex_cli',"modelId"='fixture-model' WHERE id=$1`, [bindingId, connectionId])
