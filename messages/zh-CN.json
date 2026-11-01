@@ -3715,6 +3715,11 @@
     "enterAgain": "重新输入",
     "retry": "重试"
   },
+  "Reactions": {
+    "list": "表情回应",
+    "others": "{emoji}：{count} 人",
+    "mine": "{emoji}：{others, plural, =0 {你} other {你和另外 # 人}}"
+  },
   "GroupChat": {
     "untitled": "未命名群聊",
     "composer": "给 {name} 发消息",

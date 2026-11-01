@@ -3715,6 +3715,11 @@
     "enterAgain": "Enter another code",
     "retry": "Retry"
   },
+  "Reactions": {
+    "list": "Reactions",
+    "others": "{emoji}: {count, plural, one {# person} other {# people}}",
+    "mine": "{emoji}: {others, plural, =0 {just you} one {you and # other} other {you and # others}}"
+  },
   "GroupChat": {
     "untitled": "Untitled group chat",
     "composer": "Message {name}",

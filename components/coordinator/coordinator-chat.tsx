@@ -32,6 +32,7 @@ import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
 import { ThreadCard } from './thread-card'
 import { ToolsUsed } from './tools-used'
+import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
 import { UnreadDivider } from '@/components/chat/unread-divider'
@@ -201,6 +202,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const rootRef = useRef<HTMLElement>(null)
   // Events are system lines, not messages; the person's own messages never count as unread.
   const unreadItems = useMemo(() => items.filter(item => item.from !== 'event').map(item => ({ position: item.position, messageId: item.id ?? String(item.position), own: item.from === 'person', reportable: !item.pending })), [items])
+  // Reactions people gave on the phone (decision 2026-11-01-0030-mobile-reactions); a pending row has none yet.
+  const reactions = useMessageReactions(items.map(item => item.pending || item.from === 'event' ? null : item.id))
   const unread = useUnreadIndicators({ conversationId: botId ? `bot:${botId}` : 'coordinator', items: unreadItems, rootRef })
   const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
   const sources = data?.sources
@@ -330,6 +333,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                       const run = sources?.[id]
                       return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} /> : null
                     })}
+                    {item.id && <MessageReactions reactions={reactions[item.id]} align={item.from === 'person' ? 'end' : 'start'} />}
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
                     {footerTools(item).length > 0 && <MessageFooter><ToolsUsed tools={footerTools(item)} /></MessageFooter>}
                   </MessageContent></Message>}
