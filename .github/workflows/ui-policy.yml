@@ -6,8 +6,8 @@ name: CI
 # - pull_request: premerge checks (same-repo and fork PRs);
 # - merge_group: synthetic queue candidate, if a queue is enabled later;
 # - push main: postmerge verification of each distinct main commit.
-# Browser acceptance has its own smoke/targeted PR and full main/nightly tiers
-# in browser-tests.yml. Preserve the existing protected status-check names.
+# CI runs no browser tests (decision 2026-11-01-1520). Preserve the existing
+# protected status-check names.
 on:
   push:
     branches: [main]
@@ -129,7 +129,7 @@ jobs:
       - run: pnpm test:factory-check-recovery
       - run: pnpm test:factory-routing
       - run: pnpm test:self-improvement-semantic-source
-      - run: node --test scripts/ci-docs-only.test.mjs scripts/ci-browser-tests.test.mjs
+      - run: node --test scripts/ci-docs-only.test.mjs
       - run: pnpm test:ui-policy
       - run: pnpm test:motion
       - run: pnpm test:i18n
@@ -183,7 +183,7 @@ jobs:
       - uses: ./.github/actions/pnpm-install
       - run: pnpm test:active-agents
         env:
-          # Database regressions run against ephemeral Postgres in browser-tests below.
+          # Database regressions run against ephemeral Postgres in browser-tests-full below.
           MIKKA_DATABASE_URL: ""
       - run: pnpm test:auth-composio
       - name: Test environment binding and fail-closed guards
@@ -387,7 +387,7 @@ jobs:
           done
 
   browser-tests-full:
-    # Browser tests moved to browser-tests.yml; this job keeps the build and
+    # CI runs no browser tests (decision 2026-11-01-1520); this job keeps the
     # database suites that the required check names cover.
     name: Database checks (${{ matrix.shard }}/4)
     needs: changes

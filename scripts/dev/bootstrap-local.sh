@@ -120,7 +120,7 @@ if [ "$("${PSQL[@]}" -d mikka_e2e -c "SELECT obj_description('public'::regnamesp
 fi
 
 log "ready"
-# CI's registration limits (.github/workflows/browser-tests.yml): every local signup shares one IP,
+# Local registration limits (also the fallback in lib/abuse/signup.ts): every local signup shares one IP,
 # so the production default of 5 an hour turns browser tests into 429s.
 LIMITS="MIKKA_SIGNUP_IP_HOURLY=1000 MIKKA_SIGNUP_GLOBAL_HOURLY=10000 MIKKA_VERIFICATION_IP_HOURLY=1000 MIKKA_VERIFICATION_GLOBAL_HOURLY=10000"
 echo "export PATH=$NODE_DIR:\$PATH E2E_DATABASE_URL=$DB_URL MIKKA_DATABASE_URL=$DB_URL DATABASE_URL=$DB_URL MIKKA_TEST_DB_PORT=$PG_PORT $LIMITS$PW_EXPORTS"

@@ -102,7 +102,7 @@ export function signupLimits(
     const n = Number(value)
     return Number.isSafeInteger(n) && n > 0 ? n : fallback
   }
-  // Locally, CI's limits (.github/workflows/browser-tests.yml) unless set explicitly.
+  // Locally, the limits scripts/dev/bootstrap-local.sh exports unless set explicitly.
   const local = localTestSignups(env)
   return {
     signupIp: positive(env.MIKKA_SIGNUP_IP_HOURLY, local ? 1000 : 5),
