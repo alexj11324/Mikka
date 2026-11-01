@@ -30,6 +30,7 @@ async function seedCardTasks(email: string, botTask: string, prTask: string) {
       await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, harness, `Board ${harness}`])
       await pool.query('INSERT INTO agent_runs (id, "userId", "issueId", "agentId", "botId", status, prompt, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [randomUUID(), user.id, issue.id, agentId, botId, status, 'Board card fixture', minutes(age)])
     }
+    return user.id
   } finally {
     await pool.end()
   }
@@ -104,10 +105,12 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
     await register(page, '/', email)
     await seedTask(page, 'Bot 负责的看板任务', { status: 'doing' })
     await seedTask(page, '只有 PR 的看板任务', { status: 'todo' })
-    await seedCardTasks(email, 'Bot 负责的看板任务', '只有 PR 的看板任务')
-    // GitHub is not connected here: the icon falls back to the state saved on the task. A controlled
-    // 200 body, as in github-integration, keeps the expected refusal out of the console.
-    await page.route('**/api/github/pull-request-status', route => route.fulfill({ json: { error: 'githubNotConnected' } }))
+    const viewerId = await seedCardTasks(email, 'Bot 负责的看板任务', '只有 PR 的看板任务')
+    // GitHub's answer for this viewer, as in github-integration: #95 merged, #96 open.
+    await page.route('**/api/github/pull-request-status', route => {
+      const { url } = route.request().postDataJSON() as { url: string }
+      return route.fulfill({ json: { viewerId, state: url.endsWith('/95') ? 'merged' : 'open' } })
+    })
     await page.goto(app('/'))
     await rail(page, '看板').click()
 
@@ -133,7 +136,7 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
     // A task with nobody on it draws no assignee placeholder.
     await expect(prCard.locator('[data-slot="avatar-group"]')).toHaveCount(0)
 
-    // PR icons carry their state: merged violet, open green.
+    // PR icons carry the state GitHub confirmed: merged violet, open green.
     await expect(botCard.getByRole('link', { name: /pull\/95$/ }).locator('svg')).toHaveClass(/text-info-foreground/)
     await expect(prCard.getByRole('link', { name: /pull\/96$/ }).locator('svg')).toHaveClass(/text-success-foreground/)
 
