@@ -83,7 +83,8 @@ export async function listThreads(): Promise<Thread[]> {
     ownerId: agentRuns.userId, deviceId: devices.id, deviceName: devices.name, deviceType: devices.deviceType,
     deviceEnabled: devices.enabled, lastSeenAt: devices.lastSeenAt,
     harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`,
-    superseded: sql<boolean>`exists (select 1 from agent_runs retry where retry."retryOf" = ${agentRuns.id})`,
+    // A retry, or the next run of the same thread after a new dispatch (lib/thread-dispatch.ts), takes its row.
+    superseded: sql<boolean>`exists (select 1 from agent_runs retry where retry."retryOf" = ${agentRuns.id} or retry."continuesRunId" = ${agentRuns.id})`,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
     .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)

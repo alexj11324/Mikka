@@ -132,3 +132,20 @@ test('dispatch uses the same host event as task creation and exposes no event ar
   await resumed.dispatch_run!.execute!(input, { toolCallId: 'resumed-dispatch', messages: [], context: {} })
   assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:resumed-dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId, 'v2:github.com/example/repository'])
 })
+
+test('one task, one thread: dispatch takes newThread from the model but the person\'s message only from the host', async () => {
+  const sourceEventId = 'b4000000-0000-4000-8000-000000000007'
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true, sourceEventId })
+  const dispatch = tools.dispatch_run!
+  // Retrying or adding information goes to the existing thread; only an explicit request may start another.
+  assert.match(String(dispatch.description), /one thread at a time/)
+  assert.match(String(dispatch.description), /never to start over/)
+  assert.match(COORDINATOR_INSTRUCTIONS, /Never dispatch a second thread/)
+  const schema = dispatch.inputSchema as { safeParse(input: unknown): { success: boolean; data?: Record<string, unknown> } }
+  const input = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository', newThread: true }
+  assert.equal(schema.safeParse(input).success, true)
+  // A model-supplied message id is not part of the tool's input.
+  assert.equal('sourceEventId' in (schema.safeParse({ ...input, sourceEventId: 'forged' }).data ?? {}), false)
+  await dispatch.execute!({ ...input, sourceEventId: 'forged' } as typeof input, { toolCallId: 'again', messages: [], context: {} })
+  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', { ...input, requestKey: 'dispatch:again', sourceEventId }, undefined, COORDINATOR_BOT, undefined])
+})
