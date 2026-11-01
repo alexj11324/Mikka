@@ -180,7 +180,8 @@ async function completionTransaction(userId: string, runId: string, completion: 
       const resetsAt = completion.report?.resetsAt ?? null
       const report = await prepareRunCompletionEffects(client, run, completion, factoryBound)
       let status: RunStatus = paused ? 'paused' : runStateForStop(completion.stopReason)
-      if (completion.stopReason === 'submitted' && run.kind !== 'plan') {
+      // A read-only run reports; it has nothing to publish, like a plan.
+      if (completion.stopReason === 'submitted' && run.kind !== 'plan' && !run.agentDefinition?.readOnly) {
         if (report?.verify.status === 'failed') status = 'failed'
         else if (report?.verify.status !== 'passed') {
           const gate = publicationGate({ stopReason: completion.stopReason, kind: run.kind, report: report ?? null, assignment: publication ?? null })

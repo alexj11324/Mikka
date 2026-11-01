@@ -197,3 +197,11 @@ test('a claim without a publication never forwards git_push allow as a push gran
  assert.equal(body.policy.permissions.git_push,'ask');assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny')
  assert.equal(cliPolicy.permissions.git_push,'allow','the stored CLI policy is unchanged')
 })
+
+test('a read-only local run gets no push branch and a read-only policy, whatever git_push says', async () => {
+ definition={...frozen(),readOnly:true};cliPolicy.permissions.git_push='allow'
+ const response=await request();assert.equal(response.status,200);const body=await response.json()
+ assert.equal(prepared.mock.callCount(),0,'a read-only run reserves no publication')
+ assert.equal(body.pushBranch,undefined);assert.equal(body.github,undefined)
+ assert.equal(body.policy.readOnly,true);assert.equal(body.policy.permissions.git_push,'deny')
+})

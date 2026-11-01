@@ -163,6 +163,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         issueId: id, agentId: id.optional(),
         repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
+        readOnly: z.boolean().optional().describe('true when the task only reads and reports (investigation, review): no file changes, commit, push or PR. A read-only run needs no repository push approval.'),
       }),
       execute: (input,call) => {
         const request={...input,requestKey:`dispatch:${call.toolCallId}`}

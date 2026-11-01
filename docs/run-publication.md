@@ -54,6 +54,16 @@ cache push approval. The daemon uses the same policy for fetching the previous
 task branch and pushing the next commit, with local git credentials and no
 force push. Settings revocation blocks subsequent claims and server PR creation.
 
+A read-only run (`dispatch_run` with `readOnly: true`: an investigation or
+review that changes nothing) is admitted without the repository approval,
+because it never pushes. Its frozen definition carries `readOnly`; it gets no
+admission receipt, no publication or push branch, and claim sends the
+read-only policy (`git_push`, writes and scripts denied), whatever the CLI
+policy says. It ends `succeeded` with its report and publishes nothing. A run
+that may commit still needs both gates; when admission refuses it, the error is
+`runInvalid` with a `reason` (for example `repositoryPushApprovalRequired`)
+and a sentence the Coordinator acts on (`lib/run-invalid-reason.ts`).
+
 ## Completion and retries
 
 The first completion, worker-token revocation, issue/history changes and final
