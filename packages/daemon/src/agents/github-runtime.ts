@@ -116,18 +116,20 @@ export async function agentPublishedReceipt(input: {
     }
     try {
       const gh = (args: string[]) => execa(join(receiptDir, 'github', 'bin', 'gh'), args, { cwd: input.worktree, env, extendEnv: false, stdin: 'ignore' })
-      // Hosted runs commit in a container-private clone. Verify GitHub's exact
-      // commit/tree rather than reading any config from that writable clone.
-      if (input.hosted) {
-        const object = JSON.parse((await gh(['api', `repos/${input.github.repository}/git/commits/${commit}`])).stdout)
-        if (object.sha !== commit || object.tree?.sha !== input.tree) throw new Error('Uncommitted hosted changes')
-      }
-      const pr = JSON.parse((await gh(['pr', 'view', input.github.branch, '--repo', input.github.repository, '--json', 'headRefOid,body'])).stdout)
-      if (pr.headRefOid !== commit || typeof pr.body !== 'string' || !pr.body.trimEnd().endsWith(`<!-- mikka-issue:${input.github.issueId} -->`)) throw new Error('Unbound pull request')
       const [owner, repository] = input.github.repository.split('/')
       const query = 'query($owner:String!,$repository:String!,$commit:GitObjectID!){repository(owner:$owner,name:$repository){object(oid:$commit){... on Commit {oid statusCheckRollup{state}}}}}'
-      const checks = JSON.parse((await gh(['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `repository=${repository}`, '-f', `commit=${commit}`])).stdout)
-      const checked = checks.data?.repository?.object
+      // These reads share the fixed remote SHA. Settle every child before
+      // removing its private credential helper, including when one fails.
+      const [object, pr, checks] = await Promise.allSettled([
+        // Hosted runs verify GitHub's tree, never the writable clone's config.
+        input.hosted ? gh(['api', `repos/${input.github.repository}/git/commits/${commit}`]).then(result => JSON.parse(result.stdout)) : null,
+        gh(['pr', 'view', input.github.branch, '--repo', input.github.repository, '--json', 'headRefOid,body']).then(result => JSON.parse(result.stdout)),
+        gh(['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `repository=${repository}`, '-f', `commit=${commit}`]).then(result => JSON.parse(result.stdout)),
+      ])
+      if (object.status === 'rejected' || pr.status === 'rejected' || checks.status === 'rejected') throw new Error('GitHub receipt lookup failed')
+      if (input.hosted && (object.value.sha !== commit || object.value.tree?.sha !== input.tree)) throw new Error('Uncommitted hosted changes')
+      if (pr.value.headRefOid !== commit || typeof pr.value.body !== 'string' || !pr.value.body.trimEnd().endsWith(`<!-- mikka-issue:${input.github.issueId} -->`)) throw new Error('Unbound pull request')
+      const checked = checks.value.data?.repository?.object
       if (checked?.oid !== commit || checked.statusCheckRollup?.state !== 'SUCCESS') throw new Error('Incomplete CI')
     } catch { throw new Error('The task pull request and successful CI must match the submitted commit') }
     if (input.hosted) {

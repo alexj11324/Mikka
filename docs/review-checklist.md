@@ -120,6 +120,22 @@ more than once.
 6. Squash-merged to main by the coordinator on green CI, after the screenshots
    are reviewed ([dev workflow](dev-workflow.md) § 5).
 
+## Common-sense check (every PR)
+
+Every PR review goes through these one by one, UI or not. For each, compare
+with what Slack, Notion, Cursor and ChatGPT do.
+
+- [ ] A person can always use, delete and manage their own things:
+      subscriptions, keys, computers, bots, files, settings. Switches and
+      admin permissions govern only sharing with others
+      ([decision 2026-11-01-2240](design/decisions/2026-11-01-2240-own-credentials-always-usable.md)).
+- [ ] The value on screen is the value that is stored.
+- [ ] The default works: no unusable option selected by default, and nothing
+      shown online that is not.
+- [ ] The same feature behaves the same on the phone and on the web.
+- [ ] A refusal or error matches the person's real state: someone with a
+      connected subscription is never told to connect one.
+
 ## Pull requests
 
 - One topic per PR. Title in the repo's commit style (`feat(scope): …`,

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { motion } from 'motion/react'
 import { useTranslations } from 'next-intl'
 import { Clock, FileText, Maximize2, Minimize2, Search, Trash2, X, type LucideIcon } from 'lucide-react'
 import useSWR from 'swr'
@@ -16,7 +15,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PR_GROUPS, pullRequestsOf } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
-import { SPRING_SIDEBAR } from '@/lib/ease'
 import { LetterAvatar } from './letter-avatar'
 import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
@@ -161,7 +159,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   /** The current workspace; its E2B key decides whether the 电脑 tab shows the screen or 添加 E2B API Key. */
   workspaceId?: string
   /** A thread row opens that thread in the centre column (R-50: the panel never replaces the chat with a task page). */
-  onOpenThread: (thread: { issueId: string; runId: string }) => void
+  onOpenThread: (thread: { issueId: string | null; runId: string }) => void
   onClose: () => void
   /** Shown in a Sheet below xl, where the column has no room. */
   sheet?: boolean
@@ -183,7 +181,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
     resizeTo(width >= WIDE ? max : WIDE)
   }
   const asideRef = useRef<HTMLElement>(null)
-  // The content keeps the panel's full width while it opens or closes, so it is clipped, not squeezed.
+  // The panel's width, also the content's minimum, so the content is clipped, not squeezed, when the window is narrow.
   useLayoutEffect(() => { asideRef.current?.style.setProperty('--context-panel-width', `${width}px`) }, [width])
   // Only an ordinary bot's name and look are edited here; the Coordinator keeps its own.
   const botId = conversation.kind === 'bot' ? conversation.id ?? null : null
@@ -208,9 +206,8 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   // The panel keeps its transparent pills while Alex compares them with the shared segmented control (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md);
   // `indicator: false` opts out of the gliding pill. To switch, drop `pillTab` and the list overrides.
   const pillTab = { className: pill, indicator: false }
-  // R-37: opening, closing and widening move the width on a spring; while the edge is dragged
-  // the width follows the pointer with no spring.
-  return <motion.aside ref={asideRef} aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width }} exit={sheet ? undefined : { width: 0 }} transition={dragging ? { duration: 0 } : SPRING_SIDEBAR} className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l bg-background xl:flex', dragging && 'select-none')}>
+  // R-37: opening, closing and widening are instant, no motion (decision 2026-11-01-2320); dragging the edge follows the pointer.
+  return <aside ref={asideRef} aria-label={t('label')} className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden w-(--context-panel-width) overflow-hidden border-l bg-background xl:flex', dragging && 'select-none')}>
     {/* Drag the inner edge or use the arrow keys on it to resize the panel; double-click it to reset. */}
     {!sheet && <ResizeHandle resize={resize} label={t('resize')} edge="start" onDoubleClick={() => setBeforeWide(null)} />}
     <Tabs value={view} onValueChange={value => setView(value as PanelView)} className={cn('min-h-0 flex-1 gap-0', !sheet && 'min-w-[var(--context-panel-width,22.5rem)]')}>
@@ -259,5 +256,5 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
         <ThreadResults threads={threads} shown={filter(threads)} issues={issues} all onOpenThread={onOpenThread} />
       </TabsContent>
     </Tabs>
-  </motion.aside>
+  </aside>
 }

@@ -1,10 +1,10 @@
 import { Pool } from 'pg'
-import { test, expect, register, registerInTeam } from './fixtures'
+import { test, expect, registerInTeam } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
 // N5 密钥与环境 (Figma 554:9120) against the real secrets store (ephemeral WORKSPACE_SECRETS_KEY in CI).
 test('管理员添加、编辑和删除密钥，值不回显', async ({ page }, testInfo) => {
-  await register(page, '/settings?section=secrets')
+  await registerInTeam(page, '/settings?section=secrets')
   await expect(page.getByRole('heading', { level: 1, name: '密钥与环境' })).toBeVisible()
   await expect(page.getByText('还没有密钥。')).toBeVisible()
   // The E2B key is personal now: it is under 账号 › API 与订阅, not the workspace's 密钥与环境.

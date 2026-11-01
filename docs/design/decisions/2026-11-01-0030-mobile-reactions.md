@@ -25,4 +25,7 @@
   - Reactions show under the message as chips, with a count past one. Tapping
     the person's own chip removes it.
   - They work in bot chats and group chats. The server keeps them
-    (`message_reactions`). 现状（非决定）：the web does not show them yet.
+    (`message_reactions`). 现状（非决定）：the web shows them under the message
+    as the same chips; reacting is on the phone. Group chats read them from
+    `GET /api/mobile/reactions`; bot chats show them once that route also
+    returns the person's own bot-chat messages (backend, open).

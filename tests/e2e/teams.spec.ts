@@ -52,7 +52,7 @@ function boardCard(page: Page, title: string) {
 
 test('公开团队创建、搜索、编辑、负责人保护、任务归属和项目多团队关联', async ({ page }) => {
   test.setTimeout(180000)
-  await register(page, '/settings/teams')
+  await registerInTeam(page, '/settings/teams')
   await createTeam(page, '产品团队', 'PRODUCT')
   await createTeam(page, '工程团队', 'ENGINEER')
   await page.getByRole('textbox', { name: '搜索团队', exact: true }).fill('PRODUCT')

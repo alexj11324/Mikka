@@ -86,8 +86,12 @@ export function settingsHref(id: SettingsSectionId, workspaceId?: string): strin
   return `/settings?${search}`
 }
 
-/** A personal workspace has only its owner, so it has no members, team permissions or audit log (decision 2026-10-31-2130). */
-export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'permissions', 'audit'])
+/**
+ * A personal workspace shows the account group and its own 用量 and 计费, no
+ * team setting (decision 2026-11-01-2310): no 常规, 成员, 团队, Bot 与 Agents,
+ * 团队权限, 密钥与环境 or 审计日志.
+ */
+export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['general', 'members', 'teams', 'bots', 'permissions', 'secrets', 'audit'])
 
 export function visibleSettingsSections({ admin, personal = false }: { admin: boolean; personal?: boolean }): SettingsSectionDef[] {
   return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)))

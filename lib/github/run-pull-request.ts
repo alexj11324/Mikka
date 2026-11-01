@@ -98,11 +98,15 @@ async function repositoryAccess(options: Options, need: 'push' | 'pull_request' 
   const metadataToken = parse(tokenSchema, await request(`/app/installations/${installation.id}/access_tokens`, jwt, {
     method: 'POST', body: { repositories: [repo.repo], permissions: { metadata: 'read', contents: 'read' } },
   })).token
-  const githubUser = parse(userSchema, await request(`/user/${options.githubAccountId}`, metadataToken, { missing: 'github_access_denied' }))
-  if (String(githubUser.id) !== options.githubAccountId) throw new PublicationError('github_access_denied')
-  const permission = parse(permissionSchema, await request(`${repo.path}/collaborators/${encodeURIComponent(githubUser.login)}/permission`, metadataToken, { missing: 'github_access_denied' }))
-  if (String(permission.user.id) !== options.githubAccountId || !['write', 'admin'].includes(permission.permission)) throw new PublicationError('github_access_denied')
-  const repository = parse(repositorySchema, await request(repo.path, metadataToken, { missing: 'github_not_installed' }))
+  const [repository] = await Promise.all([
+    request(repo.path, metadataToken, { missing: 'github_not_installed' }).then(value => parse(repositorySchema, value)),
+    (async () => {
+      const githubUser = parse(userSchema, await request(`/user/${options.githubAccountId}`, metadataToken, { missing: 'github_access_denied' }))
+      if (String(githubUser.id) !== options.githubAccountId) throw new PublicationError('github_access_denied')
+      const permission = parse(permissionSchema, await request(`${repo.path}/collaborators/${encodeURIComponent(githubUser.login)}/permission`, metadataToken, { missing: 'github_access_denied' }))
+      if (String(permission.user.id) !== options.githubAccountId || !['write', 'admin'].includes(permission.permission)) throw new PublicationError('github_access_denied')
+    })(),
+  ])
   if (repository.full_name.toLowerCase() !== `${repo.owner}/${repo.repo}`.toLowerCase()) throw new PublicationError('github_access_denied')
   const binding: GitHubRepositoryBinding = { installationId: installation.id, repositoryId: repository.id, githubAccountId: options.githubAccountId, defaultBranch: repository.default_branch }
   return { ...repo, request, jwt, metadataToken, binding }

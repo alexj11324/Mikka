@@ -7,14 +7,15 @@
 // - no coordinator_events (nothing wakes a model), no group_turns, no schedules;
 // - threads are finished, or running/waiting with no lease on a disabled demo
 //   device that has no token, and all are older than 15 minutes, so no daemon,
-//   run recovery or ops alert acts on them;
+//   run recovery or ops alert acts on them; ended threads carry an outcome, so
+//   the outcome sweep never asks the decision model about them;
 // - tasks are workspace tasks with linearSyncBlocked, so the Linear outbox
 //   trigger drops them;
 // - no pending_actions, billing, usage, Composio or Linear rows.
 // Every row id starts with de300000- (shared.mjs); cleanup.mjs removes exactly those.
 // Re-running replaces the previous demo rows of the account in one transaction.
 import { connect, countDemoRows, deleteDemoRows, demoId, findOwner, inTransaction, MAIN_TABLES, parseArgs, WORKSPACE_TABLES } from './shared.mjs'
-import { AGENTS, ARTIFACTS, BOT_MEMORY, BOTS, DEVICES, FACTS, ISSUES, PEOPLE, PERSONAL_ISSUES, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG } from './content.mjs'
+import { AGENTS, ARTIFACTS, BOT_MEMORY, BOT_THREADS, BOTS, DEVICES, ISSUES, PEOPLE, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG } from './content.mjs'
 import { CHATS, GROUP } from './chats.mjs'
 import { createHash } from 'node:crypto'
 
@@ -24,6 +25,8 @@ const now = Date.now()
 const ago = minutes => new Date(now - minutes * 60_000)
 const day = offset => new Date(now + offset * 86_400_000).toISOString().slice(0, 10)
 const sha = text => createHash('sha256').update(text).digest('hex')
+/** The outcome an ended demo run carries (lib/db/schema.ts RUN_OUTCOMES). */
+const OUTCOME_OF_STATUS = { succeeded: 'done', failed: 'failed', stopped: 'idle', cancelled: 'idle' }
 const json = value => JSON.stringify(value)
 /** The gradient avatar sign-up gives a new account (lib/default-avatar.ts `newUserAvatar`, R-36); seeded people skip sign-up. */
 function defaultAvatar(key) {
@@ -34,7 +37,7 @@ function defaultAvatar(key) {
 
 function plan(owner) {
   const id = key => demoId(owner.id, key)
-  const people = PEOPLE.map(person => ({ ...person, id: id(`person:${person.key}`), email: `${id(`person:${person.key}`)}@demo.mikka.invalid` }))
+  const people = PEOPLE.map(person => ({ ...person, id: id(`person:${person.key}`), email: person.email }))
   const person = key => key === 'me' ? { id: owner.id, name: owner.name } : people.find(item => item.key === key)
   const bots = BOTS.map(bot => ({ ...bot, id: id(`bot:${bot.key}`) }))
   const botOf = key => bots.find(bot => bot.key === key)
@@ -48,7 +51,8 @@ function plan(owner) {
     return { kind: 'member', id: who.id, name: who.name, image: null }
   }
   const paragraph = text => ({ type: 'paragraph', content: [{ type: 'text', text }] })
-  const issueRows = [...ISSUES.map(issue => ({ ...issue, scope: 'workspace' })), ...PERSONAL_ISSUES.map(issue => ({ ...issue, scope: 'personal' }))].map((issue, index, all) => {
+  // Every task is a team task: personal and team workspaces never mix (decision 2026-11-01-2310).
+  const issueRows = ISSUES.map(issue => ({ ...issue, scope: 'workspace' })).map((issue, index, all) => {
     const metadata = {
       // No number: numbers come from the owner's counter ("user"."lastIssueNumber", advanced by a
       // trigger on insert), and demo rows must not move the account's real numbering.
@@ -70,12 +74,21 @@ function plan(owner) {
   const devices = DEVICES.map(device => ({ ...device, id: id(`device:${device.key}`),
     lastSeenAt: device.online ? new Date(now + 10 * 365 * 86_400_000) : new Date(now - device.lastSeenMinutes * 60_000) }))
   const agents = AGENTS.map(agent => ({ ...agent, id: id(`agent:${agent.key}`), deviceId: id(`device:${agent.device}`) }))
-  const runs = RUNS.map(run => {
+  // Each bot's extra threads alternate between the two coding agents; running ones stay over 15 minutes old.
+  const threads = Object.entries(BOT_THREADS).flatMap(([bot, list]) => list.map(([title, status, hoursAgo, lastReply], index) => ({
+    key: `t-${bot}-${index}`, issue: null, bot, agent: index % 2 ? 'ag-codex' : 'ag-claude', status,
+    minutesAgo: Math.max(20, Math.round(hoursAgo * 60)), minutes: 6 + (index * 7) % 40, prompt: title, lastReply,
+    error: status === 'failed' ? lastReply : undefined,
+    chunks: [{ type: 'text-delta', id: 't1', delta: `开始：${title}。` }, { type: 'tool-input-available', toolCallId: 'a' }, { type: 'tool-input-available', toolCallId: 'b' },
+      status === 'failed' ? { type: 'error', errorText: lastReply } : { type: 'text-delta', id: 't2', delta: lastReply }],
+  })))
+  const runs = [...RUNS, ...threads].map(run => {
     const createdAt = ago(run.minutesAgo)
     const startedAt = new Date(createdAt.getTime() + 40_000)
     const finished = ['succeeded', 'failed', 'stopped', 'cancelled'].includes(run.status)
     const finishedAt = finished ? new Date(startedAt.getTime() + run.minutes * 60_000) : null
-    const lastReplyAt = finishedAt ?? ago(Math.max(16, Math.round(run.minutesAgo / 3)))
+    // Live threads replied a few minutes ago, staggered so the list does not read as one batch.
+    const lastReplyAt = finishedAt ?? ago(1 + [...run.key].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 14)
     return { ...run, id: id(`run:${run.key}`), issueId: run.issue ? id(`issue:${run.issue}`) : null, botId: botOf(run.bot).id,
       agentId: id(`agent:${run.agent}`), deviceId: agents.find(agent => agent.key === run.agent).deviceId,
       createdAt, startedAt, finishedAt, lastReplyAt, chunks: fillDeep(run.chunks) }
@@ -111,9 +124,9 @@ function summary(p) {
       conversations: 1, conversation_members: p.group.members.length, conversation_messages: p.group.messages.length,
       issues: p.issueRows.length, issue_versions: p.issueRows.length, devices: p.devices.length, agents: p.agents.length, agent_runs: p.runs.length,
       run_chunks: p.runs.reduce((n, run) => n + run.chunks.length, 0), artifacts: p.artifacts.length, artifact_versions: versions,
-      user_facts: FACTS.length, suggestions: SUGGESTIONS.length,
+      suggestions: SUGGESTIONS.length,
     },
-    personal: { issues: PERSONAL_ISSUES.length, devices: p.devices.length, agents: p.agents.length, user_facts: FACTS.length, suggestions: SUGGESTIONS.length },
+    account: { devices: p.devices.length, agents: p.agents.length, suggestions: SUGGESTIONS.length },
   }
 }
 
@@ -156,9 +169,13 @@ async function writeMain(client, owner, p, workspaceId) {
     await client.query('INSERT INTO agents (id, "userId", harness, name, description, "deviceId") VALUES ($1, $2, $3, $4, $5, $6)', [agent.id, owner.id, agent.harness, agent.name, '', agent.deviceId])
   }
   for (const run of p.runs) {
-    await client.query(`INSERT INTO agent_runs (id, "userId", "issueId", "agentId", "botId", "deviceId", status, kind, prompt, error, "lastReply", "lastReplyPart", "lastReplyAt", "startedAt", "finishedAt", "createdAt", "updatedAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'implement', $8, $9, $10, 'demo', $11, $12, $13, $14, $15)`,
-    [run.id, owner.id, run.issueId, run.agentId, run.botId, run.deviceId, run.status, run.prompt, run.error ?? null, run.lastReply, run.lastReplyAt, run.startedAt, run.finishedAt, run.createdAt, run.lastReplyAt])
+    // An ended run without an outcome is judged by the decision model in the minute sweep
+    // (lib/run-outcome-judge.ts), so every ended demo run carries one.
+    const outcome = run.finishedAt ? run.outcome ?? OUTCOME_OF_STATUS[run.status] : null
+    await client.query(`INSERT INTO agent_runs (id, "userId", "issueId", "agentId", "botId", "deviceId", status, kind, prompt, error, "lastReply", "lastReplyPart", "lastReplyAt", "startedAt", "finishedAt", "createdAt", "updatedAt", outcome, "outcomeDecidedBy", "outcomeAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'implement', $8, $9, $10, 'demo', $11, $12, $13, $14, $15, $16, $17, $18)`,
+    // decidedBy names the seed, so these outcomes never read as the decision model's.
+    [run.id, owner.id, run.issueId, run.agentId, run.botId, run.deviceId, run.status, run.prompt, run.error ?? null, run.lastReply, run.lastReplyAt, run.startedAt, run.finishedAt, run.createdAt, run.lastReplyAt, outcome, outcome ? 'seed' : null, run.finishedAt])
     for (const [index, chunk] of run.chunks.entries()) {
       await client.query('INSERT INTO run_chunks (id, "runId", seq, chunk, "createdAt") VALUES ($1, $2, $3, $4, $5)', [p.id(`chunk:${run.key}:${index}`), run.id, index + 1, json(chunk), new Date(run.startedAt.getTime() + index * 45_000)])
     }
@@ -179,12 +196,6 @@ async function writeMain(client, owner, p, workspaceId) {
   for (const member of group.members) await client.query('INSERT INTO conversation_members ("conversationId", "memberType", "memberId", role) VALUES ($1, $2, $3, $4)', [group.id, member.type, member.id, member.role])
   for (const message of group.messages) {
     await client.query('INSERT INTO conversation_messages (id, "conversationId", position, "authorType", "authorId", body, mentions, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [message.id, group.id, message.position, message.authorType, message.authorId, message.body, json(message.mentions), message.createdAt])
-  }
-  for (const fact of FACTS) {
-    const subjectKey = fact.subject.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').replace(/^[\s\p{P}\p{S}]+|[\s\p{P}\p{S}]+$/gu, '').trim()
-    // A real fact on the same subject wins; the demo one is then skipped.
-    await client.query('INSERT INTO user_facts (id, "userId", kind, subject, "subjectKey", value, evidence, confidence, "firstSeenAt", "lastSeenAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING',
-      [p.id(`fact:${fact.key}`), owner.id, fact.kind, fact.subject, subjectKey, json(fact.value), json([{ source: 'demo-data', at: ago(60 * 24 * 5).toISOString() }]), fact.confidence, ago(60 * 24 * 12), ago(60 * 24)])
   }
   for (const item of SUGGESTIONS) {
     const at = ago(item.hoursAgo * 60)

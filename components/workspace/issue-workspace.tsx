@@ -1,6 +1,5 @@
 'use client'
 import { useTranslations } from 'next-intl'
-import { AnimatePresence } from 'motion/react'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
@@ -463,18 +462,18 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     </AppShellContent>
     {browserShown && !threadShown && <BrowserPane onClose={() => showBrowser(false)} />}
     {threadShown && <ThreadColumn runId={threadShown} issueId={threads.find(thread => thread.id === threadShown)?.issueId} />}
-    {/* The panel springs only when the person opens or closes it; leaving or entering a conversation shows it at its final width. */}
-    {isConversation && <AnimatePresence initial={false}>{panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}
-      conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id ?? coordinatorChat?.botId, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}</AnimatePresence>}
-    {groupPanel && <AnimatePresence initial={false}>{panelOpen && !rightTaken && <GroupPanel key={`group-panel:${groupPanel.id}`} group={groupPanel} onClose={() => showPanel(false)} />}</AnimatePresence>}
+    {/* Opening, closing and handing the column to a thread are instant (R-37). */}
+    {isConversation && panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}
+      conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id ?? coordinatorChat?.botId, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}
+    {groupPanel && panelOpen && !rightTaken && <GroupPanel key={`group-panel:${groupPanel.id}`} group={groupPanel} onClose={() => showPanel(false)} />}
     {groupPanel && !rightTaken && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
-      <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
+      <SheetContent side="right" instant showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>
         <GroupPanel sheet group={groupPanel} onClose={() => setPanelSheet(false)} />
       </SheetContent>
     </Sheet>}
     {isConversation && !rightTaken && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
-      <SheetContent side="right" showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
+      <SheetContent side="right" instant showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>
         <ContextPanel sheet workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => { setPanelSheet(false); openThread(thread.runId) }} onClose={() => setPanelSheet(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id ?? coordinatorChat?.botId, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />

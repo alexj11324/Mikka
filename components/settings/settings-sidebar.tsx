@@ -26,7 +26,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   activeSection?: SettingsSectionId
   /** Viewer is a workspace admin. Admin-only sections stay hidden until this is known (S-P). */
   admin: boolean
-  /** The current workspace is the viewer's personal one: no member pages. */
+  /** Not (yet) known to be a team workspace: only the account group, 用量 and 计费 (decision 2026-11-01-2310). */
   personal?: boolean
   /** The second group is named after the current workspace. */
   workspaceName?: string
@@ -61,7 +61,8 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
     return { group, groupLabel, items }
   })
   // While searching, 你的团队 shows only for a team that matches; 创建团队 alone is not a result.
-  const showTeams = Boolean(activeSection) && (!normalizedQuery || joinedTeams.length > 0)
+  // A personal workspace has no teams (decision 2026-11-01-2310).
+  const showTeams = Boolean(activeSection) && !personal && (!normalizedQuery || joinedTeams.length > 0)
   const noMatch = Boolean(normalizedQuery) && !showTeams && groups.every(({ items }) => items.length === 0)
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-2">

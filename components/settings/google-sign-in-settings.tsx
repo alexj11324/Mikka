@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { authClient } from '@/lib/auth-client'
 import { getPathname } from '@/i18n/navigation'
@@ -18,43 +19,28 @@ import { FieldError } from '@/components/ui/field'
 export function GoogleSignInSettings({ googleEnabled }: { googleEnabled: boolean }) {
   const locale = useLocale()
   const t = useTranslations('Settings.integrations')
-  const [googleLinked, setGoogleLinked] = useState<boolean | null>(null)
+  // Cached: coming back to 安全 shows the last answer at once and re-reads it behind.
+  const accounts = useSWR(googleEnabled ? 'account:google-linked' : null, async () => {
+    const { data, error } = await authClient.listAccounts()
+    if (error) throw new Error('Accounts unavailable')
+    return data?.some(account => account.providerId === 'google') ?? false
+  }, { revalidateOnFocus: false })
+  const [linkedHere, setLinkedHere] = useState(false)
+  const googleLinked = !googleEnabled ? false : linkedHere || (accounts.data ?? (accounts.error ? false : null))
   const [googlePending, setGooglePending] = useState(false)
-  const [googleError, setGoogleError] = useState('')
+  const [actionError, setGoogleError] = useState('')
+  const googleError = actionError || (accounts.error && accounts.data === undefined ? t('googleStatusFailed') : '')
   const [googleSuccess, setGoogleSuccess] = useState('')
   // Linking from the desktop finishes in the system browser: read once on the way back.
-  const [reads, setReads] = useState(0)
-  const checkOnReturn = useCheckOnReturn(() => setReads(count => count + 1))
-
-  useEffect(() => {
-    if (!googleEnabled) { setGoogleLinked(false); return }
-    let current = true
-    const load = () => {
-      void authClient.listAccounts().then(({ data, error: resultError }) => {
-        if (!current) return
-        if (resultError) {
-          setGoogleError(t('googleStatusFailed'))
-          setGoogleLinked(false)
-        } else {
-          setGoogleError('')
-          setGoogleLinked(data?.some(account => account.providerId === 'google') ?? false)
-        }
-      }).catch(() => {
-        if (!current) return
-        setGoogleError(t('googleStatusFailed'))
-        setGoogleLinked(false)
-      })
-    }
-    load()
-    return () => { current = false }
-  }, [googleEnabled, t, reads])
+  const { mutate } = accounts
+  const checkOnReturn = useCheckOnReturn(() => { void mutate() })
 
   useEffect(() => {
     const url = new URL(window.location.href)
     const googleResult = url.searchParams.get('google')
     if (!googleResult) return
     if (googleResult === 'linked') {
-      setGoogleLinked(true)
+      setLinkedHere(true)
       setGoogleError('')
       setGoogleSuccess(t('googleLinkSuccess'))
     }

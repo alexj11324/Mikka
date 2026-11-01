@@ -9,10 +9,26 @@ flock -n 9 || exit 0
 profile=/home/user/.mikka/profiles/$display
 mkdir -p "$profile"
 chmod 700 "$profile"
+# Desktop preferences and application launches stay with this Bot's display.
+export XDG_CONFIG_HOME="$profile/config"
+mkdir -p "$XDG_CONFIG_HOME/pcmanfm/default"
+if [[ ! -f "$XDG_CONFIG_HOME/pcmanfm/default/desktop-items-0.conf" ]]; then
+cat > "$XDG_CONFIG_HOME/pcmanfm/default/desktop-items-0.conf" <<'EOF'
+[*]
+wallpaper_mode=color
+desktop_bg=#343434
+desktop_fg=#ffffff
+desktop_shadow=#000000
+show_wm_menu=1
+show_trash=1
+EOF
+fi
 Xvfb "$DISPLAY" -screen 0 1280x800x24 -nolisten tcp > /tmp/xvfb-$display.log 2>&1 &
 for i in {1..50}; do xdpyinfo >/dev/null 2>&1 && break; sleep .1; done
 xdpyinfo >/dev/null
 openbox > /tmp/openbox-$display.log 2>&1 &
+pcmanfm --desktop > /tmp/pcmanfm-$display.log 2>&1 &
+tint2 > /tmp/tint2-$display.log 2>&1 &
 # E2B publicly forwards even loopback TCP listeners. Use Unix VNC sockets;
 # Chromium must have no unauthenticated CDP TCP listener.
 socketdir=/home/user/.mikka/vnc
