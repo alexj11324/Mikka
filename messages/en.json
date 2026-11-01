@@ -193,7 +193,6 @@
   },
   "Auth": {
     "haveAccount": "Already have an account?",
-    "noAccount": "No work account yet?",
     "noAccountShort": "No account yet?",
     "signIn": "Sign in",
     "createAccount": "Create account",

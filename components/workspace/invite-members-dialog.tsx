@@ -315,7 +315,7 @@ export function InviteMembersDialog({
                   required
                   maxLength={5200}
                   disabled={busy}
-                  className="min-h-24 resize-y"
+                  className="max-h-48 min-h-24 resize-none"
                 />
               </Field>
               <Field>

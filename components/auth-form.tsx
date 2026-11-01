@@ -234,7 +234,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
       endSubmit()
     }
   }
-  return <Auth registering={registering} addAccount={addAccount} switchInCard next={returnPath}>
+  return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
     <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} notice={notice} next={returnPath} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>

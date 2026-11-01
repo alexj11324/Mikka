@@ -193,7 +193,6 @@
   },
   "Auth": {
     "haveAccount": "已经有账号？",
-    "noAccount": "还没有工作账号？",
     "noAccountShort": "还没有账号？",
     "signIn": "去登录",
     "createAccount": "创建账号",
