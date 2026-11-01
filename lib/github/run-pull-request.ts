@@ -127,10 +127,7 @@ export async function issueRunGitHubInstallationToken(options: Options) {
   const access = await repositoryAccess(options)
   const result = parse(z.object({ token: z.string().min(1), expires_at: z.iso.datetime() }),
     await access.request(`/app/installations/${access.binding.installationId}/access_tokens`, access.jwt, {
-      method: 'POST', body: {
-        repository_ids: [access.binding.repositoryId],
-        permissions: { contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read' },
-      },
+      method: 'POST', body: { repository_ids: [access.binding.repositoryId] },
     }))
   if (Date.parse(result.expires_at) <= Date.now()) throw new PublicationError('github_request_failed')
   return { token: result.token, expiresAt: result.expires_at }
@@ -167,7 +164,7 @@ export async function openRunPullRequest(options: Options & {
   const ref = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, access.metadataToken, { missing: 'branch_not_pushed' }))
   if (ref.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
   const writeToken = parse(tokenSchema, await request(`/app/installations/${binding.installationId}/access_tokens`, access.jwt, {
-    method: 'POST', body: { repository_ids: [binding.repositoryId], permissions: { metadata: 'read', pull_requests: 'write' } },
+    method: 'POST', body: { repository_ids: [binding.repositoryId] },
   })).token
   const marker = `<!-- mikka-issue:${options.issueId} -->`
   const write = <T>(operation: () => Promise<T>) => options.withWrite ? options.withWrite(operation) : operation()
@@ -180,11 +177,7 @@ export async function openRunPullRequest(options: Options & {
     // Only a task-marked PR may be converted; never reopen a closed/merged PR.
     if (options.draft && pr.state === 'open' && !pr.draft && !pr.merged_at) {
       if (!pr.node_id) throw new PublicationError('github_request_failed')
-      // GitHub's draft conversion also requires contents:write, unlike PR creation.
-      const draftToken = parse(tokenSchema, await request(`/app/installations/${binding.installationId}/access_tokens`, access.jwt, {
-        method: 'POST', body: { repository_ids: [binding.repositoryId], permissions: { metadata: 'read', pull_requests: 'write', contents: 'write' } },
-      })).token
-      const converted = parse(z.object({ data: z.object({ convertPullRequestToDraft: z.object({ pullRequest: z.object({ id: z.string(), isDraft: z.literal(true) }) }) }) }), await write(() => request('/graphql', draftToken, {
+      const converted = parse(z.object({ data: z.object({ convertPullRequestToDraft: z.object({ pullRequest: z.object({ id: z.string(), isDraft: z.literal(true) }) }) }) }), await write(() => request('/graphql', writeToken, {
         method: 'POST', body: {
           query: 'mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { pullRequest { id isDraft } } }',
           variables: { id: pr.node_id },
