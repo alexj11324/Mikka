@@ -54,11 +54,12 @@ import { FieldError } from '@/components/ui/field'
 const ENTER = 'animate-in fade-in-0 duration-200 motion-reduce:animate-none'
 
 /**
- * The band under the header pill (top 12px, 36px tall): nothing shows down to 48px, then rows fade in by 72px, where
- * the first message starts (`pt-18`). It replaces the scroller's own mask and keeps its bottom fade. Wide screens only;
+ * The band under the header pill (top 12px, 36px tall): nothing shows down to 56px, 8px below the pill, then rows fade
+ * in over 40px by 96px, where the first message starts (`pt-24`). A shorter ramp left a chart under the pill reading as a
+ * gradient fill. It replaces the scroller's own mask and keeps its bottom fade. Wide screens only;
  * phones have no pill.
  */
-const HEADER_FADE = 'md:[--scroll-fade-mask:linear-gradient(to_bottom,transparent_3rem,#000_4.5rem,#000_calc(100%_-_var(--scroll-fade-b,0px)),transparent)]'
+const HEADER_FADE = 'md:[--scroll-fade-mask:linear-gradient(to_bottom,transparent_3.5rem,#000_6rem,#000_calc(100%_-_var(--scroll-fade-b,0px)),transparent)]'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
 
@@ -281,7 +282,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
         {/* Full size, the header pill floats over the top of the chat: rows scrolled up fade out above it instead of
             running under it, so the top reads as a solid band in either theme and in the translucent desktop window (R-35). */}
         <MessageScrollerViewport aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')} className={cn(!compact && HEADER_FADE)}>
-          <MessageScrollerContent className={cn('flex w-full min-w-0 max-w-full flex-col gap-5 pb-6', compact ? 'px-3 pt-4' : 'px-4 pt-18 sm:px-6')}>
+          <MessageScrollerContent className={cn('flex w-full min-w-0 max-w-full flex-col gap-5 pb-6', compact ? 'px-3 pt-4' : 'px-4 pt-24 sm:px-6')}>
             {/* A slow first load shows the shape of a conversation, not an empty page (state completeness). */}
             {!data && !loadError && <div role="status" aria-label={tCommon('loading')} className="flex flex-col gap-5">
               <Skeleton className="h-16 w-3/5 rounded-2xl" />
@@ -323,13 +324,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             </MessageScrollerItem>)}
             {failed && <MessageScrollerItem messageId="failed" data-testid="failed-message" className="[content-visibility:visible]">
               <Message align="end"><MessageContent>
-                <span className="flex max-w-full items-center justify-end gap-2 self-end">
+                <span className="flex w-full min-w-0 items-center justify-end gap-2">
                   <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive" />
                   <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap"><UserMessageText text={failed.text} /></BubbleContent></Bubble>
                 </span>
                 <span role="alert" className="flex items-center justify-end gap-1 self-end text-xs text-destructive">
                   {failed.message}
-                  <Button variant="ghost" size="xs" disabled={sending} onClick={() => { void deliver(failed.text, failed.withNotes) }}>{tCommon('retry')}</Button>
+                  <Button variant="ghost" size="xs" className="text-foreground" disabled={sending} onClick={() => { void deliver(failed.text, failed.withNotes) }}>{tCommon('retry')}</Button>
                 </span>
               </MessageContent></Message>
             </MessageScrollerItem>}
