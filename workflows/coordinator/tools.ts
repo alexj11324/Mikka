@@ -25,11 +25,15 @@ import { scheduleTools } from '@/lib/schedules/tools'
 
 /** `coordinator`: this chat's bot is the person's Coordinator, which may act on any of their bots and hold the factory tools. */
 export interface CoordinatorToolOptions { coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; writeEnabled?: boolean; taskEventId?: string; approvedRepositoryKey?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
+/** One task, one thread (decision 2026-11-01-1330-one-thread-per-task): how both dispatch tools say it. */
+const ONE_THREAD = 'A task has one thread at a time. When the task already has one, this goes to that thread: a thread still working gets `note` as a message; a thread that ended (done, failed or stopped) runs again in the same thread with `note`. Use it to retry or to add information; never to start over. Set newThread only when the person, in their own words, explicitly asked for a new session or thread, or a different agent; the host checks their message and otherwise keeps the existing thread.'
+const newThreadInput = z.boolean().optional().describe('Only when the person explicitly asked for a new session or thread, or a different agent, in their own words. Retries and added information never set it.')
+
 const factoryCapabilities = new Set<string>([...FACTORY_TOOL_IDS, 'dispatch_factory_task', 'recover_factory_check', 'intake_factory_request'])
 
 export function createCoordinatorRegistry(userId: string, botId: string, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
-  const { execution,computerEnabled = false,mailboxEnabled = false,coordinator = false } = options
+  const { execution,computerEnabled = false,mailboxEnabled = false,coordinator = false,sourceEventId } = options
   const id = z.uuid()
   // A named Bot always controls its own computer. The Coordinator
   // may select any authorized Bot on the person's explicit instruction.
@@ -89,13 +93,6 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: (input, options) => steps.updateIssue(userId, input, options.toolCallId, scope, botId),
     }),
     } : {}),
-    request_repository_push_approval: tool({
-      description: 'Request the person’s explicit approval to push to this repository. This only creates a confirmation; never claim approval until the person decides.',
-      inputSchema: z.object({ repo: z.string().trim().min(1).max(4000) }).strict(),
-      execute: input => options.taskEventId
-        ? steps.proposeRepositoryPushApproval(userId, input, scope, { eventId: options.taskEventId, botId })
-        : steps.proposeRepositoryPushApproval(userId, input, scope, { botId }),
-    }),
     ...(issueMutationsEnabled() && process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? {
       dispatch_factory_task: tool({description:'Dispatch an authorized pending Factory attempt through its current binding. No permission is granted by dispatch.',inputSchema:factoryDispatchSchema,execute:input=>steps.dispatchFactoryTask(userId,input,scope,botId)}),
       recover_factory_check: tool({description:'Request an evidence-bound recovery judgment from the existing decision model. Supply only the current binding. Missing/refused evidence stays pending; no permission is granted and no run is dispatched.',inputSchema:factoryCheckRecoverySchema,execute:(input,call)=>steps.recoverFactoryCheck(userId,input,call.toolCallId,scope,botId)}),
@@ -111,7 +108,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       resolve_factory_task: tool({description:'Record a subsequent actual user response to intake clarification. It grants no execution or publication permission. Use the exact current binding and original response event.',inputSchema:resolveInput,execute:input=>steps.resolveFactoryTaskScoped(userId,input,scope,botId)}),
     } : {}),
     list_agents: tool({
-      description: 'List available local execution tools and their computers. Use the internal id as agentId for dispatch_run with a repository URL; no repository registration is needed. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, run by its Agent (Claude Code or Codex).',
+      description: 'List the person\'s computers (name, online or not, deviceId) and their local execution tools. When the person names a computer to run on, match it here and pass its deviceId as dispatch_run target; an offline one cannot take work. Never repeat hidden identity names, ids or harness keys in replies. Name the computer and its Claude Code or Codex tool when needed; call delegated work a thread, run by its Agent (Claude Code or Codex).',
       inputSchema: z.object({}),
       execute: () => steps.listAgents(userId, scope),
     }),
@@ -152,21 +149,23 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.bindComputerSubscription(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
       }),
       dispatch_bot_computer: tool({
-        description: 'When asked to use a Bot computer, queue a thread for an existing issue on that Bot. The computer must be awake and the person must already have linked a subscription. Follow the authoritative effective execution policy: allow executes, ask uses the existing wait, deny or revocation stops. Do not add another blanket confirmation.',
-        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional(), suggestionId: id.optional() }),
-        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerTask(userId, { ...input, botId: target }, options.toolCallId, scope, execution ?? undefined) : { error: 'botMismatch' } },
+        description: `When asked to use a Bot computer, give an existing issue's work to that Bot. ${ONE_THREAD} The computer must be awake and the person must already have linked a subscription. Follow the authoritative effective execution policy: allow executes, ask uses the existing wait, deny or revocation stops. Do not add another blanket confirmation.`,
+        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional(), suggestionId: id.optional(), newThread: newThreadInput }),
+        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerThread(userId, { ...input, botId: target, ...(sourceEventId ? { sourceEventId } : {}) }, options.toolCallId, scope, execution ?? undefined, botId) : { error: 'botMismatch' } },
       }),
     } : {}),
     dispatch_run: tool({
-      description: 'Queue a thread for an issue using the saved label execution rules. The rules select the place, coding harness and model. Returns the run id and queued state; an [Event] message arrives when the run ends. Machine order (also when a rule names a device that is offline): the workspace\'s own E2B cloud, else the person\'s online device that may be picked automatically, else error machineUnavailable with result.card. Then draw result.card as one BeQuestions choice question (title and options as given, each option keeps its value and action), add no explanation, and call dispatch_run again after the person answers.',
+      description: `Give an issue's work to an agent. ${ONE_THREAD} A new thread uses the saved label execution rules, which select the place, coding harness and model. Returns the run id, what happened (thread: new, message or continued) and result.placement, where it actually runs (one of the person's computers by name, or the cloud); say only that place, never one you did not get. An [Event] message arrives when the run ends. Machine order (also when a rule names a device that is offline): the workspace's own E2B cloud, else the person's online device that may be picked automatically, else error machineUnavailable with result.card. Then draw result.card as one BeQuestions choice question (title and options as given, each option keeps its value and action), add no explanation, and call dispatch_run again after the person answers.`,
       inputSchema: z.object({
         issueId: id, agentId: id.optional(),
         repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
         readOnly: z.boolean().optional().describe('true when the task only reads and reports (investigation, review): no file changes, commit, push or PR. A read-only run needs no repository push approval.'),
+        newThread: newThreadInput,
+        target: z.union([z.literal('cloud'), z.object({ deviceId: id })]).optional().describe('Only when the person named where to run it: one of their computers by its deviceId from list_agents, or "cloud". Omit to let the saved rules choose. A named computer that is offline or off returns machineUnavailable with result.card; nothing is queued and no other computer is used.'),
       }),
       execute: (input,call) => {
-        const request={...input,requestKey:`dispatch:${call.toolCallId}`}
+        const request={...input,requestKey:`dispatch:${call.toolCallId}`,...(sourceEventId ? { sourceEventId } : {})}
         return options.taskEventId
           ? options.approvedRepositoryKey
             ? steps.dispatchRun(userId, request, scope, botId, execution ?? undefined, options.taskEventId, options.approvedRepositoryKey)

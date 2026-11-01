@@ -48,7 +48,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
         const meta = thread.detail?.summary ?? null
         const view = threadQuestionView(thread)
         const body = <>
-          <ThreadStatusIcon status={view.status} waiting={view.waiting} />
+          <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} />
           <span className="flex min-w-0 flex-1 flex-col text-left">
             <span className="truncate text-sm font-medium">{name}</span>
             {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}

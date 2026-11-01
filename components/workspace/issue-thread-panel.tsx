@@ -6,7 +6,7 @@ import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ChevronLeft, SquareKanban, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
-import { runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
+import { runFailureText, runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
@@ -83,6 +83,10 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
   const stopRequested = active && (requestedAt !== null || !!view?.stopping)
   const stopPending = stopRequested && !stopFailed
   const items = data ? threadItems(data.chunks, data.messages, runId) : []
+  // A failed run says why under the stage that stopped, else at the end of the conversation.
+  const failure = data ? runFailureText(data.thread.status, data.thread.error) : null
+  const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
+  const failureLine = failure && <p className="line-clamp-2 text-xs break-words text-destructive/80" title={failure} data-slot="thread-failure">{failure}</p>
   useEffect(() => {
     if (!active || requestedAt === null) return
     const timer = setTimeout(() => setStopFailed(true), runStopTimeoutRemaining(requestedAt))
@@ -123,7 +127,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
         <Button variant="ghost" className="shrink-0" aria-label={t('back', { name: back })} onClick={onClose}><ChevronLeft data-icon="inline-start" />{back}</Button>
         <span aria-hidden="true" className="text-muted-foreground">/</span>
       </>}
-      {detail && view && <ThreadStatusIcon status={view.status} waiting={view.waiting} />}
+      {detail && view && <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} />}
       <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{detail?.name ?? t('title')}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       {back && <ThreadArtifacts issueId={issueId} runId={runId} status={data?.thread.status ?? ''} />}
@@ -150,6 +154,12 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
               {item.kind === 'agent' && <div className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>}
               {item.kind === 'steps' && <ThreadSteps harness={detail?.harness ?? ''} steps={item.steps} />}
               {item.kind === 'error' && <FieldError className="text-xs">{item.text}</FieldError>}
+              {item.kind === 'stages' && <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground" data-slot="thread-stages">
+                {item.stages.map((stage, index) => <span key={index} className={cn(!stage.ok && 'text-destructive')}>
+                  {t(`stages.${stage.stage}`)} {t('stages.duration', { seconds: (stage.ms / 1000).toFixed(1) })} {stage.ok ? '✓' : '✗'}
+                </span>)}
+              </p>}
+              {item.id === failedStagesId && failureLine}
               {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : (view?.status ?? data.thread.status) === 'succeeded' ? 'done' : 'failed'} />}
               {item.kind === 'person' && (item.mine
                 // R-14: your own words are the blue bubble on the right.
@@ -161,6 +171,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
                 </>)}
             </li>)}
           </ol>
+          {!failedStagesId && failureLine}
           {/* The subscription ran out and the run went on on the person's key (lib/run-quota.ts). */}
           {data.thread.quota?.switched.map(item => <ThreadQuotaSwitchLine key={item.runId} switched={item} />)}
           {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}

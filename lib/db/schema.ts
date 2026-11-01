@@ -330,6 +330,9 @@ export const agents = pgTable('agents', {
 
 export const RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing', 'succeeded', 'stopped', 'failed', 'cancelled'] as const
 export type RunStatus = (typeof RUN_STATUSES)[number]
+/** How an ended run came out (lib/run-outcome.ts). */
+export const RUN_OUTCOMES = ['done', 'blocked', 'needs_input', 'failed', 'idle'] as const
+export type RunOutcome = (typeof RUN_OUTCOMES)[number]
 
 /** One execution of one agent. The daemon claims it, runs it and reports back. */
 export const agentRuns = pgTable('agent_runs', {
@@ -364,6 +367,14 @@ export const agentRuns = pgTable('agent_runs', {
   /** The text part (chunk id) lastReply comes from: more text for it appends, another part replaces it. */
   lastReplyPart: text('lastReplyPart'),
   lastReplyAt: timestamp('lastReplyAt', { withTimezone: true }),
+  /** How the run came out once it ended (lib/run-outcome.ts); null until judged. The right column groups by it. */
+  outcome: text('outcome').$type<RunOutcome | null>(),
+  /** Who judged the outcome: the decision model (`decision`). */
+  outcomeDecidedBy: text('outcomeDecidedBy').$type<'decision' | null>(),
+  /** The judge's one-line reason, for review. */
+  outcomeReason: text('outcomeReason'),
+  /** When it was judged, or last asked without an answer (asked again an hour later). */
+  outcomeAt: timestamp('outcomeAt', { withTimezone: true }),
   /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
   source: text('source').$type<'mcp' | null>(),
   questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true} | null>(),
@@ -372,12 +383,16 @@ export const agentRuns = pgTable('agent_runs', {
   attempt: integer('attempt').notNull().default(1),
   /** The run this one retries, when its device went offline. */
   retryOf: uuid('retryOf').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
+  /** The run of the same thread this one goes on from: a dispatch to a task whose thread had ended (lib/thread-dispatch.ts). */
+  continuesRunId: uuid('continuesRunId').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
+  /** On a thread's root run: the root of the thread that replaced it, when the person explicitly asked for a new one. */
+  threadReplacedBy: uuid('threadReplacedBy').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
   stopRequestedAt: timestamp('stopRequestedAt', { withTimezone: true }),
   startedAt: timestamp('startedAt', { withTimezone: true }),
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`)])
+}, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`), index('agent_runs_continues_run_idx').on(table.continuesRunId).where(sql`${table.continuesRunId} is not null`)])
 
 /** A verified owner/repository binding. Installation tokens are never stored. */
 /** Plugins → GitHub connection, separate from the login identity; one GitHub account may serve many users. Tokens are sealed like Better Auth's. */
@@ -396,6 +411,8 @@ export const githubRepositoryInstallations = pgTable('github_repository_installa
   installationId: bigint('installationId', { mode: 'number' }).notNull(),
   repositoryId: bigint('repositoryId', { mode: 'number' }).notNull(),
   verifiedAt: timestamp('verifiedAt', { withTimezone: true }).notNull().defaultNow(),
+  /** When a live check last found the push granted (App contents:write, the person may write); null once refused (lib/github/push-grant.ts). */
+  pushGrantedAt: timestamp('pushGrantedAt', { withTimezone: true }),
 }, table => [primaryKey({ columns: [table.userId, table.remoteKey] })])
 
 /** Server-issued publication assignment and durable completion receipt (ADR 0024). */

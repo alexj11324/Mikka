@@ -28,6 +28,7 @@ stub('../lib/captures/run-end.ts', { stopRecordingsAfter: () => { effects.push('
 const select = { from: () => select, innerJoin: () => select, where: () => select, limit: async () => replayStatus ? [{ status: replayStatus }] : [] }
 stub('../lib/db/index.ts', { db: { select: () => select } })
 stub('../lib/coordinator/wake.ts', { wakeCoordinator: async () => { effects.push('wake') } })
+stub('../lib/run-outcome-judge.ts', { judgeRunOutcome: async () => { effects.push('outcome'); return null } })
 stub('../lib/linear-sync/dispatch.ts', { dispatchLinearIssueSync: () => { effects.push('sync') } })
 mock.module('next/server', { namedExports: { NextResponse: Response, after: (callback: () => Promise<void>) => callback() } })
 let route: typeof import('../app/v1/runs/[runId]/complete/route')
@@ -72,7 +73,7 @@ test('non-publication completion dispatches through its scope-generation guard',
   assert.equal((await post({ stopReason: 'cancelled' })).status, 204)
   assert.equal(enqueue.mock.callCount(), 0)
   assert.equal(dispatch.mock.calls[0]?.arguments[0], persisted)
-  assert.deepEqual(effects, ['captures', 'sync', 'wake'])
+  assert.deepEqual(effects, ['captures', 'sync', 'wake', 'outcome'])
 })
 
 test('retirement or a non-review completion wakes its chat without task dispatch', async () => {
@@ -81,7 +82,7 @@ test('retirement or a non-review completion wakes its chat without task dispatch
     persisted = { userId: 'owner', issueId: 'issue', publicationPending: false, review }
     dispatchAllowed = false
     assert.equal((await post({ stopReason: 'cancelled' })).status, 204)
-    assert.deepEqual(effects, ['captures', 'wake'])
+    assert.deepEqual(effects, ['captures', 'wake', 'outcome'])
   }
 })
 

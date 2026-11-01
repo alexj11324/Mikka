@@ -1,3 +1,4 @@
+import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import type { TaskRun } from '@/app/actions/task-runs'
 import type { DecisionAnswer, DecisionQuestion } from '@/lib/coordinator/decision'
 
@@ -42,7 +43,7 @@ export function desktopRunUpdate(previous: Map<string, DesktopRun['status']> | n
       kind,
       title: run.issueTitle,
       body: run.agentName,
-      href: `/?issue=${encodeURIComponent(run.issueId)}`,
+      href: workspaceLink({ issue: run.issueId }),
     })
   }
   return { badge, notifications, next }

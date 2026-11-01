@@ -116,26 +116,21 @@ export function runDomains(
 }
 
 /**
- * Whether the daemon pushes a verified run branch. A push needs the owner's
- * repository approval and `git_push` together. The server resolves both at
- * claim and sends `allow` in this run's assignment only when both hold
- * (a configured `allow` without an approved repository arrives as `ask`).
- * `ask` pushes only when the repo was approved ("always for this repo");
- * `deny` never pushes.
+ * Whether the daemon pushes a verified run branch. The server decides push
+ * authority at admission (the GitHub App grant, decision 2026-11-01-1215) and
+ * sends `allow` in this run's assignment only for an admitted run; anything
+ * else does not push and never asks.
  */
-export function pushDecision(
-  policy: RunPolicy,
-  repoApproved: boolean
-): { push: boolean; note?: string } {
+export function pushDecision(policy: RunPolicy): { push: boolean; note?: string } {
   // A read-only check (ADR 0046) never pushes: it exists to look at what the
   // implementation run already pushed, not to add to it.
   if (policy.readOnly)
     return { push: false, note: "A read-only check does not push" }
   const decision = policy.permissions.git_push
+  if (decision === "allow") return { push: true }
   if (decision === "deny")
-    return { push: false, note: "Push is turned off for this workspace" }
-  if (decision === "allow" || repoApproved) return { push: true }
-  return { push: false, note: "Push needs approval for this repo" }
+    return { push: false, note: "Push is turned off for this run" }
+  return { push: false, note: "Push needs the Mikka GitHub App's access on this repository" }
 }
 
 /** Shell commands that add or install dependencies (first word, verb), named

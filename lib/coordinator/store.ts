@@ -382,7 +382,7 @@ export async function citationSources(userId: string, texts: readonly string[], 
       const task = row.issueId ? await issueForUser(userId, row.issueId) : null
       const identifiers = task ? await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }]) : new Map<string, string>()
       const issue = task ? { id: task.id, title: task.title, number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null } : null
-      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, issue,
+      sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, issue,
         pullRequests: task ? readIssueMetadata(task.content).pullRequests : [],
         name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
         createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }

@@ -126,9 +126,9 @@ test('legacy local runs materialize stable sandbox defaults without changing exp
   const first=await readCliRunPolicy(pool,legacyRun,user)
   const second=await readCliRunPolicy(pool,legacyRun,user)
   assert.equal(first.policy.permissions.install_dependency,'allow')
-  // Network is open by default (decision 2026-11-01-1230); pushes still ask.
+  // Network is open by default (decision 2026-11-01-1230).
   assert.equal(first.policy.permissions.network,'allow')
-  assert.equal(first.policy.permissions.git_push,'ask')
+  assert.equal(first.policy.permissions.git_push,'allow','push is the GitHub App grant, never ask')
   assert.equal(first.revision,second.revision)
   assert.deepEqual(first.layers.agent,{})
   const results = await Promise.allSettled([

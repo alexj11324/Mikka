@@ -17,6 +17,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   withoutBot?: boolean; model?:string; idempotencyKey?: string; execution?: AgentExecution
   /** A quota continuation's key (lib/run-quota.ts): frozen as given instead of choosing the credential. */
   apiKey?: RunApiKey
+  /** An investigation that changes nothing: read-only policy, no push branch, no push authority. */
+  readOnly?: boolean
 }) {
   if (input.idempotencyKey !== undefined && (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 256)) throw new ComputerError(400, 'Invalid task request')
   const digest = input.idempotencyKey === undefined ? undefined : createHash('sha256').update(JSON.stringify([actor.userId, input.idempotencyKey])).digest('hex')
@@ -61,9 +63,15 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const { subscription, apiKey } = input.apiKey ? { subscription: null, apiKey: input.apiKey } : await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model: input.model === 'auto' ? undefined : input.model,
       botWorkspaceId: runBotId ? actor.workspaceId : null, choiceWorkspaceId: actor.workspaceId, subscription: binding })
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
-    const agentDefinition = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model:input.model === 'auto' ? undefined : input.model,mailboxEnabled:process.env.MIKKA_PERSONAL_MAILBOX_ENABLED==='1',mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId} })
+    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model:input.model === 'auto' ? undefined : input.model,mailboxEnabled:process.env.MIKKA_PERSONAL_MAILBOX_ENABLED==='1',mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
+    // Push authority is the person's GitHub App grant, admitted here like a local run's (decision 2026-11-01-1215).
+    const github = input.readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1
+    const push = !github ? null : await (await import('./cloud-push')).admitCloudPush(client, { userId: actor.userId, issueId: input.issueId, agentId: input.agentId, deviceId: target.deviceId, deviceRepoId: input.deviceRepoId, ...(runBotId ? { workspaceId: actor.workspaceId } : {}), now: new Date() })
+    const agentDefinition = push ? { ...frozen, repositoryAdmission: push.admission } : frozen
     await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId","agentDefinition")
       VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, target.baseBranch, prompt, runBotId,JSON.stringify(agentDefinition)])
+    if (push) await client.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)`, [runId, push.publication.userId, push.publication.issueId, push.publication.scopeVersion, push.publication.issueTitle, push.publication.remoteUrl, push.publication.remoteKey, push.publication.identifier, push.publication.branch, push.publication.baseBranch])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])
     if (process.env.MIKKA_CLOUD_THREAD_MACHINES === '1') await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'pending',$5,'starting') ON CONFLICT DO NOTHING`, [runId, actor.workspaceId, actor.userId, input.botId, randomUUID()])
     await client.query('COMMIT')

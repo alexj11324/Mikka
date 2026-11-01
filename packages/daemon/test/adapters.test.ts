@@ -89,6 +89,8 @@ function queue(
     harness,
     prompt,
     verifyCommand,
+    // The server admitted this run's push (the GitHub App grant) and sends allow.
+    policy: resolveAgentSettings({ permissions: { git_push: "allow" } }).policy,
   })
 }
 
@@ -218,7 +220,7 @@ describe("the issue branch", () => {
     expect((await execa("git", ["--git-dir", origin, "show", "mikka/orv-4:NOTES.md"])).stdout).toBeTruthy()
   })
 
-  function queueOnIssue(server: MemoryServer, pushBranch: string, claimApproved = false) {
+  function queueOnIssue(server: MemoryServer, pushBranch: string, claimApproved = true) {
     return server.queueRun(DEVICE, {
       issueId: "issue-orv-1",
       repoId: "repo",
@@ -335,7 +337,7 @@ describe("workspace agent policy (ADR 0028)", () => {
     ).toMatchObject({
       data: {
         pushed: false,
-        note: "Push is turned off for this workspace",
+        note: "Push is turned off for this run",
       },
     })
     await expect(

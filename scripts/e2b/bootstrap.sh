@@ -3,7 +3,10 @@
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq xvfb openbox x11vnc x11-utils x11-apps xdotool libxdo3 chromium python3-aiohttp docker.io bubblewrap xz-utils ffmpeg git gh
+# bubblewrap, socat and ripgrep: the worker's sandbox (Anthropic's
+# sandbox-runtime) confine every command a hosted run executes. Runs use no
+# Docker (decision 2026-11-01-1312); docker.io stays for the bot computer.
+apt-get install -y -qq xvfb openbox x11vnc x11-utils x11-apps xdotool libxdo3 chromium python3-aiohttp docker.io bubblewrap socat ripgrep xz-utils ffmpeg git gh
 # Native worker and test tooling require Node 24; use a pinned official build.
 curl -fsSL https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-x64.tar.xz -o /tmp/mikka-node.tar.xz
 echo '14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647  /tmp/mikka-node.tar.xz' | sha256sum --check --strict

@@ -15,6 +15,7 @@ import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 import { workspaceSecretMasker } from '@/lib/secrets/runtime'
 import { maskDeep } from '@/lib/secrets/mask'
+import { judgeRunOutcome } from '@/lib/run-outcome-judge'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,6 +49,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   } else {
     await dispatchCompletedIssue(result, dispatchLinearIssueSync)
     after(() => wakeCoordinator(result.userId))
+    // How it came out, for the right column (R-52); a run still publishing is judged by the minute sweep.
+    after(() => judgeRunOutcome(runId).catch(() => null))
   }
   return new NextResponse(null, { status: 204 })
 }

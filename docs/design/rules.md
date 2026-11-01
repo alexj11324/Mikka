@@ -225,9 +225,21 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
   card in a chat; a later change of state is a sentence from the Coordinator,
   not a second card. The card has no log, input box or buttons. Clicking it
-  opens the thread conversation: on desktop the centre column switches to it
-  with 「‹ Coordinator」 to go back, on a phone it pushes in full screen.
+  opens the thread conversation as R-82 says for every thread: on desktop in
+  the right column beside the chat, which stays; on a phone it pushes in full
+  screen ([decision](decisions/2026-11-01-1320-navigation-model.md)).
   Figma: page 「线程卡片 · 聊天里派出线程」.
+- **R-81** A task has one thread at a time (Alex, 2026-11-01). Dispatching a
+  task that already has a thread gives that thread the work: while it works
+  the note goes in as a message; once it ended (done, failed, stopped) it runs
+  again in the same thread, resuming the agent's session where it can. The
+  thread's id does not change. Only the person's explicit request for a new
+  session or thread, or another agent, starts a new one; the old thread is
+  stopped and marked replaced. The server enforces this at every dispatch
+  entry, not the prompt ([decision](decisions/2026-11-01-1330-one-thread-per-task.md)).
+  The person may name where it runs (one of their computers, or the cloud);
+  a named computer that is offline gets the 没有可用的电脑 card, never another
+  computer, and the reply names only where the run actually is.
 
 ## Right panel, 建议, Artifact and browser
 
@@ -240,8 +252,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot's avatar and name (R-02), then the tabs 详情, 线程, PR, 电脑. 线程
   lists only the threads this bot dispatched (for the Coordinator, the
   threads it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
-  全部线程 lists every bot's threads; each row carries the 16px mark of the
-  Agent running it (R-78), the only thread list that shows one, and a
+  全部线程 lists every bot's threads; each row carries the small mark of the
+  Agent running it (R-78), the only thread list that shows one, beside a
   relative time on the right (2 分钟前, 昨天).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
@@ -252,11 +264,34 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   (2026-10-31). The Coordinator's header stays read-only. 详情 holds two lists, 例行 (routines)
   and 资料库 (library). The bot creates routines when asked in chat; files are
   uploaded with the composer's 「+」.
-- **R-52** Every thread list groups its rows in this order: 等待回复（N）,
-  进行中（N）, 空闲（N）, 已解决（N）. A group header is muted text
-  (「等待回复（2）」) followed by a thin rule filling the rest of the row.
-  已解决 is collapsed by default behind a chevron. A failed thread sits under
-  等待回复. Never a 「今天」 or 「今天完成」 group.
+- **R-52** Every thread list, web and phone, groups its rows in this order:
+  进行中（N）, 受阻（N）, 等待你（N）, 空闲（N）, 已解决（N）
+  (Running, Blocked, Waiting for you, Idle, Resolved). A group header is
+  muted text (「等待你（2）」) followed by a thin rule filling the rest of
+  the row. 已解决 is collapsed by default behind a chevron. Never a 「今天」
+  or 「今天完成」 group
+  ([decision](decisions/2026-11-01-1250-five-thread-groups.md)).
+  - 进行中 follows the run's state: queued, preparing, running or finishing.
+  - Every other group follows how the run came out (`agent_runs.outcome`:
+    done, blocked, needs_input, failed, idle), judged by the decision model
+    when the run ends from its last reply, status, task and PRs
+    (`lib/run-outcome-judge.ts`); with no answer it stays empty and is asked
+    again an hour later. Code never guesses it from the status: a run that
+    "finished" saying it could not log in is 受阻.
+  - 受阻: blocked or failed, or paused on its quota: it needs something
+    outside the work fixed (login, credentials, proxy, permission) or nobody
+    took over after it failed. 等待你: needs_input, a run asking a question,
+    or a task with a PR to review. 空闲: idle, its task still open.
+  - 已解决 only when the outcome is done, or its task is done, cancelled or a
+    duplicate, or its PR is merged. A run nobody could judge sits under 受阻
+    (failed) or 等待你, never 已解决.
+  - Every row leads with its group's status icon and colour, the phone's set
+    (`ThreadStatusIcon`): 进行中 spins, 受阻 a red alert, 等待你 a hollow
+    circle, 空闲 a slashed circle, 已解决 a green check.
+  - A task's existing threads fold into its newest one, which carries
+    「第 N 次尝试」 past the first and stays out of 已解决 until the task is
+    resolved; the task's own 线程 tab lists every attempt. (New work keeps one
+    thread per task, so this is for threads that already exist.)
 - **R-53** A thread row has two lines: the thread's title, then the opening of
   its last reply quoted verbatim, cut to one line. No generated description,
   no status word and no bot-name prefix (generating them costs compute).
@@ -289,6 +324,24 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   a chip 「1 · <element> · <action> · <note>」 into the current chat's
   composer. The 浏览器 is the person's own and app-wide; it is not a bot's
   电脑 (R-50).
+
+## Navigation
+
+- **R-82** One address says what is on screen, and every click goes through
+  `components/workspace/workspace-navigation.ts`; nothing else writes the
+  browser history or builds a workspace link (`scripts/navigation-policy.mjs`).
+  A move the person makes (another bot or group chat, a rail page, a task, a
+  thread, an Artifact) is a new history entry, so back and forward step
+  through it one move at a time and never leave Mikka while there is a step
+  inside it; a filter or a tab replaces the entry. Each object opens in one
+  place whatever the entry point: a bot or group chat in the centre; a thread
+  in the right column beside what is in the centre (the chat, or a task with
+  its properties), a thread of another bot included, its header naming the
+  bot that dispatched it; a task as its own page in the centre, as Linear; an
+  Artifact in its window over the page (R-56); PRs and web pages in a new
+  tab. Projects and teams live under 看板, with no rail item of their own. On
+  a phone the right column is a page pushed over the chat. Source: Alex,
+  2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)).
 
 ## Settings
 
