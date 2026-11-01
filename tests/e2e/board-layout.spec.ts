@@ -102,9 +102,12 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
     await page.setViewportSize({ width: 1440, height: 900 })
     const email = `e2e-${randomUUID()}@example.com`
     await register(page, '/', email)
-    await seedTask(page, 'Bot 负责的看板任务', { status: 'in_progress' })
+    await seedTask(page, 'Bot 负责的看板任务', { status: 'doing' })
     await seedTask(page, '只有 PR 的看板任务', { status: 'todo' })
     await seedCardTasks(email, 'Bot 负责的看板任务', '只有 PR 的看板任务')
+    // GitHub is not connected here: the icon falls back to the state saved on the task. A controlled
+    // 200 body, as in github-integration, keeps the expected refusal out of the console.
+    await page.route('**/api/github/pull-request-status', route => route.fulfill({ json: { error: 'githubNotConnected' } }))
     await page.goto(app('/'))
     await rail(page, '看板').click()
 
