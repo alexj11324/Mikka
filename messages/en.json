@@ -1772,7 +1772,8 @@
       "transferred": "Transferred to {name}",
       "replayOnboarding": "Replay onboarding",
       "replay": "Replay",
-      "replaying": "Replaying…"
+      "replaying": "Replaying…",
+      "transferPick": "Choose a member"
     },
     "computerPolicy": {
       "heading": "Computer use",
@@ -2407,7 +2408,6 @@
     "description": "Invite teammates to {workspace} by entering emails or dropping in a CSV.",
     "done": "Done",
     "emailLabel": "Email addresses",
-    "emailHelp": "Separate with commas or new lines; up to {max} people at a time.",
     "csv": {
       "label": "Upload a CSV file",
       "dropNow": "Drop to import the CSV",
@@ -2422,7 +2422,6 @@
       "member": "Member",
       "admin": "Admin"
     },
-    "noEmailService": "Email delivery is not connected, so each invite becomes a link for that address; no email is sent.",
     "pendingCount": "{count, plural, =1 {1 person} other {# people}} to invite",
     "creating": "Creating…",
     "createLinks": "Create invite links",

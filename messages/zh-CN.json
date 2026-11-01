@@ -1772,7 +1772,8 @@
       "transferred": "已转让给 {name}",
       "replayOnboarding": "重新播放引导",
       "replay": "重新播放",
-      "replaying": "正在重新播放…"
+      "replaying": "正在重新播放…",
+      "transferPick": "选择成员"
     },
     "computerPolicy": {
       "heading": "电脑操作",
@@ -2407,7 +2408,6 @@
     "description": "邀请同事加入{workspace}，可输入邮箱或拖入 CSV 批量导入。",
     "done": "完成",
     "emailLabel": "邮箱地址",
-    "emailHelp": "用逗号或换行分隔，一次最多 {max} 人。",
     "csv": {
       "label": "上传 CSV 文件",
       "dropNow": "松开即可导入 CSV",
@@ -2422,7 +2422,6 @@
       "member": "成员",
       "admin": "管理员"
     },
-    "noEmailService": "当前未接入邮件服务，将生成邮箱专属邀请链接，不会自动发送邮件。",
     "pendingCount": "{count} 位待邀请",
     "creating": "正在创建…",
     "createLinks": "创建邀请链接",
