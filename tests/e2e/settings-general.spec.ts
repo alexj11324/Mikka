@@ -4,7 +4,7 @@ import { attachLightDark } from './settings-v4-shots'
 
 // V10 常规 and S-I 删除工作区 (Figma 551:7960, 551:9716) against the real backend.
 test('管理员可以改名、改地址并删除工作区', async ({ page }, testInfo) => {
-  await register(page, '/settings?section=general')
+  await registerInTeam(page, '/settings?section=general')
   await expect(page.getByRole('heading', { level: 1, name: '常规' })).toBeVisible()
   const name = page.getByRole('textbox', { name: '名称', exact: true })
   const address = page.getByRole('textbox', { name: '地址', exact: true })

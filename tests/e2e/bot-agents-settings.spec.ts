@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import { Pool } from 'pg'
-import { test, expect, register } from './fixtures'
+import { test, expect, registerInTeam } from './fixtures'
 
 // Real application, real PostgreSQL and the real server actions. Only the
 // daemon's report (devices row) and a connected account binding are seeded,
@@ -34,7 +34,7 @@ async function seed(page: Page) {
 }
 
 test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用任务默认，改运行位置、Agent 和模型', async ({ page }, testInfo) => {
-  await register(page, '/settings?section=bots')
+  await registerInTeam(page, '/settings?section=bots')
   await expect(page.getByRole('heading', { level: 1, name: 'Bot 与 Agents' })).toBeVisible()
   // The first workspace load creates the person's workspace; seed into it.
   await expect(page.getByRole('button', { name: '添加规则', exact: true })).toBeVisible()
@@ -113,7 +113,7 @@ test('Bot 与 Agents：没有自动，初始值来自订阅，添加规则沿用
 })
 
 test('Bot 与 Agents：规则标签从工作区已有标签中选，标签带颜色', async ({ page }) => {
-  await register(page, '/settings?section=bots')
+  await registerInTeam(page, '/settings?section=bots')
   await expect(page.getByRole('button', { name: '添加规则', exact: true })).toBeVisible()
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie!.value).split('.')[0]])
@@ -148,7 +148,7 @@ test('Bot 与 Agents：规则标签从工作区已有标签中选，标签带颜
 })
 
 test('Bot 与 Agents：没有 Coordinator 和各 Bot 的模型行，模型在对话框里选', async ({ page }) => {
-  await register(page, '/settings?section=bots')
+  await registerInTeam(page, '/settings?section=bots')
   await expect(page.getByRole('heading', { level: 1, name: 'Bot 与 Agents' })).toBeVisible()
   await expect(page.getByRole('button', { name: '添加规则', exact: true })).toBeVisible()
   await expect(page.locator('[data-bot]')).toHaveCount(0)

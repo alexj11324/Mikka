@@ -86,6 +86,6 @@ function whenIdle(run: () => void) {
   return () => window.clearTimeout(timer)
 }
 
-export function prefetchAllSettings(workspaceId: string, admin: boolean, cache: Cache) {
-  return whenIdle(() => { for (const { id } of visibleSettingsSections({ admin })) prefetchSettingsSection(id, workspaceId, cache) })
+export function prefetchAllSettings(workspaceId: string, admin: boolean, cache: Cache, personal = false) {
+  return whenIdle(() => { for (const { id } of visibleSettingsSections({ admin, personal })) prefetchSettingsSection(id, workspaceId, cache) })
 }
