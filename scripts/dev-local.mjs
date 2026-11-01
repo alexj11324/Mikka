@@ -6,7 +6,7 @@
 // or RESEND_API_KEY, Mikka 默认, Decisions and mail use the local substitutes.
 import { spawn, execFileSync } from 'node:child_process'
 import { generateKeyPairSync, randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import pg from 'pg'
@@ -81,14 +81,18 @@ for (let i = 0; i < 120; i++) {
 // The production minute Worker's schedule (cloudflare/suggestions-cron) against this server.
 const stopCron = startLocalCron({ appUrl: server, secret: cronSecret, log: line => console.log(`dev:local ${line}`) })
 const dataDir = resolve(process.env.MIKKA_DEV_DAEMON_DIR ?? join(root, '.cache/dev-local/daemon'))
+// Only the daemon's git sees this rewrite: the GitHub-shaped repository clones and pushes the local
+// origin. A config file, because a run's GitHub delivery sets its own GIT_CONFIG_COUNT entries.
+const gitConfig = join(dirname(dataDir), 'dev-local.gitconfig')
+mkdirSync(dirname(gitConfig), { recursive: true })
+writeFileSync(gitConfig, `[url "${pathToFileURL(scenario.barePath).href}"]\n\tinsteadOf = ${REPOSITORY}\n[protocol "file"]\n\tallow = always\n`, { mode: 0o644 })
 const tsx = join(root, 'packages/daemon/node_modules/.bin/tsx')
 const daemon = args => spawn(daemonUser ? 'setpriv' : tsx,
   daemonUser ? ['--reuid', daemonUser, '--regid', daemonUser, '--init-groups', tsx, ...args] : args, {
     cwd: join(root, 'packages/daemon'), stdio: 'inherit',
     env: { ...process.env, ...(daemonUser ? { HOME: `/home/${daemonUser}` } : {}),
-      // Only the daemon sees this rewrite: the GitHub-shaped repository clones and pushes the local origin.
-      GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: `url.${pathToFileURL(scenario.barePath).href}.insteadOf`, GIT_CONFIG_VALUE_0: REPOSITORY,
-      GIT_CONFIG_KEY_1: 'protocol.file.allow', GIT_CONFIG_VALUE_1: 'always', GIT_TERMINAL_PROMPT: '0' },
+      // File origins are allowed only in local test-account mode (daemonTestMode).
+      MIKKA_TEST_MODE: '1', GIT_CONFIG_GLOBAL: gitConfig, GIT_TERMINAL_PROMPT: '0' },
   })
 if (!existsSync(join(dataDir, 'device.json'))) {
   log(`sign up at ${server}, then approve this device with the code below`)
