@@ -63,6 +63,59 @@ test('a connected user without repository write access never receives a worker t
   assert.ok(!calls.some(call => call.body?.repository_ids))
 })
 
+test('overlaps repository metadata with identity checks, then waits for both before issuing a worker token', async () => {
+  const { calls, fetcher } = stub()
+  const userStarted = Promise.withResolvers<void>()
+  const permissionStarted = Promise.withResolvers<void>()
+  const user = Promise.withResolvers<void>()
+  const repository = Promise.withResolvers<void>()
+  const delayed: typeof fetch = async (url, init) => {
+    const response = fetcher(url, init)
+    const path = new URL(String(url)).pathname
+    if (path === '/user/456') { userStarted.resolve(); await user.promise }
+    if (path.endsWith('/permission')) permissionStarted.resolve()
+    if (path === '/repos/owner/repo') await repository.promise
+    return response
+  }
+  const result = issueRunGitHubInstallationToken({ ...input, fetcher: delayed })
+  try {
+    await userStarted.promise
+    assert.ok(calls.some(call => call.path === '/repos/owner/repo'), 'repository lookup must start while identity is pending')
+    assert.ok(!calls.some(call => call.body?.repository_ids))
+    user.resolve()
+    await permissionStarted.promise
+    assert.ok(!calls.some(call => call.body?.repository_ids), 'pending repository metadata must still prevent a worker token')
+    repository.resolve()
+    assert.equal((await result).token, 'synthetic-installation-token')
+  } finally { user.resolve(); repository.resolve(); await result.catch(() => undefined) }
+})
+
+test('failed identity or concurrent repository lookup never issues write authority', async () => {
+  for (const failure of ['identity', 'repository'] as const) {
+    const { calls, fetcher } = stub({ permission: failure === 'identity' ? 'read' : 'write' })
+    const userStarted = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const delayed: typeof fetch = async (url, init) => {
+      const response = fetcher(url, init)
+      const path = new URL(String(url)).pathname
+      if (path === '/user/456') { userStarted.resolve(); await release.promise }
+      if (failure === 'repository' && path === '/repos/owner/repo') {
+        await release.promise
+        return Response.json({}, { status: 503 })
+      }
+      return response
+    }
+    const result = issueRunGitHubInstallationToken({ ...input, fetcher: delayed })
+    try {
+      await userStarted.promise
+      assert.ok(calls.some(call => call.path === '/repos/owner/repo'))
+      release.resolve()
+      await assert.rejects(result, PublicationError)
+      assert.ok(!calls.some(call => call.body?.repository_ids))
+    } finally { release.resolve(); await result.catch(() => undefined) }
+  }
+})
+
 test('revocation uses the minted token itself and never follows redirects', async () => {
   await revokeRunGitHubInstallationToken('synthetic-expired-grant', (async (url, init) => {
     assert.equal(url, 'https://api.github.com/installation/token')
