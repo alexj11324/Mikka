@@ -15,6 +15,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // retrying cannot fix.
 import { z } from "zod"
 import { ToolApprovalGate } from "./agents/tool-approval"
+import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { toolApprovalDecision } from "./agents/tool-approval-policy"
@@ -138,6 +139,18 @@ export class HttpServerLink implements ServerLink {
     Object.freeze(assignment.policy)
     return context
   }
+  /** Asks the server's Decisions API for one run. Never throws; null on any failure. */
+  decide: ServerDecide = async (runId, request, signal) => {
+    const answer = z.discriminatedUnion('type', [
+      z.object({ type: z.literal('predicate'), name: z.string(), probability: z.number() }),
+      z.object({ type: z.literal('choice'), name: z.string(), choice: z.string() }),
+    ])
+    try {
+      const { answers } = await this.call('POST', `/v1/runs/${seg(runId)}/decision`, { body: request, schema: z.object({ answers: z.array(answer).nullable() }), signal, timeoutMs: 6000 })
+      return answers ? new Map<string, ServerDecisionAnswer>(answers.map(item => [item.name, item])) : null
+    } catch { return null }
+  }
+
   async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string) {
     if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
     let context = signal.aborted ? null : await this.verifyRunPolicy(assignment,signal)
