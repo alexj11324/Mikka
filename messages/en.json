@@ -3559,7 +3559,7 @@
   },
   "GroupChat": {
     "untitled": "Untitled group chat",
-    "readOnly": "Group chats are read-only for now; sending isn't open yet.",
+    "composer": "Sending to groups isn't open yet",
     "messages": "Group chat messages",
     "you": "You",
     "member": "Member",

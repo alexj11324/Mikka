@@ -24,7 +24,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | New task | `components/coordinator/new-task-dialog.tsx` | R-22, R-23 |
 | Search field on a page (filter a list) | `SearchInput` in `components/ui/search-input.tsx` | Borderless grey fill, icon left (R-31). Never an outlined `Input` with a magnifier |
 | Search | reUI `CommandDialog` (⌘K), centred | Local rows first, then `GET /api/search` hits per source (`hooks/use-site-search.ts`) |
-| Group chat (opened from search) | `components/workspace/group-chat-view.tsx` | Read-only until group sending opens: no composer (R-10). Runs per R-13; bot colour not available yet |
+| Group chat (opened from search) | `components/workspace/group-chat-view.tsx` | A conversation, so it ends in the standard `ChatComposer`, `disabled` until group sending opens, with no line explaining it (R-10, R-40). Runs per R-13; bot colour not available yet |
 | Board | reUI `Kanban` (`components/reui/kanban.tsx`) | R-25 |
 | Status | StatusBadge set; `components/nav/status-dot.tsx` for devices | R-24, R-34 |
 | People avatars | `components/nav/letter-avatar.tsx`, `components/user-avatar.tsx` | |

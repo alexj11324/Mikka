@@ -3559,7 +3559,7 @@
   },
   "GroupChat": {
     "untitled": "未命名群聊",
-    "readOnly": "群聊暂时只能阅读，发送消息还没有开放。",
+    "composer": "群聊暂不能发送",
     "messages": "群聊消息",
     "you": "你",
     "member": "成员",
