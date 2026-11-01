@@ -1,5 +1,7 @@
 # Codex → CC handoff — 2026-11-01
 
+Follow-up: [MVP API/CLI acceptance](acceptance-mvp-cli-2026-11-01.md) subsequently passed items 1–8. The record below preserves the earlier handoff and its original evidence boundaries.
+
 Authoritative tracker: [#838](https://github.com/alexj11324/Mikka/issues/838). Consolidated **Draft** PR: [#847](https://github.com/alexj11324/Mikka/pull/847). This is a handoff, not a production-ready release. The final user instruction was to stop validation and further fixes, push all completed work, open one Draft PR, and return control to CC. No review request, merge, production deployment or public template publication was performed.
 
 The implementation candidate is `4ca4a9376b7f3b8c50e5df2e8d43068773c092e8`; the final handoff commit adds this document and its [sanitized evidence/resource inventory](handoff-codex-to-cc-2026-11-01.json). See the PR head and #838's final comment for that commit. #840, #836, #842, #844 and #846 are continued by this PR; they were not merged by this session. #765/#760, AGENTS.md and browser-gate.yml were left alone.
