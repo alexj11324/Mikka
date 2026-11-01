@@ -6,14 +6,14 @@
 - Replaces: [2026-11-01-1201 template public, released by CI](2026-11-01-1201-e2b-template-public-auto-release.md)
   (Mikka's own worker template) and the sandbox-runtime part of
   [2026-11-01-1312 cloud runs without Docker](2026-11-01-1312-cloud-runs-without-docker.md)
-- See also: #843 (zero added start latency), #847 (Codex handoff)
+- See also: #843 (zero added start latency); builds on #847, #849, #856, #862 and #863, all on `main`
 
 ## Decision
 
 - **A bot's computer** runs on E2B's **desktop** template, not on a template
   Mikka builds.
 - **The agent that does a task** runs on E2B's **Codex** or **Claude Code**
-  template, picked by the run's harness: `codex` for Codex, `claude-code` for
+  template, picked by the run's harness: `codex` for Codex, `claude` for
   Claude Code. One task, one machine (1312) stays: that machine is the
   isolation between tasks.
 - **No `@anthropic-ai/sandbox-runtime` around the CLI.** The E2B sandbox is
@@ -26,22 +26,39 @@
 | Use | Template | What the docs say | Source |
 | --- | --- | --- | --- |
 | Task agent, Codex | `codex` | 「E2B provides a pre-built `codex` template with Codex already installed」. `Sandbox.create('codex', { envs: { CODEX_API_KEY } })`; headless with `codex exec --full-auto --skip-git-repo-check`. A derived template starts `.fromTemplate('codex')`. The docs warn that sandboxes reach the internet by default; limit it with network rules. | https://docs.e2b.dev/agents/codex |
-| Task agent, Claude Code | `claude-code` | The template example installs `@anthropic-ai/claude-code` globally as `claude` and builds it under the name `claude-code`; the sandbox is then `Sandbox.create('claude-code', …)`. The page shows building it; it does not say a public prebuilt copy exists. | https://docs.e2b.dev/template/examples/claude-code |
-| Bot computer | `desktop` | Ubuntu 22.04 with XFCE, Xvfb, x11vnc on 5900 and noVNC on 6080, xdotool and scrot; the example builds it under the name `desktop`. E2B's Desktop SDK (`@e2b/desktop`) is the client for computer use. | https://docs.e2b.dev/template/examples/desktop, https://e2b.dev/docs/use-cases/computer-use |
+| Task agent, Claude Code | `claude` | 「E2B provides a pre-built `claude` template with Claude Code already installed」. `Sandbox.create('claude', { envs: { ANTHROPIC_API_KEY } })`; headless with `claude --dangerously-skip-permissions -p "…"`. | https://docs.e2b.dev/agents/claude-code |
+| Bot computer | default desktop template | `@e2b/desktop`'s `Sandbox.create()` with no template name is 「created from the default desktop sandbox template」, with streaming (`stream.start()`, `getUrl()`), `screenshot()`, mouse and keyboard. A self-built recipe (Ubuntu 22.04, XFCE, VNC/noVNC) is also documented. | https://docs.e2b.dev/use-cases/computer-use, https://docs.e2b.dev/sdk-reference/desktop-python-sdk/v2.4.2/desktop, https://docs.e2b.dev/template/examples/desktop |
 
-Before building on them, confirm which of these are public prebuilt templates
-for our key (`Sandbox.create('<name>')` succeeds, or `e2b template list`).
+`codex` and `claude` are documented as pre-built. Before building on them, confirm all three
+are usable with our key (`Sandbox.create('<name>')` succeeds, or `e2b template list`).
 Where a page only shows how to build one, Mikka builds it from E2B's recipe
 with `.fromTemplate(...)` and changes nothing else.
 
+Checked with a real key on 2026-11-01 (each sandbox killed right after):
+
+| Template | Boot | OS | Installed | Default user |
+| --- | ---: | --- | --- | --- |
+| `claude` | 0.59 s | Ubuntu 24.04.5 | Claude Code 2.1.305 at `/home/user/.local/bin/claude`, node, git | `user` (1001), passwordless sudo |
+| `codex` | 0.39 s | Debian 12 | codex-cli 0.164.0 at `/usr/local/bin/codex`, node, git | `user` (1000), passwordless sudo |
+| default desktop (`@e2b/desktop`) | 4.83 s | Ubuntu 22.04.5 | python3, git; no agent CLI | `user` (1000), passwordless sudo |
+
 ## What follows
 
-- The worker that talks to Mikka (claims runs, holds the device credential,
-  the broker and the model key) is not something the agent can read. Without
-  sandbox-runtime, that means the agent's machine holds only what the run
-  needs: a run-scoped credential and the model access the broker grants. How
-  the worker and the agent are separated on that machine is part of the
-  implementation and needs its own review.
+- **The worker's secrets stay out of the agent's reach by Unix users, not a
+  wrapper** (coordinator, confirmed for Alex 2026-11-01): the worker and
+  everything it holds (device credential, RPC secret, journal, logs, session
+  ledgers, the broker's model key) belong to the worker's user with 0600/0700
+  modes; the agent runs as its own unprivileged user with no sudo, reaching
+  only the run's worktree and the broker and egress sockets. The templates'
+  default `user` has passwordless sudo, so the agent never runs as `user`.
+  A test reads the worker's credential file as the agent user and must fail.
+- **The model key stays with the broker**: it never goes into the agent's
+  environment, even though E2B's examples pass `ANTHROPIC_API_KEY` /
+  `CODEX_API_KEY` as envs. Credentials keep the existing path (subscription or
+  API key through Mikka's gateway or BYOK); nothing new is stored or logged.
+- **`--dangerously-skip-permissions` and `--full-auto` only on E2B.** A run on
+  a person's own computer or server keeps the daemon's current isolation and
+  permission modes unchanged.
 - Anything a run needs before it starts goes into the template or is passed at
   create time (envs, metadata), so the agent starts when E2B reports the
   machine ready (#843).
