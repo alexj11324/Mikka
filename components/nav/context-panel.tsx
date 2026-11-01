@@ -115,7 +115,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   /** The current workspace; its E2B key decides whether the 电脑 tab shows the screen or 添加 E2B API Key. */
   workspaceId?: string
   /** A thread row opens that thread in the centre column (R-50: the panel never replaces the chat with a task page). */
-  onOpenThread: (thread: { issueId: string; runId: string }) => void
+  onOpenThread: (thread: { issueId: string | null; runId: string }) => void
   onClose: () => void
   /** Shown in a Sheet below xl, where the column has no room. */
   sheet?: boolean
