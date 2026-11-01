@@ -146,3 +146,11 @@ test('response validation keeps the questions actually sent despite in-flight ca
   assert.deepEqual((requests[0].questions as typeof questions)[0].choices,[{value:'result'}])
  }finally{globalThis.fetch=originalFetch}
 })
+test('the Decisions call authenticates with DECISION_GATEWAY_API_KEY, else with the Vercel deployment OIDC token', async () => {
+ const oidc = async () => 'oidc-token'
+ assert.equal(await transport.decisionGatewayToken({ DECISION_GATEWAY_API_KEY: 'key', VERCEL: '1' }, oidc), 'key')
+ // Production sets no DECISION_GATEWAY_API_KEY: on Vercel the deployment's OIDC token signs the call, as the Coordinator's model does.
+ assert.equal(await transport.decisionGatewayToken({ VERCEL: '1' }, oidc), 'oidc-token')
+ assert.equal(await transport.decisionGatewayToken({ VERCEL: '1' }, async () => { throw Error('no oidc') }), null)
+ assert.equal(await transport.decisionGatewayToken({}, oidc), null)
+})
