@@ -4,6 +4,7 @@ import type { SubscriptionService } from './subscription-service'
 import { WorkerRefusal } from '../packages/daemon/src/subscription-worker-client'
 import { noteLogUser } from './request-log'
 import { accountLabel, failedUsage, usageCache } from './subscription-usage'
+import { stopRunsUsingSubscriptions } from './personal-policy'
 
 const id = z.uuid()
 const input = z.discriminatedUnion('action', [
@@ -88,6 +89,8 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         result = { id: row.id, removed: true }
       }
       else { await worker.call(body.action, { revision: body.revision }, request.signal); result = await service.status(session.userId, row.id, request.signal) }
+      // 断开连接 / 移除: runs using this connection stop now, wherever they run.
+      if (body.action === 'disconnect' || body.action === 'remove') await stopRunsUsingSubscriptions(service.repository.pool, { ownerId: session.userId, connectionId: row.id })
       return Response.json(result, { headers })
     } catch (error) {
       const code = refusalCode(error)

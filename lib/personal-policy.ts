@@ -42,9 +42,35 @@ export async function subscriptionsUsable(query: Query, ownerId: string, workspa
 
 /** The owner's own choice; the caller has checked membership. `allowOthers` is left as it is when omitted. */
 export async function setSubscriptionShare(query: Query, ownerId: string, workspaceId: string, shared: boolean, allowOthers?: boolean) {
-  if (!shared) return void await query.query('DELETE FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, workspaceId])
+  if (!shared) {
+    await query.query('DELETE FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, workspaceId])
+    await stopRunsUsingSubscriptions(query, { ownerId, workspaceId })
+    return
+  }
   await query.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,COALESCE($3::boolean,false))
     ON CONFLICT ("ownerId","workspaceId") DO UPDATE SET "allowOthers"=COALESCE($3::boolean,workspace_subscription_shares."allowOthers")`, [ownerId, workspaceId, allowOthers ?? null])
+  if (allowOthers === false) await stopRunsUsingSubscriptions(query, { ownerId, workspaceId, othersOnly: true })
+}
+
+/**
+ * Withdrawing a credential (un-sharing, 分享给团队成员 off, leaving, the admin
+ * switch off, disconnecting) stops the runs using it now, through the usual
+ * stop request and lease cut: the device's daemon ends the run and deletes the
+ * short-lived credential it was given, and every credential access or renewal
+ * already refuses a run with a stop request. Model calls re-check on their own.
+ * At least a workspace or a connection, so it can never stop everything.
+ * Returns how many runs it newly stopped.
+ */
+export async function stopRunsUsingSubscriptions(query: Query, scope: { ownerId?: string; workspaceId?: string; connectionId?: string; othersOnly?: boolean }) {
+  if (!scope.workspaceId && !scope.connectionId) throw new Error('stopRunsUsingSubscriptions needs a workspace or a connection')
+  const { rowCount } = await query.query(`UPDATE agent_runs r SET "stopRequestedAt"=clock_timestamp(),
+      "leaseExpiresAt"=LEAST(r."leaseExpiresAt",clock_timestamp()),"updatedAt"=clock_timestamp()
+    FROM byos_native_runs n JOIN byos_bindings b ON b.id=n."bindingId" JOIN byos_connections c ON c.id=b."connectionId"
+    WHERE n."runId"=r.id AND r."stopRequestedAt" IS NULL AND r.status IN ('queued','preparing','running','waiting_input','finishing')
+      AND ($1::text IS NULL OR c."ownerId"=$1) AND ($2::text IS NULL OR b."workspaceId"::text=$2)
+      AND ($3::uuid IS NULL OR c.id=$3) AND (NOT $4::boolean OR r."userId"<>c."ownerId")`,
+    [scope.ownerId ?? null, scope.workspaceId ?? null, scope.connectionId ?? null, scope.othersOnly ?? false])
+  return rowCount ?? 0
 }
 
 /** SQL fragment for the same rule, with the owner and workspace as SQL expressions. */

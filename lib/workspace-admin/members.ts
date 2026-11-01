@@ -1,13 +1,14 @@
 import 'server-only'
 import { and, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { agentRuns, bots } from '@/lib/db/schema'
 import { teamMembers, teams } from '@/lib/db/team-schema'
 import { workspaceInvitations, workspaceMembers } from '@/lib/db/workspace-schema'
 import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { releasePaymentDesignation } from '@/lib/payment-designation'
+import { stopRunsUsingSubscriptions } from '@/lib/personal-policy'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/delivery'
 import type { MainTransaction } from './general'
@@ -61,8 +62,8 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
 /**
  * §8.3 (decision 2026-10-31-2225): when someone leaves a team or is suspended,
  * their subscription share leaves with them and their bots there pause until an
- * admin takes one over. Runs frozen on that subscription stop at their next
- * model call (the share and the membership are checked on every call).
+ * admin takes one over. Runs on that subscription are stopped at once, and
+ * model calls check the share and the membership on every call.
  */
 export async function releaseDepartingMember(workspaceId: string, userId: string) {
   // A card they designated keeps paying through its grace period; admins see when it stops (计费).
@@ -72,6 +73,8 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
     await main.update(bots).set({ archivedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, userId), isNull(bots.archivedAt)))
   })
+  // Runs there on their subscription stop now, including other members' bots they had shared it with.
+  await stopRunsUsingSubscriptions(pool, { ownerId: userId, workspaceId })
 }
 
 /** Reactivation brings a suspended member's own bots back; their subscription stays unshared until they share it again. */
