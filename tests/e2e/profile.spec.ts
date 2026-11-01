@@ -63,30 +63,20 @@ test('通知设置可以关闭主动消息，刷新后保持', async ({ page }) 
 // The API key read is held open; the switch must still save, and stay off after a reload.
 test('设置预取未返回时，开关仍立即保存', async ({ page }) => {
   const held: import('@playwright/test').Route[] = []
-  let started: () => void = () => {}
-  const prefetching = new Promise<void>(resolve => { started = resolve })
-  // The API key read as a GET, or as the server action it used to be (its one argument is the workspace id).
-  const isKeyRead = (request: import('@playwright/test').Request) => {
-    if (new URL(request.url()).pathname.endsWith('/api/settings/api-keys')) return true
-    if (!request.headers()['next-action']) return false
-    try { const args: unknown = JSON.parse(request.postData() ?? ''); return Array.isArray(args) && args.length === 1 && typeof args[0] === 'string' } catch { return false }
-  }
-  await page.context().route('**/*', route => {
-    if (!isKeyRead(route.request())) return route.fallback()
-    held.push(route)
-    started()
-  })
+  await page.context().route('**/api/settings/api-keys**', route => { held.push(route) })
   await register(page, '/settings?section=notifications')
   const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
   await expect(proactive).toBeChecked()
-  await prefetching
+  // Pointing at 「API 与订阅」 prefetches that section now, if the idle prefetch has not already.
+  await page.locator('[data-slot="settings-list"]').getByRole('link', { name: 'API 与订阅', exact: true }).hover()
+  await expect.poll(() => held.length).toBeGreaterThan(0)
   const saved = page.waitForResponse(response => {
     const request = response.request()
     try { return Boolean(request.headers()['next-action']) && request.postData() === JSON.stringify([{ proactive: false }]) } catch { return false }
   })
   await proactive.click()
   expect((await saved).ok()).toBe(true)
-  await page.context().unroute('**/*')
+  await page.context().unroute('**/api/settings/api-keys**')
   for (const route of held) await route.fallback()
   await page.reload()
   await expect(page.getByRole('switch', { name: '主动消息', exact: true })).not.toBeChecked()
