@@ -166,7 +166,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const retry = <RetryReplyButton botId={botId} onQueued={mutate} />
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
-  const unanswered = data?.enabled === false && items.findLast(item => item.from !== 'event')?.from === 'person'
+  // A failed turn's own line already says why; this one is only for a chat with no Coordinator to answer.
+  const unanswered = data?.enabled === false && !data.error && items.findLast(item => item.from !== 'event')?.from === 'person'
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
   const welcomed = useRef(false)
   useEffect(() => {
