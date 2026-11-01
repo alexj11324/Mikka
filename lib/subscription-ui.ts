@@ -48,3 +48,8 @@ export const subscriptionUsageSchema = z.object({
   })).max(50),
 })
 export type SubscriptionUsageView = z.infer<typeof subscriptionUsageSchema>['connections'][number]
+
+/** A plan as the provider's own pages name it: Codex sends `pro`, Claude's profile gives `Max`. */
+export function planName(plan: string) {
+  return plan.charAt(0).toUpperCase() + plan.slice(1)
+}

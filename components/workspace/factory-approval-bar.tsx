@@ -65,7 +65,8 @@ export function ApprovalBar({ state, isSkill, environment, sha, busy = false, ca
   const t = useTranslations('FactoryAcceptance')
   const refused = state === 'pending' && Boolean(refusal)
   const icon = StateIcon({ state, refused })
-  const openPullRequest = pullRequestUrl && <Button size="sm" variant="secondary" render={<a href={pullRequestUrl} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-start" aria-hidden="true" />{t('openOnGitHub')}</Button>
+  // After GitHub refuses, the fix is usually on GitHub, so opening the PR leads and merging again follows.
+  const openPullRequest = pullRequestUrl && <Button size="sm" variant={refused ? 'default' : 'secondary'} render={<a href={pullRequestUrl} target="_blank" rel="noopener noreferrer" />}><ExternalLink data-icon="inline-start" aria-hidden="true" />{t('openOnGitHub')}</Button>
   return <Item variant="muted" data-state={state}>
     {icon && <ItemMedia variant="icon">{icon}</ItemMedia>}
     <ItemContent>
@@ -78,12 +79,11 @@ export function ApprovalBar({ state, isSkill, environment, sha, busy = false, ca
       </div>}
     </ItemContent>
     <ItemActions>
-      {state === 'pending' && onReject && <Button size="sm" variant="secondary" disabled={busy} onClick={onReject}>{t('reject')}</Button>}
-      {refused && openPullRequest}
+      {state === 'pending' && !refused && onReject && <Button size="sm" variant="secondary" disabled={busy} onClick={onReject}>{t('reject')}</Button>}
       {state === 'pending' && canApprove && (onAccept
-        ? <Button size="sm" disabled={busy} aria-busy={busy} onClick={onAccept}><ActionIcon icon={GitMerge} busy={busy} />{t('accept')}</Button>
+        ? <Button size="sm" variant={refused && pullRequestUrl ? 'secondary' : 'default'} disabled={busy} aria-busy={busy} onClick={onAccept}><ActionIcon icon={GitMerge} busy={busy} />{t('accept')}</Button>
         : <Button size="sm" disabled={busy} aria-busy={busy} onClick={onApprove}><ActionIcon icon={Check} busy={busy} />{t('enable')}</Button>)}
-      {state === 'merged' && openPullRequest}
+      {(state === 'merged' || refused) && openPullRequest}
       {state === 'approved' && <>
         <Button size="sm" variant="secondary" disabled={busy} onClick={onRevoke}>{t('revoke')}</Button>
         {canPublish && <Button size="sm" disabled={busy} aria-busy={busy} onClick={onPublish}><ActionIcon icon={Upload} busy={busy} />{t('publish')}</Button>}

@@ -55,3 +55,13 @@ export function activeStep(steps: readonly { atMs: number }[], ms: number) {
   steps.forEach((step, position) => { if (step.atMs <= ms) active = position })
   return active
 }
+
+/** A step's time; steps that share a second show tenths, so no two rows read the same. */
+export function stepTime(steps: { atMs: number }[], position: number) {
+  const second = (ms: number) => Math.floor(ms / 1000)
+  const atMs = steps[position].atMs
+  const shared = steps.some((other, index) => index !== position && second(other.atMs) === second(atMs))
+  if (!shared) return formatDuration(Math.floor(atMs / 1000) * 1000)
+  return `${Math.floor(atMs / 60000)}:${(Math.floor(atMs / 100) / 10 % 60).toFixed(1).padStart(4, '0')}`
+}
+
