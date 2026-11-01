@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { chatBotId } from '@/lib/coordinator/coordinator-bot'
+import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { stopChatTurn } from '@/lib/coordinator/stop-turn'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
@@ -26,7 +26,7 @@ async function handlePOST(request: Request) {
       .where(and(eq(bots.id, botId), eq(bots.ownerId, user.id), ...(workspace ? [eq(bots.workspaceId, workspace)] : []))).limit(1)
     if (!bot) return json({ error: 'botNotFound' }, 404)
   }
-  return json({ stopped: await stopChatTurn(user.id, await chatBotId(user.id, botId)) })
+  return json({ stopped: await stopChatTurn(user.id, await openChatBotId(user, botId)) })
 }
 
 export const POST = withRequestLog('/api/mobile/chat/stop', handlePOST)

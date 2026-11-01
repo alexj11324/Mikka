@@ -150,10 +150,10 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
 /** 停止 in a chat: the turn working there ends, keeping what its reply had said, marked 已停止. */
 export async function stopCoordinatorTurn(botId: string | null = null): Promise<ActionResult<{ stopped: boolean }>> {
   return runAction(async () => {
-    const userId = await getUserId()
-    const bot = await ownBot(userId, botId)
+    const user = await getUser()
+    const bot = await ownBot(user, botId)
     const { stopChatTurn } = await import('@/lib/coordinator/stop-turn')
-    return { stopped: await stopChatTurn(userId, bot.id) }
+    return { stopped: await stopChatTurn(user.id, bot.id) }
   })
 }
 
