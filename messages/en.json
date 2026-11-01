@@ -3058,6 +3058,7 @@
     "back": "Back to {name}",
     "starting": "Getting ready",
     "close": "Close thread",
+    "openTask": "Open task",
     "conversation": "Thread conversation",
     "loading": "Opening thread",
     "loadFailed": "Thread failed to load",

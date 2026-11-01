@@ -84,7 +84,10 @@ function FollowSentMessages({ count }: { count: number | null }) {
  * `embedded`, with chips instead of cards and the quote from the artifact in
  * the composer.
  */
-export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string }) {
+/** A thread picked in the right panel's thread list, for the chat it was picked beside (`chat`: the bot id, or 'coordinator'). */
+export type ThreadRequest = { issueId: string; runId: string; chat: string }
+
+export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId, threadRequest, onThreadRequestDone }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string; threadRequest?: ThreadRequest | null; onThreadRequestDone?: () => void }) {
   const t = useTranslations('Coordinator')
   const tNav = useTranslations('Nav')
   const botId = bot?.id ?? null
@@ -127,6 +130,12 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const { mutate: mutateAll } = useSWRConfig()
   // A thread card opens its conversation in place of the chat; back returns here (R-66).
   const [openThread, setOpenThread] = useState<{ issueId: string; runId: string } | null>(null)
+  // A row of the right panel's thread list opens here the same way (R-50: the panel never swaps the chat for a task page).
+  useEffect(() => {
+    if (!threadRequest) return
+    setOpenThread({ issueId: threadRequest.issueId, runId: threadRequest.runId })
+    onThreadRequestDone?.()
+  }, [threadRequest, onThreadRequestDone])
   // Notes pinned in the browser wait in this composer while it is the chat on screen (not inside the reader, not under an open thread).
   const browser = useBrowserNotesComposer(!embedded && !openThread)
   const noteCount = browser?.notes.length ?? 0
@@ -233,7 +242,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   }
 
   if (openThread) return <section aria-label={name} data-slot="thread-view" className="flex min-h-0 flex-1 flex-col">
-    <IssueThreadPanel key={openThread.runId} issueId={openThread.issueId} runId={openThread.runId} back={name} onOpenThread={runId => setOpenThread({ issueId: openThread.issueId, runId })} onClose={() => setOpenThread(null)} />
+    <IssueThreadPanel key={openThread.runId} issueId={openThread.issueId} runId={openThread.runId} back={name} onOpenTask={() => onOpenIssue(openThread.issueId)} onOpenThread={runId => setOpenThread({ issueId: openThread.issueId, runId })} onClose={() => setOpenThread(null)} />
   </section>
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
