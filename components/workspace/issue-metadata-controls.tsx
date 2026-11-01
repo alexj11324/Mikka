@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { moveIssueToProject } from '@/app/actions/projects'
 import useSWR from 'swr'
@@ -31,8 +31,10 @@ export function LabelDot({ color, small = false }: { color: IssueLabel['color'];
   return <Circle data-icon="inline-start" className={cn('fill-current', small && 'size-1.5 shrink-0', { 'text-label-violet': color === 'violet', 'text-label-blue': color === 'blue', 'text-success-foreground': color === 'green', 'text-warning-foreground': color === 'yellow', 'text-destructive': color === 'red', 'text-muted-foreground': color === 'gray' })} />
 }
 
-export function IssueMetadataControls({ task, section = 'all', compact = false, disabled = false, onSaved, onBusyChange, request }: {
+export function IssueMetadataControls({ task, section = 'all', compact = false, disabled = false, onSaved, onBusyChange, request, assigneeAvatar }: {
   task: { id: string; revision: number; metadata: IssueMetadata }
+  /** Replaces the assignee button's avatar, as the board card's avatar group (R-25). */
+  assigneeAvatar?: ReactNode
   section?: 'all' | 'assignee' | 'properties' | 'project' | 'labels' | 'pullRequests'
   request?: MetadataRequest | null
   compact?: boolean; disabled?: boolean
@@ -108,7 +110,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   }
   const metadata = task.metadata
   return <>
-    {(section === 'all' || section === 'assignee') && <IssueAssigneeMenu request={request} id={task.id} assignee={metadata.assignee} compact={compact} disabled={busy} onChange={assignee => persist({ assignee })} onInvite={() => open('invite')} />}
+    {(section === 'all' || section === 'assignee') && <IssueAssigneeMenu request={request} id={task.id} assignee={metadata.assignee} avatar={assigneeAvatar} compact={compact} disabled={busy} onChange={assignee => persist({ assignee })} onInvite={() => open('invite')} />}
     {section !== 'assignee' && <>
       {(section === 'all' || section === 'properties' || section === 'project') && <Button variant={section === 'project' ? 'ghost' : 'outline'} size={section === 'project' ? 'sm' : 'xs'} type="button" className={cn(section === 'project' ? ROW_VALUE : 'h-auto max-w-full justify-start whitespace-normal rounded-full text-left')} disabled={busy} onClick={() => open('project')} title={metadata.project ?? tProperty('setProject')} aria-label={tProperty('projectAria', { name: metadata.project ?? tProperty('unset') })}><Box data-icon="inline-start" className="shrink-0" /><span className={cn(section === 'project' && 'truncate', !metadata.project && 'text-muted-foreground')}>{metadata.project ?? tProperty('addToProject')}</span></Button>}
       {(section === 'all' || section === 'properties' || section === 'labels') && <>

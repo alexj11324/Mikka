@@ -13,6 +13,7 @@ import {
   type ExecutionRule,
 } from "./execution-rules";
 import { isDeviceOnline } from "@mikka/protocol/device";
+import { HOSTED_CHOICE } from "./bot-model-menu-view";
 
 export interface ExecutionSettingsScope {
   ownerId: string;
@@ -519,6 +520,14 @@ export class ExecutionSettings {
         throw new ActionFailureError("botNotFound");
     }
     const key = botId ?? "coordinator";
+    // Mikka 默认 picked on purpose: no binding behind it (decision 2026-10-31-2330).
+    if (bindingId === HOSTED_CHOICE) {
+      await this.pool.query(
+        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId"',
+        [scope.ownerId, scope.workspaceId, key, null],
+      );
+      return;
+    }
     if (bindingId === null || bindingId === "auto")
       throw new ActionFailureError("executionAutoNotAllowed");
     if (!z.uuid().safeParse(bindingId).success)
@@ -562,25 +571,18 @@ export class ExecutionSettings {
     if (!result.rows[0]) throw new ActionFailureError("executionModelUnknown");
     return result.rows[0].id;
   }
-  /** UI selection follows its deduplicated option; execution keeps the stored binding id. */
-  async botModelOption(scope: ExecutionSettingsScope, botId: string | null) {
-    const bindingId = await this.botModel(scope, botId);
-    if (!bindingId) return undefined;
-    const saved = (await this.connectedBindings(scope,bindingId))[0];
-    if (!saved) return bindingId;
-    return (await this.botModels(scope)).find(option => option.connectionId === saved.connectionId && option.modelId === saved.modelId)?.bindingId ?? bindingId;
-  }
   async botModel(
     scope: ExecutionSettingsScope,
     botId: string | null,
   ): Promise<string | undefined> {
-    const saved = (
+    const row = (
       await this.pool.query(
         'SELECT "bindingId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
         [scope.ownerId, scope.workspaceId, botId ?? "coordinator"],
       )
-    ).rows[0]?.bindingId;
-    if (saved) return saved;
+    ).rows[0];
+    // A saved row without a binding is Mikka 默认, picked on purpose.
+    if (row) return row.bindingId ?? HOSTED_CHOICE;
     // Decision 2026-10-30 (#537): a Claude subscription first, otherwise ChatGPT/Codex, as `suggested` does.
     const models = await this.botModels(scope);
     const first = models.find((m) => m.provider === "claude") ?? models[0];

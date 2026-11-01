@@ -14,3 +14,11 @@ export const runBotName = sql<string>`coalesce(
   (select b.name from bots b where b.id=${agentRuns.botId} and b."ownerId"=${agentRuns.userId}),
   ${executionBotName}
 )`
+
+/** The Bot a run belongs to, found the way `runBotName` finds its name; null for the Coordinator's own work. */
+export const runBotId = sql<string | null>`coalesce(
+  (select b.id from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" where crb."runId"=${agentRuns.id}),
+  (select b.id from bots b where b.id=${agentRuns.botId} and b."ownerId"=${agentRuns.userId}),
+  (select b.id from bot_cloud_runtimes bcr join bots b on b.id=bcr."botId" and b."ownerId"=bcr."ownerId"
+    where bcr."agentId"=${agents.id} and bcr."ownerId"=${agents.userId} limit 1)
+)`

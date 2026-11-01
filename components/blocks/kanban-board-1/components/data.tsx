@@ -1,4 +1,5 @@
 import type { listIssues } from '@/app/actions/issues'
+import type { TaskRun } from '@/app/actions/task-runs'
 import { ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
 
 export type BoardTask = Awaited<ReturnType<typeof listIssues>>[number]
@@ -12,6 +13,9 @@ export const boardColumnOf = (status: string) => BOARD_COLUMNS.some(column => co
 export const CARD_PROPERTIES = ['identifier', 'priority', 'assignee', 'labels', 'pullRequests', 'subtasks', 'agentState', 'project', 'dueDate', 'createdAt'] as const
 export type CardProperty = typeof CARD_PROPERTIES[number]
 export const DEFAULT_CARD_PROPERTIES: CardProperty[] = ['identifier', 'priority', 'assignee', 'labels', 'pullRequests', 'subtasks', 'agentState', 'dueDate']
+
+/** Who works a task beyond its assignee: the Bot of its newest thread and the coding agents of its threads. */
+export type RunOwner = Pick<TaskRun, 'bot' | 'harnesses'>
 
 /** The latest agent run on a task, folded into the three states a card shows. */
 export type AgentState = 'running' | 'waiting' | 'failed'

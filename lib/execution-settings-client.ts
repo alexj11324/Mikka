@@ -1,13 +1,13 @@
 /*
  * The settings screen's only door to the execution settings on the server
  * (app/actions/execution-settings.ts): task `defaults` (the label-less rule plus
- * whenDeviceOffline), label rules, and each Bot's model plus whenQuotaExhausted.
+ * whenDeviceOffline), label rules, and whenQuotaExhausted. Each bot's model is picked in its chat
+ * (components/coordinator/bot-model-picker.tsx).
  */
 import {
-  createExecutionRule, deleteExecutionRule, getBotModel, redetectDevice, setBotModel, updateExecutionFallbacks, updateExecutionRule,
+  createExecutionRule, deleteExecutionRule, redetectDevice, updateExecutionFallbacks, updateExecutionRule,
   type getExecutionFallbacks, type listExecutionRules,
 } from '@/app/actions/execution-settings'
-import type { BotView } from '@/app/actions/bots'
 import { settingsRead } from '@/lib/settings-read'
 import type { ExecutionRule } from '@/lib/execution-rules'
 import { initialExecution, retarget, type BotModelRow, type ExecutionChoice, type ExecutionPlace, type RuleHarness } from '@/lib/execution-settings-view'
@@ -88,18 +88,14 @@ export async function removeRule(id: string) {
 
 export const listPlaces = () => settingsRead<ExecutionPlace[]>('execution-places')
 export const listAccountModels = () => settingsRead<BotModelRow[]>('bot-models')
-export const listWorkspaceBots = () => settingsRead<BotView[]>('bots')
 
 /** Bot 与 Agents' SWR keys; settings-prefetch fills the same ones. */
-export const BOT_AGENTS_KEYS = { settings: 'execution-settings', places: 'execution-places', bots: 'bot-agents-bots', accounts: 'bot-models' } as const
+export const BOT_AGENTS_KEYS = { settings: 'execution-settings', places: 'execution-places', accounts: 'bot-models' } as const
 
 /** The section's first reads, by key, for settings-prefetch. */
 export const botAgentsReads = (): [key: string, read: () => Promise<unknown>][] => [
   [BOT_AGENTS_KEYS.settings, readExecutionSettings],
   [BOT_AGENTS_KEYS.places, listPlaces],
-  [BOT_AGENTS_KEYS.bots, listWorkspaceBots],
   [BOT_AGENTS_KEYS.accounts, listAccountModels],
 ]
-export const readBotModel = async (botId: string | null) => (await getBotModel(botId)) ?? null
-export const saveBotModel = (botId: string | null, bindingId: string) => setBotModel(botId, bindingId)
 export const redetect = (deviceIds: string[]) => Promise.all(deviceIds.map(id => redetectDevice(id)))
