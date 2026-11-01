@@ -1,5 +1,5 @@
-// Cloud runs are on by default: a bot with no cloud runtime gets one when a run
-// is dispatched, once, and MIKKA_CLOUD_COMPUTER_TASKS=0 turns it off. Real PostgreSQL;
+// A person's own E2B key is enough for cloud runs: a bot with no cloud runtime gets
+// one when a run is dispatched, once. No key: never the cloud. MIKKA_CLOUD_COMPUTER_TASKS=0 turns it off. Real PostgreSQL;
 // only the E2B calls (waking the computer, starting its worker) are replaced.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -54,7 +54,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   })
 
   // A new workspace: the person's own E2B key and a connected Codex subscription, no cloud runtime.
-  const person = async (label: string) => {
+  const person = async (label: string, e2bKey = true) => {
     const id = await seedUser(pool, label)
     users.push(id)
     await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
@@ -65,7 +65,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const connection = randomUUID()
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") VALUES ($1,$2,$3,'codex','connected',1,$5,$4,'synthetic-subject')`, [connection, id, ws.id, 'a'.repeat(64), `synthetic-${connection}`])
     await pool.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)`, [id, ws.id])
-    await pool.query(`INSERT INTO workspace_e2b_keys ("workspaceId",ciphertext,iv,"keyVersion",last4,"createdBy","updatedBy") VALUES ($1,'x','x',1,'abcd',$2,$2)`, [ws.id, id])
+    if (e2bKey) await pool.query(`INSERT INTO workspace_e2b_keys ("workspaceId",ciphertext,iv,"keyVersion",last4,"createdBy","updatedBy") VALUES ($1,'x','x',1,'abcd',$2,$2)`, [ws.id, id])
     await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,'cloud','codex','gpt-5',2147483647)`, [randomUUID(), id, ws.id])
     return { id, workspaceId: ws.id, issueId, botId }
   }
@@ -92,6 +92,24 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [a.botId]), 1, 'no duplicate runtime')
     assert.equal(await count('SELECT count(*)::int AS n FROM byos_bindings WHERE "consumerId"=$1', [runtime[0].agentId]), 1, 'no duplicate binding')
     assert.equal(await count('SELECT count(*)::int AS n FROM cloud_machines WHERE "ownerId"=$1', [a.id]), 1)
+  })
+
+  await t.test('no E2B key of their own: no cloud runtime; the card, or the person\'s own auto-schedule device', async () => {
+    const n = await person('no-key', false)
+    const before = provisioned
+    const result = await dispatch(n.id, n.issueId, n.botId) as unknown as { error: string; card: { title: string } }
+    assert.equal(result.error, 'machineUnavailable')
+    assert.equal(result.card.title, '这个任务需要一台电脑来跑')
+    assert.equal(provisioned, before, 'no cloud computer is woken without a key')
+    assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [n.botId]), 0)
+    // Their own server comes online (允许自动调度 is on by default for servers): it takes the run.
+    const server = randomUUID()
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Server','local','server',true,now(),$3)`, [server, n.id, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-5'], defaultModelSlot: 'default' }])])
+    await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), n.id, server, `codex-${server.slice(0, 8)}`])
+    const queued = await dispatch(n.id, n.issueId, n.botId) as unknown as { runId: string; status: string }
+    assert.equal(queued.status, 'queued')
+    assert.equal((await pool.query('SELECT "deviceId" FROM agent_runs WHERE id=$1', [queued.runId])).rows[0].deviceId, server)
+    assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [n.botId]), 0)
   })
 
   await t.test('MIKKA_CLOUD_COMPUTER_TASKS=0: no runtime is created and the bot shows the card', async () => {
