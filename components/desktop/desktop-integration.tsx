@@ -29,10 +29,10 @@ export function DesktopIntegration() {
   const { data } = useSWR(
     desktop ? 'task-runs' : null,
     () => listTaskRuns(),
-    { refreshInterval: POLL_MS, revalidateOnFocus: true, shouldRetryOnError: false },
+    { refreshInterval: POLL_MS, shouldRetryOnError: false },
   )
   // Same key as Settings › 通知, so a change there applies here at once.
-  const { data: preferences } = useSWR(desktop ? 'preferences' : null, getPreferences, { revalidateOnFocus: true, shouldRetryOnError: false })
+  const { data: preferences } = useSWR(desktop ? 'preferences' : null, getPreferences, { shouldRetryOnError: false })
   const finished = preferences !== undefined && pushAllowed(preferences, ['finished'])
   const previous = useRef<Map<string, DesktopRun['status']> | null>(null)
 

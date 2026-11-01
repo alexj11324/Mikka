@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { openSettingsInBrowser } from '@/lib/platform/open-settings'
+import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
 import { Google } from '@/components/ui/svgs/google'
 import { FieldError } from '@/components/ui/field'
 
@@ -21,6 +22,9 @@ export function GoogleSignInSettings({ googleEnabled }: { googleEnabled: boolean
   const [googlePending, setGooglePending] = useState(false)
   const [googleError, setGoogleError] = useState('')
   const [googleSuccess, setGoogleSuccess] = useState('')
+  // Linking from the desktop finishes in the system browser: read once on the way back.
+  const [reads, setReads] = useState(0)
+  const checkOnReturn = useCheckOnReturn(() => setReads(count => count + 1))
 
   useEffect(() => {
     if (!googleEnabled) { setGoogleLinked(false); return }
@@ -42,9 +46,8 @@ export function GoogleSignInSettings({ googleEnabled }: { googleEnabled: boolean
       })
     }
     load()
-    window.addEventListener('focus', load)
-    return () => { current = false; window.removeEventListener('focus', load) }
-  }, [googleEnabled, t])
+    return () => { current = false }
+  }, [googleEnabled, t, reads])
 
   useEffect(() => {
     const url = new URL(window.location.href)
@@ -64,7 +67,7 @@ export function GoogleSignInSettings({ googleEnabled }: { googleEnabled: boolean
     setGooglePending(true); setGoogleError(''); setGoogleSuccess('')
     try {
       const handoff = await openSettingsInBrowser('account')
-      if (handoff === 'desktop') { setGoogleSuccess(t('linkInBrowser')); return }
+      if (handoff === 'desktop') { setGoogleSuccess(t('linkInBrowser')); checkOnReturn(); return }
       if (handoff === 'unsupported') { setGoogleError(t('browserUpdateRequired')); return }
       const callbackURL = new URL(withBasePath('/api/integrations/google/callback'), window.location.origin)
       callbackURL.searchParams.set('locale', locale)

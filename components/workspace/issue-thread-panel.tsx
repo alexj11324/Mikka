@@ -56,7 +56,6 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
     // A question changes only when it is answered or its continuation starts: back off, capped.
     refreshInterval: detail => !detail ? 0 : runIsActive(threadQuestionView(detail.thread).status) ? 2000 : threadQuestionView(detail.thread).question ? Math.min(2000 * 2 ** questionPolls.current, 30_000) : 0,
     onSuccess: detail => { questionPolls.current = threadQuestionView(detail.thread).question ? questionPolls.current + 1 : 0 },
-    revalidateOnFocus: true,
   })
   // Frame 06: a thread whose candidate waits for acceptance has 对话 | 验收 in its header.
   const acceptance = useThreadAcceptance(issueId, runId)
@@ -179,7 +178,7 @@ function ThreadPanel({ issueId, runId, onClose, back, bare = false, initialTab =
  */
 function ThreadArtifacts({ issueId, runId, status }: { issueId: string; runId: string; status: string }) {
   const t = useTranslations('ArtifactsPage')
-  const { data, mutate } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId), { revalidateOnFocus: false })
+  const { data, mutate } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId))
   const [open, setOpen] = useState<string | null>(null)
   // A thread usually hands its artifact over as it finishes.
   useEffect(() => { void mutate() }, [status, mutate])

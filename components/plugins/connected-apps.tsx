@@ -24,6 +24,7 @@ import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type Con
 import type { StoreApp, StoreCatalog } from '@/lib/plugins/catalog'
 import type { AppDetail, AppTool } from '@/lib/plugins/app-detail'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
+import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
 import { cn } from '@/lib/utils'
 
 /** Any store toolkit's account (lib/composio-accounts). */
@@ -151,13 +152,8 @@ export function useConnectedApps(enabled = true) {
 
   const refresh = async () => { if (enabled) await mutate() }
 
-  // Back from the connect callback in the browser: re-read at once, not after SWR's focus throttle.
-  useEffect(() => {
-    if (!enabled) return
-    const onFocus = () => { void mutate() }
-    window.addEventListener('focus', onFocus)
-    return () => { window.removeEventListener('focus', onFocus) }
-  }, [enabled, mutate])
+  // A connect that finished in the system browser: read once on the way back, never on plain focus.
+  const checkOnReturn = useCheckOnReturn(() => { void refresh() })
 
   useEffect(() => {
     if (!enabled) return
@@ -177,7 +173,7 @@ export function useConnectedApps(enabled = true) {
       // read, so on the desktop it still starts in the browser (#601).
       if ('accountId' in body) {
         const handoff = await openCurrentPageInBrowser()
-        if (handoff === 'desktop') return
+        if (handoff === 'desktop') { checkOnReturn(); return }
         if (handoff === 'unsupported') { setError(t('browserUpdateRequired')); return }
       }
       const response = await fetch(integrationPath, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, returnTo: currentReturnPath() }) })
@@ -185,7 +181,9 @@ export function useConnectedApps(enabled = true) {
       const redirect = response.ok ? composioConnectRedirect(result.redirectUrl) : null
       if (!redirect) throw new Error()
       // The desktop shell sends any off-origin navigation to the system browser
-      // and stays here; the list re-reads on focus once the callback is done.
+      // and stays here; the list reads once when the person comes back. On the web
+      // this page navigates away and the callback lands on a fresh mount.
+      checkOnReturn()
       window.location.assign(redirect.href)
     } catch {
       setError(t('connectFailed'))

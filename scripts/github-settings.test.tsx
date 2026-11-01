@@ -53,7 +53,14 @@ const render = async () => { await act(async () => { root.render(<GitHubSettings
 const respond = async (index: number, viewerId: string, fullName: string) => {
   await act(async () => { requests[index].resolve(Response.json({ viewerId, configured: true, connected: true, installed: true, repositories: [{ id: fullName, fullName }] })) })
 }
-const focus = async () => { await act(async () => { browser.dispatchEvent(new browser.Event('focus')) }) }
+// A fresh visit reads GitHub again; focus never does.
+// With cached data SWR starts the mount read on the next animation frame.
+const frame = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)) }) }
+const revisit = async () => { await act(async () => { root.unmount() }); root = createRoot(container); await render(); await frame() }
+const focus = async () => { await act(async () => {
+  browser.dispatchEvent(new browser.Event('focus'))
+  browser.document.dispatchEvent(new browser.Event('visibilitychange'))
+}) }
 
 test('unconfirmed and signed-out sessions neither request nor display GitHub repositories', async () => {
   pending = true
@@ -81,8 +88,7 @@ test('a switched cookie cannot expose B repositories while the session hook stil
   await render()
   await respond(0, 'viewer-a', 'a/private')
   assert.ok(container.textContent?.includes('a/private'))
-  await focus()
-  assert.ok(!container.textContent?.includes('a/private'))
+  await revisit()
   await respond(1, 'viewer-b', 'b/private')
   assert.ok(!container.textContent?.includes('a/private'))
   assert.ok(!container.textContent?.includes('b/private'))
@@ -92,7 +98,7 @@ test('a switched cookie cannot expose B repositories while the session hook stil
 test('switching A to B clears A immediately and rejects a late A response', async () => {
   await render()
   await respond(0, 'viewer-a', 'a/private')
-  await focus()
+  await revisit()
   userId = 'viewer-b'
   await render()
   assert.ok(!container.textContent?.includes('a/private'))
@@ -110,7 +116,7 @@ test('switching A to B clears A immediately and rejects a late A response', asyn
 test('revoked authorization clears repositories and keeps the relink action available', async () => {
   await render()
   await respond(0, 'viewer-a', 'a/private')
-  await focus()
+  await revisit()
   await act(async () => { requests[1].resolve(Response.json({ viewerId: 'viewer-a', error: 'githubReconnectRequired' }, { status: 401 })) })
   assert.ok(!container.textContent?.includes('a/private'))
   assert.ok(container.textContent?.includes('githubReconnectRequired'))
@@ -121,7 +127,7 @@ test('mismatched and unauthenticated 401 errors cannot offer another viewer a re
   await render()
   await respond(0, 'viewer-a', 'a/private')
   for (const viewerId of ['viewer-b', undefined]) {
-    await focus()
+    await revisit()
     await act(async () => { requests.at(-1)!.resolve(Response.json({ viewerId, error: 'githubReconnectRequired' }, { status: 401 })) })
     assert.ok(!container.textContent?.includes('a/private'))
     assert.ok(container.textContent?.includes('githubLoadFailed'))
@@ -139,4 +145,19 @@ test('OAuth callback errors survive initial session confirmation and the keyed r
   await render()
   assert.ok(container.textContent?.includes('githubLinkFailed'))
   assert.equal(new URL(browser.location.href).searchParams.get('github'), null)
+})
+
+test('focus and visibility never ask GitHub again and never hide what is shown', async () => {
+  // Its own viewer: an earlier test leaves viewer-a's read unanswered, which SWR would join.
+  userId = 'viewer-focus'
+  await render()
+  await frame()
+  await respond(0, 'viewer-focus', 'focus/private')
+  for (let round = 0; round < 3; round++) {
+    await focus()
+    await frame()
+    assert.equal(requests.length, 1)
+    assert.ok(container.textContent?.includes('focus/private'))
+    assert.ok(!container.textContent?.includes('githubLoading'))
+  }
 })
