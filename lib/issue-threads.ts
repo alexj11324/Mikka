@@ -127,7 +127,17 @@ export function canReadThread(ownerId: string, viewerId: string, memberIds: Read
   return memberIds.has(viewerId) && ownerId === viewerId
 }
 
-export function projectIssueThreads(rows: readonly IssueThreadRow[], issueId: string, viewerId: string, memberIds: ReadonlySet<string>): IssueThread[] {
+/**
+ * Who may read a thread that works on no task, for canReadThread: the active
+ * members of its bot's workspace, or its owner alone when no bot dispatched it.
+ * Null members: the run has a bot whose workspace is gone.
+ */
+export function taskFreeThreadMembers(ownerId: string, bot: { workspaceMemberIds: readonly string[] | null } | null): ReadonlySet<string> {
+  if (!bot) return new Set([ownerId])
+  return new Set(bot.workspaceMemberIds ?? [])
+}
+
+export function projectIssueThreads(rows: readonly IssueThreadRow[], issueId: string | null, viewerId: string, memberIds: ReadonlySet<string>): IssueThread[] {
   if (!memberIds.has(viewerId)) return []
   // One row per run here; chains are folded once, by root, on the read path (lib/run-chain.ts).
   return rows.filter(row => row.issueId === issueId && memberIds.has(row.userId))

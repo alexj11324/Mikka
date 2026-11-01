@@ -43,7 +43,7 @@ const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whites
  * was opened from (R-82); the header names the bot that dispatched it.
  */
 type ThreadTab = 'chat' | 'acceptance'
-type IssueThreadPanelProps = { issueId: string; runId: string; onClose: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void }
+type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; onClose: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void }
 
 export function IssueThreadPanel(props: IssueThreadPanelProps) {
   // Drafts, in-flight callbacks and retry deadlines belong to exactly one run.
@@ -193,7 +193,7 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
  * thread handed over. One opens straight in the Artifact window, with this
  * thread's conversation on its right (F4); several open a list first.
  */
-function ThreadArtifacts({ issueId, runId, status }: { issueId: string; runId: string; status: string }) {
+function ThreadArtifacts({ issueId, runId, status }: { issueId: string | null; runId: string; status: string }) {
   const t = useTranslations('ArtifactsPage')
   const { data, mutate } = useSWR(['run-artifacts', runId], () => listRunArtifacts(runId))
   const [open, setOpen] = useState<string | null>(null)
@@ -211,6 +211,6 @@ function ThreadArtifacts({ issueId, runId, status }: { issueId: string; runId: s
           <DropdownMenuGroup>{mine.map(item => <DropdownMenuItem key={item.id} onClick={() => setOpen(item.id)}><ArtifactKindIcon kind={item.kind} /><span className="truncate">{item.title}</span></DropdownMenuItem>)}</DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>}
-    {open && <ArtifactWindow artifact={{ id: open, runId, issueId }} onChange={setOpen} onClose={() => setOpen(null)} />}
+    {open && <ArtifactWindow artifact={{ id: open, runId, issueId }} fromThread onChange={setOpen} onClose={() => setOpen(null)} />}
   </>
 }
