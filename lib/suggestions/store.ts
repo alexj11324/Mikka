@@ -1,9 +1,8 @@
 import 'server-only'
 import { and, desc, eq, gte, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
-import { continuedLevel } from '@/lib/attention/judgment'
 import { scoreNotification } from '@/lib/attention/score'
-import { judgmentContext, matterContext, recordNotice } from '@/lib/attention/store'
+import { judgmentContext, recordNotice } from '@/lib/attention/store'
 import { briefingEvent } from '@/lib/coordinator-events'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { db } from '@/lib/db'
@@ -21,10 +20,10 @@ const LIST_LIMIT = 100
 
 /**
  * Rates each new notification once with the attention model (R-20) and
- * stores it; repeats are skipped before any model call. Every level but low
- * shows in 建议. Critical, high and ask go on their matter, which the person's
- * Coordinator is handed (lib/attention/store.ts); a later notice on a matter
- * the person has not answered never rates below it. Each stored item is then
+ * stores it; repeats are skipped before any model call. Every level the
+ * Decisions API gives but low shows in 建议; what it says to hand over goes on
+ * its matter, which the person's Coordinator is handed (lib/attention/store.ts).
+ * Each stored item is then
  * read once for facts about the person (lib/profile). `route: false` does not
  * hand anything over, for what was already there when an app was connected.
  * Notifications from a Composio app the person turned off as a source are dropped first.
@@ -41,9 +40,10 @@ export async function ingestNotifications(incoming: readonly ExternalNotificatio
     const now = new Date()
     const { same, matters, ids } = await judgmentContext(notification.userId, notification.matterKey, now)
     const score = await scoreNotification(notification, matters, same, now)
+    // No answer from the Decisions API: nothing is stored, so the next delivery or the hourly backfill asks again.
+    if (!score) return
     const continuesId = score.continues ? ids.get(score.continues) ?? null : null
-    const earlier = same ?? (continuesId ? await matterContext(notification.userId, continuesId) : null)
-    const level = continuedLevel(score.level, earlier)
+    const level = score.level
     const id = randomUUID()
     // A suggestion is the person's Coordinator's: its bot row is stored now, so sending it later resolves nothing.
     // Notifications come from the account's app connections and name no workspace: the personal workspace's Coordinator.
@@ -55,7 +55,7 @@ export async function ingestNotifications(incoming: readonly ExternalNotificatio
       occurredAt: notification.occurredAt,
     }).onConflictDoNothing().returning({ id: suggestions.id })
     if (stored && level !== 'low') actionItems.set(notification.userId, [...actionItems.get(notification.userId) ?? [], { id, source: notification.source, action: notification.action, title: notification.title, actor: notification.actor, excerpt: notification.excerpt }])
-    if (stored && route && await recordNotice(notification, id, { ...score, level }, continuesId)) woken.add(notification.userId)
+    if (stored && route && await recordNotice(notification, id, score, continuesId)) woken.add(notification.userId)
     // R-73: what the item says about the person, low ones included (receipts are usually low).
     if (stored) await extractFacts(notification, id)
   }))
