@@ -39,6 +39,21 @@ export async function updateSubscriptionShare(input: { shared: boolean; allowOth
   })
 }
 
+/** 我的点数也可用于这个团队 (decision 2026-10-31-2300 item 4). */
+export async function getCreditShare(workspaceId?: string): Promise<ActionResult<import('@/lib/credit-shares').CreditShareView>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return (await import('@/lib/credit-shares')).creditShareView(actor.userId, actor.workspaceId)
+  })
+}
+
+export async function updateCreditShare(shared: boolean, workspaceId?: string): Promise<ActionResult<import('@/lib/credit-shares').CreditShareView>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return (await import('@/lib/credit-shares')).setOwnCreditShare(actor.userId, actor.workspaceId, Boolean(shared))
+  })
+}
+
 /** 由我的卡支付这个团队 (decision 2026-10-31-2225); which Stripe customer is charged changes in a follow-up. */
 export async function getPaymentDesignation(workspaceId?: string): Promise<ActionResult<PaymentDesignationView>> {
   return workspaceAction(async () => {
