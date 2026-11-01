@@ -87,18 +87,13 @@ function useUnread(activeId: string | null, latest: Record<string, string>) {
   return (id: string) => !!seen && id !== activeId && !!latest[id] && latest[id] > (seen.at[id] ?? seen.since)
 }
 
-/** Green while the bot is working, orange while it waits on you; otherwise no dot. */
-type RowStatus = 'working' | 'waiting'
-
 /** Hover is one overlay step, the current bot the next one up, so a hovered row never looks selected (R-38). */
 const ROW_FILL = 'hover:bg-control active:bg-control data-active:bg-control-hover data-active:hover:bg-control-hover'
 
-function Row({ name, preview, avatar, status, current, unread, onClick, label }: { name: string; preview: ReactNode; avatar: ReactNode; status?: RowStatus; current: boolean; unread: boolean; onClick: () => void; label: string }) {
+function Row({ name, preview, avatar, current, unread, onClick, label }: { name: string; preview: ReactNode; avatar: ReactNode; current: boolean; unread: boolean; onClick: () => void; label: string }) {
   return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={label} onClick={onClick} className={cn('h-13 gap-2.5 rounded-xl px-2.5', ROW_FILL)}>
-    <span className="relative shrink-0">
-      {avatar}
-      {status && <span aria-hidden="true" className={cn('absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-sidebar', status === 'working' ? 'bg-success' : 'bg-attention')} />}
-    </span>
+    {/* Nothing is drawn on an avatar (decision 2026-11-01-2230). */}
+    <span className="shrink-0">{avatar}</span>
     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="truncate text-sm font-semibold">{name}</span>
       {preview && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">{preview}</span>}
@@ -169,7 +164,6 @@ export function BotList({ bots, workspaceId, threads, issues, active, onOpen, on
       <SidebarGroup className="px-2 pt-1"><SidebarMenu aria-label={i18nText('Nav.bots')} className="gap-0.5">
         <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}
-          status={coordinator?.working ? 'working' : undefined}
           preview={previewOf(lastReply?.from === 'coordinator' ? namedCitations(lastReply.text, coordinator?.sources ?? {}) : lastReply?.text)} />
         {rows.map(row => {
           if (row.kind === 'group') {
@@ -182,9 +176,8 @@ export function BotList({ bots, workspaceId, threads, issues, active, onOpen, on
           const { bot } = row
           const chat = chats[bot.id]
           const mood: BotMood = botAttention(threads, bot.id, chat?.working ?? false, id => issues.find(issue => issue.id === id))
-          const status: RowStatus | undefined = mood === 'notify' ? 'waiting' : mood === 'thinking' ? 'working' : undefined
           return <Row key={bot.id} name={bot.name} label={bot.name} current={active?.kind === 'bot' && active.botId === bot.id} unread={unread(bot.id)} onClick={() => choose({ kind: 'bot', botId: bot.id })}
-            avatar={<BotAvatar color={bot.color} shape={bot.shape} mood={mood} />} status={status}
+            avatar={<BotAvatar color={bot.color} shape={bot.shape} mood={mood} />}
             preview={previewOf(chat?.line)} />
         })}
       </SidebarMenu></SidebarGroup>

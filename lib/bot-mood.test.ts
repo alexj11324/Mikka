@@ -11,8 +11,9 @@ test('raw status alone no longer decides: a failed run judged idle is not exclai
   assert.equal(botAttention([thread('a', 'failed', { outcome: 'idle' })], 'bot', false), 'idle')
 })
 
-test('a succeeded run judged needs_input is notify', () => {
-  assert.equal(botAttention([thread('a', 'succeeded', { outcome: 'needs_input' })], 'bot', false), 'notify')
+test('a thread waiting on you draws nothing on the face: no notify badge', () => {
+  assert.equal(botAttention([thread('a', 'succeeded', { outcome: 'needs_input' })], 'bot', false), 'idle')
+  assert.equal(botAttention([thread('a', 'waiting_input')], 'bot', false), 'idle')
 })
 
 test('a succeeded run judged blocked or failed is exclaim; judged done is idle', () => {
@@ -21,8 +22,8 @@ test('a succeeded run judged blocked or failed is exclaim; judged done is idle',
   assert.equal(botAttention([thread('a', 'succeeded', { outcome: 'done' })], 'bot', false), 'idle')
 })
 
-test('waiting on you first, then working, then the newest row blocked', () => {
-  assert.equal(botAttention([thread('a', 'running'), thread('b', 'waiting_input')], 'bot', false), 'notify')
+test('working first, then the newest row blocked', () => {
+  assert.equal(botAttention([thread('a', 'running'), thread('b', 'waiting_input')], 'bot', false), 'thinking')
   assert.equal(botAttention([thread('a', 'running'), thread('b', 'succeeded', { outcome: 'done' })], 'bot', false), 'thinking')
   assert.equal(botAttention([thread('a', 'succeeded', { outcome: 'done' })], 'bot', true), 'thinking')
   // Latest activity first: an older blocked thread does not stay on the face.
