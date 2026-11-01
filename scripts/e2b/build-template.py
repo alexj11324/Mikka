@@ -26,6 +26,28 @@ COMPUTER_FILES = ('start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py')
 RECIPE_PATHS = ('scripts/e2b/bootstrap.sh', 'scripts/e2b/build-template.py',
                 *(f'scripts/e2b/{name}' for name in COMPUTER_FILES))
 
+NPM_RUNTIME_CHECK = r'''node --input-type=module <<'JS'
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+createRequire(realpathSync('/usr/local/bin/npm'))('pacote')
+const directory = mkdtempSync(join(tmpdir(), 'mikka-npm-runtime-'))
+try {
+  const home = join(directory, 'home'), temp = join(directory, 'tmp')
+  mkdirSync(home); mkdirSync(temp)
+  writeFileSync(join(directory, 'package.json'), JSON.stringify({ private: true, scripts: { test: `node -e "console.log('Mikka npm runtime verified')"` } }))
+  const output = execFileSync('/usr/local/bin/npm', ['test'], {
+    cwd: directory, encoding: 'utf8', timeout: 30_000,
+    env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: home, TMPDIR: temp, LANG: 'C.UTF-8', NPM_CONFIG_UPDATE_NOTIFIER: 'true' },
+  })
+  assert.match(output, /^Mikka npm runtime verified\r?$/m)
+  console.log('npm dependency graph and first fresh-HOME command verified')
+} finally { rmSync(directory, { recursive: true, force: true }) }
+JS'''
+
 # Filesystem snapshots reboot without template memory. Start the anonymous
 # runtime beside E2B's boot services; only capability cleanup precedes envd.
 # Scrubbing is a separate once-per-boot job: a later worker restart must keep
@@ -112,6 +134,7 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None):
         template = (Template(file_context_path=str(context)).from_base_image()
                     .copy('bootstrap.sh', '/tmp/mikka-bootstrap.sh')
                     .run_cmd('bash /tmp/mikka-bootstrap.sh', user='root')
+                    .run_cmd(NPM_RUNTIME_CHECK, user='mikka-runner')
                     .copy('worker.tar', '/tmp/mikka-worker.tar')
                     .copy('source-sha', '/opt/mikka/worker-source-sha')
                     .run_cmd('mkdir -p /opt/mikka/worker && tar -xf /tmp/mikka-worker.tar -C /opt/mikka/worker && rm /tmp/mikka-worker.tar && cd /opt/mikka/worker && HOME=/tmp corepack pnpm install --filter @mikka/daemon... --frozen-lockfile && node packages/daemon/scripts/build-cloud-worker.mjs && chown -R root:root /opt/mikka/worker && chmod -R go-w /opt/mikka/worker && chown root:root /opt/mikka/worker-source-sha && chmod 0444 /opt/mikka/worker-source-sha', user='root')
