@@ -15,7 +15,7 @@ import { FactoryAcceptancePane, request, useAcceptance, type FactoryTask } from 
 
 export type { FactoryTask } from './factory-acceptance-pane'
 
-const tone = (state: AcceptanceState) => state === 'live' ? 'success' : state === 'pending' ? 'warning' : state === 'failed' ? 'destructive' : state === 'revoked' || state === 'expired' || state === 'invalidated' ? 'neutral' : 'info'
+const tone = (state: AcceptanceState) => state === 'live' || state === 'merged' ? 'success' : state === 'pending' ? 'warning' : state === 'failed' ? 'destructive' : state === 'revoked' || state === 'expired' || state === 'invalidated' ? 'neutral' : 'info'
 
 /** A task the person can accept or follow: waiting for approval, or being published. */
 const accepting = (task: FactoryTask) => (task.stage === 'approval' && ['pending', 'waiting'].includes(task.status)) || task.stage === 'publish'
@@ -39,8 +39,8 @@ export function useThreadAcceptance(issueId: string, runId: string) {
 /** The state chip next to a thread's name (等你验收, 已批准 …), from the same ledger as the pane. */
 export function AcceptanceStateBadge({ task }: { task: FactoryTask }) {
   const t = useTranslations('FactoryAcceptance')
-  const state = useAcceptance(task).derived?.state
-  return state ? <Badge variant="outline" tone={tone(state)} className="shrink-0">{t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge> : null
+  const derived = useAcceptance(task).derived
+  return derived ? <Badge variant="outline" tone={tone(derived.state)} className="shrink-0">{derived.refusal ? t('cannotMerge') : t(acceptanceStateKey(derived.state, task.isSkillCandidate))}</Badge> : null
 }
 
 /** The list's load failure. Retry is busy while refetching and cannot fire twice. */
@@ -54,7 +54,8 @@ export function FactoryListError({ retrying, onRetry }: { retrying: boolean; onR
 
 function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () => void }) {
   const t = useTranslations('FactoryAcceptance')
-  const state = useAcceptance(task).derived?.state
+  const derived = useAcceptance(task).derived
+  const state = derived?.state
   return <div className="w-full max-w-[26.25rem]">
     <Item variant="muted">
       <ItemMedia variant="icon"><ClipboardCheck aria-hidden="true" /></ItemMedia>
@@ -63,7 +64,7 @@ function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () 
         <ItemDescription>{task.reason}</ItemDescription>
       </ItemContent>
       <ItemActions>
-        {state && <Badge variant="outline" tone={tone(state)}>{t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge>}
+        {state && <Badge variant="outline" tone={tone(state)}>{derived?.refusal ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge>}
         <Button variant="ghost" size="icon" aria-label={task.isSkillCandidate ? t('skillTitle') : t('title')} onClick={onOpen}><ChevronRight data-icon="inline-start" /></Button>
       </ItemActions>
     </Item>

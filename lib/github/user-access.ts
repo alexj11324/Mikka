@@ -66,6 +66,15 @@ async function userToken(headers: Headers, userId: string): Promise<{ token: str
   }
 }
 
+/** The signed-in person's own GitHub user token, checked against their GitHub id. Never an app or installation token. */
+export async function githubUserToken(headers: Headers) {
+  const session = await auth.api.getSession({ headers })
+  if (!session?.user) throw new GitHubAccessError('authRequired', 401)
+  const { token, githubAccountId } = await userToken(headers, session.user.id)
+  if (githubId((await githubGet(token, '/user')).data.id) !== githubAccountId) throw new GitHubAccessError('githubReconnectRequired', 401)
+  return { userId: session.user.id, githubAccountId, token }
+}
+
 async function authorizedRepositories(headers: Headers) {
   const session = await auth.api.getSession({ headers })
   if (!session?.user) throw new GitHubAccessError('authRequired', 401)

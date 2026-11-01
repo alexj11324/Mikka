@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { FactoryHuman } from "./approval-contract";
 import type { createFactoryApprovals } from "./approval";
 import { PublicationDeferred } from "./publication-operation";
+import { FactoryMergeRefused, type createFactoryMerges } from "./merge";
 
 export interface ApprovalHttpRequest {
   actor: FactoryHuman | null;
@@ -11,12 +12,15 @@ export interface ApprovalHttpRequest {
   origin: string | null;
   url: string;
   body?: unknown;
+  /** The person's own GitHub user token for `accept`, read only for that operation. Null when none is linked. */
+  githubToken?: () => Promise<string | null>;
 }
 
 /** Browser cookies only. This handler is never registered as an MCP/daemon tool. */
 export async function handleFactoryApproval(
   service: ReturnType<typeof createFactoryApprovals>,
   req: ApprovalHttpRequest,
+  merges?: ReturnType<typeof createFactoryMerges>,
 ) {
   if (!req.actor || req.authorization)
     return { status: 401, body: { error: "factoryHumanRequired" } };
@@ -49,7 +53,7 @@ export async function handleFactoryApproval(
     }
     const parsed = z
       .object({
-        operation: z.enum(["approve", "reject", "revoke", "publish", "reconcile"]),
+        operation: z.enum(["accept", "approve", "reject", "revoke", "publish", "reconcile"]),
         input: z
           .object({ binding: z.object({ taskId: z.uuid() }).passthrough() })
           .passthrough(),
@@ -59,8 +63,16 @@ export async function handleFactoryApproval(
     if (!parsed.success || parsed.data.input.binding.taskId !== req.taskId)
       return { status: 422, body: { error: "factoryInvalid" } };
     const { operation, input } = parsed.data;
+    if (operation === "accept") {
+      if (!merges) return { status: 409, body: { error: "factoryAcceptanceUnavailable" } };
+      const result = await merges.accept(req.actor, input, (await req.githubToken?.()) ?? null);
+      return { status: result.status === "merging" ? 202 : 200, body: result };
+    }
     return { status: 200, body: await (operation === 'approve' ? service.approveAndPublish(req.actor, input) : service[operation](req.actor, input)) };
   } catch (error) {
+    // GitHub refused the person's merge (or could not be asked): the task keeps waiting.
+    if (error instanceof FactoryMergeRefused)
+      return { status: 409, body: { error: error.code, pullRequestUrl: error.pullRequestUrl } };
     if (error instanceof PublicationDeferred)
       return {
         status: error.state === "pending" ? 202 : 409,
