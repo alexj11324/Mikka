@@ -3,11 +3,11 @@ import { z } from 'zod'
 import { createBotSchema, viewerRequestSchema } from '@mikka/protocol/computer'
 import { ComputerError, type ComputerStore } from './store'
 
-export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'createBot' | 'state' | 'operate'>, authenticate: (request: Request) => Promise<{ userId: string; workspaceId: string } | null>, wakeWorker?: (actor: { userId: string; workspaceId: string }, botId: string) => Promise<void>) {
+export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'createBot' | 'state' | 'operate'>, authenticate: (request: Request, botId?: string) => Promise<{ userId: string; workspaceId: string } | null>, wakeWorker?: (actor: { userId: string; workspaceId: string }, botId: string) => Promise<void>) {
   return async function computerRoute(request: Request, botId?: string, action?: 'wake' | 'viewer' | 'takeover' | 'handback') {
     const response = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
     try {
-      const actor = await authenticate(request)
+      const actor = await authenticate(request, botId)
       if (!actor) return response({ error: 'Sign in required' }, 401)
       if (request.method !== 'GET' && request.headers.get('origin') !== new URL(request.url).origin) return response({ error: 'Invalid origin' }, 403)
       if (!botId) {
