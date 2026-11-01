@@ -8,7 +8,7 @@ import { attachLightDark } from './settings-v4-shots'
 // shared with the team after a confirmation, and deleted. The provider is a
 // local OpenAI-compatible server; playwright.config.ts lets the app reach
 // loopback for it (MIKKA_MODEL_KEY_LOOPBACK).
-const GOOD = `sk-e2e-${Date.now()}-good-k3y9`
+const GOOD = `test-${Date.now()}-good-k3y9`
 let server: Server
 let baseUrl = ''
 
@@ -40,7 +40,7 @@ test('API 与订阅：添加自定义服务商、校验失败、分享给团队�
   await dialog.getByRole('textbox', { name: '名称' }).fill('E2E 网关')
   await dialog.getByRole('textbox', { name: 'Base URL' }).fill(baseUrl)
   await expect(dialog.getByRole('combobox', { name: '协议' })).toHaveText('OpenAI 兼容')
-  await dialog.getByLabel('API Key').fill('sk-e2e-wrong-key-0000')
+  await dialog.getByLabel('API Key').fill(`test-${Date.now()}-wrong`)
   await dialog.getByRole('button', { name: '添加', exact: true }).click()
   await expect(dialog.getByText('Key 无效或已被撤销。', { exact: true })).toBeVisible()
   await attachLightDark(page, testInfo, 'api-keys-invalid')

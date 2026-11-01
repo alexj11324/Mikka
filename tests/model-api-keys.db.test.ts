@@ -11,6 +11,9 @@ const databaseURL = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('API key database test URL required')
 
 const env = { WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') }
+// Fake keys made per run, so no key-shaped literal sits in the repository.
+const fakeKey = (label: string) => `test-${label}-${randomBytes(12).toString('hex')}`
+const [wrongKey, downKey, firstKey, newKey, customKey, gatewayKey, localKey] = ['wrong', 'down', 'first', 'new', 'custom', 'gateway', 'local'].map(fakeKey)
 const models = (ids: string[]) => new Response(JSON.stringify({ data: ids.map(id => ({ id, object: 'model' })) }), { status: 200, headers: { 'content-type': 'application/json' } })
 
 test('API keys: migration replay, sealed storage, shares, picker order and run injection', { skip: !databaseURL }, async () => {
@@ -45,33 +48,33 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
       calls.push({ url: String(input), headers: init?.headers as Record<string, string> })
       return response()
     }) as typeof fetch
-    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'deepseek', apiKey: 'sk-wrong-key-0000' }, { env, fetch: fetchWith(() => new Response('{}', { status: 401 })) }), { code: 'apiKeyInvalid' })
-    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'deepseek', apiKey: 'sk-down-key-0000' }, { env, fetch: fetchWith(() => new Response('', { status: 503 })) }), { code: 'apiKeyUnverifiable' })
+    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'deepseek', apiKey: wrongKey }, { env, fetch: fetchWith(() => new Response('{}', { status: 401 })) }), { code: 'apiKeyInvalid' })
+    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'deepseek', apiKey: downKey }, { env, fetch: fetchWith(() => new Response('', { status: 503 })) }), { code: 'apiKeyUnverifiable' })
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM model_api_keys')).rows[0].n, 0)
     assert.equal(calls[0].url, 'https://api.deepseek.com/models')
-    assert.equal(calls[0].headers.authorization, 'Bearer sk-wrong-key-0000')
+    assert.equal(calls[0].headers.authorization, `Bearer ${wrongKey}`)
 
     // A preset key: checked, listed, sealed, last four only.
-    const secret = 'sk-ant-real-secret-1234'
+    const secret = firstKey
     const anthropic = await store.addApiKey(pool, 'alice', { provider: 'anthropic', apiKey: secret }, { env, fetch: fetchWith(() => models(['claude-opus-5-5', 'claude-sonnet-5-5'])) })
     assert.equal(calls.at(-1)!.headers['x-api-key'], secret)
-    assert.deepEqual({ ...anthropic, id: undefined }, { id: undefined, provider: 'anthropic', name: null, baseUrl: null, protocol: 'anthropic', last4: '1234', models: ['claude-opus-5-5', 'claude-sonnet-5-5'] })
+    assert.deepEqual({ ...anthropic, id: undefined }, { id: undefined, provider: 'anthropic', name: null, baseUrl: null, protocol: 'anthropic', last4: firstKey.slice(-4), models: ['claude-opus-5-5', 'claude-sonnet-5-5'] })
     const raw = (await pool.query('SELECT * FROM model_api_keys WHERE id=$1', [anthropic.id])).rows[0]
     assert.ok(!JSON.stringify(raw).includes(secret), 'stored sealed')
     // Adding the same preset again replaces the key in place.
-    const replaced = await store.addApiKey(pool, 'alice', { provider: 'anthropic', apiKey: 'sk-ant-new-secret-9876' }, { env, fetch: fetchWith(() => models(['claude-opus-5-5'])) })
+    const replaced = await store.addApiKey(pool, 'alice', { provider: 'anthropic', apiKey: newKey }, { env, fetch: fetchWith(() => models(['claude-opus-5-5'])) })
     assert.equal(replaced.id, anthropic.id)
-    assert.equal(replaced.last4, '9876')
+    assert.equal(replaced.last4, newKey.slice(-4))
 
     // Custom providers: https on a public address only; the person's own model list wins.
-    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Internal', baseUrl: 'http://example.com/v1', protocol: 'openai', apiKey: 'sk-custom-0000' }, { env, fetch: fetchWith(() => models([])) }), { code: 'apiKeyBaseUrlInvalid' })
-    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Internal', baseUrl: 'https://10.0.0.8/v1', protocol: 'openai', apiKey: 'sk-custom-0000' }, { env, fetch: fetchWith(() => models([])) }), { code: 'apiKeyBaseUrlInvalid' })
-    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Internal', baseUrl: 'https://llm.internal.example/v1', protocol: 'openai', apiKey: 'sk-custom-0000' }, { env, fetch: fetchWith(() => models([])), resolve: async () => ['192.168.1.4'] }), { code: 'apiKeyBaseUrlInvalid' })
-    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Local', baseUrl: 'http://127.0.0.1:9/v1', protocol: 'openai', apiKey: 'sk-custom-0000' }, { env: { ...env, MIKKA_MODEL_KEY_LOOPBACK: '1', VERCEL: '1' }, fetch: fetchWith(() => models([])) }), { code: 'apiKeyBaseUrlInvalid' })
-    const gateway = await store.addApiKey(pool, 'bob', { provider: 'custom', name: 'Gateway', baseUrl: 'https://gateway.example.com/v1/', protocol: 'openai', apiKey: 'sk-gateway-5555', models: ['qwen-max', 'qwen-max'] }, { env, fetch: fetchWith(() => models(['a', 'b'])), resolve: async () => ['93.184.216.34'] })
+    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Internal', baseUrl: 'http://example.com/v1', protocol: 'openai', apiKey: customKey }, { env, fetch: fetchWith(() => models([])) }), { code: 'apiKeyBaseUrlInvalid' })
+    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Internal', baseUrl: 'https://10.0.0.8/v1', protocol: 'openai', apiKey: customKey }, { env, fetch: fetchWith(() => models([])) }), { code: 'apiKeyBaseUrlInvalid' })
+    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Internal', baseUrl: 'https://llm.internal.example/v1', protocol: 'openai', apiKey: customKey }, { env, fetch: fetchWith(() => models([])), resolve: async () => ['192.168.1.4'] }), { code: 'apiKeyBaseUrlInvalid' })
+    await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Local', baseUrl: 'http://127.0.0.1:9/v1', protocol: 'openai', apiKey: customKey }, { env: { ...env, MIKKA_MODEL_KEY_LOOPBACK: '1', VERCEL: '1' }, fetch: fetchWith(() => models([])) }), { code: 'apiKeyBaseUrlInvalid' })
+    const gateway = await store.addApiKey(pool, 'bob', { provider: 'custom', name: 'Gateway', baseUrl: 'https://gateway.example.com/v1/', protocol: 'openai', apiKey: gatewayKey, models: ['qwen-max', 'qwen-max'] }, { env, fetch: fetchWith(() => models(['a', 'b'])), resolve: async () => ['93.184.216.34'] })
     assert.equal(calls.at(-1)!.url, 'https://gateway.example.com/v1/models')
     assert.deepEqual([gateway.baseUrl, gateway.protocol, gateway.models], ['https://gateway.example.com/v1', 'openai', ['qwen-max']])
-    const local = await store.addApiKey(pool, 'bob', { provider: 'custom', name: 'Local', baseUrl: 'http://127.0.0.1:8787', protocol: 'anthropic', apiKey: 'sk-local-7777' }, { env: { ...env, MIKKA_MODEL_KEY_LOOPBACK: '1' }, fetch: fetchWith(() => models(['glm-5'])) })
+    const local = await store.addApiKey(pool, 'bob', { provider: 'custom', name: 'Local', baseUrl: 'http://127.0.0.1:8787', protocol: 'anthropic', apiKey: localKey }, { env: { ...env, MIKKA_MODEL_KEY_LOOPBACK: '1' }, fetch: fetchWith(() => models(['glm-5'])) })
     assert.equal(calls.at(-1)!.url, 'http://127.0.0.1:8787/v1/models')
 
     // Sharing: team workspaces only, the admin switch gates turning it on, others' keys only.
@@ -86,7 +89,7 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const bobPage = await store.listApiKeys(pool, 'bob', team)
     assert.deepEqual(bobPage.keys.map(key => [key.name, key.shared]), [['Gateway', true], ['Local', false]])
     assert.equal(bobPage.canShare, true)
-    assert.ok(!JSON.stringify(bobPage).includes('sk-'), 'views never carry the key')
+    assert.ok(!JSON.stringify(bobPage).includes('test-'), 'views never carry the key')
 
     // The picker: own keys first when allowed here, then teammates' shared keys.
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.provider, key.mine]), [['anthropic', true], ['custom', false]])
@@ -103,10 +106,10 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     await pool.query(`INSERT INTO agent_runs (id,"userId","botId",status) VALUES ($1,'alice',$2,'running'),($3,'alice',$2,'succeeded'),($4,'carol',$2,'queued'),($5,'bob',NULL,'running')`, [run, teamBot, done, carolRun, loose])
     const stopped = async (id: string) => Boolean((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [id])).rows[0].stopRequestedAt)
     const claude = await store.apiKeyForRun(pool, run, anthropic.id, env)
-    assert.deepEqual(claude, { harness: 'claude_code', keyId: anthropic.id, ownerId: 'alice', env: { ANTHROPIC_API_KEY: 'sk-ant-new-secret-9876', ANTHROPIC_BASE_URL: 'https://api.anthropic.com' } })
+    assert.deepEqual(claude, { harness: 'claude_code', keyId: anthropic.id, ownerId: 'alice', env: { ANTHROPIC_API_KEY: newKey, ANTHROPIC_BASE_URL: 'https://api.anthropic.com' } })
     const codex = await store.apiKeyForRun(pool, run, gateway.id, env)
     assert.equal(codex.harness, 'codex')
-    assert.deepEqual(codex.harness === 'codex' && [codex.env, codex.codex.model_providers.mikka], [{ MIKKA_MODEL_API_KEY: 'sk-gateway-5555' }, { name: 'Gateway', base_url: 'https://gateway.example.com/v1', env_key: 'MIKKA_MODEL_API_KEY', wire_api: 'chat' }])
+    assert.deepEqual(codex.harness === 'codex' && [codex.env, codex.codex.model_providers.mikka], [{ MIKKA_MODEL_API_KEY: gatewayKey }, { name: 'Gateway', base_url: 'https://gateway.example.com/v1', env_key: 'MIKKA_MODEL_API_KEY', wire_api: 'chat' }])
     await assert.rejects(store.apiKeyForRun(pool, done, anthropic.id, env), { code: 'apiKeyNotFound' }, 'finished runs get nothing')
     await assert.rejects(store.apiKeyForRun(pool, carolRun, anthropic.id, env), { code: 'apiKeyNotFound' }, 'Alice did not share her key with the team')
     assert.equal((await store.apiKeyForRun(pool, carolRun, gateway.id, env)).ownerId, 'bob', 'Bob shared his with the team')
