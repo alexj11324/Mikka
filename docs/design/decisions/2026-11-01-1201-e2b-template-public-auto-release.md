@@ -4,6 +4,7 @@
 - Source: Alex, relayed by the coordinator session: every new cloud worker
   template is made public directly, and its release becomes automatic in CI.
 - Rule: —
+- Superseded by: [2026-11-01-2335 E2B official templates](2026-11-01-2335-e2b-official-templates.md)
 - Replaces: the manual release steps (build, make public, set the two
   Production variables, redeploy)
 - See also: [own E2B key is enough](2026-11-01-1200-own-e2b-key-is-enough-for-cloud.md)

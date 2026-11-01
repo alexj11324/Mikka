@@ -34,6 +34,10 @@ its existing protected status names and real acceptance coverage.
 
 ## Cloud worker template release
 
+Being replaced: cloud machines move to E2B's own desktop, Codex and Claude Code
+templates ([decision 2026-11-01-2335](../../docs/design/decisions/2026-11-01-2335-e2b-official-templates.md)).
+Until then this workflow keeps releasing the current template.
+
 - `e2b-template.yml` builds the E2B worker template from `main`, makes it
   public and points Vercel Production at it (template id and worker hash in one
   request), then redeploys Production. A `check` job first compares the worker

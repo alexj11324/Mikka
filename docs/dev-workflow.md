@@ -114,6 +114,9 @@ of order, whoever merges the later one renames it.
 
 ## 7. E2B templates
 
+Cloud machines are moving to E2B's own desktop, Codex and Claude Code templates
+([decision 2026-11-01-2335](design/decisions/2026-11-01-2335-e2b-official-templates.md)). Until then:
+
 To test worker changes, build a `-dev` template from the branch. Do not wait
 for the automatic publish that follows a merge to `main`
 ([`e2b-template.yml`](../.github/workflows/README.md#cloud-worker-template-release)).
