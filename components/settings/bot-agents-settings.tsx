@@ -15,7 +15,7 @@ import { SettingsLoading, SettingsSaveError } from '@/components/settings/primit
 import { LabelDot } from '@/components/workspace/issue-metadata-controls'
 import {
   BOT_AGENTS_KEYS, addRule, executionSettingsView, listAccountModels, listPlaces, readExecutionSettings, redetect, removeRule, saveDefaultRule, saveFallbacks, updateRule,
-  type LabelRule, type StoredExecutionSettings, type TaskDefaults, type WhenDeviceOffline, type WhenQuotaExhausted,
+  type LabelRule, type StoredExecutionSettings, type TaskDefaults, type WhenQuotaExhausted,
 } from '@/lib/execution-settings-client'
 import type { ExecutionRule } from '@/lib/execution-rules'
 import { harnessOptions, modelName, modelOptions, placeKind, redetectTargets, retarget, withCloudModels, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
@@ -58,11 +58,9 @@ export function BotAgentsSettings() {
 
   const changeDefaults = (next: TaskDefaults) => {
     const rule = next.place !== defaults.place || next.harness !== defaults.harness || next.model !== defaults.model
-    const offline = next.whenDeviceOffline !== defaults.whenDeviceOffline
     setUnsaved(state => ({ ...state, defaults: next }))
     void save(async () => {
       if (rule) await saveDefaultRule(next)
-      if (offline) await saveFallbacks({ whenDeviceOffline: next.whenDeviceOffline, whenQuotaExhausted: quota })
       setUnsaved(({ defaults: _saved, ...rest }) => rest)
       await stored.mutate()
     })
@@ -95,7 +93,6 @@ export function BotAgentsSettings() {
     await places.mutate()
   }
   const defaultPickers = executionPickers({ t, row: t('default'), value: defaults, places: placeList, wide: true, onChange: value => changeDefaults({ ...defaults, ...value }), onRedetect: refreshDevices })
-  const offline = { wait: t('offlineWait'), cloud: t('offlineCloud') } satisfies Record<WhenDeviceOffline, string>
   const quotaNames = { stop: t('quotaStop'), switchAccount: t('quotaSwitch') } satisfies Record<WhenQuotaExhausted, string>
 
   return <div className="flex flex-col gap-8">
@@ -110,9 +107,6 @@ export function BotAgentsSettings() {
       <Line title={t('columns.place')}>{defaultPickers.place}</Line>
       <Line title={t('columns.harness')}>{defaultPickers.harness}</Line>
       <Line title={t('columns.model')}>{defaultPickers.model}</Line>
-      <Line title={t('whenDeviceOffline')}>
-        <ChoicePicker ariaLabel={t('cell', { row: t('default'), column: t('whenDeviceOffline'), value: offline[defaults.whenDeviceOffline] })} value={defaults.whenDeviceOffline} names={offline} onChange={whenDeviceOffline => changeDefaults({ ...defaults, whenDeviceOffline })} />
-      </Line>
     </Group>
 
     <Group id="bot-agents-labels" title={t('labels')}>

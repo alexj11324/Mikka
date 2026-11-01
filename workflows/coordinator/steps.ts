@@ -334,9 +334,9 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
       const card = 'card' in target ? target.card : await (await import('@/lib/rule-dispatch')).machineUnavailableCardFor(userId)
       return { error: 'machineUnavailable' as const, issueId: input.issueId, card }
     }
-    const queueOnDevice = async (device: { agentId: string; model?: string; pinnedDeviceId?: string; waitFor?: string }) => {
+    const queueOnDevice = async (device: { agentId: string; model?: string; pinnedDeviceId?: string }) => {
       const result=await queueRun(userId,{...input,agentId:device.agentId,model:device.model,pinnedDeviceId:device.pinnedDeviceId},botId,execution,requestEventId,null,approvedRepositoryKey)
-      return {...result,status:device.waitFor ? 'waiting_device' : 'queued',...(device.waitFor ? {waitFor:device.waitFor} : {})}
+      return {...result,status:'queued' as const}
     }
     if ('needsMachine' in target) return noMachine()
     if (!('agentId' in target)) {

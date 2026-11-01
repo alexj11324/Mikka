@@ -36,10 +36,23 @@ A new run goes to the first machine that can take it:
    - 「让服务器重新上线」 when they have a server (it opens Settings › 电脑),
      else 「连接我的服务器」.
 
-A rule whose device is offline still waits on it under today's 「等它上线」.
-Replacing that setting with the offline flow of orchestration.md § 4 is a
-follow-up, and so are a lost E2B sandbox restarting on the same thread,
-personal E2B keys, and removing the Mikka machine caps.
+**When a machine goes away** (this replaces the 「设备离线时」 setting, which is
+removed from Settings › Bot 与 Agents; nothing waits on an offline device any
+more):
+
+- A run whose device went offline (its lease ran out) continues on the person's
+  own E2B cloud when they have one, else on another of their devices with
+  「允许自动调度」 on (servers first), else it ends and the bot shows the same
+  card. A rule whose device is offline takes the same order for a new run.
+  Where the run went is the `run_retried` event's `movedTo`
+  (`{ kind: 'cloud' }` or `{ kind: 'device', deviceId }`); the thread view
+  shows it.
+- A cloud thread whose sandbox is gone gets a new sandbox for the same thread,
+  from its workspace snapshot, continuing from the uploaded checkpoint.
+- There are no Mikka caps on thread machines; the person's own E2B account sets
+  the limit.
+
+Personal E2B keys (each member brings their own) are a separate change.
 
 Orchestration principle (agreed with Alex): the run interface is uniform. Three
 things are decided independently: the **model**, by the subscription rules; the

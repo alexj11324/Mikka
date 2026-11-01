@@ -21,12 +21,6 @@ export const LEASED_RUN_STATUSES = ['preparing', 'running', 'paused', 'waiting_i
 /** First run plus retries. */
 export const MAX_RUN_ATTEMPTS = 3
 
-/**
- * How long a retry may wait in the queue for its offline device before it
- * goes to the person instead.
- */
-export const RETRY_QUEUE_WAIT_MS = 30 * 60_000
-
 const RETRY_HEADING = '## This run is a retry'
 
 /**
@@ -68,8 +62,8 @@ export function lostRunOutcome(run: { attempt: number; stopRequestedAt: Date | n
   return { kind: 'retry', attempt: run.attempt + 1 }
 }
 
-/** The error on a retry that waited too long for its device. */
-export const DEVICE_STAYED_OFFLINE = 'The device stayed offline, so the retry could not start.'
+/** The error on a run whose machine went offline when no other machine can continue it. */
+export const DEVICE_STAYED_OFFLINE = 'The machine went offline and no other machine can continue the run.'
 
 export { remoteKey } from '@mikka/protocol/repository'
 
