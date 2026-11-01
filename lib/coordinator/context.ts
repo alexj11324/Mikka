@@ -134,6 +134,24 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         'Nothing to do; follow the new run.',
         note,
       ].filter(Boolean).join('\n')
+    case 'run_credential_switched': {
+      const to = payload.to as { provider?: string; last4?: string; model?: string } | undefined
+      return [
+        `[Event] Run ${event.runId} used up its ${(payload.from as { provider?: string } | undefined)?.provider ?? ''} subscription's quota, so it goes on as run ${payload.retryRunId} on the person's ${to?.provider ?? ''} API key ending ${to?.last4 ?? ''} (model ${to?.model ?? ''}), which is billed per use.`,
+        payload.resetsAt ? `The subscription's quota resets at ${payload.resetsAt}.` : null,
+        event.issueId ? `Issue: ${event.issueId}.` : null,
+        'The person sees this as a card. Follow the new run.',
+        note,
+      ].filter(Boolean).join('\n')
+    }
+    case 'run_quota_paused':
+      return [
+        `[Event] Run ${event.runId} is paused: its ${payload.provider} subscription's quota ran out${payload.why === 'noApiKey' ? ' and the person has no API key for it' : ' and the person turned off switching to an API key'}.`,
+        payload.resetsAt ? `The quota resets at ${payload.resetsAt}.` : 'The CLI did not say when the quota resets.',
+        event.issueId ? `Issue: ${event.issueId}.` : null,
+        'The person sees this as a card with what they can do (add an API key, or retry after the reset). Do not dispatch it again yourself.',
+        note,
+      ].filter(Boolean).join('\n')
     case 'run_dispatch_failed':
       return [
         `[Event] Factory run ${event.runId} for task ${payload.taskId} cannot start on device ${payload.deviceId}: ${payload.reasonCode}.`,

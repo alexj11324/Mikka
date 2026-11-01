@@ -46,6 +46,7 @@ export const ACTION_ERROR_CODES = [
   'runNotFound',
   'runNotActive',
   'runChainEnded',
+  'apiKeyNotFound',
   'factoryQuestionNeedsAnswerTool',
   'artifactNotFound',
   'suggestionNotFound',

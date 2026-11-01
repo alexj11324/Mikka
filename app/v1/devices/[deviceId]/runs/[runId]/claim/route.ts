@@ -21,7 +21,7 @@ import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { issueForUser } from '@/lib/issue-access'
 import { latestCheckpoint } from '@/lib/run-leases'
-import { checkpointRecoveryError, retryNote } from '@/lib/run-retry'
+import { checkpointRecoveryError, quotaContinuationNote, retryNote } from '@/lib/run-retry'
 import { constrainedAssignmentPolicy } from '@/lib/run-assignment-policy'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
@@ -91,7 +91,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
   const resumeFrom = run.retryOf ? await latestCheckpoint(run.retryOf) : null
   const [lost] = run.retryOf
-    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId }).from(agentRuns).where(eq(agentRuns.id, run.retryOf)).limit(1)
+    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, stopReason: agentRuns.stopReason }).from(agentRuns).where(eq(agentRuns.id, run.retryOf)).limit(1)
     : []
   const recoveryError = run.retryOf
     ? checkpointRecoveryError(resumeFrom) ?? (!resumeFrom ? 'No uploaded recovery snapshot is available.' : null)
@@ -248,7 +248,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   // checkpoint instead.
   const retry = run.retryOf
     ? {
-      continuesRunId: run.retryOf, followUp: retryNote(run.attempt),
+      // A continuation after a used-up quota (lib/run-quota.ts) is told that, not a lost machine.
+      continuesRunId: run.retryOf, followUp: lost?.stopReason === 'quota_exhausted' ? quotaContinuationNote() : retryNote(run.attempt),
       ...(lost?.sessionId && lost.deviceId === deviceId ? { resumeSessionId: lost.sessionId } : {}),
       ...(resumeFrom && !requireWorktreeContinuation ? { resumeFrom } : {}),
       ...(requireWorktreeContinuation ? { requireWorktreeContinuation: true as const } : {}),

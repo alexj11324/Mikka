@@ -76,6 +76,24 @@ export async function runCredentialSource<S extends Binding>(query: Query, input
   return apiKey ? { subscription: null, apiKey } : kept
 }
 
+/**
+ * The key a run on a subscription goes on with once that subscription's quota
+ * ran out mid-run (lib/run-quota.ts): the bot's saved API-key model when it is
+ * the run's Agent's, else the first usable key for that Agent. Nothing when the
+ * person has none. Whether 「订阅额度用完后，自动改用 API Key」 is on is the caller's check.
+ */
+export async function quotaFallbackApiKey(query: Query, input: {
+  ownerId: string; botId: string | null; harness: string; model?: string
+  botWorkspaceId: string | null; choiceWorkspaceId: string | null
+}): Promise<RunApiKey | undefined> {
+  if (input.harness !== 'codex' && input.harness !== 'claude_code') return undefined
+  const keys = await runKeys(query, input.ownerId, input.botWorkspaceId)
+  if (!keys.length) return undefined
+  const saved = input.choiceWorkspaceId ? await botApiKeyChoice(query, { ownerId: input.ownerId, workspaceId: input.choiceWorkspaceId }, input.botId) : undefined
+  if (saved && saved.harness === input.harness && keys.some(key => key.id === saved.keyId)) return { keyId: saved.keyId, model: saved.model }
+  return firstKey(keys, input.harness, input.model)
+}
+
 /** For a thread's model with no rule (rule-dispatch `threadModel`): the person's first usable key, on its own Agent. */
 export async function firstRunApiKey(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<(RunApiKey & { harness: 'claude_code' | 'codex' }) | undefined> {
   for (const key of await runKeys(query, ownerId, botWorkspaceId)) {

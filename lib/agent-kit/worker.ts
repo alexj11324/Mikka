@@ -56,6 +56,19 @@ export function retryWorkerDefinition(snapshot: WorkerDefinitionSnapshot | null 
   return snapshot ? { ...structuredClone(snapshot),promptDigest:digest(prompt) } : null
 }
 
+/**
+ * A quota continuation's definition: the same Agent and parent, frozen on the
+ * person's API key instead of the subscription whose quota ran out.
+ */
+export function apiKeyWorkerDefinition(snapshot: WorkerDefinitionSnapshot, prompt: string, apiKey: { keyId: string; model: string }): WorkerDefinitionSnapshot {
+  const { subscription: _subscription, apiKey: _apiKey, ...rest } = structuredClone(snapshot)
+  const key = { keyId: z.uuid().parse(apiKey.keyId), model: z.string().trim().min(1).max(128).parse(apiKey.model) }
+  return {
+    ...rest, model: key.model, cliModelSelection: 'explicit', modelSource: 'api_key', apiKey: key, promptDigest: digest(prompt),
+    definitionDigest: digest({ harness: rest.harness, instructions: rest.instructions, model: key.model, ...(rest.pinnedDeviceId ? { pinnedDeviceId: rest.pinnedDeviceId } : {}), apiKey: key, ...(rest.mailbox ? { mailbox: rest.mailbox } : {}) }),
+  }
+}
+
 /** Match a claimed run's subscription without following a later Agent edit. */
 export function workerSubscriptionMatches(snapshot: WorkerDefinitionSnapshot | null | undefined, currentHarness: string, binding: { id:string; modelId:string; route:string }): boolean {
   const harness=snapshot?.harness ?? currentHarness

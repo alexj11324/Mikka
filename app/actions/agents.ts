@@ -291,6 +291,16 @@ export async function stopRun(runId: string): Promise<{ stoppedRunIds: string[] 
   return requestRunStop(await getUserId(), runId)
 }
 
+/** A run paused because its subscription's quota ran out goes on with the person's API key. Owner only; a repeat returns the same run. */
+export async function resumeQuotaPausedRunOnApiKey(runId: string): Promise<{ runId: string }> {
+  return (await import('@/lib/run-quota')).resumeQuotaPausedRunOnApiKey(await getUserId(), runId)
+}
+
+/** A run paused because its subscription's quota ran out is tried again with its original credential. Owner only; a repeat returns the same run. */
+export async function retryQuotaPausedRun(runId: string): Promise<{ runId: string }> {
+  return (await import('@/lib/run-quota')).retryQuotaPausedRun(await getUserId(), runId)
+}
+
 /** Settings #504 queues maintenance through the same owner-scoped backend as HTTP. */
 export async function sendDeviceCommand(input: { deviceId: string; kind: DeviceCommandKind }): Promise<ActionResult<{ id: string }>> {
   return runAction(async () => {

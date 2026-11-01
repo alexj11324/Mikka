@@ -337,7 +337,9 @@ export const agentRuns = pgTable('agent_runs', {
   /** Authenticated daemon token that claimed this run; unknown for old runs. */
   deviceTokenId: uuid('deviceTokenId'),
   status: text('status').$type<RunStatus>().notNull().default('queued'),
-  pauseReason: text('pauseReason').$type<'human_control' | null>(),
+  pauseReason: text('pauseReason').$type<'human_control' | 'quota_exhausted' | null>(),
+  /** A run paused on `quota_exhausted`: when the CLI said the subscription's quota resets; null when it gave no time. */
+  quotaResetsAt: timestamp('quotaResetsAt', { withTimezone: true }),
   resumeStatus: text('resumeStatus').$type<RunStatus | null>(),
   kind: text('kind').notNull().default('implement'),
   prompt: text('prompt').notNull().default(''),
@@ -459,7 +461,7 @@ export const runTokens = pgTable('run_tokens', {
  * (lib/attention): the person has not seen it, and the Coordinator alone
  * decides whether to tell them.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff', 'run_dispatch_failed', 'run_redispatched'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff', 'run_dispatch_failed', 'run_redispatched', 'run_credential_switched', 'run_quota_paused'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth
