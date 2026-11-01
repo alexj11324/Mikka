@@ -3,6 +3,7 @@ import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH } from '@/lib/base-path'
 import { verificationNavigationResponse } from '@/lib/auth-verification-response'
 import { toNextJsHandler } from 'better-auth/next-js'
+import { handleGitHubConnectCallback } from '@/lib/github/connect-callback'
 
 const handler = toNextJsHandler(auth)
 
@@ -17,7 +18,7 @@ function withBasePathURL(route: (request: Request) => Promise<Response>) {
   }
 }
 
-export const GET = withRequestLog('/api/auth/[...all]', withBasePathURL(async request => verificationNavigationResponse(
+export const GET = withRequestLog('/api/auth/[...all]', withBasePathURL(async request => await handleGitHubConnectCallback(request) ?? verificationNavigationResponse(
   request, await handler.GET(request), authBaseURL ?? 'http://localhost:3000',
 )))
 export const POST = withRequestLog('/api/auth/[...all]', withBasePathURL(handler.POST))
