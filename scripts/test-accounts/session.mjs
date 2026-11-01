@@ -262,6 +262,11 @@ export async function acquireTestAccounts({ database, environment, runId, worker
       const initialized = await request('/api/workspace')
       if (!initialized.ok) { await initialized.body?.cancel(); fail('ACCOUNT_INITIALIZATION_FAILED') }
       await initialized.body?.cancel()
+      // The app's first screen opens the Coordinator chat, which creates the person's Coordinator bot on first
+      // use (#757). Open it here too, so the clean-account baseline already holds it and later use stays clean.
+      const coordinator = await request('/api/conversations/coordinator/read')
+      if (!coordinator.ok) { await coordinator.body?.cancel(); fail('ACCOUNT_INITIALIZATION_FAILED') }
+      await coordinator.body?.cancel()
       const landing = await request(environment.basePath)
       if (!landing.ok) { await landing.body?.cancel(); fail('ACCOUNT_INITIALIZATION_FAILED') }
       await landing.body?.cancel()
