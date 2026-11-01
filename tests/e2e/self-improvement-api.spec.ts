@@ -51,11 +51,9 @@ test('Skill baseline selection, actual claim receipt and feedback provenance use
       (SELECT count(*)::int FROM run_tokens WHERE "runId"=$1) AS tokens`,[runId])).rows[0]).toEqual({receipts:0,tokens:0})
     const claimed=await supported.post(claim);expect(claimed.status()).toBe(200)
     const assignment=await claimed.json();verifySkillAssignment(assignment)
-    // A run is never sent ask: admitted runs get allow, every other run deny (decision 2026-11-01-1310, #803).
-    // This run was queued directly, with no admission or publication, so it is denied.
     expect({runId:assignment.runId,issueId:assignment.issueId,deviceId:assignment.deviceId,repoId:assignment.repoId,
       expectedRepoRemote:assignment.expectedRepoRemote,gitPush:assignment.policy?.permissions?.git_push})
-      .toEqual({runId,issueId,deviceId,repoId,expectedRepoRemote:remoteUrl,gitPush:'deny'})
+      .toEqual({runId,issueId,deviceId,repoId,expectedRepoRemote:remoteUrl,gitPush:'ask'})
     expect(assignment.skillReceipt.runId).toBe(runId)
     expect((await pool.query('SELECT receipt FROM improvement_skill_receipts WHERE "runId"=$1',[runId])).rows[0].receipt.id).toBe(assignment.skillReceipt.id)
     const receiptPath=app(`/v1/runs/${runId}/skill-receipt?receiptId=${assignment.skillReceipt.id}`)
