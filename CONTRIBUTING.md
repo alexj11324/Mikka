@@ -55,8 +55,8 @@ cannot.
    the protected gate requires every shard to succeed.
 > Browser tests (items 3–5) are manual only since 2026-11-01
 > (`docs/design/decisions/2026-11-01-0230-browser-tests-manual-only.md`). The
-> check "Browser tests (before merge)" passes at once; the production build runs
-> in "Database checks (1/4)".
+> check "Browser tests (before merge)" passes at once; CI runs no production
+> build; Vercel builds `main`.
 
 3. **Ready pull requests** (CI job "Browser tests (before merge)"): the browser
    smoke set plus the specs of the areas the change touches, against the PR

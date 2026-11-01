@@ -14,8 +14,8 @@ its existing protected status names and real acceptance coverage.
   and DB/migration integration checks. The PR's production build is performed
   in `browser-tests.yml`, not redundantly in `ui-policy.yml`.
 - Since 2026-11-01 browser tests are manual only; `browser-gate.yml` reports
-  `Browser tests (before merge)` and passes at once, and the PR build runs in
-  `ui-policy.yml` (Database checks 1/4). The text below describes the manual run.
+  `Browser tests (before merge)` and passes at once, and CI runs no production
+  build (Vercel builds `main`). The text below describes the manual run.
 - `browser-tests.yml` runs `Browser tests (before merge)`: smoke plus
   changed-area specs, a real isolated PostgreSQL database and the applicable
   Factory/daemon/browser acceptance. `integrate/*` PRs use the full tier.
