@@ -14,6 +14,7 @@ import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubm
 import { botChats, chatView, retryFailedTurn, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import { and, eq, sql } from 'drizzle-orm'
 import { coordinatorBot } from '@/lib/coordinator/coordinator-bot'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { bots, devices } from '@/lib/db/schema'
 import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
@@ -43,7 +44,8 @@ const botIdSchema = z.uuid().nullable()
 async function ownBot(userId: string, botId: string | null | undefined): Promise<{ id: string; name: string; coordinator: boolean }> {
   const parsed = botIdSchema.safeParse(botId ?? null)
   if (!parsed.success) throw new ActionFailureError('validationGeneric')
-  const id = parsed.data ?? (await coordinatorBot(userId)).botId
+  // No bot named: the Coordinator of the workspace the person has open.
+  const id = parsed.data ?? (await coordinatorBot(userId, (await loadWorkspaceContext()).workspace.id)).botId
   const [bot] = await db.select({ id: bots.id, name: bots.name, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
     .from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, userId))).limit(1)
   if (!bot) throw new ActionFailureError('validationGeneric')

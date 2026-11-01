@@ -2,16 +2,17 @@ import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 
 /**
- * The person's Coordinator is an ordinary bot (glossary): the `bots` row that
- * coordinator_bots names for the workspace their work with no bot of its own
- * runs in (`executionWorkspace(owner, null)`, the first active workspace).
- * Its chat, memory, inbox, runs, model choice and settings are keyed by that
- * row's id like any bot's. One per person in the bot list, as before.
+ * The person's Coordinator is an ordinary bot (glossary), one per person per
+ * workspace (decision 2026-10-31-2130-personal-vs-workspace): the `bots` row
+ * that coordinator_bots names for that workspace. Its chat, memory, inbox,
+ * runs, model choice and settings are keyed by that row's id like any bot's.
  *
- * It is resolved only where Coordinator work enters (a message, a run with
- * no bot, a briefing, a matter, a suggestion, an issue done) and stored on
- * that row; later paths (run end, recovery, publication, events) read the
- * stored id and never resolve it again.
+ * It is resolved only where Coordinator work enters, for the workspace that
+ * work belongs to: the web's active workspace, a mobile request's, a
+ * channel's own binding (MCP, Slack, Telegram, Linear), or the run, issue,
+ * conversation or suggestion it comes from. Work with no workspace of its own
+ * uses the personal workspace. The id is stored on the row; later paths (run
+ * end, recovery, publication, events) read it and never resolve it again.
  */
 export interface CoordinatorBot { botId: string; workspaceId: string }
 
@@ -20,58 +21,76 @@ const RESOLVED_MS = 60_000
 const BACKFILL_MS = 10 * 60_000
 const resolved = new Map<string, { bot: CoordinatorBot; at: number }>()
 const backfilled = new Map<string, number>()
-const backfillFresh = (key: string) => Date.now() - (backfilled.get(key) ?? -Infinity) < BACKFILL_MS
+const backfillFresh = (ownerId: string) => Date.now() - (backfilled.get(ownerId) ?? -Infinity) < BACKFILL_MS
+
+/** The person's personal workspace, created when they have none yet (as the app does on their first page). */
+export async function personalWorkspaceId(ownerId: string): Promise<string> {
+  const { pool } = await import('@/lib/db')
+  const found = (await pool.query<{ id: string }>(`SELECT w.id FROM mikka_workspaces w
+      JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m."userId"=$1 AND m.status='active'
+    WHERE w."userId"=$1 AND w.kind='personal' LIMIT 1`, [ownerId])).rows[0]?.id
+  if (found) return found
+  const [person] = (await pool.query<{ id: string; email: string; name: string }>('SELECT id,email,name FROM "user" WHERE id=$1', [ownerId])).rows
+  if (!person) throw Object.assign(new Error('workspaceAccessDenied'), { code: 'workspaceAccessDenied' })
+  return (await import('@/lib/personal-workspace')).ensurePersonalWorkspace(person, 'zh-CN')
+}
+
+async function ensureFor(ownerId: string, workspaceId: string): Promise<CoordinatorBot> {
+  const [{ pool }, { ensureCoordinatorBot }] = await Promise.all([import('@/lib/db'), import('@/lib/computer/auto-runtime')])
+  // Only a workspace the person is an active member of gets their Coordinator.
+  const member = await pool.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\'', [workspaceId, ownerId])
+  if (!member.rowCount) throw Object.assign(new Error('workspaceAccessDenied'), { code: 'workspaceAccessDenied' })
+  return { botId: await ensureCoordinatorBot(pool, { userId: ownerId, workspaceId }), workspaceId }
+}
 
 /**
- * The person's Coordinator row, created on first use. The first time this
- * process sees it, its older chat is moved onto it. Code inside another
- * transaction passes `backfill: false`: the move takes row locks that
- * transaction may hold, and the next read does it instead.
+ * The person's Coordinator in `workspaceId` (their personal workspace when the
+ * work has none), created on first use. The first time this process sees the
+ * person, their older bot-less chat is moved onto their personal Coordinator.
+ * Code inside another transaction passes `backfill: false`: the move takes row
+ * locks that transaction may hold, and the next read does it instead.
  */
-export async function coordinatorBot(ownerId: string, options: { backfill?: boolean } = {}): Promise<CoordinatorBot> {
-  const cached = resolved.get(ownerId)
-  if (cached && Date.now() - cached.at < RESOLVED_MS && (options.backfill === false || backfillFresh(`${ownerId}:${cached.bot.botId}`))) return cached.bot
-  const [{ pool }, { executionWorkspace }, { ensureCoordinatorBot }] = await Promise.all([
-    import('@/lib/db'), import('@/lib/execution-settings'), import('@/lib/computer/auto-runtime'),
-  ])
-  const workspaceId = await executionWorkspace(ownerId, null).catch(async error => {
-    // A person with no active workspace yet gets their personal one, as the app does on their first page.
-    if ((error as { code?: string }).code !== 'workspaceAccessDenied') throw error
-    const [person] = (await pool.query<{ id: string; email: string; name: string }>('SELECT id,email,name FROM "user" WHERE id=$1', [ownerId])).rows
-    if (!person) throw error
-    await (await import('@/lib/personal-workspace')).ensurePersonalWorkspace(person, 'zh-CN')
-    return executionWorkspace(ownerId, null)
-  })
-  const bot = { botId: await ensureCoordinatorBot(pool, { userId: ownerId, workspaceId }), workspaceId }
-  const key = `${ownerId}:${bot.botId}`
-  if (options.backfill !== false && !backfillFresh(key)) {
-    // A move that cannot take its locks now (lock_timeout) is retried on the next read; the chat stays usable meanwhile.
-    try { await backfillCoordinatorChat(pool, ownerId, bot); backfilled.set(key, Date.now()) }
-    catch (error) { console.error('Coordinator chat move deferred', { code: (error as { code?: string }).code }) }
+export async function coordinatorBot(ownerId: string, workspaceId: string | null, options: { backfill?: boolean } = {}): Promise<CoordinatorBot> {
+  const where = workspaceId ?? await personalWorkspaceId(ownerId)
+  const key = `${ownerId}:${where}`
+  const cached = resolved.get(key)
+  const bot = cached && Date.now() - cached.at < RESOLVED_MS ? cached.bot : await ensureFor(ownerId, where)
+  resolved.set(key, { bot, at: cached?.bot === bot ? cached.at : Date.now() })
+  if (options.backfill !== false && !backfillFresh(ownerId)) {
+    // Older data has no workspace of its own, so it goes to the personal Coordinator. A move that cannot take its
+    // locks now (lock_timeout) is retried on the next read; the chat stays usable meanwhile.
+    try {
+      const { pool } = await import('@/lib/db')
+      const personal = workspaceId ? await ensureFor(ownerId, await personalWorkspaceId(ownerId)) : bot
+      await backfillCoordinatorChat(pool, ownerId, personal)
+      backfilled.set(ownerId, Date.now())
+    } catch (error) { console.error('Coordinator chat move deferred', { code: (error as { code?: string }).code }) }
   }
-  resolved.set(ownerId, { bot, at: Date.now() })
   return bot
 }
 
-/** The chat a bot id names: the bot's own, or the person's Coordinator when the work has no bot of its own. */
-export async function chatBotId(ownerId: string, botId: string | null | undefined, options: { backfill?: boolean } = {}): Promise<string> {
-  return botId ?? (await coordinatorBot(ownerId, options)).botId
+/** The chat a bot id names: the bot's own, or the person's Coordinator in `workspaceId` when the work has no bot of its own. */
+export async function chatBotId(ownerId: string, botId: string | null | undefined, workspaceId: string | null, options: { backfill?: boolean } = {}): Promise<string> {
+  return botId ?? (await coordinatorBot(ownerId, workspaceId, options)).botId
+}
+
+/**
+ * The chat a signed-in request names: its bot, or the Coordinator of the workspace the request has open
+ * (a token's own workspace, else the person's active one). For web and mobile entry points.
+ */
+export async function openChatBotId(user: { id: string; email: string; name: string; image?: string | null }, botId: string | null | undefined): Promise<string> {
+  if (botId) return botId
+  const { loadWorkspaceContext } = await import('@/lib/workspace-access')
+  return chatBotId(user.id, null, (await loadWorkspaceContext(undefined, user)).workspace.id)
 }
 
 /**
  * The bot list (web left column, mobile home): the person's bots in this
- * workspace with their Coordinator first, marked `coordinator`. The
- * Coordinator is one per person, so its row is listed in every workspace they
- * open, as before it had one; the list draws it as the Coordinator, once.
+ * workspace with this workspace's Coordinator first, marked `coordinator`.
  */
 export async function listOwnerBots(ownerId: string, workspaceId: string) {
-  const [{ db, pool }, { bots }, { and, asc, desc, eq, sql }, { ensureCoordinatorBot }] = await Promise.all([
-    import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm'), import('@/lib/computer/auto-runtime')])
-  // Moves the person's older chat onto their Coordinator first (once per process), as every Coordinator read does.
-  await coordinatorBot(ownerId)
-  // One Coordinator per person per workspace (decision 2026-10-31-2130-personal-vs-workspace): this
-  // workspace's own, created on first use, so it is an ordinary bot of this workspace like the others.
-  const botId = await ensureCoordinatorBot(pool, { userId: ownerId, workspaceId })
+  const [{ db }, { bots }, { and, asc, desc, eq, sql }] = await Promise.all([import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm')])
+  const { botId } = await coordinatorBot(ownerId, workspaceId)
   const isCoordinator = sql<boolean>`${bots.id} = ${botId}`
   return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, coordinator: isCoordinator }).from(bots)
     .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId)))

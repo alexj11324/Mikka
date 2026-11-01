@@ -21,8 +21,9 @@ import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 /** How often a waiting read checks for the Coordinator's reply. */
 const REPLY_POLL_MS = 2000
 
-/** The person's Coordinator chat: its bot row (lib/coordinator/coordinator-bot.ts). */
-const coordinatorChat = (userId: string) => chatBotId(userId, null)
+/** The person's Coordinator chat: its bot row (lib/coordinator/coordinator-bot.ts). An MCP client's OAuth grant names
+ * no workspace, so it is the personal workspace's Coordinator. */
+const coordinatorChat = (userId: string) => chatBotId(userId, null, null)
 
 async function lastPosition(userId: string): Promise<number> {
   const [row] = await db.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })

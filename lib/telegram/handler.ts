@@ -280,7 +280,8 @@ async function handleTelegramMessage(input: {
     return
   }
   // A Telegram message enters the person's Coordinator chat: its bot row is resolved here, before the transaction.
-  const coordinator = command ? null : (await coordinatorBot(link.userId)).botId
+  // A Telegram link names a person and no workspace, so it is the personal workspace's Coordinator.
+  const coordinator = command ? null : (await coordinatorBot(link.userId, null)).botId
   const result = await db.transaction(async tx => {
     const conversation = await ensureConversation(tx, input.threadId, link.userId)
     if (command) return handleCommand(tx, conversation, link.userId, command, t)

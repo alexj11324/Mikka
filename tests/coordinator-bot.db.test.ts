@@ -41,6 +41,8 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const id = await seedUser(pool, label)
     users.push(id)
     const workspace = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
+    // Their own workspace: the personal one, where work with no workspace of its own goes.
+    await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [workspace.id])
     return { id, workspaceId: workspace.id }
   }
   const messageRows = (userId: string) => pool.query<{ botId: string | null; position: number; text: string }>(
@@ -71,8 +73,8 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
       VALUES ($1,$2,NULL,NULL,$3,$4,$5,$5,'active','2030-01-01T09:00:00Z')`, [schedule, p.id, event, randomUUID(), definition])
     await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy) VALUES ($1,'coordinator',NULL,NULL,$2)`, [p.id, JSON.stringify({ permissions: { git_push: 'deny' } })])
 
-    const coordinator = await bots.coordinatorBot(p.id)
-    assert.equal(coordinator.workspaceId, p.workspaceId, 'the row lives where work with no bot runs (executionWorkspace)')
+    const coordinator = await bots.coordinatorBot(p.id, null)
+    assert.equal(coordinator.workspaceId, p.workspaceId, 'older data has no workspace, so it moves to the personal workspace\'s Coordinator')
     const moved = (await messageRows(p.id)).rows
     assert.deepEqual(moved.map(row => [row.botId, row.position, row.text]), [[coordinator.botId, 1, 'Plan the launch'], [coordinator.botId, 2, 'Here is the plan'], [coordinator.botId, 3, 'And the follow-up']], 'messages keep their order')
     const conversation = await store.loadConversation(p.id, coordinator.botId)
@@ -116,7 +118,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const { runFinishedEvent } = await import('../lib/coordinator-events')
     const { db } = await import('../lib/db')
     // A message enters the Coordinator chat: the entry point resolves its bot row once.
-    const botId = await bots.chatBotId(p.id, null)
+    const botId = await bots.chatBotId(p.id, null, p.workspaceId)
     await recordPersonalSubmission(db, p.id, 'Hello Coordinator', { botId })
     // A run carries the bot that dispatched it; its end reads that and resolves nothing.
     const agent = await seedAgent(pool, p.id)
@@ -145,7 +147,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     await recordCoordinatorEvent(db, runFinishedEvent({ id: run, userId: owner, botId: null, issueId: null, kind: 'implement', status: 'succeeded', stopReason: 'completed' }))
     assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE "runId"=$1', [run])).rows, [{ botId: null }])
     // Resolving the Coordinator gives the person their personal workspace, as the app does, and moves the legacy rows.
-    const coordinator = await bots.coordinatorBot(owner)
+    const coordinator = await bots.coordinatorBot(owner, null)
     assert.equal((await pool.query('SELECT kind FROM mikka_workspaces WHERE id=$1', [coordinator.workspaceId])).rows[0].kind, 'personal')
     assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE "runId"=$1', [run])).rows, [{ botId: coordinator.botId }])
     assert.deepEqual((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [run])).rows, [{ botId: coordinator.botId }])
@@ -155,7 +157,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const p = await person('model-choice')
     const { ExecutionSettings } = await import('../lib/execution-settings')
     const { HOSTED_CHOICE } = await import('../lib/bot-model-menu-view')
-    const { botId, workspaceId } = await bots.coordinatorBot(p.id)
+    const { botId, workspaceId } = await bots.coordinatorBot(p.id, null)
     const settings = new ExecutionSettings(appPool)
     await settings.setBotModel({ ownerId: p.id, workspaceId }, botId, HOSTED_CHOICE)
     assert.deepEqual((await pool.query('SELECT "botKey" FROM bot_model_choices WHERE "ownerId"=$1', [p.id])).rows, [{ botKey: botId }], 'saved under the bot row, never \'coordinator\'')
@@ -164,7 +166,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
 
   await t.test('the Coordinator stays outside workspace app policy; an ordinary bot does not', async () => {
     const p = await person('app-policy')
-    const { botId, workspaceId } = await bots.coordinatorBot(p.id)
+    const { botId, workspaceId } = await bots.coordinatorBot(p.id, null)
     const other = randomUUID()
     await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,\'Writer\')', [other, p.id, workspaceId])
     await pool.query(`INSERT INTO workspace_app_policies ("workspaceId",app,access,"updatedBy") VALUES ($1,'gmail','deny',$2)`, [workspaceId, p.id])
@@ -181,7 +183,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const theirs = await seedBot(pool, p.workspaceId, p.id, 'Coordinator')
     const team = await seedWorkspace(pool, p.id, [{ userId: p.id, role: 'admin' }])
     const teamBot = await seedBot(pool, team.id, p.id, 'Writer')
-    const { botId } = await bots.coordinatorBot(p.id)
+    const { botId } = await bots.coordinatorBot(p.id, null)
     const here = await bots.listOwnerBots(p.id, p.workspaceId)
     assert.deepEqual(here.map(bot => [bot.id, bot.coordinator]), [[botId, true], [theirs, false]], 'first, once, and marked')
     const there = await bots.listOwnerBots(p.id, team.id)
@@ -198,14 +200,48 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     assert.equal(summaries[botId].line, 'Morning')
   })
 
+  await t.test('one Coordinator per workspace; work with no workspace goes to the personal one, never the oldest', async () => {
+    // Invited to a team first: the team workspace is older than their personal one.
+    const id = await seedUser(pool, 'per-workspace')
+    users.push(id)
+    const team = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
+    const personal = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
+    await pool.query(`UPDATE mikka_workspaces SET kind='personal', "createdAt"=now()+interval '1 minute' WHERE id=$1`, [personal.id])
+    await pool.query(`INSERT INTO coordinator_messages (id,"userId","botId",position,message) VALUES ($1,$2,NULL,1,'{"role":"user","content":"older chat"}')`, [randomUUID(), id])
+
+    // The team's is resolved first; the older bot-less chat still moves to the personal Coordinator.
+    const inTeam = await bots.coordinatorBot(id, team.id)
+    const own = await bots.coordinatorBot(id, null)
+    assert.equal(inTeam.workspaceId, team.id)
+    assert.equal(own.workspaceId, personal.id, 'no workspace of its own: the personal one, not the oldest')
+    assert.notEqual(inTeam.botId, own.botId, 'each workspace has its own Coordinator')
+    assert.deepEqual((await bots.coordinatorBot(id, team.id)).botId, inTeam.botId, 'created once')
+    assert.deepEqual((await messageRows(id)).rows.map(row => row.botId), [own.botId], 'older chat moves to the personal Coordinator')
+    assert.equal(await bots.chatBotId(id, null, team.id), inTeam.botId)
+    assert.equal(await bots.chatBotId(id, inTeam.botId, null), inTeam.botId, 'a named bot is used as given')
+
+    // A workspace the person is not an active member of gets no Coordinator of theirs.
+    const stranger = await seedWorkspace(pool, id, [])
+    await assert.rejects(bots.coordinatorBot(id, stranger.id), { code: 'workspaceAccessDenied' })
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM coordinator_bots WHERE "workspaceId"=$1', [stranger.id])).rows[0].n, 0)
+
+    // An MCP client names no workspace: its notes are the personal Coordinator's, not the team's.
+    const mcp = await import('../lib/mcp/actions')
+    await mcp.remember(id, 'ships on Fridays')
+    const memory = async (botId: string) => (await pool.query('SELECT memory FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2', [id, botId])).rows[0]?.memory ?? ''
+    assert.match(await memory(own.botId), /ships on Fridays/)
+    assert.doesNotMatch(await memory(inTeam.botId), /ships on Fridays/)
+    assert.match((await mcp.readMemory(id)).memory, /ships on Fridays/)
+  })
+
   await t.test('a leaving member\'s Coordinator is paused with their bots and never transferred', async () => {
     const admin = await person('transfer-admin')
     const leaving = await seedUser(pool, 'transfer-leaving')
     users.push(leaving)
     await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'member','active')`, [admin.workspaceId, leaving, `${leaving}@example.invalid`])
     const helper = await seedBot(pool, admin.workspaceId, leaving, 'Helper')
-    const coordinator = await bots.coordinatorBot(leaving)
-    assert.equal(coordinator.workspaceId, admin.workspaceId, 'their only workspace holds their Coordinator')
+    const coordinator = await bots.coordinatorBot(leaving, admin.workspaceId)
+    assert.equal(coordinator.workspaceId, admin.workspaceId, 'the team workspace holds their Coordinator there')
     const members = await import('../lib/workspace-admin/members')
     const removed = await members.removeMember(admin.id, admin.workspaceId, leaving, admin.id)
     assert.deepEqual(removed.transferred, { bots: 1 }, 'only their own bot is handed over')

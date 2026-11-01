@@ -6,7 +6,7 @@ import { pool } from '@/lib/db'
 import { ExecutionSettings } from '@/lib/execution-settings'
 import { botModelMenu, botModelScope, refreshBotModelMenu } from '@/lib/bot-model-menu'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { chatBotId } from '@/lib/coordinator/coordinator-bot'
+import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +27,7 @@ async function handleGET(request: Request) {
   const bot = botParam.safeParse(new URL(request.url).searchParams.get('bot'))
   if (!bot.success) return json({ error: 'invalidBot' }, 400)
   try {
-    const botId = await chatBotId(user.id, bot.data)
+    const botId = await openChatBotId(user, bot.data)
     const scope = await botModelScope(user.id, botId, user[tokenWorkspace])
     return json(await botModelMenu(pool, new ExecutionSettings(pool), scope, botId))
   } catch (error) { return failed(error) }
@@ -46,7 +46,7 @@ async function handlePUT(request: Request) {
   const body = choice.safeParse(await request.json().catch(() => null))
   if (!body.success) return json({ error: 'invalidModel' }, 400)
   try {
-    const botId = await chatBotId(user.id, body.data.bot)
+    const botId = await openChatBotId(user, body.data.bot)
     const scope = await botModelScope(user.id, botId, user[tokenWorkspace])
     const settings = new ExecutionSettings(pool)
     await settings.setBotModel(scope, botId, body.data.id)
@@ -63,7 +63,7 @@ async function handlePOST(request: Request) {
   const body = z.strictObject({ bot: botParam }).safeParse(await request.json().catch(() => null))
   if (!body.success) return json({ error: 'invalidBot' }, 400)
   try {
-    const botId = await chatBotId(user.id, body.data.bot)
+    const botId = await openChatBotId(user, body.data.bot)
     const scope = await botModelScope(user.id, botId, user[tokenWorkspace])
     return json(await refreshBotModelMenu(pool, new ExecutionSettings(pool), scope, botId))
   } catch (error) { return failed(error) }

@@ -54,9 +54,9 @@ export async function triageInbox(userId: string, botId: string): Promise<void> 
 export async function wakeCoordinator(userId: string): Promise<void> {
   if (!coordinatorEnabled()) return
   try {
-    // Resolving the Coordinator first moves any of its chat still stored the old way onto its bot row.
+    // Resolving the Coordinator first moves any of its chat still stored the old way onto its personal Coordinator.
     // A person with no workspace to resolve has no Coordinator turn to start; their bots still wake.
-    await coordinatorBot(userId).catch(() => undefined)
+    await coordinatorBot(userId, null).catch(() => undefined)
     await releaseAttention(userId)
     for (const botId of await wakingChats(userId)) {
       await wakeChat({ userId, botId })
@@ -91,7 +91,8 @@ export async function retryCoordinatorWakes(deadline = Date.now() + 45_000) {
   counts.due = scopes.length
   for (const scope of scopes) {
     if (Date.now() >= deadline) { counts.deferred++; continue }
-    try { counts[await wakeChat({ userId: scope.userId, botId: scope.botId ?? (await coordinatorBot(scope.userId)).botId })]++ }
+    // A wake recorded before chats had bots names none: it was the Coordinator's older chat, now the personal one's.
+    try { counts[await wakeChat({ userId: scope.userId, botId: scope.botId ?? (await coordinatorBot(scope.userId, null)).botId })]++ }
     catch { counts.failed++ }
   }
   counts.exhausted = await recovery.exhausted()
