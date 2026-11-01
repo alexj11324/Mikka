@@ -70,12 +70,12 @@ test('通知保存失败时开关恢复原值，重试后保存成功', async ({
   const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
   await expect(proactive).toBeChecked()
   // A server action POSTs its arguments as JSON with a Next-Action header; drop exactly the save of this switch.
+  const isSave = (request: import('@playwright/test').Request) => {
+    try { return Boolean(request.headers()['next-action']) && JSON.stringify(JSON.parse(request.postData() ?? '')) === JSON.stringify([{ proactive: false }]) } catch { return false }
+  }
   let aborted = 0
   const dropSave = async (route: import('@playwright/test').Route) => {
-    const request = route.request()
-    let args: unknown
-    try { args = request.headers()['next-action'] ? JSON.parse(request.postData() ?? '') : undefined } catch { args = undefined }
-    if (JSON.stringify(args) !== JSON.stringify([{ proactive: false }])) return route.fallback()
+    if (!isSave(route.request())) return route.fallback()
     aborted += 1
     return route.abort()
   }
@@ -85,9 +85,13 @@ test('通知保存失败时开关恢复原值，重试后保存成功', async ({
   await expect(proactive).toBeChecked()
   expect(aborted).toBe(1)
   await page.unroute('**/*', dropSave)
+  // The switch turns off before the server answers, and server actions run one at a time: the save can still wait behind
+  // a settings prefetch. Reload only once the save has answered.
+  const saved = page.waitForResponse(response => isSave(response.request()))
   await page.getByRole('button', { name: '重试', exact: true }).click()
   await expect(page.locator('[data-slot="alert"]')).toHaveCount(0)
   await expect(proactive).not.toBeChecked()
+  expect((await saved).ok()).toBe(true)
   await page.reload()
   await expect(page.getByRole('switch', { name: '主动消息', exact: true })).not.toBeChecked()
 })
