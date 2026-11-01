@@ -197,7 +197,6 @@
     "signIn": "去登录",
     "createAccount": "创建账号",
     "addAccountTitle": "添加账户",
-    "addAccountDescription": "登录或创建另一个 Mikka 账户，同时保留当前账户以便切换。",
     "returnToCurrentAccount": "取消，返回当前账户",
     "addAccountLabel": "添加账户",
     "signUpLabel": "注册账号",
@@ -206,15 +205,9 @@
     "home": "Mikka 首页",
     "createTitle": "创建你的工作账号",
     "welcome": "登录 Mikka",
-    "createDescription": "从第一个任务开始，把想法变成可追踪的进展。",
-    "welcomeDescription": "登录 Mikka，继续你的任务与文档。",
     "continueGoogle": "使用 Google 继续",
     "googleLinkHint": "如果此邮箱已注册 Mikka，请先用邮箱密码登录，再到「设置 → 账户」关联 Google。",
-    "googleNotConfigured": "Google 登录暂未配置，请使用邮箱继续。",
-    "viewGoogleCallback": "查看 Google OAuth 回调地址",
     "continueGithub": "使用 GitHub 继续",
-    "githubNotConfigured": "GitHub 登录暂未配置，请使用邮箱继续。",
-    "viewCallback": "查看 GitHub App 回调地址",
     "orEmail": "或",
     "name": "称呼",
     "namePlaceholder": "怎么称呼你",
@@ -273,7 +266,12 @@
       "turnstileFailed": "人机验证未通过",
       "turnstileUnavailable": "人机验证暂不可用，请稍后重试。",
       "emailRegistered": "该邮箱已注册，请直接登录。"
-    }
+    },
+    "nameRequired": "称呼不能为空",
+    "emailRequired": "邮箱不能为空",
+    "emailInvalid": "邮箱格式无效",
+    "passwordRequired": "密码不能为空",
+    "passwordTooShort": "密码至少 8 位字符"
   },
   "Metadata": {
     "title": "Mikka · 任务与文档工作台",
