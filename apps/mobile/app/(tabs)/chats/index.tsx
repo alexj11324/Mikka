@@ -8,7 +8,7 @@ import { BotAvatar, Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
-import { chatPath } from '@/lib/navigate'
+import { botPath, splitPinned } from '@/lib/pins'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
 import { prefetch, useRefresh } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
@@ -17,21 +17,22 @@ import { colors } from '@/lib/theme'
  * 对话, the app's home, as a messaging app's chat list (decision
  * 2026-10-31-2330, Alex's Grok screenshot): no title and no search at the top
  * (search is the tab bar's); the person's avatar (top left) opens the drawer
- * and 「+」 (top right) opens 新建 Bot and 新建群聊. The Coordinator is pinned
- * on top with the bots the person pinned, then every other bot and group chat
- * with its last line, newest first.
+ * and 「+」 (top right) opens 新建 Bot and 新建群聊. The pinned bots sit on top
+ * with a star (the Coordinator first, pinned until the person unpins it), then
+ * every other bot and group chat with its last line, newest first.
  */
 export default function ChatsScreen() {
   const router = useRouter()
   const drawer = useDrawer()
   const { rows: all, loading, reload } = useChatRows()
-  // Pinned bots sit in the row on top with the Coordinator, not in the list (置顶 on a bot's page).
-  const pinned = all.flatMap(row => row.kind === 'bot' && row.bot.pinned ? [row.bot] : [])
-  const rows = all.filter(row => !(row.kind === 'bot' && row.bot.pinned))
+  // Pinned bots sit in the row on top, each with the star; the rest are the list (置顶 on a bot's page).
+  const split = splitPinned(all)
+  const pinned = split.pinned.flatMap(row => row.kind === 'bot' ? [row.bot] : [])
+  const rows = split.rest
   const refresh = useRefresh(reload)
   const updateReady = useUpdateReady()
   // The Coordinator's chat and the three latest bots' load ahead, so opening one is not blank while it loads.
-  const latest = rows.filter(row => row.kind === 'bot').slice(0, 3).map(rowKey).join()
+  const latest = all.filter(row => row.kind === 'bot' && !row.bot.coordinator).slice(0, 3).map(rowKey).join()
   useEffect(() => {
     for (const id of [null, ...latest.split(',').filter(Boolean)]) void prefetch(`/api/mobile/chat${id ? `?bot=${id}` : ''}`)
   }, [latest])
@@ -61,17 +62,13 @@ export default function ChatsScreen() {
                 <Text style={styles.updateText}>重启以更新</Text>
               </Pressable>
             ) : null}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.pinned, pinned.length < 2 && { flexGrow: 1, justifyContent: 'center' }]}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Coordinator" onPress={() => router.push(chatPath(null))} style={({ pressed }) => [styles.pin, pressed && { opacity: 0.6 }]}>
-                <View>
-                  <BotAvatar size={96} />
-                  <View style={styles.star}><Symbol name="star.fill" size={12} color="#fff" web={<Text style={styles.starText}>★</Text>} /></View>
-                </View>
-                <Text style={styles.pinName} numberOfLines={1}>Coordinator</Text>
-              </Pressable>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.pinned, pinned.length < 3 && { flexGrow: 1, justifyContent: 'center' }]}>
               {pinned.map(bot => (
-                <Pressable key={bot.id} accessibilityRole="button" accessibilityLabel={bot.name} onPress={() => router.push(chatPath(bot.id))} style={({ pressed }) => [styles.pin, pressed && { opacity: 0.6 }]}>
-                  <BotAvatar color={bot.color} shape={bot.shape} size={96} />
+                <Pressable key={bot.id} accessibilityRole="button" accessibilityLabel={bot.name} onPress={() => router.push(botPath(bot))} style={({ pressed }) => [styles.pin, pressed && { opacity: 0.6 }]}>
+                  <View>
+                    <BotAvatar color={bot.color} shape={bot.shape} size={96} />
+                    <View style={styles.star}><Symbol name="star.fill" size={12} color="#fff" web={<Text style={styles.starText}>★</Text>} /></View>
+                  </View>
                   <Text style={styles.pinName} numberOfLines={1}>{bot.name}</Text>
                 </Pressable>
               ))}
@@ -79,7 +76,7 @@ export default function ChatsScreen() {
           </View>
         }
         ListEmptyComponent={loading ? <View style={styles.center}><Spinner /></View> : undefined}
-        renderItem={({ item }) => <ChatRowView row={item} onPress={() => router.push(item.kind === 'bot' ? chatPath(item.bot.id) : `/groups/${item.group.id}`)} />}
+        renderItem={({ item }) => <ChatRowView row={item} onPress={() => router.push(item.kind === 'bot' ? botPath(item.bot) : `/groups/${item.group.id}`)} />}
       />
     </View>
   )
