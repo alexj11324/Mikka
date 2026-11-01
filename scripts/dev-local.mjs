@@ -6,7 +6,7 @@
 // or RESEND_API_KEY, Mikka 默认, Decisions and mail use the local substitutes.
 import { spawn, execFileSync } from 'node:child_process'
 import { generateKeyPairSync, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import pg from 'pg'
@@ -40,6 +40,21 @@ if (daemonUser) execFileSync('chown', ['-R', daemonUser, dirname(dirname(scenari
 log(`fake GitHub on ${MVP_SERVICES}; repository ${REPOSITORY} → ${scenario.barePath} (branch ${scenario.baseBranch})`)
 
 const cronSecret = process.env.CRON_SECRET || LOCAL_CRON_SECRET
+// One value for next dev and the model key seeder: what one seals, the other opens.
+const secretsKey = process.env.WORKSPACE_SECRETS_KEY || localSecretsKey(join(root, '.cache/dev-local'))
+// The workspace model key (DeepSeek preset): from the environment, else by name from Infisical
+// (MIKKA_DEV_INFISICAL_PROJECT). Held in memory for the seeder only; never written or printed.
+const deepseekKey = process.env.DEEPSEEK_API_KEY || await infisicalSecret('DEEPSEEK_API_KEY')
+log(deepseekKey ? 'model key DEEPSEEK_API_KEY: found' : 'model key: 缺少 DEEPSEEK_API_KEY，跳过模型 key 注入')
+async function infisicalSecret(name) {
+  const project = process.env.MIKKA_DEV_INFISICAL_PROJECT
+  if (!project) return undefined
+  const query = new URLSearchParams({ projectId: project, environment: process.env.MIKKA_DEV_INFISICAL_ENV ?? 'dev', secretPath: process.env.MIKKA_DEV_INFISICAL_PATH ?? '/vercel', viewSecretValue: 'true' })
+  const headers = process.env.INFISICAL_TOKEN ? { authorization: `Bearer ${process.env.INFISICAL_TOKEN}` } : {}
+  const response = await fetch(`https://app.infisical.com/api/v4/secrets/${name}?${query}`, { headers, signal: AbortSignal.timeout(15_000) }).catch(() => null)
+  if (!response?.ok) { log(`Infisical ${name}: ${response ? `HTTP ${response.status}` : 'unreachable'}`); return undefined }
+  return (await response.json()).secret?.secretValue || undefined
+}
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const preload = pathToFileURL(join(root, 'scripts/dev-local/preload.mjs')).href
 children.push(spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev', '--port', String(port)], {
@@ -50,7 +65,7 @@ children.push(spawn(process.execPath, ['node_modules/next/dist/bin/next', 'dev',
     RESEND_API_KEY: process.env.RESEND_API_KEY || LOCAL_RESEND_KEY,
     CRON_SECRET: cronSecret,
     // Saving a workspace's own model key needs it (lib/secrets/crypto.ts).
-    WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY || localSecretsKey(join(root, '.cache/dev-local')),
+    WORKSPACE_SECRETS_KEY: secretsKey,
     GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString() },
 }))
 
@@ -78,6 +93,10 @@ for (let i = 0; i < 120; i++) {
   if (await fetch(`${server}/sign-in`).then(r => r.ok, () => false)) break
   await new Promise(r => setTimeout(r, 1000))
 }
+// Every local account gets the model key through lib/model-api-keys.ts (scripts/dev-local/seed-model-keys.ts).
+if (deepseekKey) children.push(spawn(process.execPath, ['--import', './tests/support/server-only.mjs', '--import', 'tsx', 'scripts/dev-local/seed-model-keys-loop.ts'], {
+  cwd: root, stdio: 'inherit', env: { ...process.env, WORKSPACE_SECRETS_KEY: secretsKey, DEEPSEEK_API_KEY: deepseekKey },
+}))
 // The production minute Worker's schedule (cloudflare/suggestions-cron) against this server.
 const stopCron = startLocalCron({ appUrl: server, secret: cronSecret, log: line => console.log(`dev:local ${line}`) })
 const dataDir = resolve(process.env.MIKKA_DEV_DAEMON_DIR ?? join(root, '.cache/dev-local/daemon'))
@@ -85,7 +104,8 @@ const dataDir = resolve(process.env.MIKKA_DEV_DAEMON_DIR ?? join(root, '.cache/d
 // origin. A config file, because a run's GitHub delivery sets its own GIT_CONFIG_COUNT entries.
 const gitConfig = join(dirname(dataDir), 'dev-local.gitconfig')
 mkdirSync(dirname(gitConfig), { recursive: true })
-writeFileSync(gitConfig, `[url "${pathToFileURL(scenario.barePath).href}"]\n\tinsteadOf = ${REPOSITORY}\n[protocol "file"]\n\tallow = always\n`, { mode: 0o644 })
+writeFileSync(gitConfig, `[url "${pathToFileURL(scenario.barePath).href}"]\n\tinsteadOf = ${REPOSITORY}\n[protocol "file"]\n\tallow = always\n`)
+chmodSync(gitConfig, 0o644) // readable by MIKKA_DEV_DAEMON_USER whatever the umask
 const tsx = join(root, 'packages/daemon/node_modules/.bin/tsx')
 const daemon = args => spawn(daemonUser ? 'setpriv' : tsx,
   daemonUser ? ['--reuid', daemonUser, '--regid', daemonUser, '--init-groups', tsx, ...args] : args, {
