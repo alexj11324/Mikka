@@ -32,6 +32,7 @@ let pool, accounts, relay, actor, botId, sourceDevice, sourceSandboxId, runId, t
 let ownsPool = false, ownsAccounts = false
 const observed = [], metric = { id, scope: 'new remote repository task on a ready E2B template, isolated local API/DB, real DeepSeek, run-bound MCP' }
 const connection = { apiKey: process.env.E2B_API_KEY, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
+const quote = value => `'${value.replaceAll("'", "'\\''")}'`
 async function wait(check, limit = 120_000) {
   const until = performance.now() + limit
   while (performance.now() < until) { abort.signal.throwIfAborted(); const result = await check(); if (result) return result; await delay(250, undefined, { signal: abort.signal }) }
@@ -101,7 +102,9 @@ async function main() {
   const repository = `${relayOrigin}/mikka/v1/git/core-loop.git`
   metric.fixtureBaseBranch = baseBranch
   metric.fixtureBaseCommit = execFileSync('git', ['--git-dir', barePath, 'rev-parse', `refs/heads/${baseBranch}`], { encoding: 'utf8' }).trim()
-  for (const current of sourceRuntimes) await pool.query('UPDATE device_repos SET "repoPath"=$2,"remoteUrl"=$3,"baseBranch"=$4 WHERE id=$1 AND "userId"=$5', [current.repoId, remoteKey(repository), repository, baseBranch, actor.userId])
+  const fixtureReadme = execFileSync('git', ['--git-dir', barePath, 'show', `${metric.fixtureBaseCommit}:README.md`], { encoding: 'utf8' })
+  const verifyCommand = `node -e ${quote(`const fs = require('node:fs'), assert = require('node:assert/strict'); assert.equal(fs.readFileSync('cloud-acceptance.txt', 'utf8').trim(), ${JSON.stringify(marker)}); assert.equal(fs.readFileSync('README.md', 'utf8'), ${JSON.stringify(fixtureReadme)});`)}`
+  for (const current of sourceRuntimes) await pool.query('UPDATE device_repos SET "repoPath"=$2,"remoteUrl"=$3,"baseBranch"=$4,"verifyCommand"=$6 WHERE id=$1 AND "userId"=$5', [current.repoId, remoteKey(repository), repository, baseBranch, actor.userId, verifyCommand])
   await source.commands.run('install -d -m 700 /run/mikka-relay', { user: 'root' })
   await source.files.write('/run/mikka-relay/server.py', await readFile(new URL('./local-api-relay.py', import.meta.url), 'utf8'), { user: 'root' })
   await source.files.write('/run/mikka-relay/config.json', JSON.stringify({ origin: relayOrigin, deviceToken: initialDevice, controlToken, repoToken, bindDeviceOnce: true }), { user: 'root' })
@@ -187,18 +190,20 @@ async function main() {
   }, 600_000)
   assert.equal(done.status, 'succeeded', `Cloud task failed (${done.stopReason ?? 'unknown'})`)
   assert.equal(done.stopReason, 'submitted')
+  assert.equal(done.report?.verify.status, 'passed', 'The cloud daemon must verify the generated file and unchanged README')
+  assert.equal(done.report.verify.command, verifyCommand)
   assert.equal(metric.policyIssuer, `${relayOrigin}/mikka`)
   const taskMachine = (await pool.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2', [runId, actor.userId])).rows[0]
   assert.ok(taskMachine?.sandboxId && sandboxIds.has(taskMachine.sandboxId))
   const taskSandbox = await Sandbox.connect(taskMachine.sandboxId, connection)
   const content = await taskSandbox.files.read(`/home/mikka-runner/.mikka/worker/worktrees/${runId}/cloud-acceptance.txt`, { user: 'mikka-runner' })
   assert.ok(content.includes(marker), 'Real E2B worktree lacks the model-written marker')
-  const quote = value => `'${value.replaceAll("'", "'\\''")}'`
   const base = (await taskSandbox.commands.run(`git -C /home/mikka-runner/.mikka/worker/worktrees/${runId} merge-base HEAD ${quote(`origin/${baseBranch}`)}`, { user: 'mikka-runner', timeoutMs: 10_000 })).stdout.trim()
   assert.equal(base, metric.fixtureBaseCommit, 'The task must branch from the repository-declared default base commit')
   metric.runId = runId
   metric.status = done.status
   metric.actualDeepSeek = true
+  metric.verificationPassed = true
   metric.latencyIncludes = ['real model inference', 'restricted test reverse relay and fixture transport setup', 'application and worker startup']
   metric.normalAccountLease = true
   metric.productionDbWrites = false
