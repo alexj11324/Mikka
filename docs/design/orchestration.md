@@ -18,13 +18,13 @@
 | Word | What it is |
 | --- | --- |
 | **Account** | A person. Owns their sign-in, devices, app connections, cards, credits they verified, model credentials and E2B key. |
-| **Personal workspace** | One per account, with exactly one member. Every account has one. |
-| **Team workspace** | Several members, with the team's policies, secrets, credits and payment method. It has no E2B key of its own. |
+| **Personal workspace** | One per account, with exactly one member. Every account has one. Only that person's bots, chats, tasks and threads; personal billing; no team settings ([2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md)). |
+| **Team workspace** | Several members, with the team's policies, secrets, credits and payment method. It has no E2B key of its own. Nothing moves between it and a personal workspace; a personal workspace is never upgraded into one. |
 | **Bot** | Lives in one workspace and has one owner. Runs on Mikka's own AI SDK on Vercel; when it has work to do, it sends a thread through the daemon to Claude Code or Codex (R-05). |
 | **Thread** | The work a bot dispatched (`agent_runs`). Each turn of it is a **run**. |
 | **Agent** | The coding worker that runs a thread: Claude Code or Codex. Code may say `harness`; the UI says Agent (R-43). |
 | **Model credential** | A Claude or ChatGPT/Codex subscription login, an API key, or a custom provider. Bound to the account and managed on the page 「API 与订阅」. |
-| **Share** | A member's opt-in to make one of their credentials usable in one team workspace. Off by default. A share serves only the owner's own bots and runs unless the owner ticks 「分享给团队成员」. |
+| **Share** | 「分享给团队成员」: a member's opt-in, in one team workspace, to let other members' bots use one of their credentials. Off by default. The owner's own bots need no share ([2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). |
 | **Mikka 默认** | The hosted model, paid from the workspace's credits. It is a **model**, never a machine. |
 | **Machine (电脑)** | Where an Agent runs: **Mikka Cloud** (a sandbox on the run owner's own E2B key) or a **device** (a personal computer running the desktop app, or a server running the daemon). Both are **runners** with one contract (§3). |
 | **Mikka Cloud** | The cloud machine. It is a **machine**, never a model. Mikka hosts no sandbox of its own. |

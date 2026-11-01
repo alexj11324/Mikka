@@ -25,6 +25,16 @@ the 16px mark of the Agent running it (R-50, R-78). A bot does no coding
 work itself: an Agent (Claude Code, Codex) runs every thread. A cloud thread runs on its own thread machine,
 not on its bot's machine (`cloud-computer-backend.md` § 2).
 
+## Workspaces
+
+| Word | 中文 | What it is |
+| --- | --- | --- |
+| **Account** | 账号 | The person: 账户, security, 偏好, 通知, 记忆, 登录与密钥, 设备 and 「API 与订阅」. The same in every workspace. |
+| **Personal workspace** | 个人工作区 | One per person. Only that person's bots, chats, tasks and threads; personal 计费 and 用量; no team settings. |
+| **Team workspace** | 团队工作区 | Members, 团队权限, 密钥与环境, 审计日志, team 用量 and 计费. Nothing moves between it and a personal workspace. |
+
+Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md).
+
 ## Rules for designs
 
 - The left column is the **bot list**: bots and group chats only. The right
