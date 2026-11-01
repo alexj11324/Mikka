@@ -342,7 +342,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot that dispatched it; a task as its own page in the centre, as Linear; an
   Artifact in its window over the page (R-56); PRs and web pages in a new
   tab. Projects and teams live under 看板, with no rail item of their own. On
-  a phone the right column is a page pushed over the chat. Source: Alex,
+  a phone the right column is a page pushed over the chat: the chat's pill in
+  the header opens 概览 (a group's 详情), and an open thread covers the screen
+  with its close in the header; every page but a task keeps the header's list
+  button, whose sheet is the bot list with the rail's items below it (a task's
+  own header carries the same button). Source: Alex,
   2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)).
 
 ## Settings

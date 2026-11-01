@@ -101,7 +101,7 @@ export function GroupChatView({ group, userId, people }: {
     ? id === userId ? t('you') : member(type, id)?.name || people.get(id) || t('member')
     : member(type, id)?.name ?? (type === 'agent' ? agents.find(agent => agent.id === id)?.name : undefined) ?? t('bot')
 
-  return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className="relative flex size-full min-h-0 flex-col">
+  return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className="relative flex min-h-0 w-full flex-1 flex-col">
     <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
     <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">

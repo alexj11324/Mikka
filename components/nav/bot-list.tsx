@@ -50,6 +50,8 @@ type ListProps = {
   onSignOut: () => void
   signingOut: boolean
   onBeforeChange?: (action: () => Promise<void>) => void
+  /** Only on a phone, where the list's sheet is the way off a full page (the board, 建议…); desktop keeps those pages to the rail (MIK-45). */
+  phoneOnly?: boolean
 }
 
 // Linear's sidebar range; the width is remembered on this device.
@@ -113,7 +115,12 @@ function Row({ name, preview, avatar, status, current, unread, onClick, label }:
  * and the latest line of its chat, most recent first. Threads (the work a bot does) live in the
  * right column, never here. It collapses off canvas; the rail stays.
  */
-export function BotList({ bots, workspaceId, threads, issues, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: ListProps) {
+export function BotList({ phoneOnly = false, ...props }: ListProps) {
+  const { isMobile } = useSidebar()
+  return phoneOnly && !isMobile ? null : <BotListBody {...props} />
+}
+
+function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: Omit<ListProps, 'phoneOnly'>) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
   const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat())
@@ -189,9 +196,9 @@ export function BotList({ bots, workspaceId, threads, issues, active, onOpen, on
         })}
       </SidebarMenu></SidebarGroup>
     </SidebarContent>
-    {/* Phones have no rail; its destinations and the account menu move here. */}
+    {/* Phones have no rail; its destinations (主页 back to the last chat from a full page) and the account menu move here. */}
     {isMobile && <SidebarFooter>
-      <SidebarMenu>{RAIL_ITEMS.filter(item => item.id !== 'chats').map(item => <SidebarMenuItem key={item.id}><SidebarMenuButton isActive={rail === item.id} onClick={() => { onRail(item.id); setOpenMobile(false) }}><item.icon /><span>{i18nText(item.label)}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
+      <SidebarMenu>{RAIL_ITEMS.map(item => <SidebarMenuItem key={item.id}><SidebarMenuButton isActive={rail === item.id} onClick={() => { onRail(item.id); setOpenMobile(false) }}><item.icon /><span>{i18nText(item.label)}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
       <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} onBeforeChange={onBeforeChange} /></SidebarMenuItem></SidebarMenu>
     </SidebarFooter>}
   </>

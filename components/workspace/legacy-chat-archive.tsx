@@ -39,7 +39,7 @@ export function LegacyChatArchive({ userId, initialHistory, request, onActive, o
   useEffect(() => { onSessions?.(latest.data?.sessions ?? []) }, [latest.data?.sessions, onSessions])
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: true, continueFromAnswer: async () => false }}>
-    <section aria-label={t('title')} data-testid="legacy-chat-archive" className="mikka-agent relative flex size-full min-h-0 flex-col">
+    <section aria-label={t('title')} data-testid="legacy-chat-archive" className="mikka-agent relative flex min-h-0 w-full flex-1 flex-col">
       <ConversationPill name={history?.sessions.find(session => session.id === selectedId)?.title ?? selectedTitle(history, selectedId) ?? t('title')} />
       <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
       <p role="status" className="px-4 py-2 text-sm text-muted-foreground">{t('readOnly')}</p>
