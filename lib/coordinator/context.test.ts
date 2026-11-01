@@ -152,6 +152,8 @@ test('finished run publication names the verified PR or missing setup in the exi
   assert.match(prompt, /Verified GitHub pull request: https:\/\/github.com\/owner\/repo\/pull\/7 \(draft\)/)
   assert.match(prompt, /existing thread card updates in place/)
   assert.match(prompt, /Verification was not run/)
+  // The fact goes to the Coordinator; whether it needs the person's review is the model's judgment, not a fixed instruction.
+  assert.doesNotMatch(prompt, /needs human review/)
   assert.match(prompt, /Never say the changes passed verification/)
   const blocked = eventPrompt({ ...event, payload: { ...event.payload, publication: { errorCode: 'github_permission_required' } } })
   assert.match(blocked, /pull_requests: write/)

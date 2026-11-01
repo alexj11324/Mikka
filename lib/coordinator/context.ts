@@ -123,7 +123,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         event.issueId ? `Issue: ${event.issueId}.` : null,
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
         ...publicationPrompt(payload.publication),
-        payload.verification === 'not_run' ? 'Verification was not run. Tell the person that no verification command is configured and the work needs human review. Mention a draft PR only when the server-confirmed publication includes one. Never say the changes passed verification.' : null,
+        payload.verification === 'not_run' ? 'Verification was not run: no verification command is configured. Never say the changes passed verification. Mention a draft PR only when the server-confirmed publication includes one.' : null,
         payload.noMachine ? `Its machine went offline and no other machine can continue it. Draw this card as one BeQuestions choice question (title and options as given, each option keeps its value and action), add no explanation, and dispatch the issue again after the person answers: ${JSON.stringify(payload.noMachine)}` : null,
         note,
       ].filter(Boolean).join('\n')
