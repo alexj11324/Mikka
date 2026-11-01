@@ -4,6 +4,7 @@ import { act, type ComponentProps } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import type { ComputerState } from '@/lib/computer/types'
+import { ComputerRequestError } from '@/lib/computer/client'
 
 let state: ComputerState = { machine: 'sleeping', control: 'idle' }
 let requests = 0
@@ -16,7 +17,7 @@ mock.module(new URL('../hooks/use-computer.ts', import.meta.url).href, { namedEx
   useComputer: () => ({ data: state, mutate: async () => state }),
   useViewerGrant: () => ({}),
 } })
-mock.module(new URL('../lib/computer/client.ts', import.meta.url).href, { namedExports: { computerApi: {
+mock.module(new URL('../lib/computer/client.ts', import.meta.url).href, { namedExports: { ComputerRequestError, computerApi: {
   wake: () => { requests++; return new Promise<null>((resolve, reject) => { finishWake = resolve; failWake = reject }) },
 } } })
 mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ size: _size, variant: _variant, ...props }: ComponentProps<'button'> & { size?: string; variant?: string }) => <button {...props} /> } })
