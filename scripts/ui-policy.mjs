@@ -266,11 +266,13 @@ export function auditSource(file, text, policy) {
         const options = node.arguments[0]
         const fontOptions = options && ts.isObjectLiteralExpression(options) ? options : null
         const option = key => fontOptions?.properties.find(prop => ts.isPropertyAssignment(prop) && prop.name.getText(source).replaceAll(/['"]/g, '') === key)?.initializer
-        const sources = resolve(option('src')).strings
+        // src is one path, or an array of { path, style } entries (e.g. a roman and an italic file).
+        const src = option('src')
+        const entries = src && ts.isArrayLiteralExpression(src) ? src.elements : [src]
+        const sources = entries.flatMap(entry => resolve(entry && ts.isObjectLiteralExpression(entry) ? entry.properties.find(prop => ts.isPropertyAssignment(prop) && prop.name.getText(source).replaceAll(/['"]/g, '') === 'path')?.initializer : entry).strings)
+        const approved = approvedFonts => sources.length > 0 && sources.every(fontPath => approvedFonts.some(font => localFontPath(file, fontPath) === font.src && variable.includes(font.variable)))
         const variable = resolve(option('variable')).strings
-        const approvedFonts = policy.typography.localFonts ?? []
-        const approved = approvedFonts.some(font => sources.some(src => localFontPath(file, src) === font.src) && variable.includes(font.variable))
-        if (!approved) add(node, 'typography/font-family', '本地字体必须先登记到 ui-policy.json 的 typography.localFonts，并绑定批准的 CSS 变量；不允许临时引入。')
+        if (!approved(policy.typography.localFonts ?? [])) add(node, 'typography/font-family', '本地字体必须先登记到 ui-policy.json 的 typography.localFonts，并绑定批准的 CSS 变量；不允许临时引入。')
       }
     }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
@@ -411,7 +413,7 @@ export function auditCss(file, text, policy) {
     const approvedToken = policy.typography.cssTokens?.[node.prop] === node.value.trim()
     if (!approvedToken && /^(?:font(?:-.+)?|line-height|letter-spacing|--text-.+|--leading-.+|--tracking-.+|--font-weight-.+)$/.test(node.prop)) add(node, 'typography/no-css-values', '不允许 CSS 自定义排版值或重定义 Tailwind 字体档位。')
     if (node.prop.startsWith('--font-')) {
-      const permitted = { '--font-sans': 'var(--font-geist), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif', '--font-heading': 'var(--font-sans)' }
+      const permitted = { '--font-sans': 'var(--font-inter), "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif', '--font-mono': 'var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', '--font-heading': 'var(--font-sans)' }
       if (node.prop in permitted && permitted[node.prop] !== node.value) add(node, 'typography/font-token', `${node.prop} 不在批准的字体 token 映射中。`)
     }
     if (!node.prop.startsWith('--') && !/^(?::root|\.dark|\*|body|html)$/.test(node.parent.selector ?? '')) add(node, 'style/no-custom-css', '业务样式不通过 CSS 选择器绕过组件预设。')

@@ -65,7 +65,7 @@ export const runViewColumns = {
  * `note` is extra direction for this run only, after the issue.
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
-type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string }
+type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string; readOnly?: boolean }
 export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string) {
   return queueAdmittedRun(userId, input, botId, execution, requestEventId, source, approvedRepositoryKey)
 }
@@ -114,7 +114,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string,
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
   const executor = internal?.executor ?? db
-  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional() }).safeParse(input)
+  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional(), readOnly: z.boolean().optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   let requestedRepositoryKey: string
   try { requestedRepositoryKey = normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }).key } catch { throw new ActionFailureError('repoPathInvalid') }
@@ -142,7 +142,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
     mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
     : null
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
     deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)

@@ -3,6 +3,7 @@
 - Date: 2026-11-01
 - Source: Alex, relayed by the coordinating session after the demo-data review: the task page and the Artifact reader had a heavy ~30px title over ~13px body (「标题和正文大小差太多」); follow Linear and Notion
 - Rule: R-32 (adds the document steps)
+- Superseded by: `2026-11-01-1204-type-follows-comma` (chat 13/21, meta 12/18)
 - Replaces: the task title at 30px (`md:text-3xl`), document bodies at 13–14px with 28px leading, Artifact headings smaller than the title by one step only
 
 Documents people read use four steps: 24/32 SemiBold title, 18/28 SemiBold

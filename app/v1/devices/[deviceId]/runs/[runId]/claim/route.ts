@@ -3,6 +3,7 @@ import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
 import { and, eq, isNull } from 'drizzle-orm'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
+import { applyApprovalMode } from '@mikka/protocol/agent-policy'
 import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
@@ -203,11 +204,14 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim)
     if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
   } else {
-    const { prepareRunPublication } = await import('@/lib/run-publications')
-    try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
-    catch (error) {
-      if (!(error instanceof PublicationError)) throw error
-      return rejectPublication(error)
+    // A read-only run (an investigation) publishes nothing: no push branch, no push grant.
+    if (!run.agentDefinition?.readOnly) {
+      const { prepareRunPublication } = await import('@/lib/run-publications')
+      try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
+      catch (error) {
+        if (!(error instanceof PublicationError)) throw error
+        return rejectPublication(error)
+      }
     }
     const refused = await openRunKey()
     if (refused) return refused
@@ -260,11 +264,13 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   // or read-only ceiling remains authoritative for every execution tool.
   // Without a publication no repository approval was resolved, so a CLI
   // `git_push: allow` cannot reach the daemon as a push grant.
-  const executionPolicy = publication && !cliPolicy.policy.readOnly && cliPolicy.policy.permissions.git_push !== 'deny'
+  const resolvedPolicy = publication && !cliPolicy.policy.readOnly && cliPolicy.policy.permissions.git_push !== 'deny'
     ? { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: publication.policy.permissions.git_push } }
     : !publication && cliPolicy.policy.permissions.git_push === 'allow'
       ? { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: 'ask' as const } }
       : cliPolicy.policy
+  // A read-only run (dispatched without push authority) cannot change, commit or push anything.
+  const executionPolicy = run.agentDefinition?.readOnly ? applyApprovalMode(resolvedPolicy, 'read_only') : resolvedPolicy
   const computerPermission = computer?.permission ?? localComputer?.permission
   // Computer authority comes from its persisted claim; retain every trusted
   // CLI restriction and its revision when attaching that independent grant.
