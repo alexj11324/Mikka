@@ -32,6 +32,10 @@ export function runSummaryText(run: { report: unknown; error: string | null }): 
   return run.error?.split('\n').find(line => line.trim())?.trim() ?? null
 }
 
+/** One start-up stage the daemon reported (`data-run-stage`): which, how long, whether it worked. */
+export type ThreadStage = { stage: 'repository' | 'worktree' | 'agent_start'; ms: number; ok: boolean }
+const THREAD_STAGES = new Set<ThreadStage['stage']>(['repository', 'worktree', 'agent_start'])
+
 /** One tool call in a folded "N steps" line: its name, the one input that says what it did, and whether it failed. */
 export type ThreadStep = { id: string; name: string; detail: string | null; failed: boolean }
 
@@ -53,6 +57,7 @@ export type ThreadItem =
   | { kind: 'agent'; id: string; text: string; at: number }
   | { kind: 'steps'; id: string; count: number; steps: ThreadStep[]; at: number }
   | { kind: 'error'; id: string; text: string; at: number }
+  | { kind: 'stages'; id: string; stages: ThreadStage[]; at: number }
   | { kind: 'computer'; id: string; botId: string; runId: string; task: string; at: number }
   | { kind: 'person'; id: string; text: string; author: string; image?: string | null; mine: boolean; at: number }
 
@@ -88,6 +93,13 @@ export function threadItems(
       const data = chunk.data as Record<string, unknown>
       if (data.runId === expectedRunId && typeof data.botId === 'string' && typeof data.task === 'string' && data.task.length <= 200 && !items.some(item => item.kind === 'computer' && item.runId === expectedRunId))
         items.push({ kind: 'computer', id: `computer:${expectedRunId}`, botId: data.botId, runId: expectedRunId, task: data.task, at: time })
+    } else if (chunk.type === 'data-run-stage' && chunk.data && typeof chunk.data === 'object') {
+      const data = chunk.data as Record<string, unknown>
+      if (THREAD_STAGES.has(data.stage as ThreadStage['stage']) && typeof data.ms === 'number' && typeof data.ok === 'boolean') {
+        const stage: ThreadStage = { stage: data.stage as ThreadStage['stage'], ms: data.ms, ok: data.ok }
+        if (last?.kind === 'stages') last.stages.push(stage)
+        else items.push({ kind: 'stages', id: `stages:${index}`, stages: [stage], at: time })
+      }
     } else if (chunk.type === 'error' && typeof chunk.errorText === 'string') {
       items.push({ kind: 'error', id: `error:${index}`, text: chunk.errorText, at: time })
     }

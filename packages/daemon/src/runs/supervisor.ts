@@ -76,7 +76,7 @@ import type {
   StartOptions,
   ExitEvent,
 } from "../adapters/types"
-import { runStateChunk, type RunChunk } from "../chunks"
+import { runStageChunk, runStateChunk, type RunChunk, type RunStage } from "../chunks"
 import { buildChildEnv } from "../env"
 import { worktreeGitWritePaths } from "../agents/publish"
 import {
@@ -850,6 +850,24 @@ export class RunSupervisor {
     })
   }
 
+  /**
+   * Runs one start-up stage and records it as a stored `data-run-stage`
+   * chunk with its duration, ok or not, so a run that fails while starting
+   * shows which stage it reached. The stage's own result or error passes
+   * through unchanged.
+   */
+  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>): Promise<T> {
+    const started = performance.now()
+    try {
+      const value = await work()
+      this.emit(runId, runStageChunk(stage, performance.now() - started, true))
+      return value
+    } catch (error) {
+      this.emit(runId, runStageChunk(stage, performance.now() - started, false))
+      throw error
+    }
+  }
+
   private setState(
     runId: string,
     state: RunState,
@@ -1154,7 +1172,7 @@ export class RunSupervisor {
       entry = this.deps.journal.get(runId) as JournalEntry
     }
 
-    await this.deps.prepareRepository(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal]))
+    await this.stage(runId, "repository", () => this.deps.prepareRepository(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal])))
     if (this.stopping || run.cancelRequested) {
       if (!this.stopping) this.finish(runId, run.forcedStop ?? "cancelled")
       return
@@ -1188,11 +1206,11 @@ export class RunSupervisor {
     const worktree =
       entry.worktree ??
       continued ??
-      (await this.deps.worktrees.create(
+      (await this.stage(runId, "worktree", async () => this.deps.worktrees.create(
         runId,
         repo.path,
         await this.startPoint(runId, repo, assignment),
-      ))
+      )))
     if (!entry.worktree) {
       // A continued worktree was bootstrapped by the run that made it.
       // The commit checkpoints diff against: a continued worktree keeps the
@@ -1336,7 +1354,7 @@ export class RunSupervisor {
     let session: AgentSession
     if (assignment.subscriptionBinding && assignment.modelCredential) throw new Error("A run has one model credential")
     try {
-      session = assignment.modelCredential && this.deps.startCredential
+      session = await this.stage(runId, "agent_start", async () => assignment.modelCredential && this.deps.startCredential
       ? await this.deps.startCredential(assignment,{...options,prompt:assignment.prompt})
       : assignment.subscriptionBinding
       ? this.deps.startSubscription
@@ -1355,7 +1373,7 @@ export class RunSupervisor {
             continueSession,
             requireSessionResume: assignment.requireSessionResume,
           })
-        })()
+        })())
     } catch (error) {
       if (assignment.skillReceipt) this.deps.journal.update(runId, { skillMount: undefined, execution: undefined, runtime: undefined })
       throw error
