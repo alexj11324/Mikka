@@ -160,7 +160,7 @@ test('a skill: a failed publication shows 发布失败，批准仍保留 with �
 const delivery = { candidateSha: 'a3f9c2e'.padEnd(40, 'b'), pullRequest: { url: 'https://github.com/alexj11324/Mikka/pull/418', state: 'open', title: 'perf(home): 首屏图片懒加载与字体子集' }, repository: 'alexj11324/Mikka', previewUrl: null, previewDatabaseBranch: 'preview/mik-48', machine: { name: 'Alex 的 MacBook', kind: 'device' } }
 
 test('the candidate card shows the PR title and the preview database branch (#541)', async () => {
-  list = { data: { checks: [], delivery }, isLoading: false, mutate: async () => undefined }
+  detail = { checks: [], delivery }
   evidence = { binding: {}, manifest: { candidate: { sha: delivery.candidateSha, repository: 'alexj11324/Mikka', environment: 'preview', scope: '' }, artifacts: [] } }
   await pane()
   const card = document.querySelector('section[aria-label="候选版本"]')
@@ -170,7 +170,7 @@ test('the candidate card shows the PR title and the preview database branch (#54
 })
 
 test('without the #541 fields the card falls back to the repository and the bare environment', async () => {
-  list = { data: { checks: [], delivery: { ...delivery, pullRequest: { url: delivery.pullRequest.url, state: 'open' }, previewDatabaseBranch: undefined, machine: undefined } }, isLoading: false, mutate: async () => undefined }
+  detail = { checks: [], delivery: { ...delivery, pullRequest: { url: delivery.pullRequest.url, state: 'open' }, previewDatabaseBranch: undefined, machine: undefined } }
   evidence = { binding: {}, manifest: { candidate: { sha: delivery.candidateSha, repository: 'alexj11324/Mikka', environment: 'preview', scope: '' }, artifacts: [] } }
   await pane()
   const card = document.querySelector('section[aria-label="候选版本"]')
@@ -179,10 +179,10 @@ test('without the #541 fields the card falls back to the repository and the bare
 })
 
 test('the header names the machine that produced the candidate, and nothing when unknown', async () => {
-  list = { data: { checks: [], delivery }, isLoading: false, mutate: async () => undefined }
+  detail = { checks: [], delivery }
   await act(async () => root.render(<CandidateMachine taskId="t1" />))
   assert.equal(container.textContent, 'Alex 的 MacBook')
-  list = { data: { checks: [], delivery: { ...delivery, machine: null } }, isLoading: false, mutate: async () => undefined }
+  detail = { checks: [], delivery: { ...delivery, machine: null } }
   await act(async () => root.render(<CandidateMachine taskId="t1" />))
   assert.equal(container.textContent, '')
 })
