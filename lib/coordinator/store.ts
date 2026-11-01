@@ -253,16 +253,18 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
  * Appends the turn's new messages and renews the lease. `warning` says why the
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string): Promise<number> {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false): Promise<number> {
   await assertCredentialSafeChat(userId, messages)
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE`)
     const first = await nextPosition(tx, userId, botId)
     if (messages.length) {
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, ...plain } = message as unknown as Record<string, unknown>
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, ...plain } = message as unknown as Record<string, unknown>
+        // 停止: the turn's last message carries the mark; the chat shows 已停止 under the reply.
+        const stop = stopped && index === messages.length - 1 && message.role === 'assistant'
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
-          message: { ...plain, ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}) } }
+          message: { ...plain, ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}), ...(stop ? { mikkaStopped: true } : {}) } }
       }))
     }
     const now = new Date()
@@ -309,7 +311,7 @@ export async function loadConversation(userId: string, botId: string): Promise<{
   // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
   const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
   return { summary: session?.summary ?? null, memory, messages: rows.map(row => {
-    const { mikkaStreamId: _streamId, ...message } = row.message
+    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, ...message } = row.message
     return { position: row.position, message: message as unknown as ModelMessage }
   }) }
 }

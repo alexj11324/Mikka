@@ -35,6 +35,8 @@ export interface ChatItem {
   pending?: true
   /** Photos the person sent with it, loaded from /api/mobile/chat/image. */
   images?: number
+  /** The person stopped this reply (停止); it keeps what it had said. */
+  stopped?: true
 }
 
 export interface Chat {

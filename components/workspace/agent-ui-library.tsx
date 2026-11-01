@@ -62,7 +62,7 @@ const renderers = {
   BeQuestions: AgentQuestions,
   BeTodoList: AgentTasks,
   AgentIcon: AgentStatusIcon,
-  InlineText: ({ props, renderNode }) => <AgentTextBubble><p className="min-w-0 break-words text-sm leading-7">{renderNode(props.parts)}</p></AgentTextBubble>,
+  InlineText: ({ props, renderNode }) => <AgentTextBubble><p className="min-w-0 break-words text-sm leading-5.25">{renderNode(props.parts)}</p></AgentTextBubble>,
   TaskChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="issue" />,
   RunChip: ({ props }) => <CitationChip id={props.id.toLowerCase()} kind="run" />,
   SourceChip: ({ props }) => <WebCitation url={props.url} label={props.label ?? null} />,

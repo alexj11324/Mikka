@@ -24,8 +24,9 @@ speed, on the UI thread, with a light haptic.
 
 Attachments: up to two photos per message (JPEG, scaled to fit the server's
 1 MB per photo), and text files, which travel in the message as their
-contents, as on the web. A sent photo shows above the person's bubble. PDFs
-and other files are refused until the server can read them.
+contents, as on the web. A sent photo shows above the person's bubble.
+现状（非决定）：PDFs and other files are refused; the server cannot read them
+yet.
 
 The `ios-design` skill is vendored in `.claude/skills/ios-design/` and is the
 checklist for iOS work. These native modules need a new TestFlight build.

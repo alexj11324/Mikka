@@ -478,9 +478,9 @@ test('run result publication commits one owner-scoped result through retries and
       await hostedUsage.verify(workspace.id,'cus_synthetic_admission',`card_admission_${randomUUID()}`)
       const { triageInbox } = await import('../lib/coordinator/wake')
       const { DECISION_MODEL, DECISIONS_URL } = await import('../lib/coordinator/decision')
-      const originalFetch=globalThis.fetch,originalDecisionKey=process.env.DECISION_GATEWAY_API_KEY
+      const originalFetch=globalThis.fetch,originalDecisionKey=process.env.AI_GATEWAY_API_KEY
       let decisions=0
-      process.env.DECISION_GATEWAY_API_KEY='synthetic-publication-triage'
+      process.env.AI_GATEWAY_API_KEY='synthetic-publication-triage'
       globalThis.fetch=(async(url,init)=>{
         assert.equal(String(url),DECISIONS_URL,'only the declared synthetic decision provider may be called')
         const request=JSON.parse(String(init?.body))
@@ -490,7 +490,7 @@ test('run result publication commits one owner-scoped result through retries and
         return Response.json({model:DECISION_MODEL,provider_metadata:{gateway:{generationId:`synthetic-admission-${decisions}`,cost:'0.001'}},answers:[{type:'choice',name:'tier',choice:'result'}]})
       }) as typeof fetch
       try {await triageInbox(f.userId,coordinator);assert.equal(decisions,1)}
-      finally {globalThis.fetch=originalFetch;if(originalDecisionKey===undefined)delete process.env.DECISION_GATEWAY_API_KEY;else process.env.DECISION_GATEWAY_API_KEY=originalDecisionKey}
+      finally {globalThis.fetch=originalFetch;if(originalDecisionKey===undefined)delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=originalDecisionKey}
       const resumed = await takeInbox(f.userId, 'retained-admission-suite', coordinator)
       assert.equal(resumed.taskEventId, eventId, 'approval resumes the original host request, without asking the model for its event ID')
       assert.equal(resumed.approvedRepositoryKey, f.remoteKey)

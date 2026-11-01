@@ -46,7 +46,7 @@ import { CursorAdapter } from "./adapters/cursor"
 import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
-import { agentPublishedReceipt, githubReceiptEnvironment } from './agents/github-runtime'
+import { agentPublishedReceipt, githubReceiptEnvironment, withRunGitCredentials } from './agents/github-runtime'
 import { runPaths } from "./agents/run-context"
 import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
@@ -470,7 +470,8 @@ export class Daemon {
         : undefined,
       repository: assignment => this.repository(assignment),
       prepareRepository: async (assignment, signal) => {
-        if (assignment.remoteUrl) await this.repositories.prepare(assignment.remoteUrl, signal)
+        if (assignment.remoteUrl) await withRunGitCredentials(assignment, runPaths(this.paths.adapterState, assignment.runId).privateDir,
+          env => this.repositories.prepare(assignment.remoteUrl!, signal, env))
       },
       baseRef: assignment => assignment.remoteUrl
         ? this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch)

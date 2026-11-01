@@ -2784,6 +2784,7 @@
   },
   "Coordinator": {
     "stop": "停止",
+    "stopped": "已停止",
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
     "conversationWith": "与 {name} 的对话",
@@ -3683,7 +3684,7 @@
   },
   "GroupChat": {
     "untitled": "未命名群聊",
-    "composer": "群聊暂不能发送",
+    "composer": "给 {name} 发消息",
     "messages": "群聊消息",
     "you": "你",
     "member": "成员",
@@ -3694,7 +3695,10 @@
     "loadError": "无法加载群聊消息。",
     "retry": "重试",
     "older": "加载更早的消息",
-    "loadingOlder": "正在加载…"
+    "loadingOlder": "正在加载…",
+    "notSent": "未发送",
+    "answering": "正在回复",
+    "noTaker": "没有 Bot 接这条，@ 它的名字"
   },
   "DeviceSetup": {
     "title": "设置 {device}",
