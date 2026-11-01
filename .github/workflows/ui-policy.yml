@@ -454,10 +454,7 @@ jobs:
             /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
             ${{ runner.temp }}/pr13-personal-mailbox-results.xml
           if-no-files-found: warn
-      # The production build for pull requests, main and merge groups (browser
-      # tests are manual only, decision 2026-11-01-0230).
-      - run: pnpm build
-        if: matrix.shard == 1
+      # No production build in CI: Vercel builds main (decision 2026-11-01-0230).
 
   browser-tests:
     # The required check name. Same docs-only behavior as UI policy above.

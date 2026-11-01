@@ -398,7 +398,7 @@ test('blocking CI checks synthetic PR merge candidates once and preserves every 
   assert.doesNotMatch(source, /github\.event\.pull_request\.head\.repo\.full_name != github\.repository/)
   assert.match(source, /name: UI policy \(strict\)/)
   assert.match(source, /name: Production build and browser interactions\n/)
-  assert.match(source, /if: matrix\.shard == 1\n/)
+  assert.doesNotMatch(source, /run: pnpm build\n/)
   for (const workflow of ['ui-policy.yml', 'browser-tests.yml']) {
     const text = readFileSync(`.github/workflows/${workflow}`, 'utf8')
     assert.match(text, /github\.ref == 'refs\/heads\/main' && format\('-\{0\}', github\.run_id\)/)
@@ -420,7 +420,7 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   assert(database.includes('DB_TEST_SHARD: ${{ matrix.shard }}/4'))
   assert.match(database, /services:\n      postgres:\n        image: postgres:17/)
   assert(database.includes('name: pr13-http-cli-approval-${{ github.sha }}-${{ matrix.shard }}'))
-  assert.match(database, /if: matrix\.shard == 1\n/)
+  assert(!database.includes('run: pnpm build'))
   assert(job('ui-policy-integrations').includes('run: pnpm test:issues'))
   assert(!job('ui-policy-full').includes('run: pnpm test:issues'))
   const checks = job('source-checks')
