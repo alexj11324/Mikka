@@ -123,6 +123,22 @@ What is fake and what is real:
 | Model | Real: the workspace's own API key (Settings › API 与订阅) |
 | Database, auth, daemon, git clone/worktree/commit/push | Real |
 
+### Which model local runs use
+
+Local development and acceptance runs use DeepSeek **DS 4.1 Flash**
+(`deepseek/deepseek-v4.1-flash`) through the workspace's own model API key,
+never Mikka 默认 and never the AI Gateway:
+
+- The key is `DEEPSEEK_API_KEY` in the Mikka Infisical project, environment
+  `dev`, folder `/vercel`. Read it with an existing identity
+  ([infisical-cloud.md](infisical-cloud.md)) into the process environment
+  only; never write it to a file, a commit, a log or a report.
+- Add it as a DeepSeek key in Settings › API 与订阅, then pick DS 4.1 Flash for
+  the Coordinator and the Bot.
+- Mikka 默认 (hosted, billed through the AI Gateway) is not used for local
+  work, so a local run needs neither `AI_GATEWAY_API_KEY` nor a card
+  verification.
+
 First run: sign up at `http://localhost:3000/mikka`, then approve the device
 with the code the script prints. Ask the Coordinator to change
 `mikka-e2e/core-loop`. Running as root, set `MIKKA_DEV_DAEMON_USER` to an
