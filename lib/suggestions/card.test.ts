@@ -54,6 +54,11 @@ test('a Chinese action line gives its verb to the chip and names the app inline'
   assert.deepEqual(cardParts(card, '回复'), { verb: '回复', parts: [{ kind: 'text', text: 'Kevin 的 ' }, { kind: 'source', source: 'gmail' }, { kind: 'text', text: ' 邮件：周四的会改到周三' }] })
 })
 
+test('a Chinese line without a space after its verb still gets one verb chip', () => {
+  assert.deepEqual(cardParts({ source: 'linear', title: 'x', actionTitle: '处理分配给你的任务：登录死循环' }, '处理'), { verb: '处理', parts: [{ kind: 'source', source: 'linear' }, { kind: 'text', text: '分配给你的任务：登录死循环' }] })
+  assert.deepEqual(cardParts({ source: 'notion', title: 'x', actionTitle: '核对路线图草稿的新评论' }, '查看'), { verb: '查看', parts: [{ kind: 'source', source: 'notion' }, { kind: 'text', text: '核对路线图草稿的新评论' }] })
+})
+
 test('an app the sentence does not name goes in front', () => {
   assert.deepEqual(cardParts({ source: 'github', title: 'x', actionTitle: '修复 PR #212 的类型检查' }, '处理'), { verb: '修复', parts: [{ kind: 'source', source: 'github' }, { kind: 'text', text: 'PR #212 的类型检查' }] })
 })
