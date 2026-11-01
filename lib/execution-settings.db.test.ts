@@ -49,6 +49,10 @@ test(
       );
       await pool.query(migration);
       await pool.query(migration);
+      // Un-sharing also stops runs on the owner's API keys (lib/model-api-key-runs.ts).
+      await pool.query(
+        await readFile(new URL("../drizzle/20261101003800_model_api_keys.sql", import.meta.url), "utf8"),
+      );
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const personalPolicyMigration = await readFile(new URL("../drizzle/20261101002002_workspace_personal_policies.sql",import.meta.url),"utf8");

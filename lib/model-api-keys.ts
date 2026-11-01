@@ -6,6 +6,7 @@ import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { isPrivateAddress } from '@/lib/link-preview-parse'
 import { memberSubscriptionsAllowed, subscriptionsUsable } from '@/lib/personal-policy'
+import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { openSecret, sealSecret, SecretsKeyMissingError } from '@/lib/secrets/crypto'
 import { WorkspaceError } from '@/lib/workspace-access'
 import {
@@ -146,6 +147,8 @@ export async function addApiKey(query: Query, ownerId: string, input: unknown, o
 /** The owner removes their key; its shares go with it. */
 export async function removeApiKey(query: Query, ownerId: string, id: string): Promise<{ removed: boolean }> {
   z.uuid().parse(id)
+  // Runs handed this key stop first; the key is gone for them too.
+  await stopRunsUsingApiKeys(query, { keyId: id, ownerId })
   const { rowCount } = await query.query('DELETE FROM model_api_keys WHERE id=$1 AND "ownerId"=$2', [id, ownerId])
   return { removed: Boolean(rowCount) }
 }
@@ -160,7 +163,11 @@ export async function setApiKeyShare(query: Query, ownerId: string, workspace: {
   if (workspace.kind !== 'team') throw new WorkspaceError('validationGeneric')
   const { rowCount } = await query.query('SELECT 1 FROM model_api_keys WHERE id=$1 AND "ownerId"=$2', [id, ownerId])
   if (!rowCount) throw new WorkspaceError('apiKeyNotFound')
-  if (!shared) return void await query.query('DELETE FROM model_api_key_shares WHERE "keyId"=$1 AND "workspaceId"=$2', [id, workspace.id])
+  if (!shared) {
+    await query.query('DELETE FROM model_api_key_shares WHERE "keyId"=$1 AND "workspaceId"=$2', [id, workspace.id])
+    await stopRunsUsingApiKeys(query, { keyId: id, workspaceId: workspace.id, othersOnly: true })
+    return
+  }
   if (!(await memberSubscriptionsAllowed(query, workspace.id))) throw new WorkspaceError('workspaceAccessDenied')
   await query.query('INSERT INTO model_api_key_shares ("keyId","workspaceId") VALUES ($1,$2) ON CONFLICT DO NOTHING', [id, workspace.id])
 }
@@ -168,6 +175,7 @@ export async function setApiKeyShare(query: Query, ownerId: string, workspace: {
 /** A member leaves a team: their key shares there go at once (orchestration.md § 6). */
 export async function removeMemberApiKeyShares(query: Query, ownerId: string, workspaceId: string) {
   await query.query('DELETE FROM model_api_key_shares s USING model_api_keys k WHERE k.id=s."keyId" AND k."ownerId"=$1 AND s."workspaceId"=$2', [ownerId, workspaceId])
+  await stopRunsUsingApiKeys(query, { ownerId, workspaceId })
 }
 
 /** 订阅额度用完后，自动改用 API Key. On unless the person turned it off. */
@@ -234,6 +242,9 @@ export async function apiKeyForRun(query: Query, runId: string, keyId: string, e
     console.error(`[model-api-keys] open_failed id=${row.id}`)
     throw new WorkspaceError('apiKeyNotFound')
   }
+  // Recorded so withdrawing the key or its share stops this run (stopRunsUsingApiKeys).
+  await query.query(`INSERT INTO model_api_key_runs ("runId","keyId","workspaceId") VALUES ($1,$2,$3)
+    ON CONFLICT ("runId") DO UPDATE SET "keyId"=EXCLUDED."keyId","workspaceId"=EXCLUDED."workspaceId"`, [runId, keyId, run.workspaceId])
   const baseUrl = row.baseUrl ?? API_KEY_PRESET_ENDPOINTS[row.provider as Exclude<ApiKeyProvider, 'custom'>].baseUrl
   if (apiKeyHarness(row.protocol) === 'claude_code') return { harness: 'claude_code', keyId: row.id, ownerId: row.ownerId, env: { ANTHROPIC_API_KEY: apiKey, ANTHROPIC_BASE_URL: baseUrl } }
   return {

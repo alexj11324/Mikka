@@ -36,6 +36,15 @@ CREATE TABLE IF NOT EXISTS model_api_key_shares (
   PRIMARY KEY ("keyId", "workspaceId")
 );
 CREATE INDEX IF NOT EXISTS model_api_key_shares_workspace_idx ON model_api_key_shares ("workspaceId");
+-- Which key each run was handed (apiKeyForRun), so withdrawing a key or its
+-- share stops those runs at once (orchestration.md § 2: no switch mid-run).
+CREATE TABLE IF NOT EXISTS model_api_key_runs (
+  "runId" uuid PRIMARY KEY,
+  "keyId" uuid NOT NULL,
+  "workspaceId" uuid,
+  "createdAt" timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS model_api_key_runs_key_idx ON model_api_key_runs ("keyId");
 -- 「订阅额度用完后，自动改用 API Key」, on by default (orchestration.md § 2).
 ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "apiKeyAfterQuota" boolean NOT NULL DEFAULT true;
 COMMIT;

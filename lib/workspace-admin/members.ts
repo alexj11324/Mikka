@@ -9,6 +9,7 @@ import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/l
 import { workspaceDb } from '@/lib/workspace-db'
 import { releasePaymentDesignation } from '@/lib/payment-designation'
 import { stopRunsUsingSubscriptions } from '@/lib/personal-policy'
+import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/delivery'
 import type { MainTransaction } from './general'
@@ -76,6 +77,7 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
   })
   // Runs there on their subscription stop now, including other members' bots they had shared it with.
   await stopRunsUsingSubscriptions(pool, { ownerId: userId, workspaceId })
+  await stopRunsUsingApiKeys(pool, { ownerId: userId, workspaceId })
 }
 
 /** Reactivation brings a suspended member's own bots back; their subscription stays unshared until they share it again. */

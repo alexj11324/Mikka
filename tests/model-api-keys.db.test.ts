@@ -27,9 +27,9 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
       INSERT INTO "user" VALUES ('alice'),('bob'),('carol');
       CREATE TABLE byos_connections ("ownerId" text, "workspaceId" text, "removedAt" timestamptz);
       CREATE TABLE bots (id uuid PRIMARY KEY, "workspaceId" uuid NOT NULL);
-      CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "botId" uuid, status text NOT NULL)`)
+      CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "botId" uuid, status text NOT NULL, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz)`)
     await pool.query(await readFile(new URL('../drizzle/20261101002002_workspace_personal_policies.sql', import.meta.url), 'utf8'))
-    const migration = await readFile(new URL('../drizzle/20261101090000_model_api_keys.sql', import.meta.url), 'utf8')
+    const migration = await readFile(new URL('../drizzle/20261101003800_model_api_keys.sql', import.meta.url), 'utf8')
     await pool.query(migration)
     await pool.query(migration)
     assert.equal(await store.apiKeyAfterQuota(pool, 'alice'), true, 'on by default')
@@ -100,7 +100,8 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const teamBot = randomUUID(), personalBot = randomUUID()
     await pool.query('INSERT INTO bots VALUES ($1,$2),($3,$4)', [teamBot, team.id, personalBot, personal.id])
     const run = randomUUID(), done = randomUUID(), carolRun = randomUUID(), loose = randomUUID()
-    await pool.query(`INSERT INTO agent_runs VALUES ($1,'alice',$2,'running'),($3,'alice',$2,'succeeded'),($4,'carol',$2,'queued'),($5,'bob',NULL,'running')`, [run, teamBot, done, carolRun, loose])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","botId",status) VALUES ($1,'alice',$2,'running'),($3,'alice',$2,'succeeded'),($4,'carol',$2,'queued'),($5,'bob',NULL,'running')`, [run, teamBot, done, carolRun, loose])
+    const stopped = async (id: string) => Boolean((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [id])).rows[0].stopRequestedAt)
     const claude = await store.apiKeyForRun(pool, run, anthropic.id, env)
     assert.deepEqual(claude, { harness: 'claude_code', keyId: anthropic.id, ownerId: 'alice', env: { ANTHROPIC_API_KEY: 'sk-ant-new-secret-9876', ANTHROPIC_BASE_URL: 'https://api.anthropic.com' } })
     const codex = await store.apiKeyForRun(pool, run, gateway.id, env)
@@ -111,9 +112,13 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.equal((await store.apiKeyForRun(pool, carolRun, gateway.id, env)).ownerId, 'bob', 'Bob shared his with the team')
     assert.equal((await store.apiKeyForRun(pool, loose, local.id, env)).harness, 'claude_code', 'a run without a bot may use its owner\'s own key')
     await assert.rejects(store.apiKeyForRun(pool, loose, anthropic.id, env), { code: 'apiKeyNotFound' })
-    // Withdrawing the share stops the next run from getting the key.
+    // Withdrawing the share stops the run that was handed the key, and no later run gets it.
+    assert.equal(await stopped(carolRun), false)
     await store.setApiKeyShare(pool, 'bob', team, gateway.id, false)
+    assert.equal(await stopped(carolRun), true)
+    assert.equal(await stopped(run), true, 'Alice\'s run had Bob\'s key too')
     await assert.rejects(store.apiKeyForRun(pool, carolRun, gateway.id, env), { code: 'apiKeyNotFound' })
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL')
     // A copied ciphertext does not open on another row.
     await store.setApiKeyShare(pool, 'bob', team, gateway.id, true)
     await pool.query('UPDATE model_api_keys SET ciphertext=(SELECT ciphertext FROM model_api_keys WHERE id=$1), iv=(SELECT iv FROM model_api_keys WHERE id=$1) WHERE id=$2', [local.id, gateway.id])
@@ -123,8 +128,12 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     await store.removeMemberApiKeyShares(pool, 'bob', team.id)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM model_api_key_shares')).rows[0].n, 0)
     await store.setApiKeyShare(pool, 'bob', team, local.id, true)
+    assert.equal(await stopped(run), true, 'leaving stops runs on the leaver\'s keys')
+    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL')
     assert.deepEqual(await store.removeApiKey(pool, 'alice', local.id), { removed: false }, 'only the owner removes a key')
     assert.deepEqual(await store.removeApiKey(pool, 'bob', local.id), { removed: true })
+    assert.equal(await stopped(loose), true, 'deleting a key stops the run that has it')
+    assert.equal(await stopped(run), false, 'other keys\' runs go on')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM model_api_key_shares')).rows[0].n, 0)
 
     await store.setApiKeyAfterQuota(pool, 'alice', false)
