@@ -4,6 +4,7 @@ import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { shortWhen } from '@/lib/clock'
 import { useHome } from '@/lib/home'
+import { plainText } from '@/lib/quote'
 import type { GroupSummary, HomeBot } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
@@ -30,7 +31,9 @@ export const rowKey = (row: ChatRow) => row.kind === 'bot' ? row.bot.id : row.gr
 export function ChatRowView({ row, onPress }: { row: ChatRow; onPress: () => void }) {
   const bot = row.kind === 'bot' ? row.bot : null
   const group = row.kind === 'group' ? row.group : null
-  const line = bot ? bot.line : group?.lastMessage?.body ?? null
+  // A card reply is OpenUI source; the list shows its words, as a push does.
+  const raw = bot ? bot.line : group?.lastMessage?.body ?? null
+  const line = raw ? plainText(raw).split('\n').find(Boolean) ?? null : null
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={52} />
