@@ -60,4 +60,30 @@ test('mobile bot page', { skip: !dbUrl }, async t => {
     assert.ok(!page.threads.some(thread => thread.id === mine))
     assert.deepEqual([page.pullRequests, page.schedules], [[], []])
   })
+
+  await t.test('reactions: one per person per message, only on messages they can see', async () => {
+    const { reactionsFor, setReaction, visibleGroupMessages } = await import('../lib/reactions')
+    const chatMessage = randomUUID()
+    await pool.query(`insert into coordinator_messages (id,"userId","botId",position,message) values ($1,$2,$3,1,'{"role":"assistant","content":"hi"}')`, [chatMessage, owner, bot])
+    const group = randomUUID(), groupMessage = randomUUID()
+    await pool.query(`insert into conversations (id,"workspaceId",kind,title,"createdBy") values ($1,$2,'group','Team',$3)`, [group, ws.id, owner])
+    await pool.query(`insert into conversation_members ("conversationId","memberType","memberId",role) values ($1,'user',$2,'owner'),($1,'user',$3,'member')`, [group, owner, other])
+    await pool.query(`insert into conversation_messages (id,"conversationId",position,"authorType","authorId",body) values ($1,$2,1,'bot',$3,'Done')`, [groupMessage, group, bot])
+
+    assert.equal(await setReaction(owner, chatMessage, '❤️'), true)
+    assert.equal(await setReaction(owner, chatMessage, '👍'), true, 'a second reaction replaces the first')
+    assert.equal(await setReaction(other, chatMessage, '👍'), false, "someone else's bot chat")
+    assert.deepEqual(await reactionsFor(owner, [chatMessage]), { [chatMessage]: [{ emoji: '👍', count: 1, mine: true }] })
+
+    assert.equal(await setReaction(owner, groupMessage, '🎉'), true)
+    assert.equal(await setReaction(other, groupMessage, '🎉'), true)
+    assert.deepEqual(await reactionsFor(other, [groupMessage]), { [groupMessage]: [{ emoji: '🎉', count: 2, mine: true }] })
+    assert.equal(await setReaction(other, groupMessage, null), true)
+    assert.deepEqual(await reactionsFor(owner, [groupMessage]), { [groupMessage]: [{ emoji: '🎉', count: 1, mine: true }] })
+
+    await pool.query(`update conversation_members set "leftAt"=now() where "conversationId"=$1 and "memberId"=$2`, [group, other])
+    assert.equal(await setReaction(other, groupMessage, '👍'), false, 'a person who left the group')
+    assert.deepEqual(await visibleGroupMessages(other, [groupMessage]), [])
+    assert.deepEqual(await visibleGroupMessages(owner, [groupMessage, chatMessage]), [groupMessage])
+  })
 })

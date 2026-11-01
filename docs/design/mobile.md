@@ -75,6 +75,16 @@ in the blue one, as on the web (R-14). The
 thread card is a status icon and the thread name, with outputs as chips
 (R-66); no step line.
 
+**新建 and groups**: 对话's 「+」 opens 新建 Bot (name, shape, colour; its
+chat opens) and 新建群聊 (a name and its bots; the group opens). Groups sit in
+对话 with the bots, newest first, a dot while unread. In a group the person's
+messages are blue on the right and each bot's sit on the left under its name
+and avatar; `@name` sends a message to that bot, else Mikka picks who answers.
+
+**Reactions**: the long-press sheet opens with ❤️ 👍 👎 😂 🎉 🙏, one per
+person per message (the same one again removes it); they show as chips under
+the message with a count past one, and tapping one's own removes it.
+
 **Bot page** (资料): the avatar and name, then what the web's right panel
 shows beside the chat, as grouped lists: 线程 (the latest five, then 全部线程),
 电脑 with its state (a bot's only; its screen opens on the web), PR (the PRs of

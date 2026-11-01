@@ -44,6 +44,34 @@ export interface Chat {
   items: ChatItem[]
   sources: Record<string, CitationSource>
   artifacts: Record<string, { id: string; title: string }>
+  /** By message id. */
+  reactions?: Record<string, Reaction[]>
+}
+
+/** Reactions on a message, by emoji (lib/reactions.ts on the server). */
+export interface Reaction { emoji: string; count: number; mine: boolean }
+
+/** A group chat in 对话 (GET /api/conversations). */
+export interface GroupSummary {
+  id: string
+  title: string
+  createdAt: string
+  lastMessage: GroupMessage | null
+  unreadCount: string
+}
+
+/** One message in a group chat; `position` is a string (a bigint). */
+export interface GroupMessage { id: string; position: string; authorType: 'user' | 'agent' | 'bot'; authorId: string; body: string; createdAt: string }
+
+/** A group's member (GET /api/conversations/<id>/members); a bot has its colour and shape. */
+export interface GroupMember { id: string; name: string; memberType: 'user' | 'agent' | 'bot'; avatarUrl: string | null; color?: string; shape?: string }
+
+/** GET /api/conversations/<id>/messages: newest first. */
+export interface GroupPage {
+  messages: GroupMessage[]
+  nextBefore: string | null
+  agentStatus: { agentId: string | null; botId: string | null; status: string } | null
+  routingError: { code: string } | null
 }
 
 export interface Thread {

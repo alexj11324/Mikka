@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { CircleUser } from 'lucide-react-native'
+import { CircleUser, Plus } from 'lucide-react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Symbol } from '@/components/Symbol'
@@ -9,26 +9,34 @@ import { Text } from '@/components/Text'
 import { shortWhen } from '@/lib/clock'
 import { useHome } from '@/lib/home'
 import { chatPath } from '@/lib/navigate'
-import type { HomeBot } from '@/lib/types'
+import type { GroupSummary, HomeBot } from '@/lib/types'
 import { restartToUpdate, useUpdateReady } from '@/lib/updates'
-import { prefetch, useRefresh } from '@/lib/useApi'
+import { prefetch, useApi, useRefresh } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
 
 /**
  * 对话, the app's home (decision 2026-10-31-2330): the Coordinator pinned on
- * top, then every bot and group chat with its last line, newest first (the
+ * top, then every bot and group chat with its last line, newest first; 「+」
+ * (top right) opens 新建 Bot and 新建群聊 (the
  * web bot list, R-01). Tapping one opens its chat over the tabs. The bar's
  * menu opens 设置, 插件, 建议 and 任务; its search filters by name.
  */
 export default function ChatsScreen() {
   const router = useRouter()
   const home = useHome()
-  const refresh = useRefresh(home.reload)
+  const groupState = useApi<{ conversations: GroupSummary[] }>(home.data ? `/api/conversations?workspaceId=${home.data.workspace.id}` : null, 30_000)
+  const refresh = useRefresh(async () => { await Promise.all([home.reload(), groupState.reload()]) })
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
   const bots = [...home.data?.bots ?? []]
     .filter(bot => !needle || bot.name.toLowerCase().includes(needle))
     .sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''))
+  // Bots and group chats in one list, newest first.
+  const rows: Row[] = [
+    ...bots.map(bot => ({ kind: 'bot' as const, bot, at: bot.at ?? '' })),
+    ...(groupState.data?.conversations ?? []).filter(group => !needle || group.title.toLowerCase().includes(needle))
+      .map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt })),
+  ].sort((a, b) => b.at.localeCompare(a.at))
   const showCoordinator = !needle || 'coordinator'.includes(needle)
   const updateReady = useUpdateReady()
   // The Coordinator's chat and the three latest bots' load ahead, so opening one is not blank while it loads.
@@ -51,10 +59,15 @@ export default function ChatsScreen() {
             { label: '建议', icon: 'tray', onPress: () => router.push('/suggestions') },
             { label: '任务', icon: 'checklist', onPress: () => router.push('/tasks') },
           ] }}
+        right={{ icon: 'plus', label: '新建', web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onOpen: () => router.push('/new-bot'),
+          items: [
+            { label: '新建 Bot', icon: 'person.crop.circle.badge.plus', onPress: () => router.push('/new-bot') },
+            { label: '新建群聊', icon: 'person.2', onPress: () => router.push('/new-group') },
+          ] }}
       />
       <FlatList
-        data={bots}
-        keyExtractor={bot => bot.id}
+        data={rows}
+        keyExtractor={row => row.kind === 'bot' ? row.bot.id : row.group.id}
         {...underBar}
         keyboardDismissMode="on-drag"
         refreshControl={<RefreshControl {...refresh} />}
@@ -80,9 +93,33 @@ export default function ChatsScreen() {
         ) : undefined}
         ListEmptyComponent={home.loading ? <View style={styles.center}><Spinner /></View>
           : needle && !showCoordinator ? <Text style={styles.note}>没有找到「{query.trim()}」</Text> : undefined}
-        renderItem={({ item }) => <BotRow bot={item} onPress={() => router.push(chatPath(item.id))} />}
+        renderItem={({ item }) => item.kind === 'bot'
+          ? <BotRow bot={item.bot} onPress={() => router.push(chatPath(item.bot.id))} />
+          : <GroupRow group={item.group} onPress={() => router.push(`/groups/${item.group.id}`)} />}
       />
     </View>
+  )
+}
+
+type Row = { kind: 'bot'; bot: HomeBot; at: string } | { kind: 'group'; group: GroupSummary; at: string }
+
+/** A group chat: a people symbol, its name, its last message, and a dot while unread. */
+function GroupRow({ group, onPress }: { group: GroupSummary; onPress: () => void }) {
+  const unread = Number(group.unreadCount) > 0
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
+      <View style={styles.groupIcon}><Symbol name="person.2.fill" size={22} color={colors.secondary} web={<Text style={styles.groupGlyph}>群</Text>} /></View>
+      <View style={styles.body}>
+        <View style={styles.top}>
+          <Text style={styles.name} numberOfLines={1}>{group.title}</Text>
+          <Text style={styles.when}>{shortWhen(group.lastMessage?.createdAt ?? group.createdAt)}</Text>
+        </View>
+        <View style={styles.top}>
+          <Text style={[styles.line, { flex: 1 }]} numberOfLines={1}>{group.lastMessage?.body ?? ''}</Text>
+          {unread ? <View style={styles.unread} /> : null}
+        </View>
+      </View>
+    </Pressable>
   )
 }
 
@@ -118,5 +155,8 @@ const styles = StyleSheet.create({
   when: { fontSize: 13, color: colors.tertiary },
   line: { fontSize: 15, color: colors.secondary },
   center: { paddingTop: 40, alignItems: 'center' },
+  groupIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
+  groupGlyph: { fontSize: 18, color: colors.secondary },
+  unread: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
   note: { textAlign: 'center', color: colors.secondary, marginTop: 32, fontSize: 15 },
 })
