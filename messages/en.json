@@ -1863,7 +1863,7 @@
       "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
       "removeFailed": "The connection could not be removed.",
       "loading": "Loading model subscriptions…",
-      "serviceOff": "Model subscriptions aren't turned on for this deployment. Bots use the workspace's default model quota.",
+      "serviceOff": "Model subscriptions are off.",
       "startFailed": "{provider} sign-in could not start",
       "finishFailed": "{provider} sign-in did not finish",
       "signedOut": "Your session expired. Sign in again, then connect.",
@@ -2401,6 +2401,7 @@
       "labels": "By label",
       "pickModel": "Choose a model"
     },
+    "searchEmpty": "No matching settings",
     "apiKeys": {
       "add": "Add API key",
       "addConfirm": "Add",
