@@ -31,7 +31,7 @@ const SEND_DISABLED = 'disabled:bg-control disabled:text-muted-foreground disabl
  * The Grok-style composer every chat uses (Coordinator and bots): one rounded
  * bar, attach and the bot's model chip on the left, send on the right.
  */
-export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, onStop, quote, model, sendKey = 'enter' }: {
+export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, quote, model, sendKey = 'enter' }: {
   ref: Ref<HTMLTextAreaElement | null>
   value: string
   onChange: (value: string) => void
@@ -46,6 +46,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   editableWhileSending?: boolean
   /** The draft remains editable, but the run no longer accepts new messages. */
   submitDisabled?: boolean
+  /** The conversation takes no messages at all (a group chat until group sending opens): nothing can be typed, attached or sent. */
+  disabled?: boolean
   onStop?: () => void
   /** Something quoted into the message (an artifact quote chip): it sits on top, the buttons move to a row below. */
   quote?: ReactNode
@@ -94,23 +96,23 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
     const { key, shiftKey, metaKey, ctrlKey } = event
     if (!sendsMessage({ key, shiftKey, metaKey, ctrlKey, isComposing: event.nativeEvent.isComposing }, sendKey)) return
     event.preventDefault()
-    if (!sending && !submitDisabled && value.trim()) onSubmit()
+    if (!sending && !submitDisabled && !disabled && value.trim()) onSubmit()
   }
 
-  return <form onSubmit={event => { event.preventDefault(); if (!sending && !submitDisabled && value.trim()) onSubmit() }}>
+  return <form onSubmit={event => { event.preventDefault(); if (!sending && !submitDisabled && !disabled && value.trim()) onSubmit() }}>
     <FieldGroup className="sr-only w-px"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
     <InputGroup className={COMPOSER}>
       {quote && <InputGroupAddon align="block-start" className="px-2 pt-2 pb-0">{quote}</InputGroupAddon>}
       {/* readOnly, not disabled: a disabled field drops focus, so the next key went to page shortcuts. */}
-      <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 min-w-0 overflow-x-hidden px-3.5 pt-3 pb-1 wrap-break-word', quote ? 'min-h-10' : 'min-h-14')} value={value} maxLength={MAX_LENGTH} rows={2} readOnly={sending && !onStop && !editableWhileSending} aria-busy={sending || undefined} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} />
+      <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 min-w-0 overflow-x-hidden px-3.5 pt-3 pb-1 wrap-break-word', quote ? 'min-h-10' : 'min-h-14')} value={value} maxLength={MAX_LENGTH} rows={2} disabled={disabled || undefined} readOnly={sending && !onStop && !editableWhileSending} aria-busy={sending || undefined} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} />
       <InputGroupAddon align="block-end" className="justify-between px-2 pt-0 pb-2">
         <span className="flex min-w-0 items-center gap-1.5">
-          <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
+          <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending || disabled} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
           {model}
         </span>
         {stoppable
           ? <InputGroupButton type="button" variant="default" size="icon-sm" className="rounded-full" aria-label={t('stop')} onClick={onStop}><Square className="fill-current" /></InputGroupButton>
-          : <InputGroupButton type="submit" variant="default" size="icon-sm" className={cn('rounded-full', SEND_DISABLED)} aria-label={t('send')} disabled={sending || submitDisabled || !value.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>}
+          : <InputGroupButton type="submit" variant="default" size="icon-sm" className={cn('rounded-full', SEND_DISABLED)} aria-label={t('send')} disabled={sending || submitDisabled || disabled || !value.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>}
       </InputGroupAddon>
     </InputGroup>
     {/* The limit is shown only when it is close enough to matter. */}

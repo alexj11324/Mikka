@@ -4,6 +4,7 @@ import useSWRInfinite from 'swr/infinite'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { listAgents } from '@/app/actions/agents'
+import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -20,9 +21,10 @@ export type GroupChatRequest = { id: string; title: string; workspaceId: string 
 /**
  * A group chat, read-only. It opens from a search hit and reads the real
  * message history through the group API, which checks workspace and group
- * membership on every page. Sending is not wired yet, so there is no composer
- * (R-10); the status line says so. Names and bot avatars come from the
- * group's member list, then the workspace's members and the person's agents.
+ * membership on every page. Sending is not wired yet, so it ends in the
+ * standard composer, disabled (R-10), with no line explaining it (R-40). Names
+ * and bot avatars come from the group's member list, then the workspace's
+ * members and the person's agents.
  */
 export function GroupChatView({ group, userId, people }: {
   group: GroupChatRequest
@@ -50,7 +52,6 @@ export function GroupChatView({ group, userId, people }: {
   return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className="relative flex size-full min-h-0 flex-col">
     <ConversationPill name={group.title || t('untitled')} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
-    <p role="status" className="mx-auto w-full max-w-3xl px-4 py-2 text-sm text-muted-foreground">{t('readOnly')}</p>
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6">
         {code === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>
@@ -77,6 +78,9 @@ export function GroupChatView({ group, userId, people }: {
                   </ol>
                 </>}
       </div>
+    </div>
+    <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
+      <ChatComposer ref={null} value="" onChange={() => {}} onSubmit={() => {}} label={t('composer')} disabled />
     </div>
   </section>
 }
