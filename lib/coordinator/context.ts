@@ -163,6 +163,8 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
       return [`[Event] Device ${payload.deviceId} is back online; queued Factory run ${event.runId} for task ${payload.taskId} will start there.`, note].filter(Boolean).join('\n')
     case 'issue_done':
       return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to done.`, note].filter(Boolean).join('\n')
+    case 'issue_status_changed':
+      return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to ${payload.status}.`, note].filter(Boolean).join('\n')
     case 'run_report':
       return [event.runId ? `[Event] The agent in run ${event.runId} reports progress: ${payload.text}` : `[Event] An Agent reports coordination data: ${payload.text}`, event.issueId ? `Issue: ${event.issueId}.` : null, note].filter(Boolean).join('\n')
     case 'run_question':

@@ -23,7 +23,7 @@ import { promoteExistingIssueForUser } from '@/lib/team-issue-promotion'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { coordinatorBot } from '@/lib/coordinator/coordinator-bot'
-import { issueDoneEvent } from '@/lib/coordinator-events'
+import { issueStatusEvent } from '@/lib/coordinator-events'
 import { changeIssueScopeLocally, previewPersonalScope } from '@/lib/issue-scope-store'
 import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
@@ -111,10 +111,10 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     const ownerId = existing?.userId ?? userId
     const observedScopeVersion = existing?.scopeVersion ?? null
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
-    let doneEvent = false
-    // Marking a task done tells its owner's Coordinator; its bot row is resolved here, before the transaction. A task
-    // names no workspace, so it is the personal workspace's Coordinator.
-    const coordinator = existing && existing.status !== 'done' && parsed.data.status === 'done' ? (await coordinatorBot(ownerId, null, { backfill: false })).botId : null
+    let statusEvent = false
+    // A status change is recorded for its owner's Coordinator (triage decides whether it matters); its bot row is resolved
+    // here, before the transaction. A task names no workspace, so it is the personal workspace's Coordinator.
+    const coordinator = existing && parsed.data.status !== undefined && existing.status !== parsed.data.status ? (await coordinatorBot(ownerId, null, { backfill: false })).botId : null
     try {
       const result = await db.transaction(async tx => {
         if (!id) {
@@ -126,10 +126,10 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         if (!latest) return { error: 'issueNotFound' }
         requireLockedIssueScope(latest, userId, observedScopeVersion!)
         ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
-        const done = issue && coordinator && issueDoneEvent(latest, issue, coordinator)
-        if (done) {
-          await recordCoordinatorEvent(tx, done)
-          doneEvent = true
+        const changed = issue && coordinator && issueStatusEvent(latest, issue, coordinator)
+        if (changed) {
+          await recordCoordinatorEvent(tx, changed)
+          statusEvent = true
         }
         if (!issue) return { error: 'issueStale' }
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
@@ -137,7 +137,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
       })
       if ('issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
       if (!id && 'issue' in result && result.issue) scheduleIssueEffect({ kind: 'scope', issueId: result.issue.id })
-      if (doneEvent && 'issue' in result) scheduleIssueEffect({ kind: 'wake', userId: ownerId })
+      if (statusEvent && 'issue' in result) scheduleIssueEffect({ kind: 'wake', userId: ownerId })
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error
