@@ -59,6 +59,9 @@ node_matches() { local v; v="$("$1" -p process.versions.node 2>/dev/null)" || re
 NODE_DIR=""
 if command -v node >/dev/null && node_matches node; then
   NODE_DIR="$(dirname "$(command -v node)")"
+elif [ -x "/opt/node$NODE_MAJOR/bin/node" ] && node_matches "/opt/node$NODE_MAJOR/bin/node"; then
+  # The cloud image ships /opt/node24 behind /opt/node22 on PATH.
+  NODE_DIR="/opt/node$NODE_MAJOR/bin"
 else
   case "$NODE_WANT" in *.*) GLOB="node-v$NODE_WANT-*" ;; *) GLOB="node-v$NODE_MAJOR.*" ;; esac
   NODE_DIR="$(ls -d "$STATE"/$GLOB/bin 2>/dev/null | sort -V | tail -1 || true)"
