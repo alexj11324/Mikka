@@ -28,7 +28,7 @@ const json = value => JSON.stringify(value)
 
 function plan(owner) {
   const id = key => demoId(owner.id, key)
-  const people = PEOPLE.map(person => ({ ...person, id: id(`person:${person.key}`), email: `${id(`person:${person.key}`)}@demo.mikka.invalid` }))
+  const people = PEOPLE.map(person => ({ ...person, id: id(`person:${person.key}`), email: person.email }))
   const person = key => key === 'me' ? { id: owner.id, name: owner.name } : people.find(item => item.key === key)
   const bots = BOTS.map(bot => ({ ...bot, id: id(`bot:${bot.key}`) }))
   const botOf = key => bots.find(bot => bot.key === key)
