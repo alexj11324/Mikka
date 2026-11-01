@@ -1,7 +1,7 @@
 import { test, expect } from './test-account-fixtures'
 import { app } from './fixtures'
 
-test('pooled owner and peer keep ordinary browser sessions and workspace isolation', { tag: '@smoke' }, async ({ page, peerPage, testAccounts }, testInfo) => {
+test('pooled owner and peer keep ordinary browser sessions and workspace isolation', async ({ page, peerPage, testAccounts }, testInfo) => {
   const { scope } = testAccounts
   expect(scope.owner.userId).not.toBe(scope.peer.userId)
   expect(scope.owner.namespace).not.toBe(scope.peer.namespace)

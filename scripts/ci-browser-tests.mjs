@@ -2,13 +2,11 @@
 import { spawnSync } from 'node:child_process'
 import { constants, copyFileSync, existsSync, lstatSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-import { browserPlan, BROWSER_MAIN_SPECS, BROWSER_SCOPED_SPECS, BROWSER_SMOKE_TAG, BROWSER_SPEC_NAME } from './ci-docs-only.mjs'
+import { browserPlan, BROWSER_SCOPED_SPECS, BROWSER_SMOKE_TAG, BROWSER_SPEC_NAME } from './ci-docs-only.mjs'
 
 /** Cloudflare's documented always-pass test secret; public, never a credential. */
 export const TURNSTILE_TEST_SECRET = '1x0000000000000000000000000000000AA'
 export const TURNSTILE_TAG = '@turnstile'
-
-const SHARDED_TIERS = new Set(['main', 'full'])
 
 function browserShard(shard) {
   if (typeof shard !== 'string' || !/^[1-9]\d*\/[1-9]\d*$/.test(shard)) throw new Error('Invalid browser shard')
@@ -34,19 +32,32 @@ export function browserArguments(tier, encodedSpecs, shard, { specExists = spec 
   } else if (tier === 'targeted') {
     if (!specs.length) throw new Error('Targeted plan needs specs')
     args.push('--grep', specGrep(specs))
-  } else if (tier === 'main') {
-    if (specs.length) throw new Error('The main tier cannot be narrowed')
-    args.push(...BROWSER_MAIN_SPECS.map(spec => `tests/e2e/${spec}`))
   } else if (tier === 'full') {
     if (specs.length) throw new Error('Full regression cannot be narrowed')
   } else throw new Error('Missing or invalid browser tier')
   args.push('--grep-invert', '@performance')
   if (shard !== undefined) {
-    if (!SHARDED_TIERS.has(tier)) throw new Error('Only the main and full tiers are sharded')
+    if (tier !== 'full') throw new Error('Only the full tier is sharded')
     browserShard(shard)
     args.push(`--shard=${shard}`)
   }
   return args
+}
+
+/** The spec files Playwright's list reporter names under "N failed" (flaky
+ * retries that passed are not failures). Used to describe a red main run. */
+export function failedSpecs(log) {
+  const specs = new Set()
+  let failed = false
+  for (const raw of log.split(/\r?\n/)) {
+    const line = raw.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '')
+    if (/^\s*\d+ failed\s*$/.test(line)) { failed = true; continue }
+    if (!failed) continue
+    const match = line.match(/^\s+\[[^\]]+\] › (?:tests\/e2e\/)?([a-z0-9][a-z0-9-]*\.spec\.ts):\d+/)
+    if (match) specs.add(match[1])
+    else failed = false
+  }
+  return [...specs].sort()
 }
 
 /** The keyed sign-up run: only tests tagged @turnstile, against a server that

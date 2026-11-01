@@ -9,7 +9,7 @@ apiTest('旧生成 POST 已退役，共享配图 GET 仍执行认证', async ({ 
   expect(image.status()).toBe(401)
 })
 
-test('历史仅可读取，原始数据保留，新对话动作进入当前 Bot', async ({ page }, info) => {
+test('历史仅可读取，原始数据保留，新对话动作进入当前 Bot', { tag: '@smoke' }, async ({ page }, info) => {
   const { email } = await register(page)
   const saved = await seedLegacyHistory(email)
   const generationRequests: string[] = []

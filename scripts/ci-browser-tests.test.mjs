@@ -8,7 +8,7 @@ import {
   browserPlan, BROWSER_MAIN_SPECS, BROWSER_NIGHTLY_SPECS, BROWSER_SCOPED_SPECS, BROWSER_SMOKE_FILES,
   BROWSER_INFRA_FILES, needsSelectionValidation,
 } from './ci-docs-only.mjs'
-import { browserArguments, selectionPlan, selectionValidationPlans, specGrep, turnstileArguments, TURNSTILE_TEST_SECRET } from './ci-browser-tests.mjs'
+import { browserArguments, failedSpecs, selectionPlan, selectionValidationPlans, specGrep, turnstileArguments, TURNSTILE_TEST_SECRET } from './ci-browser-tests.mjs'
 
 const smoke = { tier: 'smoke', specs: [], performance: false }
 const full = { tier: 'full', specs: [], performance: false }
@@ -25,58 +25,26 @@ test('documentation alone skips browser runtime; everything else runs at least t
   ]) assert.deepEqual(browserPlan(files), smoke, files.join(','))
 })
 
-test('mapped paths add whole area specs next to the smoke set', () => {
-  for (const [file, expected] of [
-    ['app/api/search/route.ts', ['site-search.spec.ts', 'global-search-scope.spec.ts']],
-    ['lib/federated-search/input.ts', ['site-search.spec.ts']],
-    ['lib/slack/webhook.ts', ['slack-webhook.spec.ts']],
-    ['components/settings/members-panel.tsx', ['members.spec.ts', 'settings.spec.ts', 'profile.spec.ts', 'bots.spec.ts']],
-    ['app/[locale]/settings/page.tsx', ['settings.spec.ts', 'teams.spec.ts']],
-    ['lib/factory/store.ts', ['factory-acceptance-ui.spec.ts', 'factory-acceptance-a2.spec.ts', 'thread-question.spec.ts', 'factory-execution-claim.spec.ts']],
-    ['components/workspace/factory-approval-bar.tsx', ['factory-acceptance-a2.spec.ts']],
-    ['components/coordinator/thread-card.tsx', ['thread-cards.spec.ts', 'thread-stop.spec.ts', 'issue-threads.spec.ts', 'coordinator-choice-card.spec.ts']],
-    ['lib/device-enrollment.ts', ['device-authorization.spec.ts', 'mobile-handoff.spec.ts']],
-    ['components/device-authorization.tsx', ['device-authorization.spec.ts']],
-    ['lib/auth.ts', ['sign-out.spec.ts', 'workspace.spec.ts']],
-    // The avatar menu is the only place to switch workspaces and sign out.
-    ['components/workspace-menu.tsx', ['workspace-menu.spec.ts', 'workspace.spec.ts', 'sign-out.spec.ts', 'workspace-shortcuts.spec.ts']],
-    ['lib/suggestions/card.ts', ['suggestions-rail.spec.ts', 'suggestion-entry-contract.spec.ts']],
-    ['lib/issue-relations.ts', ['relations.spec.ts']],
-    ['components/blocks/kanban-board-1/components/kanban-board.tsx', ['board-layout.spec.ts', 'offline-layout.spec.ts']],
-    ['components/workspace/board-page.tsx', ['board-layout.spec.ts', 'offline-layout.spec.ts']],
-    // The OpenUI catalog parses saved replies: the archive spec must run when it changes.
-    ['lib/agent-ui-catalog.ts', ['agent.spec.ts', 'coordinator-choice-card.spec.ts']],
-    ['components/workspace/agent-ui-library.tsx', ['agent.spec.ts']],
-  ]) {
-    const plan = browserPlan([file])
-    assert.equal(plan.tier, 'targeted', file)
-    for (const spec of expected) assert(plan.specs.includes(spec), `${file} → ${spec}`)
-    assert.deepEqual(plan.specs, [...plan.specs].sort())
-  }
-  const mixed = browserPlan(['lib/slack/webhook.ts', 'lib/search/search.ts', 'README.md'])
-  assert.deepEqual(mixed.specs, ['global-search-scope.spec.ts', 'site-search.spec.ts', 'slack-webhook.spec.ts'])
+test('pull requests run only the smoke set: mapped areas and edited specs wait for main', () => {
+  for (const file of [
+    'app/api/search/route.ts', 'lib/slack/webhook.ts', 'components/settings/members-panel.tsx', 'app/[locale]/settings/page.tsx',
+    'lib/factory/store.ts', 'components/coordinator/thread-card.tsx', 'lib/device-enrollment.ts', 'lib/auth.ts',
+    'components/workspace-menu.tsx', 'components/workspace/board-page.tsx', 'lib/agent-ui-catalog.ts', 'scripts/ci-browser-map.json',
+    'tests/e2e/fixtures.ts', 'tests/e2e/removed-flow.spec.ts', 'tests/e2e/../../evil.spec.ts',
+    ...specFiles.map(file => `tests/e2e/${file}`),
+  ]) assert.deepEqual(browserPlan([file]), smoke, file)
+  assert.deepEqual(browserPlan(['lib/slack/webhook.ts', 'lib/search/search.ts', 'README.md']), smoke)
 })
 
-test('an edited spec runs whole; fixtures and deleted specs do not widen the run', () => {
-  for (const file of specFiles) {
-    const plan = browserPlan([`tests/e2e/${file}`])
-    assert.equal(plan.tier, 'targeted', file)
-    assert.deepEqual(plan.specs, [file])
+test('performance runs after the merge, on main, even when a pull request touches its budgets', () => {
+  for (const file of ['tests/e2e/navigation-performance.spec.ts', 'tests/e2e/agent-performance.spec.ts', 'components/app-sidebar.tsx', 'components/settings/settings-sidebar.tsx', 'lib/settings-navigation.ts', 'next.config.mjs', 'lib/auth.ts']) {
+    assert.deepEqual(browserPlan([file]), smoke, file)
+    assert.deepEqual(browserPlan([file], { mainPush: true }), { ...full, performance: true }, file)
   }
-  assert.deepEqual(browserPlan(['tests/e2e/fixtures.ts', 'tests/e2e/support/server.ts']), smoke)
-  assert.deepEqual(browserPlan(['tests/e2e/removed-flow.spec.ts']), smoke)
-  assert.deepEqual(browserPlan(['tests/e2e/../../evil.spec.ts']), smoke)
 })
 
-test('performance runs before merge only when its budgets or specs change', () => {
-  for (const file of ['tests/e2e/navigation-performance.spec.ts', 'tests/e2e/agent-performance.spec.ts', 'components/app-sidebar.tsx', 'components/settings/settings-sidebar.tsx', 'lib/settings-navigation.ts', 'next.config.mjs']) {
-    assert.equal(browserPlan([file]).performance, true, file)
-  }
-  for (const file of ['lib/auth.ts', 'app/page.tsx', 'lib/model.test.ts']) assert.equal(browserPlan([file]).performance, false, file)
-})
-
-test('main pushes run the main tier, nightly and manual runs run full plus performance; unsafe input fails closed', () => {
-  assert.deepEqual(browserPlan(['app/page.tsx'], { mainPush: true }), { tier: 'main', specs: [], performance: false })
+test('main pushes, nightly and manual runs run full plus performance; unsafe input fails closed', () => {
+  assert.deepEqual(browserPlan(['app/page.tsx'], { mainPush: true }), { ...full, performance: true })
   assert.deepEqual(browserPlan(['README.md'], { mainPush: true }), { tier: 'docs', specs: [], performance: false })
   for (const files of [[], ['README.md'], ['lib/slack/webhook.ts']]) {
     assert.deepEqual(browserPlan(files, { integration: true }), { ...full, performance: true })
@@ -99,7 +67,15 @@ test('the smoke tag marks exactly the approved tests, and only in the declared f
   const tagged = specFiles.filter(file => readFileSync(`tests/e2e/${file}`, 'utf8').includes("'@smoke'"))
   assert.deepEqual(tagged, [...BROWSER_SMOKE_FILES].sort())
   const count = specFiles.reduce((sum, file) => sum + (readFileSync(`tests/e2e/${file}`, 'utf8').match(/'@smoke'/g) ?? []).length, 0)
-  assert.equal(count, 10)
+  assert.equal(count, 8)
+  // The flows a pull request must keep working: sign-up and sign-out, Bot and
+  // Coordinator chat with saved OpenUI replies, the board, settings sections
+  // and device authorization.
+  for (const [file, title] of [
+    ['bots.spec.ts', '新建 Bot 进入左侧列表，打开它自己的对话，消息不进 Coordinator'], ['agent.spec.ts', '历史仅可读取，原始数据保留，新对话动作进入当前 Bot'],
+    ['board-layout.spec.ts', '看板工具栏：范围切换、筛选和筛选条同高'], ['settings.spec.ts', '设置页打开并空闲后，每个分区首次打开都不显示骨架屏'],
+    ['device-authorization.spec.ts', 'a device grant is reviewed in the browser and exchanged for a daemon credential'],
+  ]) assert(readFileSync(`tests/e2e/${file}`, 'utf8').includes(`test('${title}', { tag: '@smoke' }`), file)
   assert.equal((readFileSync('tests/mvp/core-loop.spec.ts', 'utf8').match(/'@smoke'/g) ?? []).length, 1)
   // The keyed Turnstile run selects the sign-up smoke test.
   assert.match(readFileSync('tests/e2e/workspace.spec.ts', 'utf8'), /test\('注册、创建任务、菜单、搜索、视图切换和退出登录', \{ tag: \['@smoke', '@turnstile'\] \}/)
@@ -109,13 +85,10 @@ test('runner turns each tier into fixed argv and refuses anything else', () => {
   assert.deepEqual(browserArguments('smoke', '[]'), ['exec', 'playwright', 'test', '--grep', '@smoke', '--grep-invert', '@performance'])
   assert.deepEqual(browserArguments('targeted', JSON.stringify(['settings.spec.ts', 'teams.spec.ts'])),
     ['exec', 'playwright', 'test', '--grep', '@smoke|(?:^| )(?:settings\\.spec\\.ts|teams\\.spec\\.ts) ', '--grep-invert', '@performance'])
-  const main = browserArguments('main', '[]', '2/4')
-  assert.deepEqual(main.slice(3, -3), BROWSER_MAIN_SPECS.map(spec => `tests/e2e/${spec}`))
-  assert.deepEqual(main.slice(-3), ['--grep-invert', '@performance', '--shard=2/4'])
   assert.deepEqual(browserArguments('full', '[]'), ['exec', 'playwright', 'test', '--grep-invert', '@performance'])
   assert.deepEqual(browserArguments('full', '[]', '4/4').at(-1), '--shard=4/4')
   for (const [tier, list] of [
-    ['full', ['routes.spec.ts']], ['main', ['routes.spec.ts']], ['smoke', ['routes.spec.ts']], ['targeted', []],
+    ['full', ['routes.spec.ts']], ['main', []], ['main', ['routes.spec.ts']], ['smoke', ['routes.spec.ts']], ['targeted', []],
     ['docs', []], ['', []], ['targeted', ['../evil.spec.ts']], ['targeted', ['--pass-with-no-tests']],
     ['targeted', ['routes.spec.ts', 'routes.spec.ts']], ['targeted', ['$(touch /tmp/injected)']], ['smoke', [null]],
     ['targeted', ['missing-flow.spec.ts']], ['targeted', ['fixtures.ts']], ['targeted', ['a|b.spec.ts']],
@@ -228,11 +201,11 @@ test('trusted classifier writes actual GitHub outputs for event ranges and integ
   let count = 0
   for (const [event, payload, ref, tier, perf] of [
     ['pull_request', { pull_request: { base: { sha: base }, head: { sha: head } } }, '', 'smoke', 'false'],
-    ['pull_request', { pull_request: { base: { sha: base }, head: { sha: scopedHead } } }, '', 'targeted', 'false'],
+    ['pull_request', { pull_request: { base: { sha: base }, head: { sha: scopedHead } } }, '', 'smoke', 'false'],
     ['pull_request', { pull_request: { base: { sha: base }, head: { sha: unsafeHead } } }, '', 'full', 'false'],
     ['pull_request', {}, '', 'full', 'false'],
     ['pull_request', { pull_request: { base: { sha: 'missing' }, head: { sha: head } } }, '', 'full', 'false'],
-    ['push', { before: base, after: head }, 'refs/heads/main', 'main', 'false'],
+    ['push', { before: base, after: head }, 'refs/heads/main', 'full', 'true'],
     ['push', {}, 'refs/heads/main', 'full', 'true'],
     ['schedule', {}, '', 'full', 'true'], ['workflow_dispatch', {}, '', 'full', 'true'],
   ]) {
@@ -244,7 +217,7 @@ test('trusted classifier writes actual GitHub outputs for event ranges and integ
     assert.equal(outputs.browser_performance, perf)
     assert.equal(outputs.docs_only, 'false')
     assert.equal(outputs.verify_selection, 'false')
-    browserArguments(outputs.browser_tier, outputs.browser_specs, tier === 'main' || tier === 'full' ? '1/2' : undefined)
+    browserArguments(outputs.browser_tier, outputs.browser_specs, tier === 'full' ? '1/2' : undefined)
   }
 })
 
@@ -257,7 +230,7 @@ test('protected browser gate requires exactly the jobs of the selected tier', ()
   const script = gateScript()
   const result = (options = {}) => {
     const tier = options.tier ?? 'smoke'
-    const sharded = !['smoke', 'targeted'].includes(tier)
+    const sharded = tier !== 'smoke'
     return spawnSync('bash', ['-e', '-c', script], {
       env: {
         PATH: process.env.PATH,
@@ -276,9 +249,8 @@ test('protected browser gate requires exactly the jobs of the selected tier', ()
     }).status === 0
   }
   // Pull request tiers: the direct matrix must pass; shared jobs run only for policy validation.
-  for (const tier of ['smoke', 'targeted']) {
+  for (const tier of ['smoke']) {
     assert(result({ tier }))
-    assert(result({ tier, performance: 'true' }))
     for (const value of ['failure', 'cancelled', 'skipped', '']) assert(!result({ tier, pr: value }), `${tier} pr ${value}`)
     for (const job of ['build', 'runtime', 'full']) for (const value of ['success', 'failure', 'cancelled', '']) assert(!result({ tier, [job]: value }), `${tier} unexpected ${job} ${value}`)
     for (const value of ['failure', 'cancelled', 'skipped', '']) assert(!result({ tier, verify: 'true', build: value }), `${tier} policy build ${value}`)
@@ -290,7 +262,7 @@ test('protected browser gate requires exactly the jobs of the selected tier', ()
   assert(!result({ verify: 'maybe' }))
   assert(!result({ performance: 'maybe' }))
   // Sharded tiers: build, runtime and every shard, never the pull request job.
-  for (const [event, tier, performance] of [['push', 'main', 'false'], ['push', 'full', 'true'], ['schedule', 'full', 'true'], ['workflow_dispatch', 'full', 'true'], ['pull_request', 'full', 'true'], ['pull_request', 'full', 'false']]) {
+  for (const [event, tier, performance] of [['push', 'full', 'true'], ['schedule', 'full', 'true'], ['workflow_dispatch', 'full', 'true'], ['pull_request', 'full', 'true'], ['pull_request', 'full', 'false']]) {
     assert(result({ event, tier, performance }), `${event} ${tier}`)
     for (const value of ['failure', 'cancelled', 'skipped', '']) {
       for (const job of ['build', 'runtime', 'full']) assert(!result({ event, tier, performance, [job]: value }), `${event} ${tier} ${job} ${value}`)
@@ -301,8 +273,10 @@ test('protected browser gate requires exactly the jobs of the selected tier', ()
   assert(!result({ event: 'pull_request', tier: 'full', verify: 'true', selection: 'failure' }))
   // Tier and event must agree.
   for (const [event, tier, performance] of [
-    ['push', 'main', 'true'], ['push', 'smoke', 'false'], ['push', 'full', 'false'], ['schedule', 'main', 'false'],
+    ['push', 'main', 'true'], ['push', 'main', 'false'], ['push', 'smoke', 'false'], ['push', 'full', 'false'], ['schedule', 'main', 'false'],
     ['schedule', 'full', 'false'], ['workflow_dispatch', 'targeted', 'false'], ['pull_request', 'main', 'false'], ['pull_request', '', 'false'],
+    // Pull requests block only on smoke; targeted and pull request performance are retired.
+    ['pull_request', 'targeted', 'false'], ['pull_request', 'targeted', 'true'], ['pull_request', 'smoke', 'true'],
   ]) assert(!result({ event, tier, performance }), `${event} ${tier} ${performance}`)
   // Documentation: no browser runtime, but the classification must have succeeded.
   for (const event of ['pull_request', 'push']) {
@@ -325,17 +299,18 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   assert(pr.includes('services:\n      postgres:\n        image: postgres:17'))
   assert(pr.includes('pnpm exec next build'))
   assert(!pr.includes('actions/download-artifact') && !pr.includes('tar -xzf'))
-  assert(build.includes("browser_tier == 'main'") && build.includes("browser_tier == 'full'") && build.includes("verify_selection == 'true'"))
+  assert(!build.includes("'main'") && build.includes("browser_tier == 'full'") && build.includes("verify_selection == 'true'"))
+  assert(pr.includes("needs.changes.outputs.browser_tier == 'smoke'\n") && !pr.includes("'targeted'"))
   for (const lane of [runtime, job('browser-selection')]) {
     assert(lane.includes('needs: [changes, browser-build]'))
     assert(lane.includes('name: browser-build-${{ github.sha }}'))
     assert(lane.includes('services:\n      postgres:\n        image: postgres:17'))
     assert(!lane.includes('pnpm exec next build'))
   }
-  assert(runtime.includes("browser_tier == 'main'") && runtime.includes("browser_tier == 'full'"))
+  assert(!runtime.includes("'main'") && runtime.includes("browser_tier == 'full'"))
   const steps = pr.split('\n      - ')
   const step = name => steps.find(value => value.startsWith('name: ' + name + '\n'))
-  for (const name of ['Browser smoke and targeted specs', 'Sign-up through Cloudflare Turnstile with the public test keys']) {
+  for (const name of ['Browser smoke specs', 'Sign-up through Cloudflare Turnstile with the public test keys']) {
     assert(step(name)?.includes("matrix.lane == 'browser' && !cancelled()"), name)
   }
   for (const name of ['Test account allocation across independent PostgreSQL clients', 'Factory HTTP regressions against the built application (no skips)', 'Real HTTP authentication, account reuse and isolation']) {
@@ -384,9 +359,45 @@ test('workflow wires each tier to its jobs and keeps the protected check name', 
   assert(issue.includes('issues: write'))
   assert(issue.includes('listPullRequestsAssociatedWithCommit'))
   assert(issue.includes("github.event_name == 'push' && github.ref == 'refs/heads/main'"))
+  // It carries the browser-regression label and lists the failed specs and jobs.
+  assert(issue.includes("const label = 'browser-regression'"))
+  assert(issue.includes('labels: [label]'))
+  assert(issue.includes('pattern: browser-test-report-shard-*-${{ github.sha }}'))
+  assert(issue.includes('failedSpecs(') && issue.includes('listJobsForWorkflowRun') && issue.includes('actions: read'))
+  // Every Chromium install goes through the bounded, cached action.
+  assert(!source.includes('playwright install'))
+  assert.equal(source.match(/uses: \.\/\.github\/actions\/playwright-chromium\n/g).length, 4)
   // Every install goes through the read-only-on-PR cache action.
   assert(!source.includes('cache: pnpm'))
   assert.equal(source.match(/uses: \.\/\.github\/actions\/pnpm-install/g).length, 5)
+})
+
+test('a red main issue names the specs under "failed", not flaky or passed ones', () => {
+  const log = [
+    'Running 95 tests using 1 worker', '  ✘  12 [chromium] › tests/e2e/settings.spec.ts:85:1 › title (5.0s)', '',
+    '  3 failed',
+    '    [chromium] › tests/e2e/settings.spec.ts:85:1 › 默认工作区解析后改用带 workspace 的读取时，管理员分区不闪掉 ─────',
+    '    [chromium] › tests/e2e/settings.spec.ts:102:1 › 设置页打开并空闲后 ──────',
+    '    \x1b[31m[chromium] › members.spec.ts:19:1 › 成员导航\x1b[39m',
+    '  1 flaky',
+    '    [chromium] › tests/e2e/bots.spec.ts:7:1 › 新建 Bot',
+    '  1 skipped', '  90 passed (13.5m)',
+  ].join('\n')
+  assert.deepEqual(failedSpecs(log), ['members.spec.ts', 'settings.spec.ts'])
+  assert.deepEqual(failedSpecs('  95 passed (13.2m)\n'), [])
+  assert.deepEqual(failedSpecs('  1 failed\n    [chromium] › tests/e2e/../../evil.ts:1:1 › x\n'), [])
+})
+
+test('Chromium installs are cached on main, bounded per attempt and give up on a stalled apt mirror', () => {
+  const action = readFileSync('.github/actions/playwright-chromium/action.yml', 'utf8')
+  assert.match(action, /uses:\s+actions\/cache\/restore@[a-f0-9]{40}\b/)
+  assert.match(action, /uses:\s+actions\/cache\/save@[a-f0-9]{40}\b/)
+  assert(action.includes("if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'"))
+  assert(action.includes('timeout 300 pnpm exec playwright install --with-deps chromium'))
+  assert(action.includes('for attempt in 1 2 3; do'))
+  assert(action.includes('Acquire::http::Timeout'))
+  assert(BROWSER_INFRA_FILES.includes('.github/actions/playwright-chromium/action.yml'))
+  assert.equal(workflow().match(/timeout-minutes: 16\n {8}uses: \.\/\.github\/actions\/playwright-chromium\n/g).length, 4)
 })
 
 test('pnpm store cache is restored everywhere and saved only on main', () => {
@@ -500,7 +511,7 @@ process.exit(targeted ? Number(process.env.TEST_EXIT) : 0);
 test('CI-only updates run smoke with dedicated policy validation, without full functionality or performance', () => {
   for (const file of BROWSER_INFRA_FILES) {
     assert.deepEqual(browserPlan([file]), smoke, file)
-    assert.deepEqual(browserPlan([file, 'lib/slack/webhook.ts']).specs, ['slack-webhook.spec.ts'], `${file} mixed with a mapped path`)
+    assert.deepEqual(browserPlan([file, 'lib/slack/webhook.ts']), smoke, `${file} mixed with a mapped path`)
   }
   assert(needsSelectionValidation(['scripts/ci-docs-only.mjs']))
   assert(needsSelectionValidation(['.github/workflows/browser-tests.yml']))

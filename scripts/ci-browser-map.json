@@ -1,13 +1,11 @@
 {
   "smoke": [
-    "artifact-share-lifecycle.spec.ts",
+    "agent.spec.ts",
+    "board-layout.spec.ts",
+    "bots.spec.ts",
     "device-authorization.spec.ts",
-    "factory-acceptance-a2.spec.ts",
-    "factory-acceptance-ui.spec.ts",
-    "pending-actions.spec.ts",
-    "profile.spec.ts",
     "routes.spec.ts",
-    "test-account-pool.spec.ts",
+    "settings.spec.ts",
     "workspace.spec.ts"
   ],
   "main": [
@@ -66,12 +64,12 @@
     "bot-model-picker.spec.ts",
     "devices-settings.spec.ts",
     "factory-evidence-viewer.spec.ts",
-    "onboarding.spec.ts"
+    "onboarding.spec.ts",
+    "board-layout.spec.ts"
   ],
   "nightly": [
     "agent-performance.spec.ts",
     "navigation-performance.spec.ts",
-    "board-layout.spec.ts",
     "browser-pane.spec.ts",
     "desktop-translucent.spec.ts",
     "desktop-update.spec.ts",

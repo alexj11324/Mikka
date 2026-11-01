@@ -1,0 +1,35 @@
+name: Install Playwright Chromium
+description: >-
+  Chromium and its system packages for Playwright. The browser download is
+  cached per lockfile (saved by main pushes only, like the pnpm store), apt
+  gives up on a stalled mirror, and each attempt is bounded and retried so a
+  stuck download fails within minutes instead of holding the job.
+runs:
+  using: composite
+  steps:
+    - id: path
+      shell: bash
+      run: echo "path=$HOME/.cache/ms-playwright" >> "$GITHUB_OUTPUT"
+    - id: restore
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ${{ steps.path.outputs.path }}
+        key: playwright-chromium-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+    - name: Install Chromium and official system dependencies
+      shell: bash
+      run: |
+        # A stalled Ubuntu mirror once held apt for 18 minutes (run 41257416436).
+        printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+          | sudo tee /etc/apt/apt.conf.d/80-ci-timeouts > /dev/null
+        for attempt in 1 2 3; do
+          if timeout 300 pnpm exec playwright install --with-deps chromium; then exit 0; fi
+          echo "::warning::Chromium install attempt $attempt did not finish"
+          sleep 10
+        done
+        exit 1
+    - name: Save the Chromium download (main only)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ${{ steps.path.outputs.path }}
+        key: playwright-chromium-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}

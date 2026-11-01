@@ -53,46 +53,44 @@ cannot.
    suites are partitioned across four isolated PostgreSQL jobs; every shard
    validates the complete inventory before running its share sequentially, and
    the protected gate requires every shard to succeed.
-3. **Ready pull requests** (CI job "Browser tests (before merge)"): the browser
-   smoke set plus the specs of the areas the change touches, against the PR
-   merged with main. Two "Browser tests (pull request)" lanes start directly,
-   each building the same checkout with its own PostgreSQL database and test
-   identities: the browser lane runs smoke/targeted tests and Turnstile; the
-   runtime lane runs HTTP/account checks, the first MVP real-daemon test and any
-   required performance checks. Draft PRs defer this layer.
-   The trusted classifier on `main`
-   chooses:
+3. **Ready pull requests** (CI job "Browser tests (before merge)", the only
+   browser layer that blocks a merge): the browser smoke set, against the PR
+   merged with main, in a few minutes. Two "Browser tests (pull request)" lanes
+   start directly, each building the same checkout with its own PostgreSQL
+   database and test identities: the browser lane runs the smoke tests and
+   Turnstile; the runtime lane runs HTTP/account checks and the first MVP
+   real-daemon test. Draft PRs defer this layer. The trusted classifier on
+   `main` chooses:
 
    | Change | Browser acceptance before merge |
    | --- | --- |
    | Documentation only | No browser runtime; the required gate confirms classification |
-   | Any other change | The smoke set: the tests tagged `@smoke` (about ten) and the first MVP real-daemon test, plus the Factory HTTP, real HTTP authentication and test-account gates |
-   | Mapped paths (search, settings, Slack, Factory, threads, suggestions, devices, auth, relations, active agents) | Smoke plus the complete specs of each touched area |
-   | An edited spec under `tests/e2e/` | Smoke plus that complete spec |
-   | Paths the performance budgets measure (navigation shell, settings, saved history) or a performance spec | Also the desktop/mobile performance suite |
-   | Browser mapping data (`scripts/ci-browser-map.json`) | Smoke plus affected specs; mapping additions/removals add their old/new specs without reducing trusted-main coverage |
+   | Any other change, whatever it touches | The smoke set: the tests tagged `@smoke` and the first MVP real-daemon test, plus the Factory HTTP, real HTTP authentication and test-account gates |
    | Executable selection-policy changes (classifier, runner, this workflow) | Also "Browser selection validation": every scoped spec partitioned across four isolated subsets, each retaining the smoke tag |
-   | Unsafe file modes, unavailable comparisons, `integrate/` branches | The full tier (below) before merge |
+   | Unsafe file modes, unavailable comparisons, `integrate/` branches, a changed classifier with non-CI files | The full tier (below) before merge |
 
-   The smoke set covers anonymous redirects, sign-up (with Cloudflare's public
-   Turnstile test keys once the form sends a token), task creation, account
-   isolation, a settings save, Factory acceptance and approval, device
-   authorization, share revocation, an approval card and the real daemon loop.
+   The smoke set covers anonymous redirects, sign-up and sign-out (with
+   Cloudflare's public Turnstile test keys once the form sends a token), Bot and
+   Coordinator chat, saved replies with OpenUI components, the board toolbar,
+   every settings section, device authorization and the real daemon loop.
+   Area specs, edited specs and the performance suite run after the merge.
    The tags live in the specs; the area map, the main list and the nightly-only
    list live in `scripts/ci-browser-map.json`, and every spec file is in exactly one
-   of the main or nightly-only lists. Update that JSON when adding an area or
-   assigning a new spec to a tier. During policy updates the workflow uses a
+   of the main or nightly-only lists (the full tier runs both). Update that JSON
+   when adding an area or a new spec. During policy updates the workflow uses a
    fixed CI-only allowlist plus the trusted main classifier's documentation/mode
    checks; it cannot classify its own change as documentation-only, and any
    other file escalates to the full tier. Mapping data is parsed as JSON, never
-   executed; only trusted-main code can choose a narrower tier. Main/full runtime,
+   executed; only trusted-main code can choose a narrower tier. Full runtime,
    full browser shards and policy-validation jobs reuse their exact candidate build.
+   Chromium comes from a cache seeded by main, with bounded, retried installs.
    Failed classification or any skipped/failed required lane fails the gate.
-4. **After merge** (CI, every code-bearing push to main): the functional spec
-   files (the main list) on four shards, plus the runtime gates and both MVP
-   tests. A red run opens one issue (or comments on the open one) that names the
-   merged pull request's author, who fixes forward or reverts within one working
-   day; the issue closes on the next green main run.
+4. **After merge** (CI, every code-bearing push to main; it does not block a
+   merge): every spec plus the desktop/mobile performance suite on four shards,
+   the runtime gates and both MVP tests. A red run opens one `browser-regression`
+   issue (or comments on the open one) that lists the failed specs and jobs and
+   names the merged pull request's author, who fixes forward or reverts within
+   one working day; the issue closes on the next green main run.
 5. **Nightly** (19:17 UTC) and manual Actions → Browser tests → Run workflow:
    every spec, including visual/layout, the click crawler, slower edge cases
    and specs waiting to move to component or HTTP tests, plus the

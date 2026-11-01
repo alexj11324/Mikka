@@ -77,7 +77,7 @@ for (const width of [1280, 1440]) {
   })
 }
 
-test('看板工具栏：范围切换、筛选和筛选条同高', async ({ page }) => {
+test('看板工具栏：范围切换、筛选和筛选条同高', { tag: '@smoke' }, async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await register(page)
   await page.goto(app('/'))

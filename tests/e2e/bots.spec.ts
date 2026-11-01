@@ -4,7 +4,7 @@ import { test, expect, register, conversationPill, hydrated } from './fixtures'
 // chats on the Coordinator harness, in its own conversation. No model runs in
 // e2e, so a sent message stays pending in that bot's inbox, which is enough to
 // show where it went.
-test('新建 Bot 进入左侧列表，打开它自己的对话，消息不进 Coordinator', async ({ page }) => {
+test('新建 Bot 进入左侧列表，打开它自己的对话，消息不进 Coordinator', { tag: '@smoke' }, async ({ page }) => {
   await register(page)
   const bots = page.getByRole('list', { name: 'Bot', exact: true })
   await expect(bots.getByRole('button', { name: 'Coordinator', exact: true })).toBeVisible()

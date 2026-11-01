@@ -44,7 +44,7 @@ async function shareCount(artifactId: string) {
   }
 }
 
-test('a share link opens for a signed-out reader; stopping it ends that access', { tag: '@smoke' }, async ({ page, browser }) => {
+test('a share link opens for a signed-out reader; stopping it ends that access', async ({ page, browser }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => {} } })
   })

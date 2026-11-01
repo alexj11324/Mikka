@@ -11,7 +11,7 @@ import { test, expect, register, app } from './fixtures'
  * D12: the display name was a read-only span. It is an input that saves in
  * place and survives a reload.
  */
-test('个人资料名称可以编辑，保存后刷新仍然生效', { tag: '@smoke' }, async ({ page }) => {
+test('个人资料名称可以编辑，保存后刷新仍然生效', async ({ page }) => {
   await register(page)
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()

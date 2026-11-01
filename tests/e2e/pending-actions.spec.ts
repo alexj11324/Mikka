@@ -40,7 +40,7 @@ async function actionStatus(id: string) {
   }
 }
 
-test('审批卡片显示将要发送的邮件，拒绝后不报成功', { tag: '@smoke' }, async ({ page }) => {
+test('审批卡片显示将要发送的邮件，拒绝后不报成功', async ({ page }) => {
   await register(page)
   const { id } = await seedPendingEmail(page)
   await page.reload()

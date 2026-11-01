@@ -99,7 +99,7 @@ test('默认工作区解析后改用带 workspace 的读取时，管理员分区
   expect(gaps, '管理员分区在读取期间消失').toEqual([])
 })
 
-test('设置页打开并空闲后，每个分区首次打开都不显示骨架屏', async ({ page }) => {
+test('设置页打开并空闲后，每个分区首次打开都不显示骨架屏', { tag: '@smoke' }, async ({ page }) => {
   test.setTimeout(120000)
   await register(page, '/settings?section=preferences')
   const sidebar = page.locator('[data-slot="settings-list"]')

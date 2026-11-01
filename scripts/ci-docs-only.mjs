@@ -13,9 +13,8 @@
 //   node scripts/ci-docs-only.mjs            # reads the GitHub event payload
 //   node scripts/ci-docs-only.mjs --base origin/main --head HEAD
 //
-// Also selects the browser layer: pull requests run smoke plus targeted specs,
-// code-bearing main pushes run the main tier, nightly and manual runs run full
-// functionality plus performance. All outputs are computed by the trusted main
+// Also selects the browser layer: pull requests run the smoke set, code-bearing
+// main pushes and nightly and manual runs run every spec plus performance. All outputs are computed by the trusted main
 // copy, never by PR-supplied path patterns.
 
 import { execFileSync } from 'node:child_process'
@@ -53,17 +52,17 @@ export function isSchemaOnly(files) {
 // Browser tiers (CONTRIBUTING.md, "How changes are tested"):
 // - smoke: every non-docs pull request runs the tests tagged @smoke (about ten
 //   critical flows across the files below, plus the first MVP real-daemon test);
-// - targeted: smoke plus the complete specs of each area whose paths changed,
-//   and any existing spec the pull request edits;
-// - main: every code-bearing push to main runs the functional spec files below
-//   (whole files, including the smoke files) on four shards;
-// - full: nightly, manual runs and integrate/* pull requests run every spec plus
-//   performance on four shards. Unsafe modes and unknown ranges also take full.
-// Every spec file belongs to main or to the nightly-only list, so a new spec has
-// to choose its tier; a test is never dropped, only scheduled later.
+//   this is the only browser layer that blocks a merge;
+// - full: every code-bearing push to main, nightly and manual runs, and
+//   integrate/* pull requests run every spec plus performance on four shards.
+//   A red main run opens or updates a browser-regression issue. Unsafe modes
+//   and unknown ranges also take full.
+// - targeted: the area specs below, run only by the selection validation of a
+//   pull request that changes this policy.
+// Every spec file belongs to main or to the nightly-only list (the order the
+// full tier's shards reach them); a test is never dropped, only scheduled later.
 export const BROWSER_SMOKE_TAG = '@smoke'
 export const BROWSER_SPEC_NAME = /^[a-z0-9][a-z0-9-]*\.spec\.ts$/
-const BROWSER_MAP_PATH = 'scripts/ci-browser-map.json'
 
 function mapFields(value, fields, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).sort().join(',') !== [...fields].sort().join(',')) throw new Error('Invalid browser map ' + label)
@@ -98,7 +97,7 @@ export const BROWSER_MAIN_SPECS = Object.freeze(BROWSER_MAP.main)
 export const BROWSER_NIGHTLY_SPECS = Object.freeze(BROWSER_MAP.nightly)
 // Only the paired trusted map's expressions are compiled; PR paths remain data.
 const SCOPED_BROWSER = BROWSER_MAP.areas.map(area => ({ ...area, paths: area.paths.map(path => new RegExp(path)) }))
-export const BROWSER_INFRA_FILES = Object.freeze([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/workflows/analytics-ssr.yml", ".github/actions/pnpm-install/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-browser-map.json", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "CONTRIBUTING.md"])
+export const BROWSER_INFRA_FILES = Object.freeze([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/workflows/analytics-ssr.yml", ".github/actions/pnpm-install/action.yml", ".github/actions/playwright-chromium/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-browser-map.json", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "CONTRIBUTING.md"])
 const SELECTION_POLICY_FILES = new Set([".github/workflows/browser-tests.yml", "scripts/ci-docs-only.mjs", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/test-accounts/evidence.mjs"])
 export const needsSelectionValidation = files => files.some(file => SELECTION_POLICY_FILES.has(file))
 export const BROWSER_SCOPED_SPECS = Object.freeze([...new Set(SCOPED_BROWSER.flatMap(rule => rule.specs))].sort())
@@ -111,39 +110,14 @@ const PERFORMANCE_PATHS = [
 ]
 const touchesPerformance = files => files.some(file => PERFORMANCE_SPECS.includes(file) || PERFORMANCE_PATHS.some(pattern => pattern.test(file)))
 
-/** No dependency graph guess: unknown paths run smoke; mapped paths add whole area specs. */
-export function browserPlan(files, { unsafeModes = false, integration = false, mainPush = false, specExists = name => existsSync(`tests/e2e/${name}`) } = {}) {
+/** Pull requests run the smoke set; everything else waits for the full run on main. */
+export function browserPlan(files, { unsafeModes = false, integration = false, mainPush = false } = {}) {
   const full = performance => ({ tier: 'full', specs: [], performance })
   if (integration) return full(true)
   if (unsafeModes || !files.length) return full(mainPush || touchesPerformance(files))
   if (isDocsOnly(files)) return { tier: 'docs', specs: [], performance: false }
-  if (mainPush) return { tier: 'main', specs: [], performance: false }
-  const specs = new Set()
-  for (const file of files) {
-    if (isDocsOnly([file]) || BROWSER_INFRA_FILES.includes(file)) continue
-    // An edited spec runs whole, next to smoke; shared fixtures are covered by smoke.
-    if (file.startsWith('tests/e2e/')) {
-      const name = file.slice('tests/e2e/'.length)
-      if (BROWSER_SPEC_NAME.test(name) && specExists(name)) specs.add(name)
-      continue
-    }
-    for (const rule of SCOPED_BROWSER) if (rule.paths.some(pattern => pattern.test(file))) for (const spec of rule.specs) specs.add(spec)
-  }
-  return { tier: specs.size ? 'targeted' : 'smoke', specs: [...specs].sort(), performance: touchesPerformance(files) }
-}
-
-function changedMappingSpecs(candidate) {
-  const specs = new Set()
-  for (const tier of ['smoke', 'main', 'nightly']) {
-    for (const spec of [...BROWSER_MAP[tier], ...candidate[tier]]) if (BROWSER_MAP[tier].includes(spec) !== candidate[tier].includes(spec)) specs.add(spec)
-  }
-  const trustedAreas = new Map(BROWSER_MAP.areas.map(area => [area.area, area]))
-  const candidateAreas = new Map(candidate.areas.map(area => [area.area, area]))
-  for (const name of new Set([...trustedAreas.keys(), ...candidateAreas.keys()])) {
-    const before = trustedAreas.get(name), after = candidateAreas.get(name)
-    if (JSON.stringify(before) !== JSON.stringify(after)) for (const spec of [...(before?.specs ?? []), ...(after?.specs ?? [])]) specs.add(spec)
-  }
-  return [...specs].filter(spec => existsSync('tests/e2e/' + spec))
+  if (mainPush) return full(true)
+  return { tier: 'smoke', specs: [], performance: false }
 }
 
 /** Only non-executable regular files are eligible. */
@@ -249,11 +223,7 @@ export function main() {
     ? `${result.files.length} changed file(s)`
     : 'no changed files'
   const docsOnly = isDocsOnly(result.files, result.unsafeModes)
-  let plan = browserPlan(result.files, { unsafeModes: result.unsafeModes, mainPush })
-  if (process.env.GITHUB_EVENT_NAME === 'pull_request' && !result.unsafeModes && plan.tier !== 'full' && result.files.includes(BROWSER_MAP_PATH)) {
-    const extra = changedMappingSpecs(readBrowserMap(BROWSER_MAP_PATH))
-    if (extra.length) plan = { ...plan, tier: 'targeted', specs: [...new Set([...plan.specs, ...extra])].sort(), performance: plan.performance || touchesPerformance(extra.map(spec => 'tests/e2e/' + spec)) }
-  }
+  const plan = browserPlan(result.files, { unsafeModes: result.unsafeModes, mainPush })
   output(docsOnly, result.unsafeModes ? `${reason}; non-regular path or unmerged entry` : reason, plan, !mainPush && needsSelectionValidation(result.files))
 }
 

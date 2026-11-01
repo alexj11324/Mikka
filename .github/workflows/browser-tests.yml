@@ -1,14 +1,14 @@
 name: Browser tests
 
-# Three tiers (CONTRIBUTING.md, "How changes are tested"):
-# - pull requests: the @smoke set plus the complete specs of the areas the change
-#   touches, in directly started browser/runtime lanes with independent builds.
-#   Performance runs when a change touches what the budgets measure.
-# - push to main: the functional spec files on four shards. A red run opens or
-#   updates one issue that names the merged pull request's author.
-# - nightly and manual runs: every spec, including visual, crawler and slower
-#   specs, plus performance, on four shards. integrate/* pull requests run this
-#   tier before merge. Docs-only changes keep only the small gate jobs.
+# Two levels (CONTRIBUTING.md, "How changes are tested"):
+# - pull requests (blocks the merge): only the @smoke set, in directly started
+#   browser/runtime lanes with independent builds, in a few minutes.
+# - push to main (after the merge), nightly and manual runs: every spec,
+#   including visual, crawler and slower specs, plus performance, on four
+#   shards. A red main run opens or updates one browser-regression issue that
+#   lists the failed specs and names the merged pull request's author.
+#   integrate/* pull requests run this tier before merge. Docs-only changes keep
+#   only the small gate jobs.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -95,7 +95,7 @@ jobs:
           import { appendFileSync, readFileSync } from 'node:fs'
           import { pathToFileURL } from 'node:url'
           const { isDocsOnly, hasUnsafeModes } = await import(pathToFileURL(process.argv[2]).href)
-          const infra = new Set([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/workflows/analytics-ssr.yml", ".github/actions/pnpm-install/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-browser-map.json", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
+          const infra = new Set([".github/workflows/browser-tests.yml", ".github/workflows/ui-policy.yml", ".github/workflows/analytics-ssr.yml", ".github/actions/pnpm-install/action.yml", ".github/actions/playwright-chromium/action.yml", "scripts/ci-docs-only.mjs", "scripts/ci-browser-map.json", "scripts/ci-docs-only.test.mjs", "scripts/ci-browser-tests.mjs", "scripts/ci-browser-tests.test.mjs", "scripts/run-db-tests.mjs", "scripts/run-db-tests.test.mjs", "scripts/test-accounts/evidence.mjs", "AGENTS.md", "CONTRIBUTING.md"])
           const pullRequest = process.env.GITHUB_EVENT_NAME === 'pull_request'
           const integration = !pullRequest || process.env.INTEGRATION_ACCEPTANCE === 'true'
           let ciOnly = false, performance = integration
@@ -132,7 +132,7 @@ jobs:
     # Both isolated lanes build directly, avoiding a separate build environment and handoff.
     name: Browser tests (pull request, ${{ matrix.lane }})
     needs: changes
-    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.browser_tier == 'smoke' || needs.changes.outputs.browser_tier == 'targeted')
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft && needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.browser_tier == 'smoke'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -187,8 +187,8 @@ jobs:
           appendFileSync(process.env.GITHUB_ENV, `CRON_SECRET=${cronSecret}\n`)
           NODE
       - name: Install Chromium and official system dependencies
-        timeout-minutes: 15
-        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 16
+        uses: ./.github/actions/playwright-chromium
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
@@ -281,7 +281,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
-      - name: Browser smoke and targeted specs
+      - name: Browser smoke specs
         if: ${{ matrix.lane == 'browser' && !cancelled() }}
         env:
           BROWSER_TIER: ${{ needs.changes.outputs.browser_tier }}
@@ -416,8 +416,8 @@ jobs:
           appendFileSync(process.env.GITHUB_ENV, `CRON_SECRET=${cronSecret}\n`)
           NODE
       - name: Install Chromium and official system dependencies
-        timeout-minutes: 15
-        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 16
+        uses: ./.github/actions/playwright-chromium
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
@@ -470,7 +470,7 @@ jobs:
     # Main/full and policy validation share one exact build across their consumers.
     name: Browser build
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.browser_tier == 'main' || needs.changes.outputs.browser_tier == 'full' || needs.changes.outputs.verify_selection == 'true') && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.browser_tier == 'full' || needs.changes.outputs.verify_selection == 'true') && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -564,7 +564,7 @@ jobs:
   browser-runtime:
     name: Browser runtime gates
     needs: [changes, browser-build]
-    if: needs.changes.result == 'success' && needs.browser-build.result == 'success' && needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.browser_tier == 'main' || needs.changes.outputs.browser_tier == 'full')
+    if: needs.changes.result == 'success' && needs.browser-build.result == 'success' && needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.browser_tier == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -618,8 +618,8 @@ jobs:
           appendFileSync(process.env.GITHUB_ENV, `CRON_SECRET=${cronSecret}\n`)
           NODE
       - name: Install Chromium and official system dependencies
-        timeout-minutes: 15
-        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 16
+        uses: ./.github/actions/playwright-chromium
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
@@ -721,9 +721,9 @@ jobs:
   browser-e2e-full:
     name: Browser tests (selected layer)
     needs: [changes, browser-build]
-    if: needs.changes.result == 'success' && needs.browser-build.result == 'success' && (needs.changes.outputs.browser_tier == 'main' || needs.changes.outputs.browser_tier == 'full')
+    if: needs.changes.result == 'success' && needs.browser-build.result == 'success' && needs.changes.outputs.browser_tier == 'full'
     runs-on: ubuntu-latest
-    # Four independent shards for main and full: each matrix job gets its
+    # Four independent shards for the full tier: each matrix job gets its
     # own PostgreSQL service and test-account directory, so no fixture or lease
     # is shared across shards.
     strategy:
@@ -784,8 +784,8 @@ jobs:
           appendFileSync(process.env.GITHUB_ENV, `CRON_SECRET=${cronSecret}\n`)
           NODE
       - name: Install Chromium and official system dependencies
-        timeout-minutes: 15
-        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 16
+        uses: ./.github/actions/playwright-chromium
       - name: Bootstrap empty database using tracked migrations only
         run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
         env:
@@ -872,9 +872,9 @@ jobs:
           case "$VERIFY_SELECTION" in true|false) ;; *) fail "Missing selection validation plan" ;; esac
           case "$EVENT_NAME:$BROWSER_TIER:$DOCS_ONLY:$BROWSER_PERFORMANCE" in
             *:docs:true:false) echo "Documentation-only change; no browser runtime changed."; exit 0 ;;
-            pull_request:smoke:false:false|pull_request:smoke:false:true|pull_request:targeted:false:false|pull_request:targeted:false:true) layer=pull-request ;;
+            pull_request:smoke:false:false) layer=pull-request ;;
             pull_request:full:false:false|pull_request:full:false:true) layer=sharded ;;
-            push:main:false:false|push:full:false:true|schedule:full:false:true|workflow_dispatch:full:false:true) layer=sharded ;;
+            push:full:false:true|schedule:full:false:true|workflow_dispatch:full:false:true) layer=sharded ;;
             *) fail "Invalid browser test plan: $EVENT_NAME:$BROWSER_TIER:$DOCS_ONLY:$BROWSER_PERFORMANCE" ;;
           esac
           if [ "$VERIFY_SELECTION" = "true" ]; then
@@ -900,25 +900,39 @@ jobs:
           fi
 
   main-red-issue:
-    # A red main run opens one issue (or comments on the open one) that names
-    # the merged pull request's author, who fixes forward or reverts. The issue
-    # closes itself on the next green main run.
+    # A red main run opens one browser-regression issue (or comments on the
+    # open one) that lists the failed specs and names the merged pull request's
+    # author, who fixes forward or reverts. The issue closes itself on the next
+    # green main run.
     name: Track red browser runs on main
     needs: [changes, browser-e2e]
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.browser-e2e.result == 'failure' || (needs.browser-e2e.result == 'success' && needs.changes.outputs.docs_only != 'true')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
+      actions: read
       contents: read
       issues: write
       pull-requests: read
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: needs.browser-e2e.result == 'failure'
+        with:
+          sparse-checkout: scripts
+      - name: Collect the shard logs
+        if: needs.browser-e2e.result == 'failure'
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: browser-test-report-shard-*-${{ github.sha }}
+          path: red-main-reports
       - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           GATE_RESULT: ${{ needs.browser-e2e.result }}
         with:
           script: |
             const marker = '<!-- browser-tests-red-main -->'
+            const label = 'browser-regression'
             const { owner, repo } = context.repo
             const sha = context.sha
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`
@@ -936,17 +950,38 @@ jobs:
             const source = pull ? `#${pull.number}` : `commit \`${sha.slice(0, 7)}\``
             const line = `[Run](${runUrl}) on \`${sha.slice(0, 7)}\`, merged from ${source} by @${author}.`
             const ask = `@${author}, please fix forward or revert within one working day (CONTRIBUTING.md, "How changes are tested").`
+            // What failed: the shard logs' failed specs, else the failed jobs.
+            const { readdirSync, readFileSync } = require('node:fs')
+            const { join } = require('node:path')
+            const specs = new Set()
+            try {
+              const { failedSpecs } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci-browser-tests.mjs`)
+              for (const dir of readdirSync('red-main-reports')) {
+                try { for (const spec of failedSpecs(readFileSync(join('red-main-reports', dir, '.cache/e2e/playwright-browser.log'), 'utf8'))) specs.add(spec) }
+                catch (error) { core.warning(`No browser log in ${dir}: ${error.message}`) }
+              }
+            } catch (error) { core.warning(`Could not read the shard logs: ${error.message}`) }
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, { owner, repo, run_id: context.runId, per_page: 100 })
+            const failedJobs = jobs.filter(job => job.conclusion === 'failure' && job.name !== 'Browser tests (before merge)').map(job => `- [${job.name}](${job.html_url})`)
+            const failures = [
+              specs.size ? `Failed specs:\n${[...specs].map(spec => `- \`tests/e2e/${spec}\``).join('\n')}` : 'No failed spec was found in the shard logs; see the failed jobs.',
+              failedJobs.length ? `Failed jobs:\n${failedJobs.join('\n')}` : '',
+            ].filter(Boolean).join('\n\n')
             const assign = async number => {
               try { await github.rest.issues.addAssignees({ owner, repo, issue_number: number, assignees: [author] }) }
               catch (error) { core.warning(`Could not assign ${author}: ${error.message}`) }
             }
             if (open) {
-              await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `Still red. ${line}\n\n${ask}` })
+              await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `Still red. ${line}\n\n${failures}\n\n${ask}` })
+              try { await github.rest.issues.addLabels({ owner, repo, issue_number: open.number, labels: [label] }) }
+              catch (error) { core.warning(`Could not label #${open.number}: ${error.message}`) }
               await assign(open.number)
               core.notice(`Updated #${open.number}`)
               return
             }
-            const body = `${marker}\nThe browser tests after a merge to main failed.\n\n${line}\n\n${ask}\n\nThis issue gets a comment on every red main run and closes on the next green one.`
-            const { data: created } = await github.rest.issues.create({ owner, repo, title: 'Browser tests are red on main', body })
+            const body = `${marker}\nThe browser tests after a merge to main failed.\n\n${line}\n\n${failures}\n\n${ask}\n\nThis issue gets a comment on every red main run and closes on the next green one.`
+            try { await github.rest.issues.createLabel({ owner, repo, name: label, color: 'd73a4a', description: 'The full browser suite failed on main' }) }
+            catch (error) { if (error.status !== 422) core.warning(`Could not create the ${label} label: ${error.message}`) }
+            const { data: created } = await github.rest.issues.create({ owner, repo, title: 'Browser tests are red on main', body, labels: [label] })
             await assign(created.number)
             core.notice(`Opened #${created.number}`)

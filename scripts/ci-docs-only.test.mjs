@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, existsSync, symlinkSync, unlinkSync, realpathSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, existsSync, realpathSync } from 'node:fs'
 import { tmpdir as systemTmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
@@ -149,7 +149,7 @@ test('real git diffs retain all fixtures while testing rename, deletion and even
   const unrelatedHead = git(['commit-tree', root([oldDocs]), '-m', 'unrelated-history'])
   for (const [name, before, after, expectedDocs, tier, performance] of [
     ['main-docs', base, docsHead, true, 'docs', 'false'],
-    ['main-code', base, codeHead, false, 'main', 'false'],
+    ['main-code', base, codeHead, false, 'full', 'true'],
     ['main-unknown', '0'.repeat(40), docsHead, false, 'full', 'true'],
     ['main-nonancestor', unrelatedHead, docsHead, false, 'full', 'true'],
   ]) {
@@ -463,64 +463,29 @@ function mappingFixture(map = fixtureBrowserMap()) {
   } }
 }
 
-test('mapping JSON plus business code and a new spec stays targeted without selection validation', () => {
-  const fixture = mappingFixture()
-  fixture.map.areas.push({ area: 'new area', paths: ['^business/'], specs: ['new-area.spec.ts'] })
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  writeFileSync(join(fixture.repo, 'business.ts'), 'export const changed = true\n')
-  writeFileSync(join(fixture.repo, 'tests/e2e/new-area.spec.ts'), '// new spec\n')
-  const result = fixture.run()
-  assert.equal(result.browser_tier, 'targeted')
-  assert.deepEqual(JSON.parse(result.browser_specs), ['new-area.spec.ts'])
-  assert.equal(result.verify_selection, 'false')
-})
-
-test('a new mapping selects an existing unmodified spec without executing PR path expressions', () => {
-  const fixture = mappingFixture(), marker = join(fixture.repo, 'executed')
-  fixture.map.areas.push({ area: 'new area', paths: [`(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'bad'))()`], specs: ['unread.spec.ts'] })
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  const result = fixture.run()
-  assert.equal(result.browser_tier, 'targeted')
-  assert.deepEqual(JSON.parse(result.browser_specs), ['unread.spec.ts'])
-  assert.equal(result.verify_selection, 'false')
-  assert.equal(existsSync(marker), false)
-})
-
-test('removing a PR mapping cannot shrink trusted coverage', () => {
-  const fixture = mappingFixture()
-  fixture.map.areas = []
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  mkdirSync(join(fixture.repo, 'lib')); mkdirSync(join(fixture.repo, 'lib/fixture'))
-  writeFileSync(join(fixture.repo, 'lib/fixture/change.ts'), '// changed\n')
-  const result = fixture.run()
-  assert.equal(result.browser_tier, 'targeted')
-  assert.deepEqual(JSON.parse(result.browser_specs), ['settings.spec.ts'])
-})
-
-test('changed tier lists include added and removed existing specs without narrowing trusted coverage', () => {
-  const fixture = mappingFixture()
-  fixture.map.main = ['routes.spec.ts', 'unread.spec.ts']
-  fixture.map.nightly = ['settings.spec.ts']
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  const result = fixture.run()
-  assert.deepEqual(JSON.parse(result.browser_specs), ['settings.spec.ts', 'unread.spec.ts'])
-})
-
-test('a JSON-only mapping of an existing performance spec requires performance acceptance', () => {
-  const map = fixtureBrowserMap()
-  map.nightly.push('agent-performance.spec.ts')
-  const fixture = mappingFixture(map)
-  fixture.map.areas.push({ area: 'performance fixture', paths: ['^performance/'], specs: ['agent-performance.spec.ts'] })
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  const result = fixture.run()
-  assert.equal(result.browser_tier, 'targeted')
-  assert.equal(result.browser_performance, 'true')
-})
-
-test('invalid PR mapping JSON fails classification instead of silently skipping coverage', () => {
+test('a pull request that edits the mapping still runs only smoke, never reading or executing its paths', () => {
+  for (const change of [
+    (fixture, marker) => fixture.map.areas.push({ area: 'new area', paths: [`(() => require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'bad'))()`], specs: ['unread.spec.ts'] }),
+    fixture => { fixture.map.areas = [] },
+    fixture => { fixture.map.main = ['routes.spec.ts', 'unread.spec.ts']; fixture.map.nightly = ['settings.spec.ts'] },
+    fixture => { fixture.map.nightly.push('agent-performance.spec.ts') },
+  ]) {
+    const fixture = mappingFixture(), marker = join(fixture.repo, 'executed')
+    change(fixture, marker)
+    writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
+    mkdirSync(join(fixture.repo, 'lib/fixture'), { recursive: true })
+    writeFileSync(join(fixture.repo, 'lib/fixture/change.ts'), '// changed\n')
+    const result = fixture.run()
+    assert.equal(result.browser_tier, 'smoke')
+    assert.deepEqual(JSON.parse(result.browser_specs), [])
+    assert.equal(result.browser_performance, 'false')
+    assert.equal(result.verify_selection, 'false')
+    assert.equal(existsSync(marker), false)
+  }
+  // The pull request's own map is not read: even invalid JSON leaves the trusted plan.
   const fixture = mappingFixture()
   writeFileSync(fixture.candidate, '{ invalid JSON')
-  assert.throws(() => fixture.run())
+  assert.equal(fixture.run().browser_tier, 'smoke')
 })
 
 test('unsafe mapping modes retain the full fail-closed tier', () => {
@@ -529,20 +494,6 @@ test('unsafe mapping modes retain the full fail-closed tier', () => {
   const result = fixture.run()
   assert.equal(result.browser_tier, 'full')
   assert.equal(result.docs_only, 'false')
-})
-
-test('mapping JSON must be a regular file even when the Git diff describes a regular file', () => {
-  const fixture = mappingFixture()
-  fixture.map.areas.push({ area: 'new area', paths: ['^business/'], specs: ['unread.spec.ts'] })
-  writeFileSync(fixture.candidate, JSON.stringify(fixture.map))
-  fixture.git(['add', '.']); fixture.git(['commit', '-m', 'mapping change'])
-  const outside = join(fixture.dir, 'outside.json')
-  writeFileSync(outside, JSON.stringify(fixture.map))
-  unlinkSync(fixture.candidate); symlinkSync(outside, fixture.candidate)
-  // Keep the committed mapping range while replacing only its checkout entry.
-  const event = join(fixture.dir, 'symlink-event.json')
-  writeFileSync(event, JSON.stringify({ pull_request: { base: { sha: fixture.git(['rev-parse', 'HEAD^']) }, head: { sha: fixture.git(['rev-parse', 'HEAD']) } } }))
-  assert.throws(() => execFileSync(process.execPath, [fixture.entry], { cwd: fixture.repo, encoding: 'utf8', stdio: 'pipe', env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event } }))
 })
 
 test('trusted mapping schema rejects invalid fields, duplicate entries and malformed regexes', () => {
