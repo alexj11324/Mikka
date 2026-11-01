@@ -21,3 +21,8 @@ public and its build ready, then sets `E2B_BYO_COMPUTER_TEMPLATE` and
 `MIKKA_CLOUD_WORKER_SHA` (the full commit) in Vercel Production in one request
 and redeploys Production. If any step before that fails, Production keeps its
 previous pair; a worker whose SHA does not match the template is refused.
+
+A person's cloud computer keeps the template it was created from. On its next
+wake after a release, a computer built from an older worker commit, or one E2B
+no longer has, is replaced by a new one on the current template, unless a run
+is still live on its worker; the old desktop and files go with it.

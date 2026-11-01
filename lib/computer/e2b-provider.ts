@@ -2,7 +2,7 @@ import 'server-only'
 import { createHmac } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { Sandbox } from 'e2b'
+import { Sandbox, SandboxNotFoundError } from 'e2b'
 import { HOSTED_NATIVE_IMAGE } from '@mikka/protocol/subscription'
 import { computerTemplate, e2bApiKey, sandboxKeyOwner, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { E2BKeyError } from '@/lib/secrets/flag'
@@ -22,6 +22,22 @@ export async function connectComputer(workspaceId: string, id: string, signal?: 
   const owner = await ownerOf(workspaceId, id)
   const base = await options(owner)
   return withE2BErrors(owner, false, () => Sandbox.connect(id, { ...base, ...(signal ? { signal, retries: 0 } : {}) }))
+}
+
+/** The machine's sandbox no longer exists at E2B (killed, or expired while paused). */
+export function computerGone(error: unknown) {
+  return error instanceof SandboxNotFoundError
+}
+
+/** The worker commit baked into the sandbox's template. */
+export async function computerWorkerSha(sandbox: Sandbox) {
+  return (await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim()
+}
+
+export async function killComputer(workspaceId: string, id: string) {
+  const owner = await ownerOf(workspaceId, id)
+  const base = await options(owner)
+  await withE2BErrors(owner, false, () => Sandbox.kill(id, base))
 }
 
 export async function computerState(workspaceId: string, id: string) {
