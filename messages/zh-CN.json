@@ -2781,7 +2781,23 @@
       "sources": "{count} 个来源"
     },
     "sendUncertain": "未能确认消息是否送达。在这个输入框里原样重发不会产生重复；关闭或切换输入框、刷新页面或更换账号后再发，则可能重复。",
-    "lengthCount": "{count} / {max}"
+    "lengthCount": "{count} / {max}",
+    "modelPicker": {
+      "label": "模型：{name}",
+      "labelUnavailable": "模型：{name}，不可用",
+      "hosted": "Mikka 默认",
+      "credits": "点数",
+      "apiKey": "API Key",
+      "metered": "按量",
+      "shared": "团队成员分享的",
+      "sharedKey": "{name}的 Key",
+      "manage": "管理 API 与订阅",
+      "unavailable": "不可用",
+      "notSaved": "未保存",
+      "unknownModel": "未知模型",
+      "refresh": "刷新模型列表",
+      "refreshFailed": "刷新失败，重试"
+    }
   },
   "AgentCopy": {
     "pleaseSignInFirst": "请先登录。",

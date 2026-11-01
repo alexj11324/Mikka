@@ -64,6 +64,7 @@
     "site-search.spec.ts",
     "slack-webhook.spec.ts",
     "bot-agents-settings.spec.ts",
+    "bot-model-picker.spec.ts",
     "devices-settings.spec.ts",
     "factory-evidence-viewer.spec.ts",
     "onboarding.spec.ts"
@@ -219,7 +220,8 @@
         "thread-question.spec.ts",
         "coordinator-choice-card.spec.ts",
         "coordinator-scroll.spec.ts",
-        "question-card.spec.ts"
+        "question-card.spec.ts",
+        "bot-model-picker.spec.ts"
       ]
     },
     {
