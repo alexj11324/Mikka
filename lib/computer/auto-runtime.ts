@@ -1,5 +1,5 @@
 import 'server-only'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { subscriptionsUsableSql } from '@/lib/personal-policy'
 
@@ -14,6 +14,34 @@ export const botRuntimeProvisioner = {
     await new ComputerStore(pool).operate(actor, botId, 'wake')
     await (await import('./wake-worker')).ensureCloudBotWorker(pool, actor, botId)
   },
+}
+
+/** The owner's Coordinator in this workspace: an ordinary bot row (glossary:
+ * the Coordinator is a bot), named in coordinator_bots and created on first
+ * use. Its cloud runtime is its own, so a Coordinator run never borrows
+ * another bot's (#727). A bot the person already named "Coordinator" keeps
+ * its name; this one takes the next free one. */
+export async function ensureCoordinatorBot(pool: Pool, actor: Actor) {
+  const find = async (query: Pick<Pool, 'query'>) => (await query.query<{ botId: string }>(
+    'SELECT "botId" FROM coordinator_bots WHERE "ownerId"=$1 AND "workspaceId"=$2', [actor.userId, actor.workspaceId])).rows[0]?.botId
+  const found = await find(pool)
+  if (found) return found
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`coordinator-bot:${actor.userId}:${actor.workspaceId}`])
+    let botId = await find(client)
+    if (!botId) {
+      const taken = new Set((await client.query<{ name: string }>(`SELECT lower(name) AS name FROM bots WHERE "ownerId"=$1 AND "workspaceId"=$2 AND lower(name) LIKE 'coordinator%'`, [actor.userId, actor.workspaceId])).rows.map(row => row.name))
+      let name = 'Coordinator'
+      for (let n = 2; taken.has(name.toLowerCase()); n++) name = `Coordinator ${n}`
+      botId = randomUUID()
+      await client.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [botId, actor.workspaceId, actor.userId, name])
+      await client.query('INSERT INTO coordinator_bots ("ownerId","workspaceId","botId") VALUES ($1,$2,$3)', [actor.userId, actor.workspaceId, botId])
+    }
+    await client.query('COMMIT')
+    return botId
+  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
 }
 
 async function findRuntime(pool: Pool, actor: Actor, botId: string, harness: string) {

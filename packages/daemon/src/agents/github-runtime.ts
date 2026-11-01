@@ -43,11 +43,15 @@ export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path
   writeFileSync(wrapper, `#!/bin/sh\nexec env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} gh ${quote(config)} "$@"\n`, { mode: 0o700, flag: 'wx' })
   return {
     PATH: `${bin}${delimiter}${path}`, GH_HOST: 'github.com', GH_REPO: github.repository,
-    GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_COUNT: '3',
+    // The agent commits inside the sandbox, where a signing program or agent
+    // configured outside it (gpg, ssh-agent, a signing helper) is unreachable.
+    GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_COUNT: '5',
     GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '',
     GIT_CONFIG_KEY_1: 'credential.https://github.com.helper',
     GIT_CONFIG_VALUE_1: `!env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} git ${quote(config)}`,
     GIT_CONFIG_KEY_2: 'credential.useHttpPath', GIT_CONFIG_VALUE_2: 'true',
+    GIT_CONFIG_KEY_3: 'commit.gpgSign', GIT_CONFIG_VALUE_3: 'false',
+    GIT_CONFIG_KEY_4: 'tag.gpgSign', GIT_CONFIG_VALUE_4: 'false',
     GIT_AUTHOR_NAME: 'Mikka Agent', GIT_AUTHOR_EMAIL: 'agent@mikka.invalid',
     GIT_COMMITTER_NAME: 'Mikka Agent', GIT_COMMITTER_EMAIL: 'agent@mikka.invalid',
   }

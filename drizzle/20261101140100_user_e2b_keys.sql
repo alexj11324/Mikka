@@ -6,7 +6,7 @@
 -- to the workspace id): lib/secrets/e2b.ts moves one to its creator on first use
 -- and drops the workspace row. Additive and idempotent.
 -- Rollback: drop table user_e2b_keys;
---           delete from schema_migrations where name = '20261101130100_user_e2b_keys.sql';
+--           delete from schema_migrations where name = '20261101140100_user_e2b_keys.sql';
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 CREATE TABLE IF NOT EXISTS user_e2b_keys (
