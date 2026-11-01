@@ -5,7 +5,7 @@ import type { PublicationErrorCode, PublishedPullRequest } from '@/lib/run-publi
 /** One row for `coordinator_events`, before it gets an id. */
 export interface CoordinatorEventInput {
   userId: string
-  /** The bot whose chat it goes to; null or absent for the Coordinator's. */
+  /** The bot whose chat it goes to; null or absent when the work has no bot of its own, which goes to the person's Coordinator. */
   botId?: string | null
   kind: CoordinatorEventKind
   dedupeKey: string

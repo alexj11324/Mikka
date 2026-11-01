@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { chatView } from '@/lib/coordinator/store'
+import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import { reactionsFor } from '@/lib/reactions'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
@@ -40,7 +41,7 @@ async function handleGET(request: Request) {
     if (typeof user[tokenWorkspace] === 'string') {
       if (!await tokenBotAllowed(user, bot.data)) return json({ error: 'botNotFound' }, 404)
       const enabled = coordinatorEnabled()
-      const chat = await chatView(user.id, 200, bot.data)
+      const chat = await chatView(user.id, 200, await chatBotId(user.id, bot.data))
       return json({ ...chat, enabled, working: enabled && chat.working, reactions: await reactionsOf(user.id, chat.items) })
     }
     const chat = await getCoordinatorChat(bot.data)

@@ -4,6 +4,7 @@ import { auth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError, readPersonalSubmissionBody, PersonalSubmissionBodyError } from '@/lib/coordinator-submission'
 import { chatView } from '@/lib/coordinator/store'
+import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,7 @@ async function handleGET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   noteLogUser(session?.user?.id)
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
-  return NextResponse.json({ enabled: coordinatorEnabled(), ...(await chatView(session.user.id)) }, { headers: { 'Cache-Control': 'private, no-store' } })
+  return NextResponse.json({ enabled: coordinatorEnabled(), ...(await chatView(session.user.id, 200, await chatBotId(session.user.id, null))) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 /**

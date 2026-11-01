@@ -69,10 +69,12 @@ try {
   const digest = createHash('sha256').update(marker).digest('hex')
   const text = `${marker}; SHA-256=${digest}. This is a non-model protocol task result, not native CLI inference.`
   assert.equal((await mcp.call('send_to_coordinator', { text })).queued, true)
-  const rows = (await database.query('SELECT id,tier,"createdAt" FROM coordinator_events WHERE "userId"=$1 AND kind=\'run_report\' AND payload->>\'text\'=$2', [scope.owner.userId, text])).rows
+  const rows = (await database.query('SELECT id,tier,"createdAt","botId" FROM coordinator_events WHERE "userId"=$1 AND kind=\'run_report\' AND payload->>\'text\'=$2', [scope.owner.userId, text])).rows
   assert.equal(rows.length, 1)
   assert.equal(rows[0].tier, 'result', 'Only the existing host-classified peer-report path is used')
-  const eventId = rows[0].id, wakeScope = { userId: scope.owner.userId, botId: null }
+  // The message goes to the person's Coordinator, an ordinary bot row.
+  assert.ok(rows[0].botId, 'the Coordinator chat is keyed by its bot row')
+  const eventId = rows[0].id, wakeScope = { userId: scope.owner.userId, botId: rows[0].botId }
   mark('normal-mcp-producer-committed-result-event', { eventId, userId: scope.owner.userId, applicationSha })
   const started = performance.now()
   for (let index = 0; index < 3; index++) {
@@ -95,7 +97,7 @@ try {
     while (Date.now() < row.nextWakeAt.getTime()) await delay(Math.min(20_000, row.nextWakeAt.getTime() - Date.now()))
   }
   const replacement = createWakeRecovery(database)
-  assert.ok((await replacement.due()).some(value => value.userId === wakeScope.userId && value.botId === null))
+  assert.ok((await replacement.due()).some(value => value.userId === wakeScope.userId && value.botId === wakeScope.botId))
   const claim = await replacement.claim(wakeScope)
   assert.ok(claim)
   assert.equal(claim.attempt, 4)

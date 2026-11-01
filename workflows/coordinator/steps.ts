@@ -70,9 +70,15 @@ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   }
 }
 
-// `botId` picks the chat: null is the Coordinator, otherwise one of the person's bots.
+// `botId` picks the chat: one of the person's bots, their Coordinator included.
 
-export async function takeInbox(userId: string, holder: string, botId: string | null = null) {
+/** Whether this chat's bot is the person's Coordinator (lib/coordinator/coordinator-bot.ts). */
+export async function isCoordinatorChat(userId: string, botId: string) {
+  'use step'
+  return (await import('@/lib/coordinator/coordinator-bot')).isCoordinatorBot(pool, userId, botId)
+}
+
+export async function takeInbox(userId: string, holder: string, botId: string) {
   'use step'
   return store.takeInbox(userId, holder, botId)
 }
@@ -99,17 +105,17 @@ export async function recordAttention(userId: string, input: { matterId: string;
   }
 }
 
-export async function releaseLease(userId: string, holder: string, botId: string | null = null) {
+export async function releaseLease(userId: string, holder: string, botId: string) {
   'use step'
   return store.releaseLease(userId, holder, botId)
 }
 
-export async function failTurn(userId: string, holder: string, error: string, botId: string | null = null) {
+export async function failTurn(userId: string, holder: string, error: string, botId: string) {
   'use step'
   await store.failTurn(userId, holder, error, botId)
 }
 
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string | null = null, streamId?: string) {
+export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string) {
   'use step'
   return store.appendMessages(userId, holder, messages, warning, botId, streamId)
 }
@@ -118,7 +124,7 @@ export async function appendMessages(userId: string, holder: string, messages: M
  * 订阅额度用完后，自动改用 API Key: when this turn was frozen on the person's
  * key because the subscription ran out, the chat says so before the reply.
  */
-export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string | null = null) {
+export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string) {
   'use step'
   const { hostedApiKeySnapshotSchema } = await import('@/lib/subscription-model-snapshot')
   const selection = hostedApiKeySnapshotSchema.safeParse(runtime.modelSelection)
@@ -136,18 +142,18 @@ export async function writeStreamPart(writable: WritableStream<CoordinatorWorkfl
 /** Every chunk revalidates its source, owner, chat lease and current Telegram
  * link. A cached earlier step cannot turn a revoked link into send authority.
  * Telegram has no idempotency key: response loss can remain externally uncertain. */
-export async function sendTelegramChunk(userId: string, botId: string | null, holder: string, target: PendingTelegramTarget, chunk: string) {
+export async function sendTelegramChunk(userId: string, botId: string, holder: string, target: PendingTelegramTarget, chunk: string) {
   'use step'
   await createTelegramReplies(pool, workspacePool).send(userId, botId, holder, target, tx => postTelegramText(target.threadId, chunk, tx))
 }
 
-export async function acknowledgeTelegramReply(userId: string, botId: string | null, holder: string, target: PendingTelegramTarget) {
+export async function acknowledgeTelegramReply(userId: string, botId: string, holder: string, target: PendingTelegramTarget) {
   'use step'
   await createTelegramReplies(pool, workspacePool).acknowledge(userId, botId, holder, target)
 }
 
 /** Pushes a reply the Coordinator raised on its own to the person's phones, as their 通知 settings allow (lib/mobile-push.ts). */
-export async function pushToPhones(userId: string, botId: string | null, text: string | null, reasons: PushReason[]) {
+export async function pushToPhones(userId: string, botId: string, text: string | null, reasons: PushReason[]) {
   'use step'
   // Loaded here, not at the top: only this step needs the push sender and its settings.
   const { pushReply } = await import('@/lib/mobile-push')
@@ -159,7 +165,7 @@ export async function pushToPhones(userId: string, botId: string | null, text: s
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string, botId: string | null = null, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; messages: ModelMessage[] }> {
   'use step'
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
@@ -197,13 +203,13 @@ export async function preparePrompt(userId: string, botId: string | null = null,
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
 
 export async function mailboxToolsEnabled() { 'use step'; return personalMailboxEnabled() }
-export async function mailboxCatalogue(userId: string, botId: string | null, executionId?: string) {
+export async function mailboxCatalogue(userId: string, botId: string, executionId?: string) {
   'use step'
   if (!personalMailboxEnabled()) return []
   const { personalConversationMailboxAdvertised } = await import('@/lib/personal-mailbox-runtime')
   return personalConversationMailboxAdvertised(userId, botId, executionId)
 }
-export async function personalMailbox(userId: string, botId: string | null, request: MailboxToolRequest, scope?: NativeToolScope, executionId?: string) {
+export async function personalMailbox(userId: string, botId: string, request: MailboxToolRequest, scope?: NativeToolScope, executionId?: string) {
   'use step'
   if(scope?.scheduledRead)throw new FatalError('scheduleToolNotAllowed')
   await assertNativeToolScope(userId, scope)
@@ -213,7 +219,7 @@ export async function personalMailbox(userId: string, botId: string | null, requ
   return result.body
 }
 
-export async function remember(userId: string, input: { note: string }, scope?: NativeToolScope, botId: string | null = null) {
+export async function remember(userId: string, input: { note: string }, scope: NativeToolScope | undefined, botId: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
@@ -222,7 +228,7 @@ export async function remember(userId: string, input: { note: string }, scope?: 
   }, botId)
 }
 
-export async function forget(userId: string, input: { text: string }, scope?: NativeToolScope, botId: string | null = null) {
+export async function forget(userId: string, input: { text: string }, scope: NativeToolScope | undefined, botId: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return store.editMemory(userId, memory => {
@@ -231,8 +237,8 @@ export async function forget(userId: string, input: { text: string }, scope?: Na
   }, botId)
 }
 
-/** 团队权限 › 允许使用的应用: a workspace can block an app for its bots. The personal Coordinator (no botId) is not governed. */
-async function appBlockedForBot(botId: string | null | undefined, action: ComposioActionName) {
+/** 团队权限 › 允许使用的应用: a workspace can block an app for its bots. The person's Coordinator is not governed (lib/app-policy/store.ts). */
+async function appBlockedForBot(botId: string | undefined, action: ComposioActionName) {
   if (!botId) return false
   const { botMayUseApp } = await import('@/lib/app-policy/store')
   const { isPolicyApp } = await import('@/lib/app-policy/apps')
@@ -242,14 +248,14 @@ async function appBlockedForBot(botId: string | null | undefined, action: Compos
   return Boolean(toolkit && isPolicyApp(toolkit) && !(await botMayUseApp(botId, toolkit)))
 }
 
-export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
+export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return accountId ? runComposioAction(userId, action, input, accountId) : runComposioAction(userId, action, input)
 }
 
-export async function personalMcp(userId: string, botId: string | null, executionId: string | undefined, input: import('@/lib/plugins/mcp').PersonalMcpCommand, scope?: NativeToolScope) {
+export async function personalMcp(userId: string, botId: string, executionId: string | undefined, input: import('@/lib/plugins/mcp').PersonalMcpCommand, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
   // Scheduled read grants never authorize arbitrary remote MCP tools.
@@ -266,7 +272,7 @@ export async function personalMcp(userId: string, botId: string | null, executio
 personalMcp.maxRetries = 0
 
 /** Apps connected from the 插件 store, through the tools Composio lists for them (lib/app-tools.ts). */
-export async function appTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown, scope?: NativeToolScope) {
+export async function appTools(userId: string, botId: string, operation: 'list' | 'call', input: unknown, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (scope?.scheduledRead && operation === 'call') return { error: 'integrationActionNotAllowed' }
@@ -276,7 +282,7 @@ export async function appTools(userId: string, botId: string | null, operation: 
 // A write may have happened even when its step fails; never replay it.
 appTools.maxRetries = 0
 
-export async function accountWrite(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string | null) {
+export async function accountWrite(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
@@ -285,7 +291,7 @@ export async function accountWrite(userId: string, action: ApprovalActionName, i
 // A send has no idempotency key: a replayed step could send it twice.
 accountWrite.maxRetries = 0
 
-export async function proposeRepositoryPushApproval(userId: string, input: { repo: string }, scope?: NativeToolScope, task?: { eventId: string; botId: string | null }) {
+export async function proposeRepositoryPushApproval(userId: string, input: { repo: string }, scope?: NativeToolScope, task?: { eventId: string; botId: string }) {
   'use step'
   await assertNativeToolScope(userId, scope)
   return proposeRepositoryPush(userId, input, task)
@@ -303,7 +309,7 @@ export async function listIssues(userId: string, input: { status?: string }, sco
   }))
 }
 
-export async function getIssue(userId: string, input: { issueId: string }, scope?: NativeToolScope, botId: string | null = null) {
+export async function getIssue(userId: string, input: { issueId: string }, scope: NativeToolScope | undefined, botId: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   const issue = await issueForUser(userId, input.issueId)
@@ -317,18 +323,18 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
   }
 }
 
-export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope?: NativeToolScope, botId: string | null = null, taskEventId?: string) {
+export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string, taskEventId?: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
-  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId ?? 'coordinator'), toolCallId, taskEventId ? { eventId: taskEventId, botId } : undefined)
+  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId), toolCallId, taskEventId ? { eventId: taskEventId, botId } : undefined)
 }
 
-export async function updateIssue(userId: string, input: UpdateIssueInput, toolCallId: string, scope?: NativeToolScope, botId: string | null = null) {
+export async function updateIssue(userId: string, input: UpdateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
-  return (await import('@/lib/mcp/actions')).updateIssue(userId, input, systemActor(botId ?? 'coordinator'), toolCallId)
+  return (await import('@/lib/mcp/actions')).updateIssue(userId, input, systemActor(botId), toolCallId)
 }
 
 export async function listAgents(userId: string, scope?: NativeToolScope) {
@@ -337,8 +343,8 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
   return (await import('@/lib/mcp/actions')).listAgents(userId)
 }
 
-/** The run belongs to the bot that dispatched it, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string }, scope?: NativeToolScope, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+/** The run belongs to the bot that dispatched it, the Coordinator included, so its events come back to that bot's chat. */
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   return asToolResult(async () => {
@@ -359,12 +365,12 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
       }
       if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
-      // The bot's own runtime, created on first use; the Coordinator's lives on its own bot row.
+      // The bot's own runtime, created on first use; the Coordinator's is its bot row's like any bot's.
       // An API-key model binds no subscription to it.
       const autoRuntime=await import('@/lib/computer/auto-runtime')
       const actor={userId,workspaceId:target.workspaceId}
-      const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId ?? await autoRuntime.ensureCoordinatorBot(pool,actor),{harness:target.harness,model:'apiKey' in target ? undefined : target.model})
-      const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,reportToCoordinator:botId===null},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
+      const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId,{harness:target.harness,model:'apiKey' in target ? undefined : target.model})
+      const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
       // The person's own E2B refused (capacity, quota, key): same as no cloud.
       if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
       return target.fallback ? queueOnDevice(target.fallback) : noMachine()
@@ -415,7 +421,7 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
-export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model?:string; repo?:string; reportToCoordinator?:boolean; suggestionId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
+export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model?:string; repo?:string; suggestionId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
@@ -430,7 +436,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   let queuedRunId: string | null = null
   try {
     if (input.suggestionId && !(await pool.query('SELECT 1 FROM suggestion_executions WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("botId" IS NULL OR "botId"=$4)', [input.suggestionId, userId, target.workspaceId, input.botId])).rowCount) return { error: 'suggestionUnavailable' }
-    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.repo ? input.model ?? 'auto' : input.model, reportToCoordinator:input.reportToCoordinator, ...(input.repo ? {deviceRepoId:(await (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo)).id} : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution })
+    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId: target.repoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.repo ? input.model ?? 'auto' : input.model, ...(input.repo ? {deviceRepoId:(await (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo)).id} : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution })
     if (input.suggestionId) await pool.query('UPDATE suggestion_executions SET "botId"=$4,"runId"=$5,status=\'running\' WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("runId" IS NULL OR "runId"=$5)', [input.suggestionId, userId, target.workspaceId, input.botId, result.runId])
     if (process.env.MIKKA_CLOUD_THREAD_MACHINES === '1') {
       const actor = { userId, workspaceId: target.workspaceId as string }
@@ -578,7 +584,7 @@ export async function personalWrite(userId:string, botId:string | null, executio
   return personalWriteFromRun(userId,botId,executionId,call,scope?.holder!==undefined?scope:undefined)
 }
 /** Durable personal intake; existing issue receipts recover a crash before routing. */
-export async function intakeFactoryRequest(userId: string, input: import('@/lib/factory/intake').IntakeInput, scope?: NativeToolScope, botId: string | null = null) {
+export async function intakeFactoryRequest(userId: string, input: import('@/lib/factory/intake').IntakeInput, scope: NativeToolScope | undefined, botId: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
   return asToolResult(async () => {
@@ -587,7 +593,7 @@ export async function intakeFactoryRequest(userId: string, input: import('@/lib/
     const store=factoryForBot(botId)
     return intakeRequest(input, {
       source:id=>factoryRequestSource(userId,botId,id),
-      create:async(body,key)=>(await import('@/lib/mcp/actions')).createIssue(userId,body,systemActor(botId ?? 'coordinator'),key),
+      create:async(body,key)=>(await import('@/lib/mcp/actions')).createIssue(userId,body,systemActor(botId),key),
       route:route=>store.route(userId,route),
     })
   })
@@ -650,12 +656,12 @@ export async function scheduleCommand(userId:string,botId:string|null,sourceEven
   const {executeScheduleCommand}=await import('@/lib/schedules/runtime')
   return executeScheduleCommand(userId,botId,sourceEventId,input)
 }
-export async function assertScheduleRead(userId:string,botId:string|null,scope:import('@/lib/schedules/contract').ScheduledRead){
+export async function assertScheduleRead(userId:string,botId:string,scope:import('@/lib/schedules/contract').ScheduledRead){
   'use step'
   const {assertScheduledRead}=await import('@/lib/schedules/runtime')
   await assertScheduledRead(userId,botId,scope)
 }
-export async function completeScheduleRead(userId:string,botId:string|null,scope:import('@/lib/schedules/contract').ScheduledRead,text:string,streamId?:string){
+export async function completeScheduleRead(userId:string,botId:string,scope:import('@/lib/schedules/contract').ScheduledRead,text:string,streamId?:string){
   'use step'
   const {schedules}=await import('@/lib/schedules/runtime')
   await schedules().completeRead(userId,botId,scope,text,streamId)

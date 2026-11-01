@@ -8,6 +8,7 @@ import { coordinatorEvents } from './db/schema'
 import type { db } from './db'
 import { MESSAGE_MAX } from './message-limits'
 import { taskDestinationSchema, type TaskDestination } from './task-destination'
+import { chatBotId } from './coordinator/coordinator-bot'
 
 /** Personal Coordinator HTTP contract. Question/approval fields are not supported. */
 export const personalSubmissionInput = z.object({
@@ -22,24 +23,25 @@ export class SubmissionConflictError extends Error {
 
 type Executor = Pick<typeof db, 'insert' | 'select'>
 
-function submissionKey(userId: string, botId: string | null, submissionId: string) {
+function submissionKey(userId: string, botId: string, submissionId: string) {
   return `personal_submission:v1:${createHash('sha256').update(JSON.stringify([userId, botId, submissionId])).digest('hex')}`
 }
 
 /** Read an existing receipt without inserting an event for an already-dismissed suggestion. */
 export async function personalSubmissionRecorded(executor: Pick<typeof db, 'select'>, userId: string, text: string, submissionId: string): Promise<boolean> {
   const id = personalSubmissionInput.shape.submissionId.parse(submissionId)!
+  const botId = await chatBotId(userId, null, { backfill: false })
   const [prior] = await executor.select({ userId: coordinatorEvents.userId, botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, issueId: coordinatorEvents.issueId, runId: coordinatorEvents.runId, payload: coordinatorEvents.payload })
-    .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, submissionKey(userId, null, id))).limit(1)
+    .from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey, submissionKey(userId, botId, id))).limit(1)
   if (!prior) return false
-  if (prior.userId !== userId || prior.botId !== null || prior.kind !== 'user_message' || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(prior.payload, { text })) throw new SubmissionConflictError()
+  if (prior.userId !== userId || prior.botId !== botId || prior.kind !== 'user_message' || prior.issueId !== null || prior.runId !== null || !isDeepStrictEqual(prior.payload, { text })) throw new SubmissionConflictError()
   return true
 }
 
-/** Caller authenticates the person and validates any Bot ownership before calling. */
+/** Caller authenticates the person and validates any Bot ownership before calling. No bot: the person's Coordinator. */
 export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId?: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; humanSessionId?: string } = {}) {
   const submissionId = personalSubmissionInput.shape.submissionId.parse(options.submissionId)
-  const botId = options.botId ?? null
+  const botId = await chatBotId(userId, options.botId, { backfill: false })
   const images = normalizeUserImages(options.images)
   const taskDestination = options.taskDestination ? taskDestinationSchema.parse(options.taskDestination) : undefined
   const dedupeKey = submissionId

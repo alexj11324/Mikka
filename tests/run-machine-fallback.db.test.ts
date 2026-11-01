@@ -50,7 +50,9 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
     return deviceId
   }
-  const dispatch = (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId)
+  // No bot named: the person's Coordinator, an ordinary bot row the app resolves.
+  const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
+  const dispatch = async (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, await chatBotId(userId, botId))
   type NoMachine = { error: string; card: { title: string; options: { value: string; action: string }[] } }
   const actions = (result: NoMachine) => result.card.options.map(option => option.action)
   const runOf = async (runId: string) => (await pool.query('SELECT "deviceId",status FROM agent_runs WHERE id=$1', [runId])).rows[0]

@@ -115,16 +115,15 @@ export type MobileArtifact = { id: string; title: string; kind: 'markdown' | 'ht
  * A bot's page (docs/design/mobile.md, 资料): its threads, the pull requests
  * of the tasks they worked on, its scheduled tasks, its 资料库 (what those
  * threads handed over) and the person's 置顶 / 通知 for it, as the web's right
- * panel shows them. `botId` null is the Coordinator, whose threads are the
- * ones it dispatched: no bot on the run, and not from an MCP client.
+ * panel shows them. The Coordinator is one of the bots: its threads carry its bot row's id.
  */
-export async function mobileBot(userId: string, workspaceId: string, botId: string | null): Promise<{ threads: MobileThread[]; pullRequests: MobilePullRequest[]; schedules: MobileSchedule[]; library: MobileArtifact[]; pinned: boolean; muted: boolean }> {
-  const own = botId ? eq(agentRuns.botId, botId) : and(isNull(agentRuns.botId), sql`${agentRuns.source} IS DISTINCT FROM 'mcp'`)
+export async function mobileBot(userId: string, workspaceId: string, botId: string): Promise<{ threads: MobileThread[]; pullRequests: MobilePullRequest[]; schedules: MobileSchedule[]; library: MobileArtifact[]; pinned: boolean; muted: boolean }> {
+  const own = eq(agentRuns.botId, botId)
   const [rows, schedules] = await Promise.all([
     runRows(userId, own, 60),
     pool.query<{ id: string; title: string; status: 'active' | 'paused'; next_at: Date | null }>(
       `SELECT id, definition->>'title' AS title, status, next_at FROM user_schedules
-       WHERE owner_id=$1 AND workspace_id IS NOT DISTINCT FROM $2::uuid AND bot_id IS NOT DISTINCT FROM $3::uuid AND status IN ('active','paused')
+       WHERE owner_id=$1 AND workspace_id=$2::uuid AND bot_id=$3::uuid AND status IN ('active','paused')
        ORDER BY next_at ASC NULLS LAST LIMIT 50`, [userId, workspaceId, botId]),
   ])
   // 资料库: what its threads handed over, newest first; and the person's 置顶 / 通知 for this chat.
@@ -133,7 +132,7 @@ export async function mobileBot(userId: string, workspaceId: string, botId: stri
     runIds.length ? pool.query<{ id: string; title: string; kind: 'markdown' | 'html'; version: number; updated_at: Date }>(
       `SELECT id, title, kind, "latestVersion" AS version, "updatedAt" AS updated_at FROM artifacts
        WHERE "userId"=$1 AND "runId" = ANY($2::uuid[]) ORDER BY "updatedAt" DESC LIMIT 30`, [userId, runIds]) : { rows: [] },
-    pool.query<{ pinned: boolean; muted: boolean }>('SELECT pinned, muted FROM chat_preferences WHERE "userId"=$1 AND "chatKey"=$2', [userId, botId ?? 'coordinator']),
+    pool.query<{ pinned: boolean; muted: boolean }>('SELECT pinned, muted FROM chat_preferences WHERE "userId"=$1 AND "chatKey"=$2', [userId, botId]),
   ])
   // A PR's own title when it was published with one, else its task's.
   const titles = new Map(rows.flatMap(row => row.pullRequests.map(pr => [pr.url, pr.title ?? row.issue?.title ?? ''] as const)))

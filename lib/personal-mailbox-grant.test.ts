@@ -14,12 +14,12 @@ const owner = 'owner', botId = '28700000-0000-4000-8000-000000000011', namespace
 const revision = '28700000-0000-4000-8000-000000000013', executionId = '28700000-0000-4000-8000-000000000014'
 function fixture() {
   const snapshot = makeSnapshot(revision, 1, { ...DEFAULT_AGENT_DEFINITION, tools: ['mailbox_inbox'] }, 'HOST', { harness: 'ai_sdk', model: 'synthetic' })
-  const state = { owner, key: botId as string, namespace: namespace as string | null, status: 'running', current: snapshot.definition, snapshot,
+  const state = { owner, key: botId as string, coordinator: false, namespace: namespace as string | null, status: 'running', current: snapshot.definition, snapshot,
     version: revision, executionId, rowVersion: revision, headLocked: false }
   const queries: string[] = []
   const q = { async query(sql: string, params: unknown[] = []) {
     queries.push(sql)
-    if (sql.startsWith('select bot_key from')) return { rows: params[0] === state.owner && params[1] === state.executionId ? [{ bot_key: state.key }] : [] }
+    if (sql.startsWith('select e.bot_key')) return { rows: params[0] === state.owner && params[1] === state.executionId ? [{ bot_key: state.key, coordinator: state.coordinator }] : [] }
     if (sql.startsWith('select active_version')) { if (sql.includes('for share')) state.headLocked = true; return { rows: params[0] === state.owner && params[1] === state.key ? [{ active_version: state.version, workspace_id: state.namespace }] : [] } }
     if (sql.startsWith('select snapshot')) return { rows: params[0] === state.owner && params[1] === state.key && params[2] === state.executionId ? [{ snapshot: state.snapshot, status: state.status, version_id: state.rowVersion }] : [] }
     if (sql.startsWith('select definition')) return { rows: [{ definition: state.current, digest: digest(state.current) }] }
@@ -73,7 +73,10 @@ test('Coordinator may delegate to its owned Bot; another named Bot never supplie
   const f = fixture(), worker = freezeWorkerDefinition({ harness: 'codex', instructions: 'Bound', prompt: 'Task', parent: f.state.snapshot, executionId, mailboxEnabled: true, mailboxScope: { botId, workspaceId: namespace } })
   f.state.key = 'coordinator'; f.state.namespace = null
   assert.deepEqual(await mailboxGrantTools(f.q, { ...f.identity, worker }), ['mailbox_inbox'])
-  f.state.key = 'another-bot'
+  // The Coordinator is now its bot row (coordinator_bots), whose head lives in the Coordinator's own workspace.
+  f.state.key = '28700000-0000-4000-8000-0000000c0de1'; f.state.coordinator = true; f.state.namespace = '28700000-0000-4000-8000-0000000c0de2'
+  assert.deepEqual(await mailboxGrantTools(f.q, { ...f.identity, worker }), ['mailbox_inbox'])
+  f.state.key = 'another-bot'; f.state.coordinator = false; f.state.namespace = namespace
   await assert.rejects(mailboxGrantTools(f.q, { ...f.identity, worker }), /parent scope/)
 })
 test('controlled concurrent revocation waits for the same transaction grant lock, then blocks the next effect', async () => {
