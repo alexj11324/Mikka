@@ -15,19 +15,18 @@ import {
 } from "./contract";
 import { handleFactory } from "./http";
 import { createFactoryStore, type FactoryTask } from "./store";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
-// Only an explicitly opted-in, disposable local PG or the existing CI PG service.
+// Only an explicitly opted-in local PG or a disposable loopback *_e2e database.
 const localURL = process.env.FACTORY_CYCLE_TEST_URL;
 const dbURL =
   localURL ??
-  (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true"
-    ? process.env.E2E_DATABASE_URL
-    : undefined);
+  (disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined);
 if (dbURL) {
   const url = new URL(dbURL);
   assert.equal(url.protocol, "postgresql:");
   assert.equal(url.hostname, "127.0.0.1");
-  assert.equal(url.pathname, "/mikka_e2e");
+  assert.ok(disposableDatabase(process.env, dbURL), "loopback *_e2e only");
   if (localURL) assert.equal(url.username, "factorycycle192");
 }
 const binding = (task: FactoryTask): FactoryBinding => ({

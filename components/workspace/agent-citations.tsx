@@ -3,12 +3,13 @@
 import { createContext, useContext, useState, type ComponentProps } from 'react'
 import useSWR from 'swr'
 import { Globe } from 'lucide-react'
+import { GitHubIcon } from '@/components/icons/brand-icons'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { cn } from 'cn'
-import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
+import { HarnessMark } from '@/components/labels/entity-labels'
 import { Badge } from '@/components/reui/badge'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type StreamingSource } from '@/components/ui/streaming-text'
@@ -17,14 +18,13 @@ import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { statusIconTints } from '@/lib/status-appearance'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from '@/components/workspace/issue-properties'
+import { ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
+import { openThread } from '@/components/workspace/workspace-navigation'
 
 export const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-light' | 'warning-light' | 'secondary'> = {
   queued: 'secondary', preparing: 'success-light', running: 'success-light', waiting_input: 'warning-light', finishing: 'success-light',
   succeeded: 'info-light', stopped: 'secondary', failed: 'destructive-light', cancelled: 'secondary',
 }
-
-/** A task chip is wider than a source chip: it carries the title too. */
-const TASK_CHIP = 'max-w-72'
 
 export type LinkPreviews = Record<string, LinkPreview | null>
 
@@ -84,7 +84,7 @@ export function CitationSources({ text }: { text: string }) {
       if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
       else {
         const issue = source.issue
-        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <BotAvatar color={colorFor(source.agentName)} size="row" still />, onSelect: issue ? () => onOpenIssue(issue.id) : undefined })
+        listed.set(source.id, { name: source.name, domain: source.agentName, icon: <HarnessMark harness={source.harness} />, onSelect: issue ? () => openThread(source.id) : undefined })
       }
     }
   }
@@ -95,7 +95,7 @@ export function CitationSources({ text }: { text: string }) {
   </div>
 }
 
-/** A task mentioned in a reply: status dot, number and title, inline with the text. */
+/** A task mentioned in a reply: a boxed chip with its status icon and title; the number is in the hover card. */
 export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const tIssue = useTranslations('Issue')
@@ -103,10 +103,9 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const identifier = issue.identifier
   return <InlineCitation>
-    <InlineCitationTrigger aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)} className={TASK_CHIP}>
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)}>
       <status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />
-      {identifier && <span className="shrink-0">{identifier}</span>}
-      <InlineCitationLabel className="font-sans">{issue.title}</InlineCitationLabel>
+      <InlineCitationLabel>{issue.title}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
@@ -128,7 +127,7 @@ export function CitationChip({ id, kind }: { id: string; kind: CitationKind }) {
   if (!citations || source?.kind !== kind) return <>{id}</>
   return source.kind === 'issue'
     ? <IssueCitation issue={source} onOpen={citations.onOpenIssue} />
-    : <RunCitation run={source} onOpen={citations.onOpenIssue} />
+    : <RunCitation run={source} />
 }
 
 /** A cited web page as a chip with its link preview; a plain link outside a conversation that cites. */
@@ -138,20 +137,22 @@ export function WebCitation({ url, label }: { url: string; label: string | null 
   return <LinkCitation url={url} label={label} preview={citations.previews[url]} />
 }
 
-export function RunCitation({ run, onOpen }: { run: RunSource; onOpen: (id: string) => void }) {
+/** A thread mentioned in a reply: a boxed chip with its status icon and name; it opens the thread's conversation, never the task. */
+export function RunCitation({ run }: { run: RunSource }) {
   const t = useTranslations('Coordinator.citation')
   const format = useFormatter()
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
-  // The bot runs the thread; the coding agent is a step inside it, never its face (R-62).
+  // The chip shows the thread's state, as the thread card and the Threads list do; the coding agent's mark is in the hover card (R-78).
   const issue = run.issue
   const status = t.has(`runStatus.${run.status}` as never) ? t(`runStatus.${run.status}` as never) : run.status
   return <InlineCitation>
     <InlineCitationTrigger
-      aria-label={issue ? t('openRunIssue', { agent: run.agentName, title: issue.title }) : t('runOf', { agent: run.agentName })}
-      onClick={issue ? () => onOpen(issue.id) : undefined}
+      variant="object"
+      aria-label={issue ? t('openThread', { name: run.name }) : t('runOf', { agent: run.agentName })}
+      onClick={issue ? () => openThread(run.id) : undefined}
     >
-      <SourceAvatar source={{ name: run.agentName, domain: run.agentName, icon: <BotAvatar color={colorFor(run.agentName)} size="row" still /> }} className="size-4 rounded-full" />
+      <ThreadStatusIcon status={run.status} outcome={run.outcome} small />
       <InlineCitationLabel>{run.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
@@ -185,17 +186,26 @@ function describeLink(url: string, label: string | null, preview: LinkPreview | 
   }
 }
 
+/**
+ * GitHub's favicon is its black mark, which vanished on the dark page; its mark in the text colour holds in both
+ * themes, as GitHub's own light mark does on dark (R-74). Other sites keep their favicon.
+ */
+function linkIcon(host: string | undefined, preview: LinkPreview | null | undefined) {
+  return host === 'github.com' ? { image: undefined, icon: <GitHubIcon /> } : { image: preview?.icon, icon: <Globe /> }
+}
+
 function linkSource(url: string, label: string | null, preview: LinkPreview | null | undefined): StreamingSource {
   const link = describeLink(url, label, preview)
-  return { name: preview?.title ?? link?.name ?? url, domain: link?.host ?? url, href: url, image: preview?.icon }
+  return { name: preview?.title ?? link?.name ?? url, domain: link?.host ?? url, href: url, ...linkIcon(link?.host, preview) }
 }
 
 export function LinkCitation({ url, label, preview }: { url: string; label: string | null; preview: LinkPreview | null | undefined }) {
   const link = describeLink(url, label, preview)
   if (!link) return <>{url}</>
+  const mark = linkIcon(link.host, preview)
   return <InlineCitation>
     <InlineCitationTrigger render={<a href={url} target="_blank" rel="noopener noreferrer" />}>
-      <SourceAvatar source={{ name: link.name, domain: link.host, image: preview?.icon, icon: <Globe /> }} className={sourceTileClassName} />
+      <SourceAvatar source={{ name: link.name, domain: link.host, ...mark }} className={sourceTileClassName} />
       <InlineCitationLabel>{link.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
@@ -204,7 +214,7 @@ export function LinkCitation({ url, label, preview }: { url: string; label: stri
         <InlineCitationTitle>{preview?.title ?? label ?? link.address}</InlineCitationTitle>
         {preview?.description && <InlineCitationDescription>{preview.description}</InlineCitationDescription>}
       </InlineCitationBody>
-      <InlineCitationFooter><InlineCitationFavicon src={preview?.icon} /><span className="min-w-0 truncate">{link.address}</span></InlineCitationFooter>
+      <InlineCitationFooter>{mark.image ? <InlineCitationFavicon src={mark.image} /> : mark.icon}<span className="min-w-0 truncate">{link.address}</span></InlineCitationFooter>
     </InlineCitationContent>
   </InlineCitation>
 }

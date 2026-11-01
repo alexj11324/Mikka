@@ -14,9 +14,9 @@ export function SourceMark({ source }: { source: SuggestionSource }) {
   return <Icon className="size-3 shrink-0" />
 }
 
-/** The app named inside the sentence: its mark and name, in bold, inline. */
+/** The app named inside the sentence: its mark only, so a bold name does not read as part of the sentence (R-21); the name is for screen readers. 4px either side keeps the mark off the words. */
 function SourceMention({ source }: { source: SuggestionSource }) {
-  return <span data-slot="source-mention" className="mx-0.5 inline-flex items-center gap-1 align-bottom font-semibold whitespace-nowrap"><SourceMark source={source} />{SOURCE_NAMES[source]}</span>
+  return <span data-slot="source-mention" className="mx-1 inline-flex h-5.5 items-center align-bottom"><SourceMark source={source} /><span className="sr-only">{SOURCE_NAMES[source]}</span></span>
 }
 
 /**
@@ -29,7 +29,7 @@ export function SuggestionCardBody({ card }: { card: SuggestionCard }) {
   const { verb, parts } = cardParts(card, t(`action.${card.action}`))
   return <span className="flex min-w-0 items-start gap-2.5 text-left text-sm leading-5.5 font-normal whitespace-normal text-foreground">
     {verb && <span className="shrink-0 rounded-md bg-muted px-2 text-sm leading-5.5">{verb}</span>}
-    <span className="min-w-0 break-words">{parts.map((part, index) => part.kind === 'source' ? <SourceMention key={index} source={part.source} /> : <span key={index}>{part.text}</span>)}</span>
+    <span data-slot="suggestion-words" className="line-clamp-3 min-w-0 wrap-anywhere">{parts.map((part, index) => part.kind === 'source' ? <SourceMention key={index} source={part.source} /> : <span key={index}>{part.text}</span>)}</span>
   </span>
 }
 

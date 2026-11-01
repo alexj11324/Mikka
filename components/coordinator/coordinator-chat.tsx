@@ -5,7 +5,7 @@ import useSWR, { useSWRConfig } from 'swr'
 import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { useTranslations } from 'next-intl'
-import { getCoordinatorChat, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { getCoordinatorChat, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
@@ -15,18 +15,23 @@ import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
 import { Spinner } from '@/components/ui/spinner'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { CircleAlert } from 'lucide-react'
+import { toast } from 'sonner'
 import { useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { ReplyAnswer } from '@/components/workspace/agent-decision'
 import { AgentThemeProvider } from '@/components/workspace/agent-theme'
-import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
+import { openThread } from '@/components/workspace/workspace-navigation'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 import { BotModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
 import { ThreadCard } from './thread-card'
+import { ToolsUsed } from './tools-used'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
 import { UnreadDivider } from '@/components/chat/unread-divider'
@@ -43,11 +48,20 @@ import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
 import { subscriptionRefusal } from '@/lib/subscription-refusal'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
+import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { RetryReplyButton } from './retry-reply-button'
 import { FieldError } from '@/components/ui/field'
 
 /** A new message's enter: a short fade (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md). */
 const ENTER = 'animate-in fade-in-0 duration-200 motion-reduce:animate-none'
+
+/**
+ * The band under the header pill (top 12px, 36px tall): nothing shows down to 56px, 8px below the pill, then rows fade
+ * in over 40px by 96px, where the first message starts (`pt-24`). A shorter ramp left a chart under the pill reading as a
+ * gradient fill. It replaces the scroller's own mask and keeps its bottom fade. Wide screens only;
+ * phones have no pill.
+ */
+const HEADER_FADE = 'md:[--scroll-fade-mask:linear-gradient(to_bottom,transparent_3.5rem,#000_6rem,#000_calc(100%_-_var(--scroll-fade-b,0px)),transparent)]'
 
 const ArtifactViewer = dynamic(() => import('@/components/artifacts/artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
 
@@ -84,9 +98,13 @@ function FollowSentMessages({ count }: { count: number | null }) {
  * `embedded`, with chips instead of cards and the quote from the artifact in
  * the composer.
  */
+/** A thread card or chip opens the thread in the right column; the chat stays (R-66, R-82). */
+const showThread = ({ runId }: { runId: string }) => openThread(runId)
+
 export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string }) {
   const t = useTranslations('Coordinator')
   const tNav = useTranslations('Nav')
+  const tCommon = useTranslations('Common')
   const botId = bot?.id ?? null
   const name = bot?.name ?? t('label')
   const avatar = (size: 'pill' | 'profile', mood?: 'thinking') => <BotAvatar {...(bot ? { color: bot.color, shape: bot.shape } : COORDINATOR_AVATAR)} size={size} mood={mood} />
@@ -122,13 +140,14 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     } catch { /* storage may be unavailable */ }
   }
   const [sending, setSending] = useState(false)
-  const [sendError, setSendError] = useState<string | null>(null)
+  // A message that did not go stays in the chat as a failed bubble with 重试, as in iMessage and Slack. Retrying here
+  // resends the same submission (same id), so it is stored once.
+  // `after`: the last stored position when it failed.
+  const [failed, setFailed] = useState<{ text: string; withNotes: boolean; message: string; after: number } | null>(null)
   const { submit, failureMessage } = useCoordinatorSubmit()
   const { mutate: mutateAll } = useSWRConfig()
-  // A thread card opens its conversation in place of the chat; back returns here (R-66).
-  const [openThread, setOpenThread] = useState<{ issueId: string; runId: string } | null>(null)
-  // Notes pinned in the browser wait in this composer while it is the chat on screen (not inside the reader, not under an open thread).
-  const browser = useBrowserNotesComposer(!embedded && !openThread)
+  // Notes pinned in the browser wait in this composer while it is the chat on screen (not inside the reader).
+  const browser = useBrowserNotesComposer(!embedded)
   const noteCount = browser?.notes.length ?? 0
   useEffect(() => { if (noteCount) inputRef.current?.focus() }, [noteCount])
   // The 建议 item whose text is in the composer: once sent, the Coordinator dispatches a thread for it and it leaves 建议.
@@ -142,6 +161,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
   }, [prefill])
   const items = useMemo(() => data?.items ?? [], [data])
+  // A send whose result was unknown may have been stored after all: once it shows up in the chat, the failed bubble goes.
+  useEffect(() => {
+    if (failed && items.some(item => item.from === 'person' && item.position > failed.after && item.text === failed.text)) setFailed(null)
+  }, [failed, items])
   // New messages fade in briefly, as in Claude Code; what was there when the chat opened does not (R-37).
   // A stored reply that replaces a reply already streamed on screen is not new.
   const streamedThrough = useRef(-1)
@@ -165,7 +188,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const retry = <RetryReplyButton botId={botId} onQueued={mutate} />
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
-  const unanswered = data?.enabled === false && items.findLast(item => item.from !== 'event')?.from === 'person'
+  // A failed turn's own line already says why; this one is only for a chat with no Coordinator to answer.
+  const unanswered = data?.enabled === false && !data.error && items.findLast(item => item.from !== 'event')?.from === 'person'
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
   const welcomed = useRef(false)
   useEffect(() => {
@@ -202,26 +226,52 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // A quote just picked in the reader: put the cursor where the request goes.
   useEffect(() => { if (embedded?.quote) inputRef.current?.focus() }, [embedded?.quote])
 
-  /** Sends `text` to the Coordinator or bot, with the browser's notes when `withNotes`; false if it did not go. */
-  async function post(text: string, withNotes = false) {
-    if (!text || sending) return false
+  // 停止: the turn ends on the server, keeping what it had said; the button waits until the chat stops working.
+  const [stopping, setStopping] = useState(false)
+  const working = Boolean(data?.working)
+  useEffect(() => { if (!working) setStopping(false) }, [working])
+  async function stop() {
+    setStopping(true)
+    try {
+      const result = await stopCoordinatorTurn(botId)
+      if (result.error) { setStopping(false); toast.error(actionError(result.error)) }
+      await mutate()
+    } catch { setStopping(false); toast.error(actionError()) }
+  }
+
+  /** Sends `text` to the Coordinator or bot, with the browser's notes when `withNotes`: sent, failed (now a failed bubble), or skipped. */
+  async function deliver(text: string, withNotes = false): Promise<'sent' | 'failed' | 'skipped'> {
+    if (!text || sending) return 'skipped'
     setSending(true)
-    setSendError(null)
     const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
+    const fail = (message: string | null) => {
+      if (!message) return 'skipped' as const
+      setFailed({ text, withNotes, message, after: items.at(-1)?.position ?? 0 })
+      return 'failed' as const
+    }
     try {
       const outcome = await submit(text, { quote: embedded?.quote, botId, notes })
-      if (outcome.kind !== 'accepted') { setSendError(failureMessage(outcome)); return false }
+      if (outcome.kind !== 'accepted') return fail(failureMessage(outcome))
+      setFailed(current => current?.text === text ? null : current)
       embedded?.clearQuote()
       if (notes) browser?.removeMany(notes.map(note => note.n))
       await mutate()
-      return true
-    } catch { setSendError(actionError()); return false } finally { setSending(false) }
+      return 'sent'
+    } catch { return fail(actionError()) } finally { setSending(false) }
+  }
+  /** Sends `text`; false if it did not go. */
+  async function post(text: string, withNotes = false) {
+    return await deliver(text, withNotes) === 'sent'
   }
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
-    if (!await post(text, true)) return
+    const result = await deliver(text, true)
+    if (result === 'skipped') return
+    // Sent or failed, the message leaves the composer. A failed one keeps its stored draft until the person types again,
+    // so a reload or a switch to another bot puts it back in the composer.
     setDraft(current => current.trim() === text ? '' : current)
+    if (result === 'failed') return
     if (draft.trim() === text && draftKey) { try { sessionStorage.removeItem(draftKey) } catch { /* storage may be unavailable */ } }
     const id = suggestion.current
     suggestion.current = null
@@ -232,34 +282,45 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     }
   }
 
-  if (openThread) return <section aria-label={name} data-slot="thread-view" className="flex min-h-0 flex-1 flex-col">
-    <IssueThreadPanel key={openThread.runId} issueId={openThread.issueId} runId={openThread.runId} back={name} onOpenThread={runId => setOpenThread({ issueId: openThread.issueId, runId })} onClose={() => setOpenThread(null)} />
-  </section>
+  const personBubble = cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
-  <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 flex-1 flex-col">
+  {/* The chat never widens what holds it: whatever a message carries scrolls or wraps inside its own box, and anything that still
+      reaches past the column is clipped here instead of scrolling the whole page sideways. */}
+  <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip">
     {/* Follow the end while the person is there, never anchor rows to the top: the scroller re-anchors any person row
         whose element it has not seen, and a stored message remounts its pending row, so the chat jumped up the history.
         Rows render at their real height: an estimated height on a new row shifts the end by the difference. */}
     <MessageScrollerProvider defaultScrollPosition="end" autoScroll>
       <FollowSentMessages count={data ? sentCount : null} />
       <MessageScroller className="min-h-0 flex-1">
-        <MessageScrollerViewport aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')}>
-          <MessageScrollerContent className={cn('flex w-full min-w-0 max-w-full flex-col gap-5 pb-6', compact ? 'px-3 pt-4' : 'px-4 pt-18 sm:px-6')}>
+        {/* Full size, the header pill floats over the top of the chat: rows scrolled up fade out above it instead of
+            running under it, so the top reads as a solid band in either theme and in the translucent desktop window (R-35). */}
+        <MessageScrollerViewport aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')} className={cn(!compact && HEADER_FADE)}>
+          <MessageScrollerContent className={cn('flex w-full min-w-0 max-w-full flex-col gap-5 pb-6', compact ? 'px-3 pt-4' : 'px-4 pt-24 sm:px-6')}>
+            {/* A slow first load shows the shape of a conversation, not an empty page (state completeness). */}
+            {!data && !loadError && <div role="status" aria-label={tCommon('loading')} className="flex flex-col gap-5">
+              <Skeleton className="h-16 w-3/5 rounded-2xl" />
+              <Skeleton className="h-11 w-2/5 self-end rounded-2xl" />
+              <Skeleton className="h-24 w-2/3 rounded-2xl" />
+            </div>}
+            {/* The header pill and the 概览 panel already name the bot: an empty chat says one line, no third avatar (R-41). */}
             {data && !items.length && !stream.replies.length && !data.error && (data.enabled
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
-              : <div className="flex flex-1 flex-col items-center justify-center gap-3">{avatar('profile')}<p className="text-sm font-medium">{name}</p></div>)}
+              : <p className="m-auto text-sm text-muted-foreground">{t('empty', { name })}</p>)}
             {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
               {unread.divider === item.position && <UnreadDivider />}
               <MessageScrollerItem messageId={String(item.position)} className={cn('[content-visibility:visible]', entering(item) && ENTER)} {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
               {item.from === 'event'
-                ? <p className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">{item.text.replace(/^\[Event\]\s*/, '')}</p>
+                ? item.notice
+                  ? <QuotaSwitchLine notice={item.notice} botId={botId} />
+                  : <p className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">{item.text.replace(/^\[Event\]\s*/, '')}</p>
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
                     {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
                     {item.text && (item.from === 'coordinator'
                       ? <ReplyAnswer value={answers.get(item.position) ?? null}><CoordinatorReply text={item.text} citations={citations} /></ReplyAnswer>
-                      : <Bubble variant="secondary" align="end" className={cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}<UserMessageText text={item.text} /></BubbleContent></Bubble>)}
+                      : <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}<UserMessageText text={item.text} /></BubbleContent></Bubble>)}
                     {item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
                       {item.artifacts.flatMap(id => { const artifact = data?.artifacts[id]; return artifact ? [embedded
                         ? <ArtifactChip key={id} artifact={artifact} active={id === embedded.activeArtifactId} onOpen={openArtifact} />
@@ -267,9 +328,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     </div>}
                     {item.threads.map(id => {
                       const run = sources?.[id]
-                      return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={setOpenThread} /> : null
+                      return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} /> : null
                     })}
-                    {footerTools(item).length > 0 && <MessageFooter>{t('usedTools', { tools: footerTools(item).join(', ') })}</MessageFooter>}
+                    {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
+                    {footerTools(item).length > 0 && <MessageFooter><ToolsUsed tools={footerTools(item)} /></MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>
             </Fragment>)}
@@ -278,6 +340,18 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 <CoordinatorReply text={reply.text} citations={citations} isStreaming={reply.committedThrough === undefined} />
               </MessageContent></Message>
             </MessageScrollerItem>)}
+            {failed && <MessageScrollerItem messageId="failed" data-testid="failed-message" className="[content-visibility:visible]">
+              <Message align="end"><MessageContent>
+                <span className="flex w-full min-w-0 items-center justify-end gap-2">
+                  <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive" />
+                  <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap"><UserMessageText text={failed.text} /></BubbleContent></Bubble>
+                </span>
+                <span role="alert" className="flex items-center justify-end gap-1 self-end text-xs text-destructive">
+                  {failed.message}
+                  <Button variant="ghost" size="xs" className="text-foreground" disabled={sending} onClick={() => { void deliver(failed.text, failed.withNotes) }}>{tCommon('retry')}</Button>
+                </span>
+              </MessageContent></Message>
+            </MessageScrollerItem>}
             {/* The working line fades in (R-37: opacity on a duration). It leaves at once: an exit would keep its height
                 after the reply lands and pull the scroll position back (coordinator-scroll.spec). */}
             {data?.working && items.length > 0 && <p role="status" className={cn('flex items-center gap-2 text-sm text-muted-foreground', workingEnter && ENTER)}><Spinner />{t('working')}</p>}
@@ -293,13 +367,16 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
       {refusal && <HostedRefusalNotice code={refusal} retry={retry} />}
-      {declined && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
+      {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
+      {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}
+      {!refusal && (declined === 'quotaUsed' || !data?.error) && <QuotaNotice botId={botId} stopped={declined === 'quotaUsed'}
+        retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
       {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription><AlertAction>{retry}</AlertAction></>}</Alert>}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
-      {sendError && <FieldError className="text-xs">{sendError}</FieldError>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />
-      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }}
+      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || stopping} editableWhileSending={stopping} onSubmit={() => { void send() }}
+        running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
         model={<BotModelPicker botId={botId ?? null} />}
         quote={embedded?.quote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
           {embedded?.quote && <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} />}

@@ -33,6 +33,15 @@ describe("run completion contract", () => {
     ).toEqual({ stopReason: "submitted", report })
   })
 
+  it("carries a quota stop with its reset time, or null when the CLI gave none", () => {
+    expect(RUN_STOP_REASONS).toContain("quota_exhausted")
+    for (const resetsAt of ["2026-11-01T17:00:00.000Z", null]) {
+      const body = { stopReason: "quota_exhausted" as const, report: { ...emptyRunReport(), resetsAt } }
+      expect(runCompleteRequest.parse(body)).toEqual(body)
+    }
+    expect(runReport.safeParse({ ...emptyRunReport(), resetsAt: "tomorrow" }).success).toBe(false)
+  })
+
   it("preserves the daemon check receipt and exact process failure without accepting malformed SHA", () => {
     const checked = {
       ...emptyRunReport(),

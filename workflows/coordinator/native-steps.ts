@@ -16,7 +16,7 @@ export async function runtime(userId: string): Promise<CoordinatorRuntime> {
   'use step'
   return nativeCoordinatorEnabled() ? nativeCoordinatorStore.runtime(userId) : { harness: 'ai_sdk' }
 }
-export async function enqueue(userId: string, holder: string, round: number, selected: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: NativeCoordinatorJob['tools'], botId: string | null = null, snapshot?: DefinitionSnapshot) {
+export async function enqueue(userId: string, holder: string, round: number, selected: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: NativeCoordinatorJob['tools'], botId: string, snapshot?: DefinitionSnapshot) {
   'use step'
   const { summary, memory, messages } = await loadConversation(userId, botId)
   const base = snapshot ? withCoordinatorPresentation(executionInstructions(snapshot)) : await botInstructions(userId, botId, personalCoordinatorInstructions())

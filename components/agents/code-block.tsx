@@ -125,21 +125,13 @@ export function CodeBlock({
         <span className="font-mono text-[11px] text-muted-foreground">
           {language}
         </span>
-        <span
-          className={cn(
-            "ml-auto inline-flex shrink-0 items-center gap-1 text-[11px] font-medium",
-            streaming
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-emerald-600 dark:text-emerald-400",
-          )}
-        >
-          {streaming ? (
+        {/* A finished block is static code: only its language and copy stay (R-40). */}
+        {streaming ? (
+          <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">
             <LoaderCircle className={cn("size-3", !reduce && "animate-spin")} />
-          ) : (
-            <Check className="size-3" />
-          )}
-          {streaming ? agentCopy.writing : agentCopy.completed}
-        </span>
+            {agentCopy.writing}
+          </span>
+        ) : null}
         {copyable || onCopy ? (
           <motion.button
             type="button"
@@ -148,7 +140,10 @@ export function CodeBlock({
             onClick={handleCopy}
             whileTap={reduce ? undefined : { scale: 0.9 }}
             transition={SPRING_PRESS}
-            className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-background/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(
+              "grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-background/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+              !streaming && "ml-auto",
+            )}
           >
             {copied ? (
               <Check className="size-3.5" />

@@ -14,8 +14,8 @@ import { DeviceLabel, HarnessLabel, ModelLabel, harnessName } from '@/components
 import { SettingsLoading, SettingsSaveError } from '@/components/settings/primitives'
 import { LabelDot } from '@/components/workspace/issue-metadata-controls'
 import {
-  BOT_AGENTS_KEYS, addRule, executionSettingsView, listAccountModels, listPlaces, readExecutionSettings, redetect, removeRule, saveDefaultRule, saveFallbacks, updateRule,
-  type LabelRule, type StoredExecutionSettings, type TaskDefaults, type WhenDeviceOffline, type WhenQuotaExhausted,
+  BOT_AGENTS_KEYS, addRule, executionSettingsView, listAccountModels, listPlaces, readExecutionSettings, redetect, removeRule, saveDefaultRule, updateRule,
+  type LabelRule, type StoredExecutionSettings, type TaskDefaults,
 } from '@/lib/execution-settings-client'
 import type { ExecutionRule } from '@/lib/execution-rules'
 import { harnessOptions, modelName, modelOptions, placeKind, redetectTargets, retarget, withCloudModels, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
@@ -39,7 +39,7 @@ export function BotAgentsSettings() {
   const accounts = useSWR(KEYS.accounts, listAccountModels)
   const [failed, setFailed] = useState<(() => Promise<void>) | null>(null)
   /** A choice the server refused stays on screen, marked 未保存, until a retry saves it. */
-  const [unsaved, setUnsaved] = useState<{ defaults?: TaskDefaults; whenQuotaExhausted?: WhenQuotaExhausted }>({})
+  const [unsaved, setUnsaved] = useState<{ defaults?: TaskDefaults }>({})
 
   async function save(change: () => Promise<void>) {
     setFailed(null)
@@ -53,25 +53,14 @@ export function BotAgentsSettings() {
   const placeList = withCloudModels(places.data, accountRows)
   const view = executionSettingsView(stored.data, placeList, accountRows)
   const defaults = unsaved.defaults ?? view.defaults
-  const quota = unsaved.whenQuotaExhausted ?? view.whenQuotaExhausted
   const current = stored.data
 
   const changeDefaults = (next: TaskDefaults) => {
     const rule = next.place !== defaults.place || next.harness !== defaults.harness || next.model !== defaults.model
-    const offline = next.whenDeviceOffline !== defaults.whenDeviceOffline
     setUnsaved(state => ({ ...state, defaults: next }))
     void save(async () => {
       if (rule) await saveDefaultRule(next)
-      if (offline) await saveFallbacks({ whenDeviceOffline: next.whenDeviceOffline, whenQuotaExhausted: quota })
       setUnsaved(({ defaults: _saved, ...rest }) => rest)
-      await stored.mutate()
-    })
-  }
-  const changeQuota = (next: WhenQuotaExhausted) => {
-    setUnsaved(state => ({ ...state, whenQuotaExhausted: next }))
-    void save(async () => {
-      await saveFallbacks({ whenDeviceOffline: defaults.whenDeviceOffline, whenQuotaExhausted: next })
-      setUnsaved(({ whenQuotaExhausted: _saved, ...rest }) => rest)
       await stored.mutate()
     })
   }
@@ -95,24 +84,14 @@ export function BotAgentsSettings() {
     await places.mutate()
   }
   const defaultPickers = executionPickers({ t, row: t('default'), value: defaults, places: placeList, wide: true, onChange: value => changeDefaults({ ...defaults, ...value }), onRedetect: refreshDevices })
-  const offline = { wait: t('offlineWait'), cloud: t('offlineCloud') } satisfies Record<WhenDeviceOffline, string>
-  const quotaNames = { stop: t('quotaStop'), switchAccount: t('quotaSwitch') } satisfies Record<WhenQuotaExhausted, string>
 
   return <div className="flex flex-col gap-8">
-    {/* Each bot's model is picked in its own chat (decision 2026-10-31-2330), not here. */}
-    <Group id="bot-agents-bots" title={t('bots')}>
-      <Line title={t('whenQuotaExhausted')}>
-        <ChoicePicker ariaLabel={t('setting', { name: t('whenQuotaExhausted'), value: quotaNames[quota] })} value={quota} names={quotaNames} onChange={changeQuota} />
-      </Line>
-    </Group>
-
+    {/* Each bot's model is picked in its own chat (decision 2026-10-31-2330); 设备离线时 and
+        额度用完时 are account settings in 模型与额度 (decision 2026-10-31-2130). */}
     <Group id="bot-agents-defaults" title={t('defaults')} data-rule="default">
       <Line title={t('columns.place')}>{defaultPickers.place}</Line>
       <Line title={t('columns.harness')}>{defaultPickers.harness}</Line>
       <Line title={t('columns.model')}>{defaultPickers.model}</Line>
-      <Line title={t('whenDeviceOffline')}>
-        <ChoicePicker ariaLabel={t('cell', { row: t('default'), column: t('whenDeviceOffline'), value: offline[defaults.whenDeviceOffline] })} value={defaults.whenDeviceOffline} names={offline} onChange={whenDeviceOffline => changeDefaults({ ...defaults, whenDeviceOffline })} />
-      </Line>
     </Group>
 
     <Group id="bot-agents-labels" title={t('labels')}>
@@ -183,8 +162,9 @@ function executionPickers({ t, row, value, places, wide, disabled, onChange, onR
   const harnesses = harnessOptions(places, value.place)
   const harnessList = harnesses.includes(value.harness) ? harnesses : [...harnesses, value.harness]
   const models = modelOptions(places, value.place, value.harness)
-  const modelList = models.some(option => option.value === value.model) ? models : [...models, { value: value.model, name: value.model }]
-  const shownModel = modelName(places, value.place, value.harness, value.model)
+  const modelList = !value.model || models.some(option => option.value === value.model) ? models : [...models, { value: value.model, name: value.model }]
+  // No model yet (no cloud model list here): the select shows 选择模型, never a bare provider mark.
+  const shownModel = value.model ? modelName(places, value.place, value.harness, value.model) : ''
   const cell = (column: string, name: string) => t('cell', { row, column, value: name })
   const refresh = () => onRedetect(redetectTargets(places, value.place))
   const move = (place: string) => onChange(retarget(places, { ...value, place }))
@@ -207,7 +187,8 @@ function executionPickers({ t, row, value, places, wide, disabled, onChange, onR
         {harnessList.map(harness => <CommandItem key={harness} value={harness} keywords={[harnessName(harness)]} data-checked={value.harness === harness} onSelect={() => { close(); onChange(retarget(places, { ...value, harness })) }}><HarnessLabel harness={harness} /></CommandItem>)}
       </CommandGroup>}
     </Picker>,
-    model: <Picker t={t} wide={wide} disabled={disabled} ariaLabel={cell(t('columns.model'), shownModel)} heading={t('columns.model')} onRefresh={refresh} search={t('searchModels')} value={<ModelLabel model={shownModel} source={value.harness} />}>
+    model: <Picker t={t} wide={wide} disabled={disabled} ariaLabel={cell(t('columns.model'), shownModel || t('pickModel'))} heading={t('columns.model')} onRefresh={refresh} search={t('searchModels')}
+      value={shownModel ? <ModelLabel model={shownModel} source={value.harness} /> : <span className="truncate text-muted-foreground">{t('pickModel')}</span>}>
       {close => <CommandGroup>
         {modelList.map(option => <CommandItem key={option.value} value={option.value} keywords={[option.name]} data-checked={value.model === option.value} onSelect={() => { close(); onChange({ ...value, model: option.value }) }}><ModelLabel model={option.name} source={value.harness} /></CommandItem>)}
       </CommandGroup>}
@@ -254,7 +235,7 @@ function RuleRow({ t, rule, places, onChange, onDelete, onRedetect }: {
 const TRIGGER = 'h-9 w-full min-w-0 justify-between gap-2 bg-control px-3 font-normal hover:bg-control-hover aria-expanded:bg-control-hover'
 
 /** A fallback: a fixed list of named choices. They are not devices, harnesses or models, so no icons. */
-function ChoicePicker<V extends string>({ ariaLabel, value, names, onChange }: { ariaLabel: string; value: V; names: Record<V, string>; onChange: (value: V) => void }) {
+export function ChoicePicker<V extends string>({ ariaLabel, value, names, onChange }: { ariaLabel: string; value: V; names: Record<V, string>; onChange: (value: V) => void }) {
   const [open, setOpen] = useState(false)
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger render={<Button variant="ghost" aria-label={ariaLabel} className={TRIGGER} />}>
@@ -324,7 +305,9 @@ const LABELS_KEY = 'workspace-labels'
 function LabelPicker({ t, mode, label = '', disabled, onSubmit }: { t: T; mode: 'add' | 'edit'; label?: string; disabled?: boolean; onSubmit: (label: string) => void }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(label)
-  const labels = useSWR(mode === 'edit' ? LABELS_KEY : null, listWorkspaceLabels).data ?? []
+  // 添加规则 lists the workspace's labels too: picking one adds the rule at once, and its row
+  // shows the 运行位置 / Agent / 模型 selects right away (ST20).
+  const labels = useSWR(mode === 'edit' || open ? LABELS_KEY : null, listWorkspaceLabels).data ?? []
   const trimmed = draft.trim()
   const current = findLabel(labels, label)
   // The saved name lists everything; typing narrows it.

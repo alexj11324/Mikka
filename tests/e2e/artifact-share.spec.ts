@@ -27,8 +27,9 @@ async function seedArtifactInChat(page: Page) {
     const body = '# 验收记录\n\n留在版本行里，没有 R2 也能读。'
     await db.query(`INSERT INTO artifacts (id, "userId", kind, title, "latestVersion") VALUES ($1, $2, 'markdown', $3, 1)`, [artifactId, session.userId, '验收记录'])
     await db.query(`INSERT INTO artifact_versions (id, "artifactId", version, "storageKey", "inlineContent", sha256, size, "authorName") VALUES ($1, $2, 1, $3, $4, $5, $6, $7)`, [randomUUID(), artifactId, `e2e/${artifactId}/1`, body, '0'.repeat(64), body.length, 'Mikka Frontend'])
-    const { rows: [{ position }] } = await db.query<{ position: number }>('SELECT COALESCE(MAX(position), 0) + 1 AS position FROM coordinator_messages WHERE "userId" = $1 AND "botId" IS NULL', [session.userId])
-    await db.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, NULL, $3, $4)', [randomUUID(), session.userId, position, JSON.stringify({ role: 'user', content: `[Event] [[artifact:${artifactId}]] handed over` })])
+    // The Coordinator's chat is its bot row's (coordinator_bots), created when the app first opened.
+    const { rows: [{ position }] } = await db.query<{ position: number }>('SELECT COALESCE(MAX(position), 0) + 1 AS position FROM coordinator_messages WHERE "userId" = $1 AND "botId" = (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1)', [session.userId])
+    await db.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), $3, $4)', [randomUUID(), session.userId, position, JSON.stringify({ role: 'user', content: `[Event] [[artifact:${artifactId}]] handed over` })])
     return artifactId
   } finally {
     await db.end()

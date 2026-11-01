@@ -18,18 +18,20 @@ import { settingsHref } from '@/lib/settings-sections'
  * the composer in place of 回复失败 (Figma ALW-1 `709:27554`, ALW-1b `709:27767`,
  * ALW-2 `709:27979`, ALW-3 `709:28207`). The way on is the person's own
  * Claude / ChatGPT subscription (设置 › 模型与额度); 验证银行卡 (计费) is the
- * secondary link while the workspace has no verified card.
+ * secondary link in a personal workspace that has no verified card.
  */
 export function HostedRefusalNotice({ code, retry }: { code: HostedRefusal; retry?: ReactNode }) {
   const t = useTranslations('Billing.refusal')
   const usage = useSWR(['hosted-usage'], () => getHostedUsage())
   const unverified = usage.data && !usage.data.error && !usage.data.balance.verified
   const Icon = code === 'verification_required' ? CreditCard : code === 'platform_paused' ? Pause : Info
-  const transient = code === 'usage_in_progress' || code === 'usage_cost_unavailable'
+  const transient = code === 'usage_in_progress' || code === 'usage_concurrency_limit' || code === 'usage_cost_unavailable'
   const title = code === 'verification_required'
     ? t.rich('verification_required', { mark: () => <MikkaMarkSmall />, model: chunks => <span className="inline-flex items-center gap-1">{chunks}</span> })
     : transient ? t('unavailable') : t(code)
-  const offersCard = code === 'verification_required' || (unverified && (code === 'free_allowance_used' || code === 'points_exhausted'))
+  // Verification is the person's and its credit lands in their personal workspace (C19): offered there only.
+  const personal = Boolean(usage.data && !usage.data.error && usage.data.personal)
+  const offersCard = personal && (code === 'verification_required' || (unverified && (code === 'free_allowance_used' || code === 'points_exhausted')))
   // Narrow screens: the line wraps above the actions instead of squeezing to one character per line.
   return <Alert data-hosted-refusal={code} role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 pr-1.5">
     <Icon aria-hidden="true" className="shrink-0" />

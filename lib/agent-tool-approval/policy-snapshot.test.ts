@@ -17,8 +17,8 @@ test('invalid stored decisions, domains or personal modes fail closed', () => {
   assert.throws(() => resolveTrustedRunPolicy({ workspace:{ permissions:{}, networkAllow:['*'] }, personalApprovalMode:'ask' }))
   assert.throws(() => resolveTrustedRunPolicy({ workspace:null, personalApprovalMode:'bypassPermissions' }))
 })
-test('absent settings resolve to documented ask defaults', () => {
+test('absent settings resolve to documented defaults; push is the GitHub App grant, never ask', () => {
   const policy = resolveTrustedRunPolicy({ workspace:null, personalApprovalMode:null })
-  assert.equal(policy.permissions.git_push, 'ask')
+  assert.equal(policy.permissions.git_push, 'allow')
   assert.equal(policy.permissions.network, 'ask')
 })

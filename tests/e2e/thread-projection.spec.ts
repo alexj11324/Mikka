@@ -24,7 +24,8 @@ test('the real events API projects the latest reply into owner-scoped thread lis
       [mcp, `MCP dispatch ${marker}`, 'mcp', user.id],
       [randomUUID(), `Foreign private ${marker}`, null, `foreign-${randomUUID()}`],
     ]) {
-      await pool.query('INSERT INTO agent_runs (id,"userId","agentId","deviceId",status,prompt,source) VALUES ($1,$2,$3,$4,$5,$6,$7)', [id, owner, agent, device, 'running', prompt, source])
+      // The person's app runs are their Coordinator's (its bot row since #757); an MCP client's run has no bot.
+      await pool.query('INSERT INTO agent_runs (id,"userId","agentId","deviceId",status,prompt,source,"botId") VALUES ($1,$2,$3,$4,$5,$6,$7,CASE WHEN $7::text IS NULL THEN (SELECT "botId" FROM coordinator_bots WHERE "ownerId"=$2) END)', [id, owner, agent, device, 'running', prompt, source])
     }
     const response = await page.request.post(app(`/v1/runs/${first}/events`), {
       headers: { authorization: `Bearer ${token}` },
@@ -43,12 +44,22 @@ test('the real events API projects the latest reply into owner-scoped thread lis
     await panel.getByRole('tab', { name: '全部线程', exact: true }).click()
     const running = panel.getByRole('region', { name: '进行中（3）', exact: true })
     await expect(running.getByRole('listitem')).toHaveCount(3)
+    // R-78: each row carries the mark of the Agent running it, never a bot's avatar.
+    await expect(running.getByRole('img', { name: 'Codex', exact: true })).toHaveCount(3)
+    await expect(running.locator('[data-slot="bot-avatar"]')).toHaveCount(0)
     // Ignore the MCP row's newer timestamp: the two app rows must still keep
     // their actual activity order, rather than the first row's older reply time.
     const names = await running.getByRole('listitem').allTextContents()
     expect(names.findIndex(name => name.includes(`Updated status ${marker}`))).toBeLessThan(names.findIndex(name => name.includes(`Recent reply ${marker}`)))
     await expect(panel.getByText(`MCP dispatch ${marker}`, { exact: true })).toBeVisible()
     await expect(panel.getByText(`Foreign private ${marker}`, { exact: true })).toHaveCount(0)
+    // The header's search filters this column in place (R-50), not the global ⌘K.
+    await panel.getByRole('button', { name: '搜索', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await panel.getByRole('textbox', { name: '搜索', exact: true }).fill(`MCP dispatch ${marker}`)
+    await expect(panel.getByRole('region', { name: '进行中（1）', exact: true }).getByRole('listitem')).toHaveCount(1)
+    await panel.getByRole('textbox', { name: '搜索', exact: true }).press('Escape')
+    await expect(running.getByRole('listitem')).toHaveCount(3)
     await page.screenshot({ path: testInfo.outputPath('thread-projection.png') })
   } finally {
     // Revoke this synthetic test token without deleting its audit row or data.

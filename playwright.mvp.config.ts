@@ -11,7 +11,8 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-mvp-report' }]],
   // The MVP signs in with real synthetic credentials. Raw traces can retain
   // cookies and request bodies, so keep them out of all failure artifacts.
-  use: { baseURL: MVP_ORIGIN, locale: 'zh-CN', trace: 'off', video: 'off', screenshot: 'off', actionTimeout: 15_000, navigationTimeout: 45_000 },
+  use: { baseURL: MVP_ORIGIN, locale: 'zh-CN', trace: 'off', video: 'off', screenshot: 'off', actionTimeout: 15_000, navigationTimeout: 45_000,
+    ...(process.env.MIKKA_CHROMIUM_EXECUTABLE_PATH ? { launchOptions: { executablePath: process.env.MIKKA_CHROMIUM_EXECUTABLE_PATH } } : {}) },
   projects: [{ name: 'chromium-mvp', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 960 } } }],
   webServer: { command: 'node scripts/start-mvp-e2e.mjs', url: `${MVP_ORIGIN}/mikka/sign-in`, reuseExistingServer: false, timeout: 60_000 },
 })

@@ -17,7 +17,7 @@ export type RailDestination = 'chats' | 'suggestions' | 'board' | 'plugins' | 'a
 /** A lucide icon or one of ours drawn the same way (components/icons). */
 type RailIcon = ComponentType<{ className?: string; 'data-icon'?: string }>
 
-// 主页 (the bot chats), 建议, the board, plugins, 产物. `selectedIcon` is the solid twin shown on the current item.
+// 主页 (the bot chats), 建议, the board, plugins, Artifact. `selectedIcon` is the solid twin shown on the current item.
 export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'Nav.home' | 'Nav.suggestions' | 'Nav.board' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
   { id: 'chats', icon: House, selectedIcon: HouseFilled, label: 'Nav.home' },
   { id: 'suggestions', icon: Lightbulb, selectedIcon: LightbulbFilled, label: 'Nav.suggestions' },
@@ -40,10 +40,11 @@ type RailProps = {
 }
 
 /**
- * The 68px icon column on the window's frame, left of the card (Figma 56:500,
- * Icon rail v4). Each item is an icon whose name shows as a tooltip on hover; hover and the current item fill
- * the icon, in Comma's light gray, and the current item swaps to the
- * solid icon. It never collapses; the conversation list inside the card does.
+ * The 68px icon column on the window's frame, left of the card (R-35). Each
+ * item is an icon only; its name shows as a tooltip on hover and stays its
+ * accessible name (Alex, #580). Hover and the current item fill the icon, in
+ * Comma's light gray, and the current item swaps to the solid icon. It never
+ * collapses; the bot list inside the card does.
  */
 export function IconRail({ active, onNavigate, ...menu }: RailProps) {
   const i18nText = useTranslations()
@@ -83,8 +84,9 @@ function UpdateButton() {
   if (!version) return null
   const label = i18nText('Nav.restartToUpdate', { version })
   return <Tooltip>
-    <TooltipTrigger render={<Button variant="ghost" size="icon" className={cn(ITEM, 'animate-in fade-in-0 duration-200 motion-reduce:animate-none')} aria-label={label} onClick={() => { void bridgeFromWindow(window)?.app.installUpdate?.() }} />}>
-      <span className={ITEM_ICON}><CircleArrowDown className="size-5" /></span>
+    <TooltipTrigger render={<Button variant="ghost" size="icon" className={cn(ITEM, 'text-sidebar-primary hover:text-sidebar-primary animate-in fade-in-0 duration-200 motion-reduce:animate-none')} aria-label={label} onClick={() => { void bridgeFromWindow(window)?.app.installUpdate?.() }} />}>
+      {/* The accent (R-30) and a 24px icon in the same 36px target as the other items. */}
+      <span className={cn(ITEM_ICON, 'p-1.5')}><CircleArrowDown className="size-6" /></span>
     </TooltipTrigger>
     <TooltipContent side="right">{label}</TooltipContent>
   </Tooltip>

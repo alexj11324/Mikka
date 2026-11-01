@@ -1,73 +1,64 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { mkdtempSync, rmSync } from "node:fs"
+import { arch, platform, tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { harnessFingerprint, knownAgentDirectories, loginShellPath } from "./harnesses"
+import { HARNESS_PINS, platformKey } from "./harness-install"
+import { detectHarnesses, deviceCapabilities, harnessFingerprint } from "./harnesses"
 
 let root: string
-let savedPath: string | undefined
-
-function script(path: string, body: string) {
-  writeFileSync(path, `#!/bin/sh\n${body}\n`)
-  chmodSync(path, 0o755)
-}
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "harnesses-"))
-  savedPath = process.env.PATH
 })
 
 afterEach(() => {
-  process.env.PATH = savedPath
   rmSync(root, { recursive: true, force: true })
 })
 
-describe("knownAgentDirectories", () => {
-  it("covers official installers and every installed node version", () => {
-    mkdirSync(join(root, ".nvm/versions/node/v24.0.0"), { recursive: true })
-    mkdirSync(join(root, ".nvm/versions/node/v22.0.0"), { recursive: true })
-    const directories = knownAgentDirectories(root)
-    expect(directories).toContain(join(root, ".local/bin"))
-    expect(directories).toContain(join(root, ".claude/local"))
-    expect(directories).toContain(join(root, ".nvm/versions/node/v24.0.0/bin"))
-    expect(directories).toContain(join(root, ".nvm/versions/node/v22.0.0/bin"))
+describe("deviceCapabilities", () => {
+  it("reports OS, arch, free disk, Docker and each managed harness's install state", async () => {
+    const report = await deviceCapabilities({ root, platform: "linux-x64" }, root, async () => true)
+    expect(report).toEqual({
+      os: platform(),
+      arch: arch(),
+      freeDiskBytes: expect.any(Number),
+      docker: true,
+      harnesses: [
+        { harness: "claude_code", state: "not_installed", version: HARNESS_PINS.harnesses.claude_code.version },
+        { harness: "codex", state: "not_installed", version: HARNESS_PINS.harnesses.codex.version },
+      ],
+    })
+    expect(report.freeDiskBytes).toBeGreaterThan(0)
+    expect((await deviceCapabilities({ root }, root, async () => false)).docker).toBe(false)
   })
 })
 
-describe("loginShellPath", () => {
-  it("reads the PATH through whatever startup files print", async () => {
-    const shell = join(root, "shell")
-    script(shell, `echo welcome; PATH=/from/rc:/usr/bin; eval "$2"; echo goodbye`)
-    expect(await loginShellPath(shell)).toEqual(["/from/rc", "/usr/bin"])
+describe("detectHarnesses", () => {
+  it("offers both managed harnesses without either installed", () => {
+    const store = { root: join(root, "empty"), platform: platformKey() }
+    const offered = detectHarnesses(store).filter(info => info.harness !== "mock")
+    expect(offered).toEqual([
+      { harness: "claude_code", installed: true, version: HARNESS_PINS.harnesses.claude_code.version },
+      { harness: "codex", installed: true, version: HARNESS_PINS.harnesses.codex.version },
+    ])
   })
 
-  it("does not wait for a startup file that hangs, or for a process it left holding the output", async () => {
-    const shell = join(root, "hanging")
-    script(shell, "sleep 30 &\nsleep 30")
-    const started = Date.now()
-    expect(await loginShellPath(shell)).toEqual([])
-    expect(Date.now() - started).toBeLessThan(10_000)
-  }, 40_000)
-
-  it("gives up on a shell that fails or is not a real path", async () => {
-    const shell = join(root, "broken")
-    script(shell, "exit 1")
-    expect(await loginShellPath(shell)).toEqual([])
-    expect(await loginShellPath("zsh")).toEqual([])
-    expect(await loginShellPath(join(root, "missing"))).toEqual([])
+  it("offers nothing on a platform with no pinned build", () => {
+    const offered = detectHarnesses({ root, platform: "win32-x64" }).filter(info => info.harness !== "mock")
+    expect(offered.every(info => !info.installed)).toBe(true)
   })
-})
 
-describe("harnessFingerprint", () => {
-  it("changes when an agent appears on PATH, without running it", () => {
-    process.env.PATH = root
-    const before = harnessFingerprint()
-    script(join(root, "codex"), `touch "${join(root, "ran")}"`)
-    const after = harnessFingerprint()
-    expect(after).not.toBe(before)
-    expect(after).toContain(join(root, "codex"))
-    expect(harnessFingerprint()).toBe(after)
+  it("never looks at agents on PATH", () => {
+    const saved = process.env.PATH
+    try {
+      const before = harnessFingerprint({ root })
+      process.env.PATH = "/nonexistent"
+      expect(harnessFingerprint({ root })).toBe(before)
+      expect(before).not.toContain("/")
+    } finally {
+      process.env.PATH = saved
+    }
   })
 })

@@ -4,12 +4,13 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { handleGroup, type GroupRequest } from '../group-conversations-store'
-import { GroupJudgmentPendingError, processGroupTurn, runGroupRounds, type GroupAgent, type GroupRuntime } from './group-turns'
+import { GroupJudgmentPendingError, processGroupTurn, runGroupRounds, untilStopped, type GroupAgent, type GroupRuntime } from './group-turns'
 import { checkedCorrection, checkedRoute } from './group-correction'
 import { createGroupJudgment } from './group-judgment'
 import { DECISION_MODEL, type DecisionAnswer } from './decision'
 import type { DecisionExecution } from './decide'
-import { MissingGroupLeadError, routeFromAnswers, UnknownMentionError, routingInput } from './group-routing'
+import { UnknownMentionError, routingInput } from './group-routing'
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
 const members: GroupAgent[] = [a,b].map((id,i) => ({ id, name: `Agent ${i}`, description: `role ${i}` }))
@@ -89,13 +90,9 @@ test('private routing rejects foreign/self/third peers and an unavailable writer
   assert.equal(writes, 1, 'the first authorized exchange remains, the third-peer response is never stored')
 })
 
-// Enforce the authorized ephemeral DB boundary, even if REQUIRE_DB is accidentally set locally.
-const dbURL = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' ? process.env.E2E_DATABASE_URL : undefined
-if (process.env.REQUIRE_DB === '1' && !dbURL) throw new Error('REQUIRE_DB=1 requires GitHub Actions ephemeral PG17')
-if (dbURL) {
-  const url = new URL(dbURL)
-  if (url.hostname !== '127.0.0.1' || url.pathname !== '/mikka_e2e') throw new Error('Only CI temporary mikka_e2e is allowed')
-}
+// Only a disposable loopback *_e2e database, even if REQUIRE_DB is set.
+const dbURL = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined
+if (process.env.REQUIRE_DB === '1' && !dbURL) throw new Error('REQUIRE_DB=1 requires a loopback *_e2e database')
 test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy', { skip: !dbURL }, async () => {
   const pool = new Pool({ connectionString: dbURL })
   const schema = `turns_${randomUUID().replaceAll('-','')}`
@@ -111,7 +108,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     // Minimal real agent_runs columns used by the bridge; full tracked schema
     // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
     await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid)`)
-    await scoped.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text, "lastSeenAt" timestamptz); CREATE TABLE coordinator_sessions ("userId" text, "botId" uuid, "leaseHolder" text, "leaseUntil" timestamptz, "updatedAt" timestamptz)` )
+    await scoped.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text, "lastSeenAt" timestamptz); CREATE TABLE coordinator_sessions ("userId" text, "botId" uuid, "leaseHolder" text, "leaseUntil" timestamptz, "updatedAt" timestamptz); CREATE TABLE coordinator_bots ("ownerId" text, "workspaceId" uuid, "botId" uuid)` )
     // The current active-agent reader resolves public Bot names before its
     // legacy execution-name fallback. Keep those real SQL dependencies present.
     await scoped.query(`CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" uuid,name text NOT NULL,color text,shape text);
@@ -306,8 +303,51 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const revoked = await send(id,'revoked workspace',[a])
     await assert.rejects(processGroupTurn(scoped,id,{...runtime,async authorized() {return false},async generate() {assert.fail('revoked actor must not generate')}}),/no_longer_authorized/)
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[revoked])).rows[0].status,'failed')
+    // 停止: a member stops while a reply generates; the reply in flight is aborted and nothing is posted, the turn reads stopped.
+    const stoppedRoot = await send(id,'stopped mid reply',[a])
+    let aborted = false
+    assert.equal(await processGroupTurn(scoped,id,{...runtime,async generate(_agent,input) {
+      const stop = await handleGroup(scoped,directory,{...base,userId:'member',resource:'stop',id},true)
+      assert.equal(stop.status,200); assert.deepEqual(stop.body,{stopped:1})
+      await new Promise<void>(resolve => input.signal?.addEventListener('abort',() => { aborted = true; resolve() },{once:true}))
+      throw input.signal?.reason
+    }}),true)
+    assert.ok(aborted,'the reply in flight is aborted')
+    assert.deepEqual((await scoped.query('SELECT status,error,"agentId" FROM group_turns WHERE "messageId"=$1',[stoppedRoot])).rows[0],{status:'failed',error:'stopped',agentId:null})
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[stoppedRoot])).rows[0].n,0)
+    assert.equal((await scoped.query(`SELECT status FROM agent_runs WHERE kind='group_chat' ORDER BY "createdAt" DESC LIMIT 1`)).rows[0].status,'stopped')
+    const page = await handleGroup(scoped,directory,{...base,method:'GET',resource:'messages',id},true)
+    assert.equal((page.body as {stopped:boolean;agentStatus:unknown}).stopped,true); assert.equal((page.body as {agentStatus:unknown}).agentStatus,null)
+    // A reply that finishes as the stop lands is not posted either; the next message is answered as usual.
+    const lateRoot = await send(id,'stopped as it finished',[a])
+    assert.equal(await processGroupTurn(scoped,id,{...runtime,async generate() {
+      await handleGroup(scoped,directory,{...base,resource:'stop',id},true)
+      return {text:'too late',mentions:[]}
+    }}),true)
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[lateRoot])).rows[0].n,0)
+    const afterStop = await send(id,'after stop',[a]); assert.equal(await processGroupTurn(scoped,id,runtime),true)
+    assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[afterStop])).rows[0].status,'complete')
+    // Only members stop: someone outside the group gets the same 404 as an unknown group.
+    assert.equal((await handleGroup(scoped,directory,{...base,userId:'stranger',resource:'stop',id},true)).status,404)
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { releasePending(); await scoped.end(); await pool.end() }
+})
+test('停止 ends the rounds: no further reply is generated once the turn is stopped', async () => {
+  const calls: string[] = []
+  let stop = false
+  await runGroupRounds({ by: 'mention', responders: [a,b] }, message, {
+    async eligible() { return members }, async status() {}, async stopped() { return stop },
+    async generate(agent) { calls.push(agent.id); stop = true; return { text: 'first reply', mentions: [b] } },
+    async publish() { return true },
+  })
+  assert.deepEqual(calls, [a])
+})
+test('停止 aborts a reply in flight once the poll sees it, and leaves a finished one alone', async () => {
+  let stop = false
+  const pending = untilStopped(async () => stop, signal => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })), 5)
+  stop = true
+  await assert.rejects(pending, /stopped/)
+  assert.equal(await untilStopped(async () => false, async () => 'done', 5), 'done')
 })
 test('expired execution budget cancels before generation/status publication', async () => {
   await assert.rejects(runGroupRounds({by:'mention',responders:[a]},message,{
@@ -320,14 +360,6 @@ test('production adapter does not select private standing instructions or sessio
   assert.match(runtime,/await client\.query/)
   assert.doesNotMatch(runtime,/\bdb\./)
 })
-
-test('missing or ineligible lead never silently selects first-joined agent; confident routes need no lead', () => {
-  assert.throws(()=>routeFromAnswers(null,members,null),MissingGroupLeadError)
-  assert.throws(()=>routeFromAnswers(null,members,outsider),MissingGroupLeadError)
-  assert.equal(routeFromAnswers(null,members,b).responders[0],b)
-  assert.equal(routeFromAnswers(new Map([['responder',{type:'choice' as const,name:'responder',choice:a,confidence:1}]]),members,null).responders[0],a)
-})
-
 
 test('correction facts come from model judgment and reject uncertain or invalid members', () => {
   const prior = { message: 'previous', responderId: a }

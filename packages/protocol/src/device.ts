@@ -107,6 +107,23 @@ export const devicePaths = {
 
 /** `POST /v1/devices/register` */
 export const deviceComputerCapability = z.object({ installed: z.boolean(), version: z.string().max(100).nullable() }).strict()
+/**
+ * What this machine can run (2026-10-31, devices are runners): the daemon
+ * installs its own pinned harnesses, so this reports their install state,
+ * never which agents the person installed.
+ */
+export const deviceRunnerCapability = z.object({
+  os: z.string().max(50),
+  arch: z.string().max(50),
+  freeDiskBytes: z.number().int().nonnegative().nullable(),
+  docker: z.boolean(),
+  harnesses: z.array(z.object({
+    harness: harnessSchema,
+    state: z.enum(["installed", "not_installed", "unsupported"]),
+    version: z.string().max(100),
+  })).max(20),
+})
+export type DeviceRunnerCapability = z.infer<typeof deviceRunnerCapability>
 export const deviceRegistration = z.object({
   deviceType: z.enum(["laptop", "server"]).optional(),
   name: z.string().trim().min(1).max(200),
@@ -117,6 +134,7 @@ export const deviceRegistration = z.object({
   protocolVersion: z.number().int(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
+  runner: deviceRunnerCapability.optional(),
   /**
    * This machine's one device id, the same in every workspace (ADR ORV-284).
    * Registering with it in another workspace joins the same device there.
@@ -152,6 +170,7 @@ export const deviceHeartbeatSchema = z.object({
   failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
   harnesses: z.array(harnessInfoSchema).max(20),
   computerUse: deviceComputerCapability.optional(),
+  runner: deviceRunnerCapability.optional(),
   deviceType: z.enum(["laptop", "server"]).optional(),
   runs: z.array(heartbeatRunSchema).max(500),
   worktreeDiskBytes: z.number().int().nonnegative(),
@@ -223,6 +242,26 @@ export type SetupRecipe = z.infer<typeof setupRecipeSchema>
 
 export const REPO_ORIGIN_HEADER = "x-mikka-repo-origin-check"
 
+/** Sent by a daemon that injects `modelCredential`; a run frozen on an API key is handed only to one. */
+export const MODEL_CREDENTIAL_HEADER = "x-mikka-model-credential"
+
+const credentialKey = z.string().min(1).max(4_096).refine(value => !/[\r\n\0]/.test(value))
+const credentialBaseUrl = z.url().max(500).refine(value => {
+  const url = new URL(value)
+  return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash
+})
+
+/**
+ * The model credential a run is given at claim (orchestration.md § 6): an
+ * API key, or a provider's base URL, protocol and key. The daemon's
+ * `RunCredential` (packages/daemon/src/agents/run-credential.ts).
+ */
+export const runModelCredentialSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("api_key"), key: credentialKey }).strict(),
+  z.object({ kind: z.literal("provider"), protocol: z.enum(["anthropic", "openai"]), baseUrl: credentialBaseUrl, key: credentialKey }).strict(),
+])
+export type RunModelCredential = z.infer<typeof runModelCredentialSchema>
+
 /** A repository record and its identity-scoped settings. */
 export const deviceRepoSchema = z.object({
   repoId: id,
@@ -285,6 +324,12 @@ export const runAssignmentSchema = z.object({
     bindingId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
     consumerId: z.uuid(), route: z.enum(['codex_cli', 'claude_code_cli']),
   }).strict().optional(),
+  /**
+   * The run's own API key, opened for this claim only. Never with
+   * `subscriptionBinding`. The daemon keeps it in memory and hands it only
+   * to the run's Agent process or container; it is never journaled.
+   */
+  modelCredential: runModelCredentialSchema.optional(),
   /** Local host authority comes only from the server's owner-bound Bot run. */
   localComputer: z.object({
     botId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
@@ -396,7 +441,7 @@ export const runAssignmentSchema = z.object({
   skillReceipt: skillAssignmentReceiptSchema.optional(),
   /** Frozen by the server benchmark ledger; never extracted from model output. */
   benchmark: runBenchmarkContext.optional(),
-})
+}).refine(value => !(value.modelCredential && value.subscriptionBinding), { message: "A run has one model credential", path: ["modelCredential"] })
 export type RunAssignment = z.infer<typeof runAssignmentSchema>
 
 /**
@@ -462,6 +507,9 @@ export const COMMANDS_MAX_SKIP = 100
  * person sent in the run's chat (a `message` row, delivered at least once
  * until acked); `stop` repeats until the run has ended.
  */
+/** Older daemons reject unknown command kinds; advertise this extension. */
+export const MAILBOX_NOTICE_HEADER = 'x-mikka-mailbox-notices'
+
 export const runCommandSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("input"),
@@ -470,6 +518,9 @@ export const runCommandSchema = z.discriminatedUnion("kind", [
     text: z.string().min(1).max(100_000),
   }),
   z.object({ kind: z.literal("stop"), runId: id }),
+  // A host notification carries addresses only; peer content remains behind
+  // the authenticated mailbox read and retains its original provenance.
+  z.object({ kind: z.literal('mailbox_notice'), runId: id, messageIds: z.array(z.uuid()).min(1).max(50) }),
 ])
 export type RunCommand = z.infer<typeof runCommandSchema>
 
@@ -481,6 +532,12 @@ export type RunCommand = z.infer<typeof runCommandSchema>
  */
 export const runCommandsResponse = z.object({
   commands: z.array(runCommandSchema).max(500),
+  /**
+   * Runs queued for this device (outside `skip`), so it claims them now
+   * instead of on its next heartbeat. A queued run also ends the long-poll.
+   * Absent from older servers; the heartbeat still claims either way.
+   */
+  queuedRuns: z.array(id).max(100).optional(),
 })
 export type RunCommandsResponse = z.infer<typeof runCommandsResponse>
 

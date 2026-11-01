@@ -48,8 +48,8 @@ It returns 404 when the environment, origin, marker or build does not match.
 
 ## Bootstrap
 
-The browser and database CI jobs bootstrap their existing disposable PostgreSQL
-service after schema setup and before tests create users:
+The database CI job and local runs bootstrap the disposable PostgreSQL
+database after schema setup and before tests create users:
 
 ```sh
 node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
@@ -67,6 +67,52 @@ A cloud harness that starts its own PostgreSQL process uses the exported
 that verifies the created resource's data directory/process/container identity
 against the exact connection. It must not impersonate GitHub Actions by setting
 CI flags. Ordinary shared or production databases have no bootstrap path here.
+
+### Local mode (a developer's own disposable database)
+
+`MIKKA_LOCAL_TEST_ACCOUNTS=1 node scripts/test-accounts/bootstrap.mjs --output <file>`
+is that path for a PostgreSQL 17 you started yourself on this machine (the
+version CI uses). It reads no
+CI variable and sets none. Before connecting it refuses any database that is
+not on `127.0.0.1`, `localhost` or `[::1]` or whose name does not end in `_e2e`;
+after that it applies the CI checks unchanged (a database with no users and no
+marker, the checked-out SHA equal to `MIKKA_TEST_DEPLOYMENT_SHA`, no mail or
+external service keys). Start from an empty database: migrate, run
+`pnpm test:e2e:setup`, then bootstrap. Keep the PostgreSQL data directory
+outside the session scratchpad, whose permissions can change under a running
+server.
+
+The rule is one function, `localTestAccountsMode` in
+`packages/protocol/src/local-test-mode.ts`: `MIKKA_LOCAL_TEST_ACCOUNTS=1`, no
+`VERCEL` or `VERCEL_ENV`, `E2E_DATABASE_URL` set, and every configured database
+URL a loopback `*_e2e` database. The bootstrap, auth origins
+(`lib/auth-config.ts`), signup limits (`lib/abuse/signup.ts`), the daemon's
+`MIKKA_TEST_MODE` (`daemonTestMode`) and the MVP fixture all use it. The MVP
+specs (`pnpm test:e2e:mvp`) run locally with it plus `MIKKA_TEST_MODE=1` and
+`MIKKA_MVP_E2E=1`, still only against the loopback `mikka_e2e` database at
+`http://localhost:3100`.
+
+Browser specs then run against a server you started (`E2E_BASE_URL`), with the
+preinstalled Chromium as `launchOptions.executablePath` when the pinned
+Playwright browser is not installed.
+
+- Prefer a production build (`next build`, then `next start`), with
+  `MIKKA_LOCAL_TEST_ACCOUNTS=1` and the same loopback `_e2e` database URLs in
+  the server's environment: that is what lets a production build accept the
+  `http://localhost` auth origin (`lib/auth-config.ts`). Do not set `CI`. The fixtures
+  fail a test on any `console.error`, and `next dev` prints React
+  development-only checks (for example `useInsertionEffect must not schedule
+  updates`) that a production build never logs.
+- With `next dev`, warm it first: open every route the spec visits once before
+  the run. A first compile takes 10–35 seconds and lands inside the specs'
+  15-second assertions; the run then fails on timing, not on the code.
+- Every test registers a new account. In local test-account mode the sign-up
+  and verification limits default to 1000 per address and 10000 overall each
+  hour, and Better Auth's sign-up rule to 100 per ten seconds
+  (`lib/abuse/signup.ts`); outside it they stay at five sign-ups per address
+  an hour and Better Auth's three per ten seconds. An explicitly set
+  `MIKKA_SIGNUP_*_HOURLY` or `MIKKA_VERIFICATION_*_HOURLY` still wins. Run one
+  spec process at a time and do not register by hand during a run.
 
 The environment binding is immutable for its lifetime. A new SHA or origin
 requires a new disposable environment and descriptor; changing an alias while
@@ -197,12 +243,9 @@ timestamp, run/lease IDs, non-sensitive account IDs and expected/actual results.
 Do not place credentials, cookies, tokens, raw authentication responses or
 unfiltered driver errors in logs, PRs, screenshots, traces or public artifacts.
 Secret scans must include the generated logs and exported browser evidence.
-Both CI Playwright commands first capture stdout and stderr in mode 0600 logs.
-Each log is scanned before any of its content is printed to Actions; a blocked
-scan never prints the log. The workflow preserves the test command's failure
-exit code and fails a successful test command if its log scan fails. The final
-artifact scan and upload use the same explicit log paths alongside the reports.
-The scanner also decodes the ZIP payload embedded inside Playwright HTML reports,
+CI runs no browser tests (decision 2026-11-01-1520). The lease session scans
+the evidence it records (`scripts/test-accounts/session.mjs` with
+`evidence-content.mjs`); the scanner also decodes the ZIP payload embedded inside Playwright HTML reports,
 with bounded entry count, depth and decompressed size. It rejects malformed,
 encrypted, unsupported and raw nested archives. The regular registration fixture
 records its generated passwords and cookies in the same protected scanner store.

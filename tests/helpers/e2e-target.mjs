@@ -32,3 +32,19 @@ export function assertE2eTarget(value) {
   if (!isE2eTarget(value)) throw new Error(E2E_DB_RULE)
   return new URL(value)
 }
+
+// Every application database URL a test process can reach through lib/db and
+// friends. A set one that is not a loopback *_e2e target disqualifies the run.
+export const APPLICATION_DATABASE_URLS = ['E2E_DATABASE_URL', 'MIKKA_DATABASE_URL', 'DATABASE_URL', 'ORVILO_DATABASE_URL']
+
+/**
+ * Whether a DB test may write: the URLs it connects to (E2E_DATABASE_URL by
+ * default) and every application database URL set in env are loopback *_e2e
+ * databases. Decided by the database alone, so CI and a developer's own
+ * disposable database pass alike; a remote or non-_e2e URL anywhere fails.
+ */
+export function disposableDatabase(env = process.env, ...urls) {
+  const targets = urls.length ? urls : [env.E2E_DATABASE_URL]
+  if (!targets.every(isE2eTarget)) return false
+  return APPLICATION_DATABASE_URLS.every(name => !env[name] || isE2eTarget(env[name]))
+}

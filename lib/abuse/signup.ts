@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { APIError } from 'better-auth'
 import { auditRequestContext } from '../audit/events'
+import { localTestAccountsMode } from '@mikka/protocol/local-test-mode'
 const domains = new Set(
   readFileSync(
     join(process.cwd(), 'lib/abuse/data/disposable-email-domains.txt'),
@@ -80,6 +81,25 @@ export function signupClientIP(
 ) {
   return auditRequestContext(headers, env).ip ?? 'local'
 }
+/**
+ * Local test mode: a developer's own disposable database, where every signup
+ * comes from one 'local' IP. On in local test-account mode (MIKKA_LOCAL_TEST_ACCOUNTS=1
+ * and every configured database a loopback *_e2e one, never on Vercel:
+ * packages/protocol/src/local-test-mode.ts), for
+ * `next dev` and `next start` alike; a production database never qualifies.
+ */
+export function localTestSignups(env: Record<string, string | undefined> = process.env) {
+  return localTestAccountsMode(env)
+}
+/**
+ * Better Auth's own sign-up limit (its default special rule: 3 a window of 10
+ * seconds per client, https://www.better-auth.com/docs/concepts/rate-limit).
+ * Locally every request shares one bucket, so in local test mode sign-up gets
+ * Better Auth's general limit of 100 a window instead; production keeps the default.
+ */
+export function localSignUpRateRules(env: Record<string, string | undefined> = process.env): Record<string, { window: number; max: number }> {
+  return localTestSignups(env) ? { '/sign-up/email': { window: 10, max: 100 } } : {}
+}
 export function signupLimits(
   env: Record<string, string | undefined> = process.env,
 ) {
@@ -87,11 +107,13 @@ export function signupLimits(
     const n = Number(value)
     return Number.isSafeInteger(n) && n > 0 ? n : fallback
   }
+  // Local test-account mode raises the defaults; an explicit value still wins.
+  const local = localTestSignups(env)
   return {
-    signupIp: positive(env.MIKKA_SIGNUP_IP_HOURLY, 5),
-    signupGlobal: positive(env.MIKKA_SIGNUP_GLOBAL_HOURLY, 100),
-    verificationIp: positive(env.MIKKA_VERIFICATION_IP_HOURLY, 15),
-    verificationGlobal: positive(env.MIKKA_VERIFICATION_GLOBAL_HOURLY, 300),
+    signupIp: positive(env.MIKKA_SIGNUP_IP_HOURLY, local ? 1000 : 5),
+    signupGlobal: positive(env.MIKKA_SIGNUP_GLOBAL_HOURLY, local ? 10000 : 100),
+    verificationIp: positive(env.MIKKA_VERIFICATION_IP_HOURLY, local ? 1000 : 15),
+    verificationGlobal: positive(env.MIKKA_VERIFICATION_GLOBAL_HOURLY, local ? 10000 : 300),
   }
 }
 /** Atomic fixed-hour counters in Better Auth's rateLimit storage. */

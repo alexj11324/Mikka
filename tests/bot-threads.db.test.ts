@@ -60,7 +60,7 @@ test('bot thread list', { skip: !dbUrl }, async t => {
     assert.equal(page.threads[0].threadId, T.b, 'lastReplyAt counts as activity; most recent first')
     assert.equal(page.summary.lastActivityAt, page.threads[0].lastActivityAt)
     const chat = by.get(T.ownerChat)!
-    assert.deepEqual([chat.title, chat.status, chat.canOpen, chat.href], ['Chat opening', 'done', true, `/?section=coordinator&bot=${bot}`])
+    assert.deepEqual([chat.title, chat.status, chat.canOpen, chat.href], ['Chat opening', 'done', true, `/?bot=${bot}`])
     const memberChat = by.get(T.memberChat)!
     assert.deepEqual([memberChat.title, memberChat.status, memberChat.canOpen, memberChat.href], [null, 'running', false, null])
     assert.ok(Date.parse(by.get(T.a)!.lastActivityAt) > Date.parse(chat.lastActivityAt) - 25 * 60_000)
@@ -72,7 +72,7 @@ test('bot thread list', { skip: !dbUrl }, async t => {
     assert.equal(page.summary.totalThreads, 4)
     const by = new Map(page.threads.map(row => [row.threadId, row]))
     for (const id of [T.a, T.b, T.ownerChat]) assert.deepEqual([by.get(id)!.title, by.get(id)!.canOpen, by.get(id)!.href], [null, false, null], id)
-    assert.deepEqual([by.get(T.memberChat)!.title, by.get(T.memberChat)!.href], ['Member private ask', `/?section=coordinator&bot=${bot}`])
+    assert.deepEqual([by.get(T.memberChat)!.title, by.get(T.memberChat)!.href], ['Member private ask', `/?bot=${bot}`])
     assert.ok(!JSON.stringify(page).includes('Chat opening'))
     // Invisible tasks: no task reference at all (no id in threadId, href or anywhere), initiator still shown.
     const json = JSON.stringify(page)

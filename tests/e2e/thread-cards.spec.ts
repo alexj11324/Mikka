@@ -26,7 +26,7 @@ async function seedDispatch(email: string, title: string) {
     await pool.query('INSERT INTO artifacts (id, "userId", kind, title, "runId", "issueId") VALUES ($1, $2, $3, $4, $5, $6)', [artifactId, user.id, 'markdown', 'Home page timing', runId, issue.id])
     await pool.query('INSERT INTO artifact_versions (id, "artifactId", version, "storageKey", "inlineContent", sha256, size, "authorName") VALUES ($1, $2, 1, $3, $4, $5, $6, $7)', [randomUUID(), artifactId, `e2e/${artifactId}.md`, '# Home page timing\n\n3.8s', 'e2e', 25, 'Mikka Frontend'])
     let seq = 0
-    for (const chunk of [{ type: 'text-delta', id: 't1', delta: 'Home page loads in 3.8s.' }, { type: 'tool-input-available', toolCallId: 'a' }, { type: 'tool-input-available', toolCallId: 'b' }]) {
+    for (const chunk of [{ type: 'text-delta', id: 't1', delta: 'Home page loads in 3.8s.' }, { type: 'tool-input-available', toolCallId: 'a', toolName: 'bash', input: { command: 'pnpm build --profile' } }, { type: 'tool-input-available', toolCallId: 'b', toolName: 'apply_patch', input: { files: ['app/page.tsx'] } }]) {
       await pool.query('INSERT INTO run_chunks (id, "runId", seq, chunk) VALUES ($1, $2, $3, $4)', [randomUUID(), runId, ++seq, JSON.stringify(chunk)])
     }
     const messages = [
@@ -36,7 +36,7 @@ async function seedDispatch(email: string, title: string) {
       { role: 'assistant', content: [{ type: 'text', text: 'Mikka Frontend is on it.' }] },
     ]
     for (const [index, message] of messages.entries()) {
-      await pool.query('INSERT INTO coordinator_messages (id, "userId", position, message) VALUES ($1, $2, $3, $4)', [randomUUID(), user.id, index + 1, JSON.stringify(message)])
+      await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), $3, $4)', [randomUUID(), user.id, index + 1, JSON.stringify(message)])
     }
   } finally { await pool.end() }
 }
@@ -67,12 +67,12 @@ async function seedResultCards(email: string, fixtures: ResultCardFixture[]) {
       { role: 'assistant', content: [{ type: 'text', text: 'PR 状态视觉样例。' }] },
     ]
     for (const [index, message] of messages.entries()) {
-      await pool.query('INSERT INTO coordinator_messages (id, "userId", position, message) VALUES ($1, $2, $3, $4)', [randomUUID(), user.id, Number(last.position) + index + 1, JSON.stringify(message)])
+      await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), $3, $4)', [randomUUID(), user.id, Number(last.position) + index + 1, JSON.stringify(message)])
     }
   } finally { await pool.end() }
 }
 
-test('A dispatched thread is a card under the reply that opens its conversation in place of the chat (R-66)', async ({ page }, testInfo) => {
+test('A dispatched thread is a card under the reply that opens its conversation beside the chat (R-66, R-82)', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   await page.emulateMedia({ colorScheme: 'light' })
   const { email } = await register(page)
@@ -86,7 +86,7 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await expect(card).toBeVisible()
   const surface = chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: '打开线程 Speed up the home page', exact: true }) })
   await expect(surface).toContainText('Speed up the home page')
-  await expect(surface.getByRole('img', { name: '运行中', exact: true })).toBeVisible()
+  await expect(surface.getByRole('img', { name: '进行中', exact: true })).toBeVisible()
   // R-66: status icon + title + real output chips; no avatar or progress row.
   await expect(surface).not.toContainText('交给 Codex')
   await expect(surface).not.toContainText('执行了 2 步')
@@ -95,19 +95,36 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await card.click()
   const thread = page.getByRole('region', { name: 'Speed up the home page', exact: true })
   await expect(thread.getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
-  await expect(thread.getByRole('textbox', { name: '告诉 Mikka Frontend 下一步做什么…' })).toBeVisible()
-  await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息' })).toHaveCount(0)
+  await expect(thread.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })).toBeVisible()
+  // The chat stays in the centre and the thread has its own address (R-82).
+  await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息' })).toBeVisible()
+  await expect(page).toHaveURL(url => /^[0-9a-f-]{36}$/.test(url.searchParams.get('thread') ?? ''))
   await testInfo.attach('thread-open', { body: await page.screenshot(), contentType: 'image/png' })
 
+  // The folded harness steps open to each call and close again, by pointer and by keyboard.
+  const steps = thread.getByRole('button', { name: '交给 Codex · 执行了 2 步', exact: true })
+  await expect(steps).toHaveAttribute('aria-expanded', 'false')
+  await steps.click()
+  await expect(steps).toHaveAttribute('aria-expanded', 'true')
+  const calls = thread.locator(`[id="${await steps.getAttribute('aria-controls')}"]`)
+  await expect(calls).toContainText('pnpm build --profile')
+  await expect(calls).toContainText('app/page.tsx')
+  await testInfo.attach('thread-steps-open', { body: await page.screenshot(), contentType: 'image/png' })
+  await steps.press('Enter')
+  await expect(steps).toHaveAttribute('aria-expanded', 'false')
+  await steps.press('Space')
+  await expect(steps).toHaveAttribute('aria-expanded', 'true')
+
   // 「Artifact · 1」 opens the Artifact window with this thread's conversation beside it (F3, F4).
-  await thread.getByRole('button', { name: '产物 · 1', exact: true }).click()
+  await thread.getByRole('button', { name: 'Artifact · 1', exact: true }).click()
   const artifactWindow = page.getByRole('dialog', { name: 'Home page timing', exact: true })
   await expect(artifactWindow.getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
   await artifactWindow.getByRole('button', { name: '关闭', exact: true }).click()
   await expect(artifactWindow).toHaveCount(0)
 
-  await thread.getByRole('button', { name: '返回 Coordinator', exact: true }).click()
+  await thread.getByRole('button', { name: '关闭线程', exact: true }).click()
   await expect(thread).toHaveCount(0)
+  await expect(page).toHaveURL(url => !url.searchParams.has('thread'))
   await expect(chat.getByRole('button', { name: '打开线程 Speed up the home page', exact: true })).toBeVisible()
 
   // Review frame 356:4750. Seed only this visual test's state matrix; the MVP

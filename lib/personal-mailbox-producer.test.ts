@@ -25,7 +25,7 @@ const database = {
   },
   insert(table: unknown) { assert.equal(table, agentRuns); return { async values(row: Record<string, unknown>) { inserted.push(row) } } },
 }
-mock.module(new URL('./db/index.ts', import.meta.url).href, { exports: { db: database, pool: {}, withDatabaseClient: () => { throw Error('Factory transactions are outside the mailbox snapshot producer fixture') } } })
+mock.module(new URL('./db/index.ts', import.meta.url).href, { exports: { db: database, pool: { query: async () => ({ rows: [], rowCount: 0 }) }, withDatabaseClient: () => { throw Error('Factory transactions are outside the mailbox snapshot producer fixture') } } })
 mock.module(new URL('./device-repositories.ts', import.meta.url).href, { exports: { ensureDeviceRepository: async (userId: string, deviceId: string, repo: string) => {
   assert.equal(userId, owner); assert.equal(deviceId, 'device'); assert.equal(repo, repoUrl)
   return { id: repoId, baseBranch: 'main' }
@@ -42,7 +42,7 @@ after(() => { for (const key of flags) if (original[key] === undefined) delete p
 
 test('actual personal producer freezes owned Bot workspace or explicit unbound scope and keeps flag-off old paths query-free', async () => {
   const { queueRun } = await import('./agent-runs')
-  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '1'; delete process.env.MIKKA_BYOS_ENABLED
+  delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED; delete process.env.MIKKA_BYOS_ENABLED
   for (const bot of [botId, null]) {
     await queueRun(owner, { issueId, agentId, repo: repoUrl }, bot, execution)
     assert.equal(personalWorkerMailboxScopeMatches('codex', inserted.at(-1)!.agentDefinition, { botId: bot, workspaceId: bot ? workspaceId : globalId }), true)
@@ -51,7 +51,7 @@ test('actual personal producer freezes owned Bot workspace or explicit unbound s
   const count = inserted.length
   await assert.rejects(queueRun(owner, { issueId, agentId, repo: repoUrl }, botId, execution), /runInvalid/)
   assert.equal(inserted.length, count)
-  delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
+  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
   const lookups = botQueries
   await queueRun(owner, { issueId, agentId, repo: repoUrl }, botId, execution)
   assert.equal(botQueries, lookups)
@@ -70,6 +70,7 @@ test('actual cloud producer pins the existing host-authorized Bot/workspace with
       assert.ok(sql.includes('b."ownerId"=$2 AND b."workspaceId"=$3'))
       return { rows: [{ deviceId: 'device', harness: 'codex', instructions: 'Fixture', baseBranch: 'main' }] }
     }
+    if (sql.startsWith('SELECT 1 FROM bots b JOIN agents')) return { rows: [{}], rowCount: 1 }
     if (sql.startsWith('INSERT INTO agent_runs')) snapshot = JSON.parse(params[9] as string)
     return { rows: [] }
   } }

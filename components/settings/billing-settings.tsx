@@ -18,7 +18,7 @@ import { FieldError } from '@/components/ui/field'
  * through Stripe Checkout, payment method, plan changes and invoices through
  * the Customer Portal.
  */
-export function BillingSettings({ workspaceId }: { workspaceId: string }) {
+export function BillingSettings({ workspaceId, personal = false }: { workspaceId: string; /** Card verification belongs to the person: its USD 1 lands in their personal workspace, so only that 计费 offers it (C19). */ personal?: boolean }) {
   const t = useTranslations('Settings.billing')
   const computerBilling = useGatedFeature('computerBilling')
   const locale = useLocale()
@@ -27,7 +27,7 @@ export function BillingSettings({ workspaceId }: { workspaceId: string }) {
   const { mutate } = useSWRConfig()
   // 免费额度 and 余额 (#558, #559) come first, whether or not a plan is set up.
   const credits = <>
-    <FreeAllowanceSection workspaceId={workspaceId} onVerified={() => { void mutate(creditBillingKey(workspaceId)) }} />
+    {personal && <FreeAllowanceSection workspaceId={workspaceId} onVerified={() => { void mutate(creditBillingKey(workspaceId)) }} />}
     <BalanceSection workspaceId={workspaceId} />
   </>
   const [pending, setPending] = useState<'portal' | 'checkout' | null>(null)
@@ -52,8 +52,9 @@ export function BillingSettings({ workspaceId }: { workspaceId: string }) {
 
   if (!billing.data && !billing.error) return <SettingsLoading label={t('loading')} rows={3} />
   if (!data) return <FieldError>{actionError(billing.data?.error)}</FieldError>
+  // No Stripe: card verification and 充值 cannot work, so only the state shows (and a balance already granted, read-only).
   if (!data.configured) return <>
-    {credits}
+    <BalanceSection workspaceId={workspaceId} purchasable={false} />
     <p role="status" className="text-sm text-muted-foreground">{actionError('billingNotConfigured')}</p>
   </>
 

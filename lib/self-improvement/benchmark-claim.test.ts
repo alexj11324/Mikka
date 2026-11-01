@@ -28,6 +28,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     // the actual route/fence and token revocation have real PostgreSQL tests.
     '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,scope:'personal',content:{type:'doc'}}}},
     '@/lib/device-route':{withDeviceRoute:<T>(handler:T)=>handler},
+    '@/lib/cloud-computer-flag':{cloudComputerTasksEnabled:()=>true},
     'next/server':{after:()=>{calls.push('wakeScheduled')},NextResponse:class extends Response {static json(body:unknown,init?:ResponseInit){return Response.json(body,init)}}},
     'drizzle-orm':{and:(...args:unknown[])=>args,eq:(...args:unknown[])=>args,isNull:(value:unknown)=>value},
     '@mikka/protocol/device':deviceProtocol,
@@ -36,6 +37,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@mikka/protocol/policy-snapshot':policySnapshotProtocol,
     // This legacy-capability fixture has no managed organization policy.
     '@/lib/agent-tool-approval/policy-distribution':{},
+    '@/lib/agent-tool-approval/local-cloud-issuer':{},
     '@/lib/device-agents':{localExecutionHarnesses:()=>['codex']},
     '@/lib/device-repositories':{readRepositorySettings:async()=>({verifyCommand:repo.verifyCommand})},
     '@/lib/run-test-fixture':{runTestFixture:()=>undefined},
@@ -58,6 +60,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
     '@/lib/mcp/worker':{issueRunToken:async()=>{calls.push('token');return {token:'synthetic-test-token'}}},
     '@/lib/run-leases':{},'@/lib/run-retry':{},
+    '@/lib/thread-continuation':{continuationFollowUp:()=>null},
     '@/lib/run-completion-effects':{afterRunEnded:async()=>{calls.push('runEnded');return 0}},
     '@/lib/factory/checks':{isFactoryCheckRun:async()=>false},
     '@/lib/factory/runtime':{guardFactoryClaim:async()=>{calls.push('guard');if(stopped)throw new FactoryError('stopped');return {preserveQuestionWorktree:true}}},
@@ -73,6 +76,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     }},
     '@/lib/subscription-runtime':{},
     '@/lib/computer/native-run-binding':{},
+    '@/lib/personal-policy':{sharedNativeBinding:async()=>null},
     '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
     '@/lib/secrets/runtime':{taskSecretInjection:async()=>({env:{},secretNames:[]}),remoteRepositoryRef:()=>null},
     '@/lib/personal-mailbox-config':{personalMailboxEnabled:()=>false},

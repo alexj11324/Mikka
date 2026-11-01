@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, rail, app, seedTask, openIssueFromSearch } from './fixtures'
+import { test, expect, register, registerInTeam, rail, app, seedTask, openIssueFromSearch } from './fixtures'
 
 test.use({ expectedConsoleErrors: [{ path: app('/api/auth/sign-out'), message: 'Failed to load resource: the server responded with a status of 400 (Bad Request)' }] })
 
 for (const path of ['/', '/settings/members', '/en/settings?section=devices']) {
   test(`sign-out hides private UI while pending, restores failures, and revokes the session: ${path}`, async ({ page, context }) => {
     const english = path.startsWith('/en/')
-    await register(page, english ? '/settings?section=devices' : path)
+    await (path === '/settings/members' ? registerInTeam : register)(page, english ? '/settings?section=devices' : path)
     if (english) await page.goto(app(path))
     const accountMenu = page.getByRole('button', { name: english ? 'Workspace menu' : '工作区菜单', exact: true })
     const pending = page.getByRole('status', { name: english ? 'Signing out…' : '正在退出…', exact: true })

@@ -6,6 +6,7 @@ export const subscriptionListSchema = z.object({
   connections: z.array(z.object({
     id: z.uuid(), provider: z.enum(['codex', 'claude']), state: z.string(), revision: z.number().int().positive(),
     account: z.string().max(256).nullable().optional(),
+    paused: z.boolean().optional(),
     bots: z.array(z.object({ id: z.uuid(), name: z.string().max(200), color: z.string().max(40), shape: z.string().max(40) })).max(200).optional(),
   })),
 })
@@ -47,3 +48,8 @@ export const subscriptionUsageSchema = z.object({
   })).max(50),
 })
 export type SubscriptionUsageView = z.infer<typeof subscriptionUsageSchema>['connections'][number]
+
+/** A plan as the provider's own pages name it: Codex sends `pro`, Claude's profile gives `Max`. */
+export function planName(plan: string) {
+  return plan.charAt(0).toUpperCase() + plan.slice(1)
+}

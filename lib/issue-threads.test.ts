@@ -21,7 +21,7 @@ test('a teammate thread shows whose it is, its status and time, never its conten
 test('the owner reads their own thread in full', () => {
   const [mine] = projectIssueThreads([make('mine', 'viewer')], 'issue', 'viewer', new Set(['teammate', 'viewer']))
   assert.equal(mine.ownerName, null)
-  assert.deepEqual(mine.detail, { name: 'Route group replies', agentName: 'Mikka Backend', harness: 'codex', summary: 'Done' })
+  assert.deepEqual(mine.detail, { name: 'Route group replies', agentName: 'Mikka Backend', harness: 'codex', summary: 'Done', bot: null })
 })
 
 test('stopping is shared status metadata and disappears when the daemon acknowledges', () => {
@@ -75,7 +75,7 @@ test('a resumed question is one thread: its run chain folds the continuation int
   assert.deepEqual(threads.map(thread => thread.id), ['origin'])
   assert.equal(threads[0].detail?.name, 'Speed up the home page')
   assert.deepEqual([threads[0].rootRunId, threads[0].latestRunId, threads[0].attempts.map(a => a.runId)], ['origin', 'next', ['origin', 'next']])
-  assert.deepEqual(threads[0].continuation, { id: 'next', status: 'queued', stopping: false })
+  assert.deepEqual(threads[0].continuation, { id: 'next', status: 'queued', outcome: null, stopping: false })
   // Queued continuation: its question is read on the run it resumes, and it reads 运行中, nothing to send or stop yet.
   assert.equal(threadQuestionRunId(threads[0]), 'origin')
   const queued = threadQuestionView({ ...threads[0], question: 'resuming' })
@@ -101,7 +101,7 @@ test('a one-run thread is its own chain: the question is read on it once it ende
   assert.equal(threadQuestionRunId(running), null)
   const [ended] = projectIssueThreads([{ ...make('solo', 'viewer'), status: 'stopped' }], 'issue', 'viewer', new Set(['viewer']))
   assert.equal(threadQuestionRunId(withRunChain(ended, null)), 'solo')
-  assert.deepEqual(threadQuestionView({ ...ended, question: 'waiting' }), { question: 'waiting', waiting: true, status: 'stopped', runId: 'solo', stopping: false })
+  assert.deepEqual(threadQuestionView({ ...ended, question: 'waiting' }), { question: 'waiting', waiting: true, status: 'stopped', outcome: null, runId: 'solo', stopping: false })
 })
 
 test('a continuation without its origin in view never shows raw markdown as its name', () => {

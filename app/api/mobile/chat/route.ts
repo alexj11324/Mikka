@@ -4,6 +4,8 @@ import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { chatView } from '@/lib/coordinator/store'
+import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
+import { reactionsFor } from '@/lib/reactions'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { z } from 'zod'
@@ -25,6 +27,9 @@ async function tokenBotAllowed(user: { id: string; [tokenWorkspace]?: string }, 
   return Boolean(bot)
 }
 
+/** Reactions on the chat's stored messages (a message still waiting has no id yet). */
+const reactionsOf = (userId: string, items: readonly { id?: string }[]) => reactionsFor(userId, items.flatMap(item => item.id ? [item.id] : []))
+
 /** `GET /api/mobile/chat?bot=<id>`: the chat with the Coordinator (no `bot`) or one of the person's bots. */
 async function handleGET(request: Request) {
   const user = await mobileUser(request)
@@ -36,10 +41,11 @@ async function handleGET(request: Request) {
     if (typeof user[tokenWorkspace] === 'string') {
       if (!await tokenBotAllowed(user, bot.data)) return json({ error: 'botNotFound' }, 404)
       const enabled = coordinatorEnabled()
-      const chat = await chatView(user.id, 200, bot.data)
-      return json({ ...chat, enabled, working: enabled && chat.working })
+      const chat = await chatView(user.id, 200, await openChatBotId(user, bot.data))
+      return json({ ...chat, enabled, working: enabled && chat.working, reactions: await reactionsOf(user.id, chat.items) })
     }
-    return json(await getCoordinatorChat(bot.data))
+    const chat = await getCoordinatorChat(bot.data)
+    return json({ ...chat, reactions: await reactionsOf(user.id, chat.items) })
   } catch (error) {
     if (error instanceof ActionFailureError) return json({ error: error.code }, 404)
     throw error
@@ -57,8 +63,9 @@ async function handlePOST(request: Request) {
   if (!parsed.success) return json({ error: 'messageRequired' }, 400)
   const images = parsed.data.images?.length ? parsed.data.images : undefined
   if (typeof user[tokenWorkspace] === 'string') {
-    const botId = parsed.data.botId ?? null
-    if (!await tokenBotAllowed(user, botId)) return json({ error: 'botNotFound' }, 404)
+    if (!await tokenBotAllowed(user, parsed.data.botId ?? null)) return json({ error: 'botNotFound' }, 404)
+    // No bot named: the Coordinator of the token's workspace, resolved here where the message enters.
+    const botId = await openChatBotId(user, parsed.data.botId)
     try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId, images }) }
     catch (error) {
       if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)

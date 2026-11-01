@@ -103,11 +103,15 @@ export function AccountSettings({ user, onSignOut, signingOut }: {
       <SettingRow title={t('email')}><span className="break-all">{user.email}</span></SettingRow>
     </SettingsSection>
 
-    <SettingsSection id="session-heading" title={t('sessionHeading')}>
-      <SettingRow title={t('signOut')}>
+    {/* The row names the thing, the button the action; deleting the account sits alone in 危险操作 (settings-pages). */}
+    <SettingsSection id="session-heading">
+      <SettingRow title={t('currentSession')}>
         <Button type="button" variant="secondary" size="sm" disabled={signingOut} onClick={onSignOut}>{signingOut ? t('signingOut') : t('signOut')}</Button>
       </SettingRow>
-      <SettingRow title={t('deleteAccount')}>
+    </SettingsSection>
+
+    <SettingsSection id="account-danger" title={t('danger')}>
+      <SettingRow title={t('account')}>
         <Button type="button" variant="destructive" size="sm" onClick={() => { setTyped(''); setDeleteError(null); setConfirming(true) }}>{t('deleteAccount')}</Button>
       </SettingRow>
     </SettingsSection>
@@ -120,7 +124,7 @@ export function AccountSettings({ user, onSignOut, signingOut }: {
         </DialogHeader>
         <Label className="flex flex-col items-start gap-2">
           {t('deleteConfirmLabel', { email: user.email })}
-          <Input value={typed} onChange={event => setTyped(event.target.value)} placeholder={user.email} autoComplete="off" />
+          <Input value={typed} onChange={event => setTyped(event.target.value)} autoComplete="off" />
         </Label>
         {deleteError && <FieldError>{deleteError}</FieldError>}
         <DialogFooter>

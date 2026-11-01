@@ -6,8 +6,10 @@ import {
   runPolicyDigestInput,
   runPolicySchema,
   CONFIGURABLE_ACTIONS,
+  CONFIGURABLE_PERMISSIONS,
   DEFAULT_NETWORK_ALLOW,
   FIXED_PERMISSIONS,
+  gitPushRestriction,
   PERMISSION_ACTIONS,
   PERMISSION_DEFAULTS,
   applyApprovalMode,
@@ -49,10 +51,23 @@ describe("agent policy table (ADR 0009)", () => {
       run_setup_recipe: "allow",
       install_dependency: "allow",
       write_outside_repo: "ask",
-      git_push: "ask",
-      network: "ask",
+      git_push: "deny",
+      network: "allow",
       computer_use: "ask",
     })
+  })
+
+  it("never asks for a push: stored ask reads as allow, a run policy's ask carries no authority (decision 2026-11-01-1310)", () => {
+    expect(CONFIGURABLE_PERMISSIONS.git_push).toEqual(["allow", "deny"])
+    expect(storedPermissionsSchema.parse({ git_push: "ask" })).toEqual({ git_push: "allow" })
+    expect(storedPermissionsSchema.parse({ git_push: "deny" })).toEqual({ git_push: "deny" })
+    const policy = runPolicySchema.parse({ permissions: { install_dependency: "allow", write_outside_repo: "ask", git_push: "ask", network: "ask" }, networkAllow: [] })
+    expect(policy.permissions.git_push).toBe("deny")
+    // Unset resolves to no push; a stored layer can only restrict the server's grant.
+    expect(resolvePermissions({}).git_push).toBe("deny")
+    expect(gitPushRestriction({})).toBe("allow")
+    expect(gitPushRestriction({ git_push: "ask" })).toBe("allow")
+    expect(gitPushRestriction({ git_push: "deny" })).toBe("deny")
   })
 
   it("refuses choices an action does not offer", () => {
@@ -75,7 +90,7 @@ describe("agent policy table (ADR 0009)", () => {
       install_dependency: "allow",
       write_outside_repo: "ask",
       git_push: "deny",
-      network: "ask",
+      network: "allow",
       computer_use: "ask",
     })
     expect(resolvePermissions({ computer_use: "unknown" }).computer_use).toBe("ask")
@@ -290,11 +305,11 @@ it("canonicalizes resolved execution policy independent of object key order", ()
   expect(runPolicyDigestInput({ ...policy, readOnly: true })).not.toBe(runPolicyDigestInput(policy))
 })
 
-it('uses unattended cloud networking only for a trusted cloud environment and keeps explicit choices', () => {
+it('opens the network by default everywhere and keeps the choices a person made', () => {
   expect(resolveAgentSettings(null, undefined, 'cloud').policy.permissions.network).toBe('allow')
-  expect(resolveAgentSettings(null).policy.permissions.network).toBe('ask')
-  for (const network of ['allow','ask','deny'] as const) {
-    expect(resolveAgentSettings({ permissions:{network} },undefined,'cloud').policy.permissions.network).toBe(network)
+  expect(resolveAgentSettings(null).policy.permissions.network).toBe('allow')
+  for (const environment of ['cloud', 'local'] as const) for (const network of ['allow','ask','deny'] as const) {
+    expect(resolveAgentSettings({ permissions:{network} },undefined,environment).policy.permissions.network).toBe(network)
   }
   expect(resolveAgentSettings({permissions:{install_dependency:'deny',git_push:'deny'}},undefined,'cloud').policy.permissions).toMatchObject({install_dependency:'deny',git_push:'deny'})
 })

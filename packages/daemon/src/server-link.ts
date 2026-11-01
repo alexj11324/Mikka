@@ -38,7 +38,8 @@ import type { CaptureUploadRequest, CaptureUploadResponse, CaptureView, ScreenCa
 import type { RunChunk } from "./chunks"
 import type { ToolApprovalGate } from "./agents/tool-approval"
 import type { RunMailbox } from './run-mailbox'
-import type { NativeBrokerContext, NativeBrokerRequest } from '@mikka/protocol/subscription'
+import type { ServerDecide } from './server-decision'
+import type { NativeBrokerContext, NativeBrokerRequest, NativeLease } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
 
 export type {
@@ -68,6 +69,8 @@ export interface ServerLink {
   /** Authenticated policy validation before repository/setup effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
+  /** The server's Decisions API on behalf of one run (server-decision.ts). */
+  decide?: ServerDecide
   /** Optional host-only adapter for the claimed run; never model-supplied. */
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   claimCoordinator?(deviceId: string, signal: AbortSignal): Promise<NativeCoordinatorJob | null>
@@ -91,7 +94,7 @@ export interface ServerLink {
   /** Ids of queued runs pinned to this device. */
   pendingRuns(deviceId: string): Promise<string[]>
   /** Fails with `RunNotPinnedHereError` for runs pinned elsewhere. */
-  claimRun(deviceId: string, runId: string): Promise<RunAssignment>
+  claimRun(deviceId: string, runId: string, signal?: AbortSignal): Promise<RunAssignment>
   localComputerAuthority?(deviceId: string, runId: string): Promise<NonNullable<RunAssignment['localComputer']>>
   /** Receipted resumes require a current online source/access/lease fence. */
   validateSkillReceipt?(runId:string,receiptId:string):Promise<SkillReceiptRevalidation>
@@ -100,6 +103,8 @@ export interface ServerLink {
   /** Private hosted-run channel; these methods never return provider tokens. */
   nativeContext?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeBrokerContext>
   nativeRequest?(deviceId:string,runId:string,payload:NativeBrokerRequest,signal?:AbortSignal):Promise<{contentType:string;body:ReadableStream<Uint8Array>}>
+  /** A device run's subscription access lease (never a refresh grant); asked again before it expires. */
+  nativeLease?(deviceId:string,runId:string,signal?:AbortSignal):Promise<NativeLease>
   /**
    * Screenshots and recordings a run keeps as evidence (`@mikka/protocol/capture`).
    * Optional: links without them keep the files on this machine.
@@ -124,12 +129,14 @@ export interface ServerLink {
   /**
    * Messages people sent this device's runs and stops they asked for
    * (ADR 0018). Long-polls up to `waitSeconds` when nothing is pending;
-   * `signal` ends the wait early (daemon stopping).
+   * `signal` ends the wait early (daemon stopping). A server that also
+   * reports runs queued for this device passes them to `onQueuedRuns`, so
+   * the daemon claims them without waiting for its next heartbeat.
    */
   fetchCommands(
     deviceId: string,
     waitSeconds: number,
-    options?: { signal?: AbortSignal; skipRuns?: readonly string[] }
+    options?: { signal?: AbortSignal; skipRuns?: readonly string[]; onQueuedRuns?: (runIds: string[]) => void }
   ): Promise<RunCommand[]>
   /** Marks messages as handed to their agents. */
   ackCommands(deviceId: string, delivered: string[]): Promise<void>
@@ -251,6 +258,8 @@ export class MemoryServer {
         return retry("retry", MAX_CRASH_RETRIES)
       case "device_lost":
         return { owner: "external", reason: "device_offline" }
+      case "quota_exhausted":
+        return { owner: "external", reason: "quota_exhausted" }
       case "cancelled":
         return { owner: "human", reason: "cancelled" }
     }

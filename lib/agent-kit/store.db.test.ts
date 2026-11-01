@@ -9,8 +9,9 @@ import { DECISION_MODEL } from '../coordinator/decision'
 import { AgentKitStore, type AgentScope } from './store'
 import { CORE_EVAL_CASES, EVAL_RUNNER_VERSION, bindSemanticEvidence, type EvalReport } from './evals'
 import { createAgentDefinitionHandler } from './http'
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
-// Explicitly isolated cloud sandbox OR the existing Actions loopback DB gate.
+// Explicitly isolated cloud sandbox OR a disposable loopback *_e2e database.
 // Never falls back to an application's DATABASE_URL or a cloud database.
 const explicit=process.env.AGENT_KIT_TEST_DATABASE_URL
 const connectionString=explicit ?? process.env.E2E_DATABASE_URL
@@ -18,7 +19,7 @@ if(!connectionString) throw new Error('Agent Kit database tests require an expli
 const target=new URL(connectionString)
 const loopback=['127.0.0.1','localhost'].includes(target.hostname) && !target.search && !target.hash && ['postgres:','postgresql:'].includes(target.protocol)
 const dedicated=explicit && process.env.MIKKA_AGENT_KIT_ISOLATED==='1' && /^\/mikka_agent_kit_[a-z0-9_]+$/.test(target.pathname)
-const actions=!explicit && process.env.CI==='true' && process.env.GITHUB_ACTIONS==='true' && target.hostname==='127.0.0.1' && target.port==='5432' && target.pathname==='/mikka_e2e' && process.env.DATABASE_URL===connectionString && process.env.MIKKA_DATABASE_URL===connectionString
+const actions=!explicit && disposableDatabase() && process.env.DATABASE_URL===connectionString && process.env.MIKKA_DATABASE_URL===connectionString
 if(!loopback || (!dedicated && !actions)) throw new Error('Refusing non-isolated Agent Kit test database')
 const pool=new Pool({connectionString,max:12})
 const store=new AgentKitStore(pool)

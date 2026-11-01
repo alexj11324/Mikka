@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	ex "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	osexec "os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -583,6 +585,87 @@ func TestPersistentUsage401NeverRefreshesOrStopsTheConnection(t *testing.T) {
 			bindFixture(t, w, initial.Revision, "claude_cpa")
 			if _, err := w.Execute(ctx, initial.Revision, "fixture-model", nil); err != nil {
 				t.Fatal("bots stopped after a Settings 401:", err)
+			}
+		})
+	}
+}
+
+// Device runners (orchestration.md §6): the production worker exports only a
+// run's short-lived access lease, and only when the server asks for one live
+// run. The refresh grant never appears in its output.
+func TestProductionWorkerExportsOnlyARunAccessLease(t *testing.T) {
+	for _, provider := range []string{"codex", "claude"} {
+		t.Run(provider, func(t *testing.T) {
+			w, inf, _ := fixtureWorker(t, provider)
+			initial := mustAcquire(t, w)
+			route := "codex_cli"
+			if provider == "claude" {
+				route = "claude_code_cli"
+			}
+			bindNativeRunFixture(t, w, initial.Revision, route)
+			inf.mu.Lock()
+			inf.readablePath = "/byos-access"
+			inf.mu.Unlock()
+			ca := filepath.Join(t.TempDir(), "infisical.pem")
+			if err := os.WriteFile(ca, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: inf.server.Certificate().Raw}), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			run := func(lease bool, use *RuntimeUse, executionOnly bool) []byte {
+				config := map[string]any{"scope": w.Scope, "use": use, "databaseUrl": os.Getenv("MIKKA_BYOS_TEST_DATABASE_URL"), "infisicalOrigin": inf.server.URL, "project": "fixture-project", "environment": "test", "path": "/byos-cpa", "workloadToken": "fixture-workload-token", "accessPath": "/byos-access", "accessToken": "fixture-access-reader", "enableRuntime": true, "exportAccessLease": lease, "executionOnly": executionOnly}
+				var input bytes.Buffer
+				enc := json.NewEncoder(&input)
+				_ = enc.Encode(config)
+				_ = enc.Encode(map[string]any{"id": "lease", "method": "nativeAuth", "revision": initial.Revision})
+				command := osexec.Command(os.Getenv("MIKKA_BYOS_WORKER_BINARY"))
+				// Trust only the fake secret store's own test certificate.
+				command.Env = []string{"PATH=" + os.Getenv("PATH"), "LANG=C.UTF-8", "SSL_CERT_FILE=" + ca}
+				command.Stdin = &input
+				out, _ := command.Output()
+				return out
+			}
+			leased := run(true, w.Use, false)
+			if !bytes.Contains(leased, []byte(`"accessToken":"fixture-`+provider+`-access`)) {
+				t.Fatal("run lease was not exported", string(bytes.ReplaceAll(leased, []byte("fixture-"), []byte("x-"))))
+			}
+			for _, forbidden := range []string{"refresh", "fixture-workload-token", "fixture-access-reader", "id_token"} {
+				if bytes.Contains(leased, []byte(forbidden)) {
+					t.Fatal("lease output carries more than the access token:", forbidden)
+				}
+			}
+			runless := *w.Use
+			runless.RunID = ""
+			for name, out := range map[string][]byte{
+				"without the lease flag": run(false, w.Use, false),
+				"without a run":          run(true, &runless, false),
+			} {
+				if bytes.Contains(out, []byte("accessToken")) || bytes.Contains(out, []byte("fixture-"+provider+"-access")) {
+					t.Fatal("exported native credential", name)
+				}
+			}
+		})
+	}
+}
+
+func TestUsageNamesClaudePlanOnlyFromKnownProfileLabels(t *testing.T) {
+	for organization, want := range map[string]string{"claude_max": "Max", "claude_pro": "Pro", "unexpected<b>": "", "": ""} {
+		t.Run("type "+organization, func(t *testing.T) {
+			w, _, _ := fixtureWorker(t, "claude")
+			initial := mustAcquire(t, w)
+			w.Use = nil
+			usage := usageAnswer("claude", func(string) bool { return false })
+			w.QuotaClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				if request.URL.Path != "/api/oauth/profile" {
+					return usage.Transport.RoundTrip(request)
+				}
+				raw, _ := json.Marshal(map[string]any{"organization": map[string]any{"organization_type": organization}})
+				return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(raw)), Header: http.Header{}}, nil
+			})}
+			result, err := w.Usage(context.Background(), initial.Revision)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Plan != want || result.Status != 200 {
+				t.Fatalf("plan %q status %d, want %q", result.Plan, result.Status, want)
 			}
 		})
 	}

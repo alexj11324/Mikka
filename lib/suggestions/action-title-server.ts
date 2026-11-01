@@ -1,5 +1,6 @@
 import 'server-only'
 import { generateText } from 'ai'
+import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { and, eq, sql } from 'drizzle-orm'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { db } from '@/lib/db'
@@ -24,21 +25,21 @@ export async function rememberLocale(userId: string, locale: ActionLocale): Prom
 /**
  * Writes action lines (R-45) for one person's newly shown items, in batches of
  * ACTION_BATCH, one model call each. Like the decision model it signs in with
- * DECISION_GATEWAY_API_KEY, whose budget caps the spend; without the key, or
- * when a call fails, the items keep their raw title. Never throws.
+ * the app's one gateway credential (lib/ai-gateway-auth.ts), and the hosted
+ * usage budget caps the spend; without it, or when a call fails, the items keep
+ * their raw title. Never throws.
  */
 export async function writeActionTitles(userId: string, items: readonly ActionTitleInput[]): Promise<void> {
   'use step'
   const { hostedModel, createTrustedGatewayModel } = await import('@/lib/abuse/model')
   const { modelAdmission } = await import('@/lib/model-admission/runtime')
   const { executionWorkspace } = await import('@/lib/execution-settings')
-  const key = process.env.DECISION_GATEWAY_API_KEY
-  if (!key || !items.length) return
+  if (!items.length || !await gatewayAuth()) return
   try {
     const locale = await personLocale(userId)
     const workspaceId=await executionWorkspace(userId,null)
     await modelAdmission.gateway({workspaceId,ownerId:userId},ACTION_TITLE_MODEL,undefined,{auditAllowed:false})
-    const model=await hostedModel(workspaceId,ACTION_TITLE_MODEL,await createTrustedGatewayModel(ACTION_TITLE_MODEL,key),userId)
+    const model=await hostedModel(workspaceId,ACTION_TITLE_MODEL,await createTrustedGatewayModel(ACTION_TITLE_MODEL),userId)
     for (let start = 0; start < items.length; start += ACTION_BATCH) {
       const batch = items.slice(start, start + ACTION_BATCH)
       const { instructions, prompt } = actionTitlePrompt(batch, locale)

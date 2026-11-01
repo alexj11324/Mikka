@@ -1,5 +1,5 @@
 import { policySnapshotHash } from '@mikka/protocol/node-policy-snapshot'
-import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../../../../lib/personal-agent-message'
+import { PERSONAL_MESSAGE_INSTRUCTIONS } from '@mikka/protocol/personal-agent-message'
 import { prepareGitHubEnvironment, type RunGitHub } from './github-runtime'
 import { runAppsHost, type RunApps } from './run-apps'
 // What every real harness adapter needs about one run: the sandbox policy,
@@ -44,6 +44,7 @@ import {
 import { CAPTURES_DIR } from "../captures"
 import { ownDir } from "./harness-home"
 import type { SandboxPolicy } from "./sandbox"
+import { localGitOrigin } from './local-git-origin'
 
 /**
  * Model API and login domains per harness: always reachable from that
@@ -74,6 +75,22 @@ export const MCP_SERVER_SCRIPT = resolve(import.meta.dirname, "mikka-mcp.mjs")
 /** Name of the MCP server in every harness's config (`mcp__mikka__submit`). */
 export const MCP_SERVER_NAME = "mikka"
 export const COMPUTER_MCP_SERVER_NAME = "mikka_computer"
+
+/**
+ * Git runs auto maintenance after commit, fetch and merge (gc; since 2.56 also
+ * pack-refs and repack by default). It would rewrite the shared clone cache
+ * outside this run's git dir, which the run may not write; the daemon
+ * maintains the cache. Set as GIT_CONFIG_COUNT entries: sandbox-runtime
+ * continues those, but replaces GIT_CONFIG_PARAMETERS with its proxy setting.
+ */
+const RUN_GIT_CONFIG: ReadonlyArray<readonly [string, string]> = [["maintenance.auto", "false"], ["gc.auto", "0"]]
+
+function withGitConfig(env: Record<string, string>, entries: ReadonlyArray<readonly [string, string]>): Record<string, string> {
+  const start = Number(env.GIT_CONFIG_COUNT ?? 0)
+  const out: Record<string, string> = { ...env, GIT_CONFIG_COUNT: String(start + entries.length) }
+  entries.forEach(([key, value], i) => { out[`GIT_CONFIG_KEY_${start + i}`] = key; out[`GIT_CONFIG_VALUE_${start + i}`] = value })
+  return out
+}
 
 export interface McpServerSpec {
   command: string
@@ -296,20 +313,29 @@ export class RunContext {
     // the run dir stays writable so its handoff still lands, and the
     // worktree moves from `allowWrite` to `denyWrite`.
     const readOnly = runPolicy(this.options.policy).readOnly === true
+    const fixtureOrigin = this.options.github?.repository === 'mikka-e2e/core-loop' && !readOnly && runPolicy(this.options.policy).permissions.git_push === 'allow' ? localGitOrigin() : undefined
     return {
       allowWrite: [
         ...(readOnly ? [] : [this.worktree, ...(this.options.gitWritePaths ?? [])]),
         this.runDir,
         ...(this.options.extraWrite ?? []),
+        ...(fixtureOrigin ? [fixtureOrigin] : []),
       ],
       // The daemon runs git here after the agent: the `.git` file (which
       // says where the repo is) stays read-only. Only the daemon-validated
       // per-worktree administration and object/ref paths are writable.
       denyWrite: [
+        // The fixture's refs/objects are writable for push; its configuration
+        // and hooks must remain host-owned because fixture verification runs Git.
+        ...(fixtureOrigin ? [join(fixtureOrigin, 'config'), join(fixtureOrigin, 'hooks')] : []),
         join(this.worktree, ".git"),
         join(this.gitDir, "commondir"),
         join(this.gitDir, "gitdir"),
         join(this.gitDir, "config.worktree"),
+        // sandbox-runtime's own protection of a repository's config and hooks
+        // covers repositories under the process's working directory only;
+        // the shared clone lies outside it, so it is declared here the same way.
+        ...(this.options.gitWritePaths?.length ? [join(this.gitDir, "..", "..", "config"), join(this.gitDir, "..", "..", "hooks")] : []),
         ...(readOnly ? [this.worktree, ...(this.options.gitWritePaths ?? [])] : []),
       ],
       denyRead: [
@@ -369,7 +395,16 @@ export class RunContext {
    * and zsh writes here-docs to `$TMPPREFIX` (default `/tmp/zsh`).
    */
   tempEnv(): Record<string, string> {
-    return { TMPDIR: this.tmpDir, TMPPREFIX: join(this.tmpDir, "zsh"), ...this.githubEnv, ...(this.options.policyHash ? { MIKKA_POLICY_HASH: this.options.policyHash } : {}) }
+    return { TMPDIR: this.tmpDir, TMPPREFIX: join(this.tmpDir, "zsh"), ...withGitConfig(this.githubEnv, RUN_GIT_CONFIG), ...(this.options.policyHash ? { MIKKA_POLICY_HASH: this.options.policyHash } : {}) }
+  }
+
+  /**
+   * The agent delivers this run itself: it commits, pushes to the issue
+   * branch and opens the pull request with run-scoped GitHub credentials. The
+   * server sends GitHub delivery only for a run whose push is allowed.
+   */
+  get agentDelivers(): boolean {
+    return Object.keys(this.githubEnv).length > 0
   }
 
   /** A hand-in from an earlier session would end this one at once. */

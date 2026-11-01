@@ -1,10 +1,24 @@
+import { Pressable, StyleSheet } from 'react-native'
+import { router } from 'expo-router'
 import { Plus } from 'lucide-react-native'
-import { RoundButton } from '@/components/ui'
+import { Symbol } from '@/components/Symbol'
+import { holdComposer } from '@/lib/attach-sheet'
+import { tap } from '@/lib/haptics'
 import { colors } from '@/lib/theme'
 
 export type AttachSource = 'camera' | 'library' | 'file'
 
-/** The web build's 「+」, for screenshot checks: it opens the photo picker (iOS has the native menu, AttachMenu.ios.tsx). */
-export function AttachMenu({ images, onPick }: { images: boolean; onPick: (source: AttachSource) => void }) {
-  return <RoundButton label="添加" onPress={() => onPick(images ? 'library' : 'file')}><Plus size={22} color={colors.ink} strokeWidth={2} /></RoundButton>
+/** The composer's 「+」, in the field's bottom row as in the Claude app: it opens the 相机 / 照片 / 文件 sheet (app/attach.tsx). */
+export function AttachMenu({ images, onPick }: { images: boolean; onPick: (source: AttachSource) => Promise<void> }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="添加" hitSlop={8}
+      onPress={() => { tap(); holdComposer({ images, pick: onPick }); router.push('/attach') }}
+      style={({ pressed }) => [styles.button, pressed && { opacity: 0.5 }]}>
+      <Symbol name="plus" size={20} color={colors.ink} web={<Plus size={22} color={colors.ink} strokeWidth={2} />} />
+    </Pressable>
+  )
 }
+
+const styles = StyleSheet.create({
+  button: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+})

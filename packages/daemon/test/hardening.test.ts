@@ -288,7 +288,8 @@ describe("claimed runs without an adapter", () => {
       expect(daemon.status().harnesses.filter((h) => h.installed).map((h) => h.harness)).toEqual(["mock"])
       const reported = server.devices.get(DEVICE)?.info.harnesses
       expect(reported?.filter((h) => h.installed).map((h) => h.harness)).toEqual(["mock"])
-      expect(reported?.find((h) => h.harness === "codex")).toEqual({ harness: "codex", installed: false, version: "1.0.0", sandboxBlocked: { missing: [] } })
+      // The probe's own error travels with it, so the device page can say what happened.
+      expect(reported?.find((h) => h.harness === "codex")).toEqual({ harness: "codex", installed: false, version: "1.0.0", sandboxBlocked: { missing: [], detail: "bwrap: uid map failed" } })
       expect(reset).toHaveBeenCalledOnce()
     } finally {
       supported.mockRestore()

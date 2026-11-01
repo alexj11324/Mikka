@@ -9,6 +9,8 @@ import type { RunChain } from './run-chain'
 export interface IssueThread {
   id: string
   status: string
+  /** How the run came out once it ended (R-52); null while running or not judged yet. */
+  outcome?: string | null
   /** A requested stop is status metadata, including for teammates. */
   stopping: boolean
   createdAt: Date
@@ -16,7 +18,8 @@ export interface IssueThread {
   ownedByCurrentUser: boolean
   /** Whose thread it is, shown on a teammate's thread instead of its content. */
   ownerName: string | null
-  detail: { name: string; agentName: string; harness: string; summary: string | null } | null
+  /** `bot`: the dispatching Bot's own bloub look, so every copy of it matches the bot list (R-36); null for the Coordinator's own runs. */
+  detail: { name: string; agentName: string; harness: string; summary: string | null; bot?: { color: string; shape: string } | null } | null
   /**
    * BE-18 run chain (GitHub Actions run_id + run_attempt): a question continuation is a new
    * run in the same thread. `id` is the root run (attempt 1); stop, status and send act on
@@ -36,7 +39,7 @@ export interface IssueThread {
    * dispatch), or a rerun. It is derived from the run chain, never folded separately, and
    * it is the run `latestRunId` names: what send and stop address.
    */
-  continuation: { id: string; status: string; stopping: boolean } | null
+  continuation: { id: string; status: string; outcome?: string | null; stopping: boolean } | null
 }
 
 export interface IssueThreadAttempt {
@@ -44,6 +47,7 @@ export interface IssueThreadAttempt {
   /** 1-based; the root run is attempt 1. */
   attempt: number
   status: string
+  outcome?: string | null
   stopping: boolean
   createdAt: Date
   finishedAt: Date | null
@@ -54,12 +58,12 @@ export type ThreadQuestion = 'waiting' | 'resuming' | null
 /** Attach the run's resolved chain; without one the thread is a one-attempt chain. */
 export function withRunChain(thread: IssueThread, chain: RunChain | null | undefined): IssueThread {
   if (!chain) return thread
-  const attempts = chain.attempts.map(attempt => ({ runId: attempt.runId, attempt: attempt.attempt, status: attempt.status,
+  const attempts = chain.attempts.map(attempt => ({ runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, outcome: attempt.outcome ?? null,
     stopping: runIsActive(attempt.status) && !!attempt.stopRequestedAt, createdAt: attempt.createdAt, finishedAt: attempt.finishedAt }))
   const latest = attempts.find(attempt => attempt.runId === chain.latestRunId)
   return {
     ...thread, rootRunId: chain.rootRunId, latestRunId: chain.latestRunId, attempts,
-    continuation: latest && latest.runId !== thread.id ? { id: latest.runId, status: latest.status, stopping: latest.stopping } : null,
+    continuation: latest && latest.runId !== thread.id ? { id: latest.runId, status: latest.status, outcome: latest.outcome ?? null, stopping: latest.stopping } : null,
   }
 }
 
@@ -81,13 +85,13 @@ export function threadQuestionRunId(thread: Pick<IssueThread, 'attempts'>) {
  * status, send and stop follow it. An answered question whose continuation has not started
  * shows as the run it is about to continue: the same running state, nothing new.
  */
-export function threadQuestionView(thread: { id: string; status: string; stopping?: boolean; question: ThreadQuestion; continuation?: IssueThread['continuation'] }) {
+export function threadQuestionView(thread: { id: string; status: string; outcome?: string | null; stopping?: boolean; question: ThreadQuestion; continuation?: IssueThread['continuation'] }) {
   const next = thread.continuation ?? null
   // Answered, continuation not started yet: still running, nothing to send or stop.
-  if (next?.status === 'queued' && thread.question === 'resuming') return { question: 'resuming' as const, waiting: false, status: 'running', runId: next.id, stopping: false }
-  const live = next ?? { id: thread.id, status: thread.status, stopping: !!thread.stopping }
+  if (next?.status === 'queued' && thread.question === 'resuming') return { question: 'resuming' as const, waiting: false, status: 'running', outcome: null, runId: next.id, stopping: false }
+  const live = next ?? { id: thread.id, status: thread.status, outcome: thread.outcome ?? null, stopping: !!thread.stopping }
   const question = runIsActive(live.status) ? null : thread.question
-  return { question, waiting: question === 'waiting', status: question === 'resuming' ? 'running' : live.status, runId: live.id, stopping: runIsActive(live.status) && live.stopping }
+  return { question, waiting: question === 'waiting', status: question === 'resuming' ? 'running' : live.status, outcome: live.outcome ?? null, runId: live.id, stopping: runIsActive(live.status) && live.stopping }
 }
 
 /** When the row last changed, never after `now`: clock skew with the server must not read as 「1秒钟后」. */
@@ -102,6 +106,8 @@ export interface IssueThreadRow {
   report: unknown; error: string | null; createdAt: Date; finishedAt: Date | null
   agentName: string; harness: string; ownerName?: string | null
   stopRequestedAt?: Date | null
+  outcome?: string | null
+  botColor?: string | null; botShape?: string | null
 }
 
 /** Markdown syntax a prompt may open with ("# Title", "- item", "**bold**"): never part of a name. */
@@ -128,14 +134,14 @@ export function projectIssueThreads(rows: readonly IssueThreadRow[], issueId: st
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id))
     .slice(0, ISSUE_THREAD_LIMIT)
     .map(row => ({
-      id: row.id, status: row.status, createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
+      id: row.id, status: row.status, outcome: row.outcome ?? null, createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
-        ? { name: threadName(row.prompt, row.agentName), agentName: row.agentName, harness: row.harness, summary: runSummaryText({ report: row.report, error: row.error }) }
+        ? { name: threadName(row.prompt, row.agentName), agentName: row.agentName, harness: row.harness, summary: runSummaryText({ report: row.report, error: row.error }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null }
         : null,
       rootRunId: row.id, latestRunId: row.id,
-      attempts: [{ runId: row.id, attempt: 1, status: row.status, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
+      attempts: [{ runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
       question: null, continuation: null,
     }))
 }

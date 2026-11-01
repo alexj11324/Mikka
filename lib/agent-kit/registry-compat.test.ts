@@ -12,7 +12,7 @@ const dispatched=mock.fn(async()=>({status:'queued'}))
 const beforeCall=mock.fn(async()=>{})
 const afterCall=mock.fn(async()=>{})
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
-stub('../../workflows/coordinator/steps.ts',{dispatchComputerTask:dispatched,dispatchRun:dispatched})
+stub('../../workflows/coordinator/steps.ts',{dispatchComputerTask:dispatched,dispatchComputerThread:dispatched,dispatchRun:dispatched})
 stub('../../workflows/coordinator/agent-kit-steps.ts',{beforeAgentTool:beforeCall,afterAgentTool:afterCall,loadAgentSkill:async()=>({error:'notAssigned'})})
 stub('../composio-actions.ts',{createComposioAITools:()=>({}),createGoogleAITools:()=>({})})
 let registry: typeof import('../../workflows/coordinator/tools')
@@ -47,7 +47,7 @@ test('a named Bot cannot redirect its cloud tool to another Bot',async()=>{
 test('native subscription requests retain the run snapshot after Agent harness/device edits',async()=>{
  const binding={id:randomUUID(),modelId:'frozen-model',route:'codex_cli'}
  const snapshot=freezeWorkerDefinition({harness:'codex',instructions:'Review',prompt:'task',parent:null,executionId:null,subscription:binding})
- let row={...binding,workspaceId:randomUUID(),consumerId:randomUUID(),harness:'claude_code',agentDefinition:snapshot}
+ let row={...binding,ownerId:owner,workspaceId:randomUUID(),consumerId:randomUUID(),harness:'claude_code',agentDefinition:snapshot}
  const requests:unknown[][]=[]
  const repository={pool:{query:async(_sql:string,args:unknown[])=>{requests.push(args);return {rows:[row]}}}} as unknown as SubscriptionRepository
  const service=new SubscriptionService(repository,()=>{throw Error('No worker/provider request is allowed in this unit test')},{ready:()=>false,nativeIsolation:'none'})

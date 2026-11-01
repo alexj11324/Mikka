@@ -29,8 +29,8 @@ export function WorkspaceOverview({ section, teamName, counts, projectCount, onV
     const following = tasks.filter(task => task.metadata.subscriberUserIds.includes(userId))
     return <section aria-label={i18nText("IssueDetail.menu.subscribe")} className="flex flex-col gap-6 px-5 py-8"><header className="flex flex-col gap-2"><h1 className="text-lg font-semibold">{i18nText("Overview.followingTitle")}</h1></header>{following.length ? <IssueList issues={following} searching onOpen={onOpen} onCreate={() => onView('all')} /> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Inbox /></EmptyMedia><EmptyTitle>{i18nText("Overview.noFollowingTitle")}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={() => onView('all')}>{i18nText("Overview.viewAllTasks")}</Button></Empty>}</section>
   }
-  // An open thread brings its own header, so the chat's pill steps aside (R-66). A bot's chat is the Coordinator's harness under the bot's name.
-  if (section === 'coordinator') return <div className="relative flex min-h-0 flex-1 flex-col has-data-[slot=thread-view]:[&_[data-slot=conversation-pill]]:hidden">
+  // A bot's chat is the Coordinator's harness under the bot's name; an open thread sits beside it (R-82).
+  if (section === 'coordinator') return <div className="relative flex min-h-0 flex-1 flex-col">
     <ConversationPill name={bot ? bot.name : i18nText('Nav.coordinator')} avatar={<BotAvatar {...(bot ? { color: bot.color, shape: bot.shape } : COORDINATOR_AVATAR)} size="pill" />} />
     <CoordinatorChat key={bot?.id ?? 'coordinator'} bot={bot} userId={userId} onOpenIssue={onOpen} prefill={bot ? undefined : coordinatorPrefill} />
   </div>

@@ -1,4 +1,5 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
+import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { z } from 'zod'
 import { getRun } from 'workflow/api'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
@@ -20,13 +21,15 @@ async function handleGET(request: Request) {
   const params = new URL(request.url).searchParams
   const bot = z.uuid().nullable().safeParse(params.get('botId'))
   if (!bot.success) return Response.json({ error: 'validationGeneric' }, { status: 400 })
+  // No bot named: the Coordinator of the workspace this request is in (a token's own workspace).
+  const botId = await openChatBotId(session.user, bot.data)
   if (bot.data) {
     const [owned] = await db.select({ workspaceId: bots.workspaceId }).from(bots)
       .where(and(eq(bots.id, bot.data), eq(bots.ownerId, session.user.id))).limit(1)
     if (!owned || !apiWorkspaceAllowed(session, owned.workspaceId)) return Response.json({ error: 'notFound' }, { status: 404 })
   }
   const [chat] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil }).from(coordinatorSessions)
-    .where(and(eq(coordinatorSessions.userId, session.user.id), bot.data ? eq(coordinatorSessions.botId, bot.data) : isNull(coordinatorSessions.botId))).limit(1)
+    .where(and(eq(coordinatorSessions.userId, session.user.id), eq(coordinatorSessions.botId, botId))).limit(1)
   // The request's run id is only a version check. The authenticated chat supplies authority.
   const expected = params.get('runId')
   const runId = chat?.leaseHolder

@@ -1,4 +1,5 @@
 import 'server-only'
+import { personalMailboxEnabled } from './personal-mailbox-config'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
 import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
 import type { AgentExecution } from '@/lib/agent-kit/store'
@@ -29,13 +30,16 @@ import { runBotName } from '@/lib/run-bot-name'
 
 export interface RunView {
   id: string
-  pauseReason?: 'human_control' | null
+  pauseReason?: 'human_control' | 'quota_exhausted' | null
   waitFor?: string
   issueId: string | null
   agentId: string
+  /** The Bot that dispatched the run; `harness` is the Agent that executes it (R-78). */
   agentName: string
   harness: SupportedHarness
   status: string
+  /** How it came out once it ended (R-52); null while running or not judged yet. */
+  outcome?: string | null
   kind: string
   stopReason: string | null
   error: string | null
@@ -53,7 +57,7 @@ export interface RunDetail {
 
 export const runViewColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, agentId: agentRuns.agentId, agentName: runBotName,
-  harness: sql<SupportedHarness>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`, status: agentRuns.status, pauseReason: agentRuns.pauseReason, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
+  harness: sql<SupportedHarness>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`, status: agentRuns.status, outcome: agentRuns.outcome, pauseReason: agentRuns.pauseReason, kind: agentRuns.kind, stopReason: agentRuns.stopReason,
   error: agentRuns.error, report: agentRuns.report, createdAt: agentRuns.createdAt,
   startedAt: agentRuns.startedAt, finishedAt: agentRuns.finishedAt,
 }
@@ -64,7 +68,7 @@ export const runViewColumns = {
  * `note` is extra direction for this run only, after the issue.
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
-type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string }
+type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string; readOnly?: boolean }
 export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string) {
   return queueAdmittedRun(userId, input, botId, execution, requestEventId, source, approvedRepositoryKey)
 }
@@ -113,7 +117,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string,
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
   const executor = internal?.executor ?? db
-  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional() }).safeParse(input)
+  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional(), readOnly: z.boolean().optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   let requestedRepositoryKey: string
   try { requestedRepositoryKey = normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }).key } catch { throw new ActionFailureError('repoPathInvalid') }
@@ -126,11 +130,17 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const [device] = await executor.select().from(devices).where(and(eq(devices.id, agent.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).limit(1)
   if (!device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw new ActionFailureError('agentHarnessMissing')
   const repo = internal?.repo ?? await ensureDeviceRepository(userId, agent.deviceId, parsed.data.repo)
+  // Push authority is the person's GitHub App grant: ask GitHub now, before the
+  // admission transaction, which reads the recorded outcome. A host dispatch
+  // already inside its transaction (Factory) relies on the recorded check.
+  const pushCheck = !internal && !parsed.data.readOnly ? await (await import('@/lib/github/push-grant')).verifyPushGrant(userId, requestedRepositoryKey) : null
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = true
-  const subscription = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
-  const mailboxEnabled = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED === '1'
+  const found = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
+  // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
+  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.model, found)
+  const mailboxEnabled = personalMailboxEnabled()
   let mailboxScope: { botId: string | null; workspaceId: string } | undefined
   if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
     const [bot] = botId ? await executor.select({ workspaceId: bots.workspaceId }).from(bots)
@@ -139,10 +149,18 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
     mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
     : null
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(pushCheck && !pushCheck.granted ? (pushCheck.reason === 'githubUnavailable' || pushCheck.reason === 'githubNotConfigured' ? { pushUnchecked: pushCheck.reason } : { pushRefusal: pushCheck.reason }) : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+}
+
+/** A device run's credential source; the bot's workspace decides whose API keys it may use. */
+async function localRunCredential<S extends { id: string; ownerId: string; connectionId: string; connectionRevision: number }>(query: import('pg').Pool | import('pg').PoolClient,
+  userId: string, botId: string | null, harness: string, model: string | undefined, subscription: S | null) {
+  const botWorkspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId ?? null : null
+  const choiceWorkspaceId = botWorkspaceId ?? (async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, null).catch(() => null))
+  return (await import('@/lib/run-credential-source')).runCredentialSource(query, { ownerId: userId, botId, harness, model, botWorkspaceId, choiceWorkspaceId, subscription, localLogin: true })
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,

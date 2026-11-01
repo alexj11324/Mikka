@@ -8,7 +8,7 @@ import { SubagentStore } from './subagents'
 import { startSuggestion } from './suggestions'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { claimCloudRun } from '@/lib/computer/claim'
-import { assertThreadMachineCapacity, openThreadDesktop, recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
+import { openThreadDesktop, recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
 // This suite runs DROP SCHEMA ... CASCADE, so the full target is checked before any
@@ -38,12 +38,12 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
   try {
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY);INSERT INTO "user" VALUES('alice'),('bob');
       CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,status text,"stopRequestedAt" timestamptz,"finishedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
-      CREATE TABLE devices(id uuid PRIMARY KEY,"ownerId" text,kind text,enabled boolean DEFAULT true);
+      CREATE TABLE devices(id uuid PRIMARY KEY,"ownerId" text,kind text,enabled boolean DEFAULT true,"removedAt" timestamptz);
       CREATE TABLE device_tokens("boundDeviceId" uuid,"revokedAt" timestamptz);
       CREATE TABLE device_repos(id uuid PRIMARY KEY);
-      CREATE TABLE suggestions(id uuid PRIMARY KEY);
+      CREATE TABLE suggestions(id uuid PRIMARY KEY,"botId" uuid);
       CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text,version integer);
-      CREATE TABLE byos_connections(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,provider text,state text,epoch bigint);
+      CREATE TABLE byos_connections(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,provider text,state text,epoch bigint, paused boolean NOT NULL DEFAULT false);
       CREATE TABLE byos_bindings(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,route text,"modelId" text,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE byos_native_runs("runId" uuid PRIMARY KEY,"bindingId" uuid);
     `)
@@ -104,6 +104,9 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     const ended = (await pool.query('SELECT state,"sandboxId","workerLeaseId" FROM thread_machines WHERE "runId"=$1', [cancelledRun])).rows[0]
     assert.deepEqual(ended, { state: 'ended', sandboxId: null, workerLeaseId: null })
     assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1', [cancelledDevice])).rows[0].revokedAt)
+    // An ended machine's device leaves every list and dispatch for good; other devices stay.
+    assert.ok((await pool.query('SELECT "removedAt" FROM devices WHERE id=$1', [cancelledDevice])).rows[0].removedAt, 'ended thread device is retired')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM devices WHERE "removedAt" IS NOT NULL')).rows[0].n, 1, 'no other device is retired')
     assert.equal(await recordCancelledSandbox(pool, cancelledRun, 'late-sandbox', operation), true, 'late resource remains discoverable for cleanup retry')
     await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","deviceId") VALUES ($1,\'alice\',$2,$3)', [alice.workspaceId, randomUUID(), botDevice])
     for (const [runId, deviceId] of [[runA, deviceA], [runB, deviceB]]) {
@@ -112,17 +115,6 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
       await pool.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,\'alice\',$3,$4,\'snapshot-owner-alice\',$5,\'running\',$6)', [runId, alice.workspaceId, botA, `sandbox-${runId}`, randomUUID(), deviceId])
     }
     await pool.query('INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId") VALUES ($1,\'alice\',$2,$3)', [bindingId, alice.workspaceId, agentId])
-    // Spend guard: alice already holds runA and runB as running machines.
-    const spare = randomUUID()
-    await assert.rejects(assertThreadMachineCapacity(pool, alice, spare, { perOwner: 2, perWorkspace: 20, monthlyComputeHours: 60 }), { status: 429, message: 'Thread machine limit reached' })
-    await assert.rejects(assertThreadMachineCapacity(pool, alice, spare, { perOwner: 5, perWorkspace: 2, monthlyComputeHours: 60 }), { status: 429, message: 'Workspace machine limit reached' })
-    await assert.rejects(assertThreadMachineCapacity(pool, alice, spare, { perOwner: 5, perWorkspace: 20, monthlyComputeHours: 0 }), { status: 429, message: 'Thread machine budget exhausted' })
-    // E2B bills only running time: one tracked compute hour blocks a 1-hour cap.
-    await pool.query('UPDATE thread_machines SET "computeSeconds"=3600 WHERE "runId"=$1', [runA])
-    await assert.rejects(assertThreadMachineCapacity(pool, alice, spare, { perOwner: 5, perWorkspace: 20, monthlyComputeHours: 1 }), { status: 429, message: 'Thread machine budget exhausted' })
-    await assert.doesNotReject(assertThreadMachineCapacity(pool, alice, spare, { perOwner: 5, perWorkspace: 20, monthlyComputeHours: 2 }))
-    await assert.doesNotReject(assertThreadMachineCapacity(pool, alice, runA, { perOwner: 2, perWorkspace: 20, monthlyComputeHours: 2 }), 'the run being provisioned is not counted against itself')
-    await assert.doesNotReject(assertThreadMachineCapacity(pool, bob, spare, { perOwner: 3, perWorkspace: 20, monthlyComputeHours: 60 }))
     const connectionId = randomUUID()
     await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch) VALUES ($1,'alice',$2,'codex','connected',1)`, [connectionId, alice.workspaceId])
     await pool.query(`UPDATE byos_bindings SET "connectionId"=$2,"connectionRevision"=1,route='codex_cli',"modelId"='fixture-model' WHERE id=$1`, [bindingId, connectionId])

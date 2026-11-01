@@ -7,8 +7,10 @@ import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from '@/li
 const botId = '10000000-0000-4000-8000-000000000001'
 const peerBotId = '10000000-0000-4000-8000-000000000002'
 const workspaceId = '10000000-0000-4000-8000-000000000003'
+// Each person's Coordinator is an ordinary bot row (lib/coordinator/coordinator-bot.ts).
+const coordinatorOf: Record<string, string> = { owner: '10000000-0000-4000-8000-0000000c0de1', peer: '10000000-0000-4000-8000-0000000c0de2' }
 type Session = { user: { id: string }; session: { id: string }; tokenWorkspaceId?: string }
-type Chat = { userId: string; botId: string | null; leaseHolder: string | null; leaseUntil: Date | null }
+type Chat = { userId: string; botId: string; leaseHolder: string | null; leaseUntil: Date | null }
 let session: Session | null
 let chats: Chat[] = []
 let fingerprints: SecretFingerprint[] = []
@@ -22,9 +24,8 @@ const db = drizzle(async (sql, params) => {
     return { rows: botRows.filter(bot => bot.id === params[0] && bot.ownerId === params[1]).map(bot => [bot.workspaceId]) }
   }
   assert.match(sql, /from "coordinator_sessions"/)
-  assert.match(sql, /where \("coordinator_sessions"\."userId" = \$1 and "coordinator_sessions"\."botId" (?:= \$2|is null)\)/)
-  const selectedBot = sql.includes('"botId" is null') ? null : params[1]
-  return { rows: chats.filter(chat => chat.userId === params[0] && chat.botId === selectedBot).map(chat => [chat.leaseHolder, chat.leaseUntil?.toISOString() ?? null]) }
+  assert.match(sql, /where \("coordinator_sessions"\."userId" = \$1 and "coordinator_sessions"\."botId" = \$2\)/)
+  return { rows: chats.filter(chat => chat.userId === params[0] && chat.botId === params[1]).map(chat => [chat.leaseHolder, chat.leaseUntil?.toISOString() ?? null]) }
 })
 const getSession = mock.fn(async (_options: unknown) => session)
 const loadFingerprints = mock.fn(async (_userId: string) => fingerprints)
@@ -47,16 +48,20 @@ before(async () => {
     noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler,
   } })
   mock.module('workflow/api', { namedExports: { getRun } })
+  mock.module(new URL('../../../../lib/coordinator/coordinator-bot.ts', import.meta.url).href, { namedExports: {
+    chatBotId: async (owner: string, chosen: string | null | undefined) => chosen ?? coordinatorOf[owner],
+    openChatBotId: async (user: { id: string }, chosen: string | null | undefined) => chosen ?? coordinatorOf[user.id],
+  } })
   GET = (await import('./route')).GET
 })
 beforeEach(() => {
   session = { user: { id: 'owner' }, session: { id: 'browser-session' } }
   const leaseUntil = new Date(Date.now() + 60_000)
   chats = [
-    { userId: 'peer', botId: null, leaseHolder: 'wrun_peer', leaseUntil },
+    { userId: 'peer', botId: coordinatorOf.peer, leaseHolder: 'wrun_peer', leaseUntil },
     { userId: 'owner', botId, leaseHolder: 'wrun_owner_bot', leaseUntil },
     { userId: 'peer', botId: peerBotId, leaseHolder: 'wrun_peer_bot', leaseUntil },
-    { userId: 'owner', botId: null, leaseHolder: 'wrun_owner', leaseUntil },
+    { userId: 'owner', botId: coordinatorOf.owner, leaseHolder: 'wrun_owner', leaseUntil },
   ]
   fingerprints = []; queries.length = 0
   getSession.mock.resetCalls(); loadFingerprints.mock.resetCalls(); getRun.mock.resetCalls(); readStream.mock.resetCalls()
@@ -76,7 +81,7 @@ test('authentication and malformed bot IDs fail before any chat or stream lookup
   assert.equal(options.query.disableCookieCache, true)
 })
 
-test('the authenticated owner and null bot select the Coordinator run, ignoring supplied user identity', async () => {
+test('the authenticated owner and no bot select the Coordinator run, ignoring supplied user identity', async () => {
   const response = await call({ userId: 'peer', runId: 'wrun_owner' })
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
@@ -85,7 +90,7 @@ test('the authenticated owner and null bot select the Coordinator run, ignoring 
   assert.deepEqual(getRun.mock.calls[0].arguments, ['wrun_owner'])
   assert.deepEqual(loadFingerprints.mock.calls[0].arguments, ['owner'])
   assert.equal(queries.length, 1)
-  assert.match(queries[0].sql, /"botId" is null/)
+  assert.deepEqual(queries[0].params.slice(0, 2), ['owner', coordinatorOf.owner])
   assert.deepEqual(await events(response), [{ type: 'start', id: 'turn:0' }, { type: 'text', id: 'turn:0', delta: 'visible reply' }, { type: 'committed', id: 'turn:0', through: 3, quiet: false }])
 })
 
@@ -121,7 +126,7 @@ test('workspace-scoped API sessions cannot stream an owned bot outside their wor
 })
 
 test('missing, expired, non-workflow and mismatched leases never open a supplied run ID', async () => {
-  const own = chats.find(chat => chat.userId === 'owner' && chat.botId === null)!
+  const own = chats.find(chat => chat.userId === 'owner' && chat.botId === coordinatorOf.owner)!
   const initial = { ...own }
   for (const state of [
     { leaseHolder: null }, { leaseUntil: null }, { leaseUntil: new Date(Date.now() - 1000) }, { leaseHolder: 'native_turn' },

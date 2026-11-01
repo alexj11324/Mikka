@@ -4,7 +4,7 @@ import { getLocale } from 'next-intl/server'
 
 import type { OnboardingComputer } from '@/components/onboarding/onboarding'
 import { IssueWorkspace } from '@/components/workspace/issue-workspace'
-import { sectionFromQuery } from '@/components/workspace/workspace-navigation'
+import { sectionFromQuery, workspaceLink } from '@/components/workspace/workspace-navigation'
 import { redirect as localeRedirect } from '@/i18n/navigation'
 import { isAcceptanceEnabled } from '@/lib/acceptance'
 import { safeAuthReturn } from '@/lib/auth-return'
@@ -13,12 +13,12 @@ import { onboardingDone } from '@/lib/onboarding'
 import { byoE2BKeyEnabled, getE2BKeyStatus } from '@/lib/secrets/e2b'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 
-/** Whether the guide asks about the cloud computer: only when the workspace runs on its own E2B key and has none yet. */
+/** Whether the guide asks about the cloud computer: only while the person has no E2B key of their own (keys are personal). */
 async function onboardingComputer(): Promise<OnboardingComputer> {
   if (!byoE2BKeyEnabled()) return 'none'
   const actor = await currentWorkspaceActor()
   if ((await getE2BKeyStatus(actor.userId, actor.workspaceId)).configured) return 'none'
-  return actor.role === 'admin' ? 'ask' : 'member'
+  return 'ask'
 }
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ acceptance?: string; issue?: string; section?: string; app?: string; settings?: string; google?: string }> }) {
@@ -27,7 +27,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ a
   const session = await auth.api.getSession({ headers: await headers() })
   const user = session?.user
   if (!user) {
-    if (initialSelected) localeRedirect({ href: `/sign-in?next=${encodeURIComponent(`/?issue=${initialSelected}`)}`, locale: await getLocale() })
+    if (initialSelected) localeRedirect({ href: `/sign-in?next=${encodeURIComponent(workspaceLink({ issue: initialSelected }))}`, locale: await getLocale() })
     if (query.section === 'plugins') localeRedirect({ href: `/sign-in?next=${encodeURIComponent(safeAuthReturn(`/?${new URLSearchParams({ section: 'plugins', ...(query.app ? { app: query.app } : {}) })}`))}`, locale: await getLocale() })
     if (!isAcceptanceEnabled()) localeRedirect({ href: '/sign-in', locale: await getLocale() })
     if (query.acceptance === '1') localeRedirect({ href: '/acceptance', locale: await getLocale() })

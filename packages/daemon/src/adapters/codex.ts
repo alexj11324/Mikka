@@ -1,3 +1,4 @@
+import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } from "../runs/quota-exhausted"
 import { sandboxComputerSpec, computerSandboxPolicy, computerDomain } from '../computer/transport'
 // Codex adapter (ADR 0003): the user's own signed-in `codex app-server`,
 // one process per session, inside the run's sandbox, with an isolated
@@ -18,11 +19,13 @@ import {
   spawnCli,
   untilReady,
 } from "../agents/child"
+import type { RunContainer, RunContainerOptions } from "../run-container"
 import {
   carryHistory,
-  guardCodexAuth,
   prepareCodexHome,
+  wipeRunCredentials,
 } from "../agents/harness-home"
+import { codexCredential, credentialDomain } from "../agents/run-credential"
 import { jsonlConnection } from "../agents/jsonl-rpc"
 import {
   MCP_SERVER_NAME,
@@ -48,6 +51,7 @@ import type {
   DeltaNotification,
   ErrorNotification,
   ItemNotification,
+  RateLimitsNotification,
   ThreadItem,
   ThreadResponse,
   ThreadStartParams,
@@ -70,6 +74,10 @@ export interface CodexAdapterOptions {
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
   binary?: string
+  /** The daemon's pinned Codex, installed on first need. */
+  ensureBinary?: () => Promise<string>
+  /** Docker mode (run-container.ts): set by the daemon when this device runs harnesses in containers. */
+  openContainer?: (run: Omit<RunContainerOptions, "image" | "owner">) => Promise<RunContainer>
   /** Trusted hosted transport, retaining the existing app-server adapter. */
   spawnCli?: typeof spawnCli
   /** Persist an owner-bound session before any prompt can execute. */
@@ -77,7 +85,7 @@ export interface CodexAdapterOptions {
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
   computerProvider?: ComputerSpecProvider
-  /** The user's own `CODEX_HOME` (for the auth link); `~/.codex` by default. */
+  /** @deprecated Ignored: the person's own `CODEX_HOME` is never read. */
   userHome?: string
   /** Trusted, owner-bound broker only; never a task/model-supplied credential. */
   subscriptionAuth?: {
@@ -320,13 +328,17 @@ export class CodexAdapter implements AgentAdapter {
       }
     }
     // Inside the run dir: one run's home is never another run's.
-    const codexHome = prepareCodexHome(
-      join(runDir, "codex-home"),
-      log,
-      this.options.userHome,
-      !externalAuth
-    )
+    const codexHome = prepareCodexHome(join(runDir, "codex-home"), log)
+    const assignedComputer = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
+    // Docker mode: the CLI runs in a disposable container of the runner image.
+    const inContainer = !this.options.spawnCli && this.options.sandbox.kind !== 'none' && !assignedComputer && Boolean(this.options.openContainer)
+    const binary = this.options.binary ?? (inContainer ? "codex" : await this.options.ensureBinary?.()) ?? "codex"
+    if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_AUTH_ERROR)
+    const credential = codexCredential(options.credential)
+    const providerDomain = credentialDomain(options.credential)
     const ctx = new RunContext({
+      ...(inContainer ? { nodeBinary: "node" } : {}),
+      harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
@@ -343,16 +355,15 @@ export class CodexAdapter implements AgentAdapter {
       skillReceipt: options.skillReceipt,
       runDir,
       privateDir: paths.privateDir,
-      extraWrite: codexHome.authFile ? [codexHome.authFile] : [],
     })
     // A hand-in the last daemon never got to act on ends the session now.
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
-    const computerMcp = sandboxComputerSpec(this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy), this.options.sandbox.kind)
+    const computerMcp = sandboxComputerSpec(assignedComputer, this.options.sandbox.kind)
     const mcp = ctx.mcpServer()
     const argv = [
-      this.options.binary ?? "codex",
+      binary,
       "app-server",
       "-c", `features.shell_tool=${rawCliShellAvailable(runPolicy(options.policy))}`,
       "-c",
@@ -372,16 +383,16 @@ export class CodexAdapter implements AgentAdapter {
         ...Object.entries(computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
       ] : []),
       ...codexAppArgs(options.apps),
+      ...credential.args,
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
         "-c",
         `shell_environment_policy.set.${key}=${toml(value)}`,
       ]),
     ]
-    const checkAuth = guardCodexAuth(codexHome.authFile, log)
     const spawnOptions = {
       cwd: ctx.worktree,
-      env: { ...options.env, ...ctx.tempEnv(), CODEX_HOME: codexHome.home },
+      env: { ...options.env, ...ctx.tempEnv(), ...credential.env, CODEX_HOME: codexHome.home },
       policy: computerSandboxPolicy(ctx.policy(), computerMcp),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
@@ -391,8 +402,12 @@ export class CodexAdapter implements AgentAdapter {
       : spawnOptions.policy.allowDomains.includes('*') ? [...requestedCeiling]
       : requestedCeiling.includes('*') ? spawnOptions.policy.allowDomains
       : requestedCeiling.filter(domain => spawnOptions.policy.allowDomains.includes(domain))
-    let launcher: ReturnType<typeof spawnRunSandbox> | undefined
-    const child = this.options.spawnCli || this.options.sandbox.kind === 'none'
+    let launcher: { revoke(): Promise<void> } | undefined
+    const onNetwork = runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps))
+    const container = inContainer ? await this.options.openContainer!({ runId: options.runId, cwd: ctx.worktree, policy: spawnOptions.policy, onNetwork }) : undefined
+    const child = container
+      ? (launcher = container.spawn(argv[0], argv.slice(1), spawnOptions.env))
+      : this.options.spawnCli || this.options.sandbox.kind === 'none'
       ? await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
       : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps)) }))
     if (launcher) {
@@ -401,7 +416,7 @@ export class CodexAdapter implements AgentAdapter {
       void child.exited.finally(off)
     }
     // After the whole group is gone (`exited` kills it first).
-    void child.exited.then(checkAuth)
+    void child.exited.then(async () => { await container?.close(); wipeRunCredentials(runDir) })
     const rpc: MessageConnection = jsonlConnection(
       child.process.stdout,
       child.process.stdin,
@@ -414,6 +429,9 @@ export class CodexAdapter implements AgentAdapter {
     let ending = false
     let cancelling = false
     let lastError: string | undefined
+    /** The CLI's quota or rate-limit failure seen this turn, and the plan's latest windows. */
+    let quota: QuotaSignal | undefined
+    let rateLimits: CodexRateLimits | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
     const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
     const registeredMcpTool = (server: string, tool: string) =>
@@ -570,8 +588,12 @@ export class CodexAdapter implements AgentAdapter {
           }
           return
         }
+        case "account/rateLimits/updated":
+          rateLimits = (params as RateLimitsNotification).rateLimits
+          return
         case "error": {
           const { error, willRetry } = params as ErrorNotification
+          if (!willRetry) quota = mergeQuota(quota, codexQuotaSignal(error, rateLimits))
           if (!willRetry)
             lastError = externalAuth
               ? SUBSCRIPTION_EXECUTION_ERROR
@@ -624,8 +646,10 @@ export class CodexAdapter implements AgentAdapter {
         return
       }
       if (turn.status === "failed" || lastError) {
+        quota = mergeQuota(quota, codexQuotaSignal(turn.error, rateLimits))
         return finish({
           outcome: "failed",
+          ...(quota ? { quota } : {}),
           error: externalAuth
             ? SUBSCRIPTION_EXECUTION_ERROR
             : turn.error?.message
@@ -640,6 +664,7 @@ export class CodexAdapter implements AgentAdapter {
     let runtimeModel: string | null = null
     const startTurn = async (message: string) => {
       lastError = undefined
+      quota = undefined
       if (externalAuth?.verify) {
         try { await externalAuth.verify() } catch { throw new Error(SUBSCRIPTION_AUTH_ERROR) }
       }

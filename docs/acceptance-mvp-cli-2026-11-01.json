@@ -1,0 +1,207 @@
+{
+  "status": "API/CLI acceptance items 1–8 passed; not a production release",
+  "pullRequest": "https://github.com/alexj11324/Mikka/pull/847",
+  "testedCommit": "494639ee1151901374f706eb2757630f95039f0c",
+  "ci": {
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41340466294",
+    "headSha": "494639ee1151901374f706eb2757630f95039f0c",
+    "conclusion": "success",
+    "prChecks": {
+      "success": 31,
+      "skipped": 6,
+      "failed": 0,
+      "pending": 0
+    }
+  },
+  "machine": {
+    "provider": "Docker Cloud Sandboxes",
+    "id": "sbx_001m6c5tn3zv9chkwxem94h2ebh",
+    "shape": "large",
+    "cpus": 8,
+    "memoryGiB": 16,
+    "node": "24.22.2",
+    "pnpm": "10.34.3",
+    "postgresMajor": 17,
+    "serverEncoding": "UTF8"
+  },
+  "local": {
+    "environment": {
+      "revision": "adb5e3e63e6ae40599a5b5928205fd6e65303edb",
+      "driverRevision": "adb5e3e63e6ae40599a5b5928205fd6e65303edb",
+      "sourceFingerprint": "bdbe26066ed983f5e0f194c877569e869fc46c54196e87ce3157f75348f5a9da",
+      "origin": "http://localhost:3110",
+      "database": "mikka_loop_95822f132c40_e2e",
+      "instanceId": "1d5914f5-ea79-4c80-83a4-8979d845b54b",
+      "deviceId": "3468f4b8-6acc-45c0-b323-e160efe0f2af",
+      "started": "2026-11-01T18:40:08.135Z",
+      "externalBoundaries": [
+        "Real DeepSeek model",
+        "Synthetic GitHub API and real local bare Git push",
+        "No browser tests",
+        "No production DB writes"
+      ]
+    },
+    "receipt": {
+      "runId": "95822f13-2c40-40ca-8047-a888105221c0",
+      "sourceFingerprint": "bdbe26066ed983f5e0f194c877569e869fc46c54196e87ce3157f75348f5a9da",
+      "fixedSource": true,
+      "passedItems": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "selectedItems": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7"
+      ],
+      "finishedAt": "2026-11-01T18:45:12.306Z"
+    },
+    "sourceEvidence": {
+      "startedFingerprint": "bdbe26066ed983f5e0f194c877569e869fc46c54196e87ce3157f75348f5a9da",
+      "finishedFingerprint": "bdbe26066ed983f5e0f194c877569e869fc46c54196e87ce3157f75348f5a9da",
+      "fixedSource": true
+    },
+    "dispatchCreatedToStartedMs": [
+      1382,
+      2237,
+      937
+    ],
+    "readOnly": {
+      "runId": "8b453ddb-4cb6-42de-aec2-0b3e4dee58b0",
+      "frozenReadOnly": true,
+      "policyHash": "219f5a36e962eae745c7f434424e5cce98dbd42fe5a2ac5a4b5a108c6dfc54d7",
+      "revision": "6ef6f8c57320457f74ed2ea76d5e5bcaff9fec825063c3c7ea3ec5226ee13fd6",
+      "rejected": true,
+      "authorizationReason": "error: remote unpack failed: unable to create temporary object directory\nTo /tmp/mikka-mvp-origin-4ppUnO/mvp-83992092-cd85-48e1-8e91-f10211fe5704/origin.git\n ! [remote rejected] HEAD -> acceptance-readonly-8b453ddb-4cb6-42de-aec2-0b3e4dee58b0 (unpacker error)\nerror: failed to push some refs to '/tmp/mikka-mvp-origin-4ppUnO/mvp-83992092-cd85-48e1-8e91-f10211fe5704/origin.git'",
+      "refsUnchanged": true,
+      "identicalWritableControlSucceeded": true,
+      "scope": "Actual claimed run policy + real SandboxRuntime CLI action; separate from model prose"
+    }
+  },
+  "cloud": {
+    "launch": {
+      "driverRevision": "494639ee1151901374f706eb2757630f95039f0c",
+      "templateSourceCommit": "6c3ce1a7e48a6c51fb54ea65d74d9eebb2598dac",
+      "revision": "adb5e3e63e6ae40599a5b5928205fd6e65303edb",
+      "sourceFingerprint": "bdbe26066ed983f5e0f194c877569e869fc46c54196e87ce3157f75348f5a9da",
+      "prerequisiteRunId": "95822f13-2c40-40ca-8047-a888105221c0",
+      "environmentId": "local-loop-95822f13-2c40-40ca-8047-a888105221c0",
+      "database": "mikka_loop_95822f132c40_e2e",
+      "origin": "http://localhost:3110",
+      "startedAt": "2026-11-01T19:11:54.285Z",
+      "templateId": "d2y3l8r3cpi7t06oh6x1",
+      "workerHash": "688639aea944d70841a3f2968b540351f5bcc972",
+      "passed": true,
+      "finishedAt": "2026-11-01T19:12:58.442Z"
+    },
+    "receipt": {
+      "id": "5a1420fc-a886-46be-86ed-4c9ff7ddb95e",
+      "scope": "new remote repository task on a ready E2B template, isolated local API/DB, real DeepSeek, run-bound MCP",
+      "accountLeaseSource": "independent-helper",
+      "model": "deepseek-flash",
+      "fixtureBaseBranch": "trunk",
+      "fixtureBaseCommit": "2f0465cc655f428cb73f477f14ee9d761bb8ed89",
+      "machineSource": "ready-template",
+      "workspaceSnapshotsUsed": 0,
+      "createRequestedAt": "2026-11-01T19:12:08.440Z",
+      "e2bCreateMs": 1279,
+      "fixtureTransportSetupMs": 289,
+      "policyIssuer": "https://8765-is4mj50werf6id47onsft.e2b.app/mikka",
+      "firstEventAt": "2026-11-01T19:12:40.068Z",
+      "firstEventType": "reasoning-start",
+      "createToFirstEventMs": 31628,
+      "addedAfterE2BBootMs": 30349,
+      "runId": "376cbe90-04df-4dc7-9a1e-e38b03e64918",
+      "status": "succeeded",
+      "actualDeepSeek": true,
+      "verificationPassed": true,
+      "latencyIncludes": [
+        "real model inference",
+        "restricted test reverse relay and fixture transport setup",
+        "application and worker startup"
+      ],
+      "normalAccountLease": true,
+      "productionDbWrites": false,
+      "testTransport": "restricted HTTPS reverse relay; provider transport uses the test team E2B key",
+      "cleanupConfirmed": true
+    },
+    "template": {
+      "sourceCommit": "6c3ce1a7e48a6c51fb54ea65d74d9eebb2598dac",
+      "workerSha": "688639aea944d70841a3f2968b540351f5bcc972",
+      "templateId": "d2y3l8r3cpi7t06oh6x1",
+      "buildId": "3d7577d0-3ecc-4731-9b62-036deefba857",
+      "name": "mikka-mvp-847-6c3ce1a7-private",
+      "public": false,
+      "buildStatus": "ready"
+    }
+  },
+  "reusedLocalEvidenceDelta": [
+    "packages/daemon/scripts/build-cloud-worker.mjs",
+    "packages/daemon/scripts/build.mjs",
+    "packages/daemon/test/package.test.mjs",
+    "scripts/e2b/cloud-local-acceptance.mjs"
+  ],
+  "cleanup": {
+    "at": "2026-11-01T19:16:50.741Z",
+    "activeLeases": 0,
+    "cloudMachines": 0,
+    "threadMachines": 0,
+    "testCredentialStoresRemoved": true,
+    "workspaceSealingKeyRemoved": true,
+    "evidenceAudit": [
+      {
+        "root": "/home/agent/mikka",
+        "files": 11,
+        "archives": 0,
+        "archiveEntries": 0,
+        "decodedBytes": 0,
+        "result": "passed",
+        "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+      },
+      {
+        "root": "/home/agent/mikka-cloud-driver",
+        "files": 11,
+        "archives": 0,
+        "archiveEntries": 0,
+        "decodedBytes": 0,
+        "result": "passed",
+        "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+      }
+    ]
+  },
+  "providerSecretAudit": {
+    "result": "passed",
+    "files": 12,
+    "scope": "Exact DeepSeek and E2B credential values plus URL/base64 forms"
+  },
+  "boundaries": [
+    "Real DeepSeek, real daemon and E2B worker",
+    "Real isolated PostgreSQL and bare Git push; GitHub PR API fixture",
+    "Cloud latency includes inference, relay and fixture setup; zero added latency not established",
+    "No browser acceptance, production merge/deployment or public template release"
+  ],
+  "evidenceSha256": {
+    "cleanup-and-audit.json": "0becb83cc84ff2777a22ee4ef1aabe8dca9bed80cea8e84429df7448ef2acd54",
+    "cloud-launch.json": "01dd80bbc84158dd202aa9a5ac8e1a268f2eee5b6d1874b1eb5abe39e0427d29",
+    "cloud-previous-failures.json": "6567cf6b0319b61bd4cc0f4b91411fe9837135a6c2a7e0664f35a4d03a0f67a8",
+    "cloud-relay-requests.json": "bcbf30c01005eec5360f1196b07d028faa6221f741caf8721080a9f7efab1f46",
+    "cloud-result.json": "ff2d5555043b4e913e6f399dc58cacef1332b7cfa31baf5c2605ae30d3c4d231",
+    "local-environment.json": "81d5e51b616548355dacfb12078f9c8f5f4e66ce9cb92b4ea69fb1f573e3c4b7",
+    "local-passed-items.json": "ec95f3147a3c0aed092c68529cac1eec51083155c825b9b0caa3f7c353e192c1",
+    "local-progress.jsonl": "bf566e85d253d4de5ebb03988cb2fa6685cd1b9da4696788826c09c461152c93",
+    "local-readonly-push.json": "1f9ab56be795bb190a474a4ee5349c680337db1b9e629ff49a2c25dc55aa806b",
+    "local-source-evidence.json": "7cb87023b61eca5c176961e8ebfcacf8ad3e35d3920613df17fd6626ff49e1bd",
+    "package-green.log": "0382549170439157a6bfa3cbe54baaad4be34c59cf03d814b6b7f7e97d3bb034",
+    "provider-secret-audit.json": "cb8910e5244fe7b6ed61e68fe257f71f7786d0a58318ae0ad989cc0e736a55ce",
+    "template.json": "33823f120c2790ce6f4e8f19797d974d592407e2487b27a0f6a3b03e8d442fb4"
+  }
+}

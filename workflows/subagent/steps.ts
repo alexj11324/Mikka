@@ -120,8 +120,10 @@ async function report(actor:Actor,botId:string,id:string,rawText:string,state:st
   const text=await maskForWorkspace(actor.workspaceId,rawText)
   const {recordCoordinatorEvent}=await import('@/lib/coordinator-event-store')
   const {wakeCoordinator}=await import('@/lib/coordinator/wake')
-  const fromSuggestion=Boolean((await pool.query('SELECT 1 FROM suggestion_executions WHERE "subagentId"=$1 AND "ownerId"=$2',[id,userId])).rowCount)
-  await recordCoordinatorEvent(db,{userId,botId:fromSuggestion?null:botId,kind:'user_message',dedupeKey:`subagent:${id}:${state}`,issueId:null,runId:null,payload:{text:`Web task result (${state}): ${text}. Reply as the Bot in ordinary chat.`,subagentId:id}})
+  // A suggestion's web task reports to the chat the suggestion started in (its stored Coordinator bot row).
+  const suggestion=(await pool.query<{botId:string|null}>(`SELECT e."botId" FROM suggestion_executions s JOIN coordinator_events e ON e."userId"=s."ownerId" AND e."dedupeKey"='suggestion:start:'||s."suggestionId" WHERE s."subagentId"=$1 AND s."ownerId"=$2`,[id,userId])).rows[0]
+  // A web task's result is a runtime report, not the person's message: no preset tier, so triage (the Decisions API) decides whether it needs them.
+  await recordCoordinatorEvent(db,{userId,botId:suggestion?suggestion.botId:botId,kind:'run_report',dedupeKey:`subagent:${id}:${state}`,issueId:null,runId:null,payload:{text:`Web task result (${state}): ${text}. Reply as the Bot in ordinary chat.`,subagentId:id,source:'subagent'}})
   await wakeCoordinator(userId)
 }
 export async function expire(actor:Actor,botId:string,id:string) {

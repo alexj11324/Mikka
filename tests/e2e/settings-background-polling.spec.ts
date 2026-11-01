@@ -82,8 +82,8 @@ test('workspace idle reads stay within budget across settings, return and page d
     expect(boardPollingActions.length).toBe(4)
 
     // Artifact has no extra periodic reads: learn the two shared workspace actions here.
-    await rail(page, '产物').click()
-    await expect(page.getByRole('heading', { level: 1, name: '产物', exact: true })).toBeVisible()
+    await rail(page, 'Artifact').click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Artifact', exact: true })).toBeVisible()
     await waitForActionsQuiet()
     await advance(5_000)
     const sharedDiscovery = actions.length

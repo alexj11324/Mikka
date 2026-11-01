@@ -117,7 +117,7 @@ function useAnswer() {
 
 const Failed = ({ state }: { state: string }) => state === 'failed' ? <Text style={cardText.error}>没发出去，再试一次。</Text> : null
 
-interface Question { id: string; title: string; options: { value: string; label: string }[]; multiple: boolean; allowCustom: boolean }
+interface Question { id: string; title: string; description: string; options: { value: string; label: string; action: string }[]; multiple: boolean; allowCustom: boolean }
 
 function questionsOf(value: Component): Question[] {
   return arr(value.props.questions).map((item, index) => {
@@ -125,7 +125,8 @@ function questionsOf(value: Component): Question[] {
     return {
       id: str(q.id) || String(index),
       title: str(q.title),
-      options: arr(q.options).map(option => ({ value: str(obj(option).value), label: str(obj(option).label) })).filter(option => option.label),
+      description: str(q.description),
+      options: arr(q.options).map(option => ({ value: str(obj(option).value), label: str(obj(option).label), action: str(obj(option).action) })).filter(option => option.label),
       multiple: q.multiple === true,
       allowCustom: q.allowCustom === true,
     }
@@ -138,6 +139,12 @@ function questionsOf(value: Component): Question[] {
  * Several questions, or several answers, pick then send in one message with
  * the context, in the web's words (agent-decision.tsx).
  */
+/** Where a card's setup row leads (the web's agent-decision.tsx: Settings › 电脑, and Settings › 模型 for the E2B key). */
+const SETUP_PAGES: Record<string, string> = {
+  connectServer: '/settings?section=computers', serverOnline: '/settings?section=computers', enableThisMac: '/settings?section=computers', allowAutoSchedule: '/settings?section=computers',
+  e2bKey: '/settings?section=models', cloudKeySettings: '/settings?section=models',
+}
+
 function Questions({ value }: { value: Component }) {
   const questions = questionsOf(value)
   const { reply } = useCard()
@@ -151,10 +158,16 @@ function Questions({ value }: { value: Component }) {
     return (
       <ChatCard>
         <Text style={cardText.title}>{only.title}</Text>
+        {only.description ? <Text style={cardText.meta}>{only.description}</Text> : null}
         <View style={{ gap: 4 }}>
           {only.options.map((option, index) => (
             <Pressable key={option.value || index} accessibilityRole="button" accessibilityState={{ selected: choice === option.value, disabled: !open }} disabled={!open}
-              onPress={() => { setPicked({ [only.id]: [option.value] }); void send(option.label) }}
+              onPress={() => {
+                // A setup row (没有可用的电脑, a missing E2B key) opens its Settings page on the web; it never answers.
+                const page = SETUP_PAGES[option.action]
+                if (page) { void openOnWeb(page); return }
+                setPicked({ [only.id]: [option.value] }); void send(option.label)
+              }}
               style={({ pressed }) => [styles.option, (pressed || choice === option.value) && { backgroundColor: colors.bubble }, !open && choice !== option.value && { opacity: 0.5 }]}>
               <View style={styles.letter}><Text style={styles.letterText}>{String.fromCharCode(65 + index)}</Text></View>
               <Text style={[cardText.body, { flex: 1 }]}>{option.label}</Text>

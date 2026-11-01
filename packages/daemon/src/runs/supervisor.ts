@@ -28,6 +28,7 @@
 // agent's summary, open questions, next step and blocker are taken from the
 // agent. An explicitly approved, pushed submission can finish unverified;
 // its report keeps `not_run`, and the server may open only a draft PR.
+import { quotaStopApplies } from "./quota-exhausted"
 import { runApps } from '../agents/run-apps'
 import { fixedCheckSnapshot } from "./check"
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
@@ -40,6 +41,8 @@ import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/pro
 import { runPolicyDigestInput } from "@mikka/protocol/agent-policy"
 import { createHash, randomUUID } from "node:crypto"
 import { join, resolve } from "node:path"
+import { tmpdir } from "node:os"
+import { withRunGitCredentials } from '../agents/github-runtime'
 
 import { execa } from "execa"
 
@@ -73,7 +76,7 @@ import type {
   StartOptions,
   ExitEvent,
 } from "../adapters/types"
-import { runStateChunk, type RunChunk } from "../chunks"
+import { runStageChunk, runStateChunk, type RunChunk, type RunStage } from "../chunks"
 import { buildChildEnv } from "../env"
 import { worktreeGitWritePaths } from "../agents/publish"
 import {
@@ -95,7 +98,7 @@ import {
 import type { WorktreeManager } from "../worktrees"
 import type { JournalEntry, RunJournal } from "./journal"
 import type { ToolApprovalGate } from "../agents/tool-approval"
-import { assertMailboxRunAuthority, type RunMailbox } from '../run-mailbox'
+import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '../run-mailbox'
 
 export interface SupervisorDeps {
   journal: RunJournal
@@ -106,6 +109,8 @@ export interface SupervisorDeps {
   adapters: ReadonlyMap<Harness, AgentAdapter>
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
+  /** A hosted (cloud) worker's API-key runs: the key stays behind the worker's broker, out of the task container. */
+  startCredential?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
   /** Authenticated policy validation before repository/setup effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
@@ -476,10 +481,10 @@ export class RunSupervisor {
     const existing = this.deps.journal.get(assignment.runId)
     if (existing) return this.summary(existing)
     // 4e3: mask the task's injected secrets (names from the server, values from taskEnv) before upload.
-    const masker = createRunMasker((assignment.taskSecretNames ?? []).flatMap(name => {
+    const masker = createRunMasker([...(assignment.taskSecretNames ?? []).flatMap(name => {
       const value = assignment.taskEnv?.[name]
       return typeof value === "string" ? [{ name, value }] : []
-    }))
+    }), ...(assignment.modelCredential ? [{ name: "MODEL_API_KEY", value: assignment.modelCredential.key }] : [])])
     if (masker) this.maskers.set(assignment.runId, masker)
     let repo: DeviceRepo
     try { repo = this.deps.repository(assignment) } catch (error) {
@@ -580,11 +585,36 @@ export class RunSupervisor {
         }
         continue
       }
+      // The run's API key was never written down; it does not go on without it.
+      if (entry.credentialWithheld && !entry.assignment.modelCredential) {
+        this.finish(entry.assignment.runId, 'error', 'The run stopped with the daemon; its API key is not kept. Retry the thread.')
+        continue
+      }
       // The old lease is stale; give the first heartbeat time to renew it.
       if (entry.assignment.leaseExpiresAt)
         this.leases.set(entry.assignment.runId, Date.now() + DEFAULT_LEASE_MS)
       this.launch(entry.assignment.runId, repo)
     }
+  }
+
+  /** Notify an existing authorized session; never start or resume a task. */
+  async notifyMailbox(runId: string, messageIds: readonly string[]) {
+    const run = this.active.get(runId)
+    if (!run?.session || !run.mailbox || !run.toolApproval || !run.mailbox.tools.some(tool => tool.name === 'mailbox_inbox'))
+      throw new RunNotFoundError(runId)
+    const state = this.deps.journal.get(runId)?.state
+    if (state !== 'running' && state !== 'waiting_input') throw new RunNotFoundError(runId)
+    const check = () => assertMailboxRunAuthority({ held: this.active.get(runId) === run,
+      state: this.deps.journal.get(runId)?.state,
+      stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted,
+      lease: this.leases.get(runId) })
+    check()
+    // This fixed notice grants no action authority. Avoid waiting on a human
+    // control handback here, which would block the same poll's stop channel.
+    // Reading the inbox and every subsequent tool still use their live gate.
+    if (run.toolApproval.revoked) throw new Error('Run mailbox unavailable')
+    check()
+    await this.send(runId, mailboxNoticeText(runId, messageIds))
   }
 
   async send(runId: string, text: string) {
@@ -840,6 +870,24 @@ export class RunSupervisor {
     })
   }
 
+  /**
+   * Runs one start-up stage and records it as a stored `data-run-stage`
+   * chunk with its duration, ok or not, so a run that fails while starting
+   * shows which stage it reached. The stage's own result or error passes
+   * through unchanged.
+   */
+  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>): Promise<T> {
+    const started = performance.now()
+    try {
+      const value = await work()
+      this.emit(runId, runStageChunk(stage, performance.now() - started, true))
+      return value
+    } catch (error) {
+      this.emit(runId, runStageChunk(stage, performance.now() - started, false))
+      throw error
+    }
+  }
+
   private setState(
     runId: string,
     state: RunState,
@@ -1015,14 +1063,16 @@ export class RunSupervisor {
     }
     const branch = assignment.pushBranch
     const base = await this.deps.baseRef(assignment)
-    if (!branch || !pushDecision(runPolicy(assignment.policy), repo.push?.approved === true).push) return base
+    if (!branch || !pushDecision(runPolicy(assignment.policy)).push) return base
     try {
-      return await this.deps.worktrees.fetchBranch(
-        repo.path,
-        repo.push?.remote ?? "origin",
-        branch,
-        runId,
-      )
+      return await withRunGitCredentials(assignment, runPaths(this.deps.adapterStateDir ?? join(tmpdir(), "mikka-run-state"), runId).privateDir,
+        env => this.deps.worktrees.fetchBranch(
+          repo.path,
+          repo.push?.remote ?? "origin",
+          branch,
+          runId,
+          env,
+        ))
     } catch (error) {
       this.deps.log.info(
         { run_id: runId, branch, err: error },
@@ -1142,7 +1192,7 @@ export class RunSupervisor {
       entry = this.deps.journal.get(runId) as JournalEntry
     }
 
-    await this.deps.prepareRepository(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal]))
+    await this.stage(runId, "repository", () => this.deps.prepareRepository(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal])))
     if (this.stopping || run.cancelRequested) {
       if (!this.stopping) this.finish(runId, run.forcedStop ?? "cancelled")
       return
@@ -1176,11 +1226,11 @@ export class RunSupervisor {
     const worktree =
       entry.worktree ??
       continued ??
-      (await this.deps.worktrees.create(
+      (await this.stage(runId, "worktree", async () => this.deps.worktrees.create(
         runId,
         repo.path,
         await this.startPoint(runId, repo, assignment),
-      ))
+      )))
     if (!entry.worktree) {
       // A continued worktree was bootstrapped by the run that made it.
       // The commit checkpoints diff against: a continued worktree keeps the
@@ -1275,6 +1325,8 @@ export class RunSupervisor {
       fixture: assignment.fixture,
       model: assignment.model,
       mailbox,
+      // In memory only: the adapter hands it to the run's CLI environment.
+      credential: assignment.modelCredential,
     }
     const resuming =
       entry.sessionId !== null && adapter.capabilities.supportsResume
@@ -1320,8 +1372,11 @@ export class RunSupervisor {
     const previousExecution = entry.execution
     const previousRuntime = entry.runtime
     let session: AgentSession
+    if (assignment.subscriptionBinding && assignment.modelCredential) throw new Error("A run has one model credential")
     try {
-      session = assignment.subscriptionBinding
+      session = await this.stage(runId, "agent_start", async () => assignment.modelCredential && this.deps.startCredential
+      ? await this.deps.startCredential(assignment,{...options,prompt:assignment.prompt})
+      : assignment.subscriptionBinding
       ? this.deps.startSubscription
         ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})
         : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()
@@ -1338,7 +1393,7 @@ export class RunSupervisor {
             continueSession,
             requireSessionResume: assignment.requireSessionResume,
           })
-        })()
+        })())
     } catch (error) {
       if (assignment.skillReceipt) this.deps.journal.update(runId, { skillMount: undefined, execution: undefined, runtime: undefined })
       throw error
@@ -1443,7 +1498,7 @@ export class RunSupervisor {
           continue
         }
         await this.closeMailbox(run)
-        const stopReason = stopReasonOf(event, run)
+        const stopReason = stopReasonOf(event, run, assignment)
         const error =
           event.error ??
           (stopReason === "turn_ended"
@@ -1469,7 +1524,9 @@ export class RunSupervisor {
         )
         if (this.stopping) return
         const { verifyError, tree } = outcome
-        let report = outcome.report
+        let report = stopReason === "quota_exhausted"
+          ? { ...outcome.report, resetsAt: event.quota?.resetsAt ?? null }
+          : outcome.report
         const policy = runPolicy(assignment.policy)
         if (
           stopReason === "submitted" &&
@@ -1477,7 +1534,7 @@ export class RunSupervisor {
           tree &&
           // The draft-PR exception requires an explicit repository push
           // approval. It must not even create a local commit without it.
-          (report.verify.status === "passed" || pushDecision(policy, repo.push?.approved === true).push) &&
+          (report.verify.status === "passed" || pushDecision(policy).push) &&
           // A read-only check (ADR 0046) never commits or pushes: it reports
           // on the commit the implementation run already pushed.
           policy.readOnly !== true
@@ -1621,12 +1678,14 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
  * other ended run, except a verified hand-in, is cleaned up when it left no
  * commit and no change.
  */
-const KEEP_WORKTREE: readonly StopReason[] = ["turn_ended", "asked_human"]
+const KEEP_WORKTREE: readonly StopReason[] = ["turn_ended", "asked_human", "quota_exhausted"]
 
-function stopReasonOf(event: ExitEvent, run: ActiveRun): StopReason {
+function stopReasonOf(event: ExitEvent, run: ActiveRun, assignment: RunAssignment): StopReason {
   if (run.forcedStop) return run.forcedStop
   if (event.outcome === "cancelled" || run.cancelRequested) return "cancelled"
   if (event.stopReason) return event.stopReason
+  // The continuation goes on in this worktree, on a key or after the reset.
+  if (event.outcome === "failed" && event.quota && quotaStopApplies(assignment)) return "quota_exhausted"
   return event.outcome === "failed" ? "error" : "turn_ended"
 }
 

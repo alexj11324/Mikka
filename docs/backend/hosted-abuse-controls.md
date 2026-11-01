@@ -6,15 +6,28 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
 
 ## Backend contract for the frontend
 
-- `startCardVerification(workspaceId?)` is admin-only and returns a Stripe
-  Checkout `{ url }` in `mode: 'setup'`, with USD currency and the workspace's
-  shared Stripe customer. Redirect the browser to that URL. The server builds
-  the localized billing return URL with the application base path and workspace:
+- Card verification belongs to the person (orchestration.md § 7, C19). Any
+  member may start it, from any workspace; it is always recorded on their own
+  personal workspace, which gets the USD 1 once per card. 计费 offers it only in
+  the personal workspace, and the chat's 验证银行卡 link only there too.
+- Credit shares (decision 2026-10-31-2300 item 4): in a team, a member may turn on
+  我的点数也可用于这个团队 (`workspace_credit_shares`, `lib/credit-shares.ts`).
+  A Mikka 默认 call is admitted and reserved against the team's own balance
+  first; when that is empty, against each sharer's personal workspace, oldest
+  share first, and the usage row is charged there. Only active members' shares
+  count; leaving or a suspension deletes the share.
+- `startCardVerification(workspaceId?)` needs membership of `workspaceId` and
+  returns a Stripe Checkout `{ url }` in `mode: 'setup'`, with USD currency and
+  the personal workspace's Stripe customer. Redirect the browser to that URL. The
+  server builds the localized billing return URL with the application base path
+  and the personal workspace:
   `?section=billing&workspace=…&verify=success&session_id={CHECKOUT_SESSION_ID}`
   or `verify=cancelled`. Setup creates no charge, subscription, or automatic
   top-up; bank authorization holds can still appear. The frontend never grants
   credit from the return parameters.
-- `cardVerificationStatus(workspaceId?)` is admin-only. It returns `status`
+- `cardVerificationStatus(workspaceId?)` needs membership and reads the
+  person's own verification (their personal workspace; a card they verified
+  earlier on another workspace they own counts). It returns `status`
   (`unverified`, `pending`, `verified`, or `unavailable`), nullable `last4`,
   nullable `allowance` (`granted` or `claimed_elsewhere`), and
   `remainingAllowanceMicroUsd` / `remainingAllowancePoints`. USD 1 is 1,000,000
@@ -46,7 +59,8 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
   spending and also includes the existing-workspace allowance. A verified card
   that has already claimed its allowance does not create a second gift row.
 - States: `ready`, `verification_required`, `free_allowance_used`,
-  `platform_paused`, `usage_in_progress`, `usage_cost_unavailable`. Model
+  `platform_paused`, `usage_in_progress` (a replayed call ID),
+  `usage_concurrency_limit`, `usage_cost_unavailable`. Model
   execution errors carry the stable code as their message/code, including
   Coordinator failure records. A purchase qualifies as verification even
   after the purchased balance has been consumed.
@@ -96,13 +110,14 @@ attention decisions carry the server-owned workspace billing context.
 Subscription-model snapshots retain their existing model seam and never debit
 hosted credit. Own-device work and BYO E2B do not require a card or debit points.
 Unscoped internal decision transport is exempt for the host's own judgments;
-it retains the separate existing `DECISION_GATEWAY_API_KEY` provider budget.
+it signs in with the app's one gateway credential (`lib/ai-gateway-auth.ts`)
+under the team's AI Gateway budget; there is no Decisions-only key.
 The standalone `routeGroupMessage`/`callDecisionRequest` helpers have no active
 unscoped user-facing consumer in this revision.
 
 `claimCloudRun` does not create an E2B sandbox. All sandbox create/connect
 paths (`lib/computer/e2b-provider.ts`, thread machines and desktop access) now
-resolve a workspace-owned key. There is no remaining production read of the
+resolve the sandbox owner's own key (`user_e2b_keys`; keys are personal). There is no remaining production read of the
 platform `E2B_API_KEY` for sandbox provisioning. Missing keys retain the existing
 `e2b_key_missing` code; changing the old BYO flag cannot restore the fallback.
 
@@ -134,14 +149,20 @@ receipt afterwards. Any positive balance is sufficient; a model cost estimate
 cannot reject it. There is no new balance freeze or prepayment. Free credit is
 spent before purchased points; `plan` grants are ignored.
 
-One pending/unknown call per workspace is an execution concurrency limit,
-including across processes. The existing `reserve` method records only that
-slot and a receipt ID; all reserved-money fields on new rows are zero. Each
+Calls in one workspace run concurrently (decision
+`docs/design/decisions/2026-11-01-0400-hosted-calls-run-concurrently.md`).
+`reserve` records a receipt ID and a hold of `HOSTED_CALL_HOLD_MICRO_USD`
+(USD 0.10) on the row's `holdMicroUsd`; all reserved-money fields on new rows
+are zero and the hold is never charged. A call is admitted when nothing else is
+in flight and the balance is positive, or when the balance minus the holds of
+pending/unknown calls covers its own hold; otherwise `free_allowance_used`. At
+most `HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE` (8) pending calls run per workspace,
+including across processes; beyond that, `usage_concurrency_limit`. Each
 provider invocation has its own ledger ID; settlement is idempotent. Workflow
-retries cannot silently replay a pending call. A call can finish beyond the
-remaining balance; its entire actual cost remains in the ledger as debt. The
-next call is refused until recorded purchased credit restores a positive net
-balance. Debt never authorizes another call.
+retries cannot silently replay a call (`usage_in_progress`). A call can finish
+beyond the remaining balance; its entire actual cost remains in the ledger as
+debt. The next call is refused until recorded purchased credit restores a
+positive net balance. Debt never authorizes another call.
 
 The text model caps output at 4,096 tokens and provider time at 60 seconds;
 compaction keeps its existing 30-second timeout. Inputs over 16 MB are refused;
@@ -149,7 +170,7 @@ these transport bounds do not reserve money. Subscription calls keep their
 existing capabilities.
 Actual Gateway `providerMetadata.gateway.cost` is rounded upwards to integer
 microdollars. Missing cost or an interrupted provider call retains its
-receipt record and blocks further workspace calls, rather than treating unknown
+receipt record and keeps its hold until reconciled, rather than treating unknown
 usage as free. Operators can reconcile the same call ID with
 `HostedUsageStore.settle(id, actualMicroUsd, ...)` after checking the Gateway
 receipt. No automatic retry discards an uncertain charge.
@@ -198,8 +219,8 @@ uniqueness/rate limits. It is registered in the required DB inventory.
 DB tests, including replayed events, refunds, tenant isolation, spent/reserved
 balances, and the one-time gift.
 Tests never use a production database, create a live Stripe charge or start an
-E2B sandbox. Required PR CI supplies the production build, full functionality
-and integration-branch performance acceptance.
+E2B sandbox. Functional acceptance runs locally ([dev workflow](../dev-workflow.md));
+CI runs the source and database checks as the final gate.
 
 ## Hosted verification
 

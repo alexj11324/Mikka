@@ -1,6 +1,10 @@
 # Cloud Preview development
 
-Develop and test on cloud Preview deployments. Vercel previews, v0 previews and Cloudflare-hosted previews use their own HTTPS origin and an isolated Preview database. Set `BETTER_AUTH_URL` to the current origin without `/mikka`; if omitted, Vercel Preview prefers its deployment URL, and v0/Cloudflare Pages use their supplied preview URL. Vercel Preview uses the Neon integration's branch-specific `DATABASE_URL` ahead of the global `MIKKA_DATABASE_URL` override. Other environments retain their existing database selection.
+> Development and acceptance are local first ([dev workflow](dev-workflow.md));
+> Vercel does not build pull requests. This page covers Preview origins and the
+> OAuth proxy for the cases that need a deployed origin.
+
+Preview deployments Vercel previews, v0 previews and Cloudflare-hosted previews use their own HTTPS origin and an isolated Preview database. Set `BETTER_AUTH_URL` to the current origin without `/mikka`; if omitted, Vercel Preview prefers its deployment URL, and v0/Cloudflare Pages use their supplied preview URL. Vercel Preview uses the Neon integration's branch-specific `DATABASE_URL` ahead of the global `MIKKA_DATABASE_URL` override. Other environments retain their existing database selection.
 
 ## Google and GitHub login
 
@@ -19,9 +23,9 @@ Actual `VERCEL_URL`, `VERCEL_BRANCH_URL`, `VERCEL_PROJECT_PRODUCTION_URL`, `V0_R
 
 Use `AUTH_TRUSTED_ORIGINS` only for additional project-controlled HTTPS origins or project-scoped hostname patterns needed by direct auth requests. Never trust shared hosting domains such as `*.vercel.app`, `*.v0.build`, `*.pages.dev` or `*.workers.dev`. Workers deployments without `CF_PAGES_URL` must set their exact `BETTER_AUTH_URL` and any additional controlled origins. Invalid non-HTTPS origins, credentials or URL paths fail configuration validation.
 
-For optional localhost debugging, set `BETTER_AUTH_URL=http://localhost:3000` and use development mode (`pnpm dev`). HTTP loopback origins are allowed only in development and CI; other origins and the OAuth proxy hub still require HTTPS. Inject the matching provider credentials and both proxy variables to return through the same fixed hub, without adding localhost callbacks in Google Console. Without the proxy variables, use a separate development OAuth client with `http://localhost:3000/mikka/api/auth/callback/google` registered. Local HTTP uses Better Auth's default cookies; HTTPS development previews retain partitioned cookies. Keep real credentials out of local files. This does not replace deployed runtime acceptance.
+For localhost development, set `BETTER_AUTH_URL=http://localhost:3000` and use development mode (`pnpm dev`). HTTP loopback origins are allowed only in development and CI; other origins and the OAuth proxy hub still require HTTPS. Inject the matching provider credentials and both proxy variables to return through the same fixed hub, without adding localhost callbacks in Google Console. Without the proxy variables, use a separate development OAuth client with `http://localhost:3000/mikka/api/auth/callback/google` registered. Local HTTP uses Better Auth's default cookies; HTTPS development previews retain partitioned cookies. Keep real credentials out of local files.
 
-Validate login from each deployed Preview: the provider authorization URL must name the stable hub callback, then return to the originating Preview and create its own session. Confirm a foreign origin cannot initiate a trusted callback. Unit tests validate configuration and real Better Auth request handling without starting a local server; provider login and cloud database acceptance still require deployed testing.
+Validate login from each deployed Preview: the provider authorization URL must name the stable hub callback, then return to the originating Preview and create its own session. Confirm a foreign origin cannot initiate a trusted callback. Unit tests validate configuration and real Better Auth request handling without starting a local server; real provider login needs the OAuth proxy described above.
 
 Runtime acceptance follows [acceptance.md](acceptance.md): use direct Google/GitHub OAuth, reuse authorized sessions, and do not repeatedly ask the user for a Mikka password.
 

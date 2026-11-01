@@ -78,6 +78,10 @@ more than once.
       R-23). When a frame can be read two ways, ask Alex before
       building.
 
+- [ ] Every vertical line between two columns drags to resize them, with a
+      `col-resize` cursor on hover, arrow keys, double-click to reset, and a
+      remembered width; it is a `ResizablePane` or `ResizeHandle` (R-80).
+
 ### Copy
 
 - [ ] No filler or explanatory copy (R-40); empty states follow R-41.
@@ -85,7 +89,7 @@ more than once.
       same thing, it was filler. Sheets have no subtitle; reassurance is a
       mark (🔒 Secured by Mikka), not a sentence. Reviewers fail any frame
       with such a sentence, even when the brief asked for it.
-- [ ] The Coordinator looks like every other bot: no star, badge or special copy (R-06).
+- [ ] The Coordinator looks like every other bot: no badge or special copy; the star is only the 置顶 mark, the same on every pinned bot (R-06).
 - [ ] All strings in `messages/*.json`; `pnpm i18n:check` passes (R-42).
 - [ ] Glossary words only (R-43).
 
@@ -98,7 +102,8 @@ more than once.
 ## Showing it
 
 - One Artifact page with all screenshots (light, dark, each state), the
-  Figma frame beside each one, and the branch, commit SHA and Preview URL.
+  Figma frame beside each one, and the branch and commit SHA. Screenshots come
+  from a local production build (`next build`, `next start`).
   No piles of attachments.
 - Say which rules or frames you could not follow and why.
 
@@ -106,13 +111,14 @@ more than once.
 
 1. The checklist above passes.
 2. Alex accepted the review page.
-3. Then e2e tests are written or updated and pass in CI (not before
+3. Then e2e tests are written or updated and pass locally (not before
    acceptance).
-4. CI is green: the CI and Browser tests workflows (`CONTRIBUTING.md` § How
-   changes are tested); do not run builds on the Mac.
+4. CI is green as the final gate (`CONTRIBUTING.md` § How changes are
+   tested); do not run builds on the Mac.
 5. Docs updated in the same PR: `rules.md`, `components.md`, `decisions.md`,
    `glossary.md` or the feature spec, whichever the change touches.
-6. Merged to main. Green PRs may be merged without asking.
+6. Merged to main in the next integration batch ([dev workflow](dev-workflow.md) § 5),
+   after the coordinator reviews the screenshots.
 
 ## Pull requests
 

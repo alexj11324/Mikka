@@ -25,6 +25,9 @@ stub('../coordinator/store.ts',{loadConversation:async()=>conversation,saveSumma
 stub('../agent-kit/service.ts',{agentScope:async(ownerId:string,botId:string|null)=>({ownerId,botId,workspaceId:null})})
 stub('../subscription-runtime.ts',{subscriptionRuntime:unavailable,authorizeSubscriptionWorkspace:unavailable})
 stub('../coordinator/wake.ts',{coordinatorEnabled:()=>true,wakeCoordinator:unavailable})
+/** The person's Coordinator: an ordinary bot row, resolved by the host. */
+const COORDINATOR_BOT='30000000-0000-4000-8000-0000000c0de1'
+stub('../coordinator/coordinator-bot.ts',{chatBotId:async(_owner:string,botId:string|null|undefined)=>botId??COORDINATOR_BOT,openChatBotId:async(_user:unknown,botId:string|null|undefined)=>botId??COORDINATOR_BOT})
 stub('../coordinator/bot-instructions.ts',{botInstructions:async(_owner:string,_bot:string|null,base:string)=>base})
 stub('../coordinator/personal-instructions.ts',{withPersonalInstructions:async(_owner:string,base:string)=>base})
 stub('../issue-visibility.ts',{issueVisibility:unavailable})
@@ -49,8 +52,9 @@ test('authenticated HTTP submission reaches actual planner prompt through stored
   assert.equal((await POST(request({text:'Use this image to compose the message',images:[{dataUrl:png}]}))).status,202)
   const event=events.at(-1)!
   assert.equal(event.userId,userId)
+  assert.equal((event as Event & {botId?:string}).botId,COORDINATOR_BOT,'a message with no bot goes to the Coordinator\'s bot row')
   conversation.messages=[{position:1,message:sourcedEventMessage(event,eventPrompt(event))}]
-  const prompt=await preparePrompt(userId)
+  const prompt=await preparePrompt(userId,COORDINATOR_BOT)
   assert.deepEqual(files(prompt.messages[0].content).map(part=>[part.mediaType,part.data]),[['image/png',png]])
   const runtime=runtimeForWritePlanning({harness:'ai_sdk',model:'original'},['send_slack_message'],true,false)
   assert.equal(supportsWritePlanning(runtime),true)
@@ -72,7 +76,7 @@ test('text-only HTTP submission stays text in actual planner prompt',async()=>{
   assert.equal((await POST(request({text:'Cancel the identified event'}))).status,202)
   const event=events.at(-1)!
   conversation.messages=[{position:1,message:sourcedEventMessage(event,eventPrompt(event))}]
-  assert.equal((await preparePrompt(userId)).messages[0].content,'Cancel the identified event')
+  assert.equal((await preparePrompt(userId,COORDINATOR_BOT)).messages[0].content,'Cancel the identified event')
 })
 
 test('host-signed compaction retains original pixels after a text followup',async()=>{
@@ -104,7 +108,7 @@ test('actual preparePrompt compacts original HTTP image using the frozen planner
     const runtime=runtimeForWritePlanning({harness:'ai_sdk',model:'original'},['send_slack_message'],true,false)
     const snapshot=makeSnapshot('10000000-0000-4000-8000-000000000001',1,DEFAULT_AGENT_DEFINITION,'host',runtime)
     allowCompaction=true
-    const prompt=await preparePrompt(userId,null,snapshot)
+    const prompt=await preparePrompt(userId,COORDINATOR_BOT,snapshot)
     assert.equal(compactions.length,1)
     assert.equal(compactions[0].model,runtime.model)
     const submitted=compactions[0].messages as StoredMessage['message'][]

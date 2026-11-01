@@ -8,30 +8,23 @@ test.beforeAll(() => {
   expect(process.env.STRIPE_SECRET_KEY, 'This spec requires Stripe to be unconfigured').toBeFalsy()
 })
 
-test('计费：未验证时显示免费额度和余额；Stripe 未配置时显示暂不可用', async ({ page }, testInfo) => {
+test('计费：Stripe 未配置时只显示状态，没有免费额度、余额和充值', async ({ page }, testInfo) => {
   await register(page, '/settings?section=billing')
-  const allowance = page.getByRole('region', { name: '免费额度' })
-  await expect(allowance.getByText('银行卡验证', { exact: true })).toBeVisible()
-  await expect(allowance.getByText('不扣款；验证后可免费使用 1 美元的')).toBeVisible()
-  await expect(allowance.getByRole('status')).toHaveText('暂不可用')
-  await expect(page.locator('[data-slot="balance"]')).toHaveText('0 点')
+  await expect(page.getByRole('status').filter({ hasText: '计费尚未开通。' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '免费额度' })).toHaveCount(0)
+  await expect(page.locator('[data-slot="balance"]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '充值', exact: true })).toHaveCount(0)
   await attachLightDark(page, testInfo, 'billing-unverified')
-  await page.getByRole('button', { name: '充值', exact: true }).click()
-  await page.getByRole('menuitem', { name: /\$10\.00 · 1,000 点/ }).click()
-  await expect(page.getByText('充值暂不可用')).toBeVisible()
 })
 
-test('计费：Stripe 未配置时返回仍显示暂不可用，已赠送的 $1 保留在余额', async ({ page }, testInfo) => {
+test('计费：Stripe 未配置时已赠送的 $1 仍显示在余额，但不能充值', async ({ page }, testInfo) => {
   await register(page, '/settings?section=billing')
-  await expect(page.getByRole('region', { name: '免费额度' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: '计费尚未开通。' })).toBeVisible()
   await seedHostedVerification(page, 1_000_000)
-  await page.goto(app('/settings?section=billing&verify=success&session_id=cs_test_fixture'))
-  const allowance = page.getByRole('region', { name: '免费额度' })
-  await expect(allowance.getByRole('status')).toHaveText('正在确认…')
-  await expect(allowance.getByRole('status')).toHaveText('暂不可用', { timeout: 25_000 })
-  await expect(page.getByText('银行卡已验证', { exact: true })).toHaveCount(0)
+  await page.reload()
   await expect(page.locator('[data-slot="balance"]')).toHaveText('100 点')
-  await expect(page).not.toHaveURL(/verify=|session_id=/)
+  await expect(page.getByRole('button', { name: '充值', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: '免费额度' })).toHaveCount(0)
   await attachLightDark(page, testInfo, 'billing-return-unavailable')
 })
 

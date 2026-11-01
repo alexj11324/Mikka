@@ -16,6 +16,7 @@ export async function listComposioAccountRecords(userId: string): Promise<Compos
     emailChecked: sql<boolean>`${composioAccounts.emailCheckedAt} is not null`,
     lastAttemptAt: composioAccounts.lastAttemptAt,
     isDefault: composioAccounts.isDefault,
+    needsReconnect: sql<boolean>`${composioAccounts.needsReconnectAt} is not null`,
   })
     .from(composioAccounts).where(eq(composioAccounts.userId, userId))
 }
@@ -48,6 +49,18 @@ export async function noteComposioEmailAttempt(userId: string, toolkit: string, 
   const now = new Date()
   await db.insert(composioAccounts).values({ accountId, userId, toolkit, lastAttemptAt: now })
     .onConflictDoUpdate({ target: composioAccounts.accountId, set: { lastAttemptAt: now, updatedAt: now }, setWhere: sql`${composioAccounts.userId} = ${userId}` })
+}
+
+/** The provider refused the person's authorization through this account: it shows as needing reconnection. */
+export async function markComposioNeedsReconnect(userId: string, toolkit: string, accountId: string, now = new Date()) {
+  await db.insert(composioAccounts).values({ accountId, userId, toolkit, needsReconnectAt: now })
+    .onConflictDoUpdate({ target: composioAccounts.accountId, set: { needsReconnectAt: now, updatedAt: now }, setWhere: sql`${composioAccounts.userId} = ${userId}` })
+}
+
+/** A read through this account worked again: it no longer needs reconnection. */
+export async function clearComposioNeedsReconnect(userId: string, accountId: string) {
+  await db.update(composioAccounts).set({ needsReconnectAt: null, updatedAt: new Date() })
+    .where(and(eq(composioAccounts.userId, userId), eq(composioAccounts.accountId, accountId), sql`${composioAccounts.needsReconnectAt} is not null`))
 }
 
 export async function forgetComposioAccount(userId: string, accountId: string) {

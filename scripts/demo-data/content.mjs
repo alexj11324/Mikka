@@ -171,7 +171,7 @@ export const RUNS = [
   { key: 'r-safari-analysis', issue: 'i-safari-blank', bot: 'frontend', agent: 'ag-claude', status: 'succeeded', minutesAgo: 60 * 8, minutes: 26,
     prompt: '分析 Safari 17 白屏的根因，写成文档', lastReply: '根因分析已提交为 Artifact。',
     chunks: [text('二分 v2.3.1..v2.3.2 的依赖变更：date-fns-tz 3.1 引入了 lookbehind。'), tool('a'), text('根因分析已提交为 Artifact。', 't2')], artifacts: ['a-safari-rca'] },
-  { key: 'r-release-notes', issue: 'i-sub-notes', bot: 'release', agent: 'ag-codex', status: 'succeeded', minutesAgo: 60 * 3, minutes: 6,
+  { key: 'r-release-notes', issue: null, bot: 'release', agent: 'ag-codex', status: 'succeeded', minutesAgo: 60 * 3, minutes: 6,
     prompt: '起草 v2.4 发版说明', lastReply: '草稿已提交为 Artifact。',
     chunks: [text('汇总 v2.3.2 以来合入的 23 个 PR。'), tool('a'), text('草稿已提交为 Artifact。', 't2')], artifacts: ['a-release-notes'] },
   { key: 'r-rate-limit-cancel', issue: 'i-rate-limit', bot: 'backend', agent: 'ag-codex', status: 'cancelled', minutesAgo: 60 * 26, minutes: 3,
@@ -202,11 +202,11 @@ export const FACTS = [
 
 /** 建议 rows, dated more than a day back so the 08:00 briefing never picks them up. */
 export const SUGGESTIONS = [
-  { key: 's-review', source: 'github', action: 'review', title: 'fix(stripe): verify webhook against raw body', actionTitle: '评审陈予的 PR：Stripe webhook 签名校验', actor: '陈予', level: 'high', required: true, hoursAgo: 26, url: 'https://github.com/qingning-tech/ledger-api/pull/216' },
-  { key: 's-linear', source: 'linear', action: 'handle', title: 'iOS 2.4.0 在 iOS 16 冷启动崩溃', actionTitle: '处理分配给你的问题：iOS 16 冷启动崩溃', actor: '赵一鸣', level: 'critical', required: true, hoursAgo: 28, url: null },
-  { key: 's-slack', source: 'slack', action: 'reply', title: 'v2.4 周五能上吗？市场那边周六要发公众号', actionTitle: '回复周宁：v2.4 能否周五上线', actor: '周宁', level: 'ask', required: false, hoursAgo: 31, url: null },
-  { key: 's-gmail', source: 'gmail', action: 'reply', title: '【投诉】这个月被扣了两次会员费', actionTitle: '回复客户禾木咖啡：重复扣费投诉', actor: '禾木咖啡 张老板', level: 'high', required: false, hoursAgo: 40, url: null },
-  { key: 's-notion', source: 'notion', action: 'read', title: 'Q4 产品路线图有 3 条新评论', actionTitle: '看 Q4 路线图的新评论', actor: '王蕾', level: 'normal', required: false, hoursAgo: 75, url: null },
+  { key: 's-review', source: 'github', action: 'review', title: 'fix(stripe): verify webhook against raw body', actionTitle: '评审 陈予的 PR：Stripe webhook 签名校验', actor: '陈予', level: 'high', required: true, hoursAgo: 26, url: 'https://github.com/qingning-tech/ledger-api/pull/216' },
+  { key: 's-linear', source: 'linear', action: 'handle', title: 'iOS 2.4.0 在 iOS 16 冷启动崩溃', actionTitle: '处理 赵一鸣分配的问题：iOS 16 冷启动崩溃', actor: '赵一鸣', level: 'critical', required: true, hoursAgo: 28, url: null },
+  { key: 's-slack', source: 'slack', action: 'reply', title: 'v2.4 周五能上吗？市场那边周六要发公众号', actionTitle: '回复 周宁：v2.4 能否周五上线，周六要发公众号', actor: '周宁', level: 'ask', required: false, hoursAgo: 31, url: null },
+  { key: 's-gmail', source: 'gmail', action: 'reply', title: '【投诉】这个月被扣了两次会员费', actionTitle: '回复 禾木咖啡：重复扣费，今天给退款结果', actor: '禾木咖啡 张老板', level: 'high', required: false, hoursAgo: 40, url: null },
+  { key: 's-notion', source: 'notion', action: 'read', title: 'Q4 产品路线图有 3 条新评论', actionTitle: '查看 Q4 路线图的 3 条新评论', actor: '王蕾', level: 'normal', required: false, hoursAgo: 75, url: null },
 ]
 
 /** What each bot remembers (coordinator_sessions.memory, Markdown lines). */

@@ -24,6 +24,7 @@ import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type Con
 import type { StoreApp, StoreCatalog } from '@/lib/plugins/catalog'
 import type { AppDetail, AppTool } from '@/lib/plugins/app-detail'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
+import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
 import { cn } from '@/lib/utils'
 
 /** Any store toolkit's account (lib/composio-accounts). */
@@ -151,13 +152,8 @@ export function useConnectedApps(enabled = true) {
 
   const refresh = async () => { if (enabled) await mutate() }
 
-  // Back from the connect callback in the browser: re-read at once, not after SWR's focus throttle.
-  useEffect(() => {
-    if (!enabled) return
-    const onFocus = () => { void mutate() }
-    window.addEventListener('focus', onFocus)
-    return () => { window.removeEventListener('focus', onFocus) }
-  }, [enabled, mutate])
+  // A connect that finished in the system browser: read once on the way back, never on plain focus.
+  const checkOnReturn = useCheckOnReturn(() => { void refresh() })
 
   useEffect(() => {
     if (!enabled) return
@@ -177,7 +173,7 @@ export function useConnectedApps(enabled = true) {
       // read, so on the desktop it still starts in the browser (#601).
       if ('accountId' in body) {
         const handoff = await openCurrentPageInBrowser()
-        if (handoff === 'desktop') return
+        if (handoff === 'desktop') { checkOnReturn(); return }
         if (handoff === 'unsupported') { setError(t('browserUpdateRequired')); return }
       }
       const response = await fetch(integrationPath, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, returnTo: currentReturnPath() }) })
@@ -185,7 +181,9 @@ export function useConnectedApps(enabled = true) {
       const redirect = response.ok ? composioConnectRedirect(result.redirectUrl) : null
       if (!redirect) throw new Error()
       // The desktop shell sends any off-origin navigation to the system browser
-      // and stays here; the list re-reads on focus once the callback is done.
+      // and stays here; the list reads once when the person comes back. On the web
+      // this page navigates away and the callback lands on a fresh mount.
+      checkOnReturn()
       window.location.assign(redirect.href)
     } catch {
       setError(t('connectFailed'))
@@ -370,7 +368,8 @@ function AppTools({ tools }: { tools: AppDetail['tools'] }) {
   </section>
 }
 
-function ToolGroup({ label, tools }: { label: string; tools: AppTool[] }) {
+/** One collapsible 写入 / 读取 card; `control` puts a tool's own setting at the right of its row. */
+export function ToolGroup({ label, tools, control, uniformRows = false }: { label: string; tools: AppTool[]; control?: (tool: AppTool) => ReactNode; uniformRows?: boolean }) {
   const [open, setOpen] = useState(true)
   return <Collapsible open={open} onOpenChange={setOpen} className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/5">
     <CollapsibleTrigger render={<Button type="button" variant="ghost" className="h-auto w-full justify-between rounded-none px-5 py-3 font-medium hover:bg-muted/50" />}>
@@ -378,9 +377,12 @@ function ToolGroup({ label, tools }: { label: string; tools: AppTool[] }) {
     </CollapsibleTrigger>
     <CollapsibleContent>
       <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto pb-3">
-        {tools.map(tool => <li key={tool.slug} className="flex flex-col gap-0.5 px-5 py-1.5">
-          <span className="text-sm">{tool.name}</span>
-          {tool.description && <span className="text-xs text-muted-foreground">{tool.description}</span>}
+        {tools.map(tool => <li key={tool.slug} className={cn('flex items-center gap-3 px-5 py-1.5', uniformRows && 'min-h-11')}>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-sm">{tool.name}</span>
+            {tool.description && <span className="text-xs text-muted-foreground">{tool.description}</span>}
+          </div>
+          {control?.(tool)}
         </li>)}
       </ul>
     </CollapsibleContent>

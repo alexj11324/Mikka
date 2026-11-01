@@ -138,24 +138,26 @@ test('subscription provenance is copied across retries and participates in the d
 })
 test('cloud queue captures exact worker and parent snapshot in the same transaction as binding',async()=>{
  const calls:{sql:string,args:unknown[]}[]=[]
- const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Cloud review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Cloud review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
  await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'synthetic',execution:parent})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string);assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(snapshot.parent.executionId,parent.id);assert.equal(calls.at(-1)!.sql,'COMMIT');assert.ok(calls.some(c=>c.sql.startsWith('INSERT INTO computer_run_bindings')))
 })
 
 
-test('feature-off cloud queue keeps the existing main SQL path without snapshot or binding lookup',async()=>{
+test('with versioned definitions off, a cloud run still freezes its Agent and credential source',async()=>{
+ // Every cloud run freezes its definition when it is queued (orchestration.md § 5), with or without a model in the request.
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
- const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});return {rows:sql.startsWith('SELECT m.')?[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]:[]}}}
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:''})
- assert.ok(!calls.some(c=>c.sql.includes('agentDefinition')||c.sql.startsWith('select id from byos_bindings')));assert.equal(calls.at(-1)!.sql,'COMMIT')
+ const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string)
+ assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
 })
 test('an automatic rule model stays automatic with versioned definitions disabled',async()=>{
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
- const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
+ const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:'auto'})
  const insert=calls.find(call=>call.sql.startsWith('INSERT INTO agent_runs'))!
  const snapshot=JSON.parse(insert.args[9] as string)
@@ -181,9 +183,34 @@ test('a scoped device credential cannot claim a different device even for the sa
 
 
 test('repository push approval composes with CLI limits without broadening unrelated actions', async () => {
- cliPolicy.permissions.git_push='ask'
+ cliPolicy.permissions.git_push='allow'
  const approved=await request();assert.equal(approved.status,200);const accepted=await approved.json()
  assert.equal(accepted.policy.permissions.git_push,'allow');assert.equal(accepted.policy.permissions.network,'deny');assert.equal(accepted.policy.permissions.install_dependency,'deny');assert.equal(accepted.policyRevision,'a'.repeat(64))
- selectIndex=0;cliPolicy.permissions.git_push='allow';publicationPolicy.permissions.git_push='ask'
- const pending=await request();assert.equal(pending.status,200);assert.equal((await pending.json()).policy.permissions.git_push,'ask')
+ selectIndex=0;cliPolicy.permissions.git_push='allow';publicationPolicy.permissions.git_push='deny'
+ const pending=await request();assert.equal(pending.status,200);assert.equal((await pending.json()).policy.permissions.git_push,'deny','a local run never receives ask: no push card')
+})
+
+test('a cloud claim without a push admission denies the push, never asks', async () => {
+ cloud=true;cliPolicy.permissions.git_push='allow'
+ const response=await request();assert.equal(response.status,200);const body=await response.json()
+ assert.equal(prepared.mock.callCount(),0)
+ assert.equal(body.policy.permissions.git_push,'deny');assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny')
+ assert.equal(cliPolicy.permissions.git_push,'allow','the stored CLI policy is unchanged')
+})
+
+test('a cloud run admitted with the GitHub App grant gets its publication and allow, like a local run', async () => {
+ cloud=true;cliPolicy.permissions.git_push='allow'
+ definition={...frozen(),repositoryAdmission:{userId:owner,issueId,deviceId,agentId,remoteKey:'v2/github.com/example/repo',remoteUrl:'https://github.com/example/repo.git',permission:'push_to_origin',targetBranch:'mikka/mik-1',authority:'github_app',approvedAt:'2026-11-01T00:00:00Z',acceptedAt:'2026-11-01T00:00:00Z'}}
+ const response=await request();assert.equal(response.status,200);const body=await response.json()
+ assert.equal(prepared.mock.callCount(),1,'the admitted cloud run reserves its publication before the lease')
+ assert.equal(body.pushBranch,publicationAssignment.pushBranch)
+ assert.equal(body.policy.permissions.git_push,'allow')
+})
+
+test('a read-only local run gets no push branch and a read-only policy, whatever git_push says', async () => {
+ definition={...frozen(),readOnly:true};cliPolicy.permissions.git_push='allow'
+ const response=await request();assert.equal(response.status,200);const body=await response.json()
+ assert.equal(prepared.mock.callCount(),0,'a read-only run reserves no publication')
+ assert.equal(body.pushBranch,undefined);assert.equal(body.github,undefined)
+ assert.equal(body.policy.readOnly,true);assert.equal(body.policy.permissions.git_push,'deny')
 })

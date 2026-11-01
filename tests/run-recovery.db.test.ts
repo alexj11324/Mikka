@@ -25,14 +25,15 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     await (await import('../lib/db')).pool.end()
   })
   const now = new Date()
-  async function fixture(attempt = 1, definition: unknown = null) {
+  // The other device has 允许自动调度 on unless a test says otherwise (decision 2026-10-31-2200-run-machine-fallback).
+  async function fixture(attempt = 1, definition: unknown = null, otherAutoSchedule = true) {
     const userId = `recovery-${randomUUID()}`, issueId = randomUUID(), agentId = randomUUID()
     const deviceId = randomUUID(), otherDeviceId = randomUUID(), repoId = randomUUID(), id = randomUUID()
     const remote = 'https://github.com/isolated/recovery-fixture.git'
     await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
     await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,\'Recovery fixture\',\'{}\',\'todo\',\'normal\')', [issueId, userId])
-    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt","protocolVersion") VALUES ($1,$3,\'Old device\',\'local\',true,$4,$5,$6),($2,$3,\'New device\',\'local\',true,$4,$7,$6)',
-      [deviceId, otherDeviceId, userId, JSON.stringify([{ harness: 'codex', installed: true }]), new Date(now.getTime() - 600_000), DAEMON_PROTOCOL_VERSION, now])
+    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt","protocolVersion","autoSchedule") VALUES ($1,$3,\'Old device\',\'local\',true,$4,$5,$6,NULL),($2,$3,\'New device\',\'local\',true,$4,$7,$6,$8)',
+      [deviceId, otherDeviceId, userId, JSON.stringify([{ harness: 'codex', installed: true }]), new Date(now.getTime() - 600_000), DAEMON_PROTOCOL_VERSION, now, otherAutoSchedule])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Recovery worker\')', [agentId, userId, deviceId])
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, deviceId, userId, remoteKey(remote), remote])
     await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,attempt,"leaseExpiresAt","agentDefinition") VALUES ($1,$2,$3,$4,$5,$6,\'running\',\'Controlled recovery fixture\',$7,$8,$9)',
@@ -70,6 +71,33 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     assert.equal(Boolean(await verifyRunToken(new Request('http://localhost/mikka/api/mcp'), fresh.token)), true)
   })
 
+  await t.test('ending runs inside transactions that hold every app connection needs no second connection', async () => {
+    // Each ending keeps its transaction open while it records the event; the event's
+    // credential check must read through that transaction, or a full pool stalls every one.
+    const { db, pool: appPool } = await import('../lib/db')
+    const { recordCoordinatorEvent } = await import('../lib/coordinator-event-store')
+    const { runFinishedEvent } = await import('../lib/coordinator-events')
+    const { agentRuns } = await import('../lib/db/schema')
+    const { eq } = await import('drizzle-orm')
+    const size = appPool.options.max ?? 10
+    const runs = await Promise.all(Array.from({ length: size }, () => fixture()))
+    let holding = 0
+    let release!: () => void
+    const full = new Promise<void>(resolve => { release = resolve })
+    const endings = Promise.all(runs.map(run => db.transaction(async tx => {
+      await tx.update(agentRuns).set({ status: 'failed' }).where(eq(agentRuns.id, run.id))
+      if (++holding === size) release()
+      await full
+      await recordCoordinatorEvent(tx, runFinishedEvent({ id: run.id, userId: run.userId, issueId: null, kind: 'run', status: 'failed', stopReason: 'device_lost' }))
+    })))
+    let timer: NodeJS.Timeout | undefined
+    const stalled = new Promise<'stalled'>(resolve => { timer = setTimeout(() => resolve('stalled'), 5000) })
+    try { assert.notEqual(await Promise.race([endings, stalled]), 'stalled', 'an ending waited for a second connection from a full pool') }
+    finally { clearTimeout(timer); await endings.catch(() => undefined) }
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM coordinator_events WHERE kind=\'run_finished\' AND "runId"=ANY($1)', [runs.map(run => run.id)])
+    assert.equal(rows[0].n, size)
+  })
+
   await t.test('STOP arriving during target lookup cannot create a new retry', async () => {
     const run = await fixture()
     await locked(async blocker => {
@@ -100,14 +128,33 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [run.id])).rows[0].status, 'running')
   })
 
-  await t.test('a pinned retry still ends after the existing thirty-minute queue bound', async () => {
-    const run = await fixture()
+  await t.test('a retry queued on an offline device ends at once with the card when no other machine may take it', async () => {
+    const run = await fixture(1, null, false)
     await pool.query('UPDATE agent_runs SET status=\'failed\' WHERE id=$1', [run.id])
     const retryId = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,attempt,"retryOf","createdAt","agentDefinition") SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId",\'queued\',prompt,2,id,$3,$4 FROM agent_runs WHERE id=$1',
-      [run.id, retryId, new Date(now.getTime() - 31 * 60_000), JSON.stringify({ pinnedDeviceId: run.deviceId })])
+      [run.id, retryId, now, JSON.stringify({ pinnedDeviceId: run.deviceId })])
     await reclaimLostRuns(run.userId, now)
-    assert.equal((await pool.query('SELECT status,error FROM agent_runs WHERE id=$1', [retryId])).rows[0].status, 'failed')
+    assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [retryId])).rows[0].status, 'failed', 'nothing waits on an offline device')
+    const event = (await pool.query('SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind=\'run_finished\'', [retryId])).rows[0]
+    // 没有可用的电脑 is the same two rows whatever devices there are (Alex): 连接电脑 and 填入 E2B Key.
+    assert.deepEqual(event.payload.noMachine.options.map((option: { action: string }) => option.action), ['connectServer', 'e2bKey'])
+  })
+
+  await t.test('a lost run with no cloud and no auto-schedule device ends with the card instead of a retry', async () => {
+    const run = await fixture(1, null, false)
+    await reclaimLostRuns(run.userId, now)
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "retryOf"=$1', [run.id])).rows[0].n, 0)
+    assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [run.id])).rows[0].status, 'failed')
+    const event = (await pool.query('SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind=\'run_finished\'', [run.id])).rows[0]
+    assert.ok(event.payload.noMachine, 'the bot gets the card of what the person can do')
+  })
+
+  await t.test('a run handed to another device records where it went', async () => {
+    const run = await fixture()
+    await reclaimLostRuns(run.userId, now)
+    const event = (await pool.query('SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind=\'run_retried\'', [run.id])).rows[0]
+    assert.deepEqual(event.payload.movedTo, { kind: 'device', deviceId: run.otherDeviceId })
   })
 
   await t.test('STOP wins over a retry-cap ending and over an offline queued takeover', async () => {

@@ -78,6 +78,13 @@ test('stored emails and the chosen default are joined per toolkit', () => {
   assert.deepEqual(fallback.filter(item => item.isDefault).map(item => item.id), ['n1'])
 })
 
+test('an account the provider refused shows as expired, so the list offers a reconnect', () => {
+  const view = (id: string, status: string) => toConnectedAccountView({ ...account, id, status, toolkit: { slug: 'notion' }, createdAt: '2026-10-01T00:00:00Z' })!
+  const record = (accountId: string, needsReconnect: boolean) => ({ accountId, email: null, emailChecked: true, lastAttemptAt: null, isDefault: false, needsReconnect })
+  const joined = withAccountRecords([view('refused', 'ACTIVE'), view('fine', 'ACTIVE'), view('failed', 'FAILED')], [record('refused', true), record('fine', false), record('failed', true)])
+  assert.deepEqual(joined.map(item => [item.id, item.status]), [['refused', 'EXPIRED'], ['fine', 'ACTIVE'], ['failed', 'FAILED']], "Composio's own status wins when it is not ACTIVE")
+})
+
 test('only a plain email address is kept', () => {
   assert.equal(sanitizeEmail(' Alex@Example.COM '), 'alex@example.com')
   assert.equal(sanitizeEmail('a.b+tag@mail.example.co'), 'a.b+tag@mail.example.co')

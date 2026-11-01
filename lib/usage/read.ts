@@ -9,6 +9,11 @@ import { requireWorkspace } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { monthBounds, monthDays } from './month'
 
+/**
+ * `threads` counts the threads a bot started in the month (the 新线程 column and the
+ * daily bars); `seconds` is run time spent in the month, so a thread that started
+ * last month and ran on adds time with no new thread.
+ */
 export interface UsageRow { id: string; name: string; threads: number; seconds: number }
 export interface BotUsageRow extends UsageRow { color: string; shape: string; ownerId: string }
 export interface WorkspaceUsage {

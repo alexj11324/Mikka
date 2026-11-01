@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
+import type { DecisionAnswer, DecisionQuestion } from '../coordinator/decision'
 
 // R-73: a profile belongs to one person. Teammates in the same workspace never
 // see, delete or correct each other's facts; repeats merge; corrections stick.
@@ -106,14 +107,17 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
     // nightly merge reads every user. Only this test's people count; anyone else is treated as not entitled.
     const mine = new Set([alex, dana, outsider])
     const entitled = async (userId: string) => mine.has(userId) && userId !== outsider
-    const first = await store.consolidateDueFacts({ entitled, now: morning })
+    // The Decision API is mocked (no network): it says yes to every interest pattern and leaves the rest unanswered.
+    const decider = () => async (_input: string, questions: DecisionQuestion[]) => new Map<string, DecisionAnswer>(questions.flatMap(question =>
+      question.type === 'choice' && question.choices.some(choice => choice.value === 'interest') ? [[question.name, { type: 'choice' as const, name: question.name, choice: 'interest' }]] : []))
+    const first = await store.consolidateDueFacts({ entitled, now: morning, decider })
     assert.equal(first.written, 1, 'only Alex: Dana has 记忆 off, the outsider is not entitled')
-    assert.ok((await store.listFacts(alex)).some(item => item.kind === 'interest' && item.subject === '川菜'), 'scattered purchases become an interest')
+    assert.ok((await store.listFacts(alex)).some(item => item.kind === 'interest' && item.subject === '川菜'), 'scattered purchases become an interest when the Decision API says so')
     assert.equal((await store.listFacts(dana)).some(item => item.subject === '川菜'), false)
     const [settings] = await db.select().from(schema.userFactConsolidations).where(eq(schema.userFactConsolidations.userId, alex))
     assert.equal(settings.consolidatedOn, '2026-10-28')
     assert.equal((await db.select().from(schema.userFactConsolidations).where(eq(schema.userFactConsolidations.userId, outsider))).length, 0, 'not entitled: not merged or claimed')
-    const again = await store.consolidateDueFacts({ entitled, now: morning })
+    const again = await store.consolidateDueFacts({ entitled, now: morning, decider })
     assert.equal(again.written, 0, 'once per local day')
     assert.equal(again.due - again.skipped, 0, 'whoever is still due is skipped (the outsider and other suites\' users), nobody is merged twice')
     assert.equal((await db.select().from(schema.userFactConsolidations).where(eq(schema.userFactConsolidations.userId, outsider))).length, 0, 'the outsider stays unclaimed')

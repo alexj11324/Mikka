@@ -4,6 +4,7 @@ import { AppWindow, ChevronRight, FileText, type LucideProps } from 'lucide-reac
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
+import { HarnessMark } from '@/components/labels/entity-labels'
 import type { ArtifactSummary, ArtifactVersionInfo } from '@/lib/artifacts/types'
 import type { ArtifactKind } from '@/lib/db/schema'
 import { cn } from '@/lib/utils'
@@ -13,8 +14,9 @@ export function ArtifactKindIcon({ kind, ...props }: { kind: ArtifactKind } & Lu
   return <Icon aria-hidden="true" {...props} />
 }
 
-/** The bot that wrote a version, as its bloub; a name with no bot gets a steady colour from the name. */
-export function ArtifactAuthorAvatar({ author, size = 'row' }: { author: Pick<ArtifactVersionInfo, 'authorName' | 'authorColor' | 'authorShape'>; size?: 'row' | 'pill' }) {
+/** Who wrote a version: a run's Agent by its mark (R-78); a bot as its bloub; a name with no bot gets a steady colour from the name. */
+export function ArtifactAuthorAvatar({ author, size = 'row' }: { author: Pick<ArtifactVersionInfo, 'authorName' | 'authorColor' | 'authorShape' | 'authorHarness'>; size?: 'row' | 'pill' }) {
+  if (author.authorHarness) return <span className={cn('flex shrink-0 items-center justify-center', size === 'row' ? 'size-4' : 'size-5.5')}><HarnessMark harness={author.authorHarness} /></span>
   return <BotAvatar color={author.authorColor ?? colorFor(author.authorName)} shape={author.authorShape} size={size} still />
 }
 

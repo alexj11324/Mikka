@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, browserClientHeaders, watchRuntime, app, BASE_PATH } from './fixtures'
+import { test, expect, register, registerInTeam, browserClientHeaders, watchRuntime, app, BASE_PATH } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
 // V10 常规 and S-I 删除工作区 (Figma 551:7960, 551:9716) against the real backend.
@@ -48,7 +48,7 @@ test('管理员可以改名、改地址并删除工作区', async ({ page }, tes
 
 // 转让工作区 (Alex: 常规 fully wired) and S-P: a member reads 常规 as plain values.
 test('成员只读常规；所有者把工作区转让给成员后，转让按钮跟着所有者走', async ({ page, browser, baseURL }, testInfo) => {
-  await register(page, '/settings/members')
+  await registerInTeam(page, '/settings/members')
   await page.getByRole('button', { name: '邀请成员', exact: true }).click()
   const invite = page.getByRole('dialog', { name: '邀请成员', exact: true })
   const email = `member-${randomUUID()}@example.com`

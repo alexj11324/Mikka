@@ -33,8 +33,9 @@ const UNBUILT = ['developer']
 test('members do not see admin-only sections; admins see every built one', () => {
   const member = visibleSettingsSections({ admin: false }).map(s => s.id)
   assert.equal(member.includes('permissions'), false)
-  for (const id of ['general', 'members', 'teams', 'computers', 'usage']) assert.equal(member.includes(id), true, id)
-  for (const id of ['secrets', 'audit', 'billing']) assert.equal(member.includes(id), false, id)
+  // 计费: members see 付款 only (their card designation and credit share; C19).
+  for (const id of ['general', 'members', 'teams', 'computers', 'usage', 'billing']) assert.equal(member.includes(id), true, id)
+  for (const id of ['secrets', 'audit']) assert.equal(member.includes(id), false, id)
   assert.deepEqual(visibleSettingsSections({ admin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id)).map(s => s.id))
 })
 
@@ -55,4 +56,13 @@ test('sidebar names follow Figma 设置 v4 in the English search titles', () => 
 test('a current id wins over a legacy alias with the same name', () => {
   assert.equal(resolveSettingsSection('/settings', 'account'), 'account')
   assert.equal(resolveSettingsSection('/settings', 'profile'), 'account')
+})
+
+test('a personal workspace hides 成员, 团队权限 and 审计日志; a team workspace keeps them', () => {
+  // Decision 2026-10-31-2130: a personal workspace has exactly one member.
+  const personal = visibleSettingsSections({ admin: true, personal: true }).map(s => s.id)
+  for (const id of ['members', 'permissions', 'audit']) assert.equal(personal.includes(id), false, id)
+  for (const id of ['account', 'models', 'general', 'bots', 'usage', 'billing']) assert.ok(personal.includes(id), id)
+  const team = visibleSettingsSections({ admin: true }).map(s => s.id)
+  for (const id of ['members', 'permissions', 'audit']) assert.ok(team.includes(id), id)
 })

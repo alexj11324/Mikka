@@ -21,12 +21,6 @@ export const LEASED_RUN_STATUSES = ['preparing', 'running', 'paused', 'waiting_i
 /** First run plus retries. */
 export const MAX_RUN_ATTEMPTS = 3
 
-/**
- * How long a retry may wait in the queue for its offline device before it
- * goes to the person instead.
- */
-export const RETRY_QUEUE_WAIT_MS = 30 * 60_000
-
 const RETRY_HEADING = '## This run is a retry'
 
 /**
@@ -50,6 +44,24 @@ export function retryPrompt(prompt: string, attempt: number): string {
   return `${base.slice(0, 100_000 - note.length - 2)}\n\n${note}`
 }
 
+const QUOTA_HEADING = '## This run continues after a usage limit'
+
+/** What a run that goes on after its subscription's quota ran out is told. */
+export function quotaContinuationNote(): string {
+  return [
+    QUOTA_HEADING,
+    'The previous run stopped because its subscription\'s usage limit ran out, not because of anything it did.',
+    'Its work is usually still here: check the files and `git status` first and continue from them. Do not repeat a push, a pull request or a message that already happened.',
+  ].join('\n\n')
+}
+
+/** The continuation's brief: the original one, with that note instead of any earlier one. */
+export function quotaContinuationPrompt(prompt: string): string {
+  const base = prompt.split(`\n\n${RETRY_HEADING}`)[0].split(`\n\n${QUOTA_HEADING}`)[0]
+  const note = quotaContinuationNote()
+  return `${base.slice(0, 100_000 - note.length - 2)}\n\n${note}`
+}
+
 export type LostRunOutcome =
   | { kind: 'retry'; attempt: number }
   | { kind: 'stopped' }
@@ -68,8 +80,8 @@ export function lostRunOutcome(run: { attempt: number; stopRequestedAt: Date | n
   return { kind: 'retry', attempt: run.attempt + 1 }
 }
 
-/** The error on a retry that waited too long for its device. */
-export const DEVICE_STAYED_OFFLINE = 'The device stayed offline, so the retry could not start.'
+/** The error on a run whose machine went offline when no other machine can continue it. */
+export const DEVICE_STAYED_OFFLINE = 'The machine went offline and no other machine can continue the run.'
 
 export { remoteKey } from '@mikka/protocol/repository'
 

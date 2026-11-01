@@ -12,8 +12,7 @@ export function approvedWriteDecisionEvent(proposal: StoredWriteProposal, result
     if (result.outcome.url) outcome.url = result.outcome.url
   }
   return {
-    ...actionDecidedEvent({ id: proposal.id, userId: proposal.userId, action: proposal.action, input: proposal.input }, { status: result.status, error: result.error, outcome }),
-    botId: binding.success ? binding.data.run?.botId ?? null : null,
+    ...actionDecidedEvent({ id: proposal.id, userId: proposal.userId, action: proposal.action, input: proposal.input }, { status: result.status, error: result.error, outcome }, { botId: binding.success ? binding.data.run?.botId ?? null : null }),
     dedupeKey: `approved_write_decided:${proposal.id}:${result.status}`,
   }
 }

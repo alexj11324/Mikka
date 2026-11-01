@@ -20,10 +20,9 @@ export const CHATS = {
     user([{ type: 'text', text: '这是客户发来的截图' }, { type: 'file', mediaType: 'image/png', data: PIXEL }]),
     bot('和我复现的一致。线程那边 CI 上 WebKit 没装上，失败了；根因我已经确认，写在 Artifact 里：[[artifact:{{artifact:a-safari-rca}}]]\n\n先发一个热修：把 `date-fns-tz` 锁回 3.0.1。\n\n```diff\n-    "date-fns-tz": "^3.1.0",\n+    "date-fns-tz": "3.0.1",\n```'),
     user('这周前端的 PR 都什么状态'),
-    bot(`root = Stack([title, table, follow])
+    bot(`root = Stack([title, table])
 title = TextContent("ledger-web 本周 PR", "large-heavy")
-table = BeTable(["PR", "标题", "作者", "状态"], [["#488", "去掉 components/ui 的 barrel 导入", "前端助手", "CI 中"], ["#485", "导出 CSV 加 UTF-8 BOM", "前端助手", "待评审"], ["#479", "隐私政策链接 404", "王蕾", "已合并"], ["#471", "首页预加载首图、字体子集化", "前端助手", "已合并"]])
-follow = BeFollowUps([{label: "#485 谁来评审？", prompt: "#485 现在等谁评审？能不能今天合？"}, {label: "#488 能快多少？", prompt: "#488 合进去之后 CI 构建时间能降到多少？"}])`),
+table = BeTable(["PR", "标题", "作者", "状态"], [["#488", "去掉 components/ui 的 barrel 导入", "前端助手", "CI 中"], ["#485", "导出 CSV 加 UTF-8 BOM", "前端助手", "待评审"], ["#479", "隐私政策链接 404", "王蕾", "已合并"], ["#471", "首页预加载首图、字体子集化", "前端助手", "已合并"]])`),
     user('#485 改了什么'),
     bot(`root = Stack([intro, diff, note])
 intro = InlineText(["修 ", TaskChip("{{issue:i-csv-garbled}}"), "：Windows Excel 打开没有 BOM 的 CSV 会按 GBK 解析。见 ", SourceChip("https://github.com/qingning-tech/ledger-web/pull/485", "PR #485"), "。"])
@@ -73,7 +72,7 @@ list = BeTodoList("建议跟进", [{id: "1", title: "给白屏期间流失的试
     user('哪些功能用得最多'),
     bot(`root = Stack([area, card])
 area = AreaChart(["第 41 周", "第 42 周", "第 43 周", "第 44 周"], [{name: "记账", values: [52100, 53800, 55200, 54900]}, {name: "开发票", values: [8200, 8900, 9600, 11800]}, {name: "导出报表", values: [3100, 3300, 3500, 3700]}], "次")
-card = BeCard("观察", [TextContent("开发票增长最快，第 44 周环比 +23%，和发票模板灰度时间吻合。导出报表平稳。"), Separator(), Tag("发票模板", null, "sm", "success"), Tag("需关注：导出报表慢", null, "sm", "warning")], "数据来自产品埋点，按周统计")`),
+card = BeCard("观察", [TextContent("开发票增长最快，第 44 周环比 +23%，和发票模板灰度时间吻合。导出报表平稳。"), Separator(), Stack([Tag("发票模板", null, "sm", "success"), Tag("需关注：导出报表慢", null, "sm", "warning")], "row")], "数据来自产品埋点，按周统计")`),
     user('把重复扣费的客户名单拉一下'),
     bot('10 月因 Stripe webhook 重放导致重复扣费的客户共 **3 家**：禾木咖啡、北岸花艺、小满烘焙，合计 597 元。退款单已经准备好，等你确认后由客服助手发邮件说明。'),
   ],

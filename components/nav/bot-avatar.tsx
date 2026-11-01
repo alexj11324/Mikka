@@ -8,7 +8,7 @@ export { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotC
 
 /**
  * What the bot is doing, as bloub states (Figma 196:3571): 空闲 idle (it plays
- * its own animations), 工作中 thinking, 等你处理 notify, 完成 wink, 出错
+ * its own animations), 工作中 thinking (its own body, blinking), 等你处理 notify, 完成 wink, 出错
  * exclaim, 离线 sleep.
  * The rest are one-off moves (wide eyes, play, the hexagon pose, and the
  * burst, orbit and comet effects) for moments like the first-run guide; they
@@ -60,17 +60,28 @@ if (typeof window !== 'undefined') void loadRuntime()
 /**
  * Idle plays bloub's own animations on its own, with no cursor following
  * (Alex: 「它自己动就行了」): short rests (bloub blinks by itself) between the
- * shape changes, glances and effects. The status states (thinking, notify,
- * exclaim, sleep) stay out, so they keep meaning 工作中 / 等你处理 / 出错 / 离线.
+ * shape changes, glances and effects. Every block keeps the bot's outline at
+ * full size: comet and burst shrink the body to a dot (0.13 and 0.17 of its
+ * radius), which read as an avatar that had not loaded (R-36), so they stay
+ * one-off moves. The status states (thinking, notify, exclaim, sleep) stay
+ * out, so they keep meaning 工作中 / 等你处理 / 出错 / 离线.
  * Other moods hold their state.
  */
 const IDLE_MONTAGE = [
   ['idle', 3], ['egg', 1.8], ['idle', 2.5], ['wink', 1.6], ['idle', 2.5], ['hexagon', 1.6],
   ['idle', 2.5], ['wide', 1.8], ['idle', 2.5], ['play', 2], ['idle', 2.5], ['orbit', 3.4],
-  ['idle', 2.5], ['comet', 2.6], ['idle', 2.5], ['burst', 2.4],
 ] as const
 
+/**
+ * bloub's thinking pose swaps the body for three dots, so a working bot lost
+ * its shape and colour and read as a spinner. Working keeps the bot's own
+ * body and only blinks and widens its eyes; the row's green dot says it is
+ * working (R-36).
+ */
+const WORKING = [['idle', 2.5], ['wide', 1.8]] as const
+
 function cycleFor(bloub: Runtime[0], mood: BotMood, brisk: boolean) {
+  if (mood === 'thinking') return WORKING.map(([state, seconds]) => ({ state, duration: bloub.clampDuration(state, seconds) }))
   if (BOT_MOVES.has(mood) || brisk && mood !== 'idle') return [{ state: mood, duration: bloub.clampDuration(mood, BOT_MOOD_SECONDS[mood]) }]
   if (mood !== 'idle') return [{ state: mood, duration: 12 }]
   return IDLE_MONTAGE.map(([state, seconds]) => ({ state, duration: bloub.clampDuration(state, seconds) }))
@@ -100,7 +111,7 @@ function blockAt(cycle: { duration: number }[], phase: number) {
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /** Visible blob sizes. bloub's svg is 1.58× the blob, so it overflows its box on purpose. */
-const SIZES = { row: 16, pill: 22, search: 28, list: 34, cell: 40, profile: 72, hero: 144 } as const
+const SIZES = { row: 16, pill: 22, message: 24, search: 28, list: 34, cell: 40, profile: 72, hero: 144 } as const
 const SVG_SCALE = 1.58
 
 const pick = <T extends string>(value: string | null | undefined, options: readonly T[], fallback: T) => (options as readonly string[]).includes(value ?? '') ? value as T : fallback
@@ -192,6 +203,6 @@ export function BotAvatar({ color, shape, size = 'list', mood = 'idle', label, s
   return <span ref={host} role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} data-slot="bot-avatar" data-color={tone} data-shape={form}
     className={cn('relative inline-flex shrink-0 [&>svg]:absolute [&>svg]:top-1/2 [&>svg]:left-1/2 [&>svg]:max-w-none [&>svg]:-translate-1/2',
       // Buttons and sidebar rows size every svg inside them; the blob's svg keeps its own size (1.58× the box).
-      size === 'row' && 'size-4 [&>svg]:size-6.5!', size === 'pill' && 'size-5.5 [&>svg]:size-9!', size === 'search' && 'size-7 [&>svg]:size-11!', size === 'list' && 'size-8.5 [&>svg]:size-13.5!',
+      size === 'row' && 'size-4 [&>svg]:size-6.5!', size === 'pill' && 'size-5.5 [&>svg]:size-9!', size === 'message' && 'size-6 [&>svg]:size-9.5!', size === 'search' && 'size-7 [&>svg]:size-11!', size === 'list' && 'size-8.5 [&>svg]:size-13.5!',
       size === 'cell' && 'size-10 [&>svg]:size-16!', size === 'profile' && 'size-18 [&>svg]:size-28.5!', size === 'hero' && 'size-36 [&>svg]:size-57!')} />
 }

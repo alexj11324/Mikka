@@ -10,7 +10,7 @@ import type { ComputerState, ViewerGrant, ViewerMode } from '@/lib/computer/type
  * page, the chat card and the viewer all show the same state.
  */
 export function useComputer(botId: string | null | undefined) {
-  const swr = useSWR<ComputerState>(botId ? ['computer', botId] : null, ([, id]: [string, string]) => computerApi.state(id), { refreshInterval: 2000, revalidateOnFocus: true })
+  const swr = useSWR<ComputerState>(botId ? ['computer', botId] : null, ([, id]: [string, string]) => computerApi.state(id), { refreshInterval: 2000 })
   const { mutate } = swr
   useEffect(() => {
     if (!botId) return

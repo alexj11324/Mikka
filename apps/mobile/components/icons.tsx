@@ -41,17 +41,6 @@ export function StatusIcon({ status, size = 18 }: { status: ThreadStatus; size?:
   }
 }
 
-/** A run's stored status (agent_runs.status) as the app's thread state. */
-export function threadStatus(status: string): ThreadStatus {
-  switch (status) {
-    case 'waiting_input': return 'waiting'
-    case 'failed': return 'failed'
-    case 'succeeded': return 'done'
-    case 'stopped': case 'cancelled': return 'stopped'
-    default: return 'running'
-  }
-}
-
 export function MachineIcon({ machine, size = 13, color = colors.secondary }: { machine: MachineKind; size?: number; color?: string }) {
   const Icon = machine === 'cloud' ? Cloud : machine === 'laptop' ? Laptop : Server
   return <Icon size={size} color={color} strokeWidth={2} />
@@ -121,7 +110,8 @@ export function SourceIcon({ source, size = 20 }: { source: Source | 'google'; s
 }
 
 /** Bot colours, as on the web (app/globals.css --bot-*). */
-const BOT_COLORS: Record<string, string> = {
+/** The web's twelve bot colours (lib/bot-shapes.ts BOT_COLORS), in its order. */
+export const BOT_COLORS: Record<string, string> = {
   encre: '#0a0a0c', brun: '#8b5e3c', rouge: '#e8483f', orange: '#f08a24', ambre: '#f0b429', vert: '#3ecf8e',
   turquoise: '#2fbfa0', bleu: '#3b93f0', violet: '#8b5cf6', rose: '#e152b0', gris: '#a3a3a3', creme: '#d9d5ca',
 }
@@ -134,6 +124,9 @@ const SHAPES: Record<string, Shape> = {
   squircle: 'squircle', capsule: 'squircle', triangle: 'squircle', hexagone: 'squircle', ecran: 'squircle',
   nuage: 'cloud', goutte: 'drop', fleur: 'flower', etoile: 'flower', chat: 'cat',
 }
+
+/** The shapes 新建 Bot offers: one per drawing the app has, as the web names them. */
+export const BOT_PICKER_SHAPES = ['cercle', 'squircle', 'nuage', 'goutte', 'fleur', 'chat'] as const
 
 /** A bot's avatar: its blob in its colour and shape, with one bright eye (a still bloub, R-36). The Coordinator is the ink circle. */
 export function BotAvatar({ color = 'encre', shape = 'cercle', size = 24 }: { color?: string; shape?: string; size?: number }) {

@@ -9,6 +9,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { SettingRow, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { withBasePath } from '@/lib/base-path'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
+import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
 import { disconnectLinearAccount, disableLinearTeam, enableLinearTeam, getLinearIntegrationState, listLinearTeamOptions, retryLinearDelivery, retryLinearIssue, startLinearOAuth } from '@/app/actions/linear-sync'
 import { FieldError } from '@/components/ui/field'
 
@@ -23,6 +24,9 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
   const [selectedTeam, setSelectedTeam] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // Connecting from the desktop finishes in the system browser: read once on the way back.
+  const [reads, setReads] = useState(0)
+  const checkOnReturn = useCheckOnReturn(() => setReads(count => count + 1))
 
   useEffect(() => {
     let active = true
@@ -30,7 +34,7 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
     let loadedTeams = false
     let timer: number | undefined
     const loadState = async () => {
-      if (inFlight || document.hidden) return
+      if (inFlight) return
       inFlight = true
       window.clearTimeout(timer)
       let poll = false
@@ -57,26 +61,22 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
         if (active) { setEnabled(false); setError(t('loadError')) }
       } finally {
         inFlight = false
-        if (active && poll) timer = window.setTimeout(() => { void loadState() }, 10_000)
+        if (active && poll) timer = window.setTimeout(tick, 10_000)
       }
     }
+    // The poll skips its read while the page is hidden and keeps its schedule;
+    // showing the page again never reads by itself.
+    const tick = () => { if (document.hidden) timer = window.setTimeout(tick, 10_000); else void loadState() }
     void loadState()
-    const refresh = () => { window.clearTimeout(timer); if (!document.hidden) void loadState() }
-    window.addEventListener('focus', refresh)
-    document.addEventListener('visibilitychange', refresh)
-    return () => {
-      active = false; window.clearTimeout(timer)
-      window.removeEventListener('focus', refresh)
-      document.removeEventListener('visibilitychange', refresh)
-    }
-  }, [t, state?.connected, state?.syncs.some(sync => sync.active)])
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [t, state?.connected, state?.syncs.some(sync => sync.active), reads])
 
   const activeTeam = state?.syncs.find(sync => sync.active)
   async function connect() {
     setBusy(true); setError('')
     try {
       const handoff = await openCurrentPageInBrowser()
-      if (handoff === 'desktop') return
+      if (handoff === 'desktop') { checkOnReturn(); return }
       if (handoff === 'unsupported') { setError(t('browserUpdateRequired')); return }
       const result = await startLinearOAuth()
       window.location.assign(result.url)

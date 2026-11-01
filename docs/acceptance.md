@@ -2,11 +2,13 @@
 
 ## Ordinary functional acceptance
 
-Run ordinary functional acceptance in cloud Linux against a local application,
-a real isolated PostgreSQL database and a real daemon when the flow uses one.
-A deployed site and provider OAuth are not prerequisites for ordinary business
-checks. Builds and type checks run in cloud Linux or CI; keep the existing rule
-against starting those services or builds on the developer's Mac.
+Run ordinary functional acceptance locally, in the session's cloud Linux
+container, against `pnpm dev`, a real isolated PostgreSQL database and a real
+daemon from source when the flow uses one ([dev workflow](dev-workflow.md)).
+Do not wait for CI, a merge or a deploy to check what can be checked here. A
+deployed site and provider OAuth are not prerequisites for ordinary business
+checks. Keep the existing rule against starting those services or builds on
+the developer's Mac.
 
 Use the existing automatic test-account allocation, reuse and lease mechanism
 by default: `acquireTestAccounts` in `scripts/test-accounts/session.mjs` uses
@@ -29,8 +31,8 @@ lease reuse or provider OAuth acceptance.
 
 ## Record the version and environment
 
-Record the branch/revision, Git-linked CI run, application origin, database and
-daemon environment, UTC interval, expected/actual behavior and observed request
+Record the branch/revision, the local run (and the Git-linked CI run once it
+reports), application origin, database and daemon environment, UTC interval, expected/actual behavior and observed request
 IDs. Keep code and environment fixed during each run. Reuse completed checks
 when their code and environment remain applicable, using Git's PR/commit-to-CI
 association instead of repeatedly comparing identifiers. Recheck the affected

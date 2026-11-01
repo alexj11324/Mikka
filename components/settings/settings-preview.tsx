@@ -9,7 +9,7 @@ export function SettingsPreview() {
   const t = useTranslations('Settings')
   const router = useRouter()
   return (
-    <SettingsFrame user={{ name: t('preview.userName'), email: 'preview@example.com' }} onRail={() => router.push('/sign-in')} onSettings={() => {}} onSignOut={() => router.push('/sign-in')} signingOut={false}>
+    <SettingsFrame user={{ name: t('preview.userName'), email: 'preview@example.com' }} onRail={() => router.push('/sign-in')} onSearch={() => router.push('/sign-in')} onBrowser={() => router.push('/sign-in')} onSettings={() => {}} onSignOut={() => router.push('/sign-in')} signingOut={false}>
         <SettingsView
           user={{ name: t('preview.userName'), email: 'preview@example.com' }}
           googleEnabled={false}

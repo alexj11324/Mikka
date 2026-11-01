@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
-// This suite must run after tracked migrations in GitHub's disposable service,
-// never against a developer database or a Preview/production application DB.
+// This suite must run after tracked migrations in a disposable loopback *_e2e
+// database, never against a shared or Preview/production application DB.
 const url = process.env.E2E_DATABASE_URL
-if (!url || process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true'
-  || new URL(url).hostname !== '127.0.0.1' || new URL(url).pathname !== '/mikka_e2e'
-  || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) {
-  throw new Error('Local runtime integration requires GitHub CI ephemeral mikka_e2e')
+if (!disposableDatabase() || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) {
+  throw new Error('Local runtime integration requires a migrated loopback *_e2e database')
 }
 
 test('device identity convergence, repository URL deduplication and history preservation', async () => {
@@ -93,7 +92,8 @@ test('device identity convergence, repository URL deduplication and history pres
     const [identity] = await db.select({ name: executionBotName }).from(agents).where(eq(agents.id, codex.id))
     assert.equal(identity?.name, 'Coordinator', 'standalone activity/directory projections hide the device identity too')
     const [activity] = await enrichActivityActors([{ actorType: 'agent' as const, actorId: codex.id }], owner)
-    assert.equal(activity.actor?.name, 'Coordinator')
+    // R-78: a run's activity names its Agent; the device identity stays hidden.
+    assert.equal(activity.actor?.name, 'Codex')
     assert.equal(activity.actor?.id, codex.id, 'display names do not replace the technical actor ID')
     assert.equal((await pool.query('SELECT name FROM agents WHERE id=$1', [codex.id])).rows[0].name, `codex ${first}`, 'read projections never rename stored execution identities')
     await pool.query('UPDATE devices SET harnesses=$1 WHERE id=$2', [JSON.stringify([infos[0]]), first])

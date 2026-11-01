@@ -10,6 +10,7 @@ export type SettingsSectionId =
 
 export interface SettingsSectionDef {
   id: SettingsSectionId
+  /** 'personal' is the 账号 group (account-level); 'workspace' is the current workspace's group. */
   group: 'personal' | 'workspace'
   /** English name; the sidebar search matches it in any locale. */
   title: string
@@ -31,7 +32,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
-  { id: 'models', group: 'personal', title: 'Models' },
+  { id: 'models', group: 'personal', title: 'API and subscriptions' },
   { id: 'logins', group: 'personal', title: 'Logins and keys' },
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
   { id: 'computers', group: 'personal', title: 'Devices' },
@@ -45,7 +46,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true },
   { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
   { id: 'usage', group: 'workspace', title: 'Usage' },
-  { id: 'billing', group: 'workspace', title: 'Billing', adminOnly: true },
+  // Members see 付款 here (their card designation and credit share); plan, balance and top-ups are admins' (C19).
+  { id: 'billing', group: 'workspace', title: 'Billing' },
 ]
 
 /** Section ids from before v4. Old links open the page that now holds the content. */
@@ -84,6 +86,9 @@ export function settingsHref(id: SettingsSectionId, workspaceId?: string): strin
   return `/settings?${search}`
 }
 
-export function visibleSettingsSections({ admin }: { admin: boolean }): SettingsSectionDef[] {
-  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly))
+/** A personal workspace has only its owner, so it has no members, team permissions or audit log (decision 2026-10-31-2130). */
+export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'permissions', 'audit'])
+
+export function visibleSettingsSections({ admin, personal = false }: { admin: boolean; personal?: boolean }): SettingsSectionDef[] {
+  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)))
 }

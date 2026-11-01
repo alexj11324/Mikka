@@ -29,8 +29,10 @@ session. The existing action names remain:
   show only its resolved `name`, without an alias prefix. Legacy `models` stays
   available. Cloud models come from connected subscription bindings.
 - `getExecutionFallbacks()` and `updateExecutionFallbacks(value)`: per-person
-  `{whenDeviceOffline: 'wait' | 'cloud', whenQuotaExhausted: 'stop' | 'switchAccount'}`.
-  Both fields are required when updating. Defaults are `wait` and `stop`.
+  `{whenDeviceOffline: 'wait' | 'cloud'}`, default `wait`. The retired
+  `whenQuotaExhausted` is ignored where older rows still carry it.
+  `whenDeviceOffline` is still stored but no longer read or shown: an offline
+  device follows the fixed order below (decision 2026-10-31-2200).
 - `listBotModels()`, `getBotModel(botId)`, `setBotModel(botId, bindingId)`:
   null Bot means Coordinator. A binding must be explicit; null/`auto` choices
   are refused. First access persists the first connected binding when none is
@@ -85,30 +87,37 @@ latest heartbeat report at each new dispatch; in-flight snapshots remain frozen.
 
 First matching label by position wins, otherwise the saved default. Explicit
 harness/model values reach the existing local/cloud admission and subscription
-checks. With `wait`, offline/disabled devices remain pinned and queued; takeover
-and offline expiry do not reroute them. `cloud` explicitly routes to cloud using
-the last reported resolved model, retaining runtime and account authorization.
-Device-specific source-event authorization still cannot be redirected to cloud.
+checks. A rule whose device is offline or disabled takes the same order as a
+cloud choice (below), using the last reported resolved model and keeping runtime
+and account authorization. Device-specific source-event authorization still
+cannot be redirected to cloud.
 
 When no machine can take the run, `dispatch_run` returns an error the person can
 act on ([decision 2026-10-31-2200](design/decisions/2026-10-31-2200-run-machine-fallback.md)).
 A cloud choice runs on the person's own E2B key only; when there is no key,
 no bot cloud runtime, or that E2B refuses (concurrency cap, quota, key), the run
 goes to the person's online device with 允许调度 and 允许自动调度 on (a server
-first, then the default rule's device, else the most recently seen), then to
-the rule's offline device under `wait`. With none of these it returns
+first, then the default rule's device, else the most recently seen). With none
+of these it returns
 `error: 'machineUnavailable'` and a card (允许这台电脑自动调度 / 在这台电脑上启用,
 填入 E2B Key, 让服务器重新上线 / 连接我的服务器). 允许自动调度 (`devices."autoSchedule"`)
 defaults to on for servers and off for personal computers, and automatic default
 placement (`suggested`, `auto` rows) uses only devices with it on.
 
-Bot quota `stop` propagates the exhaustion error. Target: no switch inside a
-running run ([orchestration](design/orchestration.md) § 2). Today `switchAccount` only tries
-another connected account of the same owner/workspace, route and model. Each
-candidate is independently bound to the consumer and reauthorized for epoch,
-workspace, connection and quota. No paid provider fallback, model substitution,
-or retry of a partially emitted generation is introduced. Unavailable accounts,
-unknown quota and authorization errors do not trigger switching.
+A run that loses its machine (`lib/run-leases.ts`) takes the same order: the
+person's own E2B cloud, else another device with 允许自动调度 on, else it ends
+and the bot gets the card (`run_finished` payload `noMachine`). A cloud run's
+retry gets a new sandbox on the same bot. The `run_retried` event's `movedTo`
+says where it went.
+
+Bot quota: a turn frozen on a subscription that runs out stops with
+`quota_exhausted`; it never switches inside the turn. When the subscription is
+already known to be out of quota (`byos_connections.quota`, a used-up window
+that has not reset) and 「订阅额度用完后，自动改用 API Key」 (`"user"."apiKeyAfterQuota"`)
+is on, `freezeBotModel` freezes the next turn on the person's own API key
+instead (`lib/quota-fallback.ts`: the same model when the key serves it, else
+its first chat model; never a teammate's shared key). The snapshot carries
+`afterQuota`, and the chat shows one line for it before the reply.
 
 ## Other existing handoff actions (#539)
 

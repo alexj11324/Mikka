@@ -30,16 +30,25 @@ briefing in the morning and see what is waiting on me.
 
 ## Where it lives
 
-The system tab bar holds **对话** and **线程**
-([decision](decisions/2026-10-31-2345-mobile-bot-home.md)); the app opens on
-对话. A chat, a thread, 设置, 插件, 建议 and 任务 open over the tabs, with
-the system back button and edge swipe.
+The system tab bar holds **对话**, **线程** and the system search tab
+([decision](decisions/2026-10-31-2345-mobile-bot-home.md),
+[top bar and drawer](decisions/2026-11-01-0045-mobile-home-bar.md)); the app
+opens on 对话. A chat, a thread, 设置, 插件, 建议 and 任务 open over the tabs,
+with the system back button and edge swipe.
 
-**对话**: the Coordinator pinned on top (a star on its avatar), then every
+**对话** is a messaging app's chat list (Alex's Grok screenshot): no title and
+no search field at the top. The person's avatar (top left) opens the
+**drawer**: the person and workspace (→ 设置), 建议, 任务, 插件, 设置, and
+「重启以更新」 once an update has downloaded
+([decision](decisions/2026-10-31-2010-ota-updates.md)); a swipe right on a
+tab's root opens it too. 「+」 (top right) opens 新建 Bot and 新建群聊. The
+pinned bots sit on top, each with a star (the star is the pin, the same for
+every bot; the Coordinator is pinned until the person unpins it,
+[decision](decisions/2026-11-01-1215-star-is-the-pin.md)), then every other
 bot and group chat with its last line and time, newest first (the web bot
-list, R-01). The system search field filters by name. The bar's left menu
-opens 设置, 插件, 建议 and 任务. 「重启以更新」 sits at the top once an
-update has downloaded ([decision](decisions/2026-10-31-2010-ota-updates.md)).
+list, R-01; R-06).
+**搜索** is the tab bar's search: its field sits at the bottom and matches
+bots and group chats by name.
 The Coordinator gets no other special UI (R-06).
 
 Controls are the system's where iOS has one
@@ -47,20 +56,22 @@ Controls are the system's where iOS has one
 the iOS navigation bar with its own bar buttons, menus and back button;
 the tab bar, capsules and the composer are Liquid Glass on iOS 26.
 
-**线程** (the tab; like the Claude app's Code screen): grouped by state,
-等你回复 · 进行中 · 失败 · 已完成; 新线程 and the filter menu sit in the bar.
+**线程** (the tab; like the Claude app's Code screen): grouped as on the
+web (R-52), 进行中 · 受阻 · 等待你 · 空闲 · 已解决, a task's attempts folded
+into its newest thread (「第 N 次尝试」); 新线程 and the filter menu sit in the bar.
 
 - A thread row is a status icon, the thread name, and one grey line: the
   bot's name and a machine icon (cloud, laptop, server), never the machine
   as text. Only 等你回复 and 待审阅 add a word before the name; no 完成 or
   失败 word (the icon says it) and no failure reason. Never the bot's bloub avatar (glossary). Icons: grey
-  spinner 进行中, hollow circle 等你回复, red alert 失败, green check 完成.
+  spinner 进行中, red alert 受阻, hollow circle 等待你, slashed circle 空闲,
+  green check 已解决; the icon follows the row's group (R-52), never the run's raw status.
   A thread whose output is a PR shows the PR icon in GitHub's colours: open
   green (待审阅), draft grey, merged purple, closed red. Rows waiting on the person carry a blue unread dot on the right.
 - 设备 chips at the top (Mikka Cloud, Mac, …); an online machine has a green
   dot (R-24). Tapping one filters the list.
-- The filter button (top right) opens a menu: 全部 · 等你回复 · 待审阅 ·
-  进行中 · 已完成 · 已归档.
+- The filter button (top right) opens a menu: 全部 · 等待你 · 进行中 ·
+  已解决 (待审阅 and 已归档 wait for the server to track them).
 - 新线程 (top right, beside the filter) opens the Coordinator's composer to
   dispatch work through it.
 
@@ -74,6 +85,26 @@ under it. A long press on any message opens a system sheet: 回复 (quote it),
 in the blue one, as on the web (R-14). The
 thread card is a status icon and the thread name, with outputs as chips
 (R-66); no step line.
+
+**新建 and groups**: 对话's 「+」 opens 新建 Bot (name, shape, colour; its
+chat opens) and 新建群聊 (a name and its bots; the group opens). Groups sit in
+对话 with the bots, newest first, a dot while unread. In a group the person's
+messages are blue on the right and each bot's sit on the left under its name
+and avatar; `@name` sends a message to that bot, else Mikka picks who answers.
+
+**Reactions**: the long-press sheet opens with ❤️ 👍 👎 😂 🎉 🙏, one per
+person per message (the same one again removes it); they show as chips under
+the message with a count past one, and tapping one's own removes it.
+
+**Bot page** (资料): the avatar and name, then what the web's right panel
+shows beside the chat, as grouped lists: 线程 (the latest five, then 全部线程),
+电脑 with its state (a bot's only; its screen opens on the web), PR (the PRs of
+the tasks its threads worked on, each with 等待审查 / 进行中 / 已合并; opens on
+GitHub), 资料库 (what its threads handed over; Markdown opens in the app, HTML
+on the web) and 例行 (its scheduled tasks and when each runs next, or 已暂停).
+A section with nothing in it is left out. On top sit two switches: 置顶 (the
+bot joins 对话's pinned row, with the star; the Coordinator too) and 通知 (off: no pushes from
+this chat) ([decision](decisions/2026-11-01-0050-mobile-chat-settings.md)).
 
 Message times are hidden. Swiping the chat from right to left reveals each
 message's time on the right, as in iMessage and ChatGPT (Figma 01b); no time
@@ -117,7 +148,7 @@ What reaches the person and when is R-20. On mobile:
 
 ## Settings
 
-Opened from 设置 in 对话's left menu. A hierarchy (R-70): the
+Opened from 设置 in the drawer. A hierarchy (R-70): the
 top screen holds categories, each opens its own page. Every row cites its
 precedent. Figma frames 07, 07a–07e.
 
@@ -150,7 +181,7 @@ large Dynamic Type. Plus:
 - Coordinator chat: streaming reply, proactive card (unanswered / answered /
   snoozed), thread card (running / waiting / failed / done).
 - Push: lock screen and banner, one per kind (mail, CI, run finished,
-- 对话: the bot list with the Coordinator pinned, search, and 重启以更新.
+- 对话: the bot list with the pinned bots on top, search, and 重启以更新.
 - Drawer: open over the Coordinator chat, with unread dots.
 - 线程: each filter, running / waiting / failed / done rows.
 - 建议: no apps connected (connect CTA), nothing today, briefing generating.
@@ -232,14 +263,15 @@ mobile tabs.
 - **Settings stored:** 主动消息 is lib/attention's switch
   (`attention_settings.enabled`); the push switches and 使用记忆 (off leaves
   the memory out of the prompt) are in `user_preferences`.
-- **Attachments:** the composer's 「+」 is a native menu: 拍照, 照片 (up to
-  two per message) and 文件 (text files). Photos are re-encoded as JPEG under
+- **Attachments:** the composer's 「+」 opens a sheet from the bottom, as in
+  the Claude app: 相机, 照片 (up to two per message) and 文件 (text files) as
+  tiles; the picker opens over it and the sheet closes after. Photos are re-encoded as JPEG under
   the server's 1 MB limit and sent as `images` with `POST /api/mobile/chat`;
   a text file goes into the message as its contents under its name, as on the
   web. Chat items carry `images` (a count) and the app loads each photo from
   `GET /api/mobile/chat/image?message=<id>&index=<n>`, which serves only the
   person's own messages.
-- **Not on the server yet**, so the app leaves them out: 待审阅 and 已归档
+- **现状（非决定）:** not on the server yet, so the app leaves them out: 待审阅 and 已归档
   threads, pinned bots, 电脑不在用时 (needs the web to report presence),
   dictation (so the composer has no mic yet), dark mode.
 - **App icon:** the Mikka mark, the same file as the desktop app's

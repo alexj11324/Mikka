@@ -11,6 +11,7 @@ let available: { bindingId: string; provider?: string }[] = []
 let savedBinding: { bindingId: string } | undefined
 let settingsError: Error | undefined
 let workspaceCalls = 0
+let botActive = true
 const workspaceBots: (string | null)[] = []
 const hostedCalls: unknown[][] = []
 const hostedModel = { modelId: 'hosted-fixture' }
@@ -23,11 +24,23 @@ mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExp
     return scope.workspaceId
   },
   ExecutionSettings: class {
+    async botActive() { return botActive }
     async botModel() { if (settingsError) throw settingsError; return selected }
     async botModels() { return available }
+    async pooledBindings() { return [] }
     async botBinding() { return savedBinding }
     async bindingForBot(_scope: unknown, _bot: unknown, bindingId: string) { return bindingId }
   },
+} })
+let keyChoice: { keyId: string; model: string; harness: string } | undefined
+let usableKeys: { id: string; provider: string; baseUrl: string | null; protocol: string }[] = []
+const chatModels: unknown[] = []
+mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports: {
+  botApiKeyChoice: async () => keyChoice,
+  usableApiKeys: async () => usableKeys,
+} })
+mock.module(new URL('./model-api-key-chat.ts', import.meta.url).href, { namedExports: {
+  resolveApiKeyChatModel: async (frozen: unknown) => { chatModels.push(frozen); return { modelId: 'api-key-fixture' } },
 } })
 mock.module(new URL('./abuse/resolve.ts', import.meta.url).href, { namedExports: {
   resolveDefaultHostedModel: async (...args: unknown[]) => { hostedCalls.push(args); return hostedModel },
@@ -50,6 +63,27 @@ beforeEach(() => {
   workspaceCalls = 0
   workspaceBots.length = 0
   hostedCalls.length = 0
+  keyChoice = undefined
+  usableKeys = []
+  chatModels.length = 0
+})
+
+test('A bot saved on an API key model freezes that key and resolves through it; an unusable key falls back', async () => {
+  const botScope = { ...scope, botId: id(1) }
+  keyChoice = { keyId: id(9), model: 'deepseek-chat', harness: 'claude_code' }
+  usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic' }]
+  const frozen = await freezeBotModel(botScope, noSubscription)
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: 'deepseek-chat', modelSelection: { consumerId: id(1), type: 'api_key', keyId: id(9), ownerId: 'alice', workspaceId: id(2), modelId: 'deepseek-chat' } })
+  assert.deepEqual(await resolveFrozenHostedModel(botScope, frozen, noSubscription), { modelId: 'api-key-fixture' })
+  assert.equal(chatModels.length, 1)
+  await assert.rejects(resolveFrozenHostedModel({ ...botScope, ownerId: 'mallory' }, frozen, noSubscription), { code: 'binding_mismatch' })
+  await assert.rejects(resolveFrozenHostedModel({ ...botScope, botId: id(5) }, frozen, noSubscription), { code: 'binding_mismatch' })
+  // The key was withdrawn: the usual order, here Mikka 默认.
+  usableKeys = []
+  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  // An Anthropic-only custom provider cannot serve a bot chat.
+  usableKeys = [{ id: id(9), provider: 'custom', baseUrl: 'https://llm.example/anthropic', protocol: 'anthropic' }]
+  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
 })
 
 test('Coordinator without a subscription freezes and resolves the configured hosted default', async () => {
@@ -102,7 +136,7 @@ test('a saved choice whose account is gone switches to a bound subscription, Cla
   savedBinding = undefined
   available = [{ bindingId: id(8), provider: 'codex' }, { bindingId: binding.id, provider: 'claude' }]
   const frozen = await freezeBotModel(scope, dependencies)
-  assert.equal(frozen.modelSelection?.bindingId, binding.id)
+  assert.equal((frozen.modelSelection as { bindingId?: string } | undefined)?.bindingId, binding.id)
   assert.equal(frozen.model, binding.modelId)
   assert.equal(hostedCalls.length, 0)
 })
@@ -124,7 +158,7 @@ test('Coordinator still freezes an available or selected subscription with owner
     savedBinding = available[0]
     const frozen = await freezeBotModel(scope, dependencies)
     assert.equal(frozen.model, binding.modelId)
-    assert.equal(frozen.modelSelection?.bindingId, binding.id)
+    assert.equal((frozen.modelSelection as { bindingId?: string } | undefined)?.bindingId, binding.id)
     assert.equal(frozen.modelSelection?.coordinator, true)
     const foreign = { ...dependencies, service: () => ({ repository: {
       binding: async () => ({ ...binding, ownerId: 'other' }),
@@ -138,4 +172,12 @@ test('settings errors propagate instead of selecting the hosted fallback', async
   settingsError = new Error('database unavailable')
   await assert.rejects(freezeBotModel(scope, noSubscription), settingsError)
   assert.equal(hostedCalls.length, 0)
+})
+
+test('an archived bot (its owner left the team) is refused before any model is chosen', async () => {
+  botActive = false
+  try {
+    await assert.rejects(freezeBotModel({ ...scope, botId: id(1) }, noSubscription), { code: 'botNotFound' })
+    assert.equal(hostedCalls.length, 0)
+  } finally { botActive = true }
 })
