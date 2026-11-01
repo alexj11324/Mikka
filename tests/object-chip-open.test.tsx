@@ -24,6 +24,8 @@ const sources: Record<string, CitationSource> = {
 const run = (id: string, status: string, name: string): CitationSource => ({ kind: 'run', id, agentName: 'Worker', harness: 'claude_code', status, issue: { id: TASK, number: 4, identifier: 'ZHIX-4', title: 'Rebuild the shell' }, name, summary: null, steps: 1, createdAt: '2026-11-01T00:00:00.000Z', finishedAt: null })
 const RUNS = { running: '00000000-0000-4000-8000-0000000000a1', failed: '00000000-0000-4000-8000-0000000000a2', succeeded: '00000000-0000-4000-8000-0000000000a3' } as const
 for (const [status, id] of Object.entries(RUNS)) sources[id] = run(id, status, `Thread ${status}`)
+// The succeeded run was judged done (R-52): only then is it 已解决.
+sources[RUNS.succeeded] = { ...sources[RUNS.succeeded], outcome: 'done' } as CitationSource
 
 test('a thread chip shows its status and opens the thread beside the chat (?thread=); only a task chip opens the task', async () => {
   const opened: { issues: string[]; moves: number } = { issues: [], moves: 0 }
@@ -45,8 +47,8 @@ test('a thread chip shows its status and opens the thread beside the chat (?thre
     const chips = [...container.querySelectorAll('[data-slot="inline-citation-trigger"]')] as HTMLElement[]
     assert.equal(chips.length, 4)
     const [taskChip, ...threadChips] = chips
-    // Each thread chip leads with the thread's status, the same marks as the thread card.
-    assert.deepEqual(threadChips.map(chip => chip.querySelector('[role="img"]')?.getAttribute('aria-label')), ['Running', 'Failed', 'Succeeded'])
+    // Each thread chip leads with the thread's group (R-52), the same marks as the thread card and the list.
+    assert.deepEqual(threadChips.map(chip => chip.querySelector('[role="img"]')?.getAttribute('aria-label')), ['Running', 'Blocked', 'Resolved'])
     assert.ok(threadChips[0].querySelector('svg')?.getAttribute('class')?.includes('animate-spin'))
     assert.ok(threadChips[1].querySelector('svg')?.getAttribute('class')?.includes('text-destructive'))
     assert.ok(threadChips[2].querySelector('svg')?.getAttribute('class')?.includes('text-success'))

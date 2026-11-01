@@ -53,9 +53,15 @@ export const harnessInfoSchema = z.object({
   /**
    * The CLI exists but `installed` stays false because the daemon cannot run it
    * in a sandbox. `missing` names the absent packages; empty means the machine
-   * itself refused isolation.
+   * itself refused isolation. `reason` names a refusal the person can lift
+   * (`userns_restricted`: Ubuntu's AppArmor user namespace restriction), and
+   * `detail` is the probe's own error, already sanitized by the daemon.
    */
-  sandboxBlocked: z.object({ missing: z.array(z.string().trim().min(1).max(64)).max(8) }).optional(),
+  sandboxBlocked: z.object({
+    missing: z.array(z.string().trim().min(1).max(64)).max(8),
+    reason: z.enum(["userns_restricted"]).optional(),
+    detail: z.string().max(300).optional(),
+  }).optional(),
   /** Version string reported by the CLI, null when not installed. */
   version: z.string().nullable(),
 })

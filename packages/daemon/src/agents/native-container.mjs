@@ -1,6 +1,12 @@
 // Private hosted-run bootstrap. The first stdin frame is host configuration;
 // later bytes are the existing CLI protocol. No vault/provider token is accepted.
+//
+// It runs inside Anthropic's sandbox-runtime on the task's own E2B machine
+// (one task, one machine; no Docker: decision 2026-11-01-1312), with the CLI
+// it starts. The host names the CLI, the run's broker and egress sockets and
+// its node. Those sockets are its only way out: the sandbox has no network.
 import { spawn } from "node:child_process";
+import { dirname } from "node:path";
 import { createServer, request as httpRequest } from "node:http";
 import { mkdirSync } from "node:fs";
 import { startNativeEgress } from "./native-egress.mjs";
@@ -34,6 +40,10 @@ function onData(part) {
   initial = Buffer.alloc(0);
   void start(config, remainder).catch(fail);
 }
+/** An absolute host path the worker named; never one the task could shape. */
+function hostPath(value) {
+  return typeof value === "string" && value.startsWith("/") && !/[\0\n\r:]/.test(value);
+}
 async function start(config, remainder) {
   if (
     !["claude_code", "codex"].includes(config.kind) ||
@@ -41,7 +51,12 @@ async function start(config, remainder) {
     !config.args.every((a) => typeof a === "string") ||
     typeof config.cwd !== "string" ||
     !config.env ||
-    typeof config.env !== "object"
+    typeof config.env !== "object" ||
+    !hostPath(config.cli) ||
+    !hostPath(config.node) ||
+    !hostPath(config.brokerSocket) ||
+    (config.egressSocket !== undefined && !hostPath(config.egressSocket)) ||
+    (config.publicEgress === true) !== (config.egressSocket !== undefined)
   )
     fail();
   for (const [key, value] of Object.entries(config.env)) {
@@ -56,11 +71,11 @@ async function start(config, remainder) {
   }
   delete config.env.CLAUDE_CODE_OAUTH_TOKEN;
   if (config.githubBin !== undefined && (typeof config.githubBin !== 'string' || !config.githubBin.startsWith('/') || !config.githubBin.endsWith('/github/bin') || config.githubBin.includes(':') || config.githubBin.includes('\n'))) fail();
-  config.env.PATH = `${config.githubBin ? config.githubBin + ':' : ''}/usr/local/bin:/usr/bin:/bin`;
+  config.env.PATH = `${config.githubBin ? config.githubBin + ':' : ''}${dirname(config.node)}:/usr/local/bin:/usr/bin:/bin`;
   mkdirSync(config.env.HOME, { recursive: true, mode: 0o700 });
   // Model credentials stay on the original task broker. Public downloads use
   // a separate live, public-IP-only host proxy, never that credential endpoint.
-  const egress = config.publicEgress === true ? await startNativeEgress() : null;
+  const egress = config.publicEgress === true ? await startNativeEgress(config.egressSocket) : null;
   if (egress) {
     Object.assign(config.env, {
       HTTP_PROXY: egress.url, HTTPS_PROXY: egress.url,
@@ -80,7 +95,7 @@ async function start(config, remainder) {
       path = "/responses";
     const upstream = httpRequest(
       {
-        socketPath: "/run/mikka-native.sock",
+        socketPath: config.brokerSocket,
         method: "POST",
         path,
         headers: request.headers,
@@ -102,7 +117,8 @@ async function start(config, remainder) {
   if (config.kind === "claude_code") {
     config.env.ANTHROPIC_BASE_URL = base;
     config.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = "3";
-    // Docker confines all tools here; never request a privileged nested sandbox.
+    // The worker's sandbox-runtime encloses the CLI and every command it runs;
+    // a nested sandbox cannot start inside it (no nested user namespaces).
     const settingsIndex = args.findIndex(
       (value) => value === "--settings" || value.startsWith("--settings="),
     );
@@ -122,7 +138,7 @@ async function start(config, remainder) {
       if (args[i] === "--mcp-config" && args[i + 1]) {
         const value = JSON.parse(args[i + 1]);
         if (value.mcpServers?.mikka)
-          value.mcpServers.mikka.command = "/usr/local/bin/node";
+          value.mcpServers.mikka.command = config.node;
         args[i + 1] = JSON.stringify(value);
       }
   } else {
@@ -141,8 +157,7 @@ async function start(config, remainder) {
       "-c",
       "features.responses_websockets_v2=false",
     );
-    args.push("-c", 'mcp_servers.mikka.command="/usr/local/bin/node"');
-    for (const key of [
+    args.push("-c", `mcp_servers.mikka.command=${JSON.stringify(config.node)}`);    for (const key of [
       "GIT_DIR",
       "GIT_WORK_TREE",
       "GIT_CONFIG_GLOBAL",
@@ -158,7 +173,7 @@ async function start(config, remainder) {
         `shell_environment_policy.set.${key}=${JSON.stringify(config.env[key])}`,
       );
   }
-  const child = spawn("/usr/local/bin/native-cli", args, {
+  const child = spawn(config.cli, args, {
     cwd: config.cwd,
     env: config.env,
     stdio:

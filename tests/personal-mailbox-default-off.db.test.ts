@@ -78,7 +78,7 @@ test('default-off claim, MCP and Coordinator work on the tracked schema with the
       const assignment = await response.json()
       assert.equal(assignment.runId, runId)
       assert.equal(assignment.remoteUrl, repository.remoteUrl)
-      assert.equal(assignment.policy.permissions.git_push, 'ask', 'a legacy claim does not invent repository push approval')
+      assert.equal(assignment.policy.permissions.git_push, 'deny', 'a claim without admitted push authority denies the push, never asks')
       assert.ok(assignment.mcp && typeof assignment.mcp.token === 'string')
       assert.equal(Object.hasOwn(assignment.mcp, 'mailbox'), false)
       runToken = assignment.mcp.token

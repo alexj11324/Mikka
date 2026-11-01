@@ -154,7 +154,7 @@ export async function startMvpServices(port = 3191) {
       const appAccess = () => assert.match(bearer ?? '', /^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/, 'Expected an App JWT')
       if (path === `${REPO_PATH}/installation` && method === 'GET') {
         appAccess()
-        return reply({ id: 99, suspended_at: null, permissions: { pull_requests: 'write', contents: 'read' } })
+        return reply({ id: 99, suspended_at: null, permissions: { pull_requests: 'write', contents: 'write' } })
       }
       if (path === '/app/installations/99/access_tokens' && method === 'POST') {
         appAccess()

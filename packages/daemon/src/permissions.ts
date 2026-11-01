@@ -28,6 +28,8 @@ import {
   type RunPolicy,
 } from "@mikka/protocol/agent-policy"
 
+import { decisionFallback } from "./decision-judgments"
+
 export { PERMISSION_ACTIONS, PERMISSION_DEFAULTS }
 export type { PermissionAction, PermissionDecision, RunPolicy }
 
@@ -54,6 +56,29 @@ export function decide(
     return context.policy.permissions[typed] ?? "ask"
   }
   return PERMISSION_DEFAULTS[typed]
+}
+
+/**
+ * `decide`, with the Decisions API in place of the fixed `ask` for an action
+ * the person set nothing for: an unknown action, or a setup recipe nobody
+ * approved. A read-only run still denies, and an approved recipe or a
+ * configured action never asks. No answer keeps the previous decision (ask).
+ */
+export async function decideWithJudgment(
+  action: string,
+  context: PermissionContext,
+  judge: (evidence: { action: string; subject?: string }) => Promise<"allow" | "ask" | null>,
+  subject?: string
+): Promise<PermissionDecision> {
+  const fixed = decide(action, context)
+  const unknown = !Object.hasOwn(PERMISSION_DEFAULTS, action)
+  const unapprovedRecipe = action === "run_setup_recipe" && !context.setupRecipeApproved
+  if (fixed === "deny" || !(unknown || unapprovedRecipe)) return fixed
+  const judged = await judge({ action, subject })
+  if (judged) return judged
+  // No answer: what this point did before the Decisions API (ask), never a looser default.
+  decisionFallback(`${action} kept its previous decision (${fixed}) without a judgment`)
+  return fixed
 }
 
 /** The policy a run applies: what the server sent, or the defaults. */
@@ -91,29 +116,25 @@ export function runDomains(
 }
 
 /**
- * Whether the daemon pushes a verified run branch. A push needs the owner's
- * repository approval and `git_push` together. The server resolves both at
- * claim and sends `allow` in this run's assignment only when both hold
- * (a configured `allow` without an approved repository arrives as `ask`).
- * `ask` pushes only when the repo was approved ("always for this repo");
- * `deny` never pushes.
+ * Whether the daemon pushes a verified run branch. The server decides push
+ * authority at admission (the GitHub App grant, decision 2026-11-01-1215) and
+ * sends `allow` in this run's assignment only for an admitted run; anything
+ * else does not push and never asks.
  */
-export function pushDecision(
-  policy: RunPolicy,
-  repoApproved: boolean
-): { push: boolean; note?: string } {
+export function pushDecision(policy: RunPolicy): { push: boolean; note?: string } {
   // A read-only check (ADR 0046) never pushes: it exists to look at what the
   // implementation run already pushed, not to add to it.
   if (policy.readOnly)
     return { push: false, note: "A read-only check does not push" }
   const decision = policy.permissions.git_push
+  if (decision === "allow") return { push: true }
   if (decision === "deny")
-    return { push: false, note: "Push is turned off for this workspace" }
-  if (decision === "allow" || repoApproved) return { push: true }
-  return { push: false, note: "Push needs approval for this repo" }
+    return { push: false, note: "Push is turned off for this run" }
+  return { push: false, note: "Push needs the Mikka GitHub App's access on this repository" }
 }
 
-/** Shell commands that add or install dependencies (first word, verb). */
+/** Shell commands that add or install dependencies (first word, verb), named
+ * only in Claude Code's own CLI rules below; Cursor's commands are judged. */
 const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
   ["npm", ["install", "i", "add", "ci"]],
   ["pnpm", ["install", "i", "add"]],
@@ -130,14 +151,16 @@ const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
 ]
 
 /**
- * The policy action a shell command line falls under, for CLIs that ask
- * before running a command (Cursor). Each `&&`, `;` or `|` segment counts.
+ * The hard-boundary action a shell command line falls under, for CLIs that
+ * ask before running a command (Cursor): only `git push`, which the daemon
+ * owns (ADR 0017). Every other command is judged by the Decisions API
+ * (`judgeCommandAction`), never by a list here. Each `&&`, `;` or `|` segment counts.
  * Wrappers (`sudo`, `env`, `command`, `xargs`, `sh -c …`) are unwrapped so
  * `env git push` and `/usr/bin/git push` cannot slip past the git rule.
  */
-export function classifyCommand(command: string): PermissionAction | null {
+export function classifyCommand(command: string, legacy = false): PermissionAction | null {
   for (const segment of command.split(/&&|\|\||;|\||\n/)) {
-    const action = classifySegment(segment, 0)
+    const action = classifySegment(segment, 0, legacy)
     if (action) return action
   }
   return null
@@ -148,7 +171,7 @@ const SHELLS = new Set(["sh", "bash", "zsh", "dash", "fish"])
 /** Wrapper options that take the next word as their value (`sudo -u deploy`). */
 const OPTION_VALUES = new Set(["-u", "-g", "-p", "-C", "-h", "-r", "-t", "-U", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "-I", "-S"])
 
-function classifySegment(segment: string, depth: number): PermissionAction | null {
+function classifySegment(segment: string, depth: number, legacy: boolean): PermissionAction | null {
   const words = segment
     .trim()
     .split(/\s+/)
@@ -170,7 +193,7 @@ function classifySegment(segment: string, depth: number): PermissionAction | nul
     }
     break
   }
-  const [tool, verb] = words
+  const [tool] = words
   if (!tool) return null
   const name = basename(tool)
   // `sh -c "git push"` keeps the real command in the argument string.
@@ -178,13 +201,16 @@ function classifySegment(segment: string, depth: number): PermissionAction | nul
     const index = words.findIndex((word) => word === "--command" || /^-[A-Za-z]*c[A-Za-z]*$/.test(word))
     if (index !== -1) {
       const nested = words.slice(index + 1).join(" ").replace(/^['"]|['"]$/g, "")
-      const action = classifyCommand(nested)
+      const action = classifyCommand(nested, legacy)
       if (action) return action
     }
   }
   if (name === "git" && words.slice(1).some((word) => word === "push")) return "git_push"
-  const entry = INSTALL_COMMANDS.find(([command]) => command === name)
-  if (entry && verb && entry[1].includes(verb)) return "install_dependency"
+  // Only when the Decisions API gave no answer: the classification in force before it, so a fallback never loosens anything.
+  if (legacy) {
+    const entry = INSTALL_COMMANDS.find(([command]) => command === name)
+    if (entry && words[1] && entry[1].includes(words[1])) return "install_dependency"
+  }
   return null
 }
 

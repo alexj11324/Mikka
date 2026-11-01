@@ -10,6 +10,7 @@ import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { MODEL_CREDENTIAL_HEADER, REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { recordPushGrant } from './support/github-app-stub'
 
 test('API-key runs: frozen by id at dispatch, opened only at claim, subscription first, withdrawn key refused', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED }
@@ -72,7 +73,8 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const botId = await seedBot(pool, ws.id, id)
     const issueId = await task(id)
     const remote = `https://github.com/mikka-ci/api-key-runs-${randomUUID()}.git`
-    await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository(remote).key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
+    // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+    await recordPushGrant(pool, id, normalizeRepository(remote).key)
     const deviceId = randomUUID()
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses) VALUES ($1,$2,'Laptop','local',true,$3,now(),$4)`,
       [deviceId, id, DAEMON_PROTOCOL_VERSION, JSON.stringify([{ harness: 'claude_code', installed: true, toolApproval: true }, { harness: 'codex', installed: true, toolApproval: true }])])

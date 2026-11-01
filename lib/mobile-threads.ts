@@ -1,14 +1,16 @@
 import 'server-only'
-import { and, desc, eq, isNull, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
-import { agentRuns, agents, devices } from '@/lib/db/schema'
+import { agentRuns, agents, devices, issues } from '@/lib/db/schema'
 import { citationSources } from '@/lib/coordinator/store'
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import { threadName } from '@/lib/issue-threads'
 import type { RunSource } from '@/lib/coordinator/citations'
 import { runBotName } from '@/lib/run-bot-name'
-import { pullRequestsOf, type PrGroup } from '@/lib/thread-groups'
+import { readIssueMetadata } from '@/lib/issue-metadata'
+import { groupThreads, pullRequestsOf, THREAD_GROUPS, threadGroup, type GroupIssue, type PrGroup, type ThreadGroup } from '@/lib/thread-groups'
 import { pinnedByDefault } from '@/lib/chat-preferences'
+import { notThreadMachineDevice } from '@/lib/cloud-computer/thread-devices'
 
 /** The app's thread states (docs/design/mobile.md, 线程 screen icons). */
 export type MobileThreadStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped'
@@ -24,8 +26,8 @@ export function mobileThreadStatus(status: string): MobileThreadStatus {
 }
 
 /** A machine as the app draws it: an icon, never its name as a status (mobile.md). */
-export function machineKind(device: { name: string | null; platform: string | null } | null): 'cloud' | 'laptop' | 'server' {
-  if (!device) return 'cloud'
+export function machineKind(device: { name: string | null; platform: string | null; kind?: string | null } | null): 'cloud' | 'laptop' | 'server' {
+  if (!device || device.kind === 'cloud') return 'cloud'
   if (device.platform === 'darwin' || device.platform === 'win32') return 'laptop'
   if (/cloud/i.test(device.name ?? '')) return 'cloud'
   return 'server'
@@ -41,6 +43,10 @@ export interface MobileThread {
   device: { id: string; name: string; kind: 'cloud' | 'laptop' | 'server' } | null
   createdAt: string
   finishedAt: string | null
+  /** Its place in the list, as on the web (R-52): 进行中, 受阻, 等待你, 空闲 or 已解决. */
+  group: ThreadGroup
+  /** How many threads its task has had (第 N 次尝试); a list shows only the newest of them. */
+  attempts: number
 }
 
 /** A thread's name: its task as "MIK-11 群聊建表" when it has one, else the first line of its prompt (glossary). */
@@ -59,18 +65,31 @@ async function threadRows(userId: string, filter: SQL | undefined, limit: number
   return (await runRows(userId, filter, limit)).map(row => row.thread)
 }
 
+/** A list's rows: a task's threads fold into its newest, with the task's attempt count, newest first (R-52). */
+function listed(rows: Awaited<ReturnType<typeof runRows>>): MobileThread[] {
+  const byId = new Map(rows.map(row => [row.thread.id, row]))
+  const groups = groupThreads(rows.map(row => ({ id: row.thread.id, status: row.status, issueId: row.issue?.id ?? null, createdAt: row.thread.createdAt, outcome: row.outcome })),
+    id => rows.find(row => row.issue?.id === id)?.task)
+  return THREAD_GROUPS.flatMap(group => groups[group].map(item => ({ ...byId.get(item.id)!.thread, group, attempts: item.attempts })))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
 /** Threads with what their task links: its id, title and pull requests, as far as this person can see it. */
 async function runRows(userId: string, filter: SQL | undefined, limit: number) {
   const rows = await db.select({
     id: agentRuns.id, prompt: sql<string>`left(${agentRuns.prompt}, 300)`, status: agentRuns.status,
     agentName: runBotName, harness: agents.harness,
-    deviceId: devices.id, deviceName: devices.name, platform: devices.platform,
-    createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
+    deviceId: devices.id, deviceName: devices.name, platform: devices.platform, deviceKind: devices.kind,
+    createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, outcome: agentRuns.outcome,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .leftJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(eq(agentRuns.userId, userId), filter))
     .orderBy(desc(agentRuns.createdAt)).limit(limit)
   const sources = rows.length ? await citationSources(userId, [], rows.map(row => row.id)) : {}
+  // The tasks' state and PRs, for the group; only tasks the person can see (citationSources checked them).
+  const issueIds = [...new Set(Object.values(sources).flatMap(source => source?.kind === 'run' && source.issue ? [source.issue.id] : []))]
+  const tasks = new Map<string, GroupIssue>((issueIds.length ? await db.select({ id: issues.id, status: issues.status, content: issues.content }).from(issues).where(inArray(issues.id, issueIds)) : [])
+    .map(issue => [issue.id, { status: issue.status, metadata: { pullRequests: readIssueMetadata(issue.content).pullRequests } }]))
   return rows.map(row => {
     const found = sources[row.id]
     const source = found?.kind === 'run' ? found : undefined
@@ -80,19 +99,23 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
       status: mobileThreadStatus(row.status),
       by: row.agentName,
       harness: row.harness,
-      device: row.deviceId ? { id: row.deviceId, name: row.deviceName ?? '', kind: machineKind({ name: row.deviceName, platform: row.platform }) } : null,
+      device: row.deviceId ? { id: row.deviceId, name: row.deviceName ?? '', kind: machineKind({ name: row.deviceName, platform: row.platform, kind: row.deviceKind }) } : null,
       createdAt: row.createdAt.toISOString(),
       finishedAt: row.finishedAt?.toISOString() ?? null,
+      group: threadGroup({ id: row.id, status: row.status, issueId: source?.issue?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: row.outcome }, source?.issue ? tasks.get(source.issue.id) : undefined),
+      attempts: 1,
     }
-    return { thread, status: row.status, issue: source?.issue ?? null, pullRequests: source?.pullRequests ?? [] }
+    return { thread, status: row.status, issue: source?.issue ?? null, pullRequests: source?.pullRequests ?? [], task: source?.issue ? tasks.get(source.issue.id) : undefined, outcome: row.outcome }
   })
 }
 
 /** The person's threads from the last 30 days, newest first, and their machines with whether each is online (R-24). */
 export async function mobileThreads(userId: string, limit = 60): Promise<{ threads: MobileThread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[] }> {
   const [threads, machines] = await Promise.all([
-    threadRows(userId, sql`${agentRuns.createdAt} > now() - interval '30 days'`, limit),
-    db.select({ id: devices.id, name: devices.name, platform: devices.platform, lastSeenAt: devices.lastSeenAt }).from(devices).where(and(eq(devices.ownerId, userId), isNull(devices.removedAt))),
+    runRows(userId, sql`${agentRuns.createdAt} > now() - interval '30 days'`, limit).then(listed),
+    // A task's own cloud sandbox is not one of the person's machines (Alex, 2026-11-01).
+    db.select({ id: devices.id, name: devices.name, platform: devices.platform, kind: devices.kind, lastSeenAt: devices.lastSeenAt }).from(devices)
+      .where(and(eq(devices.ownerId, userId), isNull(devices.removedAt), notThreadMachineDevice)),
   ])
   return {
     threads,
@@ -143,7 +166,7 @@ export async function mobileBot(userId: string, workspaceId: string, botId: stri
     [...new Map(rows.flatMap(row => row.issue ? [[row.issue.id, { id: row.issue.id, metadata: { pullRequests: row.pullRequests } }] as const] : [])).values()],
   ).map(row => ({ url: row.url, number: row.number, title: titles.get(row.url) ?? '', group: row.group }))
   return {
-    threads: rows.map(row => row.thread),
+    threads: listed(rows),
     pullRequests,
     schedules: schedules.rows.map(row => ({ id: row.id, title: row.title, status: row.status, nextAt: row.next_at?.toISOString() ?? null })),
     library: library.rows.map(row => ({ id: row.id, title: row.title, kind: row.kind, version: row.version, updatedAt: row.updated_at.toISOString() })),

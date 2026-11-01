@@ -311,7 +311,7 @@ export async function publishRun(options: PublishOptions): Promise<RunPublish> {
       pushed: false,
       remote: null,
       skipped: "not_approved",
-      note: options.push.note ?? "Push needs approval for this repo",
+      note: options.push.note ?? "Push needs the Mikka GitHub App's access on this repository",
     }
   }
   return push(commit)

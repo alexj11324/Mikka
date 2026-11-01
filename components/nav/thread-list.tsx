@@ -7,10 +7,11 @@ import type { Thread } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
-import { activityLabel, groupThreads, lastActivity, THREAD_GROUPS } from '@/lib/thread-groups'
+import { activityLabel, groupThreads, lastActivity, THREAD_GROUPS, type ThreadGroup, type ThreadRowOf } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
 import { HarnessMark } from '@/components/labels/entity-labels'
 import { GroupHeader } from './group-header'
+import { ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
@@ -52,11 +53,14 @@ function WaitingChip({ waiting }: { waiting: NonNullable<ThreadView['waitingFor'
 
 /**
  * One row: the thread's name, then the opening of its last reply on one line,
- * verbatim. No status word, no bot name. In 全部线程 the mark of the Agent
- * running it leads the name (R-78; a neutral thread mark when unknown, never
- * the bot's avatar) and the last activity sits on the right.
+ * verbatim. No status word, no bot name. A task's earlier threads fold into
+ * its newest; past the first, the line opens with 第 N 次尝试, and the task's
+ * page lists them all. The row leads with its status icon and colour, the
+ * group's (R-52), as on the phone. In 全部线程 the mark of the Agent running it
+ * (R-78; a neutral thread mark when unknown, never the bot's avatar) and the
+ * last activity sit on the right.
  */
-function ThreadRow({ thread, issues, all, now, onOpenThread }: { thread: Thread; issues: Issue[]; all: boolean; now: Date; onOpenThread: (thread: { issueId: string; runId: string }) => void }) {
+function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: ThreadRowOf<Thread>; group: ThreadGroup; issues: Issue[]; all: boolean; now: Date; onOpenThread: (thread: { issueId: string; runId: string }) => void }) {
   const t = useTranslations('Shell.threads')
   const format = useFormatter()
   const name = threadName(thread, issues, t('untitled'))
@@ -65,13 +69,14 @@ function ThreadRow({ thread, issues, all, now, onOpenThread }: { thread: Thread;
   const waiting = thread.status === 'queued' ? (thread as ThreadView).waitingFor : undefined
   const body = <>
     <span className="flex w-full min-w-0 items-center gap-2">
-      {all && <span data-slot="thread-agent" className="flex size-4 shrink-0 items-center justify-center">{thread.harness ? <HarnessMark harness={thread.harness} /> : <ThreadMark size="row" />}</span>}
+      <span data-slot="thread-status" className="flex size-4 shrink-0 items-center justify-center"><ThreadStatusIcon group={group} small /></span>
       <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
+      {all && <span data-slot="thread-agent" className="flex shrink-0 items-center text-muted-foreground opacity-80 [&_svg]:size-3">{thread.harness ? <HarnessMark harness={thread.harness} /> : <ThreadMark size="row" />}</span>}
       {all && <span className="shrink-0 text-xs text-muted-foreground">{when === 'relative' ? format.relativeTime(at, now) : t(when)}</span>}
     </span>
     {waiting
-      ? <span className={cn('flex w-full min-w-0', all && 'pl-6')}><WaitingChip waiting={waiting} /></span>
-      : thread.lastReply && <span className={cn('block w-full truncate text-xs text-muted-foreground', all && 'pl-6')}>{thread.lastReply}</span>}
+      ? <span className="flex w-full min-w-0 pl-6"><WaitingChip waiting={waiting} /></span>
+      : (thread.lastReply || thread.attempts > 1) && <span className="block w-full truncate pl-6 text-xs text-muted-foreground">{[thread.attempts > 1 ? t('attempt', { count: thread.attempts }) : null, thread.lastReply].filter(Boolean).join(' · ')}</span>}
   </>
   return <li>
     {thread.issueId
@@ -81,10 +86,11 @@ function ThreadRow({ thread, issues, all, now, onOpenThread }: { thread: Thread;
 }
 
 /**
- * The right column's thread list: 等待回复 → 进行中 → 空闲 → 已解决, each
- * with its count; 已解决 starts collapsed. A failed thread waits for the
- * person, so it sits under 等待回复. Picking a thread opens it in the centre, as a
- * thread card does; the chat stays one click away (R-50, R-66).
+ * The right column's thread list (R-52): 进行中 → 受阻 → 等待你 → 空闲 →
+ * 已解决, each with its count; 已解决 starts collapsed. Outside 进行中 the
+ * judged outcome places a thread, so a failed or blocked run never reads as
+ * resolved. Picking a thread opens it in the centre, as a thread card does;
+ * the chat stays one click away (R-50, R-66).
  */
 export function ThreadList({ threads, issues, all = false, onOpenThread }: { threads: Thread[]; issues: Issue[]; all?: boolean; onOpenThread: (thread: { issueId: string; runId: string }) => void }) {
   const t = useTranslations('Shell.threads')
@@ -92,7 +98,7 @@ export function ThreadList({ threads, issues, all = false, onOpenThread }: { thr
   const now = useNow({ updateInterval: 60_000 })
   if (!threads.length) return <p className="px-2 py-6 text-center text-xs text-muted-foreground">{t('empty')}</p>
   const groups = groupThreads(threads, id => issues.find(issue => issue.id === id))
-  const rows = (list: Thread[]) => <ul className="flex flex-col">{list.map(thread => <ThreadRow key={thread.id} thread={thread} issues={issues} all={all} now={now} onOpenThread={onOpenThread} />)}</ul>
+  const rows = (list: ThreadRowOf<Thread>[], group: ThreadGroup) => <ul className="flex flex-col">{list.map(thread => <ThreadRow key={thread.id} thread={thread} group={group} issues={issues} all={all} now={now} onOpenThread={onOpenThread} />)}</ul>
   return <div role="group" aria-label={t('title')} className="flex flex-col gap-3">
     {THREAD_GROUPS.map(group => {
       const list = groups[group]
@@ -102,9 +108,9 @@ export function ThreadList({ threads, issues, all = false, onOpenThread }: { thr
         <CollapsibleTrigger render={<Button variant="ghost" className="group flex h-auto w-full p-0 text-left font-normal hover:bg-transparent" />}>
           <GroupHeader>{label}<ChevronRight aria-hidden="true" className="size-3.5 transition-transform group-data-panel-open:rotate-90" /></GroupHeader>
         </CollapsibleTrigger>
-        <CollapsibleContent>{rows(list)}</CollapsibleContent>
+        <CollapsibleContent>{rows(list, group)}</CollapsibleContent>
       </Collapsible>
-      return <section key={group} aria-label={label} className="flex flex-col gap-1"><GroupHeader>{label}</GroupHeader>{rows(list)}</section>
+      return <section key={group} aria-label={label} className="flex flex-col gap-1"><GroupHeader>{label}</GroupHeader>{rows(list, group)}</section>
     })}
   </div>
 }

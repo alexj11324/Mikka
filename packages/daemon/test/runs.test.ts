@@ -93,6 +93,12 @@ function states(chunks: RunChunk[]) {
   )
 }
 
+function stages(chunks: RunChunk[]) {
+  return chunks.flatMap((c) =>
+    c.type === "data-run-stage" ? [[c.data.stage, c.data.ok] as const] : []
+  )
+}
+
 afterEach(async () => {
   for (const daemon of daemons.splice(0)) await daemon.stop()
 })
@@ -127,8 +133,9 @@ describe("mock runs", () => {
     const origin = join(tempDir(), "origin.git")
     git(source, "clone", "--bare", source, origin)
     const cases = [
+      // Only the server's allow (an admitted GitHub App grant) fetches and pushes the issue branch; a local approval no longer stands in.
       { decision: "allow", approved: false, expected: true },
-      { decision: "ask", approved: true, expected: true },
+      { decision: "ask", approved: true, expected: false },
       { decision: "ask", approved: false, expected: false },
       { decision: "deny", approved: true, expected: false },
     ] as const
@@ -141,7 +148,8 @@ describe("mock runs", () => {
         issueId: `issue-${decision}-${approved}`, repoId: "repo-1",
         remoteUrl: pathToFileURL(origin).href, harness: "mock", prompt: "inspect",
         pushBranch: "mikka/issue-1", fixture: "turn-ended",
-        policy: { ...defaults, permissions: { ...defaults.permissions, git_push: decision } },
+        // ask is what an older server could still send over the wire; it carries no push authority.
+        policy: { ...defaults, permissions: { ...defaults.permissions, git_push: decision as "allow" | "deny" } },
       })
       const run = await runToEnd(daemon, server, runId)
       // An isolated child process observes the same checkout a CLI receives.
@@ -179,6 +187,9 @@ describe("mock runs", () => {
       "finishing",
       "succeeded",
     ])
+    // Each start-up stage is stored with its duration, in order.
+    expect(stages(chunks)).toEqual([["repository", true], ["worktree", true], ["agent_start", true]])
+    expect(chunks.filter((c) => c.type === "data-run-stage").every((c) => !("transient" in c) && typeof (c.data as { ms: number }).ms === "number")).toBe(true)
     expect(chunks.some((c) => c.type === "data-file-change")).toBe(true)
     expect(server.issueStatus.get("issue-success-edit")).toBe("in_review")
     expect(server.runs.get(runId)?.state).toBe("succeeded")
@@ -233,6 +244,22 @@ describe("mock runs", () => {
     expect(daemon.supervisor.list().some(run => run.runId === runId)).toBe(false)
     expect(existsSync(join(dataDir, "worktrees", runId))).toBe(false)
     expect(existsSync(join(repo, "MIKKA_MOCK.md"))).toBe(false)
+  })
+
+  it("a run whose repository cannot be fetched records that stage as failed, and nothing after it", async () => {
+    const { server, dataDir } = await setup()
+    const daemon = await boot(server, dataDir)
+    const missing = join(dataDir, "no-such-repo")
+    const runId = server.queueRun(DEVICE, {
+      issueId: "issue-missing-repo", repoId: "repo-1", baseBranch: "main", harness: "mock",
+      prompt: "do it", fixture: "success-edit", verifyCommand: VERIFY,
+      remoteUrl: pathToFileURL(missing).href,
+    })
+    await daemon.syncWithServer()
+    await waitFor(() => server.runs.get(runId)?.completion)
+    await waitFor(() => daemon.status().pendingUploads === 0)
+    expect(server.runs.get(runId)?.completion?.stopReason).toBe("error")
+    expect(stages(server.chunksFor(runId))).toEqual([["repository", false]])
   })
 
   it("accepts an approved repository URL delivered at claim without registering a checkout", async () => {

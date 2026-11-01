@@ -19,7 +19,8 @@ export async function provisionCloudDevice(pool: Pool, actor: { userId: string; 
       if (!device.rowCount) throw new Error('Invalid cloud device')
     } else {
       deviceId = randomUUID()
-      await client.query('INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,$3,$4)', [deviceId, actor.userId, 'Cloud computer', 'cloud'])
+      // The bot's computer keeps its name; the sandbox hostname (e2b.local) never replaces it.
+      await client.query('INSERT INTO devices (id,"ownerId",name,kind,"nameLocked") VALUES ($1,$2,$3,$4,true)', [deviceId, actor.userId, 'Cloud computer', 'cloud'])
       await client.query('UPDATE cloud_machines SET "deviceId"=$2 WHERE "workspaceId"=$1 AND "ownerId"=$3', [actor.workspaceId, deviceId,actor.userId])
     }
     await client.query('UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=$1 AND "revokedAt" IS NULL', [deviceId])

@@ -43,11 +43,11 @@ for (const width of [1280, 402]) {
     await testInfo.attach(`github-settings-repositories-dialog-${width}`, { body: await page.screenshot(), contentType: 'image/png' })
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
-    // The two writes are this person's own settings, saved for real and read back on the next visit.
+    // 推送分支 is the GitHub App's own grant (decision 2026-11-01-1215): shown, with no switch.
+    // 创建 Pull Request is this person's own setting, saved for real and read back on the next visit.
     const pullRequest = page.getByRole('group', { name: '创建 Pull Request', exact: true })
-    const push = page.getByRole('group', { name: '推送分支', exact: true })
-    await expect(push.getByRole('button', { name: '允许', exact: true })).toHaveAttribute('aria-pressed', 'true')
-    await expect(push.getByRole('button', { name: '询问', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('group', { name: '推送分支', exact: true })).toHaveCount(0)
+    await expect(page.getByText('由 GitHub App 授权决定', { exact: true })).toBeVisible()
     await expect(pullRequest.getByRole('button', { name: '允许', exact: true })).toHaveAttribute('aria-pressed', 'true')
     const saved = page.waitForResponse(response => response.url().endsWith('/api/integrations/github/permissions') && response.request().method() === 'PATCH')
     await pullRequest.getByRole('button', { name: '拒绝', exact: true }).click()
