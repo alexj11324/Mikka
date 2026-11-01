@@ -95,8 +95,14 @@ Playwright browser is not installed.
 - With `next dev`, warm it first: open every route the spec visits once before
   the run. A first compile takes 10–35 seconds and lands inside the specs'
   15-second assertions; the run then fails on timing, not on the code.
-- Sign-up is limited to three per ten seconds from one origin. Run one spec
-  process at a time and do not register by hand during a run.
+- Every test registers a new account. Start the server with the sign-up and
+  verification throttle values the browser workflow uses
+  (`MIKKA_SIGNUP_IP_HOURLY`, `MIKKA_SIGNUP_GLOBAL_HOURLY`,
+  `MIKKA_VERIFICATION_IP_HOURLY`, `MIKKA_VERIFICATION_GLOBAL_HOURLY` in
+  `.github/workflows/browser-tests.yml`); the defaults allow five sign-ups per
+  address an hour (`lib/abuse/signup.ts`). Better Auth also allows three
+  sign-ups per ten seconds from one origin: run one spec process at a time and
+  do not register by hand during a run.
 
 The environment binding is immutable for its lifetime. A new SHA or origin
 requires a new disposable environment and descriptor; changing an alias while
