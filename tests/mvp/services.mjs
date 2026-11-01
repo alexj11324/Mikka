@@ -29,8 +29,12 @@ async function readBody(request) {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {}
 }
 
-/** Loopback only. Real git changes are required before the fake GitHub accepts a PR. */
-export async function startMvpServices(port = 3191) {
+/**
+ * Loopback only. Real git changes are required before the fake GitHub accepts a PR.
+ * `routes` (pnpm dev:local's other substitutes, scripts/dev-local/services.mjs)
+ * sees each request first and returns true when it answered it.
+ */
+export async function startMvpServices(port = 3191, { routes } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-mvp-origin-'))
   await indexMvpResource('origin-directory', directory)
   let scenario = null
@@ -44,6 +48,7 @@ export async function startMvpServices(port = 3191) {
     const url = new URL(request.url, 'http://127.0.0.1')
     const reply = (value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json', 'x-mvp-request-id': requestId }); response.end(JSON.stringify(value)) }
     try {
+      if (routes && await routes(request, response, url)) return
       if (url.pathname === '/health') return reply({ ready: true })
       if (url.pathname === '/observations') return reply({ observations, errors, pullRequests: pullRequests.map(pr => ({ number: pr.number, url: pr.html_url, branch: pr.head.ref, draft: pr.draft })) })
       if (url.pathname === '/streaming/scenario' && request.method === 'POST') {

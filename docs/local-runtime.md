@@ -97,11 +97,11 @@ thread showing it, with no request to api.github.com. One command, hot reload,
 no `next build`:
 
 - the local fake services from `tests/mvp/services.mjs` on `127.0.0.1:3191`
-  (GitHub API, Decisions), with a bare `file://` origin for the repository
+  (GitHub API, plus the substitutes in `scripts/dev-local/services.mjs`), with a bare `file://` origin for the repository
   `mikka-e2e/core-loop` (default branch `trunk`);
 - `next dev` on `MIKKA_DEV_PORT` (3000) with `scripts/dev-local/preload.mjs`,
-  which sends only `https://api.github.com` to the fake (and the Decisions
-  endpoint when no real `AI_GATEWAY_API_KEY` is set);
+  which sends `https://api.github.com` to the fake, and the AI Gateway and
+  Resend to their substitutes only when no real key for them is set;
 - the daemon from source with `tsx`. Only the daemon's git sees a rewrite of
   the repository URL to the local origin.
 
@@ -119,11 +119,33 @@ What is fake and what is real:
 | GitHub App, installation, push grant, pull requests | Fake (`tests/mvp/services.mjs`); a fresh App key is generated at start |
 | Repository | A local bare `file://` origin seeded with `README.md` |
 | GitHub identity | Synthetic: every local account is linked to GitHub account `4242`, which the fake lets write |
-| Decisions | Real with a real `AI_GATEWAY_API_KEY`; otherwise the fake |
-| Model | Real: the workspace's own API key (Settings › API 与订阅) |
+| Model, a workspace's own key (Settings › API 与订阅) | Real |
+| Mikka 默认 and the Coordinator through the [AI Gateway](https://vercel.com/docs/ai-gateway) | Real with a real `AI_GATEWAY_API_KEY`; otherwise a scripted model: it echoes (`Local model: <text>`), a message `/tool <name> <json>` calls that registered tool for real, and a tool result comes back as JSON |
+| Decisions (AI Gateway Decision API: triage, run outcome, push) | Real with a real `AI_GATEWAY_API_KEY`; otherwise the first choice of each question, `0.5` for a predicate |
+| Card verification and credit for Mikka 默认 (Stripe) | Every local workspace gets a verification and a $1000 local allowance, checked every 5 seconds |
+| Verification and password-reset mail ([Resend](https://resend.com/docs/api-reference/emails/send-email)) | Real with a real `RESEND_API_KEY`; otherwise a local outbox at `http://127.0.0.1:3191/mail` (JSON at `/mail.json`), one terminal line per mail |
+| Cron (the production minute Worker, `cloudflare/suggestions-cron`) | `scripts/dev-local/cron.mjs` calls the same `/api/cron/*` endpoints on the same schedule against `next dev`, with `CRON_SECRET` or a local placeholder ([securing cron jobs](https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs)) |
+| [Vercel Workflow](https://useworkflow.dev/docs/deploying/world/local-world) | The local world, as `next dev` always uses off Vercel |
 | Database, auth, daemon, git clone/worktree/commit/push | Real |
 
 First run: sign up at `http://localhost:3000/mikka`, then approve the device
 with the code the script prints. Ask the Coordinator to change
 `mikka-e2e/core-loop`. Running as root, set `MIKKA_DEV_DAEMON_USER` to an
 unprivileged user for the daemon (bubblewrap).
+
+The placeholders (`AI_GATEWAY_API_KEY`, `RESEND_API_KEY`, `CRON_SECRET`) are
+set in the `next dev` process only, never in the shell, so the test-account
+harness, which refuses provider keys, is unaffected. Only the local
+substitutes accept them.
+
+Not substituted:
+
+| Service | Local behaviour |
+| --- | --- |
+| PostHog | No key: every server flag reads off and kill switches read "not killed"; only the proactive profile feature (`mikka-proactive-profile`) stays hidden. The browser client's host is fixed to PostHog cloud, so a local flag service would need an application change. |
+| E2B cloud computers / cloud worker | `NEXT_PUBLIC_COMPUTER_MOCK=1` for the UI. Real runs would need a local container provider in place of `lib/computer/e2b-provider.ts`. |
+| Stripe checkout and webhooks | Billing pages say billing is not configured; the local credit above is what runs need. |
+| Composio, Linear, Slack, Telegram, Firecrawl, Expo push, Turnstile | Off without their keys, with no effect on the loop. |
+
+`pnpm test:dev-local` covers the guard, the routing, the cron schedule and the
+real AI SDK gateway provider against the substitutes.
