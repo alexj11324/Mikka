@@ -15,6 +15,7 @@ import {
 } from "./execution-rules";
 import { isDeviceOnline } from "@mikka/protocol/device";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
+import { ownE2BKeySql } from "./secrets/e2b-owner-sql";
 
 export interface ExecutionSettingsScope {
   ownerId: string;
@@ -85,8 +86,8 @@ export class ExecutionSettings {
       model: model.modelId,
       position: 2147483647,
     };
-    // Cloud first when the workspace has its own E2B key (decision 2026-10-31-2200-run-machine-fallback).
-    if (cloud && (await query.query('SELECT 1 FROM workspace_e2b_keys WHERE "workspaceId"=$1', [scope.workspaceId])).rowCount) return cloud;
+    // Cloud first when the person has their own E2B key (decision 2026-10-31-2200-run-machine-fallback; the key is personal).
+    if (cloud && (await query.query(`SELECT ${ownE2BKeySql("$1")} AS own`, [scope.ownerId])).rows[0]?.own) return cloud;
     const devices = places
       .filter((p) => p.id !== "cloud" && p.enabled && p.online && autoScheduleOn(p))
       .sort(

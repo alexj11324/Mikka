@@ -29,7 +29,7 @@ import { MemorySettings } from '@/components/settings/memory-settings'
 import { LocaleSetting } from '@/components/settings/locale-setting'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
-import { SecretsSettings } from '@/components/settings/secrets-settings'
+import { E2BKeySettings, SecretsSettings } from '@/components/settings/secrets-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
@@ -122,7 +122,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
-    case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} /> : waiting}</>
+    case 'models': return <>{workspaceId && !preview ? <><ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} /><E2BKeySettings key={`e2b-${workspaceId}`} workspaceId={workspaceId} /></> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting

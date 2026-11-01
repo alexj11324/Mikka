@@ -14,6 +14,7 @@ import { defaultAgentCopy } from "./agent-copy";
 import { harnessForModel } from "@mikka/protocol/harness";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
 import { COORDINATOR_MODEL } from "./coordinator/model";
+import { ownE2BKeySql } from "./secrets/e2b-owner-sql";
 
 type Query = Pick<Pool, "query">;
 type DeviceRow = ExecutionDevice & { lastSeenAt: Date | null; deviceType?: string | null; autoSchedule?: boolean | null };
@@ -38,9 +39,9 @@ export async function cloudReady(
 ) {
   if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== "1" || !scope.botId) return false;
   const { rowCount } = await query.query(
-    `SELECT 1 FROM workspace_e2b_keys k JOIN bots b ON b."workspaceId"=k."workspaceId"
-      WHERE k."workspaceId"=$1 AND b.id=$2 AND b."ownerId"=$3 AND b."archivedAt" IS NULL
-        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=k."workspaceId" AND p.permission='deny') LIMIT 1`,
+    `SELECT 1 FROM bots b
+      WHERE b."workspaceId"=$1 AND b.id=$2 AND b."ownerId"=$3 AND b."archivedAt" IS NULL AND ${ownE2BKeySql('b."ownerId"')}
+        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny') LIMIT 1`,
     [scope.workspaceId, scope.botId, scope.ownerId],
   );
   return Boolean(rowCount);
