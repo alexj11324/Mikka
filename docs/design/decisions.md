@@ -207,7 +207,7 @@ Questions waiting on Alex. Move a row to "Decided" when he answers.
 
 | Since | Question | Default until answered |
 | --- | --- | --- |
-| 2026-10-28 | ~~待 Alex 确认：本机线程只接受可 clone 的远程仓库；没有 origin 的本地仓库不支持。来源：核心闭环 MVP 第 3 项。~~ 已决定：从远端默认分支（需要时可用远端其他已推送分支）开新分支，在沙盒里运行，见 [2026-11-01-2300-thread-visibility-follows-warp](decisions/2026-11-01-2300-thread-visibility-follows-warp.md) 和 [2026-11-01-2245-thread-privacy-and-local-isolation](decisions/2026-11-01-2245-thread-privacy-and-local-isolation.md)。 | ~~按请求的 remote URL 在 daemon 缓存中 clone；不读取本地 checkout。~~ |
+| 2026-10-28 | ~~待 Alex 确认：本机线程只接受可 clone 的远程仓库；没有 origin 的本地仓库不支持。来源：核心闭环 MVP 第 3 项。~~ 已决定：从 GitHub 仓库自己设置的默认分支开新分支（同一 issue 可接着前一个线程已推送的分支），在沙盒里运行，见 [2026-11-01-2300-thread-visibility-follows-warp](decisions/2026-11-01-2300-thread-visibility-follows-warp.md) 和 [2026-11-01-2245-thread-privacy-and-local-isolation](decisions/2026-11-01-2245-thread-privacy-and-local-isolation.md)。 | ~~按请求的 remote URL 在 daemon 缓存中 clone；不读取本地 checkout。~~ |
 | 2026-10-28 | ~~待 Alex 确认：线程看不到用户 checkout 里未提交的改动。来源：核心闭环 MVP 第 3 项。~~ 已决定：不改本地 checkout，也看不到未提交的改动，见 [2026-11-01-2245-thread-privacy-and-local-isolation](decisions/2026-11-01-2245-thread-privacy-and-local-isolation.md)。 | ~~每个线程从远程分支建立独立 worktree；用户先提交并推送需要带入的改动。~~ |
 | 2026-10-24 | Remove white hairlines app-wide (dialog and popover rings, column borders), not only inputs? | Inputs only |
 | 2026-10-24 | Token drift between Figma and code (`rules.md` § Tokens): which side moves? | Code value ships, Figma follows |

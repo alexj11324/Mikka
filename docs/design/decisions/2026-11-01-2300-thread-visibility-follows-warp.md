@@ -3,7 +3,7 @@
 - Date: 2026-11-01
 - Source: Alex, relayed by the coordinator session: 「按照他们的去做，我们的和他们不一样的话，以他们的为准」 (they = Warp Factories)
 - Rule: R-62
-- Replaces: [2026-11-01-2245-thread-privacy-and-local-isolation](2026-11-01-2245-thread-privacy-and-local-isolation.md) rule 1 (only the starter sees a thread), and its rule 2's "from the remote `main`" (see rule 3 below; the rest of rule 2 stands).
+- Replaces: [2026-11-01-2245-thread-privacy-and-local-isolation](2026-11-01-2245-thread-privacy-and-local-isolation.md) rule 1 (only the starter sees a thread), and the base branch in its rule 2 (see rule 3 below; the rest of rule 2 stands).
 
 1. **A thread a bot or the Coordinator dispatches in a workspace is a Warp
    Factories run.** By default every member who can access that bot sees it:
@@ -17,16 +17,15 @@
    for edit access, and once the owner approves, they send instructions in
    it. Without edit access, continuing it forks a copy.
 3. **One thread is one task; an issue can have several threads.** A thread on
-   a person's own computer starts a new branch from the remote's default
-   branch (usually `main`, never only `main`). When the work needs it, the
-   Agent starts from another remote branch, such as the branch an earlier
-   thread for the same issue already pushed. It uses only what is pushed to
-   the remote, never the person's local checkout or uncommitted changes, and
-   runs in a sandbox (an isolated worktree). The daemon already does this:
-   a new thread for an issue starts from that issue's pushed branch
-   (`packages/daemon/src/runs/supervisor.ts:1063-1082`), else from the
-   repository's `baseBranch`, else `origin/HEAD`
-   (`packages/daemon/src/repositories.ts:60-68`).
+   a person's own computer starts a new branch from the default branch the
+   GitHub repository itself sets. The repository's maintainers choose it;
+   Mikka does not set, override or change it. A new thread for the same issue
+   may continue from the branch an earlier thread already pushed to the
+   remote. A thread uses only what is on the remote, never the person's local
+   checkout or uncommitted changes, and runs in a sandbox (an isolated
+   worktree). 现状（非决定）：the code still has a hard-coded branch name in
+   places; Codex is fixing it in
+   [#838](https://github.com/alexj11324/Mikka/issues/838).
 
 ## What Warp's documentation says
 
