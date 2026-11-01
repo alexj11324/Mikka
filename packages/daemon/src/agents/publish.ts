@@ -17,7 +17,7 @@ import {
   rmSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import { assertSafeId } from "../ids"
 
 import type { RunPublish } from "@mikka/protocol"
@@ -113,16 +113,19 @@ export async function worktreeGitDir(
   throw new Error(`${worktree} is not a worktree of ${repoPath}`)
 }
 
-/** Only this run's git administration and shared immutable object storage. */
+/**
+ * The repository the worktree belongs to, as sandbox-runtime expects a
+ * repository to be granted: its root directory, with `.git` beneath it. The
+ * runtime itself keeps that `.git/config` and `.git/hooks` read-only
+ * (mandatory deny paths), so git can take any lock it needs in `.git`
+ * (refs, packed-refs, logs, objects). Listing files inside `.git` instead
+ * makes each one a mount point, and git's rename of a lock over it fails.
+ */
 export async function worktreeGitWritePaths(repoPath: string, worktree: string, runId: string): Promise<string[]> {
-  const gitDir = await worktreeGitDir(repoPath, worktree)
-  const common = resolve(gitDir, '..', '..')
-  const branch = `mikka/run-${assertSafeId('run id', runId)}`
-  // Directories only. The sandbox bind-mounts every listed path; git updates a
-  // ref by writing `<branch>.lock` and renaming it over the ref, and a rename
-  // onto a mount point fails with EBUSY ("couldn't set refs/heads/..."). The
-  // run's ref and reflog live in these two directories.
-  return [gitDir, join(common, 'objects'), dirname(join(common, 'refs', 'heads', branch)), dirname(join(common, 'logs', 'refs', 'heads', branch))]
+  assertSafeId('run id', runId)
+  const common = resolve(await worktreeGitDir(repoPath, worktree), '..', '..')
+  if (basename(common) !== '.git') throw new Error(`${repoPath} is not a standard clone`)
+  return [dirname(common)]
 }
 
 function safeRealpath(path: string) {

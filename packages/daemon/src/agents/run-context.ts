@@ -326,6 +326,10 @@ export class RunContext {
         join(this.gitDir, "commondir"),
         join(this.gitDir, "gitdir"),
         join(this.gitDir, "config.worktree"),
+        // sandbox-runtime's own protection of a repository's config and hooks
+        // covers repositories under the process's working directory only;
+        // the shared clone lies outside it, so it is declared here the same way.
+        ...(this.options.gitWritePaths?.length ? [join(this.gitDir, "..", "..", "config"), join(this.gitDir, "..", "..", "hooks")] : []),
         ...(readOnly ? [this.worktree, ...(this.options.gitWritePaths ?? [])] : []),
       ],
       denyRead: [
