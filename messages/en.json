@@ -2791,7 +2791,9 @@
       "manage": "Manage API and subscriptions",
       "unavailable": "Unavailable",
       "notSaved": "Not saved",
-      "unknownModel": "Unknown model"
+      "unknownModel": "Unknown model",
+      "refresh": "Refresh models",
+      "refreshFailed": "Refresh failed. Try again"
     }
   },
   "AgentCopy": {

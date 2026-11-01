@@ -4,7 +4,7 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { ActionFailureError } from '@/lib/action-error'
 import { pool } from '@/lib/db'
 import { ExecutionSettings } from '@/lib/execution-settings'
-import { botModelMenu, botModelScope } from '@/lib/bot-model-menu'
+import { botModelMenu, botModelScope, refreshBotModelMenu } from '@/lib/bot-model-menu'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 
 export const dynamic = 'force-dynamic'
@@ -51,5 +51,20 @@ async function handlePUT(request: Request) {
   } catch (error) { return failed(error) }
 }
 
+/** `POST /api/mobile/model` with `{ bot }`: 刷新, re-reads the menu after asking each subscription for its models. */
+async function handlePOST(request: Request) {
+  const user = await mobileUser(request)
+  noteLogUser(user?.id)
+  if (!user) return unauthorized()
+  if (!writeAllowed(request)) return forbiddenOrigin()
+  const body = z.strictObject({ bot: botParam }).safeParse(await request.json().catch(() => null))
+  if (!body.success) return json({ error: 'invalidBot' }, 400)
+  try {
+    const scope = await botModelScope(user.id, body.data.bot, user[tokenWorkspace])
+    return json(await refreshBotModelMenu(pool, new ExecutionSettings(pool), scope, body.data.bot))
+  } catch (error) { return failed(error) }
+}
+
 export const GET = withRequestLog('/api/mobile/model', handleGET)
 export const PUT = withRequestLog('/api/mobile/model', handlePUT)
+export const POST = withRequestLog('/api/mobile/model', handlePOST)

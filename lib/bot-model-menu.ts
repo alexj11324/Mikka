@@ -152,3 +152,28 @@ async function connectionQuota(pool: Pick<Pool, "query">, connectionId: string) 
     await pool.query("SELECT quota FROM byos_connections WHERE id::text=$1", [String(connectionId)])
   ).rows[0]?.quota;
 }
+
+/**
+ * 刷新模型列表: asks each subscription the menu lists for its current models
+ * (`refreshBotModels`), then reads the menu again, so a new subscription, a
+ * renewed quota or a new model shows at once. A provider that does not answer
+ * in time keeps its last catalogue; the menu is still re-read.
+ */
+export async function refreshBotModelMenu(
+  pool: Pick<Pool, "query">,
+  settings: Pick<ExecutionSettings, "botModels" | "botBinding" | "refreshBotModels">,
+  scope: ExecutionSettingsScope,
+  botId: string | null,
+  timeoutMs = 8000,
+): Promise<BotModelMenu> {
+  const connections = [...new Set((await settings.botModels(scope)).map((row) => String(row.connectionId)))];
+  await Promise.allSettled(
+    connections.map((connectionId) =>
+      Promise.race([
+        settings.refreshBotModels(scope, connectionId),
+        new Promise((resolve) => setTimeout(resolve, timeoutMs).unref?.()),
+      ]),
+    ),
+  );
+  return botModelMenu(pool, settings, scope, botId);
+}

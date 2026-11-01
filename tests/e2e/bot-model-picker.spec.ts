@@ -58,6 +58,32 @@ test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 
   }
   await expect.poll(placement).toEqual({ left: 0, gap: 4 })
   await testInfo.attach('model-menu', { body: await page.screenshot(), contentType: 'image/png' })
+
+  // 刷新模型列表: a subscription connected while the menu is open shows after a refresh, and the menu stays open.
+  const fresh = randomUUID()
+  await db().query(`INSERT INTO byos_connections (id, "ownerId", "workspaceId", provider, state, epoch, "secretName", "secretDigest", "providerSubject")
+    SELECT $1, "ownerId", "workspaceId", 'claude', 'connected', 1, $2, $3, 'e2e-subject' FROM byos_connections WHERE id = $4`, [fresh, `e2e-fixture-${fresh}`, 'a'.repeat(64), connections.claude])
+  await db().query(`INSERT INTO byos_bindings (id, "ownerId", "workspaceId", "consumerId", "connectionId", "connectionRevision", route, "modelId")
+    SELECT $1, "ownerId", "workspaceId", 'e2e-consumer', $2, 1, 'claude_cpa', 'claude-fresh-e2e-model' FROM byos_connections WHERE id = $2`, [randomUUID(), fresh])
+  const refresh = menu.getByTestId('bot-model-refresh')
+  await expect(refresh).toHaveAccessibleName('刷新模型列表')
+  await refresh.click()
+  await expect(menu.getByRole('menuitemradio', { name: /claude-fresh-e2e-model/ })).toBeVisible()
+  await expect(menu).toBeVisible()
+  // A refresh that fails says so inside the menu, and the row retries.
+  const isAction = (request: import('@playwright/test').Request) => request.method() === 'POST' && Boolean(request.headers()['next-action'])
+  // The refresh gets an answer that is not the action's: it fails without a network error.
+  await page.route('**/*', route => isAction(route.request()) ? route.fulfill({ status: 200, contentType: 'text/plain', body: 'unavailable' }) : route.fallback())
+  await refresh.click()
+  const retry = menu.getByRole('menuitem', { name: '刷新失败，重试' })
+  await expect(retry).toBeVisible()
+  await page.unroute('**/*')
+  await retry.click()
+  await expect(retry).toHaveCount(0)
+  await expect(menu).toBeVisible()
+  await db().query(`UPDATE byos_connections SET state = 'disconnected' WHERE id = $1`, [fresh])
+  await refresh.click()
+  await expect(menu.getByRole('menuitemradio', { name: /claude-fresh-e2e-model/ })).toHaveCount(0)
   await menu.getByRole('menuitemradio', { name: /codex-e2e-model/ }).click()
 
   await expect(chip).toHaveAccessibleName('模型：codex-e2e-model')

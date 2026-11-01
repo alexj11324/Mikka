@@ -2791,7 +2791,9 @@
       "manage": "管理 API 与订阅",
       "unavailable": "不可用",
       "notSaved": "未保存",
-      "unknownModel": "未知模型"
+      "unknownModel": "未知模型",
+      "refresh": "刷新模型列表",
+      "refreshFailed": "刷新失败，重试"
     }
   },
   "AgentCopy": {

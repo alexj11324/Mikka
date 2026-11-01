@@ -5,7 +5,7 @@ import { ActionFailureError } from "@/lib/action-error";
 import { loadWorkspaceContext } from "@/lib/workspace-access";
 import { pool } from "@/lib/db";
 import { ExecutionSettings } from "@/lib/execution-settings";
-import { botModelMenu, botModelScope } from "@/lib/bot-model-menu";
+import { botModelMenu, botModelScope, refreshBotModelMenu } from "@/lib/bot-model-menu";
 async function context(workspaceId?: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ActionFailureError("authRequired");
@@ -77,6 +77,11 @@ async function chatScope(botId: string | null) {
 export async function getBotModelMenu(botId: string | null) {
   const scope = await chatScope(botId);
   return botModelMenu(pool, new ExecutionSettings(pool), scope, botId);
+}
+/** 刷新模型列表: re-reads what this person can use here, after asking each subscription for its models. */
+export async function refreshBotModelMenuAction(botId: string | null) {
+  const scope = await chatScope(botId);
+  return refreshBotModelMenu(pool, new ExecutionSettings(pool), scope, botId);
 }
 /** Saves the composer's pick for the bot's next runs; a run already going keeps its model. */
 export async function chooseBotModel(botId: string | null, id: string) {

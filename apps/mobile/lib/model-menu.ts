@@ -46,5 +46,19 @@ export function useModelMenu(botId: string | null) {
       setFailed(true)
     }
   }, [botId, setData])
-  return { menu: data, choose, failed }
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshFailed, setRefreshFailed] = useState(false)
+  /** 刷新: asks each subscription for its models, then reads the menu again. */
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
+    setRefreshFailed(false)
+    try {
+      setData(await api<ModelMenu>('/api/mobile/model', { method: 'POST', body: { bot: botId } }))
+    } catch {
+      setRefreshFailed(true)
+    } finally {
+      setRefreshing(false)
+    }
+  }, [botId, setData])
+  return { menu: data, choose, failed, refresh, refreshing, refreshFailed }
 }

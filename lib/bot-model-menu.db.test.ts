@@ -131,6 +131,29 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal((await botModelMenu(pool, settings, alice, botA)).current.available, false);
     await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [claude, quota(1, PAST)]);
     assert.equal((await botModelMenu(pool, settings, alice, botA)).current.available, true);
+
+    // 6. 刷新模型列表: a subscription connected since the menu was read, and a model its provider now offers, show at once.
+    const { refreshBotModelMenu } = await import("./bot-model-menu");
+    const fresh = await connection("alice", workspace, "claude", "connected");
+    await binding("alice", workspace, fresh, "claude-fresh-fixture", "claude_cpa");
+    const discovering = {
+      botModels: settings.botModels.bind(settings),
+      botBinding: settings.botBinding.bind(settings),
+      refreshBotModels: (scope: typeof alice, connectionId: string) =>
+        settings.refreshBotModels(scope, connectionId, async () => connectionId === claude ? [{ id: "claude-sonnet-fixture" }, { id: "claude-opus-fixture" }, { id: "claude-new-fixture" }] : [{ id: "claude-fresh-fixture" }]),
+    };
+    const refreshed = await refreshBotModelMenu(pool, discovering, alice, botA);
+    const models = refreshed.groups.flatMap((group) => group.options.map((option) => option.modelId));
+    for (const model of ["claude-new-fixture", "claude-fresh-fixture"]) assert.ok(models.includes(model), model);
+    // A provider that does not answer keeps its catalogue; the menu is still read.
+    const hanging = { ...discovering, refreshBotModels: () => new Promise<never>(() => {}) };
+    const started = Date.now();
+    const kept = await refreshBotModelMenu(pool, hanging, alice, botA, 50);
+    assert.ok(Date.now() - started < 2000);
+    assert.deepEqual(kept.groups.flatMap((group) => group.options.map((option) => option.modelId)).sort(), models.sort());
+    // A provider that refuses (signed out, backend down) is skipped the same way.
+    const refusing = { ...discovering, refreshBotModels: async () => { throw new Error("provider down"); } };
+    assert.ok((await refreshBotModelMenu(pool, refusing, alice, botA)).groups.length > 1);
   } finally {
     await pool.end();
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);

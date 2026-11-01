@@ -21,6 +21,12 @@ running app on main is the only design source); this file fixes the content.
   group with nothing in it is left out. Only credentials the resolver can use
   in this workspace are listed. The Coordinator only uses its own person's
   credentials, so its menu has no 团队成员分享的 group.
+- **Refresh.** A refresh icon sits at the right of 「管理 API 与订阅」
+  (「刷新模型列表」). It asks each listed subscription for its models and
+  re-reads what the person can use. Opening the menu refreshes too, in the
+  background, over what the menu already shows. The icon turns while it works,
+  the menu stays open, and a failure leaves one row, 「刷新失败，重试」. The
+  phone's menu has 「刷新」.
 - **Saved per bot,** in `bot_model_choices`. Mikka 默认 picked on purpose is a
   row with no binding; no row means nothing was picked. The choice applies to
   the bot's next runs; a run already going keeps its frozen model.

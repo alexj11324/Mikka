@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { ChevronDown, ChevronRight } from 'lucide-react'
-import { chooseBotModel, getBotModelMenu } from '@/app/actions/execution-settings'
+import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { chooseBotModel, getBotModelMenu, refreshBotModelMenuAction } from '@/app/actions/execution-settings'
 import { Link } from '@/i18n/navigation'
 import { settingsHref } from '@/lib/settings-sections'
+import { Button } from '@/components/ui/button'
 import { InputGroupButton } from '@/components/ui/input-group'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -59,6 +61,8 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
   const t = useTranslations('Coordinator.modelPicker')
   const menu = useSWR<BotModelMenu>(botModelMenuKey(botId), () => getBotModelMenu(botId), { revalidateOnFocus: true })
   const [failed, setFailed] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshFailed, setRefreshFailed] = useState(false)
   // Someone else's bot, or no menu yet: the chip is left out rather than shown wrong.
   if (!menu.data) return null
   const { current, groups } = menu.data
@@ -78,8 +82,18 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
     } catch { setFailed(true) }
   }
 
+  /** 刷新模型列表: the menu keeps what it shows until the new list arrives, and stays open. */
+  async function refresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    setRefreshFailed(false)
+    try {
+      await menu.mutate(() => refreshBotModelMenuAction(botId), { populateCache: true, revalidate: false })
+    } catch { setRefreshFailed(true) } finally { setRefreshing(false) }
+  }
+
   const name = current.id === HOSTED_CHOICE ? t('hosted') : current.modelId || t('unknownModel')
-  return <DropdownMenu>
+  return <DropdownMenu onOpenChange={open => { if (open) void refresh() }}>
     <DropdownMenuTrigger render={<InputGroupButton type="button" variant="secondary" size="xs" data-testid="bot-model-chip" data-unavailable={!current.available || undefined}
       className={cn('max-w-56 rounded-full px-2 font-normal', current.available ? 'text-foreground' : 'text-muted-foreground')}
       aria-label={current.available ? t('label', { name }) : t('labelUnavailable', { name })} />}>
@@ -102,9 +116,18 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
       </DropdownMenuRadioGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
-        <DropdownMenuItem className="text-xs text-muted-foreground" render={<Link href={settingsHref('models')} />}>
-          {t('manage')}<ChevronRight />
-        </DropdownMenuItem>
+        {refreshFailed && <DropdownMenuItem closeOnClick={false} className="text-xs text-destructive" onClick={() => { void refresh() }}>{t('refreshFailed')}</DropdownMenuItem>}
+        <div className="flex items-center gap-1">
+          <DropdownMenuItem className="flex-1 text-xs text-muted-foreground" render={<Link href={settingsHref('models')} />}>
+            {t('manage')}<ChevronRight />
+          </DropdownMenuItem>
+          <Tooltip>
+            <TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('refresh')} aria-busy={refreshing || undefined} data-testid="bot-model-refresh" onClick={() => { void refresh() }} />}>
+              <RefreshCw className={cn(refreshing && 'animate-spin motion-reduce:animate-none')} />
+            </TooltipTrigger>
+            <TooltipContent side="top">{t('refresh')}</TooltipContent>
+          </Tooltip>
+        </div>
       </DropdownMenuGroup>
     </DropdownMenuContent>
   </DropdownMenu>
