@@ -2140,7 +2140,6 @@
         "all": "All",
         "security": "Security"
       },
-      "export": "Export",
       "exportCsv": "Export CSV",
       "empty": "Nothing in the last 90 days.",
       "loadMore": "Load more",
