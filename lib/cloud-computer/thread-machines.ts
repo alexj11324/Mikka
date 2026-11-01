@@ -10,6 +10,8 @@ import { installSubagentRuntime, runtimeRequest } from './runtime'
 import { e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
+import { workspaceSecretMasker } from '@/lib/secrets/runtime'
+import { readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder } from './thread-worker-logs'
 import { credentialProbeCommand, credentialScrubCommand } from '../../packages/daemon/src/credential-globs'
 /** A thread machine runs on its owner's own E2B key (orchestration § 2); this module only acts for that owner. */
 async function options(ownerId: string) {
@@ -128,9 +130,13 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
  * a resume mints new ones. A refused pause (503, the sandbox keeps running)
  * throws, and the lifecycle tries again on its next tick.
  */
-export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string, pause: (sandboxId: string) => Promise<unknown> = sandboxId => withE2BErrors(actor.userId, false, async () => Sandbox.pause(sandboxId, await options(actor.userId)))) {
+export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
+  pause: (sandboxId: string) => Promise<unknown> = sandboxId => withE2BErrors(actor.userId, false, async () => Sandbox.pause(sandboxId, await options(actor.userId))),
+  readTail: (sandboxId: string) => Promise<string | null> = sandboxId => readWorkerTail(() => connectComputer(actor.workspaceId, sandboxId))) {
   const machine = (await pool.query(`SELECT "sandboxId","deviceId",state FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3`, [runId, actor.userId, actor.workspaceId])).rows[0]
   if (!machine?.sandboxId || machine.state === 'ended' || machine.state === 'paused') return
+  // What the run's worker printed, kept with the machine before it sleeps. Best effort.
+  await saveWorkerTail(pool, runId, await readTail(machine.sandboxId), await workspaceSecretMasker(actor.workspaceId)).catch(() => undefined)
   await pause(machine.sandboxId)
   const client = await pool.connect()
   try {
@@ -140,6 +146,11 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
     await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [machine.deviceId])
     await client.query('COMMIT')
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+}
+
+/** The worker's last output, saved before a kill; never throws, never waits past readWorkerTail's timeout. */
+export async function keepTailBeforeKill(pool: Pick<Pool, 'query'>, actor: Actor, runId: string, sandboxId: string, readTail: (sandboxId: string) => Promise<string | null> = id => readWorkerTail(() => connectComputer(actor.workspaceId, id))) {
+  try { await saveWorkerTail(pool, runId, await readTail(sandboxId), await workspaceSecretMasker(actor.workspaceId)) } catch { /* the kill goes ahead */ }
 }
 
 /** Closed, duplicate or deleted tasks give up their paused sandboxes for good (kill, device retired). */
@@ -277,14 +288,21 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     await sandbox.files.write(handoff, JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) }), { user: 'root' })
     await sandbox.commands.run(`install -d -o mikka-runner -g mikka-runner -m 700 /home/mikka-runner/.mikka; install -o mikka-runner -g mikka-runner -m 600 ${handoff} /home/mikka-runner/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', timeoutMs: 10_000 })
-    await sandbox.commands.run('cd /opt/mikka/worker/packages/daemon && HOME=/home/mikka-runner ./node_modules/.bin/tsx bin/cloud-worker.ts > /home/mikka-runner/.mikka/thread-bootstrap.log 2>&1', { user: 'mikka-runner', background: true, timeoutMs: 0 })
+    // The worker's output streams into the server logs only while this invocation lives;
+    // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
+    const mask = await workspaceSecretMasker(actor.workspaceId)
+    await sandbox.commands.run(workerCommand('cd /opt/mikka/worker/packages/daemon && HOME=/home/mikka-runner ./node_modules/.bin/tsx bin/cloud-worker.ts'), { user: 'mikka-runner', background: true, timeoutMs: 0, ...workerOutputForwarder(runId, mask) })
     const deadline = Date.now() + 30_000
     let ready = false
     do {
       ready = Boolean((await pool.query('SELECT 1 FROM devices WHERE id=$1 AND "ownerId"=$2 AND "lastSeenAt">now()-interval \'30 seconds\'', [deviceId, actor.userId])).rowCount)
       if (!ready) await new Promise(resolve => setTimeout(resolve, 500))
     } while (!ready && Date.now() < deadline)
-    if (!ready) throw new Error('Thread worker did not register')
+    if (!ready) {
+      // Say what the worker printed: the run's error and the machine keep its last lines.
+      await saveWorkerTail(pool, runId, await readWorkerTail(async () => sandbox), mask, 'Thread worker did not register').catch(() => undefined)
+      throw new Error('Thread worker did not register')
+    }
     const finished = await pool.query('UPDATE thread_machines SET state=\'running\',"lastActiveAt"=now(),"runningSince"=now(),"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' RETURNING "runId"', [runId, leaseId])
     if (!finished.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
     return { runId, state: 'running' }
@@ -358,6 +376,9 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
     // destroying the dedicated filesystem that still holds their bytes.
     const { screenCaptures } = await import('@/lib/captures/screen')
     await screenCaptures.stopRunRecordings([runId])
+    // A running machine's last output is kept before the kill (a parked one kept it when it paused).
+    // Best effort and bounded: reading never blocks the kill.
+    if (sandboxId && machine.state !== 'paused') await keepTailBeforeKill(pool, actor, runId, sandboxId)
     if (sandboxId) await Sandbox.kill(sandboxId, await options(actor.userId))
     return { runId, state: 'ended' }
   }

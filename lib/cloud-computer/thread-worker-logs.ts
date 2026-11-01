@@ -37,7 +37,7 @@ export function workerOutputForwarder(runId: string, mask: Mask, log: (line: str
 
 /** The command that appends the worker's output to its file while still streaming it. */
 export function workerCommand(start: string) {
-  return `set -o pipefail; ${start} 2>&1 | tee -a ${WORKER_LOG}`
+  return `{ ${start}; } 2>&1 | tee -a ${WORKER_LOG}`
 }
 
 type TailSandbox = { commands: { run(cmd: string, opts: { user: 'root'; timeoutMs: number }): Promise<{ stdout: string }> } }
