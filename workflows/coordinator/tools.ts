@@ -150,7 +150,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       }),
       dispatch_bot_computer: tool({
         description: `When asked to use a Bot computer, give an existing issue's work to that Bot. ${ONE_THREAD} The computer must be awake and the person must already have linked a subscription. Follow the authoritative effective execution policy: allow executes, ask uses the existing wait, deny or revocation stops. Do not add another blanket confirmation.`,
-        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional(), suggestionId: id.optional(), newThread: newThreadInput }),
+        inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional(), suggestionId: id.optional(), readOnly: z.boolean().optional().describe('true when the task only reads and reports: no file changes, commit, push or PR.'), newThread: newThreadInput }),
         execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerThread(userId, { ...input, botId: target, ...(sourceEventId ? { sourceEventId } : {}) }, options.toolCallId, scope, execution ?? undefined, botId) : { error: 'botMismatch' } },
       }),
     } : {}),
